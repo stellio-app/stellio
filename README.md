@@ -1,4 +1,4 @@
-# 🎲 Stellio - Gestionnaire de Fichiers 3D
+#  Stellio - Gestionnaire de Fichiers 3D
 
 [![Version](https://img.shields.io/github/v/release/stellio-app/stellio-app)](https://github.com/stellio-app/stellio-app/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
