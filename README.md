@@ -9,11 +9,11 @@
 ## ✨ Fonctionnalités
 
 - 📁 **Multi-sources** : Local, SMB, NFS
-- 🌐 **Téléchargements** : Telegram, Cults3D, Thingiverse
+- 🌐 **Téléchargements** : Telegram
 - 🖼️ **Miniatures auto** : Rendu PyRender professionnel
 - 🏷️ **Tags & Favoris** : Organisation avancée
 - ✂️ **Envoi au Slicer** : Orca, Bambu, Prusa, Cura
-- 🖨️ **Monitoring** : OctoPrint, Klipper, BambuLab
+- 🖨️ **Monitoring** : Klipper
 - 🔧 **Réparation auto** : Fichiers non-manifold
 - 🌍 **Multi-langue** : FR, EN, ES, IT, PT, JA, DE, ZH
 - 🔄 **Mise à jour auto** : Installation en un clic
