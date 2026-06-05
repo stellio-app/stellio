@@ -10,7 +10,7 @@
 [![Python](https://img.shields.io/badge/Python-3.10+-yellow?style=for-the-badge&logo=python)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey?style=for-the-badge)]()
 
-[🌐 Site Officiel](https://stellio-app.com) • [📥 Télécharger](https://github.com/stellio-app/stellio-app/releases/latest) • [📖 Documentation](https://stellio-app.com/docs) • [🐛 Signaler un bug](https://github.com/stellio-app/stellio-app/issues) • [💡 Suggestions](https://github.com/stellio-app/stellio-app/discussions)
+[🌐 Site Officiel](https://stellio-app.com) • [📥 Télécharger](https://github.com/stellio-app/stellio-app/releases/latest) • [🐛 Signaler un bug](https://github.com/stellio-app/stellio-app/issues)
 
 </div>
 
@@ -34,8 +34,6 @@
 
 ### 🌐 Téléchargements Intégrés
 - 📨 **Telegram** : Téléchargez depuis channels et groupes
-- 🎨 **Cults3D** : Accès à votre bibliothèque via API
-- 🧊 **Thingiverse** : Intégration avec token API
 - 📊 **Suivi en temps réel** : Barre de progression avec annulation
 
 ### 🖼️ Miniatures Automatiques
@@ -61,7 +59,7 @@
 - 📈 **Progression** : Suivi d'impression avec estimation de temps
 - 📹 **Caméra** : Flux vidéo MJPEG intégré
 - 📜 **Historique** : Dernière impression et statistiques
-- 🎯 **Support** : Klipper/Moonraker, OctoPrint, BambuLab
+- 🎯 **Support** : Klipper/Moonraker
 
 ### 🔧 Réparation de Maillage
 - 🔍 **Détection automatique** : Fichiers non-manifold
@@ -82,26 +80,6 @@
 - 🎨 **Couleurs de marque** : Stellio, Bambu Lab, Prusa, Voron, Creality
 - 📱 **Interface responsive** : Design épuré et moderne
 
----
-
-## 📸 Aperçu
-
-<div align="center">
-
-| Bibliothèque | Monitoring | Tags |
-|:---:|:---:|:---:|
-| ![Bibliothèque](https://stellio-app.com/screenshots/library.png) | ![Monitoring](https://stellio-app.com/screenshots/monitor.png) | ![Tags](https://stellio-app.com/screenshots/tags.png) |
-
-| Téléchargement | Réparation | Paramètres |
-|:---:|:---:|:---:|
-| ![Download](https://stellio-app.com/screenshots/download.png) | ![Repair](https://stellio-app.com/screenshots/repair.png) | ![Settings](https://stellio-app.com/screenshots/settings.png) |
-
-</div>
-
-> 👉 **Plus de captures sur [stellio-app.com/gallery](https://stellio-app.com/gallery)**
-
----
-
 ## 📥 Installation
 
 ### 🪟 Windows (Recommandé)
@@ -110,40 +88,6 @@
 2. Lancez `Stellio-Setup-x.x.x.exe`
 3. Suivez l'assistant d'installation
 4. Lancez Stellio depuis le menu Démarrer ou le bureau
-
-### Installation Portable
-
-Téléchargez `Stellio-Portable-x.x.x.zip` et extrayez-le n'importe où.
-
-### 🐧 Linux (Bientôt disponible)
-
-Support Linux en développement :
-- AppImage (universel)
-- Package .deb (Ubuntu/Debian)
-- Snap (multi-distributions)
-
-### 💻 Installation depuis les sources
-
-```bash
-# Cloner le repo
-git clone https://github.com/stellio-app/stellio-app.git
-cd stellio-app
-
-# Créer un environnement virtuel
-python -m venv venv
-
-# Activer l'environnement
-# Windows :
-venv\Scripts\activate
-# Linux/Mac :
-source venv/bin/activate
-
-# Installer les dépendances
-pip install -r requirements.txt
-
-# Lancer l'application
-python main.py
-```
 
 ---
 
@@ -176,7 +120,7 @@ python main.py
 | **Base de données** | SQLite3 |
 | **Rendu 3D** | PyRender, Trimesh, PyVista |
 | **Visualisation** | Three.js |
-| **API Externes** | Telegram (Telethon), Cults3D (GraphQL), Thingiverse |
+| **API Externes** | Telegram (Telethon)|
 | **Protocoles** | SMB (smbprotocol), NFS |
 | **Chiffrement** | cryptography (AES-CFB) |
 | **Interface Desktop** | PyWebView |
@@ -191,11 +135,6 @@ python main.py
 - **RAM** : 4 GB minimum (8 GB recommandé)
 - **Stockage** : 500 MB pour l'application + espace pour les miniatures
 - **GPU** : Support OpenGL 3.3+ pour le rendu 3D
-
-### Linux (Bientôt)
-- **OS** : Ubuntu 20.04+, Debian 11+, Fedora 35+
-- **Dépendances** : Python 3.8+, OpenGL, GTK3 ou Qt5
-- **RAM** : 4 GB minimum
 
 ---
 
@@ -222,51 +161,23 @@ Les contributions sont les bienvenues ! Voici comment participer :
 2. Décrivez votre idée et son cas d'usage
 3. Discutez avec la communauté
 
-### Développer
-```bash
-# Fork et clone
-git clone https://github.com/VOTRE-USERNAME/stellio-app.git
-cd stellio-app
-
-# Créer une branche
-git checkout -b ma-fonctionnalite
-
-# Commit et push
-git commit -m "Ajout de ma fonctionnalite"
-git push origin ma-fonctionnalite
-
-# Ouvrir une Pull Request
-```
-
----
-
-## 📖 Documentation
-
-La documentation complète est disponible sur [stellio-app.com/docs](https://stellio-app.com/docs) :
-
-- [🚀 Guide de démarrage](https://stellio-app.com/docs/getting-started)
-- [📁 Configuration des sources](https://stellio-app.com/docs/sources)
-- [📨 Intégration Telegram](https://stellio-app.com/docs/telegram)
-- [🖨️ Monitoring imprimantes](https://stellio-app.com/docs/printers)
-- [❓ FAQ](https://stellio-app.com/docs/faq)
-
 ---
 
 ## 🗺️ Roadmap
 
-### Version 1.1 (Q2 2026)
+### Version 1.1
 - [ ] Support Linux complet (AppImage + .deb)
 - [ ] Intégration Bambu Lab (MQTT)
 - [ ] Export de statistiques d'impression
 - [ ] Thèmes personnalisables
 
-### Version 1.2 (Q3 2026)
+### Version 1.2
 - [ ] Synchronisation multi-appareils (optionnel)
 - [ ] Éditeur de tags en masse
 - [ ] Recherche avancée (métadonnées 3D)
 - [ ] Plugin system
 
-### Version 2.0 (Q4 2026)
+### Version 2.0
 - [ ] Version mobile (Android/iOS)
 - [ ] Intégration cloud (Printables, MakerWorld)
 - [ ] Collaboration en équipe
@@ -279,11 +190,8 @@ La documentation complète est disponible sur [stellio-app.com/docs](https://ste
 Rejoignez la communauté Stellio :
 
 - 🌐 **Site web** : [stellio-app.com](https://stellio-app.com)
-- 💬 **Discord** : [discord.gg/stellio](https://discord.gg/stellio)
-- 🐦 **Twitter** : [@stellio_app](https://twitter.com/stellio_app)
 - 📧 **Email** : contact@stellio-app.com
 - 🐛 **Issues** : [GitHub Issues](https://github.com/stellio-app/stellio-app/issues)
-- 💡 **Discussions** : [GitHub Discussions](https://github.com/stellio-app/stellio-app/discussions)
 
 ---
 
@@ -325,7 +233,6 @@ Si vous aimez Stellio, pensez à :
 
 - ⭐ **Starrer** le repo sur GitHub
 - 🐦 **Partager** sur les réseaux sociaux
-- 💬 **Rejoindre** le Discord
 - 🐛 **Signaler** les bugs
 - 💡 **Proposer** des fonctionnalités
 - ☕ **Sponsoriser** (bientôt disponible)
