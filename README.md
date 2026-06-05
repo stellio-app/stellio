@@ -22,10 +22,3 @@
 
 ### Windows
 Téléchargez le dernier installateur depuis [la page Releases](https://github.com/stellio-app/stellio-app/releases/latest).
-
-### Depuis les sources
-```bash
-git clone https://github.com/stellio-app/stellio-app.git
-cd stellio-app
-pip install -r requirements.txt
-python main.py
