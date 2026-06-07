@@ -33,7 +33,7 @@
 - 🔄 **Automatic Scan**: Real-time detection of new files
 
 ### 🌐 Integrated Downloads
-- 📨 **Telegram**: Download from channels and groups
+- 📨 **Printables**: Download
 - 📊 **Real-Time Tracking**: Progress bar with cancellation support
 
 ### 🖼️ Automatic Thumbnails
@@ -165,28 +165,6 @@ Contributions are welcome! Here is how you can help:
 
 ---
 
-## 🗺️ Roadmap
-
-### Version 1.1
-- [ ] Full Linux support (AppImage + .deb)
-- [ ] Bambu Lab integration (MQTT)
-- [ ] Print statistics export
-- [ ] Customizable themes
-
-### Version 1.2
-- [ ] Multi-device synchronization (optional)
-- [ ] Bulk tag editor
-- [ ] Advanced search (3D metadata)
-- [ ] Plugin system
-
-### Version 2.0
-- [ ] Mobile application (Android/iOS)
-- [ ] Cloud integration (Printables, MakerWorld)
-- [ ] Team collaboration features
-- [ ] Public API
-
----
-
 ## 💬 Community
 
 Join the Stellio community:
@@ -222,7 +200,6 @@ Stellio is made possible thanks to:
 - **[PyRender](https://github.com/mmatl/pyrender)** - Professional 3D rendering
 - **[Trimesh](https://github.com/mikedh/trimesh)** - 3D mesh manipulation
 - **[Flask](https://flask.palletsprojects.com/)** - Lightweight web framework
-- **[Telethon](https://github.com/LonamiWebs/Telethon)** - Telegram client
 - **[PyWebView](https://github.com/r0x0r/pywebview)** - Desktop UI component
 - **[Three.js](https://threejs.org/)** - Web-based 3D visualization
 - **The Maker Community** - Invaluable feedback and suggestions
