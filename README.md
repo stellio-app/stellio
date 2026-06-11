@@ -122,7 +122,6 @@
 | **Database** | SQLite3 |
 | **3D Rendering** | PyRender, Trimesh, PyVista |
 | **Visualization** | Three.js |
-| **External APIs** | Telegram (Telethon) |
 | **Protocols** | SMB (smbprotocol), NFS |
 | **Encryption** | cryptography (AES-CFB) |
 | **Desktop Shell** | PyWebView |
