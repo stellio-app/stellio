@@ -23,11 +23,11 @@ source venv/bin/activate
 echo ""
 echo "[4/6] Installation des dependances Python..."
 pip install --upgrade pip
-pip install pyinstaller flask waitress pywebview numpy pillow matplotlib trimesh pyrender telethon paho-mqtt rarfile py7zr nest-asyncio smbclient cryptography imageio
+pip install pyinstaller flask waitress pywebview numpy pillow matplotlib trimesh pyrender telethon paho-mqtt rarfile py7zr nest-asyncio smbprotocol cryptography imageio
 
 echo ""
 echo "[5/6] Compilation de l'application..."
-python3 -m PyInstaller --name Stellio --onedir --windowed --noconfirm --clean --icon=assets/logo-nom-stellio.ico --copy-metadata imageio --copy-metadata pyrender --copy-metadata trimesh --copy-metadata Pillow --collect-all numpy --collect-all PIL --collect-all matplotlib --hidden-import flask --hidden-import waitress --hidden-import webview --hidden-import trimesh --hidden-import pyrender --hidden-import numpy --hidden-import PIL --hidden-import matplotlib --hidden-import matplotlib.pyplot --hidden-import mpl_toolkits --hidden-import mpl_toolkits.mplot3d --hidden-import mpl_toolkits.mplot3d.art3d --hidden-import matplotlib.backends --hidden-import matplotlib.backends.backend_agg --hidden-import matplotlib.figure --hidden-import matplotlib.axes --hidden-import smbclient --hidden-import cryptography --collect-all telethon --hidden-import paho.mqtt --hidden-import rarfile --hidden-import py7zr --hidden-import nest_asyncio launcher.py
+python3 -m PyInstaller --name Stellio --onedir --windowed --noconfirm --clean --icon=assets/logo-nom-stellio.ico --copy-metadata imageio --copy-metadata pyrender --copy-metadata trimesh --copy-metadata Pillow --collect-all numpy --collect-all PIL --collect-all matplotlib --hidden-import flask --hidden-import waitress --hidden-import webview --hidden-import trimesh --hidden-import pyrender --hidden-import numpy --hidden-import PIL --hidden-import matplotlib --hidden-import matplotlib.pyplot --hidden-import mpl_toolkits --hidden-import mpl_toolkits.mplot3d --hidden-import mpl_toolkits.mplot3d.art3d --hidden-import matplotlib.backends --hidden-import matplotlib.backends.backend_agg --hidden-import matplotlib.figure --hidden-import matplotlib.axes --hidden-import smbprotocol --hidden-import cryptography --collect-all telethon --hidden-import paho.mqtt --hidden-import rarfile --hidden-import py7zr --hidden-import nest_asyncio launcher.py
 
 echo ""
 echo "[6/6] Configuration finale..."
