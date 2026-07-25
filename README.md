@@ -104,7 +104,7 @@ Que vous soyez maker débutant ou imprimeur expérimenté avec plusieurs machine
 <table>
 <tr>
 <td><img src="library.png" alt="Bibliothèque" width="400"/><br><em>Bibliothèque avec miniatures</em></td>
-<td><img src="printers.png" alt="Imprimantes" width="400"/><br><em>Monitoring imprimantes</em></td>
+<td><img src="monitoring.png" alt="Imprimantes" width="400"/><br><em>Monitoring imprimantes</em></td>
 </tr>
 <tr>
 <td><img src="slicer.png" alt="Slicer" width="400"/><br><em>Recommandation IA de profil</em></td>
