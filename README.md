@@ -176,13 +176,13 @@ Stellio détecte automatiquement :
 | `Échap` | Fermer modale / vider recherche |
 
 ### Structure du projet
-stellio-app/
-├── main.py                 # Backend Flask + Desktop
-├── script.js               # Frontend JavaScript
-├── index.html              # Interface principale
-├── style.css               # Styles
-├── assets/                 # Logos, icônes
-├── languages/              # Fichiers de traduction (JSON)
+stellio-app/ <br>
+├── main.py                 # Backend Flask + Desktop<br>
+├── script.js               # Frontend<br> JavaScript
+├── index.html              # Interface<br> principale<br>
+├── style.css               # Styles<br>
+├── assets/                 # Logos, icônes<br>
+├── languages/              # Fichiers de traduction (JSON)<br>
 ├── requirements.txt        # Dépendances Python
 
 ---
