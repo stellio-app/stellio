@@ -7,7 +7,7 @@
 [![Version](https://img.shields.io/badge/version-0.2.6-blue.svg)](https://github.com/stellio-app/stellio-app/releases)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/flask-3.0+-green.svg)](https://flask.palletsprojects.com/)
-[![License](https://img.shields.io/badge/license-propriétaire-orange.svg)](./LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
 
@@ -176,8 +176,6 @@ Stellio détecte automatiquement :
 | `Échap` | Fermer modale / vider recherche |
 
 ### Structure du projet
-
-```
 stellio-app/
 ├── main.py                 # Backend Flask + Desktop
 ├── script.js               # Frontend JavaScript
@@ -186,7 +184,6 @@ stellio-app/
 ├── assets/                 # Logos, icônes
 ├── languages/              # Fichiers de traduction (JSON)
 ├── requirements.txt        # Dépendances Python
-```
 
 ---
 
@@ -221,11 +218,9 @@ Utilisez le template de bug report et incluez :
 
 ## 📜 Licence
 
-© 2026 Stellio Project. Tous droits réservés.
+Ce projet est sous licence libre **GNU Affero General Public License v3.0** - consultez le fichier [LICENSE](./LICENSE) pour plus de détails.
 
-Ce projet est distribué sous licence propriétaire. Consultez le fichier [LICENSE](./LICENSE) pour plus de détails.
-
-> 💡 **Note** : Le code source est disponible pour transparence et contribution communautaire, mais la redistribution commerciale n'est pas autorisée sans accord préalable.
+> 💡 **En résumé** : Vous êtes libre de copier, modifier et distribuer ce logiciel. Si vous modifiez Stellio ou l'utilisez pour fournir un service hébergé sur un réseau, vous devez publier l'intégralité du code source sous la même licence AGPLv3.
 
 ---
 
