@@ -135,10 +135,10 @@ Stellio détecte automatiquement :
 
 ### Imprimantes
 
-| Type | Protocole | Fonctionnalités |
-|------|-----------|-----------------|
-| OctoPrint | HTTP API | Monitoring, upload, caméra |
-| Klipper/Moonraker | HTTP API | Monitoring, upload, caméra, heures exactes |
+| Type | Protocole | Fonctionnalités |<br>
+|------|-----------|-----------------|<br>
+| OctoPrint | HTTP API | Monitoring, upload, caméra |<br>
+| Klipper/Moonraker | HTTP API | Monitoring, upload, caméra, heures exactes |<br>
 | Bambu Lab | MQTT | Monitoring temps réel, AMS, caméra |
 
 ---
@@ -164,22 +164,22 @@ Stellio détecte automatiquement :
 
 ### Raccourcis clavier
 
-| Raccourci | Action |
-|-----------|--------|
-| `Ctrl+F` | Rechercher |
-| `Ctrl+N` | Nouveau téléchargement |
-| `Ctrl+,` | Paramètres |
-| `Alt+1-8` | Navigation rapide |
-| `F` | Toggle favoris |
-| `T` | Gestionnaire de tags |
-| `?` | Aide raccourcis |
-| `Échap` | Fermer modale / vider recherche |
+| Raccourci | Action |<br>
+|-----------|--------|<br>
+| `Ctrl+F` | Rechercher |<br>
+| `Ctrl+N` | Nouveau téléchargement |<br>
+| `Ctrl+,` | Paramètres |<br>
+| `Alt+1-8` | Navigation rapide |<br>
+| `F` | Toggle favoris |<br>
+| `T` | Gestionnaire de tags |<br>
+| `?` | Aide raccourcis |<br>
+| `Échap` | Fermer modale / vider recherche |<br>
 
 ### Structure du projet
 stellio-app/ <br>
 ├── main.py                 # Backend Flask + Desktop<br>
 ├── script.js               # Frontend<br> JavaScript
-├── index.html              # Interface<br> principale<br>
+├── index.html              # Interface principale<br>
 ├── style.css               # Styles<br>
 ├── assets/                 # Logos, icônes<br>
 ├── languages/              # Fichiers de traduction (JSON)<br>
@@ -204,7 +204,7 @@ Les contributions sont les bienvenues ! 🎉
 ### Guidelines
 - Respectez le style de code existant
 - Ajoutez des commentaires en français ou anglais
-- Testez vos modifications sur Windows et Linux si possible
+- Testez vos modifications sur Windows si possible
 - Mettez à jour la documentation si nécessaire
 
 ### Signaler un bug
