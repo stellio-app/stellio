@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🌟 Stellio
+#  Stellio
 
 ### Le gestionnaire de fichiers 3D ultime pour makers et imprimeurs 3D
 
