@@ -46,7 +46,6 @@ Que vous soyez maker débutant ou imprimeur expérimenté avec plusieurs machine
 - 🔎 **Recherche sémantique** en langage naturel
 - 🎯 **Recommandation de profil slicer** basée sur la géométrie + historique de réussite
 - 🩺 **S.O.S Print** : diagnostic d'échec d'impression (avec analyse photo)
-- ☁️ Fallback cloud gratuit (Pollinations) si Ollama indisponible
 
 ### 🖨️ Gestion des imprimantes
 - 🔌 Support **OctoPrint**, **Klipper/Moonraker**, **Bambu Lab** (MQTT)
@@ -153,7 +152,7 @@ Stellio détecte automatiquement :
 | Desktop | pywebview |
 | Rendu 3D | PyRender, Matplotlib, Three.js |
 | Maillage | trimesh, pymeshfix, shapely |
-| IA | Ollama (local), Pollinations (cloud) |
+| IA | Ollama (local) |
 | Réseau | paho-mqtt, smbclient, requests |
 | Chiffrement | cryptography (AES-CFB) |
 | Archives | zipfile, rarfile, py7zr, tarfile |
