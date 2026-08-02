@@ -1,6 +1,6 @@
 <div align="center">
 
-#  Stellio
+#  <img src="https://stellio-app.com/assets/logo-nom-stellio.png" alt="Stellio Logo" width="200"/>
 
 ### Le gestionnaire de fichiers 3D ultime pour makers et imprimeurs 3D
 
@@ -13,7 +13,7 @@
 
 [🚀 Installation](#-installation) • [✨ Fonctionnalités](#-fonctionnalités) • [📖 Documentation](#-documentation) • [🤝 Contribuer](#-contribuer) • [📜 Licence](#-licence)
 
-<img src="https://stellio-app.com/assets/logo-nom-stellio.png" alt="Stellio Logo" width="200"/>
+<img src="assets/logo-nom-stellio.png" alt="Stellio Logo" width="200"/>
 
 </div>
 
