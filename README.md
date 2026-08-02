@@ -13,7 +13,7 @@
 
 [🚀 Installation](#-installation) • [✨ Fonctionnalités](#-fonctionnalités) • [📖 Documentation](#-documentation) • [🤝 Contribuer](#-contribuer) • [📜 Licence](#-licence)
 
-<img src="assets/logo-nom-stellio.png" alt="Stellio Logo" width="200"/>
+<img src="https://stellio-app.com/assets/logo-nom-stellio.png" alt="Stellio Logo" width="200"/>
 
 </div>
 
