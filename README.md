@@ -177,7 +177,7 @@ Stellio détecte automatiquement :
 ### Structure du projet
 stellio-app/ <br>
 ├── main.py                 # Backend Flask + Desktop<br>
-├── script.js               # Frontend<br> JavaScript
+├── script.js               # Frontend JavaScript<br>
 ├── index.html              # Interface principale<br>
 ├── style.css               # Styles<br>
 ├── assets/                 # Logos, icônes<br>
