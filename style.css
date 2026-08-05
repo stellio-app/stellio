@@ -157,6 +157,17 @@ body {
 /* ============================================
    🔘 BOUTONS
    ============================================ */
+.auth-buttons-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 15px;
+}
+
+.auth-buttons-row .btn {
+    flex: 1;
+}
+
 .btn {
     display: inline-flex; 
     align-items: center; 
@@ -176,6 +187,10 @@ body {
     width: 100%; 
 }
 
+.btn-secondary {
+    background: var(--text-secondary); 
+    color: #fff; 
+}	
 .btn-primary { 
     background: var(--accent); 
     color: #fff; 
@@ -403,6 +418,44 @@ body {
 
 .input-group input[type="password"] { 
     padding-right: 40px; 
+}
+
+.security-question-select {
+    width: 100%;
+    padding: 12px 26px 12px 38px;
+    background-color: var(--bg-input);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 10.5px;
+    letter-spacing: -0.1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.security-question-select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.security-question-select:invalid {
+    color: var(--text-muted);
+}
+
+.security-question-select option {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
 }
 
 /* ============================================
