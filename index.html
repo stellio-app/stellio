@@ -14,13 +14,13 @@
     <meta name="theme-color" content="#1a1d2e">
     <link rel="stylesheet" href="style.css?v=20260513">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/vendor/fontawesome/css/all.min.css">
+	<link rel="stylesheet" href="assets/vendor/mdi/css/materialdesignicons.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/3MFLoader.js"></script>
-	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
 </head>
 <body>
     <div id="auth-screen" class="auth-screen">
@@ -48,8 +48,8 @@
                     </div>
                     <p class="auth-subtitle" style="margin-top:14px; margin-bottom:6px; text-align:left;" data-i18n="auth.security_question_intro">Question secrète (seconde protection pour la récupération du compte) :</p>
                     <div class="input-group">
-                        <i class="fa-solid fa-circle-question"></i>
-                        <select id="reg-security-question" required style="width:100%; background:transparent; border:none; color:inherit; font-size:inherit;">
+                        <select id="reg-security-question" class="security-question-select" required>
+                            <option value="" selected disabled hidden>Choisissez une question secrète</option>
                             <option value="pet" data-i18n="auth.security_q_pet">Le nom de votre premier animal de compagnie ?</option>
                             <option value="city" data-i18n="auth.security_q_city">La ville où vous êtes né(e) ?</option>
                             <option value="school" data-i18n="auth.security_q_school">Le nom de votre école primaire ?</option>
@@ -61,13 +61,18 @@
                         <i class="fa-solid fa-pen"></i>
                         <input type="text" id="reg-security-question-custom" data-i18n-placeholder="auth.security_question_custom_placeholder" placeholder="Votre question personnalisée" autocomplete="off">
                     </div>
-                    <div class="input-group">
+                    <div class="input-group hidden" id="reg-security-answer-group">
                         <i class="fa-solid fa-key"></i>
                         <input type="text" id="reg-security-answer" data-i18n-placeholder="auth.security_answer_placeholder" placeholder="Réponse" required autocomplete="off">
                     </div>
-                    <button type="submit" class="btn btn-primary" data-i18n="auth.create_account_btn">
-                         Créer le compte
-                    </button>
+					<div class="auth-buttons-row">
+						<button type="submit" class="btn btn-primary" data-i18n="auth.create_account_btn">
+							 Créer le compte
+						</button>
+						<button type="button" class="btn btn-ghost btn-sm" onclick="showPanel('login-panel'); return false;" data-i18n="actions.back">
+							Retour
+						</button>
+					</div>					
                 </form>
             </div>
             
@@ -272,7 +277,7 @@
 					<div class="user-avatar">
 						<i class="fa-solid fa-user"></i>
 					</div>
-					<span id="current-username" style="flex:1; font-size:13px; color:var(--text-secondary);" data-i18n="common.user">Utilisateur</span>					
+					<span id="current-username" style="flex:1; font-size:13px; color:var(--text-secondary);">Utilisateur</span>					
 				</div>
 			</div>
         </aside>
@@ -758,11 +763,49 @@
                                         <option value="superslicer.exe">SuperSlicer</option>
                                         <option value="Creality Print.exe">Creality Print</option>
                                         <option value="Cura.exe">Ultimaker Cura</option>
-										<option value="UltiMaker-Cura.exe">Elegoo slicer</option>
-										<option value="flash studio.exe">Flashforge studio</option>
+                                        <option value="ElegooSlicer.exe">Elegoo Slicer</option>
+                                        <option value="AnycubicSlicerNext.exe">Anycubic Slicer Next</option>
+                                        <option value="Anycubic-Slicer.exe">Anycubic Slicer</option>
+                                        <option value="Simplify3D.exe">Simplify3D</option>
+                                        <option value="ideaMaker.exe">ideaMaker</option>
+                                        <option value="FlashPrint.exe">FlashPrint</option>
+                                        <option value="LycheeSlicer.exe">Lychee Slicer</option>
+                                        <option value="CraftWare.exe">CraftWare</option>
+                                        <option value="MatterControl.exe">MatterControl</option>
+                                        <option value="MakerBotPrint.exe">MakerBot Print</option>
+                                        <option value="Voxelizer.exe">Voxelizer</option>
+                                        <option value="slic3r.exe">Slic3r</option>
+                                        <option value="KISSlicer.exe">KISSlicer</option>
                                     </select>
                                 </div>
                                 <p class="settings-hint" style="margin-top:8px;" data-i18n="settings.slicer_desc">Ouvre les fichiers STL/3MF directement dans ton slicer.</p>
+
+                                <div class="settings-row" style="margin-top:14px;">
+                                    <label data-i18n="settings.preferred_slicer">Slicer préféré (détection auto)</label>
+                                    <select id="preferred-slicer-select" class="settings-select">
+                                        <option value="" data-i18n="settings.slicer_select">Sélectionnez un slicer</option>
+                                        <option value="orcaslicer">OrcaSlicer</option>
+                                        <option value="bambustudio">Bambu Studio</option>
+                                        <option value="prusaslicer">PrusaSlicer</option>
+                                        <option value="superslicer">SuperSlicer</option>
+                                        <option value="crealityprint">Creality Print</option>
+                                        <option value="cura">Ultimaker Cura</option>
+                                        <option value="elegooslicer">Elegoo Slicer</option>
+                                        <option value="anycubicslicernext">Anycubic Slicer Next</option>
+                                        <option value="anycubicslicer">Anycubic Slicer</option>
+                                        <option value="simplify3d">Simplify3D</option>
+                                        <option value="ideamaker">ideaMaker</option>
+                                        <option value="flashprint">FlashPrint</option>
+                                        <option value="lycheeslicer">Lychee Slicer</option>
+                                        <option value="craftware">CraftWare</option>
+                                        <option value="mattercontrol">MatterControl</option>
+                                        <option value="makerbotprint">MakerBot Print</option>
+                                        <option value="voxelizer">Voxelizer</option>
+                                        <option value="slic3r">Slic3r</option>
+                                        <option value="kisslicer">KISSlicer</option>
+                                    </select>
+                                </div>
+                                <p class="settings-hint" style="margin-top:8px;" data-i18n="settings.preferred_slicer_desc">Quand plusieurs slicers sont détectés sur ta machine (pré-estimation de découpe, etc.), celui-ci est prioritaire.</p>
 
                                 <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--border);">
                                     <label style="font-size:13px; font-weight:500;" data-i18n="settings.slicer_profiles_title">Mes profils de slicer</label>
@@ -994,7 +1037,7 @@
 
                         <div class="accord-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
-                                <span><i class="fa-solid fa-box-archive"></i> <span data-i18n="settings.backup">Sauvegarde &amp; données</span></span>
+                                <span><i class="fa-solid fa-box-archive"></i> <span data-i18n="settings.backup">Sauvegarde et données</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
                             </div>
                             <div class="accord-body" style="display:flex; flex-direction:column; gap:14px;">
@@ -1195,6 +1238,13 @@
 							</div>
 
 							<div class="input-group">
+								<label for="sosprint-printer-select">Imprimante concernée <span class="sosprint-optional-tag" data-i18n="sosprint.optional">(facultatif)</span></label>
+								<select id="sosprint-printer-select" style="width:100%;">
+									<option value="">Non précisé</option>
+								</select>
+							</div>
+
+							<div class="input-group">
 								<label for="sosprint-description" data-i18n="sosprint.describe_problem">Décrivez le problème</label>
 								<textarea id="sosprint-description" rows="4" data-i18n-placeholder="sosprint.describe_placeholder" placeholder="ex : Mes couches se séparent en hauteur sur les pièces hautes, ou le plastique fait des fils entre les pièces..." maxlength="2000" required></textarea>
 							</div>
@@ -1231,6 +1281,11 @@
 									<i class="fa-solid fa-stethoscope"></i> <span data-i18n="sosprint.run_diagnostic">Lancer le diagnostic</span>
 								</button>
 							</div>
+						</div>
+
+						<div id="sosprint-recurring-hint" style="display:none; align-items:flex-start; gap:8px; padding:10px 12px; margin-bottom:14px; background:#f59e0b15; border:1px solid #f59e0b40; border-radius:var(--radius); color:#f59e0b; font-size:12.5px;">
+							<i class="fa-solid fa-clock-rotate-left" style="margin-top:2px;"></i>
+							<div id="sosprint-recurring-hint-text"></div>
 						</div>
 
 						<div id="sosprint-result" class="sosprint-result" style="display:none;">
