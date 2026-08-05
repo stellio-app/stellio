@@ -1449,10 +1449,11 @@ def _set_security_headers(response):
     response.headers.setdefault(
         'Content-Security-Policy',
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: blob:; "
-        "connect-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; "
+        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; "
+        "img-src 'self' data: blob: http: https:; "
+        "connect-src 'self' http: https: ws: wss: blob: data:; "
+        "media-src 'self' http: https:; "
         "object-src 'none'; "
         "base-uri 'self'; "
         "frame-ancestors 'self'"
