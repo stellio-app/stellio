@@ -9476,6 +9476,7 @@ def _call_ollama(base_url: str, model: str, prompt: str, system: str = "",
                  temperature: float = 0.2, num_predict: int = 200,
                  timeout: int = 300, images: list = None) -> str:
     payload = {"model": model, "prompt": prompt, "stream": False,
+               "think": False, 
                "options": {"temperature": temperature, "num_predict": num_predict}}
     if system:
         payload["system"] = system
@@ -9483,7 +9484,15 @@ def _call_ollama(base_url: str, model: str, prompt: str, system: str = "",
         payload["images"] = images
     r = requests.post(f"{base_url}/api/generate", json=payload, timeout=timeout)
     r.raise_for_status()
-    return (r.json().get('response') or '').strip()
+    data = r.json()
+    text = (data.get('response') or '').strip()
+    if not text and (data.get('thinking') or '').strip():
+        app_logger.info("[AI] Réponse vide (budget consumé en thinking), nouvel essai avec num_predict élargi")
+        payload["options"]["num_predict"] = max(num_predict * 4, 1024)
+        r = requests.post(f"{base_url}/api/generate", json=payload, timeout=timeout)
+        r.raise_for_status()
+        text = (r.json().get('response') or '').strip()
+    return text
 
 class AIDisabledError(RuntimeError):
     pass
