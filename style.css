@@ -3053,6 +3053,16 @@ kbd {
 }
 
 /* ============================================
+   👁️ MASQUAGE CONTEXTUEL DE LA BARRE D'EN-TÊTE
+   Cache la recherche / tri / vue / sélection / compteur
+   sur les pages qui n'en ont pas besoin (Paramètres,
+   Statistiques, Historique, etc.)
+   ============================================ */
+.header-hide {
+    display: none !important;
+}
+
+/* ============================================
    📊 FOOTER BAR
    ============================================ */
 .header-library-info {
