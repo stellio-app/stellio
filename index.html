@@ -49,7 +49,7 @@
                     <p class="auth-subtitle" style="margin-top:14px; margin-bottom:6px; text-align:left;" data-i18n="auth.security_question_intro">Question secrète (seconde protection pour la récupération du compte) :</p>
                     <div class="input-group">
                         <select id="reg-security-question" class="security-question-select" required>
-                            <option value="" selected disabled hidden>Choisissez une question secrète</option>
+                            <option value="" selected disabled hidden data-i18n="auth.security_q_choose">Choisissez une question secrète</option>
                             <option value="pet" data-i18n="auth.security_q_pet">Le nom de votre premier animal de compagnie ?</option>
                             <option value="city" data-i18n="auth.security_q_city">La ville où vous êtes né(e) ?</option>
                             <option value="school" data-i18n="auth.security_q_school">Le nom de votre école primaire ?</option>
@@ -277,7 +277,7 @@
 					<div class="user-avatar">
 						<i class="fa-solid fa-user"></i>
 					</div>
-					<span id="current-username" style="flex:1; font-size:13px; color:var(--text-secondary);">Utilisateur</span>					
+					<span id="current-username" style="flex:1; font-size:13px; color:var(--text-secondary);" data-i18n="common.user">Utilisateur</span>					
 				</div>
 			</div>
         </aside>
@@ -674,11 +674,7 @@
                                     </label>
                                 </div>
                                 <div id="ollama-config-block" style="display:flex; flex-direction:column; gap:12px;">
-                                    <div>
-                                        <label style="font-size:13px; color:var(--text-secondary); font-weight:500;" data-i18n="settings.ollama_url">URL du serveur Ollama</label>
-                                        <input id="ollama-url-input" type="text" placeholder="http://localhost:11434"
-                                            style="margin-top:6px; width:100%; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px; box-sizing:border-box;">
-                                    </div>
+
                                     <div>
                                         <label style="font-size:13px; color:var(--text-secondary); font-weight:500;" data-i18n="settings.ollama_model">Modèle</label>
                                         <div style="display:flex; gap:8px; margin-top:6px;">
@@ -731,14 +727,6 @@
                                                             <i class="fa-regular fa-copy"></i>
                                                         </button>
                                                     </div>
-                                                    <p class="settings-hint" data-i18n="settings.ollama_step2_alt">Ou <code>ollama pull mistral</code> pour un modèle plus léger.</p>
-                                                </div>
-                                            </div>
-                                            <div class="ollama-guide-step">
-                                                <div class="ollama-guide-step-num">3</div>
-                                                <div class="ollama-guide-step-content">
-                                                    <strong data-i18n="settings.ollama_step3_title">Se connecter depuis Stellio</strong>
-                                                    <p data-i18n="settings.ollama_step3_text">Laissez l'URL par défaut ci-dessus (<code>http://localhost:11434</code>) et cliquez sur « Tester » : vos modèles installés apparaîtront automatiquement dans la liste.</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -1238,9 +1226,9 @@
 							</div>
 
 							<div class="input-group">
-								<label for="sosprint-printer-select">Imprimante concernée <span class="sosprint-optional-tag" data-i18n="sosprint.optional">(facultatif)</span></label>
+								<label for="sosprint-printer-select"><span data-i18n="sosprint.printer_concerned">Imprimante concernée</span> <span class="sosprint-optional-tag" data-i18n="sosprint.optional">(facultatif)</span></label>
 								<select id="sosprint-printer-select" style="width:100%;">
-									<option value="">Non précisé</option>
+									<option value="" data-i18n="sosprint.not_specified">Non précisé</option>
 								</select>
 							</div>
 
@@ -1667,7 +1655,7 @@
                 <div class="about-logo-section">
                     <img src="assets/logo-stellio.png" alt="Stellio Logo" class="stellio-logo-img">
                     <h1>STELLIO</h1>
-                    <span style="font-weight: bold; color: var(--accent);">V</span><span id="app-version-display" style="font-weight: bold; color: var(--accent);" data-i18n="common.loading">Chargement...</span>
+                    <span style="font-weight: bold; color: var(--accent);">V</span><span id="app-version-display" style="font-weight: bold; color: var(--accent);">Chargement...</span>
                 </div>
                 <p class="about-description" data-i18n="about.description">
                     Stellio est un gestionnaire de fichiers 3D moderne et léger, conçu pour les makers, imprimeurs 3D et passionnés de modélisation. Il centralise vos fichiers STL, 3MF et OBJ, génère des miniatures haute qualité via PyVista et s'intègre directement avec votre Slicer.
