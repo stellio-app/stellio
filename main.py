@@ -26,14 +26,9 @@ import numpy as np
 import smbclient
 from PIL import Image, ImageDraw
 import base64
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from pathlib import Path
 from functools import wraps
 from flask import Flask, request, jsonify, session, send_file
-import pyrender
 import trimesh.transformations as tra
 import io
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -50,7 +45,7 @@ except ImportError:
     print("[SECURITE] ⚠️  defusedxml non installé — parsing XML des .3mf non protégé contre XXE. Ajouter 'defusedxml' à requirements.txt")
 import time
 import tempfile
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, wait as futures_wait, FIRST_COMPLETED
 import queue
 import collections
 import requests
@@ -61,6 +56,7 @@ import threading
 import glob
 import atexit
 import platform
+import multiprocessing as mp
 
 # ============================================
 # 🌐 VARIABLES GLOBALES & QUEUES
@@ -97,12 +93,11 @@ def mark_repair_attempted(file_path):
     _save_repair_ignored()
 
 pyrender_lock = threading.Lock()  
-NUM_THUMB_WORKERS = max(1, min(2, (os.cpu_count() or 2) - 1))
-THUMB_GENERATION_TIMEOUT = 25       
-THUMB_GENERATION_TIMEOUT_PER_MB = 1.5 
-THUMB_GENERATION_TIMEOUT_MAX = 120  
-thumb_failure_notifications = queue.Queue()  
-_render_executor = ThreadPoolExecutor(max_workers=NUM_THUMB_WORKERS, thread_name_prefix="thumb-render")
+NUM_THUMB_WORKERS = max(2, min(6, (os.cpu_count() or 4) - 1))
+THUMB_GENERATION_TIMEOUT = 90
+THUMB_GENERATION_TIMEOUT_PER_MB = 5
+THUMB_GENERATION_TIMEOUT_MAX = 600 
+thumb_failure_notifications = queue.Queue()
 
 _thumb_session_lock = threading.Lock()
 _thumb_session_active = False       
@@ -1450,7 +1445,8 @@ def _set_security_headers(response):
         'Content-Security-Policy',
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; "
-        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; "
+        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
         "img-src 'self' data: blob: http: https:; "
         "connect-src 'self' http: https: ws: wss: blob: data:; "
         "media-src 'self' http: https:; "
@@ -1752,14 +1748,7 @@ def process_generation_queue():
                     timed_out = False
                     timeout_s = get_thumb_timeout(file_path)
                     try:
-                        future = _render_executor.submit(generate_thumbnail_pyrender, file_path, thumb_path)
-                        success = future.result(timeout=timeout_s)
-                    except FuturesTimeoutError:
-                        timed_out = True
-                        app_logger.warning(
-                            f"[TIMEOUT #{worker_id}] Génération trop longue (> {timeout_s:.0f}s), "
-                            f"passage au fichier suivant: {os.path.basename(file_path)}"
-                        )
+                        success = generate_thumbnail_pyrender(file_path, thumb_path, timeout_s=timeout_s)
                     except Exception as render_err:
                         app_logger.warning(f"[ERROR #{worker_id}] Génération {os.path.basename(file_path)}: {render_err}")
 
@@ -1816,7 +1805,7 @@ def process_generation_queue():
                 for source in sources:
                     if source['type'] == 'folder' and os.path.exists(source['path']):
                         for root, dirs, files in os.walk(source['path']):
-                            for f in files:
+                            for f in sorted(files, key=str.lower):
                                 if f.lower().endswith(('.stl', '.obj', '.3mf')):
                                     file_path = os.path.join(root, f).replace('\\', '/')
                                     if file_path in ignored_files_cache:
@@ -2024,7 +2013,37 @@ def _draw_fallback_cube(draw, center):
         (cube_center[0] - cube_size//2, cube_center[1])
     ], fill=(78, 161, 211, 180), outline=(100, 180, 230, 255))
 
-def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(320, 320)):
+def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(320, 320), timeout_s=None):
+    if timeout_s is None:
+        timeout_s = get_thumb_timeout(stl_path)
+
+    result = {}
+
+    def _run():
+        try:
+            result['value'] = _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution)
+        except Exception as e:
+            result['error'] = e
+
+    worker = threading.Thread(target=_run, daemon=True, name="thumb-render-1shot")
+    worker.start()
+    worker.join(timeout=timeout_s)
+
+    if worker.is_alive():
+        app_logger.warning(
+            f"[TIMEOUT] Rendu miniature trop long (> {timeout_s:.0f}s), "
+            f"abandon et passage au fichier suivant: {os.path.basename(stl_path)}"
+        )
+        return False
+
+    if 'error' in result:
+        app_logger.warning(f"[ERROR] Rendu miniature {os.path.basename(stl_path)}: {result['error']}")
+        return False
+
+    return bool(result.get('value', False))
+
+
+def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(320, 320)):
     try:
         is_smb = stl_path.startswith('//') or stl_path.startswith('\\\\')
         is_virtual = is_virtual_archive_path(stl_path)
@@ -2094,13 +2113,19 @@ def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(320, 320)):
             rot_fix = tra.rotation_matrix(np.radians(-90), [1, 0, 0])
             mesh.apply_transform(rot_fix)
 
-            if sys.platform == 'win32':
-                ok = _generate_thumbnail_raster(mesh, thumb_path, resolution)
-                if tmp_path and os.path.exists(tmp_path):
-                    os.unlink(tmp_path)
-                return ok
+            MAX_RENDER_FACES = 15000
+            if len(mesh.faces) > MAX_RENDER_FACES:
+                try:
+                    import fast_simplification
+                    mesh = mesh.simplify_quadric_decimation(face_count=MAX_RENDER_FACES)
+                except Exception as simplify_err:
+                    app_logger.info(
+                        f"[RENDER] Décimation rapide indisponible ({simplify_err}), "
+                        f"rendu du mesh complet ({len(mesh.faces)} faces)"
+                    )
 
             try:
+                import pyrender
                 with pyrender_lock:
                     scene = pyrender.Scene(bg_color=[0.10, 0.10, 0.12, 1.0])
                     material = pyrender.MetallicRoughnessMaterial(
@@ -2169,7 +2194,7 @@ def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(320, 320)):
                     r.delete()
 
                 img = Image.fromarray(color)
-                img.save(thumb_path, quality=95, optimize=True)
+                img.save(thumb_path, quality=92, method=6)
 
                 if tmp_path and os.path.exists(tmp_path):
                     os.unlink(tmp_path)
@@ -2199,10 +2224,11 @@ def _generate_thumbnail_raster(mesh, thumb_path, resolution=(320, 320)):
         faces = mesh.faces
         if len(vertices) == 0 or len(faces) == 0:
             return False
-        MAX_RASTER_FACES = 18000
+
+        MAX_RASTER_FACES = 40000
         if len(faces) > MAX_RASTER_FACES:
             try:
-                import fast_simplification  
+                import fast_simplification
                 mesh = mesh.simplify_quadric_decimation(face_count=MAX_RASTER_FACES)
                 vertices = mesh.vertices
                 faces = mesh.faces
@@ -2214,12 +2240,12 @@ def _generate_thumbnail_raster(mesh, thumb_path, resolution=(320, 320)):
                 stride = (len(faces) // MAX_RASTER_FACES) + 1
                 faces = faces[::stride]
 
-        ss = 2
+        ss = 3
         w, h = resolution[0] * ss, resolution[1] * ss
 
         camera_dir = np.array([1.0, 1.0, 1.0])
         camera_dir /= np.linalg.norm(camera_dir)
-        forward = -camera_dir  
+        forward = -camera_dir
         world_up = np.array([0.0, 1.0, 0.0])
         right = np.cross(forward, world_up)
         right /= np.linalg.norm(right)
@@ -2229,93 +2255,83 @@ def _generate_thumbnail_raster(mesh, thumb_path, resolution=(320, 320)):
         v = vertices - bbox_center
         cam_x = v @ right
         cam_y = v @ up
-        cam_z = v @ forward 
+        cam_z = v @ forward
 
         extent = max(np.ptp(cam_x), np.ptp(cam_y), 1e-6)
         scale = (min(w, h) * 0.80) / extent
         px_all = (cam_x * scale) + w / 2.0
         py_all = (h / 2.0) - (cam_y * scale)
 
-        tri_px = px_all[faces]  
+        v0 = vertices[faces[:, 0]]
+        v1 = vertices[faces[:, 1]]
+        v2 = vertices[faces[:, 2]]
+        face_normals = np.cross(v1 - v0, v2 - v0)
+        n_len = np.linalg.norm(face_normals, axis=1, keepdims=True)
+        n_len[n_len == 0] = 1.0
+        face_normals = face_normals / n_len
+
+        face_height = (v0[:, 1] + v1[:, 1] + v2[:, 1]) / 3.0
+
+        view_dot = face_normals @ forward
+        visible_mask = view_dot < 0
+        if visible_mask.any() and visible_mask.sum() < len(faces):
+            faces = faces[visible_mask]
+            face_normals = face_normals[visible_mask]
+            face_height = face_height[visible_mask]
+
+        if len(faces) == 0:
+            return False
+
+        AMBIENT = 0.24
+        KEY_DIFFUSE = 0.58
+        FILL_DIFFUSE = 0.22
+        SPECULAR_COLOR = (0x18 / 255.0)
+        SHININESS = 55.0
+        base_color = np.array([0x4e, 0xa1, 0xd3], dtype=np.float64)
+
+        key_dir = -0.30 * right + 0.55 * up - 0.78 * forward
+        key_dir /= np.linalg.norm(key_dir)
+        fill_dir = 0.45 * right - 0.10 * up - 0.55 * forward
+        fill_dir /= np.linalg.norm(fill_dir)
+
+        n_dot_key = np.clip(face_normals @ key_dir, 0.0, 1.0)
+        n_dot_fill = np.clip(face_normals @ fill_dir, 0.0, 1.0)
+
+        y_min, y_max = float(vertices[:, 1].min()), float(vertices[:, 1].max())
+        height_norm = np.clip((face_height - y_min) / max(y_max - y_min, 1e-6), 0.0, 1.0)
+        ao = 0.68 + 0.32 * height_norm
+
+        diffuse_ambient = np.clip(
+            (AMBIENT + KEY_DIFFUSE * n_dot_key + FILL_DIFFUSE * n_dot_fill) * ao,
+            0.0, 1.05
+        )
+        specular_term = SPECULAR_COLOR * np.power(n_dot_key, SHININESS)
+        face_colors = np.clip(
+            base_color[None, :] * diffuse_ambient[:, None] + specular_term[:, None] * 255.0,
+            0, 255
+        ).astype(np.uint8)
+
+        avg_z = cam_z[faces].mean(axis=1)
+        order = np.argsort(-avg_z)
+
+        tri_px = px_all[faces]
         tri_py = py_all[faces]
-        tri_pz = cam_z[faces]   
 
-        AMBIENT = 0.32
-        DIFFUSE_SCALE = 0.60
-        SPECULAR_COLOR = (0x11 / 255.0)      
-        SHININESS = 200.0
-        light_dir_world = camera_dir 
+        img = Image.new('RGB', (w, h), (26, 29, 35))
+        draw = ImageDraw.Draw(img)
+        for idx in order:
+            poly = [
+                (float(tri_px[idx, 0]), float(tri_py[idx, 0])),
+                (float(tri_px[idx, 1]), float(tri_py[idx, 1])),
+                (float(tri_px[idx, 2]), float(tri_py[idx, 2])),
+            ]
+            color = tuple(int(c) for c in face_colors[idx])
+            draw.polygon(poly, fill=color, outline=color)
 
-        vertex_normals = np.nan_to_num(mesh.vertex_normals)
-        vn_len = np.linalg.norm(vertex_normals, axis=1, keepdims=True)
-        vn_len[vn_len == 0] = 1.0
-        vertex_normals = vertex_normals / vn_len
-
-        base_color = np.array([0x4e, 0xa1, 0xd3], dtype=np.float64) 
-        tri_normals = vertex_normals[faces]  
-
-        color_buf = np.empty((h, w, 3), dtype=np.uint8)
-        color_buf[:] = (26, 29, 35)
-        depth_buf = np.full((h, w), np.inf, dtype=np.float32)
-
-        x_min_all = np.clip(np.floor(tri_px.min(axis=1)).astype(int), 0, w - 1)
-        x_max_all = np.clip(np.ceil(tri_px.max(axis=1)).astype(int), 0, w - 1)
-        y_min_all = np.clip(np.floor(tri_py.min(axis=1)).astype(int), 0, h - 1)
-        y_max_all = np.clip(np.ceil(tri_py.max(axis=1)).astype(int), 0, h - 1)
-
-        for i in range(len(tri_px)):
-            x0, x1 = x_min_all[i], x_max_all[i]
-            y0, y1 = y_min_all[i], y_max_all[i]
-            if x1 < x0 or y1 < y0:
-                continue
-
-            xs, ys, zs = tri_px[i], tri_py[i], tri_pz[i]
-            denom = (ys[1] - ys[2]) * (xs[0] - xs[2]) + (xs[2] - xs[1]) * (ys[0] - ys[2])
-            if abs(denom) < 1e-9:
-                continue
-
-            gx, gy = np.meshgrid(
-                np.arange(x0, x1 + 1) + 0.5,
-                np.arange(y0, y1 + 1) + 0.5
-            )
-            w0 = ((ys[1] - ys[2]) * (gx - xs[2]) + (xs[2] - xs[1]) * (gy - ys[2])) / denom
-            w1 = ((ys[2] - ys[0]) * (gx - xs[2]) + (xs[0] - xs[2]) * (gy - ys[2])) / denom
-            w2 = 1.0 - w0 - w1
-            mask = (w0 >= -1e-6) & (w1 >= -1e-6) & (w2 >= -1e-6)
-            if not np.any(mask):
-                continue
-
-            z_interp = w0 * zs[0] + w1 * zs[1] + w2 * zs[2]
-            sub_depth = depth_buf[y0:y1 + 1, x0:x1 + 1]
-            closer = mask & (z_interp < sub_depth)
-            if not np.any(closer):
-                continue
-
-            n0, n1, n2 = tri_normals[i]
-            interp_n = (w0[:, :, None] * n0 + w1[:, :, None] * n1 + w2[:, :, None] * n2)
-            n_len = np.linalg.norm(interp_n, axis=-1, keepdims=True)
-            n_len[n_len == 0] = 1.0
-            interp_n /= n_len
-
-            n_dot_l = np.clip(interp_n @ light_dir_world, 0.0, 1.0)
-            diffuse_ambient = np.clip(AMBIENT + DIFFUSE_SCALE * n_dot_l, 0.0, 1.0)
-            specular_term = SPECULAR_COLOR * np.power(n_dot_l, SHININESS)
-            pixel_color = np.clip(
-                base_color[None, None, :] * diffuse_ambient[:, :, None] + specular_term[:, :, None] * 255.0,
-                0, 255
-            ).astype(np.uint8)
-
-            sub_depth[closer] = z_interp[closer]
-            depth_buf[y0:y1 + 1, x0:x1 + 1] = sub_depth
-            sub_color = color_buf[y0:y1 + 1, x0:x1 + 1]
-            sub_color[closer] = pixel_color[closer]
-            color_buf[y0:y1 + 1, x0:x1 + 1] = sub_color
-
-        img = Image.fromarray(color_buf, 'RGB')
         if ss != 1:
             img = img.resize(resolution, Image.Resampling.LANCZOS)
 
-        img.save(thumb_path, quality=88, optimize=True)
+        img.save(thumb_path, quality=92, method=6)
         return True
     except Exception as e:
         app_logger.warning(f"[ERROR] Rendu rapide (raster) {os.path.basename(thumb_path)}: {e}")
@@ -3307,7 +3323,7 @@ def update_cache_thumb_status(file_path, has_thumb, is_fallback=False):
                         break
             tmp_path = CACHE_FILE + '.tmp'
             with open(tmp_path, 'w', encoding='utf-8') as f:
-                json.dump(cache, f, ensure_ascii=False, indent=2)
+                json.dump(cache, f, ensure_ascii=False, separators=(',', ':'))
             _atomic_replace(tmp_path, CACHE_FILE)
     except Exception as e:
         app_logger.info(f"[CACHE] Erreur mise à jour thumb status: {e}")
@@ -3327,7 +3343,7 @@ def pregenerate_thumbnails_on_startup(limit=90):
         try:
             if source['type'] == 'folder' and os.path.exists(source['path']):
                 for root, dirs, files in os.walk(source['path']):
-                    for f in files:
+                    for f in sorted(files, key=str.lower):
                         if len(to_process) >= limit:
                             break
                         if f.lower().endswith(('.stl', '.obj', '.3mf')):
@@ -3345,7 +3361,8 @@ def pregenerate_thumbnails_on_startup(limit=90):
         file_path, thumb_path = item
         try:
             app_logger.info(f"[THUMBS] Génération: {os.path.basename(file_path)}")
-            if generate_thumbnail_pyrender(file_path, thumb_path):
+            success = generate_thumbnail_pyrender(file_path, thumb_path)
+            if success:
                 update_cache_thumb_status(file_path, True)
                 return True
             create_fallback_thumbnail(thumb_path)
@@ -3442,8 +3459,9 @@ def reconcile_thumbnails_with_disk():
             if existing_thumbs is not None:
                 requeued = 0
                 changed = False
-                seen_paths = set() 
-                for f in files:
+                seen_paths = set()
+                files_ordered = sorted(files, key=lambda f: os.path.basename(f.get('path', '')).lower())
+                for f in files_ordered:
                     normalized = f['path'].replace('\\', '/')
                     thumb_filename = hashlib.md5(normalized.encode()).hexdigest()
                     real_has_thumb = (
@@ -4461,7 +4479,8 @@ def _get_all_source_paths(user_id):
             ).fetchall()
         finally:
             conn.close()
-        folders = [r['path'] for r in rows if r['type'] == 'folder']
+        
+        folders = [r['path'] for r in rows if r['type'] in ('folder', 'smb', 'nfs')]
         files = [r['path'] for r in rows if r['type'] == 'file']
         return folders, files
     except Exception:
@@ -4470,28 +4489,57 @@ def _get_all_source_paths(user_id):
 def _is_path_within_sources(file_path, user_id):
     if not file_path:
         return False
+    
+    def _normalize_path(p):
+        if not p:
+            return ''
+        norm = p.replace('\\', '/')
+        if norm.startswith('//'):
+            parts = norm.split('/')
+            cleaned = [x for x in parts if x]  
+            if len(cleaned) >= 2:
+                return '//' + '/'.join(cleaned)
+            return norm
+        else:
+            try:
+                return os.path.realpath(norm).replace('\\', '/')
+            except Exception:
+                return norm
+    
+    norm_file = _normalize_path(file_path)
+    is_smb_file = norm_file.startswith('//')
+    
     try:
-        real_path = os.path.realpath(file_path)
+        folders, files = _get_all_source_paths(user_id)
     except Exception:
         return False
-
-    folders, files = _get_all_source_paths(user_id)
-
+    
     for f in files:
-        try:
-            if os.path.realpath(f) == real_path:
-                return True
-        except Exception:
-            continue
+        norm_f = _normalize_path(f)
+        if norm_f == norm_file:
+            return True
+    
+    norm_file_cmp = norm_file.rstrip('/').lower()
 
     for folder in folders:
-        try:
-            real_folder = os.path.realpath(folder)
-            if os.path.commonpath([real_path, real_folder]) == real_folder:
-                return True
-        except (ValueError, Exception):
-            continue
+        norm_folder = _normalize_path(folder)
+        is_smb_folder = norm_folder.startswith('//')
+        norm_folder_cmp = norm_folder.rstrip('/').lower()
 
+        if is_smb_file and is_smb_folder:
+            folder_prefix = norm_folder_cmp + '/'
+            if norm_file_cmp.startswith(folder_prefix) or norm_file_cmp == norm_folder_cmp:
+                return True
+        elif not is_smb_file and not is_smb_folder:
+            try:
+                if os.path.commonpath([norm_file_cmp, norm_folder_cmp]) == norm_folder_cmp:
+                    return True
+            except (ValueError, Exception):
+                folder_prefix = norm_folder_cmp + '/'
+                if norm_file_cmp.startswith(folder_prefix) or norm_file_cmp == norm_folder_cmp:
+                    return True
+
+    app_logger.debug(f"[SECURITY] Rejet '{file_path}' — sources connues: {folders}")
     return False
 
 def _get_source_root_paths(user_id):
@@ -4499,7 +4547,7 @@ def _get_source_root_paths(user_id):
         conn = get_db()
         try:
             rows = conn.execute(
-                "SELECT path FROM sources WHERE user_id = ? AND type = 'folder'", (user_id,)
+                "SELECT path FROM sources WHERE user_id = ? AND type IN ('folder', 'smb', 'nfs')", (user_id,)
             ).fetchall()
         finally:
             conn.close()
@@ -5126,7 +5174,7 @@ PRINT_PHOTO_MAX_SIZE = 15 * 1024 * 1024
 @login_required
 def api_get_print_photos():
     file_path = request.args.get('path', '').replace('\\', '/')
-    result_filter = request.args.get('result', '').strip().lower()  # '', 'success', 'failed'
+    result_filter = request.args.get('result', '').strip().lower() 
     conn = get_db()
     try:
         query = "SELECT id, file_path, image_filename, note, result, created_at FROM print_photos WHERE user_id=?"
@@ -7749,14 +7797,26 @@ def api_repair_file():
         app_logger.warning(f"[SECURITY] Tentative de réparation hors sources: {file_path}")
         return jsonify({"error": "Ce fichier n'appartient à aucune source configurée"}), 403
 
-    try:
+    def _load_mesh_to_repair():
         ext = os.path.splitext(file_path)[1].lower()
         if ext == '.3mf':
-            mesh = load_3mf_mesh(file_path)
+            return load_3mf_mesh(file_path)
         elif ext == '.obj':
-            mesh = trimesh.load(file_path, force='mesh', process=False)
+            return trimesh.load(file_path, force='mesh', process=False)
         else:
-            mesh = trimesh.load(file_path, force='mesh')
+            return trimesh.load(file_path, force='mesh')
+
+    try:
+        ext = os.path.splitext(file_path)[1].lower()
+        load_timeout = get_integrity_timeout(file_path)
+        with ThreadPoolExecutor(max_workers=1) as _load_pool:
+            _load_future = _load_pool.submit(_load_mesh_to_repair)
+            try:
+                mesh = _load_future.result(timeout=load_timeout)
+            except FuturesTimeoutError:
+                return jsonify({"error": f"Délai dépassé lors de la lecture du fichier (>{load_timeout:.0f}s). "
+                                          f"Le fichier semble valide mais le partage réseau est trop lent — "
+                                          f"réessayez, ou copiez-le en local avant de le réparer."}), 504
 
         if isinstance(mesh, trimesh.Scene):
             geoms = [m for m in mesh.geometry.values() if hasattr(m, 'vertices') and len(m.vertices) > 0]
@@ -7779,7 +7839,10 @@ def api_repair_file():
         if not mesh.is_watertight and HAS_PYMESHFIX:
             try:
                 fixer = pymeshfix.MeshFix(mesh.vertices.copy(), mesh.faces.copy())
-                fixer.repair(verbose=False)
+                try:
+                    fixer.repair(verbose=False)
+                except TypeError:
+                    fixer.repair()
                 if fixer.v is not None and len(fixer.v) > 0:
                     mesh = trimesh.Trimesh(vertices=fixer.v, faces=fixer.f, process=True)
             except Exception as e:
@@ -8005,8 +8068,21 @@ def api_convert_file_batch():
 # ============================================
 # 🛡️ VÉRIFICATION D'INTÉGRITÉ DE LA BIBLIOTHÈQUE
 # ============================================
-INTEGRITY_CHECK_TIMEOUT = 20
+INTEGRITY_CHECK_BASE_TIMEOUT = 45       
+INTEGRITY_CHECK_TIMEOUT_PER_MB = 1.0    
+INTEGRITY_CHECK_TIMEOUT_MAX = 180
+INTEGRITY_CHECK_WORKERS = 4            
 INTEGRITY_REPORT_FILE = os.path.join(DATA_DIR, "integrity_report.json")
+
+
+def get_integrity_timeout(file_path):
+    """Timeout de vérification proportionnel à la taille du fichier (adapté aux partages réseau lents)."""
+    try:
+        size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    except Exception:
+        return INTEGRITY_CHECK_BASE_TIMEOUT
+    timeout = INTEGRITY_CHECK_BASE_TIMEOUT + size_mb * INTEGRITY_CHECK_TIMEOUT_PER_MB
+    return min(timeout, INTEGRITY_CHECK_TIMEOUT_MAX)
 
 integrity_check_state = {
     'running': False,
@@ -8103,30 +8179,54 @@ def _run_integrity_check(paths):
             'started_at': time.time(), 'finished_at': None, 'problems': []
         })
 
-    executor = ThreadPoolExecutor(max_workers=1)
-    for p in paths:
-        try:
-            future = executor.submit(check_single_file_integrity, p)
-            result = future.result(timeout=INTEGRITY_CHECK_TIMEOUT)
-        except FuturesTimeoutError:
-            result = {'path': p, 'status': 'corrupted',
-                      'error': "Délai dépassé lors de la lecture (fichier probablement corrompu ou trop volumineux)"}
-        except Exception as e:
-            result = {'path': p, 'status': 'corrupted', 'error': str(e)[:300]}
+    executor = ThreadPoolExecutor(max_workers=INTEGRITY_CHECK_WORKERS)
+    paths_iter = iter(paths)
+    pending = {}  
 
-        with integrity_check_lock:
-            integrity_check_state['checked'] += 1
-            status = result.get('status', 'corrupted')
-            if status == 'ok':
-                integrity_check_state['ok'] += 1
+    def _submit_next():
+        try:
+            p = next(paths_iter)
+        except StopIteration:
+            return False
+        fut = executor.submit(check_single_file_integrity, p)
+        pending[fut] = (p, time.time() + get_integrity_timeout(p))
+        return True
+
+    for _ in range(INTEGRITY_CHECK_WORKERS):
+        if not _submit_next():
+            break
+
+    while pending:
+        done, _ = futures_wait(list(pending.keys()), timeout=1, return_when=FIRST_COMPLETED)
+        now = time.time()
+        to_process = list(done) + [f for f, (p, deadline) in pending.items() if f not in done and now >= deadline]
+
+        for fut in to_process:
+            p, deadline = pending.pop(fut)
+            if fut.done():
+                try:
+                    result = fut.result()
+                except Exception as e:
+                    result = {'path': p, 'status': 'corrupted', 'error': str(e)[:300]}
             else:
-                integrity_check_state[status] = integrity_check_state.get(status, 0) + 1
-                integrity_check_state['problems'].append({
-                    'path': p,
-                    'name': os.path.basename(p),
-                    'status': status,
-                    'error': result.get('error')
-                })
+                result = {'path': p, 'status': 'corrupted',
+                          'error': "Délai dépassé lors de la lecture (fichier probablement corrompu, trop volumineux ou partage réseau lent)"}
+
+            with integrity_check_lock:
+                integrity_check_state['checked'] += 1
+                status = result.get('status', 'corrupted')
+                if status == 'ok':
+                    integrity_check_state['ok'] += 1
+                else:
+                    integrity_check_state[status] = integrity_check_state.get(status, 0) + 1
+                    integrity_check_state['problems'].append({
+                        'path': p,
+                        'name': os.path.basename(p),
+                        'status': status,
+                        'error': result.get('error')
+                    })
+            _submit_next()
+
     executor.shutdown(wait=False)
 
     with integrity_check_lock:
@@ -8518,7 +8618,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio-app"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.3.4"
+CURRENT_VERSION = "0.3.7"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
@@ -8612,8 +8712,11 @@ def check_for_updates():
             'expected_sha256': expected_sha256
         }
 
+    except requests.exceptions.SSLError as e:
+        app_logger.info(f"[UPDATE] ⚠️ Vérification impossible (SSL/Antivirus) - Ignoré.")
+        return None
     except Exception as e:
-        app_logger.error(f"[UPDATE] ❌ Erreur: {e}")
+        app_logger.warning(f"[UPDATE] ⚠️ Impossible de vérifier les mises à jour: {str(e)[:80]}")
         return None
 
 def install_update(installer_path):
@@ -9476,7 +9579,7 @@ def _call_ollama(base_url: str, model: str, prompt: str, system: str = "",
                  temperature: float = 0.2, num_predict: int = 200,
                  timeout: int = 300, images: list = None) -> str:
     payload = {"model": model, "prompt": prompt, "stream": False,
-               "think": False, 
+               "think": False,  
                "options": {"temperature": temperature, "num_predict": num_predict}}
     if system:
         payload["system"] = system
@@ -9559,12 +9662,15 @@ def api_ollama_models():
         models = [m.get('name', '') for m in r.json().get('models', []) if m.get('name')]
         return jsonify({"models": models}), 200
     except requests.exceptions.ConnectionError:
-        return jsonify({"error": f"Impossible de joindre Ollama sur {base_url}."}), 502
+        return jsonify({"error_code": "ollama_unreachable", "error_params": {"url": base_url},
+                         "error": f"Impossible de joindre Ollama sur {base_url}."}), 502
     except requests.exceptions.Timeout:
-        return jsonify({"error": "Ollama ne répond pas (timeout)."}), 504
+        return jsonify({"error_code": "ollama_timeout",
+                         "error": "Ollama ne répond pas (timeout)."}), 504
     except Exception as e:
         app_logger.error(f"[API] Erreur non gérée: {e}")
-        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+        return jsonify({"error_code": "internal_error",
+                         "error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 def _detect_hardware():
     info = {
