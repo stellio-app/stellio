@@ -273,11 +273,19 @@ if (el && I18N.has(field.key)) el.placeholder = I18N.t(field.key);
 }
 document.addEventListener('DOMContentLoaded', async () => {
 console.log('[Stellio] DOM chargé, initialisation...');
+// La requête réseau de checkAuth ne dépend pas des traductions : on la lance
+// tout de suite, en parallèle des fetch de I18N.init(), au lieu de l'enchaîner
+// derrière lui. L'affichage du panneau (showPanel, qui a besoin des
+// traductions) attend toujours la fin de I18N.init — aucun flash de clés
+// non traduites, seulement le round-trip réseau qui se recouvre.
+const firstLaunchPromise = fetch(`${API}/api/auth/first-launch`)
+    .then(r => r.json())
+    .catch(() => null);
 await I18N.init({ folder: 'languages', autoApply: true });
 populateLanguageSelectors();
 translateSortOptions();
 translateAuthFields();
-checkAuth();
+checkAuth(firstLaunchPromise);
 setupEventListeners();
 initSettings();
 setupHoverDelegation();
@@ -622,7 +630,7 @@ function renderIntegrityResults(problems) {
             <div class="integrity-result-actions">
                 ${p.status === 'missing'
                     ? `<span class="integrity-missing-note" data-i18n="integrity.missing_note">Sera retiré au prochain scan</span>`
-                    : `<button class="btn btn-ghost btn-sm" onclick="sendToRepairFromIntegrity()" data-i18n-title="integrity.try_repair" title="Tenter une réparation"><i class="fa-solid fa-wrench"></i></button>
+                    : `<button class="btn btn-ghost btn-sm" onclick="repairFileFromIntegrity('${escapeJs(p.path)}', this)" data-i18n-title="integrity.try_repair" title="Tenter une réparation"><i class="fa-solid fa-wrench"></i></button>
                        <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteFileFromIntegrity('${escapeJs(p.path)}')" data-i18n-title="actions.delete" title="Supprimer"><i class="fa-solid fa-trash"></i></button>`
                 }
             </div>
@@ -654,9 +662,43 @@ async function deleteFileFromIntegrity(path) {
     }
 }
 
-function sendToRepairFromIntegrity() {
-    document.getElementById('repair-grid')?.scrollIntoView({ behavior: 'smooth' });
-    showToast(I18N.t('integrity.check_repair_tab') || 'Consultez la liste ci-dessous pour la réparation de maillage.', 'info');
+async function repairFileFromIntegrity(path, btn) {
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
+    try {
+        const res = await fetch(`${API}/api/files/repair`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path })
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok && data.success) {
+            const msg = data.watertight === false
+                ? (data.message || I18N.t('toast.repair_partial') || 'Réparation partielle : problèmes non résolus automatiquement (.bak conservé)')
+                : (data.message || I18N.t('toast.repair_success') || 'Fichier réparé');
+            showToast(msg, data.watertight === false ? 'warning' : 'success');
+
+            // Retire la ligne de la liste des problèmes et met à jour les compteurs affichés
+            const row = document.querySelector(`.integrity-result-row[data-path="${CSS.escape(path)}"]`);
+            row?.remove();
+            const corruptedEl = document.getElementById('integrity-corrupted-count');
+            const okEl = document.getElementById('integrity-ok-count');
+            if (corruptedEl) corruptedEl.textContent = Math.max(0, (parseInt(corruptedEl.textContent) || 0) - 1);
+            if (okEl) okEl.textContent = (parseInt(okEl.textContent) || 0) + 1;
+
+            loadFiles();
+        } else {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+            showToast(data.error || I18N.t('toast.repair_failed') || 'Échec de la réparation', 'error');
+        }
+    } catch (err) {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+        showToast(I18N.t('toast.connection_error') || 'Erreur de connexion', 'error');
+    }
 }
 
 /* ============================================
@@ -1153,6 +1195,7 @@ const currentPage = document.querySelector('.page.active');
 if (libraryPage && currentPage !== libraryPage) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     libraryPage.classList.add('active');
+    if (typeof updateHeaderVisibilityForPage === 'function') updateHeaderVisibilityForPage('library');
 }
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -1309,11 +1352,14 @@ function prefillRememberedLogin() {
     }
 }
 
-async function checkAuth() {
+async function checkAuth(preFetchedFirstLaunch = null) {
 try {
-const firstLaunchRes = await fetch(`${API}/api/auth/first-launch`);
-const firstLaunchData = await firstLaunchRes.json();
-if (firstLaunchData.first_launch) {
+// Si l'appel a déjà été lancé en parallèle de I18N.init(), on réutilise
+// sa promesse au lieu de refaire la requête réseau.
+const firstLaunchData = preFetchedFirstLaunch
+    ? await preFetchedFirstLaunch
+    : await (await fetch(`${API}/api/auth/first-launch`)).json();
+if (firstLaunchData && firstLaunchData.first_launch) {
 showPanel('register-panel');
 return;
 }
@@ -4025,13 +4071,25 @@ function toggleOllamaGuide(forceOpen) {
 
 function copyOllamaCmd(btn, text) {
     navigator.clipboard.writeText(text).then(() => {
-        showToast(I18N.t('toast.copied') || 'Copié', 'success');
+        showToast(I18N.t('toast.copied'), 'success');
         const icon = btn.querySelector('i');
         if (icon) {
             icon.className = 'fa-solid fa-check';
             setTimeout(() => { icon.className = 'fa-regular fa-copy'; }, 1500);
         }
     }).catch(() => showToast(I18N.t('toast.error'), 'error'));
+}
+
+function ollamaErrorMessage(data, res) {
+    const codeMap = {
+        ollama_unreachable: 'settings.ollama_err_unreachable',
+        ollama_timeout: 'settings.ollama_err_timeout',
+        internal_error: 'settings.ollama_err_internal',
+    };
+    if (data && data.error_code && codeMap[data.error_code]) {
+        return I18N.t(codeMap[data.error_code], data.error_params || {});
+    }
+    return I18N.t('settings.ollama_err_generic', { status: res.status });
 }
 
 async function testOllamaConnection() {
@@ -4058,7 +4116,7 @@ async function testOllamaConnection() {
     try {
         const res = await fetch(`${API}/api/ollama/models`);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        if (!res.ok) throw new Error(ollamaErrorMessage(data, res));
 
         const models = data.models || [];
         if (modelSel) {
@@ -4104,10 +4162,12 @@ async function recommendOllamaModel() {
         const rec = data.recommendation || {};
 
         const hwParts = [];
-        hwParts.push(`<i class="fa-solid fa-microchip"></i> ${hw.cpu_cores || '?'} ${I18N.t('settings.ollama_hw_cores')}`);
-        hwParts.push(`<i class="fa-solid fa-memory"></i> ${hw.ram_gb != null ? hw.ram_gb + ' Go RAM' : I18N.t('settings.ollama_hw_unknown')}`);
+        hwParts.push(`<i class="fa-solid fa-microchip"></i> ${I18N.t('settings.ollama_hw_cores', { count: hw.cpu_cores || '?' })}`);
+        hwParts.push(hw.ram_gb != null
+            ? `<i class="fa-solid fa-memory"></i> ${I18N.t('settings.ollama_hw_ram', { value: hw.ram_gb })}`
+            : `<i class="fa-solid fa-memory"></i> ${I18N.t('settings.ollama_hw_unknown')}`);
         hwParts.push(hw.gpu_name
-            ? `<i class="fa-solid fa-display"></i> ${escapeHtml(hw.gpu_name)} (${hw.vram_gb} Go VRAM)`
+            ? `<i class="fa-solid fa-display"></i> ${escapeHtml(hw.gpu_name)} (${I18N.t('settings.ollama_hw_vram', { value: hw.vram_gb })})`
             : `<i class="fa-solid fa-display"></i> ${I18N.t('settings.ollama_hw_no_gpu')}`);
 
         const visionNote = rec.vision
@@ -4115,9 +4175,13 @@ async function recommendOllamaModel() {
             : '';
         const installedNote = rec.already_installed
             ? `<div style="margin-top:8px; color:#16a34a;"><i class="fa-solid fa-circle-check"></i> ${I18N.t('settings.ollama_rec_already_installed')}</div>`
-            : `<div style="margin-top:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                 <code style="background:var(--bg-secondary); padding:4px 8px; border-radius:6px; font-size:11px;">${escapeHtml(rec.pull_command)}</code>
-                 <button type="button" class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${escapeJs(rec.pull_command)}').then(() => showToast(I18N.t('toast.copied'), 'success'))"><i class="fa-solid fa-copy"></i> ${I18N.t('actions.copy')}</button>
+            : `<div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+                 <div style="color:var(--text-secondary); margin-bottom:6px;">${I18N.t('settings.ollama_rec_install_hint')}</div>
+                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                   <code style="background:var(--bg-secondary); padding:4px 8px; border-radius:6px; font-size:11px;">${escapeHtml(rec.pull_command)}</code>
+                   <button type="button" class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${escapeJs(rec.pull_command)}').then(() => showToast(I18N.t('toast.copied'), 'success'))"><i class="fa-solid fa-copy"></i> ${I18N.t('actions.copy')}</button>
+                 </div>
+                 <p class="settings-hint" style="margin-top:6px;">${I18N.t('settings.ollama_rec_install_next')}</p>
                </div>`;
 
         resultEl.innerHTML = `
@@ -5128,6 +5192,37 @@ document.getElementById('preferred-slicer-select')?.addEventListener('change', a
     } catch (err) { showToast(I18N.t('toast.error'), 'error'); }
 });
 
+// ============================================
+// 👁️ MASQUAGE CONTEXTUEL DE LA BARRE D'EN-TÊTE
+// ============================================
+function updateHeaderVisibilityForPage(page) {
+    const isLibrary = page === 'library';
+    const libraryOnlyEls = [
+        document.querySelector('.header-center'),
+        document.getElementById('mobile-search-toggle'),
+        document.getElementById('sort-select'),
+        document.querySelector('.view-modes'),
+        document.getElementById('refresh-files'),
+        document.getElementById('select-all-btn'),
+        document.querySelector('.header-library-info')
+    ];
+    libraryOnlyEls.forEach(el => {
+        if (!el) return;
+        el.classList.toggle('header-hide', !isLibrary);
+    });
+}
+window.updateHeaderVisibilityForPage = updateHeaderVisibilityForPage;
+
+function resetGlobalSearch() {
+    const hadQuery = !!(globalSearchInput?.value || mobileSearchInput?.value);
+    if (globalSearchInput) globalSearchInput.value = '';
+    if (mobileSearchInput) mobileSearchInput.value = '';
+    if (hadQuery && typeof handleSearchInput === 'function') {
+        handleSearchInput('', null);
+    }
+}
+window.resetGlobalSearch = resetGlobalSearch;
+
 document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         const page = btn.dataset.page;
@@ -5141,6 +5236,8 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
                 if (headerTitle) headerTitle.innerHTML = `<i class="fa-solid fa-layer-group"></i> ${I18N.t('nav.library')}`;
             }
             document.querySelector('.nav-btn[data-page="library"]')?.classList.add('active');
+        } else {
+            resetGlobalSearch();
         }
         if (btn.innerHTML.includes('fa-filter')) { openFiltersModal(); return; }
         if (!page) return;
@@ -5150,6 +5247,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         document.getElementById(`page-${page}`)?.classList.add('active');
         const titleKey = btn.dataset.titleKey || 'app.title';
         document.getElementById('header-page-title').innerHTML = `<i class="fa-solid ${btn.dataset.icon || 'fa-layer-group'}"></i> ${I18N.t(titleKey)}`;
+        updateHeaderVisibilityForPage(page);
         if (page === 'library') loadFiles();
         if (page === 'printers') loadPrinters();
         if (page === 'settings') loadSources();
