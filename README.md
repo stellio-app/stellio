@@ -128,7 +128,6 @@ Stellio détecte automatiquement :
 - ✅ PrusaSlicer / SuperSlicer
 - ✅ Ultimaker Cura
 - ✅ Creality Print
-- ✅ Slicers personnalisés (configurables)
 
 ### Imprimantes
 
