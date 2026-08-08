@@ -23,7 +23,7 @@
 
 Que vous soyez maker débutant ou imprimeur expérimenté avec plusieurs machines, Stellio vous fait gagner un temps précieux grâce à l'**IA locale** (Ollama), la **gestion intelligente des imprimantes** et une **interface pensée pour la productivité**.
 
-> 💡 **Philosophie** : Vos données restent chez vous. Tout fonctionne en local, sans dépendance cloud obligatoire.
+> 💡 **Philosophie** : Vos données restent chez vous. Tout fonctionne en local.
 
 ---
 
