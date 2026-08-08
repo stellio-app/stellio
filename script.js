@@ -1919,19 +1919,24 @@ const isSelected = selectedFiles.has(f.path);
 const NEW_THRESHOLD_S = 48 * 3600;
 const isNew = f.mtime && (Date.now() / 1000 - f.mtime) < NEW_THRESHOLD_S && !seenFilesSet.has(f.path);
 const newBadgeHtml = isNew ? `<span class="file-new-badge"><i class="fa-solid fa-sparkles"></i> Nouveau</span>` : '';
+const multiPlateLabel = I18N.t('card.multi_plate') || 'Plateau multiple';
+const multiPlateBadgeHtml = f.multi_plate
+    ? `<span class="file-multiplate-badge" title="${multiPlateLabel}"><i class="fa-solid fa-table-cells"></i></span>`
+    : '';
 const tooltipHtml = `<div class="file-metadata-tooltip" id="tooltip-${f.path.replace(/[^\w]/g, '-')}"><div class="meta-row"><i class="fa-solid fa-ruler-combined"></i><span id="dims-${f.path.replace(/[^\w]/g, '-')}">${I18N.t('library.loading')}</span></div><div class="meta-row"><i class="fa-solid fa-weight-scale"></i><span id="weight-${f.path.replace(/[^\w]/g, '-')}">PLA: -g • PETG: -g</span></div><div class="meta-row"><i class="fa-solid fa-clock"></i><span id="time-${f.path.replace(/[^\w]/g, '-')}">~--</span></div></div>`;
 const thumbContent = f.has_thumb
     ? `<img src="${thumbUrl}" data-loaded="pending" onload="this.dataset.loaded='true'; this.style.display='block'; this.nextElementSibling?.style.setProperty('display','none','important');" onerror="window.handleThumbnailError(this)" style="width:100%; height:100%; object-fit:cover; display:block;"><div class="file-loading" style="display:none; align-items:center; justify-content:center;"><i class="fa-solid ${icon} thumb-icon" style="font-size:48px; color:var(--text-muted);"></i></div>`
     : `<img src="" data-loaded="false" style="display:none; width:100%; height:100%; object-fit:cover;"><div class="file-loading thumb-pending" data-path="${escapeHtml(f.path)}" style="display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px;"><i class="fa-solid fa-spinner fa-spin" style="font-size:32px; color:var(--text-muted); opacity:0.6;"></i></div>`;
 const checkboxHtml = isSelectionMode ? `<div class="file-checkbox" onclick="event.stopPropagation(); toggleFileSelection('${escapeJs(f.path)}', event)" title="${isSelected ? I18N.t('actions.cancel') : I18N.t('actions.select')}"><i class="fa-solid ${isSelected ? 'fa-check-square' : 'fa-square'}"></i></div>` : '';
-const viewerClick = `onclick="open3DViewer('${escapeJs(f.name)}', '${escapeJs(f.path)}')" style="cursor:pointer;"`;
+const fileMenuBtnHtml = isSelectionMode ? '' : `<button type="button" class="file-menu-btn" onclick="event.stopPropagation(); openFileCtxMenu(event, '${escapeJs(f.path)}', '${escapeJs(f.name)}')" title="${I18N.t('actions.more') || 'Actions'}"><i class="fa-solid fa-ellipsis"></i></button>`;
+const viewerClick = `onclick="open3DViewer('${escapeJs(f.name)}', '${escapeJs(f.path)}', ${f.plate_count || 1})" style="cursor:pointer;"`;
 const selectedClass = isSelected ? ' selected' : '';
 if (currentView === 'details') {
     const dirPath = escapeHtml(f.path.replace(/\\/g, '/').split('/').slice(0, -1).join('/') || I18N.t('source.local_folder'));
     const sizeStr = formatSize(f.size || 0);
     const safeId = f.path.replace(/[^\w]/g, '-');
-    return `<div class="file-card file-card--details${selectedClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeJs(f.path)}" ${viewerClick}>
-  <div class="dv-thumb">${checkboxHtml}${thumbContent}${isNew ? `<span class="file-new-badge file-new-badge--small"><i class="fa-solid fa-sparkles"></i></span>` : ''}${inArchiveBadgeHtml}</div>
+    return `<div class="file-card file-card--details${selectedClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}>
+  <div class="dv-thumb">${checkboxHtml}${thumbContent}${isNew ? `<span class="file-new-badge file-new-badge--small"><i class="fa-solid fa-sparkles"></i></span>` : ''}${inArchiveBadgeHtml}${multiPlateBadgeHtml}</div>
   <div class="dv-name">
     <span class="dv-filename" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
     <span class="dv-path" title="${dirPath}"><i class="fa-solid fa-folder"></i> ${dirPath}</span>
@@ -1947,6 +1952,7 @@ if (currentView === 'details') {
     ${isArchive ? `<button type="button" class="dv-btn" onclick="event.stopPropagation(); decompressFile('${escapeJs(f.path)}', event)" title="${I18N.t('toast.extract_success')}"><i class="fa-solid fa-file-zipper"></i></button>` : ''}
     ${extractEntryBtnHtml}
     <button type="button" class="dv-btn dv-btn--star ${isFav ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleFavorite('${escapeJs(f.path)}', event)" title="${isFav ? I18N.t('toast.favorites_removed') : I18N.t('toast.favorites_added')}"><i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-star"></i></button>
+    <button type="button" class="dv-btn dv-btn--menu" onclick="event.stopPropagation(); openFileCtxMenu(event, '${escapeJs(f.path)}', '${escapeJs(f.name)}')" title="${I18N.t('actions.more') || 'Actions'}"><i class="fa-solid fa-ellipsis"></i></button>
   </div>
 </div>`;
 }
@@ -1954,7 +1960,7 @@ const isVirtualEntry = f.path.includes('::');
 const deleteBtnHtml = (!isVirtualEntry && !isSelectionMode)
     ? `<button type="button" class="file-delete-btn" onclick="event.stopPropagation(); openDeleteFileModal('${escapeJs(f.path)}', '${escapeJs(f.name)}')" title="${I18N.t('actions.delete') || 'Supprimer'}"><i class="fa-solid fa-xmark"></i></button>`
     : '';
-return `<div class="file-card${selectedClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeJs(f.path)}" ${viewerClick}><div class="file-thumb" style="position:relative;">${checkboxHtml}${thumbContent}${tooltipHtml}<span class="file-ext-badge">${ext.replace('.', '')}</span>${deleteBtnHtml}${isArchive ? archiveEntryHtml : ''}${inArchiveBadgeHtml}${isNew ? newBadgeHtml : ''}${isArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); decompressFile('${escapeJs(f.path)}', event)" title="${I18N.t('toast.extract_success')}"><i class="fa-solid fa-file-zipper"></i> ${I18N.t('actions.add')}</button>` : ''}${inArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); extractArchiveEntry('${escapeJs(f.archive_path)}', '${escapeJs(f.internal_path)}', event)" title="${I18N.t('actions.extract_single_file') || 'Extraire uniquement ce fichier'}"><i class="fa-solid fa-download"></i></button>` : ''}<button type="button" class="file-favorite-btn ${isFav ? 'favorited' : ''}" onclick="toggleFavorite('${escapeJs(f.path)}', event); return false;" title="${isFav ? I18N.t('toast.favorites_removed') : I18N.t('toast.favorites_added')}"><i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-star"></i></button><button type="button" class="file-tag-btn" onclick="event.stopPropagation(); openTagModal('${escapeJs(f.path)}')" title="${I18N.t('modal.manage_tags')}"><i class="fa-solid fa-tag"></i></button></div><div class="file-info"><div class="file-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>${f.tags?.length ? `<div class="file-tags">${f.tags.map(t => `<span class="file-tag" style="background:${t.color}20;color:${t.color};border-color:${t.color}">${escapeHtml(t.name)}</span>`).join('')}</div>` : ''}</div></div>`;
+return `<div class="file-card${selectedClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}><div class="file-thumb" style="position:relative;">${checkboxHtml}${fileMenuBtnHtml}${thumbContent}${tooltipHtml}<span class="file-ext-badge">${ext.replace('.', '')}</span>${deleteBtnHtml}${isArchive ? archiveEntryHtml : ''}${inArchiveBadgeHtml}${multiPlateBadgeHtml}${isNew ? newBadgeHtml : ''}${isArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); decompressFile('${escapeJs(f.path)}', event)" title="${I18N.t('toast.extract_success')}"><i class="fa-solid fa-file-zipper"></i> ${I18N.t('actions.add')}</button>` : ''}${inArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); extractArchiveEntry('${escapeJs(f.archive_path)}', '${escapeJs(f.internal_path)}', event)" title="${I18N.t('actions.extract_single_file') || 'Extraire uniquement ce fichier'}"><i class="fa-solid fa-download"></i></button>` : ''}<button type="button" class="file-favorite-btn ${isFav ? 'favorited' : ''}" onclick="toggleFavorite('${escapeJs(f.path)}', event); return false;" title="${isFav ? I18N.t('toast.favorites_removed') : I18N.t('toast.favorites_added')}"><i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-star"></i></button><button type="button" class="file-tag-btn" onclick="event.stopPropagation(); openTagModal('${escapeJs(f.path)}')" title="${I18N.t('modal.manage_tags')}"><i class="fa-solid fa-tag"></i></button></div><div class="file-info"><div class="file-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>${f.tags?.length ? `<div class="file-tags">${f.tags.map(t => `<span class="file-tag" style="background:${t.color}20;color:${t.color};border-color:${t.color}">${escapeHtml(t.name)}</span>`).join('')}</div>` : ''}</div></div>`;
 }
 // ============================================
 // ✅ SÉLECTION MULTIPLE
@@ -2902,6 +2908,7 @@ window.openCreateFolderModal = async function() {
 const sourceSelect = document.getElementById('download-source');
 const selectedSourceId = sourceSelect ? sourceSelect.value : null;
 let parentPath = null;
+let sourceConfig = null;
 if (selectedSourceId && selectedSourceId !== "") {
     const selectedOption = sourceSelect.options[sourceSelect.selectedIndex];
     const match = selectedOption.text.match(/\((.*?)\)$/);
@@ -2910,6 +2917,18 @@ if (selectedSourceId && selectedSourceId !== "") {
     } else {
         showToast(I18N.t('toast.source_path_missing') || 'Impossible de trouver le chemin', 'warning');
         return;
+    }
+    try {
+        const srcRes = await fetch(`${API}/api/sources`);
+        if (srcRes.ok) {
+            const allSources = await srcRes.json();
+            const matchedSource = allSources.find(s => String(s.id) === String(selectedSourceId));
+            if (matchedSource && matchedSource.config) {
+                sourceConfig = matchedSource.config;
+            }
+        }
+    } catch (err) {
+        console.error('[Create Folder] Impossible de récupérer la config de la source', err);
     }
 } else {
     showToast(I18N.t('toast.select_parent_folder') || 'Sélectionnez un dossier parent', 'info');
@@ -2973,7 +2992,8 @@ const createFolder = async () => {
             body: JSON.stringify({
                 folder_path: newFolderPath,
                 folder_name: cleanFolderName,
-                add_as_source: true
+                add_as_source: true,
+                config: sourceConfig
             })
         });
         const result = await createRes.json();
@@ -3225,25 +3245,68 @@ viewerCamera = null;
 viewerMesh = null;
 }
 
-function open3DViewer(fileName, filePath) {
+let viewerCurrentPlate = 1;
+let viewerPlateCount = 1;
+let viewerCurrentPath = null;
+
+function open3DViewer(fileName, filePath, plateCount) {
 document.getElementById('viewer-title').innerHTML = `<i class="fa-solid fa-cube"></i> ${fileName}`;
 openModal('modal-3d-viewer');
-load3DModel(filePath);
+viewerCurrentPath = filePath;
+viewerPlateCount = (plateCount && plateCount > 1) ? plateCount : 1;
+viewerCurrentPlate = 1;
+load3DModel(filePath, viewerCurrentPlate);
+updatePlateNavUI();
 }
+
+function updatePlateNavUI() {
+    const prevBtn = document.getElementById('viewer-plate-prev');
+    const nextBtn = document.getElementById('viewer-plate-next');
+    const label = document.getElementById('viewer-plate-label');
+    if (!prevBtn || !nextBtn || !label) return;
+    if (viewerPlateCount <= 1) {
+        prevBtn.style.display = 'none';
+        nextBtn.style.display = 'none';
+        label.style.display = 'none';
+        return;
+    }
+    prevBtn.style.display = viewerCurrentPlate > 1 ? 'flex' : 'none';
+    nextBtn.style.display = viewerCurrentPlate < viewerPlateCount ? 'flex' : 'none';
+    label.style.display = 'block';
+    label.textContent = `${I18N.t('viewer.plate') || 'Plateau'} ${viewerCurrentPlate}/${viewerPlateCount}`;
+}
+
+function goToPlate(delta) {
+    const newPlate = viewerCurrentPlate + delta;
+    if (newPlate < 1 || newPlate > viewerPlateCount || !viewerCurrentPath) return;
+    viewerCurrentPlate = newPlate;
+    load3DModel(viewerCurrentPath, viewerCurrentPlate);
+    updatePlateNavUI();
+}
+
 function close3DViewer() {
 disposeViewer3D();
 closeModal('modal-3d-viewer');
+viewerCurrentPath = null;
+viewerPlateCount = 1;
+viewerCurrentPlate = 1;
 }
-function load3DModel(filePath) {
+let viewer3DLoadToken = 0;
+
+function load3DModel(filePath, plateIndex) {
 disposeViewer3D();
+const myToken = ++viewer3DLoadToken;
 const container = document.getElementById('viewer-canvas-container');
 container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin fa-2x"></i></div>`;
-fetch(`${API}/api/file/mesh?path=${encodeURIComponent(filePath)}`)
+let meshUrl = `${API}/api/file/mesh?path=${encodeURIComponent(filePath)}`;
+if (plateIndex) meshUrl += `&plate=${plateIndex}`;
+fetch(meshUrl)
 .then(res => {
 if (!res.ok) throw new Error(I18N.t('toast.file_not_found'));
 return res.blob();
 })
 .then(blob => {
+if (myToken !== viewer3DLoadToken) return; // une requête plus récente a pris le relais
 const url = URL.createObjectURL(blob);
 viewerScene = new THREE.Scene();
 viewerScene.background = new THREE.Color('#1a1d23');
@@ -3255,19 +3318,28 @@ viewerRenderer.setPixelRatio(window.devicePixelRatio);
 container.innerHTML = '';
 container.appendChild(viewerRenderer.domElement);
 
-    viewerControls = new THREE.OrbitControls(viewerCamera, viewerRenderer.domElement);
-    viewerControls.enableDamping = true;
-    viewerControls.dampingFactor = 0.05;
-    
+    viewerControls = new THREE.TrackballControls(viewerCamera, viewerRenderer.domElement);
+    viewerControls.rotateSpeed = 4.0;
+    viewerControls.zoomSpeed = 1.2;
+    viewerControls.panSpeed = 0.8;
+    viewerControls.dynamicDampingFactor = 0.15;
+    viewerControls.staticMoving = false;
+
     const ambientLight = new THREE.AmbientLight(0x404040, 2);
     viewerScene.add(ambientLight);
+    // La lumière directionnelle est attachée à la caméra (comme une lampe
+    // frontale) plutôt que fixée dans l'espace du monde : elle suit ainsi
+    // toujours le point de vue au lieu de sembler "tourner" sur le modèle
+    // quand on orbite/tourne autour de celui-ci.
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(50, 50, 50);
-    viewerScene.add(directionalLight);
+    directionalLight.position.set(0, 0, 1);
+    viewerCamera.add(directionalLight);
+    viewerScene.add(viewerCamera);
     
     const loader = new THREE.STLLoader();
     
     loader.load(url, function (geometry) {
+        if (myToken !== viewer3DLoadToken) { URL.revokeObjectURL(url); return; }
         const material = new THREE.MeshPhongMaterial({ color: 0x4ea1d3, specular: 0x111111, shininess: 200, flatShading: false });
         geometry.computeBoundingBox();
         const center = new THREE.Vector3();
@@ -3295,12 +3367,14 @@ container.appendChild(viewerRenderer.domElement);
         URL.revokeObjectURL(url);
         
     }, undefined, function (error) {
+        if (myToken !== viewer3DLoadToken) return;
         console.error('[3D Viewer] Fichier illisible/corrompu:', error);
         viewerActive = false;
         container.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;color:var(--danger);"><i class="fa-solid fa-triangle-exclamation fa-2x"></i><span>${I18N.t('toast.file_unreadable') || 'Fichier illisible ou corrompu'}</span></div>`;
     });
 })
 .catch(err => {
+    if (myToken !== viewer3DLoadToken) return;
     console.error('[3D Viewer]', err);
     container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--danger);">${I18N.t('toast.connection_error')}</div>`;
 });
@@ -5317,15 +5391,6 @@ document.getElementById('delete-selected-btn')?.addEventListener('click', () => 
 // ============================================
 // 📂 DRAG & DROP — ajout de fichiers/dossiers par glisser-déposer
 // ============================================
-document.getElementById('files-grid')?.addEventListener('contextmenu', (e) => {
-    if (isSelectionMode) return; 
-    const card = e.target.closest('.file-card');
-    if (!card) return;
-    const path = card.dataset.path;
-    const name = card.dataset.name;
-    if (!path) return;
-    openFileCtxMenu(e, path, name);
-});
 
 (function initDragDropSources() {
     const dropZone = document.querySelector('.main-content');
@@ -5701,6 +5766,18 @@ const mobileSearchInput = document.getElementById('mobile-search-input');
 globalSearchInput?.addEventListener('input', (e) => handleSearchInput(e.target.value, e.target));
 mobileSearchInput?.addEventListener('input', (e) => handleSearchInput(e.target.value, e.target));
 
+// ============================================
+// ❌ CROIX POUR VIDER LA RECHERCHE
+// ============================================
+function clearSearchInput(input) {
+    if (!input) return;
+    input.value = '';
+    handleSearchInput('', input);
+    input.focus();
+}
+document.getElementById('global-search-clear')?.addEventListener('click', () => clearSearchInput(globalSearchInput));
+document.getElementById('mobile-search-clear')?.addEventListener('click', () => clearSearchInput(mobileSearchInput));
+
 window.runSemanticSearch = runSemanticSearch;
 window.setSearchMode     = setSearchMode;
 
@@ -5957,7 +6034,7 @@ return;
 empty.classList.add('hidden');
 let html = '';
 repairFilesList.forEach(f => {
-html += `<div class="repair-card" data-path="${escapeJs(f.path)}"><div class="repair-thumb">${f.has_thumb ? `<img src="${API}/api/thumb?path=${encodeURIComponent(f.path)}" alt="${escapeHtml(f.name)}">` : `<i class="fa-solid fa-cube"></i>`}<span class="repair-badge-warn"><i class="fa-solid fa-triangle-exclamation"></i> ${I18N.t('repair.non_manifold_badge')}</span></div><div class="repair-info"><div class="repair-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div><div class="repair-meta">${formatSize(f.size)} • ${(f.extension || '.stl').toUpperCase()}</div><button class="btn btn-primary btn-sm repair-btn" onclick="repairFile('${escapeJs(f.path)}', this)"><i class="fa-solid fa-wrench"></i> ${I18N.t('actions.repair') || 'Réparer'}</button></div></div>`;
+html += `<div class="repair-card" data-path="${escapeHtml(f.path)}"><div class="repair-thumb">${f.has_thumb ? `<img src="${API}/api/thumb?path=${encodeURIComponent(f.path)}" alt="${escapeHtml(f.name)}">` : `<i class="fa-solid fa-cube"></i>`}<span class="repair-badge-warn"><i class="fa-solid fa-triangle-exclamation"></i> ${I18N.t('repair.non_manifold_badge')}</span></div><div class="repair-info"><div class="repair-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div><div class="repair-meta">${formatSize(f.size)} • ${(f.extension || '.stl').toUpperCase()}</div><button class="btn btn-primary btn-sm repair-btn" onclick="repairFile('${escapeJs(f.path)}', this)"><i class="fa-solid fa-wrench"></i> ${I18N.t('actions.repair') || 'Réparer'}</button></div></div>`;
 });
 if (unanalyzedFiles.length > 0 && !isRepairScanning) {
 html += `<div class="repair-card" style="grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;border:2px dashed var(--border);background:transparent;"><i class="fa-solid fa-magnifying-glass" style="font-size:32px;color:var(--text-muted);margin-bottom:12px;"></i><p style="color:var(--text-secondary);margin-bottom:16px;font-size:14px;">${I18N.tp('repair.unanalyzed_count', unanalyzedFiles.length, { count: unanalyzedFiles.length })}</p><button class="btn btn-primary" onclick="scanUnanalyzedFiles()" style="gap:8px;"><i class="fa-solid fa-play"></i> ${I18N.t('repair.analyze_btn')}</button><p style="color:var(--text-muted);font-size:12px;margin-top:10px;">${I18N.t('repair.scan_limit', { max: MAX_FILES_TO_SCAN })}</p></div>`;
@@ -6144,7 +6221,7 @@ empty.classList.add('hidden');
 grid.innerHTML = list.map(f => {
     const isSelected = converterSelectedFiles.has(f.path);
     const extLabel = (f.extension || '').replace('.', '').toUpperCase();
-    return `<div class="repair-card converter-card${isSelected ? ' selected' : ''}" data-path="${escapeJs(f.path)}">
+    return `<div class="repair-card converter-card${isSelected ? ' selected' : ''}" data-path="${escapeHtml(f.path)}">
         <div class="converter-card-checkbox" onclick="event.stopPropagation(); toggleConverterFileSelection('${escapeJs(f.path)}')">
             <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation();" onchange="toggleConverterFileSelection('${escapeJs(f.path)}')">
         </div>
@@ -8157,6 +8234,26 @@ async function exportDiagnosticLogs(btn) {
 const originalHtml = btn.innerHTML;
 btn.disabled = true;
 btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${I18N.t('about.exporting_logs') || 'Génération...'}`;
+
+// En mode application desktop (pywebview), on écrit directement dans le
+// dossier Téléchargements de l'utilisateur, sans passer par le navigateur.
+if (window.pywebview && window.pywebview.api && window.pywebview.api.save_diagnostic_logs) {
+    try {
+        const result = await window.pywebview.api.save_diagnostic_logs();
+        if (result && result.success) {
+            showToast(I18N.t('toast.logs_exported') || `Logs exportés : ${result.path}`, 'success');
+        } else if (!(result && result.cancelled)) {
+            showToast((result && result.error) || I18N.t('toast.connection_error'), 'error');
+        }
+    } catch (err) {
+        showToast(err.message || I18N.t('toast.connection_error'), 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+    return;
+}
+
 try {
 const res = await fetch(`${API}/api/logs/export`);
 if (!res.ok) {
@@ -9594,7 +9691,7 @@ async function refreshProjectDetail(projectId) {
             const thumbUrl = projectFileThumb(f.file_path);
             const isDone = f.quantity_printed >= f.quantity_needed;
             const safeId = f.file_path.replace(/[^\w]/g, '-');
-            return `<div class="project-file-row${isDone ? ' project-file-row--done' : ''}" data-path="${escapeJs(f.file_path)}">
+            return `<div class="project-file-row${isDone ? ' project-file-row--done' : ''}" data-path="${escapeHtml(f.file_path)}">
                 <div class="project-file-thumb">${thumbUrl ? `<img src="${thumbUrl}">` : `<i class="fa-solid fa-cube"></i>`}</div>
                 <div class="project-file-info">
                     <span class="project-file-name" title="${escapeHtml(f.file_path)}">${escapeHtml(file?.name || f.file_path.split(/[\\/]/).pop())}</span>
