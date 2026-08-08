@@ -65,7 +65,18 @@ thumb_generation_queue = queue.Queue()
 metadata_generation_queue = queue.Queue()
 currently_downloading_paths = set()
 is_generation_running = False
-ignored_files_cache = set()
+ignored_files_cache = {}  
+IGNORED_FILE_COOLDOWN_S = 600  
+
+def _is_ignored_recently(path):
+    ts = ignored_files_cache.get(path)
+    if ts is None:
+        return False
+    return (time.time() - ts) < IGNORED_FILE_COOLDOWN_S
+
+def _mark_ignored(path):
+    ignored_files_cache[path] = time.time()
+
 scan_lock = threading.Lock()
 matplotlib_render_lock = threading.Lock()
 
@@ -198,6 +209,7 @@ PRINT_PHOTOS_DIR = os.path.join(DATA_DIR, "print_photos")
 os.makedirs(PRINT_PHOTOS_DIR, exist_ok=True)
 CACHE_FILE = os.path.join(DATA_DIR, "file_cache.json")
 CACHE_DURATION = 18000
+CACHE_SCHEMA_VERSION = 2
 REPAIR_IGNORE_FILE = os.path.join(DATA_DIR, "repair_ignored.json")
 repair_ignored_cache = _load_repair_ignored()
 
@@ -1646,6 +1658,7 @@ def save_file_cache(files, sources):
         cache = {
             'timestamp': time.time(),
             'cache_key': get_cache_key(sources),
+            'schema_version': CACHE_SCHEMA_VERSION,
             'files': files
         }
         with cache_file_lock:
@@ -1662,6 +1675,128 @@ def invalidate_cache():
             os.remove(CACHE_FILE)
     except:
         pass
+
+
+def _migrate_file_cache_schema():
+    try:
+        if not os.path.exists(CACHE_FILE):
+            return
+        with open(CACHE_FILE, 'r', encoding='utf-8') as f:
+            cache = json.load(f)
+        if not isinstance(cache, dict) or 'files' not in cache:
+            return
+        if cache.get('schema_version') == CACHE_SCHEMA_VERSION:
+            return 
+
+        files = cache.get('files') or []
+        to_patch = [f for f in files if (f.get('extension') or '').lower() == '.3mf'
+                    and ('plate_count' not in f or 'multi_plate' not in f)]
+
+        if to_patch:
+            smb_sources_by_name = {}
+            try:
+                conn = get_db()
+                rows = conn.execute("SELECT * FROM sources WHERE type = 'smb'").fetchall()
+                conn.close()
+                for row in rows:
+                    s = dict(row)
+                    config = json.loads(s.get('config') or '{}')
+                    kwargs = {}
+                    if config.get('username'):
+                        kwargs['username'] = config['username']
+                    if config.get('password'):
+                        kwargs['password'] = config['password']
+                    smb_sources_by_name[s['name']] = kwargs
+            except Exception as e:
+                app_logger.info(f"[CACHE] Migration: lecture sources SMB impossible ({e}), fichiers réseau ignorés")
+
+            patched = 0
+            for f in to_patch:
+                path = f.get('path', '')
+                try:
+                    is_smb = path.startswith('//') or path.startswith('\\\\')
+                    if is_smb:
+                        kwargs = smb_sources_by_name.get(f.get('source'))
+                        if kwargs is None:
+                            continue 
+                        smb_path = path.replace('\\\\', '//').replace('\\', '/')
+                        with smbclient.open_file(smb_path, mode='rb', **kwargs) as smb_f:
+                            plate_count = get_3mf_plate_count(smb_f)
+                    else:
+                        if not os.path.exists(path):
+                            continue
+                        plate_count = get_3mf_plate_count(path)
+                    f['plate_count'] = plate_count
+                    f['multi_plate'] = plate_count > 1
+                    patched += 1
+                except Exception:
+                    continue  
+
+            if patched:
+                app_logger.info(
+                    f"[CACHE] Migration schéma v{CACHE_SCHEMA_VERSION} : {patched}/{len(to_patch)} "
+                    f"fichier(s) .3mf mis à jour (détection plateaux multiples)."
+                )
+
+        cache['schema_version'] = CACHE_SCHEMA_VERSION
+        with cache_file_lock:
+            tmp_path = CACHE_FILE + '.tmp'
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(cache, f, ensure_ascii=False, separators=(',', ':'))
+            _atomic_replace(tmp_path, CACHE_FILE)
+    except Exception as e:
+        app_logger.info(f"[CACHE] Migration schéma échouée, cache invalidé par précaution: {e}")
+        invalidate_cache()
+
+
+def _backfill_multiplate_tags():
+    try:
+        if not os.path.exists(CACHE_FILE):
+            return
+        with open(CACHE_FILE, 'r', encoding='utf-8') as f:
+            cache = json.load(f)
+        if not isinstance(cache, dict):
+            return
+        if cache.get('multiplate_tags_backfilled'):
+            return
+
+        files = cache.get('files') or []
+        multi_plate_paths = [
+            (f.get('path') or '').replace('\\', '/')
+            for f in files
+            if f.get('multi_plate') and f.get('path')
+        ]
+
+        if multi_plate_paths:
+            conn = get_db()
+            try:
+                tag_id = _get_or_create_tag(conn, MULTI_PLATE_TAG_NAME)
+                if tag_id:
+                    tagged = 0
+                    for path in multi_plate_paths:
+                        try:
+                            conn.execute(
+                                "INSERT OR IGNORE INTO file_tags (file_path, tag_id) VALUES (?, ?)",
+                                (path, tag_id)
+                            )
+                            tagged += 1
+                        except Exception:
+                            continue
+                    conn.commit()
+                    app_logger.info(
+                        f"[TAGS] Rattrapage 'Multi plateaux' : {tagged}/{len(multi_plate_paths)} fichier(s) tagué(s)."
+                    )
+            finally:
+                conn.close()
+
+        cache['multiplate_tags_backfilled'] = True
+        with cache_file_lock:
+            tmp_path = CACHE_FILE + '.tmp'
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(cache, f, ensure_ascii=False, separators=(',', ':'))
+            _atomic_replace(tmp_path, CACHE_FILE)
+    except Exception as e:
+        app_logger.info(f"[TAGS] Rattrapage 'Multi plateaux' échoué (sera retenté au prochain démarrage): {e}")
 
 # ============================================
 # 🔄 FILES D'ATTENTE BACKGROUND
@@ -1682,7 +1817,7 @@ def mark_download_complete_and_refresh_thumbnail(dest_path):
         thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
         if os.path.exists(thumb_path):
             os.remove(thumb_path)
-        ignored_files_cache.discard(normalized)
+        ignored_files_cache.pop(normalized, None)
         thumb_generation_queue.put({
             'path': dest_path,
             'thumb_path': thumb_path,
@@ -1711,8 +1846,8 @@ def process_generation_queue():
             try:
                 file_path = task.get('path')
                 thumb_path = task.get('thumb_path')
-                if file_path in ignored_files_cache:
-                    app_logger.info(f"[SKIP] Fichier déjà ignoré: {os.path.basename(file_path)}")
+                if _is_ignored_recently(file_path):
+                    app_logger.info(f"[SKIP] Fichier déjà ignoré (retenté dans <10 min): {os.path.basename(file_path)}")
                     time.sleep(0.05)  
                     continue
                 if file_path.replace('\\', '/') in currently_downloading_paths:
@@ -1721,6 +1856,7 @@ def process_generation_queue():
                 is_smb = file_path.startswith('//') or file_path.startswith('\\\\')
                 is_virtual = is_virtual_archive_path(file_path)
                 file_accessible = False
+                smb_error = None
                 if is_virtual:
                     archive_path, _internal = split_virtual_archive_path(file_path)
                     file_accessible = os.path.exists(archive_path)
@@ -1731,11 +1867,12 @@ def process_generation_queue():
                         smb_path = file_path.replace('\\\\', '//').replace('\\', '/')
                         smbclient.stat(smb_path, connection_timeout=8)
                         file_accessible = True
-                    except:
+                    except Exception as e:
                         file_accessible = False
+                        smb_error = e
                 if not file_accessible:
-                    app_logger.info(f"[SKIP] Fichier inaccessible: {os.path.basename(file_path)}")
-                    ignored_files_cache.add(file_path)
+                    app_logger.info(f"[SKIP] Fichier inaccessible: {file_path}" + (f" ({smb_error})" if smb_error else ""))
+                    ignored_files_cache[file_path] = time.time()
                     consecutive_errors += 1
                     if consecutive_errors > 10:
                         app_logger.info(f"[ABORT #{worker_id}] Trop d'erreurs, pause 60s...")
@@ -1808,7 +1945,7 @@ def process_generation_queue():
                             for f in sorted(files, key=str.lower):
                                 if f.lower().endswith(('.stl', '.obj', '.3mf')):
                                     file_path = os.path.join(root, f).replace('\\', '/')
-                                    if file_path in ignored_files_cache:
+                                    if _is_ignored_recently(file_path):
                                         continue
                                     normalized_path = file_path
                                     thumb_filename = hashlib.md5(normalized_path.encode()).hexdigest()
@@ -1873,19 +2010,218 @@ def _concatenate_filtering_outliers(geoms):
     except Exception:
         return kept[0]
 
-def load_3mf_mesh(source):
+def _parse_3mf_plate_object_ids(source):
+    try:
+        is_bytes = isinstance(source, (bytes, bytearray))
+        zip_source = io.BytesIO(source) if is_bytes else source
+        with zipfile.ZipFile(zip_source, 'r') as zf:
+            settings_path = next((n for n in zf.namelist() if n.lower().endswith('model_settings.config')), None)
+            if not settings_path:
+                return None
+            with zf.open(settings_path) as f:
+                tree = _safe_xml_parse(f)
+                root = tree.getroot()
+                plates = {}
+                for i, plate_el in enumerate(root.findall('.//plate')):
+                    plater_id = None
+                    for meta in plate_el.findall('metadata'):
+                        if meta.get('key') == 'plater_id':
+                            plater_id = meta.get('value')
+                            break
+                    if not plater_id:
+                        plater_id = str(i + 1)
+                    obj_ids = set()
+                    for inst in plate_el.findall('.//model_instance'):
+                        for meta in inst.findall('metadata'):
+                            if meta.get('key') == 'object_id':
+                                obj_ids.add(meta.get('value'))
+                    if obj_ids:
+                        plates[plater_id] = obj_ids
+                return plates if len(plates) > 1 else None
+    except Exception:
+        return None
+
+
+def get_3mf_plate_count(source):
+    plates = _parse_3mf_plate_object_ids(source)
+    return len(plates) if plates else 1
+
+
+def _resolve_3mf_plate_mesh(source, wanted_ids):
+    try:
+        is_bytes = isinstance(source, (bytes, bytearray))
+        zip_source = io.BytesIO(source) if is_bytes else source
+        with zipfile.ZipFile(zip_source, 'r') as zf:
+            model_files = [n for n in zf.namelist() if n.lower().endswith('.model')]
+            model_files.sort(key=lambda n: (0 if '3d/' in n.lower() else 1, n))
+
+            for model_path in model_files:
+                try:
+                    with zf.open(model_path) as xml_file:
+                        tree = _safe_xml_parse(xml_file)
+                        xml_root = tree.getroot()
+                except Exception:
+                    continue
+
+                ns = {'ns': 'http://schemas.microsoft.com/3dmanufacturing/core/2015/02'}
+
+                def _find(el, tag):
+                    found = el.find(f'ns:{tag}', ns)
+                    return found if found is not None else el.find(tag)
+
+                def _findall(el, tag):
+                    found = el.findall(f'ns:{tag}', ns)
+                    return found if found else el.findall(tag)
+
+                objects_by_id = {}
+                for obj in xml_root.findall('.//ns:object', ns) or xml_root.findall('.//object'):
+                    oid = obj.get('id')
+                    if oid and oid not in objects_by_id:
+                        objects_by_id[oid] = obj
+
+                if not objects_by_id:
+                    continue
+
+                def _parse_transform(s):
+                    if not s:
+                        return np.eye(4)
+                    try:
+                        vals = [float(x) for x in s.split()]
+                        if len(vals) != 12:
+                            return np.eye(4)
+                        m = np.eye(4)
+                        m[0, 0], m[1, 0], m[2, 0] = vals[0], vals[1], vals[2]
+                        m[0, 1], m[1, 1], m[2, 1] = vals[3], vals[4], vals[5]
+                        m[0, 2], m[1, 2], m[2, 2] = vals[6], vals[7], vals[8]
+                        m[0, 3], m[1, 3], m[2, 3] = vals[9], vals[10], vals[11]
+                        return m
+                    except Exception:
+                        return np.eye(4)
+
+                def _resolve(oid, transform, depth=0):
+                    out = []
+                    if depth > 8 or oid not in objects_by_id:
+                        return out
+                    obj = objects_by_id[oid]
+
+                    obj_type = obj.get('type', 'model')
+                    mesh_el = _find(obj, 'mesh') if obj_type in ('model', 'solid', '') else None
+                    if mesh_el is not None:
+                        verts_el = _find(mesh_el, 'vertices')
+                        tris_el = _find(mesh_el, 'triangles')
+                        if verts_el is not None and tris_el is not None:
+                            vertices, faces = [], []
+                            for v in list(verts_el):
+                                try:
+                                    vertices.append([float(v.get('x', 0)),
+                                                     float(v.get('y', 0)),
+                                                     float(v.get('z', 0))])
+                                except Exception:
+                                    pass
+                            for t in list(tris_el):
+                                try:
+                                    faces.append([int(t.get('v1', 0)),
+                                                  int(t.get('v2', 0)),
+                                                  int(t.get('v3', 0))])
+                                except Exception:
+                                    pass
+                            if vertices and faces:
+                                varr = np.array(vertices, dtype=np.float64)
+                                farr = np.array(faces, dtype=np.int32)
+                                if not np.allclose(transform, np.eye(4)):
+                                    varr = (np.hstack([varr, np.ones((len(varr), 1))]) @ transform.T)[:, :3]
+                                out.append((varr, farr))
+
+                    components_el = _find(obj, 'components')
+                    if components_el is not None:
+                        for comp in _findall(components_el, 'component'):
+                            comp_id = comp.get('objectid')
+                            if not comp_id:
+                                continue
+                            comp_tf = _parse_transform(comp.get('transform'))
+                            out.extend(_resolve(comp_id, transform @ comp_tf, depth + 1))
+                    return out
+
+                # Récupère la transformation de placement de chaque item du
+                build_el = _find(xml_root, 'build')
+                build_items = []
+                if build_el is not None:
+                    for item in _findall(build_el, 'item'):
+                        item_id = item.get('objectid')
+                        if item_id:
+                            build_items.append((item_id, _parse_transform(item.get('transform'))))
+
+                all_parts = []
+                for item_id, item_tf in build_items:
+                    if item_id in wanted_ids:
+                        all_parts.extend(_resolve(item_id, item_tf))
+
+                if all_parts:
+                    sub_meshes = [trimesh.Trimesh(vertices=v, faces=f, process=False) for v, f in all_parts]
+                    mesh = _concatenate_filtering_outliers(sub_meshes) if len(sub_meshes) > 1 else sub_meshes[0]
+                    if mesh is not None and not mesh.is_empty and len(mesh.vertices) > 0:
+                        return mesh
+        return None
+    except Exception as e:
+        app_logger.debug(f"[3MF] _resolve_3mf_plate_mesh échoué: {e}")
+        return None
+
+
+def load_3mf_mesh(source, plate_index=None):
     is_bytes = isinstance(source, (bytes, bytearray))
     display_name = "archive (mémoire)" if is_bytes else os.path.basename(source)
+
+    plates = _parse_3mf_plate_object_ids(source)
+    plate_object_ids = None
+    if plates:
+        plate_keys_sorted = sorted(plates.keys(), key=lambda k: (len(k), k))
+        wanted_idx = (plate_index - 1) if plate_index else 0
+        wanted_idx = max(0, min(wanted_idx, len(plate_keys_sorted) - 1))
+        selected_key = plate_keys_sorted[wanted_idx]
+        plate_object_ids = plates[selected_key]
+        app_logger.info(
+            f"[3MF] {len(plates)} plateaux détectés dans {display_name}, "
+            f"rendu du plateau '{selected_key}' uniquement ({len(plate_object_ids)} objet(s))"
+        )
+
+        resolved_mesh = _resolve_3mf_plate_mesh(source, plate_object_ids)
+        if resolved_mesh is not None:
+            app_logger.info(f"[3MF] Plateau isolé via résolution XML directe ({len(resolved_mesh.vertices)} sommets)")
+            return resolved_mesh
+        app_logger.debug(f"[3MF] Résolution XML directe infructueuse pour {display_name}, repli sur trimesh")
+
     try:
         if is_bytes:
-            loaded = trimesh.load(io.BytesIO(source), file_type='3mf', force='mesh')
+            loaded = trimesh.load(io.BytesIO(source), file_type='3mf')
         else:
-            loaded = trimesh.load(source, force='mesh')
+            loaded = trimesh.load(source)
+
         if isinstance(loaded, trimesh.Scene):
-            geoms = [m for m in loaded.geometry.values()
-                     if hasattr(m, 'vertices') and len(m.vertices) > 0]
-            if geoms:
-                mesh = _concatenate_filtering_outliers(geoms)
+            all_geoms = [m for m in loaded.geometry.values()
+                         if hasattr(m, 'vertices') and len(m.vertices) > 0]
+
+            if plate_object_ids is not None:
+                filtered_geoms = []
+                try:
+                    for node_name in loaded.graph.nodes_geometry:
+                        candidate_ids = {str(node_name), str(node_name).split('/')[-1]}
+                        if candidate_ids & plate_object_ids:
+                            transform, geom_name = loaded.graph[node_name]
+                            geom = loaded.geometry.get(geom_name)
+                            if geom is not None and hasattr(geom, 'vertices') and len(geom.vertices) > 0:
+                                filtered_geoms.append(geom)
+                except Exception as e:
+                    app_logger.debug(f"[3MF] Filtrage plateau via scène impossible pour {display_name}: {e}")
+
+                if filtered_geoms:
+                    mesh = _concatenate_filtering_outliers(filtered_geoms)
+                    if mesh is not None and not mesh.is_empty and len(mesh.vertices) > 0:
+                        app_logger.info(f"[3MF] Plateau isolé avec succès ({len(filtered_geoms)} géométrie(s))")
+                        return mesh
+                app_logger.debug(f"[3MF] Mapping plateau→géométrie impossible pour {display_name}, fusion complète en repli")
+
+            if all_geoms:
+                mesh = _concatenate_filtering_outliers(all_geoms)
                 if mesh is not None and not mesh.is_empty and len(mesh.vertices) > 0:
                     return mesh
         elif loaded is not None and not loaded.is_empty and len(loaded.vertices) > 0:
@@ -1893,71 +2229,83 @@ def load_3mf_mesh(source):
     except Exception as e:
         app_logger.debug(f"[3MF] trimesh.load direct échoué pour {display_name}: {e}")
 
-    try:
-        zip_source = io.BytesIO(source) if is_bytes else source
-        with zipfile.ZipFile(zip_source, 'r') as zf:
-            model_files = [n for n in zf.namelist() if n.lower().endswith('.model')]
-            model_files.sort(key=lambda n: (0 if '3D/' in n or '3d/' in n else 1, n))
-            for model_path in model_files:
-                try:
-                    with zf.open(model_path) as xml_file:
-                        tree = _safe_xml_parse(xml_file)
-                        xml_root = tree.getroot()
-                        ns_uri = 'http://schemas.microsoft.com/3dmanufacturing/core/2015/02'
-                        ns = {'ns': ns_uri}
-                        meshes_data = []
-                        for tag in ['.//ns:object', './/object']:
-                            try:
-                                objects = xml_root.findall(tag, ns) if tag.startswith('.//ns:') else xml_root.findall(tag)
-                            except Exception:
-                                objects = []
-                            for obj in objects:
-                                obj_type = obj.get('type', 'model')
-                                if obj_type not in ('model', 'solid', ''):
-                                    continue
-                                mesh_el = (obj.find('ns:mesh', ns) or obj.find('mesh'))
-                                if mesh_el is None:
-                                    continue
-                                verts_el = (mesh_el.find('ns:vertices', ns) or mesh_el.find('vertices'))
-                                tris_el  = (mesh_el.find('ns:triangles', ns) or mesh_el.find('triangles'))
-                                if verts_el is None or tris_el is None:
-                                    continue
-                                vertices = []
-                                for v in list(verts_el):
-                                    try:
-                                        vertices.append([float(v.get('x', 0)),
-                                                         float(v.get('y', 0)),
-                                                         float(v.get('z', 0))])
-                                    except Exception:
-                                        pass
-                                faces = []
-                                for t in list(tris_el):
-                                    try:
-                                        faces.append([int(t.get('v1', 0)),
-                                                      int(t.get('v2', 0)),
-                                                      int(t.get('v3', 0))])
-                                    except Exception:
-                                        pass
-                                if vertices and faces:
-                                    meshes_data.append((np.array(vertices, dtype=np.float64),
-                                                        np.array(faces,    dtype=np.int32)))
-                        if meshes_data:
-                            sub_meshes = [trimesh.Trimesh(vertices=v, faces=f, process=False)
-                                          for v, f in meshes_data]
-                            mesh = _concatenate_filtering_outliers(sub_meshes) if len(sub_meshes) > 1 else sub_meshes[0]
-                            if mesh is not None and not mesh.is_empty and len(mesh.vertices) > 0:
-                                app_logger.info(f"[3MF] Mesh extrait via XML ({len(mesh.vertices)} sommets)")
-                                return mesh
-                except Exception as e:
-                    app_logger.debug(f"[3MF] Erreur parsing {model_path}: {e}")
-                    continue
-    except Exception as e:
-        app_logger.warning(f"[3MF] Erreur extraction XML {display_name}: {e}")
+    def _parse_manual(filter_ids):
+        try:
+            zip_source = io.BytesIO(source) if is_bytes else source
+            with zipfile.ZipFile(zip_source, 'r') as zf:
+                model_files = [n for n in zf.namelist() if n.lower().endswith('.model')]
+                model_files.sort(key=lambda n: (0 if '3D/' in n or '3d/' in n else 1, n))
+                for model_path in model_files:
+                    try:
+                        with zf.open(model_path) as xml_file:
+                            tree = _safe_xml_parse(xml_file)
+                            xml_root = tree.getroot()
+                            ns_uri = 'http://schemas.microsoft.com/3dmanufacturing/core/2015/02'
+                            ns = {'ns': ns_uri}
+                            meshes_data = []
+                            for tag in ['.//ns:object', './/object']:
+                                try:
+                                    objects = xml_root.findall(tag, ns) if tag.startswith('.//ns:') else xml_root.findall(tag)
+                                except Exception:
+                                    objects = []
+                                for obj in objects:
+                                    obj_type = obj.get('type', 'model')
+                                    if obj_type not in ('model', 'solid', ''):
+                                        continue
+                                    if filter_ids is not None and obj.get('id') not in filter_ids:
+                                        continue
+                                    mesh_el = (obj.find('ns:mesh', ns) or obj.find('mesh'))
+                                    if mesh_el is None:
+                                        continue
+                                    verts_el = (mesh_el.find('ns:vertices', ns) or mesh_el.find('vertices'))
+                                    tris_el  = (mesh_el.find('ns:triangles', ns) or mesh_el.find('triangles'))
+                                    if verts_el is None or tris_el is None:
+                                        continue
+                                    vertices = []
+                                    for v in list(verts_el):
+                                        try:
+                                            vertices.append([float(v.get('x', 0)),
+                                                             float(v.get('y', 0)),
+                                                             float(v.get('z', 0))])
+                                        except Exception:
+                                            pass
+                                    faces = []
+                                    for t in list(tris_el):
+                                        try:
+                                            faces.append([int(t.get('v1', 0)),
+                                                          int(t.get('v2', 0)),
+                                                          int(t.get('v3', 0))])
+                                        except Exception:
+                                            pass
+                                    if vertices and faces:
+                                        meshes_data.append((np.array(vertices, dtype=np.float64),
+                                                            np.array(faces,    dtype=np.int32)))
+                            if meshes_data:
+                                sub_meshes = [trimesh.Trimesh(vertices=v, faces=f, process=False)
+                                              for v, f in meshes_data]
+                                mesh = _concatenate_filtering_outliers(sub_meshes) if len(sub_meshes) > 1 else sub_meshes[0]
+                                if mesh is not None and not mesh.is_empty and len(mesh.vertices) > 0:
+                                    return mesh
+                    except Exception as e:
+                        app_logger.debug(f"[3MF] Erreur parsing {model_path}: {e}")
+                        continue
+        except Exception as e:
+            app_logger.warning(f"[3MF] Erreur extraction XML {display_name}: {e}")
+        return None
+
+    mesh = _parse_manual(plate_object_ids)
+    if mesh is None and plate_object_ids is not None:
+        app_logger.debug(f"[3MF] Filtrage du plateau vide pour {display_name}, repli sur tous les objets")
+        mesh = _parse_manual(None)
+
+    if mesh is not None:
+        app_logger.info(f"[3MF] Mesh extrait via XML ({len(mesh.vertices)} sommets)")
+        return mesh
 
     app_logger.warning(f"[3MF] ⚠️  Impossible de charger le mesh: {display_name}")
     return trimesh.Trimesh()
 
-def create_fallback_thumbnail(thumb_path, resolution=(320, 320)):
+def create_fallback_thumbnail(thumb_path, resolution=(512, 512)):
     try:
         logo_path = os.path.join(BASE_DIR, 'assets', 'logo-nom-stellio.png')
         img = Image.new('RGBA', resolution, (26, 29, 35, 255))
@@ -2013,7 +2361,7 @@ def _draw_fallback_cube(draw, center):
         (cube_center[0] - cube_size//2, cube_center[1])
     ], fill=(78, 161, 211, 180), outline=(100, 180, 230, 255))
 
-def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(320, 320), timeout_s=None):
+def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(512, 512), timeout_s=None):
     if timeout_s is None:
         timeout_s = get_thumb_timeout(stl_path)
 
@@ -2043,7 +2391,7 @@ def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(320, 320), tim
     return bool(result.get('value', False))
 
 
-def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(320, 320)):
+def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(512, 512)):
     try:
         is_smb = stl_path.startswith('//') or stl_path.startswith('\\\\')
         is_virtual = is_virtual_archive_path(stl_path)
@@ -2189,11 +2537,15 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(320, 320
                     fill_light = pyrender.DirectionalLight(color=[0.7, 0.85, 1.0], intensity=1.2)
                     scene.add(fill_light, pose=fill_pose)
 
-                    r = pyrender.OffscreenRenderer(resolution[0], resolution[1])
+                    ss = 2
+                    render_w, render_h = resolution[0] * ss, resolution[1] * ss
+                    r = pyrender.OffscreenRenderer(render_w, render_h)
                     color, _ = r.render(scene)
                     r.delete()
 
                 img = Image.fromarray(color)
+                if ss != 1:
+                    img = img.resize(resolution, Image.Resampling.LANCZOS)
                 img.save(thumb_path, quality=92, method=6)
 
                 if tmp_path and os.path.exists(tmp_path):
@@ -2218,7 +2570,7 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(320, 320
         app_logger.error(f"[ERROR] generate_thumbnail_pyrender {os.path.basename(stl_path)}: {e}")
         return False
 
-def _generate_thumbnail_raster(mesh, thumb_path, resolution=(320, 320)):
+def _generate_thumbnail_raster(mesh, thumb_path, resolution=(512, 512)):
     try:
         vertices = mesh.vertices
         faces = mesh.faces
@@ -2337,7 +2689,7 @@ def _generate_thumbnail_raster(mesh, thumb_path, resolution=(320, 320)):
         app_logger.warning(f"[ERROR] Rendu rapide (raster) {os.path.basename(thumb_path)}: {e}")
         return False
 
-def _generate_thumbnail_matplotlib(mesh, thumb_path, resolution=(320, 320)):
+def _generate_thumbnail_matplotlib(mesh, thumb_path, resolution=(512, 512)):
     with matplotlib_render_lock:
         try:
             import matplotlib
@@ -3177,6 +3529,7 @@ def api_delete_account(platform):
 @login_required
 def api_file_mesh():
     file_path = request.args.get('path', '').split('&t=')[0].strip()
+    plate_index = request.args.get('plate', type=int)
     if not file_path:
         return jsonify({"error": "Chemin requis"}), 400
 
@@ -3209,7 +3562,7 @@ def api_file_mesh():
 
             elif ext in ('.3mf', '.obj'):
                 if ext == '.3mf':
-                    mesh = load_3mf_mesh(raw_bytes)
+                    mesh = load_3mf_mesh(raw_bytes, plate_index=plate_index)
                 else:
                     mesh = trimesh.load(io.BytesIO(raw_bytes), file_type='obj', force='mesh')
 
@@ -3250,7 +3603,7 @@ def api_file_mesh():
 
         elif ext in ('.3mf', '.obj'):
             if ext == '.3mf':
-                mesh = load_3mf_mesh(file_path)
+                mesh = load_3mf_mesh(file_path, plate_index=plate_index)
             else:
                 mesh = trimesh.load(file_path, force='mesh')
 
@@ -3276,6 +3629,40 @@ def api_file_mesh():
     except Exception as e:
         app_logger.error(f"[Viewer] Erreur serving mesh {file_path}: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+
+@app.route('/api/file/plate-count', methods=['GET'])
+@login_required
+def api_file_plate_count():
+    file_path = request.args.get('path', '').split('&t=')[0].strip()
+    if not file_path:
+        return jsonify({"error": "Chemin requis"}), 400
+
+    file_path = file_path.replace('\\', '/')
+    if '..' in file_path:
+        return jsonify({"error": "Chemin invalide"}), 400
+
+    try:
+        if is_virtual_archive_path(file_path):
+            archive_path, internal_path = split_virtual_archive_path(file_path)
+            if not _is_path_within_sources(archive_path, session['user_id']):
+                return jsonify({"error": "Ce fichier n'appartient à aucune source configurée"}), 403
+            if os.path.splitext(internal_path)[1].lower() != '.3mf':
+                return jsonify({"plate_count": 1})
+            raw_bytes = read_archive_entry_bytes(archive_path, internal_path)
+            count = get_3mf_plate_count(raw_bytes)
+        else:
+            if not _is_path_within_sources(file_path, session['user_id']):
+                return jsonify({"error": "Ce fichier n'appartient à aucune source configurée"}), 403
+            if os.path.splitext(file_path)[1].lower() != '.3mf':
+                return jsonify({"plate_count": 1})
+            if not os.path.exists(file_path):
+                return jsonify({"error": "Fichier non trouvé"}), 404
+            count = get_3mf_plate_count(file_path)
+        return jsonify({"plate_count": count})
+    except Exception as e:
+        app_logger.warning(f"[3MF] Erreur comptage plateaux {file_path}: {e}")
+        return jsonify({"plate_count": 1})
 
 # ============================================
 # 🖼️ MINIATURES
@@ -3351,7 +3738,7 @@ def pregenerate_thumbnails_on_startup(limit=90):
                             normalized_path = file_path
                             thumb_filename = hashlib.md5(normalized_path.encode()).hexdigest()
                             thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
-                            if not os.path.exists(thumb_path) and file_path not in ignored_files_cache:
+                            if not os.path.exists(thumb_path) and not _is_ignored_recently(file_path):
                                 to_process.append((file_path, thumb_path))
                     break
         except Exception as e:
@@ -3472,13 +3859,13 @@ def reconcile_thumbnails_with_disk():
                         f['has_thumb'] = False
                         f.pop('thumb_mtime', None)
                         changed = True
-                        if normalized not in ignored_files_cache and normalized not in seen_paths:
+                        if not _is_ignored_recently(normalized) and normalized not in seen_paths:
                             seen_paths.add(normalized)
                             thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
                             thumb_generation_queue.put({'path': normalized, 'thumb_path': thumb_path, 'priority': 'low'})
                             requeued += 1
                     elif f.get('thumb_fallback') and f.get('thumb_fallback_retries', 0) < MAX_THUMB_FALLBACK_RETRIES:
-                        if normalized not in ignored_files_cache and normalized not in seen_paths:
+                        if not _is_ignored_recently(normalized) and normalized not in seen_paths:
                             seen_paths.add(normalized)
                             thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
                             try:
@@ -3573,7 +3960,7 @@ def api_generate_thumb_now():
     thumb_filename = hashlib.md5(normalized_path.encode()).hexdigest()
     thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
 
-    if not force and normalized_path in ignored_files_cache:
+    if not force and _is_ignored_recently(normalized_path):
         return jsonify({"success": False, "ignored": True, "message": "Fichier précédemment marqué inaccessible"}), 200
 
     if force and os.path.exists(thumb_path):
@@ -3584,7 +3971,7 @@ def api_generate_thumb_now():
             app_logger.warning(f"[REGEN] Suppression impossible: {e}")
 
     if force:
-        ignored_files_cache.discard(normalized_path)
+        ignored_files_cache.pop(normalized_path, None)
 
     if os.path.exists(thumb_path) and not force:
         return jsonify({"success": True, "cached": True})
@@ -3621,7 +4008,7 @@ def api_regen_thumb_batch():
             except Exception as e:
                 app_logger.warning(f"[REGEN-BATCH] Suppression impossible pour {os.path.basename(file_path)}: {e}")
 
-        ignored_files_cache.discard(normalized_path)
+        ignored_files_cache.pop(normalized_path, None)
 
         thumb_generation_queue.put({
             'path': file_path,
@@ -3793,6 +4180,12 @@ def extract_archive_to_disk(file_path, source_name, extensions_3d=None):
                 normalized_path = extracted_path.replace('\\', '/')
                 thumb_filename = hashlib.md5(normalized_path.encode()).hexdigest()
                 thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
+                plate_count = 1
+                if extracted_ext == '.3mf':
+                    try:
+                        plate_count = get_3mf_plate_count(extracted_path)
+                    except Exception:
+                        plate_count = 1
                 found.append({
                     'name': extracted_file,
                     'path': normalized_path,
@@ -3801,7 +4194,9 @@ def extract_archive_to_disk(file_path, source_name, extensions_3d=None):
                     'source': source_name,
                     'date_added': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'has_thumb': os.path.exists(thumb_path),
-                    'has_metadata': False
+                    'has_metadata': False,
+                    'multi_plate': plate_count > 1,
+                    'plate_count': plate_count
                 })
 
         if extracted_count > 0:
@@ -3840,6 +4235,12 @@ def scan_local_folder(folder_path):
                     thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
 
                     thumb_exists = os.path.exists(thumb_path)
+                    plate_count = 1
+                    if ext == '.3mf':
+                        try:
+                            plate_count = get_3mf_plate_count(file_path)
+                        except Exception:
+                            plate_count = 1
                     files.append({
                         'name': filename,
                         'path': normalized_path,
@@ -3850,7 +4251,9 @@ def scan_local_folder(folder_path):
                         'mtime': int(os.path.getmtime(file_path)),
                         'has_thumb': thumb_exists,
                         'thumb_mtime': int(os.path.getmtime(thumb_path)) if thumb_exists else 0,
-                        'has_metadata': False
+                        'has_metadata': False,
+                        'multi_plate': plate_count > 1,
+                        'plate_count': plate_count
                     })
                 except Exception as e:
                     app_logger.info(f"    Erreur lecture {filename}: {e}")
@@ -3889,6 +4292,14 @@ def scan_smb_folder_recursive(base_path, current_subdir, kwargs, source_name):
                     thumb_filename = hashlib.md5(normalized_path.encode()).hexdigest()
                     thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
 
+                    plate_count = 1
+                    if entry.lower().endswith('.3mf'):
+                        try:
+                            with smbclient.open_file(full_path, mode='rb', **kwargs) as smb_f:
+                                plate_count = get_3mf_plate_count(smb_f)
+                        except Exception:
+                            plate_count = 1
+
                     files.append({
                         'name': entry,
                         'path': normalized_path,
@@ -3898,7 +4309,9 @@ def scan_smb_folder_recursive(base_path, current_subdir, kwargs, source_name):
                         'date_added': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                         'subdir': current_subdir,
                         'has_thumb': os.path.exists(thumb_path),
-                        'has_metadata': False
+                        'has_metadata': False,
+                        'multi_plate': plate_count > 1,
+                        'plate_count': plate_count
                     })
             except Exception as e:
                 if "ACCESS_DENIED" not in str(e):
@@ -3952,12 +4365,14 @@ AUTO_TAG_COLORS = {
     'local': '#8899aa',
     'réseau (smb)': '#8899aa',
     'fichier unique': '#8899aa',
+    'multi plateaux': '#e0679e',
 }
 _SOURCE_TYPE_TAG_LABELS = {
     'folder': 'Local',
     'smb': 'Réseau (SMB)',
     'file': 'Fichier unique',
 }
+MULTI_PLATE_TAG_NAME = 'Multi plateaux'
 
 
 def _get_or_create_tag(conn, name):
@@ -4001,14 +4416,21 @@ def _auto_tag_new_files(new_files, sources_list, user_id):
                 source = sources_by_name.get(f.get('source'))
                 source_type = source.get('type') if source else None
                 tag_name = _SOURCE_TYPE_TAG_LABELS.get(source_type)
-            if not tag_name:
-                continue
-            tag_id = _get_or_create_tag(conn, tag_name)
-            if tag_id:
-                try:
-                    conn.execute("INSERT OR IGNORE INTO file_tags (file_path, tag_id) VALUES (?, ?)", (normalized, tag_id))
-                except Exception:
-                    pass
+            if tag_name:
+                tag_id = _get_or_create_tag(conn, tag_name)
+                if tag_id:
+                    try:
+                        conn.execute("INSERT OR IGNORE INTO file_tags (file_path, tag_id) VALUES (?, ?)", (normalized, tag_id))
+                    except Exception:
+                        pass
+
+            if f.get('multi_plate'):
+                mp_tag_id = _get_or_create_tag(conn, MULTI_PLATE_TAG_NAME)
+                if mp_tag_id:
+                    try:
+                        conn.execute("INSERT OR IGNORE INTO file_tags (file_path, tag_id) VALUES (?, ?)", (normalized, mp_tag_id))
+                    except Exception:
+                        pass
         conn.commit()
     finally:
         conn.close()
@@ -4088,6 +4510,12 @@ def _do_background_scan(sources_list, user_id, blocking=False):
                     normalized_path = source['path'].replace('\\', '/')
                     thumb_filename = hashlib.md5(normalized_path.encode()).hexdigest()
                     thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
+                    plate_count = 1
+                    if src_ext == '.3mf':
+                        try:
+                            plate_count = get_3mf_plate_count(source['path'])
+                        except Exception:
+                            plate_count = 1
                     all_files.append({
                         'name': os.path.basename(source['path']),
                         'path': normalized_path,
@@ -4096,7 +4524,9 @@ def _do_background_scan(sources_list, user_id, blocking=False):
                         'source': source['name'],
                         'date_added': source.get('created_at') or datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                         'has_thumb': os.path.exists(thumb_path),
-                        'has_metadata': False
+                        'has_metadata': False,
+                        'multi_plate': plate_count > 1,
+                        'plate_count': plate_count
                     })
             except Exception as e:
                 app_logger.info(f"    [SCAN] Erreur source {source['name']}: {e}")
@@ -4167,7 +4597,7 @@ def _do_background_scan(sources_list, user_id, blocking=False):
             missing_count = 0
             seen_paths = set()
             for f in all_files:
-                if not f.get('has_thumb') and f['path'] not in ignored_files_cache and f['path'] not in seen_paths:
+                if not f.get('has_thumb') and not _is_ignored_recently(f['path']) and f['path'] not in seen_paths:
                     seen_paths.add(f['path'])
                     thumb_filename = hashlib.md5(f['path'].encode()).hexdigest()
                     thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
@@ -4237,7 +4667,7 @@ def api_get_files():
                         f['has_thumb'] = False
                         f.pop('thumb_mtime', None)
                         changed = True
-                        if normalized not in ignored_files_cache and normalized not in seen_paths:
+                        if not _is_ignored_recently(normalized) and normalized not in seen_paths:
                             seen_paths.add(normalized)
                             thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
                             thumb_generation_queue.put({
@@ -6423,24 +6853,88 @@ def api_create_download_folder():
             import smbclient
             base_path = folder_path.replace('\\\\', '//').replace('\\', '/')
             config = json.loads(data.get('config', '{}') if isinstance(data.get('config'), str) else '{}')
+            parent_config = dict(config)
             kwargs = {'connection_timeout': 8}
             if config.get('username'):
-                kwargs['username'] = config['username']
+                kwargs['username'] = config.get('username')
             if config.get('password'):
-                kwargs['password'] = config['password']
+                kwargs['password'] = config.get('password')
+
+            if not kwargs.get('username'):
+                try:
+                    conn = get_db()
+                    try:
+                        rows = conn.execute(
+                            "SELECT path, config FROM sources WHERE user_id = ? AND type = 'smb'",
+                            (session['user_id'],)
+                        ).fetchall()
+                    finally:
+                        conn.close()
+                    norm_target = base_path.rstrip('/').lower()
+                    best_cfg, best_len = None, -1
+                    for row in rows:
+                        src_norm = (row['path'] or '').replace('\\\\', '//').replace('\\', '/').rstrip('/').lower()
+                        if src_norm and (norm_target == src_norm or norm_target.startswith(src_norm + '/')):
+                            if len(src_norm) > best_len:
+                                best_cfg, best_len = row['config'], len(src_norm)
+                    if best_cfg:
+                        parent_config.update(json.loads(best_cfg or '{}'))
+                        if parent_config.get('username'):
+                            kwargs['username'] = parent_config['username']
+                        if parent_config.get('password'):
+                            kwargs['password'] = parent_config['password']
+                except Exception as e:
+                    app_logger.warning(f"[create-folder] Identifiants SMB de la source ignorés: {e}")
 
             try:
                 if not smbclient.path.exists(base_path, **kwargs):
                     smbclient.makedirs(base_path, exist_ok=True, **kwargs)
+
+                # Ajoute le nouveau dossier comme source (comme pour le local)
+                added_as_source = False
+                if add_as_source:
+                    try:
+                        unc_path = base_path.replace('/', '\\')
+                        conn = get_db()
+                        try:
+                            if not conn.execute("SELECT id FROM sources WHERE user_id = ? AND path = ?",
+                                                (session['user_id'], unc_path)).fetchone():
+                                source_name = folder_name
+                                counter = 1
+                                while conn.execute("SELECT id FROM sources WHERE user_id = ? AND name = ?",
+                                                   (session['user_id'], source_name)).fetchone():
+                                    source_name = f"{folder_name} ({counter})"
+                                    counter += 1
+                                smb_cfg = {'type': 'smb'}
+                                if parent_config.get('username'):
+                                    smb_cfg['username'] = parent_config['username']
+                                if parent_config.get('password'):
+                                    smb_cfg['password'] = parent_config['password']
+                                conn.execute(
+                                    "INSERT INTO sources (user_id, name, type, path, config) VALUES (?, ?, 'smb', ?, ?)",
+                                    (session['user_id'], source_name, unc_path, json.dumps(smb_cfg))
+                                )
+                                conn.commit()
+                                added_as_source = True
+                                invalidate_cache()
+                        finally:
+                            conn.close()
+                    except Exception as db_err:
+                        app_logger.error(f"[create-folder] Erreur ajout source SMB: {db_err}")
+
                 return jsonify({
                     "success": True,
                     "message": "Dossier SMB créé",
                     "path": base_path,
                     "is_local": False,
-                    "added_as_source": False
+                    "added_as_source": added_as_source
                 }), 200
             except Exception as smb_err:
-                return jsonify({"error": f"Erreur SMB: {str(smb_err)}"}), 500
+                err_msg = str(smb_err)
+                if 'ACCESS_DENIED' in err_msg or '0xc0000022' in err_msg:
+                    err_msg += (" — le compte SMB utilisé n'a pas les droits en écriture sur ce partage "
+                                "(vérifie les permissions du dossier partagé côté OMV).")
+                return jsonify({"error": f"Erreur SMB: {err_msg}"}), 500
 
         else:
             if not os.path.exists(folder_path):
@@ -8076,7 +8570,6 @@ INTEGRITY_REPORT_FILE = os.path.join(DATA_DIR, "integrity_report.json")
 
 
 def get_integrity_timeout(file_path):
-    """Timeout de vérification proportionnel à la taille du fichier (adapté aux partages réseau lents)."""
     try:
         size_mb = os.path.getsize(file_path) / (1024 * 1024)
     except Exception:
@@ -8555,22 +9048,29 @@ def _collect_diagnostic_info():
     return info
 
 
+def build_diagnostic_zip_bytes():
+    """Construit le ZIP de diagnostic (logs + infos système) et retourne (bytes, filename)."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for suffix in ('', '.1', '.2', '.3'):
+            path = LOG_FILE + suffix
+            if os.path.exists(path):
+                zf.write(path, arcname=f"logs/{os.path.basename(LOG_FILE)}{suffix}")
+
+        diag = _collect_diagnostic_info()
+        zf.writestr('diagnostic.json', json.dumps(diag, indent=2, ensure_ascii=False))
+
+    buf.seek(0)
+    filename = f"stellio-diagnostic-{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.zip"
+    return buf.getvalue(), filename
+
+
 @app.route('/api/logs/export', methods=['GET'])
 @login_required
 def api_export_logs():
     try:
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-            for suffix in ('', '.1', '.2', '.3'):
-                path = LOG_FILE + suffix
-                if os.path.exists(path):
-                    zf.write(path, arcname=f"logs/{os.path.basename(LOG_FILE)}{suffix}")
-
-            diag = _collect_diagnostic_info()
-            zf.writestr('diagnostic.json', json.dumps(diag, indent=2, ensure_ascii=False))
-
-        buf.seek(0)
-        filename = f"stellio-diagnostic-{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.zip"
+        zip_bytes, filename = build_diagnostic_zip_bytes()
+        buf = io.BytesIO(zip_bytes)
         return send_file(buf, mimetype='application/zip', as_attachment=True, download_name=filename)
     except Exception as e:
         app_logger.error(f"[LogsExport] Erreur: {e}")
@@ -8618,7 +9118,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio-app"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.3.7"
+CURRENT_VERSION = "0.3.8"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
@@ -12278,6 +12778,9 @@ if __name__ in ('__main__', 'stellio_main'):
                     with open(CACHE_FILE, 'r', encoding='utf-8') as f: json.load(f)
                 except Exception: invalidate_cache()
 
+            _migrate_file_cache_schema()
+            _backfill_multiplate_tags()
+
             threading.Thread(target=ensure_ollama_running, daemon=True).start()
             threading.Thread(target=lambda: _kill_orphan_cloudflared(DATA_DIR, app_logger), daemon=True).start()
             if on_status:
@@ -12480,6 +12983,35 @@ if __name__ in ('__main__', 'stellio_main'):
                         return {"success": True, "path": dest_path}
                     except Exception as e:
                         app_logger.error(f"[BACKUP] Échec écriture fichier : {e}")
+                        return {"success": False, "error": str(e)}
+
+                def save_diagnostic_logs(self):
+                    """Génère le ZIP de logs/diagnostic et l'enregistre directement dans le
+                    dossier Téléchargements de l'utilisateur (sans boîte de dialogue)."""
+                    try:
+                        zip_bytes, filename = build_diagnostic_zip_bytes()
+                    except Exception as e:
+                        app_logger.error(f"[LogsExport] Échec génération : {e}")
+                        return {"success": False, "error": str(e)}
+
+                    try:
+                        downloads_dir = Path.home() / 'Downloads'
+                        downloads_dir.mkdir(parents=True, exist_ok=True)
+
+                        dest_path = downloads_dir / filename
+                        # Évite d'écraser un export existant portant le même nom
+                        counter = 1
+                        stem, suffix = dest_path.stem, dest_path.suffix
+                        while dest_path.exists():
+                            dest_path = downloads_dir / f"{stem}_{counter}{suffix}"
+                            counter += 1
+
+                        with open(dest_path, 'wb') as f:
+                            f.write(zip_bytes)
+                        app_logger.info(f"[LogsExport] 📋 Logs exportés : {dest_path}")
+                        return {"success": True, "path": str(dest_path)}
+                    except Exception as e:
+                        app_logger.error(f"[LogsExport] Échec écriture fichier : {e}")
                         return {"success": False, "error": str(e)}
 
             _window_kwargs = dict(
