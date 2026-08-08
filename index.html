@@ -18,6 +18,7 @@
 	<link rel="stylesheet" href="assets/vendor/mdi/css/materialdesignicons.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TrackballControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/3MFLoader.js"></script>
@@ -297,6 +298,9 @@
                     <div class="search-box">
                         <i class="fa-solid fa-search"></i>
                         <input type="text" id="global-search" data-i18n-placeholder="search.placeholder">
+                        <button type="button" id="global-search-clear" class="search-clear-btn" data-i18n-aria="actions.clear_search" aria-label="Effacer la recherche" title="Effacer">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
                     </div>
                     <div id="semantic-search-hint" style="display:none; align-items:center; gap:6px; margin-top:5px; padding:5px 12px; background:var(--accent)15; border:1px solid var(--accent)40; border-radius:var(--radius); font-size:11px; color:var(--accent);">
                         <i class="fa-solid fa-wand-magic-sparkles fa-beat-fade"></i>
@@ -377,6 +381,9 @@
                     <div class="search-box">
                         <i class="fa-solid fa-search"></i>
                         <input type="text" id="mobile-search-input" data-i18n-placeholder="search.placeholder">
+                        <button type="button" id="mobile-search-clear" class="search-clear-btn" data-i18n-aria="actions.clear_search" aria-label="Effacer la recherche" title="Effacer">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
                     </div>
                     <button id="mobile-search-close" type="button" data-i18n-aria="actions.close" aria-label="Fermer">
                         <i class="fa-solid fa-xmark"></i>
@@ -1636,7 +1643,16 @@
                     <button class="modal-close" onclick="close3DViewer()">&times;</button>
                 </div>
             </div>
-            <div id="viewer-canvas-container" class="viewer-canvas"></div>
+            <div class="viewer-canvas-wrapper">
+                <div id="viewer-canvas-container" class="viewer-canvas"></div>
+                <button type="button" id="viewer-plate-prev" class="viewer-plate-nav-btn viewer-plate-nav-btn--left" onclick="goToPlate(-1)" title="Plateau précédent" style="display:none;">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <button type="button" id="viewer-plate-next" class="viewer-plate-nav-btn viewer-plate-nav-btn--right" onclick="goToPlate(1)" title="Plateau suivant" style="display:none;">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+                <div id="viewer-plate-label" class="viewer-plate-label" style="display:none;"></div>
+            </div>
             <div class="viewer-footer">
                 <p id="viewer-info" style="font-size: 12px; color: var(--text-muted);" data-i18n="viewer.controls">
                     Clic gauche : Rotation | Clic droit : Pan | Molette : Zoom
