@@ -457,6 +457,20 @@
                                         <div class="stats-kpi-label" data-i18n="stats.sent_to_slicer">Envois au slicer</div>
                                     </div>
                                 </div>
+                                <div class="stats-kpi-card">
+                                    <div class="stats-kpi-icon" style="background:rgba(74,222,128,0.15);color:#4ade80;"><i class="fa-solid fa-coins"></i></div>
+                                    <div class="stats-kpi-body">
+                                        <div class="stats-kpi-value" id="stat-total-cost">—</div>
+                                        <div class="stats-kpi-label" data-i18n="stats.total_spent">Dépensé au total</div>
+                                    </div>
+                                </div>
+                                <div class="stats-kpi-card">
+                                    <div class="stats-kpi-icon" style="background:rgba(96,165,250,0.15);color:#60a5fa;"><i class="fa-solid fa-chart-line"></i></div>
+                                    <div class="stats-kpi-body">
+                                        <div class="stats-kpi-value" id="stat-avg-cost">—</div>
+                                        <div class="stats-kpi-label" data-i18n="stats.avg_cost">Coût moyen / impression</div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="stats-panels">
@@ -645,6 +659,64 @@
                                         <option value="zh" data-i18n="language.zh">中文</option>
                                     </select>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="accord-section">
+                            <div class="accord-header" onclick="toggleAccord(this)">
+                                <span><i class="fa-solid fa-arrows-rotate"></i> <span data-i18n="settings.auto_scan">Scan automatique</span></span>
+                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                            </div>
+                            <div class="accord-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <div class="settings-row" style="align-items:flex-start;">
+                                    <div>
+                                        <label style="font-size:13px; font-weight:500;" data-i18n="settings.auto_scan_enable">Détecter automatiquement les nouveaux fichiers</label>
+                                        <p class="settings-hint" style="margin-top:2px;" data-i18n="settings.auto_scan_hint">Revérifie périodiquement toutes vos sources (dossiers, SMB, NFS, fichiers) pour ajouter les nouveaux fichiers sans avoir à rouvrir la bibliothèque.</p>
+                                    </div>
+                                    <label class="nav-toggle-switch" style="margin-top:2px;">
+                                        <input type="checkbox" id="auto-scan-enabled-toggle" onchange="toggleAutoScanEnabled(this.checked)">
+                                        <span class="nav-toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div id="auto-scan-interval-block" class="settings-row">
+                                    <label data-i18n="settings.auto_scan_interval">Fréquence du scan (minutes)</label>
+                                    <input type="number" id="auto-scan-interval-input" min="1" max="180" step="1"
+                                        style="width:80px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;"
+                                        onchange="saveAutoScanInterval(this.value)">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accord-section">
+                            <div class="accord-header" onclick="toggleAccord(this)">
+                                <span><i class="fa-solid fa-coins"></i> <span data-i18n="settings.print_cost_title">Tarifs d'impression</span></span>
+                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                            </div>
+                            <div class="accord-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <p class="settings-hint" data-i18n="settings.print_cost_hint">Renseigné ici une seule fois, ce tarif sert de base au calculateur de coût par fichier et à l'historique d'impression.</p>
+                                <div class="settings-row">
+                                    <label data-i18n="cost.spool_price_label">Prix de la bobine (€)</label>
+                                    <input type="number" id="settings-spool-price" min="0" step="0.01"
+                                        style="width:100px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+                                </div>
+                                <div class="settings-row">
+                                    <label data-i18n="cost.spool_weight_label">Poids de la bobine (g)</label>
+                                    <input type="number" id="settings-spool-weight" min="1" step="1"
+                                        style="width:100px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+                                </div>
+                                <div class="settings-row">
+                                    <label data-i18n="cost.elec_price_label">Prix électricité (€/kWh)</label>
+                                    <input type="number" id="settings-elec-price" min="0" step="0.001"
+                                        style="width:100px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+                                </div>
+                                <div class="settings-row">
+                                    <label data-i18n="cost.printer_power_label">Puissance imprimante (W)</label>
+                                    <input type="number" id="settings-printer-power" min="0" step="1"
+                                        style="width:100px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+                                </div>
+                                <button type="button" class="btn-secondary" style="align-self:flex-start;" onclick="savePrintCostSettings()">
+                                    <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="actions.save">Enregistrer</span>
+                                </button>
                             </div>
                         </div>
 
@@ -918,7 +990,7 @@
 											<a href="https://one.dash.cloudflare.com/" style="color:var(--accent)" target="_blank" rel="noopener noreferrer">
                                                 <i class="fa-solid fa-arrow-up-right-from-square"></i> <span data-i18n="settings.fixed_url_dashboard_link">Ouvrir le dashboard Cloudflare Zero Trust</span>
                                             </a>
-                                            <span data-i18n="settings.fixed_url_dashboard_steps"> → Networks → Tunnels → Créer un tunnel → copiez le Token et configurez un Public Hostname pointant vers <code>http://localhost:5000</code>.</span>
+                                            <span data-i18n="settings.fixed_url_dashboard_steps"> → Réseaux → Tunnels → Créer un tunnel → copiez le Token et configurez un Public Hostname pointant vers <code>http://localhost:5000</code>.</span>
                                         </p>
                                         <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:6px;">
                                             <label data-i18n="settings.fixed_url_token_label">Tunnel Token</label>
@@ -1087,6 +1159,35 @@
                                     <div class="shortcut-row"><span data-i18n="shortcuts.show_help">Afficher cette aide</span><span class="shortcut-keys"><kbd>?</kbd></span></div>
                                 </div>
                                 <p class="shortcuts-note" data-i18n="shortcuts.note">Les raccourcis à touche unique (F, T, ?) sont désactivés lorsque vous écrivez dans un champ de texte.</p>
+                            </div>
+                        </div>
+                        <div class="accord-section" id="accord-diagnostic">
+                            <div class="accord-header" onclick="toggleAccord(this); onDiagnosticAccordToggle(this)">
+                                <span><i class="fa-solid fa-stethoscope"></i> <span data-i18n="settings.diagnostic_title">Diagnostic</span></span>
+                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                            </div>
+                            <div class="accord-body" style="display:flex; flex-direction:column; gap:14px;">
+                                <div>
+                                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+                                        <label style="font-size:13px; font-weight:500;" data-i18n="settings.diagnostic_console_label">Console Python (temps réel)</label>
+                                        <div style="display:flex; align-items:center; gap:12px;">
+                                            <label style="display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--text-muted); cursor:pointer;">
+                                                <input type="checkbox" id="diag-console-autoscroll" checked style="cursor:pointer;"> <span data-i18n="settings.diagnostic_autoscroll">Défilement auto</span>
+                                            </label>
+                                            <button type="button" class="btn btn-ghost btn-sm" onclick="clearDiagnosticConsole()" data-i18n-title="settings.diagnostic_clear" title="Vider l'affichage">
+                                                <i class="fa-solid fa-eraser"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <pre id="diag-console" class="diag-console"><span class="diag-console-placeholder" data-i18n="settings.diagnostic_console_placeholder">En attente de connexion…</span></pre>
+                                    <p class="settings-hint" style="margin-top:6px;" data-i18n="settings.diagnostic_console_hint">Ce flux se met à jour automatiquement toutes les 2 secondes tant que cette section est ouverte.</p>
+                                </div>
+                                <div style="border-top:1px solid var(--border); padding-top:14px;">
+                                    <p class="settings-hint" style="margin-bottom:10px;" data-i18n="settings.diagnostic_export_hint">Génère une archive avec les logs et les informations système (matériel, config), utile pour signaler un bug ou remonter un rapport en tant que bêta-testeur. Les mots de passe et clés API sont automatiquement masqués.</p>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="exportDiagnosticLogs(this)" style="gap:8px;">
+                                        <i class="fa-solid fa-file-zipper"></i> <span data-i18n="settings.diagnostic_export_btn">Exporter les logs</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1640,11 +1741,26 @@
             <div class="viewer-header">
                 <h3 id="viewer-title"><i class="fa-solid fa-cube"></i> <span data-i18n="viewer.3d_title">Visualisation 3D</span></h3>
                 <div class="viewer-controls">
+                    <button type="button" id="viewer-overhang-toggle" class="viewer-plate-nav-btn" onclick="toggleOverhangView()" title="Afficher les surplombs (surfaces nécessitant du support)" style="position:static; width:auto; padding:6px 12px; display:flex; align-items:center; gap:6px; font-size:12px;">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span data-i18n="viewer.overhang_toggle">Surplombs</span>
+                    </button>
                     <button class="modal-close" onclick="close3DViewer()">&times;</button>
                 </div>
             </div>
             <div class="viewer-canvas-wrapper">
                 <div id="viewer-canvas-container" class="viewer-canvas"></div>
+                <div id="viewer-overhang-legend" style="display:none; position:absolute; left:16px; bottom:16px; background:rgba(20,22,28,0.85); border:1px solid var(--border); border-radius:var(--radius); padding:8px 12px; font-size:11px; color:var(--text-secondary); z-index:5;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                        <span style="width:12px;height:12px;border-radius:3px;background:#4ea1d3;display:inline-block;"></span>
+                        <span data-i18n="viewer.overhang_safe">Sans risque</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                        <span style="width:12px;height:12px;border-radius:3px;background:linear-gradient(90deg,#ffcc33,#ff3b30);display:inline-block;"></span>
+                        <span data-i18n="viewer.overhang_risk">Surplomb (&gt;45° depuis la verticale)</span>
+                    </div>
+                    <div style="font-size:10px; color:var(--text-muted); margin-top:2px;" data-i18n="viewer.overhang_hint">Rouge = support fortement conseillé</div>
+                </div>
                 <button type="button" id="viewer-plate-prev" class="viewer-plate-nav-btn viewer-plate-nav-btn--left" onclick="goToPlate(-1)" title="Plateau précédent" style="display:none;">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
@@ -1685,13 +1801,6 @@
                 <div class="about-section">
                     <h4><i class="fa-solid fa-copyright"></i> <span data-i18n="about.license">Licence & Droits</span></h4>
                     <p class="about-legal" data-i18n="about.legal">© 2026 Stellio Project. Tous droits réservés. Développé avec passion pour la communauté Maker.</p>
-                </div>
-                <div class="about-section">
-                    <h4><i class="fa-solid fa-stethoscope"></i> <span data-i18n="about.diagnostic_title">Diagnostic</span></h4>
-                    <p style="color:var(--text-muted); font-size:12.5px; margin-bottom:10px;" data-i18n="about.diagnostic_desc">Génère une archive avec les logs et les informations système (matériel, config), utile pour signaler un bug ou remonter un rapport en tant que bêta-testeur. Les mots de passe et clés API sont automatiquement masqués.</p>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="exportDiagnosticLogs(this)" style="gap:8px;">
-                        <i class="fa-solid fa-file-zipper"></i> <span data-i18n="about.export_logs_btn">Exporter les logs</span>
-                    </button>
                 </div>
             </div>
         </div>
@@ -2283,7 +2392,7 @@
 							<option value="" data-i18n="common.loading">Chargement…</option>
 						</select>
 						<button class="btn btn-ghost btn-sm" onclick="browseFolderForMove()" data-i18n-title="actions.browse" title="Parcourir les dossiers" style="white-space:nowrap;">
-							<i class="fa-solid fa-folder-open"></i> <span data-i18n="actions.browse">Parcourir…</span>
+							<span data-i18n="actions.browse">Parcourir…</span>
 						</button>
 					</div>
 				</div>
