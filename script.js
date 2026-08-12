@@ -3207,7 +3207,17 @@ try {
 // 🎮 VISUALISEUR 3D
 // ============================================
 let viewer3D = null, viewerControls = null, viewerScene = null, viewerCamera = null, viewerMesh = null, viewerRenderer = null;
+let viewerOverhangMode = false;
+const OVERHANG_THRESHOLD_DEG = 45; // seuil standard (angle depuis la verticale au-delà duquel un support est conseillé)
 let viewerActive = false, viewerAnimationId = null;
+// Petit repère XYZ affiché dans un coin du viewer, qui suit l'orientation de
+// la caméra (comme le "navigation cube" de Fusion360/Blender). Scène et
+// caméra dédiées, rendues dans un sous-rectangle du même canvas via
+// setScissor, pour permettre à l'utilisateur de savoir en un coup d'œil
+// quel axe est le Z "vertical d'impression" utilisé par le calcul de
+// surplombs, quelle que soit la rotation appliquée avec la TrackballControls
+// (qui autorise un roulis libre, contrairement à des contrôles orbit classiques).
+let viewerGizmoScene = null, viewerGizmoCamera = null;
 
 function disposeViewer3D() {
 viewerActive = false;
@@ -3218,6 +3228,10 @@ viewerAnimationId = null;
 if (viewerScene) {
 viewerScene.traverse((obj) => {
 if (obj.geometry) obj.geometry.dispose();
+if (obj.userData) {
+    if (obj.userData.shadedMaterial && obj.userData.shadedMaterial !== obj.material) obj.userData.shadedMaterial.dispose();
+    if (obj.userData.overhangMaterial && obj.userData.overhangMaterial !== obj.material) obj.userData.overhangMaterial.dispose();
+}
 if (obj.material) {
 const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
 materials.forEach((mat) => {
@@ -3230,6 +3244,20 @@ mat.dispose();
 }
 });
 }
+if (viewerGizmoScene) {
+viewerGizmoScene.traverse((obj) => {
+if (obj.geometry) obj.geometry.dispose();
+if (obj.material) {
+const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+materials.forEach((mat) => {
+if (mat.map && typeof mat.map.dispose === 'function') mat.map.dispose();
+mat.dispose();
+});
+}
+});
+viewerGizmoScene = null;
+}
+viewerGizmoCamera = null;
 if (viewerControls) {
 viewerControls.dispose();
 viewerControls = null;
@@ -3290,8 +3318,142 @@ closeModal('modal-3d-viewer');
 viewerCurrentPath = null;
 viewerPlateCount = 1;
 viewerCurrentPlate = 1;
+// Repart toujours en vue normale à la prochaine ouverture, plutôt que de
+// garder le mode surplombs actif d'un fichier à l'autre sans que ce soit
+// explicitement redemandé.
+viewerOverhangMode = false;
+const overhangBtn = document.getElementById('viewer-overhang-toggle');
+const overhangLegend = document.getElementById('viewer-overhang-legend');
+if (overhangBtn) {
+    overhangBtn.classList.remove('active');
+    overhangBtn.style.background = 'rgba(0,0,0,0.6)';
+}
+if (overhangLegend) overhangLegend.style.display = 'none';
 }
 let viewer3DLoadToken = 0;
+
+// Génère une petite pastille ronde colorée avec une lettre dessus (X/Y/Z),
+// utilisée comme étiquette au bout de chaque brin du repère. Rendue en
+// sprite (toujours face à la caméra) via une texture canvas générée à la
+// volée : plus net qu'un texte 3D et beaucoup plus simple à maintenir.
+function makeAxisLabelSprite(text, hexColor) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = hexColor;
+    ctx.beginPath();
+    ctx.arc(32, 32, 27, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 30px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 32, 34);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    const material = new THREE.SpriteMaterial({ map: texture, depthTest: false, depthWrite: false, transparent: true });
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(4.6, 4.6, 1);
+    return sprite;
+}
+
+// Construit le repère XYZ du mini-viewport d'orientation (coin du viewer).
+// Convention couleurs standard Three.js/CAD : X = rouge, Y = vert, Z = bleu
+// (Z = axe "vertical d'impression" utilisé par le calcul de surplombs).
+// Chaque axe a un brin positif plein et étiqueté, et un brin négatif court
+// et discret pour donner un repère complet sans surcharger l'affichage.
+function buildAxisGizmo() {
+    const group = new THREE.Group();
+    const axisLength = 9.5;
+    const axes = [
+        { dir: new THREE.Vector3(1, 0, 0), color: 0xe6453c, hex: '#e6453c', label: 'X' },
+        { dir: new THREE.Vector3(0, 1, 0), color: 0x4dd977, hex: '#4dd977', label: 'Y' },
+        { dir: new THREE.Vector3(0, 0, 1), color: 0x4ea1d3, hex: '#4ea1d3', label: 'Z' },
+    ];
+    axes.forEach(({ dir, color, hex, label }) => {
+        const tip = dir.clone().multiplyScalar(axisLength);
+        const posGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), tip]);
+        group.add(new THREE.Line(posGeom, new THREE.LineBasicMaterial({ color })));
+
+        const negTip = dir.clone().multiplyScalar(-axisLength * 0.55);
+        const negGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), negTip]);
+        group.add(new THREE.Line(negGeom, new THREE.LineBasicMaterial({ color: 0x777777, transparent: true, opacity: 0.6 })));
+
+        const sprite = makeAxisLabelSprite(label, hex);
+        sprite.position.copy(tip);
+        group.add(sprite);
+    });
+    return group;
+}
+
+// Calcule une couleur par sommet selon l'angle de surplomb de la normale
+// (axe Z = direction d'impression, comme dans les fichiers STL/3MF).
+// Bleu = surface sûre (verticale ou orientée vers le haut). Jaune -> rouge =
+// surface orientée vers le bas au-delà du seuil de surplomb imprimable,
+// rouge = quasi-horizontale vers le bas (support fortement conseillé).
+// Reproduit la même logique que l'aperçu "surplombs" des slicers (Cura,
+// PrusaSlicer), en pur calcul géométrique côté client — pas de simulation
+// de trajectoire, juste l'angle réel des faces du maillage.
+function computeOverhangVertexColors(geometry, thresholdDeg = OVERHANG_THRESHOLD_DEG) {
+    const normalAttr = geometry.getAttribute('normal');
+    const posAttr = geometry.getAttribute('position');
+    if (!normalAttr || !posAttr) return null;
+    const count = normalAttr.count;
+    const colors = new Float32Array(count * 3);
+    const dThreshold = Math.cos(THREE.MathUtils.degToRad(thresholdDeg));
+    const safeColor = new THREE.Color(0x4ea1d3);
+    const warnColor = new THREE.Color(0xffcc33);
+    const critColor = new THREE.Color(0xff3b30);
+    const tmp = new THREE.Color();
+
+    // La face qui repose à plat sur le plateau d'impression (le bas du
+    // modèle dans son orientation actuelle) a forcément une normale
+    // tournée vers le bas, mais elle ne nécessite aucun support puisque
+    // c'est la toute première couche, posée directement sur le plateau.
+    // On exclut donc de la détection toute géométrie proche du point le
+    // plus bas du modèle, sur une tolérance proportionnelle à sa hauteur.
+    // Toujours recalculé ici : le bounding box existant peut dater d'avant
+    // le recentrage du modèle (geometry.translate) et serait alors décalé
+    // par rapport aux positions réelles des sommets.
+    geometry.computeBoundingBox();
+    const minZ = geometry.boundingBox.min.z;
+    const heightZ = geometry.boundingBox.max.z - minZ;
+    const bedEpsilon = Math.max(heightZ * 0.01, 0.15);
+
+    for (let i = 0; i < count; i++) {
+        const z = posAttr.getZ(i);
+        let c;
+        if (z - minZ <= bedEpsilon) {
+            c = safeColor;
+        } else {
+            const nz = normalAttr.getZ(i);
+            const downFactor = -nz; // >0 si la normale pointe (au moins en partie) vers le bas
+            if (downFactor > dThreshold) {
+                const t = Math.min(1, (downFactor - dThreshold) / (1 - dThreshold));
+                c = tmp.copy(warnColor).lerp(critColor, t);
+            } else {
+                c = safeColor;
+            }
+        }
+        colors[i * 3] = c.r;
+        colors[i * 3 + 1] = c.g;
+        colors[i * 3 + 2] = c.b;
+    }
+    return new THREE.BufferAttribute(colors, 3);
+}
+
+function toggleOverhangView() {
+    viewerOverhangMode = !viewerOverhangMode;
+    const btn = document.getElementById('viewer-overhang-toggle');
+    const legend = document.getElementById('viewer-overhang-legend');
+    if (btn) btn.classList.toggle('active', viewerOverhangMode);
+    if (btn) btn.style.background = viewerOverhangMode ? 'var(--accent, #4ea1d3)' : 'rgba(0,0,0,0.6)';
+    if (legend) legend.style.display = viewerOverhangMode ? 'block' : 'none';
+    if (viewerMesh && viewerMesh.userData) {
+        viewerMesh.material = viewerOverhangMode ? viewerMesh.userData.overhangMaterial : viewerMesh.userData.shadedMaterial;
+    }
+}
 
 function load3DModel(filePath, plateIndex) {
 disposeViewer3D();
@@ -3302,7 +3464,14 @@ let meshUrl = `${API}/api/file/mesh?path=${encodeURIComponent(filePath)}`;
 if (plateIndex) meshUrl += `&plate=${plateIndex}`;
 fetch(meshUrl)
 .then(res => {
-if (!res.ok) throw new Error(I18N.t('toast.file_not_found'));
+if (!res.ok) {
+    return res.json()
+        .then(data => { throw new Error(data && data.error ? data.error : `${I18N.t('toast.file_not_found')} (HTTP ${res.status})`); })
+        .catch(parseErr => {
+            if (parseErr instanceof SyntaxError) throw new Error(`${I18N.t('toast.file_not_found')} (HTTP ${res.status})`);
+            throw parseErr;
+        });
+}
 return res.blob();
 })
 .then(blob => {
@@ -3318,6 +3487,14 @@ viewerRenderer.setPixelRatio(window.devicePixelRatio);
 container.innerHTML = '';
 container.appendChild(viewerRenderer.domElement);
 
+    // Mini-viewport d'orientation : scène/caméra dédiées, indépendantes du
+    // modèle, rendues par-dessus dans un coin (voir la boucle animate plus
+    // bas). La caméra orthographique évite tout effet de perspective sur le
+    // petit repère, pour des proportions stables quel que soit le zoom.
+    viewerGizmoScene = new THREE.Scene();
+    viewerGizmoScene.add(buildAxisGizmo());
+    viewerGizmoCamera = new THREE.OrthographicCamera(-15, 15, 15, -15, 0.1, 100);
+
     viewerControls = new THREE.TrackballControls(viewerCamera, viewerRenderer.domElement);
     viewerControls.rotateSpeed = 4.0;
     viewerControls.zoomSpeed = 1.2;
@@ -3325,13 +3502,13 @@ container.appendChild(viewerRenderer.domElement);
     viewerControls.dynamicDampingFactor = 0.15;
     viewerControls.staticMoving = false;
 
-    const ambientLight = new THREE.AmbientLight(0x404040, 2);
+    const ambientLight = new THREE.AmbientLight(0x404040, 1.3);
     viewerScene.add(ambientLight);
     // La lumière directionnelle est attachée à la caméra (comme une lampe
     // frontale) plutôt que fixée dans l'espace du monde : elle suit ainsi
     // toujours le point de vue au lieu de sembler "tourner" sur le modèle
     // quand on orbite/tourne autour de celui-ci.
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
     directionalLight.position.set(0, 0, 1);
     viewerCamera.add(directionalLight);
     viewerScene.add(viewerCamera);
@@ -3340,13 +3517,38 @@ container.appendChild(viewerRenderer.domElement);
     
     loader.load(url, function (geometry) {
         if (myToken !== viewer3DLoadToken) { URL.revokeObjectURL(url); return; }
-        const material = new THREE.MeshPhongMaterial({ color: 0x4ea1d3, specular: 0x111111, shininess: 200, flatShading: false });
+        // Beaucoup de STL "HD"/haute résolution exportent des normales par
+        // face à zéro (0,0,0), en s'attendant à ce que le viewer les
+        // recalcule. Si on les utilise telles quelles, l'éclairage Phong
+        // n'a rien à quoi répondre et le modèle apparaît tout noir.
+        // On recalcule systématiquement les normales à partir de la
+        // géométrie pour un rendu fiable, quel que soit le fichier source.
+        geometry.deleteAttribute('normal');
+        geometry.computeVertexNormals();
+        const shadedMaterial = new THREE.MeshPhongMaterial({ color: 0x4ea1d3, specular: 0x111111, shininess: 120, flatShading: false, side: THREE.DoubleSide });
         geometry.computeBoundingBox();
         const center = new THREE.Vector3();
         geometry.boundingBox.getCenter(center);
         geometry.translate(-center.x, -center.y, -center.z);
-        viewerMesh = new THREE.Mesh(geometry, material);
+
+        const overhangColors = computeOverhangVertexColors(geometry);
+        let overhangMaterial = shadedMaterial;
+        if (overhangColors) {
+            geometry.setAttribute('color', overhangColors);
+            overhangMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+        }
+
+        viewerMesh = new THREE.Mesh(geometry, viewerOverhangMode ? overhangMaterial : shadedMaterial);
+        viewerMesh.userData.shadedMaterial = shadedMaterial;
+        viewerMesh.userData.overhangMaterial = overhangMaterial;
         viewerScene.add(viewerMesh);
+        const overhangBtn = document.getElementById('viewer-overhang-toggle');
+        const overhangLegend = document.getElementById('viewer-overhang-legend');
+        if (overhangBtn) {
+            overhangBtn.classList.toggle('active', viewerOverhangMode);
+            overhangBtn.style.background = viewerOverhangMode ? 'var(--accent, #4ea1d3)' : 'rgba(0,0,0,0.6)';
+        }
+        if (overhangLegend) overhangLegend.style.display = viewerOverhangMode ? 'block' : 'none';
         const size = new THREE.Vector3();
         geometry.boundingBox.getSize(size);
         const maxDim = Math.max(size.x, size.y, size.z);
@@ -3360,7 +3562,48 @@ container.appendChild(viewerRenderer.domElement);
             if (!viewerActive) return;
             viewerAnimationId = requestAnimationFrame(animate);
             viewerControls.update();
+
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            // autoClear désactivé pour toute la frame : on effectue
+            // nous-mêmes UN SEUL vrai clear (couleur + profondeur) avant le
+            // rendu principal. La passe du gizmo, elle, ne fait ensuite
+            // qu'un clearDepth (pas de clear couleur) : les pixels déjà
+            // dessinés par le rendu principal dans ce coin restent visibles
+            // en dessous du repère, qui apparaît donc bien à fond
+            // transparent plutôt que sur un carré uni. Sans cette
+            // désactivation, render() réappliquerait un clear couleur
+            // automatique dans le rectangle scissor du gizmo, d'où le carré
+            // noir/uni observé auparavant.
+            viewerRenderer.autoClear = false;
+            viewerRenderer.setViewport(0, 0, width, height);
+            viewerRenderer.setScissorTest(false);
+            viewerRenderer.clear(true, true, true);
             viewerRenderer.render(viewerScene, viewerCamera);
+
+            // Repère XYZ dans le coin : on copie l'orientation (quaternion)
+            // de la caméra principale sur la caméra du gizmo, en la gardant
+            // à distance fixe de l'origine — comme ça le repère tourne
+            // exactement comme la vue, sans jamais être affecté par le zoom
+            // ou le pan appliqués au modèle. Rendu ensuite dans un petit
+            // rectangle (scissor) en haut à droite du canvas, par-dessus le
+            // rendu principal déjà effectué, sans effacer la couleur
+            // dessous (voir commentaire ci-dessus).
+            if (viewerGizmoScene && viewerGizmoCamera) {
+                const gizmoSize = 132;
+                const margin = 16;
+                viewerGizmoCamera.position.set(0, 0, 30).applyQuaternion(viewerCamera.quaternion);
+                viewerGizmoCamera.up.copy(viewerCamera.up);
+                viewerGizmoCamera.quaternion.copy(viewerCamera.quaternion);
+
+                viewerRenderer.setScissorTest(true);
+                viewerRenderer.setScissor(width - gizmoSize - margin, height - gizmoSize - margin, gizmoSize, gizmoSize);
+                viewerRenderer.setViewport(width - gizmoSize - margin, height - gizmoSize - margin, gizmoSize, gizmoSize);
+                viewerRenderer.clearDepth();
+                viewerRenderer.render(viewerGizmoScene, viewerGizmoCamera);
+                viewerRenderer.setScissorTest(false);
+            }
         }
         animate();
         
@@ -3376,7 +3619,8 @@ container.appendChild(viewerRenderer.domElement);
 .catch(err => {
     if (myToken !== viewer3DLoadToken) return;
     console.error('[3D Viewer]', err);
-    container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--danger);">${I18N.t('toast.connection_error')}</div>`;
+    const message = (err && err.message) ? escapeHtml(err.message) : I18N.t('toast.connection_error');
+    container.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;color:var(--danger);text-align:center;padding:0 16px;"><i class="fa-solid fa-triangle-exclamation fa-2x"></i><span>${message}</span></div>`;
 });
 }
 // ============================================
@@ -3962,6 +4206,8 @@ console.log('[Theme] 🔄 Système:', e.matches ? I18N.t('settings.theme_light')
 loadSlicerSettings();
 loadSpoolmanSettings();
 loadOllamaSettings();
+loadAutoScanSettings();
+loadPrintCostSettings();
 loadAccountBadges();
 loadNavOrder();
 }
@@ -4135,6 +4381,113 @@ async function toggleAiEnabled(enabled) {
     }
 }
 window.toggleAiEnabled = toggleAiEnabled;
+
+function applyAutoScanUI(enabled) {
+    const intervalBlock = document.getElementById('auto-scan-interval-block');
+    if (intervalBlock) {
+        intervalBlock.style.opacity = enabled ? '1' : '0.45';
+        intervalBlock.style.pointerEvents = enabled ? 'auto' : 'none';
+    }
+}
+
+async function toggleAutoScanEnabled(enabled) {
+    applyAutoScanUI(enabled);
+    try {
+        const res = await fetch(`${API}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ auto_scan_enabled: enabled })
+        });
+        if (res.ok) {
+            showToast(enabled ? I18N.t('toast.auto_scan_enabled') : I18N.t('toast.auto_scan_disabled'), 'success');
+        } else {
+            showToast(I18N.t('toast.save_error'), 'error');
+        }
+    } catch (_) {
+        showToast(I18N.t('toast.network_error'), 'error');
+    }
+}
+window.toggleAutoScanEnabled = toggleAutoScanEnabled;
+
+async function saveAutoScanInterval(value) {
+    let minutes = parseInt(value, 10);
+    if (!Number.isFinite(minutes) || minutes < 1) minutes = 1;
+    if (minutes > 180) minutes = 180;
+    const input = document.getElementById('auto-scan-interval-input');
+    if (input) input.value = minutes;
+    try {
+        const res = await fetch(`${API}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ auto_scan_interval_minutes: minutes })
+        });
+        if (res.ok) {
+            showToast(I18N.t('toast.settings_saved'), 'success');
+        } else {
+            showToast(I18N.t('toast.save_error'), 'error');
+        }
+    } catch (_) {
+        showToast(I18N.t('toast.network_error'), 'error');
+    }
+}
+window.saveAutoScanInterval = saveAutoScanInterval;
+
+async function loadAutoScanSettings() {
+    try {
+        const res = await fetch(`${API}/api/settings`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const toggle = document.getElementById('auto-scan-enabled-toggle');
+        const enabled = data.auto_scan_enabled !== false;
+        if (toggle) toggle.checked = enabled;
+        applyAutoScanUI(enabled);
+        const input = document.getElementById('auto-scan-interval-input');
+        if (input) input.value = data.auto_scan_interval_minutes || 5;
+    } catch (e) { console.warn('[AutoScan] Réglages indisponibles'); }
+}
+
+async function loadPrintCostSettings() {
+    try {
+        const res = await fetch(`${API}/api/settings`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const spoolPrice = document.getElementById('settings-spool-price');
+        const spoolWeight = document.getElementById('settings-spool-weight');
+        const elecPrice = document.getElementById('settings-elec-price');
+        const printerPower = document.getElementById('settings-printer-power');
+        if (spoolPrice) spoolPrice.value = data.print_cost_spool_price ?? 20;
+        if (spoolWeight) spoolWeight.value = data.print_cost_spool_weight ?? 1000;
+        if (elecPrice) elecPrice.value = data.print_cost_elec_price ?? '';
+        if (printerPower) printerPower.value = data.print_cost_printer_power ?? 120;
+    } catch (e) { console.warn('[PrintCost] Réglages indisponibles'); }
+}
+
+async function savePrintCostSettings() {
+    const spoolPrice = parseFloat(document.getElementById('settings-spool-price')?.value);
+    const spoolWeight = parseFloat(document.getElementById('settings-spool-weight')?.value);
+    const elecPriceRaw = document.getElementById('settings-elec-price')?.value;
+    const printerPower = parseFloat(document.getElementById('settings-printer-power')?.value);
+    const payload = {};
+    if (Number.isFinite(spoolPrice)) payload.print_cost_spool_price = spoolPrice;
+    if (Number.isFinite(spoolWeight)) payload.print_cost_spool_weight = spoolWeight;
+    payload.print_cost_elec_price = (elecPriceRaw === '' || elecPriceRaw == null) ? '' : parseFloat(elecPriceRaw);
+    if (Number.isFinite(printerPower)) payload.print_cost_printer_power = printerPower;
+    try {
+        const res = await fetch(`${API}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+            showToast(I18N.t('toast.settings_saved') || 'Réglages enregistrés', 'success');
+        } else {
+            showToast(I18N.t('toast.save_error') || 'Erreur', 'error');
+        }
+    } catch (_) {
+        showToast(I18N.t('toast.network_error') || 'Erreur de connexion', 'error');
+    }
+}
+window.savePrintCostSettings = savePrintCostSettings;
 
 function toggleOllamaGuide(forceOpen) {
     const guide = document.getElementById('ollama-guide');
@@ -5325,6 +5678,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         if (page === 'library') loadFiles();
         if (page === 'printers') loadPrinters();
         if (page === 'settings') loadSources();
+        else stopDiagnosticConsolePoll();
         if (page === 'spoolman') loadSpoolmanPage();
         if (page === 'stats') loadStats();
         if (page === 'history') { loadHistory(); loadDownloadHistory(); }
@@ -6793,6 +7147,11 @@ window.loadStats = async function () {
         document.getElementById('stat-new-month').textContent    = data.new_this_month.toLocaleString();
         document.getElementById('stat-total-prints').textContent = data.total_prints.toLocaleString();
 
+        const totalCostEl = document.getElementById('stat-total-cost');
+        if (totalCostEl) totalCostEl.textContent = (data.total_spent || 0).toFixed(2) + ' €';
+        const avgCostEl = document.getElementById('stat-avg-cost');
+        if (avgCostEl) avgCostEl.textContent = data.avg_cost_per_print != null ? data.avg_cost_per_print.toFixed(2) + ' €' : '—';
+
         const fmtEl = document.getElementById('stat-formats');
         const fmtColors = { '.stl':'#63b3ed', '.3mf':'#68d391', '.obj':'#f6ad55', '.zip':'#fc8181', '.rar':'#b794f4' };
         const total = data.total_files || 1;
@@ -6879,6 +7238,7 @@ window.loadStats = async function () {
 // 🕒 HISTORIQUE DES IMPRESSIONS
 // ============================================
 let _historyOffset = 0;
+let _historyEntries = [];
 const HISTORY_LIMIT = 30;
 
 // ============================================
@@ -6895,6 +7255,77 @@ function _getRatingReasonLabels() {
         other:            _t3('history.reason_other', 'Autre'),
     };
 }
+
+function _renderHistoryCostBadge(entry) {
+    if (entry.total_cost != null) {
+        return `<span onclick="toggleCostEditor(${entry.id})" style="cursor:pointer;" title="${I18N.t('cost.click_to_edit') || 'Cliquer pour modifier'}">
+            <i class="fa-solid fa-coins"></i> ${Number(entry.total_cost).toFixed(2)} €
+        </span>`;
+    }
+    return `<span onclick="toggleCostEditor(${entry.id})" style="cursor:pointer; color:var(--text-muted);" title="${I18N.t('cost.click_to_add') || 'Renseigner le coût'}">
+        <i class="fa-solid fa-circle-plus"></i> ${I18N.t('cost.add_cost') || 'Coût'}
+    </span>`;
+}
+
+function toggleCostEditor(id) {
+    const el = document.getElementById(`hcost-${id}`);
+    if (!el) return;
+    if (el.dataset.editing === '1') {
+        _historyLastData = _historyLastData || {};
+        const entry = (_historyEntries || []).find(e => e.id === id);
+        el.innerHTML = _renderHistoryCostBadge(entry || {});
+        el.dataset.editing = '0';
+        return;
+    }
+    const entry = (_historyEntries || []).find(e => e.id === id) || {};
+    el.dataset.editing = '1';
+    el.innerHTML = `
+        <span style="display:inline-flex; align-items:center; gap:4px;" onclick="event.stopPropagation();">
+            <input type="number" id="cost-mat-${id}" min="0" step="0.01" placeholder="${I18N.t('cost.material_label') || 'Matière'}"
+                value="${entry.material_cost ?? ''}"
+                style="width:64px; padding:3px 6px; background:var(--bg-input); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-size:12px;">
+            <input type="number" id="cost-elec-${id}" min="0" step="0.01" placeholder="${I18N.t('cost.elec_price_label') || 'Élec'}"
+                value="${entry.elec_cost ?? ''}"
+                style="width:64px; padding:3px 6px; background:var(--bg-input); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-size:12px;">
+            <button class="history-rate-btn" onclick="saveHistoryCost(${id})" title="${I18N.t('actions.confirm') || 'Confirmer'}"><i class="fa-solid fa-check"></i></button>
+        </span>`;
+}
+
+async function saveHistoryCost(id) {
+    const matInput = document.getElementById(`cost-mat-${id}`);
+    const elecInput = document.getElementById(`cost-elec-${id}`);
+    const material_cost = matInput && matInput.value !== '' ? parseFloat(matInput.value) : null;
+    const elec_cost = elecInput && elecInput.value !== '' ? parseFloat(elecInput.value) : null;
+    try {
+        const res = await fetch(`${API}/api/print-history/${id}/cost`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ material_cost, elec_cost })
+        });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.error || I18N.t('toast.error') || 'Erreur', 'error'); return; }
+
+        const entry = (_historyEntries || []).find(e => e.id === id);
+        if (entry) {
+            entry.material_cost = data.material_cost;
+            entry.elec_cost = data.elec_cost;
+            entry.total_cost = data.total_cost;
+        }
+        const el = document.getElementById(`hcost-${id}`);
+        if (el) {
+            el.dataset.editing = '0';
+            el.innerHTML = _renderHistoryCostBadge(entry || data);
+        }
+        showToast(I18N.t('toast.settings_saved') || 'Enregistré', 'success');
+        if (typeof loadStats === 'function' && document.getElementById('page-stats')?.classList.contains('active')) {
+            loadStats();
+        }
+    } catch (err) {
+        showToast(I18N.t('toast.network_error') || 'Erreur de connexion', 'error');
+    }
+}
+window.toggleCostEditor = toggleCostEditor;
+window.saveHistoryCost = saveHistoryCost;
 
 function _renderHistoryRatingBlock(entry) {
     if (entry.result === 'success') {
@@ -6972,6 +7403,7 @@ async function rateHistoryEntry(id, result, failureReason) {
 window.loadHistory = async function (reset = true) {
     if (reset) {
         _historyOffset = 0;
+        _historyEntries = [];
         document.getElementById('history-list').innerHTML = '';
         document.getElementById('history-list').classList.add('hidden');
         document.getElementById('history-empty').classList.add('hidden');
@@ -6994,6 +7426,7 @@ window.loadHistory = async function (reset = true) {
         listEl.classList.remove('hidden');
         let lastDate = '';
         data.history.forEach(entry => {
+            _historyEntries.push(entry);
             const d = new Date(entry.sent_at);
             const dateStr = d.toLocaleDateString(I18N.lang, { weekday:'long', day:'numeric', month:'long', year:'numeric' });
             if (dateStr !== lastDate) {
@@ -7009,6 +7442,7 @@ window.loadHistory = async function (reset = true) {
                        <i class="fa-solid ${platformIcons[entry.source_platform] || 'fa-download'}"></i> ${entry.source_platform}
                    </span>`
                 : '';
+            const costBadge = `<span class="history-entry-cost" id="hcost-${entry.id}">${_renderHistoryCostBadge(entry)}</span>`;
             listEl.insertAdjacentHTML('beforeend', `
                 <div class="history-entry" id="hentry-${entry.id}">
                     <div class="history-entry-icon" style="background:${extColor}22;color:${extColor};">
@@ -7020,6 +7454,7 @@ window.loadHistory = async function (reset = true) {
                             <span><i class="fa-solid fa-scissors"></i> ${escapeHtml(entry.slicer || I18N.t('common.unknown'))}</span>
                             <span><i class="fa-solid fa-weight-scale"></i> ${formatSize(entry.file_size)}</span>
                             <span class="history-entry-ext" style="color:${extColor};">${(entry.file_ext||'').replace('.','').toUpperCase()}</span>
+                            ${costBadge}
                             ${platformBadge}
                         </div>
                     </div>
@@ -7073,12 +7508,86 @@ async function loadDownloadHistory() {
             opt.title = entry.file_path;
             opt.textContent = `${dateStr} ${timeStr}${platform}  \u2014  ${entry.file_name}${size}`;
             opt.dataset.path = entry.file_path;
+            opt.dataset.name = entry.file_name;
             sel.appendChild(opt);
         });
     } catch (e) {
         console.error('[DownloadHistory]', e);
     }
 }
+
+// ============================================
+// 🔗 CLIC SUR UN FICHIER TÉLÉCHARGÉ → BIBLIOTHÈQUE
+// ============================================
+document.getElementById('download-history-select')?.addEventListener('change', (e) => {
+    const sel = e.target;
+    const opt = sel.selectedOptions?.[0];
+    const path = opt?.dataset.path || sel.value;
+    const name = opt?.dataset.name;
+    if (path) goToFileInLibrary(path, name);
+});
+
+window.goToFileInLibrary = function (filePath, fileName) {
+    // Bascule sur la page Bibliothèque
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-library')?.classList.add('active');
+    if (typeof updateHeaderVisibilityForPage === 'function') updateHeaderVisibilityForPage('library');
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.nav-btn[data-page="library"]')?.classList.add('active');
+    const headerTitle = document.getElementById('header-page-title');
+    if (headerTitle) headerTitle.innerHTML = `<i class="fa-solid fa-layer-group"></i> ${I18N.t('nav.library')}`;
+    closeMobileSidebar?.();
+
+    // Réinitialise tout ce qui pourrait masquer le fichier (favoris, recherche, filtres)
+    showFavoritesOnly = false;
+    if (typeof activeTypeFilters !== 'undefined') activeTypeFilters = [];
+    if (typeof currentSizeFilter !== 'undefined') currentSizeFilter = null;
+    if (typeof currentWeightFilter !== 'undefined') currentWeightFilter = null;
+    if (typeof printStatusFilter !== 'undefined') printStatusFilter = '';
+    if (typeof noThumbFilterOnly !== 'undefined') noThumbFilterOnly = false;
+    activeTagFilters?.clear?.();
+    if (globalSearchInput) globalSearchInput.value = '';
+    if (mobileSearchInput) mobileSearchInput.value = '';
+    if (typeof setSearchMode === 'function') setSearchMode('normal');
+
+    filteredFiles = [...allFiles];
+    applySorting();
+    renderFiles();
+    updateSidebarCounts(filteredFiles);
+
+    const exists = allFiles.some(f => f.path === filePath);
+    if (!exists) {
+        showToast(`${I18N.t('toast.file_not_found_library') || "Fichier introuvable dans la bibliothèque"}${fileName ? ' : ' + fileName : ''}`, 'warning');
+        return;
+    }
+
+    let attempts = 0;
+    const tryHighlight = () => {
+        const card = document.querySelector(`.file-card[data-path="${CSS.escape(filePath)}"]`);
+        if (card) {
+            // Déplie les dossiers parents fermés (mode tri par dossier)
+            let parent = card.closest('.folder-block');
+            while (parent) {
+                if (!parent.classList.contains('folder-block--open')) {
+                    parent.classList.add('folder-block--open');
+                    const content = parent.querySelector(':scope > .folder-block-content');
+                    if (content) {
+                        content.style.maxHeight = content.scrollHeight + 5000 + 'px';
+                        content.style.opacity = '1';
+                    }
+                }
+                parent = parent.parentElement?.closest('.folder-block');
+            }
+            card.scrollIntoView({ behavior: 'auto', block: 'center' });
+            card.classList.add('file-card--highlight');
+            setTimeout(() => card.classList.remove('file-card--highlight'), 2600);
+        } else if (attempts < 30) {
+            attempts++;
+            setTimeout(tryHighlight, 100);
+        }
+    };
+    setTimeout(tryHighlight, 60);
+};
 
 window.clearDownloadHistory = async function () {
     showConfirmModal(I18N.t('history.confirm_clear_downloads'), async () => {
@@ -8230,10 +8739,83 @@ if (versionEl) versionEl.textContent = I18N.t('common.unknown') || 'Inconnue';
 }
 }
 
+// ============================================
+// 🩺 CONSOLE DIAGNOSTIC (logs Python en direct)
+// ============================================
+let diagConsoleInterval = null;
+let diagConsoleOffset = -1;
+let diagConsoleFetching = false;
+const DIAG_CONSOLE_MAX_CHARS = 500000;
+
+function onDiagnosticAccordToggle(headerEl) {
+    const section = headerEl.closest('.accord-section');
+    if (!section) return;
+    if (section.classList.contains('open')) {
+        diagConsoleOffset = -1;
+        const box = document.getElementById('diag-console');
+        if (box) box.textContent = '';
+        startDiagnosticConsolePoll();
+    } else {
+        stopDiagnosticConsolePoll();
+    }
+}
+window.onDiagnosticAccordToggle = onDiagnosticAccordToggle;
+
+function startDiagnosticConsolePoll() {
+    if (diagConsoleInterval) return;
+    pollDiagnosticConsole();
+    diagConsoleInterval = setInterval(pollDiagnosticConsole, 2000);
+}
+window.startDiagnosticConsolePoll = startDiagnosticConsolePoll;
+
+function stopDiagnosticConsolePoll() {
+    if (diagConsoleInterval) { clearInterval(diagConsoleInterval); diagConsoleInterval = null; }
+}
+window.stopDiagnosticConsolePoll = stopDiagnosticConsolePoll;
+
+async function pollDiagnosticConsole() {
+    const section = document.getElementById('accord-diagnostic');
+    if (!section || !section.classList.contains('open')) return;
+    if (diagConsoleFetching) return;
+    diagConsoleFetching = true;
+    try {
+        const res = await fetch(`${API}/api/logs/tail?offset=${diagConsoleOffset}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const box = document.getElementById('diag-console');
+        if (!box) return;
+
+        if (data.reset) box.textContent = '';
+        const placeholder = box.querySelector('.diag-console-placeholder');
+        if (placeholder) placeholder.remove();
+
+        if (data.lines) {
+            box.textContent += data.lines;
+            if (box.textContent.length > DIAG_CONSOLE_MAX_CHARS) {
+                box.textContent = box.textContent.slice(-Math.floor(DIAG_CONSOLE_MAX_CHARS * 0.6));
+            }
+            const autoscroll = document.getElementById('diag-console-autoscroll');
+            if (!autoscroll || autoscroll.checked) box.scrollTop = box.scrollHeight;
+        }
+        diagConsoleOffset = data.offset;
+    } catch (err) {
+        console.warn('[Diagnostic] Erreur récupération logs:', err);
+    } finally {
+        diagConsoleFetching = false;
+    }
+}
+window.pollDiagnosticConsole = pollDiagnosticConsole;
+
+function clearDiagnosticConsole() {
+    const box = document.getElementById('diag-console');
+    if (box) box.textContent = '';
+}
+window.clearDiagnosticConsole = clearDiagnosticConsole;
+
 async function exportDiagnosticLogs(btn) {
 const originalHtml = btn.innerHTML;
 btn.disabled = true;
-btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${I18N.t('about.exporting_logs') || 'Génération...'}`;
+btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${I18N.t('settings.diagnostic_exporting') || 'Génération...'}`;
 
 // En mode application desktop (pywebview), on écrit directement dans le
 // dossier Téléchargements de l'utilisateur, sans passer par le navigateur.
