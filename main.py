@@ -278,6 +278,101 @@ def setup_logging():
 app_logger = setup_logging()
 
 # ============================================
+# 📦 VÉRIFICATION DES MODULES PYTHON REQUIS
+# ============================================
+# (nom_import, nom_pip, requis_au_démarrage)
+_REQUIRED_MODULES = [
+    ("flask", "Flask", True),
+    ("werkzeug", "Werkzeug", True),
+    ("cryptography", "cryptography", True),
+    ("numpy", "numpy", True),
+    ("PIL", "Pillow", True),
+    ("trimesh", "trimesh", True),
+    ("requests", "requests", True),
+    ("packaging", "packaging", True),
+    ("nest_asyncio", "nest_asyncio", True),
+    ("webview", "pywebview", True),
+    ("smbclient", "smbprotocol", True),
+    ("rarfile", "rarfile", True),
+    ("waitress", "waitress", True),
+    # Optionnels : fonctionnalités dégradées si absents, l'app démarre quand même
+    ("pymeshfix", "pymeshfix", False),
+    ("defusedxml", "defusedxml", False),
+    ("paho.mqtt.client", "paho-mqtt", False),
+    ("rectpack", "rectpack", False),
+    ("shapely", "shapely", False),
+    ("py7zr", "py7zr", False),
+    ("fast_simplification", "fast-simplification", False),
+    ("pyrender", "pyrender", False),
+    ("matplotlib", "matplotlib", False),
+    ("psutil", "psutil", False),
+    ("qrcode", "qrcode", False),
+]
+
+def _check_required_modules(log=True):
+    """Vérifie la présence de tous les modules Python utilisés par Stellio
+    (requis + optionnels) et retourne le détail. Si log=True, écrit un
+    rapport lisible dans les logs (utile pour le support / bêta-test)."""
+    import importlib.util
+    try:
+        import importlib.metadata as importlib_metadata
+    except ImportError:
+        importlib_metadata = None
+
+    results = []
+    for import_name, pip_name, required in _REQUIRED_MODULES:
+        top_level = import_name.split('.')[0]
+        try:
+            installed = importlib.util.find_spec(top_level) is not None
+        except Exception:
+            installed = False
+
+        version_str = None
+        if installed and importlib_metadata is not None:
+            try:
+                version_str = importlib_metadata.version(pip_name)
+            except Exception:
+                version_str = "?"
+
+        results.append({
+            "import": import_name,
+            "pip": pip_name,
+            "required": required,
+            "installed": installed,
+            "version": version_str,
+        })
+
+    if log:
+        try:
+            missing_required = [r for r in results if r["required"] and not r["installed"]]
+            missing_optional = [r for r in results if not r["required"] and not r["installed"]]
+
+            app_logger.info("[MODULES] === Vérification des modules Python ===")
+            for r in results:
+                if r["installed"]:
+                    status = f"OK (v{r['version']})" if r["version"] not in (None, "?") else "OK"
+                else:
+                    status = "MANQUANT"
+                kind = "requis" if r["required"] else "optionnel"
+                app_logger.info(f"[MODULES]   {r['import']:<26} [{kind:<9}] -> {status}")
+
+            if missing_required:
+                names = ", ".join(r["pip"] for r in missing_required)
+                app_logger.error(f"[MODULES] ❌ Modules REQUIS manquants: {names} (pip install {' '.join(r['pip'] for r in missing_required)})")
+            if missing_optional:
+                names = ", ".join(r["pip"] for r in missing_optional)
+                app_logger.info(f"[MODULES] ⚠️  Modules optionnels manquants: {names} (fonctionnalités associées désactivées)")
+            if not missing_required and not missing_optional:
+                app_logger.info("[MODULES] ✅ Tous les modules (requis + optionnels) sont installés")
+            app_logger.info("[MODULES] === Fin de la vérification ===")
+        except Exception as e:
+            app_logger.error(f"[MODULES] Erreur lors du rapport de vérification: {e}")
+
+    return results
+
+_check_required_modules()
+
+# ============================================
 # 📊 UTILITAIRE TAILLE FICHIER
 # ============================================
 def formatSize(bytes):
@@ -786,6 +881,12 @@ def migrate_print_history():
             c.execute("ALTER TABLE print_history ADD COLUMN slicer_profile_name TEXT DEFAULT ''")
         if 'rated_at' not in columns:
             c.execute("ALTER TABLE print_history ADD COLUMN rated_at TIMESTAMP")
+        if 'material_cost' not in columns:
+            c.execute("ALTER TABLE print_history ADD COLUMN material_cost REAL")
+        if 'elec_cost' not in columns:
+            c.execute("ALTER TABLE print_history ADD COLUMN elec_cost REAL")
+        if 'total_cost' not in columns:
+            c.execute("ALTER TABLE print_history ADD COLUMN total_cost REAL")
         conn.commit()
     except Exception as e:
         app_logger.info(f"[ERROR] migrate_print_history: {e}")
@@ -1139,7 +1240,7 @@ class PrinterManager:
         serial = config.get('serial', '')
         if not access_code:
             return {**default_result, 'status': 'error'}
-        result = {}
+        raw_state = {}
         received = threading.Event()
         def on_connect(client, userdata, flags, rc):
             if rc == 0:
@@ -1157,74 +1258,88 @@ class PrinterManager:
                 print_info = payload.get('print', {})
                 if not print_info:
                     return
-                gcode_state = print_info.get('gcode_state', '').lower()
-                status_map = {
-                    'printing': 'printing', 'running': 'printing',
-                    'pause': 'paused', 'paused': 'paused',
-                    'finish': 'idle', 'idle': 'idle', 'prepare': 'idle',
-                    'failed': 'error', 'slicing': 'idle'
-                }
-                status = status_map.get(gcode_state, 'idle')
-                nozzle_temp = print_info.get('nozzle_temper', 0)
-                nozzle_target = print_info.get('nozzle_target_temper', 0)
-                bed_temp = print_info.get('bed_temper', 0)
-                bed_target = print_info.get('bed_target_temper', 0)
-                chamber_temp = print_info.get('chamber_temper', 0)
-                mc_percent = print_info.get('mc_percent', 0)
-                mc_remaining = print_info.get('mc_remaining_time', 0)  # en minutes
-                layer_num = print_info.get('layer_num', 0)
-                total_layer = print_info.get('total_layer_num', 0)
-                subtask_name = print_info.get('subtask_name', '')
-                ams_info = []
-                ams = print_info.get('ams', {})
-                if ams and isinstance(ams, dict):
-                    for tray in ams.get('tray', []):
-                        remain_pct = tray.get('remain', -1)
-                        try:
-                            remain_pct = float(remain_pct)
-                        except (TypeError, ValueError):
-                            remain_pct = -1
-                        tray_weight_raw = tray.get('tray_weight', '')
-                        try:
-                            tray_weight = float(tray_weight_raw) if tray_weight_raw not in ('', None) else 1000.0
-                        except (TypeError, ValueError):
-                            tray_weight = 1000.0
-                        remaining_g = round(tray_weight * remain_pct / 100, 1) if remain_pct >= 0 else None
-                        ams_info.append({
-                            'id': tray.get('id', ''),
-                            'color': tray.get('tray_color', ''),
-                            'material': tray.get('tray_type', ''),
-                            'temp': tray.get('nozzle_temp_max', 0),
-                            'remain_pct': remain_pct if remain_pct >= 0 else None,
-                            'tray_weight': tray_weight,
-                            'remaining_g': remaining_g
-                        })
-                elapsed_min = 0
-                total_min = 0
-                if mc_percent > 0 and mc_remaining > 0:
-                    total_min = int(mc_remaining / (1 - mc_percent / 100)) if mc_percent < 100 else mc_remaining
-                    elapsed_min = total_min - mc_remaining
-                result.update({
-                    'status': status,
-                    'progress': mc_percent,
-                    'file': subtask_name,
-                    'temps': {
-                        'extruder': {'current': round(nozzle_temp, 1), 'target': round(nozzle_target, 1)},
-                        'bed': {'current': round(bed_temp, 1), 'target': round(bed_target, 1)},
-                        'chamber': {'current': round(chamber_temp, 1), 'target': 0}
-                    },
-                    'time': {
-                        'elapsed': elapsed_min * 60,
-                        'remaining': mc_remaining * 60,
-                        'total': total_min * 60
-                    },
-                    'layers': {'current': layer_num, 'total': total_layer},
-                    'ams': ams_info,
-                    'last_print': {'filename': '', 'duration': 0, 'finished_at': ''}
-                })
-                received.set()
+                # Bambu envoie très souvent des mises à jour PARTIELLES
+                # (uniquement les champs modifiés depuis le dernier envoi),
+                # pas le rapport complet à chaque message. On fusionne donc
+                # les champs au fil des messages reçus plutôt que de ne
+                # garder que le tout premier — sinon un delta partiel
+                # (sans gcode_state/mc_percent) écrase tout avec des 0.
+                raw_state.update(print_info)
+                # On ne considère l'état exploitable qu'une fois qu'on a vu
+                # au moins un rapport contenant gcode_state (marqueur fiable
+                # d'un état complet, présent dans le "pushall" demandé).
+                if 'gcode_state' in raw_state:
+                    received.set()
             except Exception as e:
                 app_logger.info(f"[Bambu MQTT] Erreur parsing: {e}")
+
+        def _build_result_from_state():
+            status_map = {
+                'printing': 'printing', 'running': 'printing',
+                'pause': 'paused', 'paused': 'paused',
+                'finish': 'idle', 'idle': 'idle', 'prepare': 'idle',
+                'failed': 'error', 'slicing': 'idle'
+            }
+            gcode_state = raw_state.get('gcode_state', '').lower()
+            status = status_map.get(gcode_state, 'idle')
+            nozzle_temp = raw_state.get('nozzle_temper', 0)
+            nozzle_target = raw_state.get('nozzle_target_temper', 0)
+            bed_temp = raw_state.get('bed_temper', 0)
+            bed_target = raw_state.get('bed_target_temper', 0)
+            chamber_temp = raw_state.get('chamber_temper', 0)
+            mc_percent = raw_state.get('mc_percent', 0)
+            mc_remaining = raw_state.get('mc_remaining_time', 0)  # en minutes
+            layer_num = raw_state.get('layer_num', 0)
+            total_layer = raw_state.get('total_layer_num', 0)
+            subtask_name = raw_state.get('subtask_name', '')
+            ams_info = []
+            ams = raw_state.get('ams', {})
+            if ams and isinstance(ams, dict):
+                for tray in ams.get('tray', []):
+                    remain_pct = tray.get('remain', -1)
+                    try:
+                        remain_pct = float(remain_pct)
+                    except (TypeError, ValueError):
+                        remain_pct = -1
+                    tray_weight_raw = tray.get('tray_weight', '')
+                    try:
+                        tray_weight = float(tray_weight_raw) if tray_weight_raw not in ('', None) else 1000.0
+                    except (TypeError, ValueError):
+                        tray_weight = 1000.0
+                    remaining_g = round(tray_weight * remain_pct / 100, 1) if remain_pct >= 0 else None
+                    ams_info.append({
+                        'id': tray.get('id', ''),
+                        'color': tray.get('tray_color', ''),
+                        'material': tray.get('tray_type', ''),
+                        'temp': tray.get('nozzle_temp_max', 0),
+                        'remain_pct': remain_pct if remain_pct >= 0 else None,
+                        'tray_weight': tray_weight,
+                        'remaining_g': remaining_g
+                    })
+            elapsed_min = 0
+            total_min = 0
+            if mc_percent > 0 and mc_remaining > 0:
+                total_min = int(mc_remaining / (1 - mc_percent / 100)) if mc_percent < 100 else mc_remaining
+                elapsed_min = total_min - mc_remaining
+            return {
+                'status': status,
+                'progress': mc_percent,
+                'file': subtask_name,
+                'temps': {
+                    'extruder': {'current': round(nozzle_temp, 1), 'target': round(nozzle_target, 1)},
+                    'bed': {'current': round(bed_temp, 1), 'target': round(bed_target, 1)},
+                    'chamber': {'current': round(chamber_temp, 1), 'target': 0}
+                },
+                'time': {
+                    'elapsed': elapsed_min * 60,
+                    'remaining': mc_remaining * 60,
+                    'total': total_min * 60
+                },
+                'layers': {'current': layer_num, 'total': total_layer},
+                'ams': ams_info,
+                'last_print': {'filename': '', 'duration': 0, 'finished_at': ''}
+            }
+
         try:
             try:
                 client = mqtt.Client(
@@ -1250,7 +1365,8 @@ class PrinterManager:
                 client.disconnect()
             except Exception:
                 pass
-            if result:
+            if raw_state:
+                result = _build_result_from_state()
                 return result
             return {**default_result, 'status': 'idle'}
         except Exception as e:
@@ -1972,6 +2088,36 @@ def process_generation_queue():
 # ============================================
 # 🖼️ MINIATURES 3D
 # ============================================
+def _get_transformed_scene_geometries(scene, node_filter=None):
+    """Récupère les géométries d'une trimesh.Scene en appliquant la matrice
+    de transformation (rotation + translation) propre à chaque objet dans
+    le fichier 3MF. trimesh.Scene stocke les géométries dans leur repère
+    LOCAL — sans appliquer cette transformation, un objet pivoté dans le
+    fichier (très courant : orientation d'impression choisie par
+    l'utilisateur avant export) ressort dans la mauvaise orientation, ce
+    qui fausse tout calcul dépendant de l'axe Z (dont la détection de
+    surplomb dans le viewer). node_filter est un set optionnel d'IDs de
+    nœuds à inclure (pour l'isolation d'un plateau spécifique).
+    """
+    out = []
+    try:
+        for node_name in scene.graph.nodes_geometry:
+            if node_filter is not None:
+                candidate_ids = {str(node_name), str(node_name).split('/')[-1]}
+                if not (candidate_ids & node_filter):
+                    continue
+            transform, geom_name = scene.graph[node_name]
+            geom = scene.geometry.get(geom_name)
+            if geom is None or not hasattr(geom, 'vertices') or len(geom.vertices) == 0:
+                continue
+            if transform is not None and not np.allclose(transform, np.eye(4)):
+                geom = geom.copy()
+                geom.apply_transform(transform)
+            out.append(geom)
+    except Exception as e:
+        app_logger.debug(f"[3MF] Extraction géométries transformées échouée: {e}")
+    return out
+
 def _concatenate_filtering_outliers(geoms):
     if not geoms:
         return None
@@ -2197,21 +2343,17 @@ def load_3mf_mesh(source, plate_index=None):
             loaded = trimesh.load(source)
 
         if isinstance(loaded, trimesh.Scene):
-            all_geoms = [m for m in loaded.geometry.values()
-                         if hasattr(m, 'vertices') and len(m.vertices) > 0]
+            # Important : loaded.geometry.values() donne les géométries en
+            # repère LOCAL, sans la rotation/translation propre à chaque
+            # objet stockée dans le graphe de scène. On applique cette
+            # transformation via le helper dédié, sinon les objets pivotés
+            # ressortent dans la mauvaise orientation (et faussent ensuite
+            # la détection de surplomb dans le viewer, qui se base sur
+            # l'axe Z du maillage reçu).
+            all_geoms = _get_transformed_scene_geometries(loaded)
 
             if plate_object_ids is not None:
-                filtered_geoms = []
-                try:
-                    for node_name in loaded.graph.nodes_geometry:
-                        candidate_ids = {str(node_name), str(node_name).split('/')[-1]}
-                        if candidate_ids & plate_object_ids:
-                            transform, geom_name = loaded.graph[node_name]
-                            geom = loaded.geometry.get(geom_name)
-                            if geom is not None and hasattr(geom, 'vertices') and len(geom.vertices) > 0:
-                                filtered_geoms.append(geom)
-                except Exception as e:
-                    app_logger.debug(f"[3MF] Filtrage plateau via scène impossible pour {display_name}: {e}")
+                filtered_geoms = _get_transformed_scene_geometries(loaded, node_filter=plate_object_ids)
 
                 if filtered_geoms:
                     mesh = _concatenate_filtering_outliers(filtered_geoms)
@@ -2305,7 +2447,7 @@ def load_3mf_mesh(source, plate_index=None):
     app_logger.warning(f"[3MF] ⚠️  Impossible de charger le mesh: {display_name}")
     return trimesh.Trimesh()
 
-def create_fallback_thumbnail(thumb_path, resolution=(512, 512)):
+def create_fallback_thumbnail(thumb_path, resolution=(768, 768)):
     try:
         logo_path = os.path.join(BASE_DIR, 'assets', 'logo-nom-stellio.png')
         img = Image.new('RGBA', resolution, (26, 29, 35, 255))
@@ -2361,7 +2503,7 @@ def _draw_fallback_cube(draw, center):
         (cube_center[0] - cube_size//2, cube_center[1])
     ], fill=(78, 161, 211, 180), outline=(100, 180, 230, 255))
 
-def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(512, 512), timeout_s=None):
+def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(768, 768), timeout_s=None):
     if timeout_s is None:
         timeout_s = get_thumb_timeout(stl_path)
 
@@ -2391,7 +2533,7 @@ def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(512, 512), tim
     return bool(result.get('value', False))
 
 
-def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(512, 512)):
+def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768)):
     try:
         is_smb = stl_path.startswith('//') or stl_path.startswith('\\\\')
         is_virtual = is_virtual_archive_path(stl_path)
@@ -2461,7 +2603,7 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(512, 512
             rot_fix = tra.rotation_matrix(np.radians(-90), [1, 0, 0])
             mesh.apply_transform(rot_fix)
 
-            MAX_RENDER_FACES = 15000
+            MAX_RENDER_FACES = 60000
             if len(mesh.faces) > MAX_RENDER_FACES:
                 try:
                     import fast_simplification
@@ -2474,14 +2616,24 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(512, 512
 
             try:
                 import pyrender
+                try:
+                    mesh.fix_normals()
+                except Exception:
+                    pass
                 with pyrender_lock:
-                    scene = pyrender.Scene(bg_color=[0.10, 0.10, 0.12, 1.0])
-                    material = pyrender.MetallicRoughnessMaterial(
-                        baseColorFactor=[0.30, 0.60, 0.90, 1.0],
-                        metallicFactor=0.3,
-                        roughnessFactor=0.7
+                    # Fond identique au viewer 3D (#1a1d23)
+                    scene = pyrender.Scene(
+                        bg_color=[0x1a / 255.0, 0x1d / 255.0, 0x23 / 255.0, 1.0],
+                        ambient_light=[0x40 / 255.0 * 1.3, 0x40 / 255.0 * 1.3, 0x40 / 255.0 * 1.3]
                     )
-                    render_mesh = pyrender.Mesh.from_trimesh(mesh, material=material)
+                    # Même couleur/brillance que le MeshPhongMaterial du viewer
+                    # (color: 0x4ea1d3, specular: 0x111111, shininess: 120)
+                    material = pyrender.MetallicRoughnessMaterial(
+                        baseColorFactor=[0x4e / 255.0, 0xa1 / 255.0, 0xd3 / 255.0, 1.0],
+                        metallicFactor=0.0,
+                        roughnessFactor=0.35
+                    )
+                    render_mesh = pyrender.Mesh.from_trimesh(mesh, material=material, smooth=True)
                     scene.add(render_mesh)
 
                     max_dim = np.linalg.norm(mesh.extents)
@@ -2512,30 +2664,12 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(512, 512
                     camera = pyrender.PerspectiveCamera(yfov=np.pi / 4.0, aspectRatio=1.0)
                     scene.add(camera, pose=camera_pose)
 
-                    main_light = pyrender.DirectionalLight(color=[1.0, 1.0, 1.0], intensity=3.5)
-                    scene.add(main_light, pose=camera_pose)
-
-                    fill_angle = np.radians(30)
-                    fill_x = dist * np.cos(elev_rad) * np.sin(azim_rad - fill_angle)
-                    fill_y = dist * np.sin(elev_rad) * 0.6
-                    fill_z = dist * np.cos(elev_rad) * np.cos(azim_rad - fill_angle)
-
-                    fill_forward = -np.array([fill_x, fill_y, fill_z])
-                    fill_forward /= np.linalg.norm(fill_forward)
-                    fill_right = np.cross(fill_forward, np.array([0.0, 1.0, 0.0]))
-                    if np.linalg.norm(fill_right) < 1e-6:
-                        fill_right = np.cross(fill_forward, np.array([0.0, 0.0, 1.0]))
-                    fill_right /= np.linalg.norm(fill_right)
-                    fill_up = np.cross(fill_right, fill_forward)
-
-                    fill_pose = np.eye(4)
-                    fill_pose[:3, 0] = fill_right
-                    fill_pose[:3, 1] = fill_up
-                    fill_pose[:3, 2] = -fill_forward
-                    fill_pose[:3, 3] = [fill_x, fill_y, fill_z]
-
-                    fill_light = pyrender.DirectionalLight(color=[0.7, 0.85, 1.0], intensity=1.2)
-                    scene.add(fill_light, pose=fill_pose)
+                    # Lumière directionnelle attachée à la caméra, comme dans le viewer
+                    # (directionalLight.position.set(0,0,1) + viewerCamera.add(...))
+                    # → toujours "de face" par rapport au point de vue, jamais de zone
+                    # sombre inattendue selon l'angle du modèle.
+                    headlight = pyrender.DirectionalLight(color=[1.0, 1.0, 1.0], intensity=2.2)
+                    scene.add(headlight, pose=camera_pose)
 
                     ss = 2
                     render_w, render_h = resolution[0] * ss, resolution[1] * ss
@@ -2546,7 +2680,7 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(512, 512
                 img = Image.fromarray(color)
                 if ss != 1:
                     img = img.resize(resolution, Image.Resampling.LANCZOS)
-                img.save(thumb_path, quality=92, method=6)
+                img.save(thumb_path, quality=95, method=6)
 
                 if tmp_path and os.path.exists(tmp_path):
                     os.unlink(tmp_path)
@@ -2570,7 +2704,7 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(512, 512
         app_logger.error(f"[ERROR] generate_thumbnail_pyrender {os.path.basename(stl_path)}: {e}")
         return False
 
-def _generate_thumbnail_raster(mesh, thumb_path, resolution=(512, 512)):
+def _generate_thumbnail_raster(mesh, thumb_path, resolution=(768, 768)):
     try:
         vertices = mesh.vertices
         faces = mesh.faces
@@ -2634,32 +2768,29 @@ def _generate_thumbnail_raster(mesh, thumb_path, resolution=(512, 512)):
         if len(faces) == 0:
             return False
 
-        AMBIENT = 0.24
-        KEY_DIFFUSE = 0.58
-        FILL_DIFFUSE = 0.22
-        SPECULAR_COLOR = (0x18 / 255.0)
-        SHININESS = 55.0
+        AMBIENT = 0x40 / 255.0 * 1.3      # ambient_light 0x404040 @ intensité 1.3 du viewer
+        KEY_INTENSITY = 0.7                # directionalLight attachée à la caméra du viewer
+        SPECULAR_COLOR, SHININESS = (0x11 / 255.0), 120.0   # specular 0x111111, shininess 120
         base_color = np.array([0x4e, 0xa1, 0xd3], dtype=np.float64)
 
-        key_dir = -0.30 * right + 0.55 * up - 0.78 * forward
-        key_dir /= np.linalg.norm(key_dir)
-        fill_dir = 0.45 * right - 0.10 * up - 0.55 * forward
-        fill_dir /= np.linalg.norm(fill_dir)
-
-        n_dot_key = np.clip(face_normals @ key_dir, 0.0, 1.0)
-        n_dot_fill = np.clip(face_normals @ fill_dir, 0.0, 1.0)
-
-        y_min, y_max = float(vertices[:, 1].min()), float(vertices[:, 1].max())
-        height_norm = np.clip((face_height - y_min) / max(y_max - y_min, 1e-6), 0.0, 1.0)
-        ao = 0.68 + 0.32 * height_norm
-
-        diffuse_ambient = np.clip(
-            (AMBIENT + KEY_DIFFUSE * n_dot_key + FILL_DIFFUSE * n_dot_fill) * ao,
-            0.0, 1.05
+        # Normales moyennées par sommet (équivalent de geometry.computeVertexNormals()
+        # dans le viewer) pour un dégradé lisse plutôt qu'un aplat par facette.
+        vertex_normals = mesh.vertex_normals
+        smooth_normals = (
+            vertex_normals[faces[:, 0]] + vertex_normals[faces[:, 1]] + vertex_normals[faces[:, 2]]
         )
-        specular_term = SPECULAR_COLOR * np.power(n_dot_key, SHININESS)
+        sn_len = np.linalg.norm(smooth_normals, axis=1, keepdims=True)
+        sn_len[sn_len == 0] = 1.0
+        smooth_normals = smooth_normals / sn_len
+
+        # Lumière directionnelle "attachée à la caméra" (headlight), comme dans le viewer :
+        # elle éclaire toujours de face, quel que soit l'angle du modèle.
+        n_dot_light = np.clip(-smooth_normals @ forward, 0.0, 1.0)
+        shade = AMBIENT + KEY_INTENSITY * n_dot_light
+
+        specular_term = SPECULAR_COLOR * np.power(n_dot_light, SHININESS)
         face_colors = np.clip(
-            base_color[None, :] * diffuse_ambient[:, None] + specular_term[:, None] * 255.0,
+            base_color[None, :] * shade[:, None] + specular_term[:, None] * 255.0,
             0, 255
         ).astype(np.uint8)
 
@@ -2689,7 +2820,7 @@ def _generate_thumbnail_raster(mesh, thumb_path, resolution=(512, 512)):
         app_logger.warning(f"[ERROR] Rendu rapide (raster) {os.path.basename(thumb_path)}: {e}")
         return False
 
-def _generate_thumbnail_matplotlib(mesh, thumb_path, resolution=(512, 512)):
+def _generate_thumbnail_matplotlib(mesh, thumb_path, resolution=(768, 768)):
     with matplotlib_render_lock:
         try:
             import matplotlib
@@ -2791,6 +2922,22 @@ def analyze_3d_file(file_path):
 
         already_handled = file_path.replace('\\', '/') in repair_ignored_cache
 
+        # is_watertight ne garantit PAS que les normales sont cohérentes :
+        # un maillage peut être une coque parfaitement fermée (chaque arête
+        # partagée par exactement 2 faces) tout en contenant un îlot de
+        # triangles dont le winding order est inversé (import depuis un
+        # logiciel tiers, booléen mal résolu, etc.). Ces normales inversées
+        # ne cassent pas l'étanchéité, donc le fichier passait pour "sain"
+        # alors que l'aperçu de surplombs (qui se fie directement au sens
+        # des normales) affichait des faux positifs sur des parois pourtant
+        # verticales. is_winding_consistent détecte spécifiquement ce cas.
+        try:
+            winding_ok = bool(mesh.is_winding_consistent)
+        except Exception:
+            winding_ok = True  # propriété coûteuse/instable sur certains maillages : ne pas bloquer dessus
+
+        mesh_is_sane = mesh.is_watertight and winding_ok
+
         return {
             'dimensions': {'x': round(dimensions[0], 1), 'y': round(dimensions[1], 1), 'z': round(dimensions[2], 1)},
             'volume_cm3': round(volume_cm3, 2),
@@ -2798,8 +2945,8 @@ def analyze_3d_file(file_path):
             'triangle_count': triangle_count,
             'weights': weights,
             'estimated_time': {'seconds': int(estimated_time_seconds), 'formatted': f"{hours}h {minutes}min" if hours > 0 else f"{minutes}min"},
-            'is_manifold': mesh.is_watertight or already_handled,
-            'needs_repair': (not mesh.is_watertight) and not already_handled,
+            'is_manifold': mesh_is_sane or already_handled,
+            'needs_repair': (not mesh_is_sane) and not already_handled,
             'is_empty': mesh.is_empty,
             'estimate_source': 'geometric' 
         }
@@ -3308,7 +3455,9 @@ def api_delete_source(source_id):
                             all_files.extend(scan_smb_folder_recursive(unc_path, '', kwargs, source['name']))
                     except Exception as e:
                         app_logger.warning(f"[DELETE] Erreur source {source.get('name')}: {e}")
-                all_files = deduplicate_files_hybrid(all_files)
+                # même correctif que dans _do_background_scan : voir la note à ce sujet
+                # (deduplicate_files_hybrid jetait silencieusement des fichiers distincts
+                # partageant un même nom).
                 save_file_cache(all_files, sources)
                 app_logger.info(f"[DELETE] Cache mis à jour : {len(all_files)} fichiers")
             finally:
@@ -4452,7 +4601,7 @@ def _do_background_scan(sources_list, user_id, blocking=False):
 
         for source in sources_list:
             try:
-                if source['type'] == 'folder':
+                if source['type'] in ('folder', 'nfs'):
                     if not os.path.exists(source['path']):
                         app_logger.warning(f"[SCAN] Source \"{source['name']}\" introuvable ({source['path']}) — ignorée pour ce scan")
                         unreachable_sources.append(source['name'])
@@ -4532,7 +4681,15 @@ def _do_background_scan(sources_list, user_id, blocking=False):
                 app_logger.info(f"    [SCAN] Erreur source {source['name']}: {e}")
                 unreachable_sources.append(source['name'])
 
-        all_files = deduplicate_files_hybrid(all_files)
+        # NOTE: l'ancien appel à deduplicate_files_hybrid(all_files) a été retiré.
+        # Cette fonction ne dédupliquait pas par contenu réel (elle hashait le CHEMIN,
+        # pas les octets du fichier) : elle gardait uniquement le 1er fichier rencontré
+        # pour chaque couple (nom, extension) et jetait silencieusement tous les autres,
+        # même s'il s'agissait de modèles totalement différents portant un nom courant
+        # (ex: "model.stl", "Base.3mf"). C'est ce qui faisait "disparaître" les fichiers
+        # fraîchement téléchargés dès que leur nom existait déjà ailleurs dans les sources.
+        # La détection de vrais doublons reste disponible via la page Doublons
+        # (/api/files/duplicates), qui compare taille + hash du contenu.
 
         try:
             conn2 = get_db()
@@ -4613,6 +4770,42 @@ def _do_background_scan(sources_list, user_id, blocking=False):
         app_logger.info(f"[SCAN] Erreur critique: {e}")
     finally:
         _background_scan_running.release()
+
+# ============================================
+# 🔁 SCAN AUTOMATIQUE PÉRIODIQUE (toutes sources)
+# ============================================
+def _auto_scan_scheduler():
+    """Relance périodiquement un scan complet de toutes les sources
+    configurées (dossier local, SMB, NFS, fichier unique) pour détecter les
+    nouveaux fichiers ajoutés depuis l'extérieur (dépôt manuel sur le NAS,
+    autre PC, etc.) sans que l'utilisateur ait besoin de rouvrir la
+    bibliothèque. Réutilise _do_background_scan (diff + auto-tag inclus).
+    Configurable via /api/settings : auto_scan_enabled, auto_scan_interval_minutes.
+    """
+    _lower_thread_priority()
+    app_logger.info("[AUTO-SCAN] Planificateur démarré")
+    while True:
+        interval_min = 5
+        try:
+            settings = load_settings() or {}
+            enabled = settings.get('auto_scan_enabled', True)
+            try:
+                interval_min = max(1, int(settings.get('auto_scan_interval_minutes', 5)))
+            except (TypeError, ValueError):
+                interval_min = 5
+
+            if enabled:
+                conn = get_db()
+                try:
+                    sources = [dict(s) for s in conn.execute("SELECT * FROM sources").fetchall()]
+                finally:
+                    conn.close()
+                if sources:
+                    app_logger.info(f"[AUTO-SCAN] Scan périodique de {len(sources)} source(s)...")
+                    _do_background_scan(sources, None, blocking=False)
+        except Exception as e:
+            app_logger.info(f"[AUTO-SCAN] Erreur: {e}")
+        time.sleep(interval_min * 60)
 
 @app.route('/api/files', methods=['GET'])
 @login_required
@@ -4956,20 +5149,18 @@ def _is_path_within_sources(file_path, user_id):
         is_smb_folder = norm_folder.startswith('//')
         norm_folder_cmp = norm_folder.rstrip('/').lower()
 
-        if is_smb_file and is_smb_folder:
-            folder_prefix = norm_folder_cmp + '/'
-            if norm_file_cmp.startswith(folder_prefix) or norm_file_cmp == norm_folder_cmp:
-                return True
-        elif not is_smb_file and not is_smb_folder:
-            try:
-                if os.path.commonpath([norm_file_cmp, norm_folder_cmp]) == norm_folder_cmp:
-                    return True
-            except (ValueError, Exception):
-                folder_prefix = norm_folder_cmp + '/'
-                if norm_file_cmp.startswith(folder_prefix) or norm_file_cmp == norm_folder_cmp:
-                    return True
+        if is_smb_file != is_smb_folder:
+            continue
 
-    app_logger.debug(f"[SECURITY] Rejet '{file_path}' — sources connues: {folders}")
+        # Comparaison par préfixe de chaîne (pas de commonpath : sur Windows,
+        # os.path.commonpath() renvoie le séparateur natif '\' même si on lui donne
+        # des chemins en '/', ce qui fait toujours échouer la comparaison avec
+        # norm_folder_cmp et rejette à tort des fichiers pourtant bien dans la source).
+        folder_prefix = norm_folder_cmp + '/'
+        if norm_file_cmp == norm_folder_cmp or norm_file_cmp.startswith(folder_prefix):
+            return True
+
+    app_logger.warning(f"[SECURITY] Rejet '{file_path}' — hors des sources configurées")
     return False
 
 def _get_source_root_paths(user_id):
@@ -5409,6 +5600,17 @@ def api_get_stats():
                 "SELECT COUNT(*) FROM print_history WHERE user_id=?", (user_id,)
             ).fetchone()[0]
 
+            cost_row = conn.execute(
+                """SELECT COALESCE(SUM(total_cost), 0), COUNT(total_cost),
+                          COALESCE(SUM(CASE WHEN sent_at >= ? THEN total_cost ELSE 0 END), 0)
+                   FROM print_history WHERE user_id=? AND total_cost IS NOT NULL""",
+                (month_start.strftime('%Y-%m-%d %H:%M:%S'), user_id)
+            ).fetchone()
+            total_spent = round(cost_row[0] or 0, 2)
+            costed_prints = cost_row[1] or 0
+            spent_this_month = round(cost_row[2] or 0, 2)
+            avg_cost_per_print = round(total_spent / costed_prints, 2) if costed_prints else None
+
             platform_rows = conn.execute(
                 """SELECT platform, COUNT(*) as cnt
                    FROM download_history
@@ -5474,6 +5676,9 @@ def api_get_stats():
             "favorites": fav_count,
             "new_this_month": new_this_month,
             "total_prints": total_prints,
+            "total_spent": total_spent,
+            "spent_this_month": spent_this_month,
+            "avg_cost_per_print": avg_cost_per_print,
             "top_printed": [{"name": r["file_name"], "count": r["cnt"]} for r in top_printed],
             "by_platform": by_platform,
             "profile_reliability": profile_reliability,
@@ -5504,7 +5709,8 @@ def api_get_print_history():
         try:
             rows = conn.execute(
                 """SELECT id, file_path, file_name, file_size, file_ext, slicer, sent_at, source_platform,
-                          result, failure_reason, rating_notes, slicer_profile_id, slicer_profile_name, rated_at
+                          result, failure_reason, rating_notes, slicer_profile_id, slicer_profile_name, rated_at,
+                          material_cost, elec_cost, total_cost
                    FROM print_history WHERE user_id=?
                    ORDER BY sent_at DESC LIMIT ? OFFSET ?""",
                 (session['user_id'], limit, offset)
@@ -5590,6 +5796,46 @@ def api_rate_print_history(entry_id):
         return jsonify({"success": True}), 200
     except Exception as e:
         app_logger.error(f"[PrintHistory] Notation échouée: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+
+@app.route('/api/print-history/<int:entry_id>/cost', methods=['POST'])
+@login_required
+def api_set_print_history_cost(entry_id):
+    data = request.json or {}
+
+    def _parse_cost(value):
+        if value in (None, ''):
+            return None
+        try:
+            v = float(value)
+        except (TypeError, ValueError):
+            return None
+        return round(max(0, v), 4)
+
+    material_cost = _parse_cost(data.get('material_cost'))
+    elec_cost = _parse_cost(data.get('elec_cost'))
+    total_cost = None
+    if material_cost is not None or elec_cost is not None:
+        total_cost = round((material_cost or 0) + (elec_cost or 0), 4)
+
+    try:
+        conn = get_db()
+        try:
+            cur = conn.execute(
+                """UPDATE print_history SET material_cost=?, elec_cost=?, total_cost=?
+                   WHERE id=? AND user_id=?""",
+                (material_cost, elec_cost, total_cost, entry_id, session['user_id'])
+            )
+            conn.commit()
+            found = cur.rowcount > 0
+        finally:
+            conn.close()
+        if not found:
+            return jsonify({"error": "Entrée introuvable"}), 404
+        return jsonify({"success": True, "material_cost": material_cost, "elec_cost": elec_cost, "total_cost": total_cost}), 200
+    except Exception as e:
+        app_logger.error(f"[PrintHistory] Mise à jour coût échouée: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 
@@ -6605,13 +6851,16 @@ def api_send_to_slicer():
                             except (TypeError, ValueError):
                                 spool_id_logged = None
 
+            material_cost, elec_cost, total_cost, _weight_for_cost = _compute_estimated_cost(norm, weight_g_hint=weight_used_logged)
+
             cur = conn.execute(
-                "INSERT INTO print_history (user_id, file_path, file_name, file_size, file_ext, slicer, source_platform, spool_id, spool_weight_used_g, slicer_profile_id, slicer_profile_name) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO print_history (user_id, file_path, file_name, file_size, file_ext, slicer, source_platform, spool_id, spool_weight_used_g, slicer_profile_id, slicer_profile_name, material_cost, elec_cost, total_cost) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (session['user_id'], norm, os.path.basename(file_path),
                  os.path.getsize(file_path) if os.path.exists(file_path) else 0,
                  os.path.splitext(file_path)[1].lower(), detected_slicer,
                  detect_platform_from_path(norm), spool_id_logged, weight_used_logged,
-                 data.get('slicer_profile_id') or '', data.get('slicer_profile_name') or '')
+                 data.get('slicer_profile_id') or '', data.get('slicer_profile_name') or '',
+                 material_cost, elec_cost, total_cost)
             )
             history_id = cur.lastrowid
             conn.commit()
@@ -6684,12 +6933,13 @@ def api_slicer_send_batch():
                 slicer_label = os.path.basename(slicer_path).replace('.exe', '')
                 for fp in file_paths:
                     norm = fp.replace('\\', '/')
+                    material_cost, elec_cost, total_cost, _w = _compute_estimated_cost(norm)
                     conn.execute(
-                        "INSERT INTO print_history (user_id, file_path, file_name, file_size, file_ext, slicer, source_platform) VALUES (?,?,?,?,?,?,?)",
+                        "INSERT INTO print_history (user_id, file_path, file_name, file_size, file_ext, slicer, source_platform, material_cost, elec_cost, total_cost) VALUES (?,?,?,?,?,?,?,?,?,?)",
                         (session['user_id'], norm, os.path.basename(fp),
                          os.path.getsize(fp) if os.path.exists(fp) else 0,
                          os.path.splitext(fp)[1].lower(), slicer_label,
-                         detect_platform_from_path(norm))
+                         detect_platform_from_path(norm), material_cost, elec_cost, total_cost)
                     )
                 conn.commit()
             finally:
@@ -7377,6 +7627,7 @@ def api_download_file():
     if not save_dir:
         save_dir = os.path.join(os.path.expanduser('~'), 'Downloads', 'Stellio')
         os.makedirs(save_dir, exist_ok=True)
+        _ensure_download_folder_registered(save_dir, session['user_id'])
 
     active_downloads[download_id] = {
         "filename": "",
@@ -7489,12 +7740,12 @@ def api_download_file():
                 active_downloads.pop(download_id, None)
                 if not results:
                     return jsonify({"error": "Aucun fichier n'a pu être téléchargé (connexion interrompue)."}), 502
-                invalidate_cache()
                 fname = results[0]
                 file_size = os.path.getsize(os.path.join(save_dir, fname))
                 for rf in results:
                     rp = os.path.join(save_dir, rf)
                     save_download_history(session['user_id'], rf, rp, os.path.getsize(rp) if os.path.exists(rp) else 0, os.path.splitext(rf)[1], url, 'Thingiverse')
+                invalidate_cache()
 
                 active_downloads.pop(download_id, None)
                 return jsonify({"success": True, "filename": fname, "path": os.path.join(save_dir, fname), "size": file_size})
@@ -7571,14 +7822,12 @@ def api_download_file():
                         "error": "Impossible de récupérer les liens de téléchargement Printables pour ce modèle."
                     }), 502
 
-                invalidate_cache()
-                if not results:
-                    return jsonify({"error": "Aucun fichier n'a pu être téléchargé (connexion interrompue)."}), 502
                 fname = results[0]
                 file_size = os.path.getsize(os.path.join(save_dir, fname))
                 for rf in results:
                     rp = os.path.join(save_dir, rf)
                     save_download_history(session['user_id'], rf, rp, os.path.getsize(rp) if os.path.exists(rp) else 0, os.path.splitext(rf)[1], url, 'Printables')
+                invalidate_cache()
 
                 active_downloads.pop(download_id, None)
                 return jsonify({
@@ -7735,7 +7984,6 @@ def api_download_file():
             if not results:
                 return jsonify({'error': 'Aucun fichier téléchargé depuis MakerWorld.'}), 502
 
-            invalidate_cache()
             fname = results[0]
             file_size = os.path.getsize(os.path.join(save_dir, fname))
             for rf in results:
@@ -7745,6 +7993,7 @@ def api_download_file():
                     os.path.getsize(rp) if os.path.exists(rp) else 0,
                     os.path.splitext(rf)[1], url, 'MakerWorld'
                 )
+            invalidate_cache()
 
             active_downloads.pop(download_id, None)
             return jsonify({
@@ -7816,10 +8065,10 @@ def api_download_file():
                 return jsonify({"error": "Le fichier téléchargé est vide ou invalide. Vérifiez l'URL ou configurez votre clé API."}), 400
 
             active_downloads.pop(download_id, None)
-            invalidate_cache()
 
             platform_name = 'Thingiverse' if 'thingiverse' in url else ('MakerWorld' if 'makerworld' in url else '')
             save_download_history(session['user_id'], fname, dest_path, file_size, os.path.splitext(fname)[1], url, platform_name)
+            invalidate_cache()
 
             app_logger.info(f"[Download] Fichier téléchargé : {fname} ({file_size} octets) → {dest_path}")
 
@@ -7851,6 +8100,45 @@ def api_download_file():
 # ============================================
 # 🕒 HISTORIQUE TÉLÉCHARGEMENTS WEB
 # ============================================
+def _ensure_download_folder_registered(path, user_id):
+    """Enregistre automatiquement le dossier de téléchargement par défaut comme Source
+    s'il ne l'est pas déjà. Sans ça, les fichiers téléchargés sans dossier de destination
+    choisi n'apparaissent jamais dans la bibliothèque : le scan ne parcourt que les
+    sources enregistrées, jamais tout le disque."""
+    try:
+        normalized = os.path.normpath(path)
+        conn = get_db()
+        try:
+            rows = conn.execute(
+                "SELECT path FROM sources WHERE user_id = ? AND type = 'folder'",
+                (user_id,)
+            ).fetchall()
+            if any(os.path.normpath(r['path']) == normalized for r in rows):
+                return
+
+            name = "Téléchargements"
+            existing_names = {r['name'] for r in conn.execute(
+                "SELECT name FROM sources WHERE user_id = ?", (user_id,)
+            ).fetchall()}
+            if name in existing_names:
+                suffix = 2
+                while f"{name} ({suffix})" in existing_names:
+                    suffix += 1
+                name = f"{name} ({suffix})"
+
+            conn.execute(
+                "INSERT INTO sources (user_id, name, type, path, config) VALUES (?, ?, 'folder', ?, '{}')",
+                (user_id, name, normalized)
+            )
+            conn.commit()
+            invalidate_cache()
+            app_logger.info(f"[Download] Dossier de téléchargement par défaut enregistré comme source: {normalized}")
+        finally:
+            conn.close()
+    except Exception as e:
+        app_logger.warning(f"[Download] Échec enregistrement source dossier par défaut: {e}")
+
+
 def save_download_history(user_id, file_name, file_path, file_size, file_ext, source_url, platform):
     try:
         conn = get_db()
@@ -8317,32 +8605,53 @@ def api_repair_file():
             if not geoms: return jsonify({"error": "Maillage vide"}), 400
             mesh = trimesh.util.concatenate(geoms)
 
-        if mesh.is_watertight:
+        def _winding_ok(m):
+            # is_watertight ne dit rien sur la cohérence du sens des
+            # normales (winding order) : un maillage peut être une coque
+            # fermée valide tout en ayant un îlot de faces inversées, ce
+            # qui ne casse pas l'étanchéité mais fausse tout ce qui dépend
+            # du sens des normales (aperçu des surplombs notamment).
+            try:
+                return bool(m.is_winding_consistent)
+            except Exception:
+                return True  # propriété instable sur certains maillages : ne pas bloquer dessus
+
+        was_watertight_initially = mesh.is_watertight
+        if was_watertight_initially and _winding_ok(mesh):
             return jsonify({"success": True, "message": "Déjà valide (watertight)"})
 
         backup_path = file_path + ".bak"
         if not os.path.exists(backup_path):
             shutil.copy2(file_path, backup_path)
 
-        _repair_mesh_inplace(mesh)  
-        if not mesh.is_watertight:
+        if was_watertight_initially:
+            # Le maillage est déjà étanche : seul le winding est en cause,
+            # donc on se contente de remettre les normales dans le bon sens
+            # sans repasser par tout le pipeline de comblement de trous /
+            # pymeshfix, qui n'a rien à corriger ici et pourrait même
+            # dégrader inutilement une géométrie déjà saine.
             trimesh.repair.fix_winding(mesh)
-            trimesh.repair.fill_holes(mesh)
-            trimesh.repair.fix_normals(mesh)
+            trimesh.repair.fix_normals(mesh, multibody=True)
+        else:
+            _repair_mesh_inplace(mesh)
+            if not mesh.is_watertight:
+                trimesh.repair.fix_winding(mesh)
+                trimesh.repair.fill_holes(mesh)
+                trimesh.repair.fix_normals(mesh)
 
-        if not mesh.is_watertight and HAS_PYMESHFIX:
-            try:
-                fixer = pymeshfix.MeshFix(mesh.vertices.copy(), mesh.faces.copy())
+            if not mesh.is_watertight and HAS_PYMESHFIX:
                 try:
-                    fixer.repair(verbose=False)
-                except TypeError:
-                    fixer.repair()
-                if fixer.v is not None and len(fixer.v) > 0:
-                    mesh = trimesh.Trimesh(vertices=fixer.v, faces=fixer.f, process=True)
-            except Exception as e:
-                app_logger.warning(f"[Repair] Passe pymeshfix échouée pour {file_path}: {e}")
+                    fixer = pymeshfix.MeshFix(mesh.vertices.copy(), mesh.faces.copy())
+                    try:
+                        fixer.repair(verbose=False)
+                    except TypeError:
+                        fixer.repair()
+                    if fixer.v is not None and len(fixer.v) > 0:
+                        mesh = trimesh.Trimesh(vertices=fixer.v, faces=fixer.f, process=True)
+                except Exception as e:
+                    app_logger.warning(f"[Repair] Passe pymeshfix échouée pour {file_path}: {e}")
 
-        still_broken = not mesh.is_watertight
+        still_broken = not (mesh.is_watertight and _winding_ok(mesh))
 
         mark_repair_attempted(file_path)
 
@@ -9041,6 +9350,11 @@ def _collect_diagnostic_info():
         pass
 
     try:
+        info['python_modules'] = _check_required_modules(log=False)
+    except Exception as e:
+        info['python_modules_error'] = str(e)
+
+    try:
         info['remote_access_state'] = dict(_remote_state)
     except Exception:
         pass
@@ -9049,7 +9363,6 @@ def _collect_diagnostic_info():
 
 
 def build_diagnostic_zip_bytes():
-    """Construit le ZIP de diagnostic (logs + infos système) et retourne (bytes, filename)."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         for suffix in ('', '.1', '.2', '.3'):
@@ -9077,6 +9390,49 @@ def api_export_logs():
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 
+LOG_TAIL_INITIAL_BYTES = 50 * 1024   
+LOG_TAIL_MAX_CHUNK = 200 * 1024      
+
+@app.route('/api/logs/tail', methods=['GET'])
+@login_required
+def api_logs_tail():
+    try:
+        offset_param = request.args.get('offset', default='-1')
+        try:
+            offset = int(offset_param)
+        except (TypeError, ValueError):
+            offset = -1
+
+        if not os.path.exists(LOG_FILE):
+            return jsonify({"lines": "", "offset": 0, "size": 0}), 200
+
+        size = os.path.getsize(LOG_FILE)
+
+        if offset < 0:
+            start = max(0, size - LOG_TAIL_INITIAL_BYTES)
+        elif offset > size:
+            start = 0
+        else:
+            start = offset
+
+        with open(LOG_FILE, 'rb') as f:
+            f.seek(start)
+            chunk = f.read(LOG_TAIL_MAX_CHUNK)
+
+        text = chunk.decode('utf-8', errors='replace')
+        new_offset = start + len(chunk)
+
+        return jsonify({
+            "lines": text,
+            "offset": new_offset,
+            "size": size,
+            "reset": start == 0 and offset > 0
+        }), 200
+    except Exception as e:
+        app_logger.error(f"[LogsTail] Erreur: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+
 # ============================================
 # ⚙️ PARAMÈTRES
 # ============================================
@@ -9088,6 +9444,8 @@ def api_get_settings():
         settings.setdefault('default_slicer', 'system_default')
         settings.setdefault('lang', 'fr')
         settings.setdefault('ai_enabled', False)
+        settings.setdefault('auto_scan_enabled', True)
+        settings.setdefault('auto_scan_interval_minutes', 5)
         return jsonify(settings), 200
     except Exception as e:
         app_logger.error(f"[API] Erreur non gérée: {e}")
@@ -9118,7 +9476,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio-app"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.3.8"
+CURRENT_VERSION = "0.4.5"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
@@ -11881,6 +12239,54 @@ def _get_required_weight_for_file(file_path):
         pass
     return None, None
 
+def _compute_estimated_cost(file_path, weight_g_hint=None):
+    """Calcule le coût matière + électricité d'une impression, avec la même
+    logique que le calculateur de coût côté client (Réglages > coût
+    d'impression). Utilisé pour persister le coût dans l'historique
+    d'impression et l'agréger dans les statistiques. Retourne
+    (material_cost, elec_cost, total_cost, weight_g) — chaque valeur peut
+    être None si les données nécessaires (poids, prix bobine, prix élec...)
+    ne sont pas disponibles.
+    """
+    material_cost = elec_cost = total_cost = None
+    try:
+        settings = load_settings() or {}
+
+        weight_g = weight_g_hint
+        if weight_g is None:
+            weight_g, _src = _get_required_weight_for_file(file_path.replace('\\', '/'))
+
+        if weight_g:
+            spool_price = float(settings.get('print_cost_spool_price') or 0)
+            spool_weight = float(settings.get('print_cost_spool_weight') or 0)
+            if spool_price > 0 and spool_weight > 0:
+                price_per_gram = spool_price / spool_weight
+                material_cost = round(weight_g * price_per_gram, 4)
+
+            elec_price_raw = settings.get('print_cost_elec_price')
+            if elec_price_raw not in (None, ''):
+                try:
+                    elec_price = float(elec_price_raw)
+                except (TypeError, ValueError):
+                    elec_price = 0
+                if elec_price > 0:
+                    time_seconds = None
+                    with slice_estimate_lock:
+                        precise = slice_estimate_results.get(file_path.replace('\\', '/'))
+                    if precise and precise.get('status') == 'done':
+                        time_seconds = precise.get('data', {}).get('time_seconds')
+                    if time_seconds:
+                        printer_power = float(settings.get('print_cost_printer_power') or 120)
+                        time_hours = time_seconds / 3600
+                        elec_cost = round(time_hours * (printer_power / 1000) * elec_price, 4)
+
+            if material_cost is not None or elec_cost is not None:
+                total_cost = round((material_cost or 0) + (elec_cost or 0), 4)
+    except Exception as e:
+        app_logger.info(f"[Cost] Erreur calcul coût pour {file_path}: {e}")
+
+    return material_cost, elec_cost, total_cost, weight_g
+
 def _consume_spool_filament(spoolman_url, spool_id, weight_g):
     try:
         res = requests.post(
@@ -12773,6 +13179,7 @@ if __name__ in ('__main__', 'stellio_main'):
                 on_status('database')
             process_generation_queue()
             process_slice_estimate_queue()
+            threading.Thread(target=_auto_scan_scheduler, daemon=True).start()
             if os.path.exists(CACHE_FILE):
                 try:
                     with open(CACHE_FILE, 'r', encoding='utf-8') as f: json.load(f)
