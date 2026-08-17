@@ -99,7 +99,7 @@ Que vous soyez maker débutant ou imprimeur expérimenté avec plusieurs machine
 
 <div align="center">
 <table>
-<tr>
+<tr></tr>
 <td><img src="library.png" alt="Bibliothèque" width="400"/><br><em>Bibliothèque avec miniatures</em></td>
 <td><img src="monitoring.png" alt="Imprimantes" width="400"/><br><em>Monitoring imprimantes</em></td>
 </tr>
