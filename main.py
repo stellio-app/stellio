@@ -1,15 +1,179 @@
 #!/usr/bin/env python3
-import nest_asyncio
-nest_asyncio.apply()
-import os
-import uuid
 import sys
+import os
+import subprocess
+import importlib
+import importlib.util
+
 if sys.platform != 'win32':
     os.environ['PYOPENGL_PLATFORM'] = 'osmesa'
     os.environ['PYRENDER_OFFSCREEN'] = '1'
+
+try:
+    from check_deps import (
+        REQUIRED_MODULES as _REQUIRED_MODULES,
+        find_owning_packages as _find_owning_packages,
+        deep_check_module as _deep_check_module,
+        auto_install_missing_modules as _shared_auto_install_missing_modules,
+        check_required_modules as _shared_check_required_modules,
+    )
+    _HAS_CHECK_DEPS_MODULE = True
+except ImportError:
+    _HAS_CHECK_DEPS_MODULE = False
+    _REQUIRED_MODULES = [
+        ("flask",                                  "Flask",                  "Flask",              None),
+        ("werkzeug",                                "Werkzeug",               None,                 None),
+        ("cryptography.hazmat.primitives.ciphers",  "cryptography",           "Cipher",             None),
+        ("numpy",                                   "numpy",                  "array",              None),
+        ("PIL.Image",                               "Pillow",                 "open",               None),
+        ("trimesh",                                 "trimesh",                "load",               None),
+        ("requests",                                "requests",               "get",                None),
+        ("packaging.version",                       "packaging",              "parse",              None),
+        ("nest_asyncio",                            "nest_asyncio",           "apply",              None),
+        ("webview",                                 "pywebview",              "create_window",      None),
+        ("smbclient",                               "smbprotocol",            "open_file",          None),
+        ("rarfile",                                 "rarfile",                "RarFile",            None),
+        ("waitress",                                "waitress",               "serve",              None),
+        ("pymeshfix",                               "pymeshfix",              "MeshFix",            None),
+        ("defusedxml.ElementTree",                  "defusedxml",             "parse",              None),
+        ("paho.mqtt.client",                        "paho-mqtt",              "Client",             None),
+        ("rectpack",                                "rectpack",               "newPacker",          None),
+        ("shapely.affinity",                        "shapely",                None,                 None),
+        ("py7zr",                                   "py7zr",                  "SevenZipFile",       None),
+        ("fast_simplification",                     "fast-simplification",    None,                 None),
+        ("pyrender",                                "pyrender",               "OffscreenRenderer",  None),
+        ("matplotlib",                              "matplotlib",             "use",                None),
+        ("psutil",                                  "psutil",                 "virtual_memory",     None),
+        ("qrcode",                                  "qrcode",                 "QRCode",             None),
+        ("websocket",                               "websocket-client",       "WebSocketApp",       ["websocket", "websocket-client"]),
+        ("flashforge",                              "flashforge-python-api",  "FlashForgeClient",   None),
+    ]
+
+
+def _find_owning_packages(top_level_import_name):
+    try:
+        import importlib.metadata as importlib_metadata
+        mapping = importlib_metadata.packages_distributions()
+        return list(mapping.get(top_level_import_name, []))
+    except Exception:
+        return []
+
+
+def _deep_check_module(import_name, expected_attr):
+    try:
+        mod = importlib.import_module(import_name)
+    except Exception as e:
+        return False, f"échec d'import ({e})"
+    if expected_attr and not hasattr(mod, expected_attr):
+        return False, f"importé mais '{expected_attr}' absent (mauvais paquet installé sous ce nom ?)"
+    return True, None
+
+
+def _auto_install_missing_modules():
+    if getattr(sys, 'frozen', False):
+        return
+    if os.environ.get('STELLIO_NO_AUTO_INSTALL', '').strip().lower() in ('1', 'true', 'yes'):
+        print("[MODULES] Vérification/installation automatique désactivée (STELLIO_NO_AUTO_INSTALL=1)")
+        return
+
+    print("[MODULES] === Vérification complète (import réel + signature) de tous les modules requis ===")
+    problems = []
+    for import_name, pip_name, expected_attr, conflicting in _REQUIRED_MODULES:
+        ok, reason = _deep_check_module(import_name, expected_attr)
+        print(f"[MODULES]   {import_name:<42} -> {'OK' if ok else 'PROBLÈME : ' + reason}")
+        if not ok:
+            problems.append((import_name, pip_name, expected_attr, conflicting, reason))
+
+    if not problems:
+        print("[MODULES] ✅ Tous les modules requis sont présents et fonctionnels")
+        return
+
+    print(f"[MODULES] {len(problems)} module(s) manquant(s) ou cassé(s) — correction automatique en cours...")
+    still_broken = []
+    for import_name, pip_name, expected_attr, conflicting, reason in problems:
+        top_level = import_name.split('.')[0]
+
+        wrong_module_installed = "attribut" in reason
+        bad_packages = set(conflicting or [])
+        if wrong_module_installed:
+            bad_packages.update(_find_owning_packages(top_level))
+        bad_packages.discard(pip_name)
+
+        for bad_pkg in bad_packages:
+            subprocess.run(
+                [sys.executable, '-m', 'pip', 'uninstall', '-y', bad_pkg],
+                capture_output=True, timeout=120
+            )
+
+        force_reinstall = bool(bad_packages) or wrong_module_installed
+        base_cmd = [sys.executable, '-m', 'pip', 'install', '--disable-pip-version-check', '--no-input']
+        base_cmd += ['--force-reinstall'] if force_reinstall else ['--upgrade']
+        base_cmd += [pip_name]
+
+        installed_ok = False
+        for extra_args in ([], ['--break-system-packages']):
+            try:
+                subprocess.run(base_cmd + extra_args, check=True, timeout=900)
+                installed_ok = True
+                break
+            except Exception:
+                continue
+
+        if not installed_ok:
+            still_broken.append((import_name, pip_name, "échec de la commande pip install"))
+            continue
+
+        importlib.invalidate_caches()
+        top_level = import_name.split('.')[0]
+        for mod_name in list(sys.modules):
+            if mod_name == top_level or mod_name.startswith(top_level + '.'):
+                del sys.modules[mod_name]
+
+        ok, reason = _deep_check_module(import_name, expected_attr)
+        if ok:
+            print(f"[MODULES] ✅ {pip_name} corrigé")
+        else:
+            still_broken.append((import_name, pip_name, reason))
+
+    if still_broken:
+        print("[MODULES] ❌ Modules toujours en échec après tentative de correction automatique :")
+        for import_name, pip_name, reason in still_broken:
+            print(f"[MODULES]     - {import_name} ({pip_name}) : {reason}")
+        print("[MODULES] Stellio ne peut pas démarrer de façon fiable sans ces modules. Arrêt.")
+        sys.exit(1)
+
+    print("[MODULES] ✅ Tous les modules corrigés avec succès")
+
+
+def _run_startup_module_check():
+    if getattr(sys, 'frozen', False):
+        return
+    if os.environ.get('STELLIO_NO_AUTO_INSTALL', '').strip().lower() in ('1', 'true', 'yes'):
+        print("[MODULES] Vérification/installation automatique désactivée (STELLIO_NO_AUTO_INSTALL=1)")
+        return
+
+    if _HAS_CHECK_DEPS_MODULE:
+        all_ok, still_broken = _shared_auto_install_missing_modules(modules=_REQUIRED_MODULES)
+        if not all_ok:
+            print("[MODULES] Stellio ne peut pas démarrer de façon fiable sans ces modules. Arrêt.")
+            sys.exit(1)
+        return
+
+    _auto_install_missing_modules()
+
+
+_run_startup_module_check()
+
+import nest_asyncio
+nest_asyncio.apply()
+import uuid
+import socket
+import asyncio
 import sqlite3
 import hashlib
 import json
+import ssl
+import struct
 import subprocess
 import shlex
 import secrets
@@ -28,7 +192,7 @@ from PIL import Image, ImageDraw
 import base64
 from pathlib import Path
 from functools import wraps
-from flask import Flask, request, jsonify, session, send_file
+from flask import Flask, request, jsonify, session, send_file, Response
 import trimesh.transformations as tra
 import io
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -280,55 +444,21 @@ app_logger = setup_logging()
 # ============================================
 # 📦 VÉRIFICATION DES MODULES PYTHON REQUIS
 # ============================================
-# (nom_import, nom_pip, requis_au_démarrage)
-_REQUIRED_MODULES = [
-    ("flask", "Flask", True),
-    ("werkzeug", "Werkzeug", True),
-    ("cryptography", "cryptography", True),
-    ("numpy", "numpy", True),
-    ("PIL", "Pillow", True),
-    ("trimesh", "trimesh", True),
-    ("requests", "requests", True),
-    ("packaging", "packaging", True),
-    ("nest_asyncio", "nest_asyncio", True),
-    ("webview", "pywebview", True),
-    ("smbclient", "smbprotocol", True),
-    ("rarfile", "rarfile", True),
-    ("waitress", "waitress", True),
-    # Optionnels : fonctionnalités dégradées si absents, l'app démarre quand même
-    ("pymeshfix", "pymeshfix", False),
-    ("defusedxml", "defusedxml", False),
-    ("paho.mqtt.client", "paho-mqtt", False),
-    ("rectpack", "rectpack", False),
-    ("shapely", "shapely", False),
-    ("py7zr", "py7zr", False),
-    ("fast_simplification", "fast-simplification", False),
-    ("pyrender", "pyrender", False),
-    ("matplotlib", "matplotlib", False),
-    ("psutil", "psutil", False),
-    ("qrcode", "qrcode", False),
-]
+# _REQUIRED_MODULES est défini tout en haut du fichier (utilisé par
+# _auto_install_missing_modules() avant même les premiers imports tiers).
 
 def _check_required_modules(log=True):
-    """Vérifie la présence de tous les modules Python utilisés par Stellio
-    (requis + optionnels) et retourne le détail. Si log=True, écrit un
-    rapport lisible dans les logs (utile pour le support / bêta-test)."""
-    import importlib.util
     try:
         import importlib.metadata as importlib_metadata
     except ImportError:
         importlib_metadata = None
 
     results = []
-    for import_name, pip_name, required in _REQUIRED_MODULES:
-        top_level = import_name.split('.')[0]
-        try:
-            installed = importlib.util.find_spec(top_level) is not None
-        except Exception:
-            installed = False
+    for import_name, pip_name, expected_attr, _conflicting in _REQUIRED_MODULES:
+        ok, reason = _deep_check_module(import_name, expected_attr)
 
         version_str = None
-        if installed and importlib_metadata is not None:
+        if ok and importlib_metadata is not None:
             try:
                 version_str = importlib_metadata.version(pip_name)
             except Exception:
@@ -337,33 +467,28 @@ def _check_required_modules(log=True):
         results.append({
             "import": import_name,
             "pip": pip_name,
-            "required": required,
-            "installed": installed,
+            "installed": ok,
+            "reason": reason,
             "version": version_str,
         })
 
     if log:
         try:
-            missing_required = [r for r in results if r["required"] and not r["installed"]]
-            missing_optional = [r for r in results if not r["required"] and not r["installed"]]
+            broken = [r for r in results if not r["installed"]]
 
-            app_logger.info("[MODULES] === Vérification des modules Python ===")
+            app_logger.info("[MODULES] === Vérification complète des modules Python ===")
             for r in results:
                 if r["installed"]:
                     status = f"OK (v{r['version']})" if r["version"] not in (None, "?") else "OK"
                 else:
-                    status = "MANQUANT"
-                kind = "requis" if r["required"] else "optionnel"
-                app_logger.info(f"[MODULES]   {r['import']:<26} [{kind:<9}] -> {status}")
+                    status = f"PROBLÈME ({r['reason']})"
+                app_logger.info(f"[MODULES]   {r['import']:<42} -> {status}")
 
-            if missing_required:
-                names = ", ".join(r["pip"] for r in missing_required)
-                app_logger.error(f"[MODULES] ❌ Modules REQUIS manquants: {names} (pip install {' '.join(r['pip'] for r in missing_required)})")
-            if missing_optional:
-                names = ", ".join(r["pip"] for r in missing_optional)
-                app_logger.info(f"[MODULES] ⚠️  Modules optionnels manquants: {names} (fonctionnalités associées désactivées)")
-            if not missing_required and not missing_optional:
-                app_logger.info("[MODULES] ✅ Tous les modules (requis + optionnels) sont installés")
+            if broken:
+                names = ", ".join(r["pip"] for r in broken)
+                app_logger.error(f"[MODULES] ❌ Modules en échec: {names}")
+            else:
+                app_logger.info("[MODULES] ✅ Tous les modules requis sont présents et fonctionnels")
             app_logger.info("[MODULES] === Fin de la vérification ===")
         except Exception as e:
             app_logger.error(f"[MODULES] Erreur lors du rapport de vérification: {e}")
@@ -905,6 +1030,8 @@ def migrate_printer_maintenance():
             c.execute("ALTER TABLE printers ADD COLUMN last_status_poll_at TIMESTAMP")
         if 'brand' not in columns:
             c.execute("ALTER TABLE printers ADD COLUMN brand TEXT DEFAULT ''")
+        if 'power_w' not in columns:
+            c.execute("ALTER TABLE printers ADD COLUMN power_w INTEGER DEFAULT 120")
 
         c.execute("""CREATE TABLE IF NOT EXISTS printer_maintenance_tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -979,6 +1106,33 @@ except ImportError:
     app_logger.info("[WARN] paho-mqtt non installé. BambuLab ne fonctionnera pas.")
 
 try:
+    import websocket as ws_client
+    app_logger.info(
+        f"[WEBSOCKET] Module chargé depuis : {getattr(ws_client, '__file__', '???')} "
+        f"— WebSocketApp présent : {hasattr(ws_client, 'WebSocketApp')}"
+    )
+    if not hasattr(ws_client, 'WebSocketApp'):
+        raise ImportError("mauvais paquet 'websocket' installé")
+    HAS_WEBSOCKET = True
+except ImportError:
+    HAS_WEBSOCKET = False
+    app_logger.info(
+        "[WARN] Le module websocket-client est absent ou remplacé par le "
+        "paquet 'websocket' (différent, obsolète, sans rapport). "
+        "Elegoo (résine/Centauri Carbon 1) et Creality ne fonctionneront pas. "
+        "Corrige avec : pip uninstall -y websocket websocket-client && "
+        "pip install websocket-client"
+    )
+
+try:
+    from flashforge import FlashForgeClient as _FFClient
+    from flashforge.models.machine_info import MachineState as _FFMachineState
+    HAS_FLASHFORGE = True
+except ImportError:
+    HAS_FLASHFORGE = False
+    app_logger.info("[WARN] flashforge-python-api non installé (pip install flashforge-python-api). FlashForge ne fonctionnera pas.")
+
+try:
     from rectpack import newPacker, MaxRectsBssf, SORT_AREA
     HAS_RECTPACK = True
 except ImportError:
@@ -992,6 +1146,924 @@ try:
 except ImportError:
     HAS_SHAPELY = False
     app_logger.info("[WARN] shapely non installé (pip install shapely). Nesting en mode rectangle englobant.")
+
+def _build_bambu_result_from_state(raw_state, default_result):
+    status_map = {
+        'printing': 'printing', 'running': 'printing',
+        'pause': 'paused', 'paused': 'paused',
+        'finish': 'idle', 'idle': 'idle', 'prepare': 'idle',
+        'failed': 'error', 'slicing': 'idle'
+    }
+    gcode_state = raw_state.get('gcode_state', '').lower()
+    status = status_map.get(gcode_state, 'idle')
+    nozzle_temp = raw_state.get('nozzle_temper', 0)
+    nozzle_target = raw_state.get('nozzle_target_temper', 0)
+    bed_temp = raw_state.get('bed_temper', 0)
+    bed_target = raw_state.get('bed_target_temper', 0)
+    chamber_temp = raw_state.get('chamber_temper', 0)
+    mc_percent = raw_state.get('mc_percent', 0)
+    mc_remaining = raw_state.get('mc_remaining_time', 0)
+    layer_num = raw_state.get('layer_num', 0)
+    total_layer = raw_state.get('total_layer_num', 0)
+    subtask_name = raw_state.get('subtask_name', '')
+    ams_info = []
+    ams = raw_state.get('ams', {})
+    if ams and isinstance(ams, dict):
+        for tray in ams.get('tray', []):
+            remain_pct = tray.get('remain', -1)
+            try:
+                remain_pct = float(remain_pct)
+            except (TypeError, ValueError):
+                remain_pct = -1
+            tray_weight_raw = tray.get('tray_weight', '')
+            try:
+                tray_weight = float(tray_weight_raw) if tray_weight_raw not in ('', None) else 1000.0
+            except (TypeError, ValueError):
+                tray_weight = 1000.0
+            remaining_g = round(tray_weight * remain_pct / 100, 1) if remain_pct >= 0 else None
+            ams_info.append({
+                'id': tray.get('id', ''),
+                'color': tray.get('tray_color', ''),
+                'material': tray.get('tray_type', ''),
+                'temp': tray.get('nozzle_temp_max', 0),
+                'remain_pct': remain_pct if remain_pct >= 0 else None,
+                'tray_weight': tray_weight,
+                'remaining_g': remaining_g
+            })
+    elapsed_min = 0
+    total_min = 0
+    if mc_percent > 0 and mc_remaining > 0:
+        total_min = int(mc_remaining / (1 - mc_percent / 100)) if mc_percent < 100 else mc_remaining
+        elapsed_min = total_min - mc_remaining
+    return {
+        'status': status,
+        'progress': mc_percent,
+        'file': subtask_name,
+        'temps': {
+            'extruder': {'current': round(nozzle_temp, 1), 'target': round(nozzle_target, 1)},
+            'bed': {'current': round(bed_temp, 1), 'target': round(bed_target, 1)},
+            'chamber': {'current': round(chamber_temp, 1), 'target': 0}
+        },
+        'time': {
+            'elapsed': elapsed_min * 60,
+            'remaining': mc_remaining * 60,
+            'total': total_min * 60
+        },
+        'layers': {'current': layer_num, 'total': total_layer},
+        'ams': ams_info,
+        'last_print': {'filename': '', 'duration': 0, 'finished_at': ''}
+    }
+
+
+class BambuPersistentConnection:
+
+    def __init__(self, pid, ip, access_code, serial):
+        self.pid = pid
+        self.ip = ip
+        self.access_code = access_code
+        self.serial = serial
+        self.raw_state = {}
+        self.lock = threading.Lock()
+        self.is_connected = False
+        self.client = None
+        self._thread = None
+        self._stopping = False
+
+    def matches(self, ip, access_code, serial):
+        return self.ip == ip and self.access_code == access_code and self.serial == serial
+
+    def _on_connect(self, client, userdata, flags, rc):
+        self.is_connected = (rc == 0)
+        if rc == 0:
+            topic = f"device/{self.serial}/report" if self.serial else '#'
+            client.subscribe(topic)
+            if self.serial:
+                client.publish(
+                    f"device/{self.serial}/request",
+                    json.dumps({"pushing": {"sequence_id": "0", "command": "pushall"}}),
+                    qos=1
+                )
+
+    def _on_disconnect(self, client, userdata, rc):
+        self.is_connected = False
+
+    def _on_message(self, client, userdata, msg):
+        try:
+            payload = json.loads(msg.payload.decode('utf-8'))
+            print_info = payload.get('print', {})
+            if not print_info:
+                return
+            with self.lock:
+                self.raw_state.update(print_info)
+        except Exception as e:
+            app_logger.info(f"[Bambu MQTT] Erreur parsing (printer #{self.pid}): {e}")
+
+    def start(self):
+        try:
+            try:
+                self.client = mqtt.Client(
+                    callback_api_version=mqtt.CallbackAPIVersion.VERSION1,
+                    client_id=f"stellio_persist_{self.pid}_{uuid.uuid4().hex[:8]}",
+                    protocol=mqtt.MQTTv311,
+                    clean_session=True
+                )
+            except TypeError:
+                self.client = mqtt.Client(
+                    client_id=f"stellio_persist_{self.pid}_{uuid.uuid4().hex[:8]}",
+                    protocol=mqtt.MQTTv311,
+                    clean_session=True
+                )
+            self.client.username_pw_set('bblp', self.access_code)
+            self.client.tls_set(cert_reqs=ssl.CERT_NONE)
+            self.client.tls_insecure_set(True)
+            self.client.on_connect = self._on_connect
+            self.client.on_disconnect = self._on_disconnect
+            self.client.on_message = self._on_message
+            self.client.reconnect_delay_set(min_delay=1, max_delay=30)
+            self.client.connect(self.ip, 8883, keepalive=5)
+            self._thread = threading.Thread(target=self.client.loop_forever, kwargs={'retry_first_connection': False}, daemon=True)
+            self._thread.start()
+        except Exception as e:
+            app_logger.info(f"[Bambu MQTT] Échec démarrage connexion persistante (printer #{self.pid}): {e}")
+
+    def stop(self):
+        self._stopping = True
+        try:
+            if self.client:
+                self.client.disconnect()
+        except Exception:
+            pass
+
+    def get_state_snapshot(self):
+        with self.lock:
+            return dict(self.raw_state)
+
+
+_bambu_connections = {}
+_bambu_connections_lock = threading.Lock()
+
+
+def _ensure_bambu_connection(db_row):
+    pid = db_row['id']
+    ip = db_row['ip']
+    config = db_row.get('config') or {}
+    access_code = config.get('code', '') or db_row.get('api_key', '')
+    serial = config.get('serial', '')
+    if not access_code:
+        return None
+    with _bambu_connections_lock:
+        existing = _bambu_connections.get(pid)
+        if existing and existing.matches(ip, access_code, serial):
+            return existing
+        if existing:
+            existing.stop()
+        conn = BambuPersistentConnection(pid, ip, access_code, serial)
+        _bambu_connections[pid] = conn
+    conn.start()
+    return conn
+
+
+def _stop_bambu_connection(pid):
+    with _bambu_connections_lock:
+        conn = _bambu_connections.pop(pid, None)
+    if conn:
+        conn.stop()
+
+
+def _generate_bambu_mjpeg_stream(ip, access_code):
+    username = 'bblp'
+    auth_data = bytearray()
+    auth_data += struct.pack("<I", 0x40)
+    auth_data += struct.pack("<I", 0x3000)
+    auth_data += struct.pack("<I", 0)
+    auth_data += struct.pack("<I", 0)
+    auth_data += username.encode('ascii').ljust(32, b'\x00')
+    auth_data += access_code.encode('ascii').ljust(32, b'\x00')
+
+    jpeg_start = b'\xff\xd8\xff\xe0'
+    jpeg_end = b'\xff\xd9'
+
+    ssl_sock = None
+    try:
+        raw_sock = socket.create_connection((ip, 6000), timeout=10)
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        ssl_sock = ctx.wrap_socket(raw_sock, server_hostname=ip)
+        ssl_sock.write(auth_data)
+        ssl_sock.settimeout(10)
+
+        img = None
+        payload_size = 0
+        while True:
+            dr = ssl_sock.recv(4096)
+            if len(dr) == 0:
+                app_logger.info(f"[Bambu Camera] Connexion refusée par {ip} (code d'accès incorrect ?)")
+                break
+            if img is not None and len(dr) > 0:
+                img += dr
+                if len(img) > payload_size:
+                    img = None
+                elif len(img) == payload_size:
+                    if img[:4] == jpeg_start and img[-2:] == jpeg_end:
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n'
+                               b'Content-Length: ' + str(len(img)).encode() + b'\r\n\r\n' +
+                               bytes(img) + b'\r\n')
+                    img = None
+            elif len(dr) == 16:
+                img = bytearray()
+                payload_size = int.from_bytes(dr[0:4], byteorder='little')
+    except (ssl.SSLError, OSError, socket.timeout) as e:
+        app_logger.info(f"[Bambu Camera] Flux interrompu ({ip}): {e}")
+    except GeneratorExit:
+        pass  
+    finally:
+        if ssl_sock:
+            try:
+                ssl_sock.close()
+            except Exception:
+                pass
+
+
+def _elegoo_sdcp_discover(ip, timeout=3):
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.settimeout(timeout)
+        sock.sendto(b"M99999", (ip, 3000))
+        data, _addr = sock.recvfrom(8192)
+        sock.close()
+        payload = json.loads(data.decode('utf-8'))
+        data_dict = payload.get('Data', payload)
+        attrs = data_dict.get('Attributes', data_dict)
+        return {
+            'connection': payload.get('Id'),
+            'mainboard_id': attrs.get('MainboardID'),
+            'name': attrs.get('Name', ''),
+            'model': attrs.get('MachineName', ''),
+        }
+    except Exception as e:
+        app_logger.info(f"[Elegoo SDCP] Découverte échouée pour {ip}: {e}")
+        return None
+
+
+def _elegoo_cc2_discover(ip, timeout=3):
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.settimeout(timeout)
+        sock.sendto(json.dumps({"id": 0, "method": 7000}).encode('utf-8'), (ip, 52700))
+        data, _addr = sock.recvfrom(8192)
+        sock.close()
+        payload = json.loads(data.decode('utf-8'))
+        result = payload.get('result', payload)
+        return {
+            'serial': result.get('sn'),
+            'name': result.get('host_name', ''),
+            'model': result.get('machine_model', ''),
+        }
+    except Exception as e:
+        app_logger.info(f"[Elegoo CC2] Découverte échouée pour {ip}: {e}")
+        return None
+
+
+ELEGOO_SDCP_STATUS_MAP = {
+    0: 'idle', 1: 'idle', 2: 'idle', 3: 'printing', 4: 'idle',
+    5: 'paused', 6: 'paused', 7: 'idle', 8: 'idle', 9: 'idle',
+    10: 'idle', 12: 'error', 13: 'printing', 114: 'error',
+}
+
+
+def _build_elegoo_sdcp_result(raw_state, default_result):
+    print_info = raw_state.get('PrintInfo', {})
+    sub_status = print_info.get('Status', 0)
+    status = ELEGOO_SDCP_STATUS_MAP.get(sub_status, 'idle')
+    current_ticks = print_info.get('CurrentTicks', 0) or 0
+    total_ticks = print_info.get('TotalTicks', 0) or 0
+    remaining_ticks = max(0, total_ticks - current_ticks)
+    progress = print_info.get('Progress', 0) or 0
+    return {
+        'status': status,
+        'progress': progress,
+        'file': print_info.get('Filename', ''),
+        'temps': {
+            'extruder': {'current': round(raw_state.get('TempOfNozzle', 0) or 0, 1), 'target': round(raw_state.get('TempTargetNozzle', 0) or 0, 1)},
+            'bed': {'current': round(raw_state.get('TempOfHotbed', 0) or 0, 1), 'target': round(raw_state.get('TempTargetHotbed', 0) or 0, 1)},
+            'chamber': {'current': round(raw_state.get('TempOfBox', 0) or 0, 1), 'target': 0}
+        },
+        'time': {'elapsed': current_ticks / 1000, 'remaining': remaining_ticks / 1000, 'total': total_ticks / 1000},
+        'layers': {'current': print_info.get('CurrentLayer', 0) or 0, 'total': print_info.get('TotalLayer', 0) or 0},
+        'ams': [],
+        'last_print': {'filename': '', 'duration': 0, 'finished_at': ''}
+    }
+
+
+class ElegooSDCPConnection:
+
+    def __init__(self, pid, ip, connection_id, mainboard_id):
+        self.pid = pid
+        self.ip = ip
+        self.connection_id = connection_id
+        self.mainboard_id = mainboard_id
+        self.raw_state = {}
+        self.lock = threading.Lock()
+        self.is_connected = False
+        self.ws = None
+        self._stopping = False
+        self._thread = None
+        self._refresh_thread = None
+        self.video_url = None
+        self.video_ack = None
+        self._video_event = threading.Event()
+
+    def matches(self, ip, connection_id, mainboard_id):
+        return self.ip == ip and self.connection_id == connection_id and self.mainboard_id == mainboard_id
+
+    def _send_cmd(self, cmd, data=None):
+        if not self.ws or not self.is_connected:
+            return
+        payload = {
+            "Id": self.connection_id,
+            "Data": {
+                "Cmd": cmd,
+                "Data": data or {},
+                "RequestID": uuid.uuid4().hex[:16],
+                "MainboardID": self.mainboard_id,
+                "TimeStamp": int(time.time()),
+                "From": 0,
+            },
+            "Topic": f"sdcp/request/{self.mainboard_id}",
+        }
+        try:
+            self.ws.send(json.dumps(payload))
+        except Exception:
+            pass
+
+    def _on_open(self, ws):
+        self.is_connected = True
+        self._send_cmd(0)  
+
+    def _on_close(self, ws, *args):
+        self.is_connected = False
+
+    def _on_error(self, ws, error):
+        self.is_connected = False
+
+    def _on_message(self, ws, message):
+        try:
+            payload = json.loads(message)
+            topic = payload.get('Topic', '')
+            if '/status/' in topic:
+                status_data = payload.get('Status', payload.get('Data', {}))
+                with self.lock:
+                    self.raw_state.update(status_data)
+                return
+            if '/response/' in topic:
+                resp = payload.get('Data', {})
+                if resp.get('Cmd') == 386:
+                    inner = resp.get('Data', {}) or {}
+                    ack = inner.get('Ack')
+                    with self.lock:
+                        self.video_ack = ack
+                        self.video_url = inner.get('VideoUrl') if ack == 0 else None
+                    self._video_event.set()
+        except Exception as e:
+            app_logger.info(f"[Elegoo SDCP] Erreur parsing (printer #{self.pid}): {e}")
+
+    def request_video(self, timeout=4):
+        """Demande au firmware l'ouverture du flux vidéo (Cmd 386 du protocole SDCP)
+        et attend la réponse (VideoUrl en MJPEG, ou Ack=2 si l'imprimante n'a pas de caméra)."""
+        if not self.is_connected:
+            return None, None
+        with self.lock:
+            self.video_url = None
+            self.video_ack = None
+        self._video_event.clear()
+        self._send_cmd(386, {"Enable": 1})
+        self._video_event.wait(timeout)
+        with self.lock:
+            return self.video_url, self.video_ack
+
+    def _refresh_loop(self):
+        while not self._stopping:
+            time.sleep(6)
+            if self.is_connected:
+                self._send_cmd(0)
+
+    def _run_forever_loop(self):
+        if not HAS_WEBSOCKET:
+            app_logger.info(
+                f"[Elegoo SDCP] Désactivé (printer #{self.pid}) : "
+                f"websocket-client indisponible ou cassé."
+            )
+            return
+        while not self._stopping:
+            try:
+                self.ws = ws_client.WebSocketApp(
+                    f"ws://{self.ip}:3030/websocket",
+                    on_open=self._on_open,
+                    on_close=self._on_close,
+                    on_error=self._on_error,
+                    on_message=self._on_message,
+                )
+                self.ws.run_forever(ping_interval=20, ping_timeout=10)
+            except Exception as e:
+                app_logger.info(f"[Elegoo SDCP] Connexion perdue (printer #{self.pid}): {e}")
+            self.is_connected = False
+            if self._stopping:
+                break
+            time.sleep(5)
+
+    def start(self):
+        self._thread = threading.Thread(target=self._run_forever_loop, daemon=True)
+        self._thread.start()
+        self._refresh_thread = threading.Thread(target=self._refresh_loop, daemon=True)
+        self._refresh_thread.start()
+
+    def stop(self):
+        self._stopping = True
+        try:
+            if self.ws:
+                self.ws.close()
+        except Exception:
+            pass
+
+    def get_state_snapshot(self):
+        with self.lock:
+            return dict(self.raw_state)
+
+
+_elegoo_sdcp_connections = {}
+_elegoo_sdcp_connections_lock = threading.Lock()
+
+
+def _ensure_elegoo_sdcp_connection(db_row):
+    pid = db_row['id']
+    ip = db_row['ip']
+    with _elegoo_sdcp_connections_lock:
+        existing = _elegoo_sdcp_connections.get(pid)
+        if existing and existing.ip == ip:
+            return existing
+    discovered = _elegoo_sdcp_discover(ip)
+    if not discovered or not discovered.get('mainboard_id'):
+        return None
+    with _elegoo_sdcp_connections_lock:
+        existing = _elegoo_sdcp_connections.get(pid)
+        if existing:
+            existing.stop()
+        conn = ElegooSDCPConnection(pid, ip, discovered['connection'], discovered['mainboard_id'])
+        _elegoo_sdcp_connections[pid] = conn
+    conn.start()
+    return conn
+
+
+def _stop_elegoo_sdcp_connection(pid):
+    with _elegoo_sdcp_connections_lock:
+        conn = _elegoo_sdcp_connections.pop(pid, None)
+    if conn:
+        conn.stop()
+
+
+def _build_creality_result(raw_state, default_result):
+    err_code = (raw_state.get('err') or {}).get('errcode', 0)
+    if err_code:
+        status = 'error'
+    else:
+        st = raw_state.get('state')
+        if st == 1:
+            status = 'printing'
+        elif st == 5:
+            status = 'paused'
+        else:
+            status = 'idle'
+    progress = raw_state.get('printProgress')
+    if progress is None:
+        progress = raw_state.get('dProgress', 0) or 0
+    return {
+        'status': status,
+        'progress': progress,
+        'file': raw_state.get('printFileName', '') or '',
+        'temps': {
+            'extruder': {'current': round(raw_state.get('nozzleTemp', 0) or 0, 1), 'target': round(raw_state.get('targetNozzleTemp', 0) or 0, 1)},
+            'bed': {'current': round(raw_state.get('bedTemp0', 0) or 0, 1), 'target': round(raw_state.get('targetBedTemp0', 0) or 0, 1)},
+            'chamber': {'current': round(raw_state.get('boxTemp', 0) or 0, 1), 'target': round(raw_state.get('targetBoxTemp', 0) or 0, 1)}
+        },
+        'time': {
+            'elapsed': raw_state.get('printJobTime', 0) or 0,
+            'remaining': raw_state.get('printLeftTime', 0) or 0,
+            'total': (raw_state.get('printJobTime', 0) or 0) + (raw_state.get('printLeftTime', 0) or 0)
+        },
+        'layers': {'current': 0, 'total': 0},
+        'ams': [],
+        'last_print': {'filename': '', 'duration': 0, 'finished_at': ''}
+    }
+
+
+class CrealityConnection:
+
+    def __init__(self, pid, ip):
+        self.pid = pid
+        self.ip = ip
+        self.raw_state = {}
+        self.lock = threading.Lock()
+        self.is_connected = False
+        self.ws = None
+        self._stopping = False
+        self._thread = None
+
+    def _on_open(self, ws):
+        self.is_connected = True
+
+    def _on_close(self, ws, *args):
+        self.is_connected = False
+
+    def _on_error(self, ws, error):
+        self.is_connected = False
+
+    def _on_message(self, ws, message):
+        try:
+            if message == 'ok':
+                return
+            payload = json.loads(message)
+            if not isinstance(payload, dict):
+                return
+            if payload.get('ModeCode') == 'heart_beat':
+                try:
+                    ws.send('ok')
+                except Exception:
+                    pass
+                return
+            with self.lock:
+                self.raw_state.update(payload)
+        except Exception as e:
+            app_logger.info(f"[Creality] Erreur parsing (printer #{self.pid}): {e}")
+
+    def _run_forever_loop(self):
+        if not HAS_WEBSOCKET:
+            app_logger.info(
+                f"[Creality] Désactivé (printer #{self.pid}) : "
+                f"websocket-client indisponible ou cassé."
+            )
+            return
+        while not self._stopping:
+            try:
+                self.ws = ws_client.WebSocketApp(
+                    f"ws://{self.ip}:9999",
+                    subprotocols=['wsslicer'],
+                    on_open=self._on_open,
+                    on_close=self._on_close,
+                    on_error=self._on_error,
+                    on_message=self._on_message,
+                )
+                self.ws.run_forever(ping_interval=None)
+            except Exception as e:
+                app_logger.info(f"[Creality] Connexion perdue (printer #{self.pid}): {e}")
+            self.is_connected = False
+            if self._stopping:
+                break
+            time.sleep(5)
+
+    def start(self):
+        self._thread = threading.Thread(target=self._run_forever_loop, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._stopping = True
+        try:
+            if self.ws:
+                self.ws.close()
+        except Exception:
+            pass
+
+    def get_state_snapshot(self):
+        with self.lock:
+            return dict(self.raw_state)
+
+
+_creality_connections = {}
+_creality_connections_lock = threading.Lock()
+
+
+def _ensure_creality_connection(db_row):
+    pid = db_row['id']
+    ip = db_row['ip']
+    with _creality_connections_lock:
+        existing = _creality_connections.get(pid)
+        if existing and existing.ip == ip:
+            return existing
+        if existing:
+            existing.stop()
+        conn = CrealityConnection(pid, ip)
+        _creality_connections[pid] = conn
+    conn.start()
+    return conn
+
+
+def _stop_creality_connection(pid):
+    with _creality_connections_lock:
+        conn = _creality_connections.pop(pid, None)
+    if conn:
+        conn.stop()
+
+
+def _build_flashforge_result(info, default_result):
+    state_value = info.machine_state.value if info.machine_state else 'unknown'
+    status_map = {'printing': 'printing', 'paused': 'paused', 'pausing': 'paused', 'error': 'error'}
+    status = status_map.get(state_value, 'idle')
+    extruder = info.extruder
+    bed = info.print_bed
+    chamber = info.chamber
+    return {
+        'status': status,
+        'progress': info.print_progress_int or 0,
+        'file': info.print_file_name or '',
+        'temps': {
+            'extruder': {'current': round(extruder.current, 1) if extruder else 0, 'target': round(extruder.set, 1) if extruder else 0},
+            'bed': {'current': round(bed.current, 1) if bed else 0, 'target': round(bed.set, 1) if bed else 0},
+            'chamber': {'current': round(chamber.current, 1) if chamber else 0, 'target': round(chamber.set, 1) if chamber else 0}
+        },
+        'time': {'elapsed': info.print_duration or 0, 'remaining': 0, 'total': 0},
+        'layers': {'current': info.current_print_layer or 0, 'total': info.total_print_layers or 0},
+        'ams': [],
+        'last_print': {'filename': '', 'duration': 0, 'finished_at': ''}
+    }
+
+
+class FlashForgePersistentConnection:
+
+    def __init__(self, pid, ip, serial, check_code):
+        self.pid = pid
+        self.ip = ip
+        self.serial = serial
+        self.check_code = check_code
+        self.snapshot = None
+        self.lock = threading.Lock()
+        self.is_connected = False
+        self._stopping = False
+        self._thread = None
+        self._client = None
+
+    def matches(self, ip, serial, check_code):
+        return self.ip == ip and self.serial == serial and self.check_code == check_code
+
+    async def _main(self):
+        while not self._stopping:
+            try:
+                self._client = _FFClient(self.ip, self.serial, self.check_code)
+                ok = await self._client.initialize()
+                if not ok:
+                    self.is_connected = False
+                    await asyncio.sleep(10)
+                    continue
+                await self._client.init_control()
+                self.is_connected = True
+                while not self._stopping:
+                    try:
+                        info = await self._client.info.get()
+                        if info:
+                            with self.lock:
+                                self.snapshot = info
+                    except Exception as e:
+                        app_logger.info(f"[FlashForge] Erreur lecture statut (printer #{self.pid}): {e}")
+                        self.is_connected = False
+                        break
+                    await asyncio.sleep(5)
+            except Exception as e:
+                app_logger.info(f"[FlashForge] Connexion perdue (printer #{self.pid}): {e}")
+            self.is_connected = False
+            try:
+                if self._client:
+                    await self._client.dispose()
+            except Exception:
+                pass
+            if self._stopping:
+                break
+            await asyncio.sleep(10)
+
+    def _thread_main(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(self._main())
+        except Exception:
+            pass
+
+    def start(self):
+        self._thread = threading.Thread(target=self._thread_main, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._stopping = True
+
+    def get_state_snapshot(self):
+        with self.lock:
+            return self.snapshot
+
+
+_flashforge_connections = {}
+_flashforge_connections_lock = threading.Lock()
+
+
+def _ensure_flashforge_connection(db_row):
+    pid = db_row['id']
+    ip = db_row['ip']
+    config = db_row.get('config') or {}
+    serial = config.get('serial', '')
+    check_code = config.get('code', '') or db_row.get('api_key', '')
+    if not serial or not check_code:
+        return None
+    with _flashforge_connections_lock:
+        existing = _flashforge_connections.get(pid)
+        if existing and existing.matches(ip, serial, check_code):
+            return existing
+        if existing:
+            existing.stop()
+        conn = FlashForgePersistentConnection(pid, ip, serial, check_code)
+        _flashforge_connections[pid] = conn
+    conn.start()
+    return conn
+
+
+def _stop_flashforge_connection(pid):
+    with _flashforge_connections_lock:
+        conn = _flashforge_connections.pop(pid, None)
+    if conn:
+        conn.stop()
+
+
+ELEGOO_CC2_STATUS_MAP = {
+    0: 'idle', 1: 'idle', 2: 'printing', 3: 'idle', 4: 'idle',
+    5: 'idle', 6: 'idle', 7: 'idle', 8: 'idle', 9: 'idle',
+    10: 'idle', 11: 'idle', 12: 'idle', 13: 'idle', 14: 'error', 15: 'idle',
+}
+
+
+def _build_elegoo_cc2_result(raw_state, default_result):
+    machine_status = raw_state.get('machine_status', {})
+    sub_status = machine_status.get('sub_status', 0)
+    status = 'paused' if sub_status in (2502, 2505) else ELEGOO_CC2_STATUS_MAP.get(machine_status.get('status', 0), 'idle')
+    print_status = raw_state.get('print_status', {})
+    extruder = raw_state.get('extruder', {})
+    heater_bed = raw_state.get('heater_bed', {})
+    ztemp = raw_state.get('ztemperature_sensor', {})
+    progress = print_status.get('progress', machine_status.get('progress', 0)) or 0
+    current_time = print_status.get('print_duration', 0) or 0
+    total_time = print_status.get('total_duration', 0) or 0
+    remaining_time = print_status.get('remaining_time_sec', max(0, total_time - current_time))
+    return {
+        'status': status,
+        'progress': progress,
+        'file': print_status.get('filename', ''),
+        'temps': {
+            'extruder': {'current': round(extruder.get('temperature', 0) or 0, 1), 'target': round(extruder.get('target', 0) or 0, 1)},
+            'bed': {'current': round(heater_bed.get('temperature', 0) or 0, 1), 'target': round(heater_bed.get('target', 0) or 0, 1)},
+            'chamber': {'current': round(ztemp.get('temperature', 0) or 0, 1), 'target': 0}
+        },
+        'time': {'elapsed': current_time, 'remaining': remaining_time, 'total': total_time},
+        'layers': {'current': print_status.get('current_layer', 0) or 0, 'total': print_status.get('total_layer', 0) or 0},
+        'ams': [],
+        'last_print': {'filename': '', 'duration': 0, 'finished_at': ''}
+    }
+
+
+class ElegooCC2Connection:
+
+    def __init__(self, pid, ip, serial, access_code):
+        self.pid = pid
+        self.ip = ip
+        self.serial = serial
+        self.access_code = access_code or '123456'
+        self.client_id = f"stellio{uuid.uuid4().hex[:8]}"
+        self.raw_state = {}
+        self.lock = threading.Lock()
+        self.is_connected = False
+        self.is_registered = False
+        self.client = None
+        self._stopping = False
+        self._thread = None
+        self._loop_thread = None
+
+    def matches(self, ip, serial, access_code):
+        return self.ip == ip and self.serial == serial and (self.access_code or '123456') == (access_code or '123456')
+
+    def _on_connect(self, client, userdata, flags, rc):
+        self.is_connected = (rc == 0)
+        if rc != 0:
+            return
+        client.subscribe(f"elegoo/{self.serial}/{self.client_id}/api_response")
+        client.subscribe(f"elegoo/{self.serial}/api_status")
+        client.subscribe(f"elegoo/{self.serial}/{self.client_id}/register_response")
+        client.publish(f"elegoo/{self.serial}/api_register", json.dumps({
+            "client_id": self.client_id, "request_id": self.client_id
+        }))
+
+    def _on_disconnect(self, client, userdata, rc):
+        self.is_connected = False
+        self.is_registered = False
+
+    def _on_message(self, client, userdata, msg):
+        try:
+            payload = json.loads(msg.payload.decode('utf-8'))
+            topic = msg.topic
+            if 'register_response' in topic:
+                self.is_registered = (payload.get('error', payload.get('error_code', 0)) in (0, None, ''))
+                return
+            result = payload.get('result', payload.get('params', {}))
+            if not isinstance(result, dict):
+                return
+            with self.lock:
+                self.raw_state.update(result)
+        except Exception as e:
+            app_logger.info(f"[Elegoo CC2] Erreur parsing (printer #{self.pid}): {e}")
+
+    def _request_status(self):
+        if not self.client or not self.is_connected:
+            return
+        topic = f"elegoo/{self.serial}/{self.client_id}/api_request"
+        try:
+            self.client.publish(topic, json.dumps({"id": 1, "method": 1002, "params": {}}))
+        except Exception:
+            pass
+
+    def _heartbeat_loop(self):
+        while not self._stopping:
+            time.sleep(8)
+            if self.is_connected:
+                self._request_status()
+                try:
+                    self.client.publish(f"elegoo/{self.serial}/{self.client_id}/api_request", json.dumps({"type": "PING"}))
+                except Exception:
+                    pass
+
+    def start(self):
+        try:
+            try:
+                self.client = mqtt.Client(
+                    callback_api_version=mqtt.CallbackAPIVersion.VERSION1,
+                    client_id=self.client_id, protocol=mqtt.MQTTv311, clean_session=True
+                )
+            except TypeError:
+                self.client = mqtt.Client(client_id=self.client_id, protocol=mqtt.MQTTv311, clean_session=True)
+            self.client.username_pw_set('elegoo', self.access_code)
+            self.client.on_connect = self._on_connect
+            self.client.on_disconnect = self._on_disconnect
+            self.client.on_message = self._on_message
+            self.client.reconnect_delay_set(min_delay=1, max_delay=30)
+            self.client.connect(self.ip, 1883, keepalive=60)
+            self._loop_thread = threading.Thread(target=self.client.loop_forever, kwargs={'retry_first_connection': False}, daemon=True)
+            self._loop_thread.start()
+            self._thread = threading.Thread(target=self._heartbeat_loop, daemon=True)
+            self._thread.start()
+        except Exception as e:
+            app_logger.info(f"[Elegoo CC2] Échec démarrage connexion persistante (printer #{self.pid}): {e}")
+
+    def stop(self):
+        self._stopping = True
+        try:
+            if self.client:
+                self.client.disconnect()
+        except Exception:
+            pass
+
+    def get_state_snapshot(self):
+        with self.lock:
+            return dict(self.raw_state)
+
+
+_elegoo_cc2_connections = {}
+_elegoo_cc2_connections_lock = threading.Lock()
+
+
+def _ensure_elegoo_cc2_connection(db_row):
+    pid = db_row['id']
+    ip = db_row['ip']
+    config = db_row.get('config') or {}
+    access_code = config.get('code', '') or db_row.get('api_key', '') or '123456'
+    with _elegoo_cc2_connections_lock:
+        existing = _elegoo_cc2_connections.get(pid)
+        if existing and existing.matches(ip, existing.serial, access_code):
+            return existing
+    serial = config.get('serial', '')
+    if not serial:
+        discovered = _elegoo_cc2_discover(ip)
+        if not discovered or not discovered.get('serial'):
+            return None
+        serial = discovered['serial']
+    with _elegoo_cc2_connections_lock:
+        existing = _elegoo_cc2_connections.get(pid)
+        if existing:
+            existing.stop()
+        conn = ElegooCC2Connection(pid, ip, serial, access_code)
+        _elegoo_cc2_connections[pid] = conn
+    conn.start()
+    return conn
+
+
+def _stop_elegoo_cc2_connection(pid):
+    with _elegoo_cc2_connections_lock:
+        conn = _elegoo_cc2_connections.pop(pid, None)
+    if conn:
+        conn.stop()
+
 
 class PrinterManager:
     def __init__(self):
@@ -1020,35 +2092,54 @@ class PrinterManager:
                 return r.status_code == 200
             elif ptype == 'bambu':
                 if not HAS_MQTT: return False
-                config = db_row.get('config') or {}
-                access_code = config.get('code', '') or api_key
-                port = 8883
-                user = 'bblp'
-                connected = [False]
-                try:
-                    client = mqtt.Client(
-                        callback_api_version=mqtt.CallbackAPIVersion.VERSION1,
-                        client_id=f"stellio_{db_row['id']}",
-                        protocol=mqtt.MQTTv311
-                    )
-                except TypeError:
-                    client = mqtt.Client(client_id=f"stellio_{db_row['id']}", protocol=mqtt.MQTTv311)
-                client.username_pw_set(user, access_code)
-                client.tls_set(cert_reqs=ssl.CERT_NONE)
-                client.tls_insecure_set(True)
-                def on_connect(c, ud, flags, rc):
-                    connected[0] = (rc == 0)
-                client.on_connect = on_connect
-                client.connect(ip, port, 5)
-                client.loop_start()
-                import time as _time
-                _time.sleep(2)
-                client.loop_stop()
-                try:
-                    client.disconnect()
-                except Exception:
-                    pass
-                return connected[0]
+                conn = _ensure_bambu_connection(db_row)
+                if not conn:
+                    return False
+                for _ in range(20):
+                    if conn.is_connected:
+                        return True
+                    time.sleep(0.2)
+                return conn.is_connected
+            elif ptype == 'elegoo_sdcp':
+                if not HAS_WEBSOCKET: return False
+                conn = _ensure_elegoo_sdcp_connection(db_row)
+                if not conn:
+                    return False
+                for _ in range(20):
+                    if conn.is_connected:
+                        return True
+                    time.sleep(0.2)
+                return conn.is_connected
+            elif ptype == 'elegoo_cc2':
+                if not HAS_MQTT: return False
+                conn = _ensure_elegoo_cc2_connection(db_row)
+                if not conn:
+                    return False
+                for _ in range(30):
+                    if conn.is_connected and conn.is_registered:
+                        return True
+                    time.sleep(0.2)
+                return conn.is_connected and conn.is_registered
+            elif ptype == 'creality':
+                if not HAS_WEBSOCKET: return False
+                conn = _ensure_creality_connection(db_row)
+                if not conn:
+                    return False
+                for _ in range(20):
+                    if conn.is_connected:
+                        return True
+                    time.sleep(0.2)
+                return conn.is_connected
+            elif ptype == 'flashforge':
+                if not HAS_FLASHFORGE: return False
+                conn = _ensure_flashforge_connection(db_row)
+                if not conn:
+                    return False
+                for _ in range(40):
+                    if conn.is_connected:
+                        return True
+                    time.sleep(0.5)
+                return conn.is_connected
         except Exception as e:
             app_logger.info(f"[Printer] Erreur connexion {ptype} ({ip}): {e}")
             return False
@@ -1222,6 +2313,14 @@ class PrinterManager:
                     return {**default_result, 'status': 'error'}
             elif ptype == 'bambu':
                 return self._get_bambu_status(db_row, default_result)
+            elif ptype == 'elegoo_sdcp':
+                return self._get_elegoo_sdcp_status(db_row, default_result)
+            elif ptype == 'elegoo_cc2':
+                return self._get_elegoo_cc2_status(db_row, default_result)
+            elif ptype == 'creality':
+                return self._get_creality_status(db_row, default_result)
+            elif ptype == 'flashforge':
+                return self._get_flashforge_status(db_row, default_result)
         except requests.exceptions.Timeout:
             return {**default_result, 'status': 'timeout'}
         except requests.exceptions.ConnectionError:
@@ -1234,144 +2333,71 @@ class PrinterManager:
     def _get_bambu_status(self, db_row, default_result):
         if not HAS_MQTT:
             return {**default_result, 'status': 'error'}
-        ip = db_row['ip']
         config = db_row.get('config') or {}
         access_code = config.get('code', '') or db_row.get('api_key', '')
-        serial = config.get('serial', '')
         if not access_code:
             return {**default_result, 'status': 'error'}
-        raw_state = {}
-        received = threading.Event()
-        def on_connect(client, userdata, flags, rc):
-            if rc == 0:
-                topic = f"device/{serial}/report" if serial else '#'
-                client.subscribe(topic)
-                if serial:
-                    client.publish(
-                        f"device/{serial}/request",
-                        json.dumps({"pushing": {"sequence_id": "0", "command": "pushall"}}),
-                        qos=1
-                    )
-        def on_message(client, userdata, msg):
-            try:
-                payload = json.loads(msg.payload.decode('utf-8'))
-                print_info = payload.get('print', {})
-                if not print_info:
-                    return
-                # Bambu envoie très souvent des mises à jour PARTIELLES
-                # (uniquement les champs modifiés depuis le dernier envoi),
-                # pas le rapport complet à chaque message. On fusionne donc
-                # les champs au fil des messages reçus plutôt que de ne
-                # garder que le tout premier — sinon un delta partiel
-                # (sans gcode_state/mc_percent) écrase tout avec des 0.
-                raw_state.update(print_info)
-                # On ne considère l'état exploitable qu'une fois qu'on a vu
-                # au moins un rapport contenant gcode_state (marqueur fiable
-                # d'un état complet, présent dans le "pushall" demandé).
-                if 'gcode_state' in raw_state:
-                    received.set()
-            except Exception as e:
-                app_logger.info(f"[Bambu MQTT] Erreur parsing: {e}")
-
-        def _build_result_from_state():
-            status_map = {
-                'printing': 'printing', 'running': 'printing',
-                'pause': 'paused', 'paused': 'paused',
-                'finish': 'idle', 'idle': 'idle', 'prepare': 'idle',
-                'failed': 'error', 'slicing': 'idle'
-            }
-            gcode_state = raw_state.get('gcode_state', '').lower()
-            status = status_map.get(gcode_state, 'idle')
-            nozzle_temp = raw_state.get('nozzle_temper', 0)
-            nozzle_target = raw_state.get('nozzle_target_temper', 0)
-            bed_temp = raw_state.get('bed_temper', 0)
-            bed_target = raw_state.get('bed_target_temper', 0)
-            chamber_temp = raw_state.get('chamber_temper', 0)
-            mc_percent = raw_state.get('mc_percent', 0)
-            mc_remaining = raw_state.get('mc_remaining_time', 0)  # en minutes
-            layer_num = raw_state.get('layer_num', 0)
-            total_layer = raw_state.get('total_layer_num', 0)
-            subtask_name = raw_state.get('subtask_name', '')
-            ams_info = []
-            ams = raw_state.get('ams', {})
-            if ams and isinstance(ams, dict):
-                for tray in ams.get('tray', []):
-                    remain_pct = tray.get('remain', -1)
-                    try:
-                        remain_pct = float(remain_pct)
-                    except (TypeError, ValueError):
-                        remain_pct = -1
-                    tray_weight_raw = tray.get('tray_weight', '')
-                    try:
-                        tray_weight = float(tray_weight_raw) if tray_weight_raw not in ('', None) else 1000.0
-                    except (TypeError, ValueError):
-                        tray_weight = 1000.0
-                    remaining_g = round(tray_weight * remain_pct / 100, 1) if remain_pct >= 0 else None
-                    ams_info.append({
-                        'id': tray.get('id', ''),
-                        'color': tray.get('tray_color', ''),
-                        'material': tray.get('tray_type', ''),
-                        'temp': tray.get('nozzle_temp_max', 0),
-                        'remain_pct': remain_pct if remain_pct >= 0 else None,
-                        'tray_weight': tray_weight,
-                        'remaining_g': remaining_g
-                    })
-            elapsed_min = 0
-            total_min = 0
-            if mc_percent > 0 and mc_remaining > 0:
-                total_min = int(mc_remaining / (1 - mc_percent / 100)) if mc_percent < 100 else mc_remaining
-                elapsed_min = total_min - mc_remaining
-            return {
-                'status': status,
-                'progress': mc_percent,
-                'file': subtask_name,
-                'temps': {
-                    'extruder': {'current': round(nozzle_temp, 1), 'target': round(nozzle_target, 1)},
-                    'bed': {'current': round(bed_temp, 1), 'target': round(bed_target, 1)},
-                    'chamber': {'current': round(chamber_temp, 1), 'target': 0}
-                },
-                'time': {
-                    'elapsed': elapsed_min * 60,
-                    'remaining': mc_remaining * 60,
-                    'total': total_min * 60
-                },
-                'layers': {'current': layer_num, 'total': total_layer},
-                'ams': ams_info,
-                'last_print': {'filename': '', 'duration': 0, 'finished_at': ''}
-            }
-
-        try:
-            try:
-                client = mqtt.Client(
-                    callback_api_version=mqtt.CallbackAPIVersion.VERSION1,
-                    client_id=f"stellio_status_{db_row['id']}",
-                    protocol=mqtt.MQTTv311
-                )
-            except TypeError:
-                client = mqtt.Client(
-                    client_id=f"stellio_status_{db_row['id']}",
-                    protocol=mqtt.MQTTv311
-                )
-            client.username_pw_set('bblp', access_code)
-            client.tls_set(cert_reqs=ssl.CERT_NONE)
-            client.tls_insecure_set(True)
-            client.on_connect = on_connect
-            client.on_message = on_message
-            client.connect(ip, 8883, 5)
-            client.loop_start()
-            received.wait(timeout=4)
-            client.loop_stop()
-            try:
-                client.disconnect()
-            except Exception:
-                pass
-            if raw_state:
-                result = _build_result_from_state()
-                return result
-            return {**default_result, 'status': 'idle'}
-        except Exception as e:
-            app_logger.info(f"[Bambu MQTT] Erreur connexion {ip}: {e}")
+        conn = _ensure_bambu_connection(db_row)
+        if not conn:
+            return {**default_result, 'status': 'error'}
+        if not conn.is_connected:
             return {**default_result, 'status': 'offline'}
+        raw_state = conn.get_state_snapshot()
+        if 'gcode_state' not in raw_state:
+            return {**default_result, 'status': 'idle'}
+        return _build_bambu_result_from_state(raw_state, default_result)
+
+    def _get_elegoo_sdcp_status(self, db_row, default_result):
+        if not HAS_WEBSOCKET:
+            return {**default_result, 'status': 'error'}
+        conn = _ensure_elegoo_sdcp_connection(db_row)
+        if not conn:
+            return {**default_result, 'status': 'error'}
+        if not conn.is_connected:
+            return {**default_result, 'status': 'offline'}
+        raw_state = conn.get_state_snapshot()
+        if 'PrintInfo' not in raw_state:
+            return {**default_result, 'status': 'idle'}
+        return _build_elegoo_sdcp_result(raw_state, default_result)
+
+    def _get_elegoo_cc2_status(self, db_row, default_result):
+        if not HAS_MQTT:
+            return {**default_result, 'status': 'error'}
+        conn = _ensure_elegoo_cc2_connection(db_row)
+        if not conn:
+            return {**default_result, 'status': 'error'}
+        if not conn.is_connected or not conn.is_registered:
+            return {**default_result, 'status': 'offline'}
+        raw_state = conn.get_state_snapshot()
+        if 'machine_status' not in raw_state:
+            return {**default_result, 'status': 'idle'}
+        return _build_elegoo_cc2_result(raw_state, default_result)
+
+    def _get_creality_status(self, db_row, default_result):
+        if not HAS_WEBSOCKET:
+            return {**default_result, 'status': 'error'}
+        conn = _ensure_creality_connection(db_row)
+        if not conn:
+            return {**default_result, 'status': 'error'}
+        if not conn.is_connected:
+            return {**default_result, 'status': 'offline'}
+        raw_state = conn.get_state_snapshot()
+        if 'state' not in raw_state:
+            return {**default_result, 'status': 'idle'}
+        return _build_creality_result(raw_state, default_result)
+
+    def _get_flashforge_status(self, db_row, default_result):
+        if not HAS_FLASHFORGE:
+            return {**default_result, 'status': 'error'}
+        conn = _ensure_flashforge_connection(db_row)
+        if not conn:
+            return {**default_result, 'status': 'error'}
+        if not conn.is_connected:
+            return {**default_result, 'status': 'offline'}
+        info = conn.get_state_snapshot()
+        if not info:
+            return {**default_result, 'status': 'idle'}
+        return _build_flashforge_result(info, default_result)
 
     def _get_octoprint_last_print(self, ip, api_key):
         try:
@@ -1464,6 +2490,8 @@ def parse_printer_config(db_row):
         row['config'] = {}
     if row.get('api_key'):
         row['api_key'] = decrypt_account_secret(row['api_key'])
+    if row.get('power_w') is None:
+        row['power_w'] = 120
     return row
 
 printer_hub = PrinterManager()
@@ -1918,6 +2946,7 @@ def _backfill_multiplate_tags():
 # 🔄 FILES D'ATTENTE BACKGROUND
 # ============================================
 active_downloads = {}
+cancelled_downloads = set()  # download_id marqués pour annulation (voir /api/download/cancel)
 scan_state = {
     'new_batch': [],
     'status': 'idle',
@@ -2089,16 +3118,6 @@ def process_generation_queue():
 # 🖼️ MINIATURES 3D
 # ============================================
 def _get_transformed_scene_geometries(scene, node_filter=None):
-    """Récupère les géométries d'une trimesh.Scene en appliquant la matrice
-    de transformation (rotation + translation) propre à chaque objet dans
-    le fichier 3MF. trimesh.Scene stocke les géométries dans leur repère
-    LOCAL — sans appliquer cette transformation, un objet pivoté dans le
-    fichier (très courant : orientation d'impression choisie par
-    l'utilisateur avant export) ressort dans la mauvaise orientation, ce
-    qui fausse tout calcul dépendant de l'axe Z (dont la détection de
-    surplomb dans le viewer). node_filter est un set optionnel d'IDs de
-    nœuds à inclure (pour l'isolation d'un plateau spécifique).
-    """
     out = []
     try:
         for node_name in scene.graph.nodes_geometry:
@@ -2288,7 +3307,6 @@ def _resolve_3mf_plate_mesh(source, wanted_ids):
                             out.extend(_resolve(comp_id, transform @ comp_tf, depth + 1))
                     return out
 
-                # Récupère la transformation de placement de chaque item du
                 build_el = _find(xml_root, 'build')
                 build_items = []
                 if build_el is not None:
@@ -2343,13 +3361,6 @@ def load_3mf_mesh(source, plate_index=None):
             loaded = trimesh.load(source)
 
         if isinstance(loaded, trimesh.Scene):
-            # Important : loaded.geometry.values() donne les géométries en
-            # repère LOCAL, sans la rotation/translation propre à chaque
-            # objet stockée dans le graphe de scène. On applique cette
-            # transformation via le helper dédié, sinon les objets pivotés
-            # ressortent dans la mauvaise orientation (et faussent ensuite
-            # la détection de surplomb dans le viewer, qui se base sur
-            # l'axe Z du maillage reçu).
             all_geoms = _get_transformed_scene_geometries(loaded)
 
             if plate_object_ids is not None:
@@ -2603,6 +3614,11 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
             rot_fix = tra.rotation_matrix(np.radians(-90), [1, 0, 0])
             mesh.apply_transform(rot_fix)
 
+            try:
+                mesh.fix_normals()
+            except Exception:
+                pass
+
             MAX_RENDER_FACES = 60000
             if len(mesh.faces) > MAX_RENDER_FACES:
                 try:
@@ -2616,18 +3632,11 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
 
             try:
                 import pyrender
-                try:
-                    mesh.fix_normals()
-                except Exception:
-                    pass
                 with pyrender_lock:
-                    # Fond identique au viewer 3D (#1a1d23)
                     scene = pyrender.Scene(
                         bg_color=[0x1a / 255.0, 0x1d / 255.0, 0x23 / 255.0, 1.0],
                         ambient_light=[0x40 / 255.0 * 1.3, 0x40 / 255.0 * 1.3, 0x40 / 255.0 * 1.3]
                     )
-                    # Même couleur/brillance que le MeshPhongMaterial du viewer
-                    # (color: 0x4ea1d3, specular: 0x111111, shininess: 120)
                     material = pyrender.MetallicRoughnessMaterial(
                         baseColorFactor=[0x4e / 255.0, 0xa1 / 255.0, 0xd3 / 255.0, 1.0],
                         metallicFactor=0.0,
@@ -2664,10 +3673,6 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
                     camera = pyrender.PerspectiveCamera(yfov=np.pi / 4.0, aspectRatio=1.0)
                     scene.add(camera, pose=camera_pose)
 
-                    # Lumière directionnelle attachée à la caméra, comme dans le viewer
-                    # (directionalLight.position.set(0,0,1) + viewerCamera.add(...))
-                    # → toujours "de face" par rapport au point de vue, jamais de zone
-                    # sombre inattendue selon l'angle du modèle.
                     headlight = pyrender.DirectionalLight(color=[1.0, 1.0, 1.0], intensity=2.2)
                     scene.add(headlight, pose=camera_pose)
 
@@ -2768,13 +3773,11 @@ def _generate_thumbnail_raster(mesh, thumb_path, resolution=(768, 768)):
         if len(faces) == 0:
             return False
 
-        AMBIENT = 0x40 / 255.0 * 1.3      # ambient_light 0x404040 @ intensité 1.3 du viewer
-        KEY_INTENSITY = 0.7                # directionalLight attachée à la caméra du viewer
-        SPECULAR_COLOR, SHININESS = (0x11 / 255.0), 120.0   # specular 0x111111, shininess 120
+        AMBIENT = 0x40 / 255.0 * 1.3      
+        KEY_INTENSITY = 0.7                
+        SPECULAR_COLOR, SHININESS = (0x11 / 255.0), 120.0   
         base_color = np.array([0x4e, 0xa1, 0xd3], dtype=np.float64)
 
-        # Normales moyennées par sommet (équivalent de geometry.computeVertexNormals()
-        # dans le viewer) pour un dégradé lisse plutôt qu'un aplat par facette.
         vertex_normals = mesh.vertex_normals
         smooth_normals = (
             vertex_normals[faces[:, 0]] + vertex_normals[faces[:, 1]] + vertex_normals[faces[:, 2]]
@@ -2783,8 +3786,6 @@ def _generate_thumbnail_raster(mesh, thumb_path, resolution=(768, 768)):
         sn_len[sn_len == 0] = 1.0
         smooth_normals = smooth_normals / sn_len
 
-        # Lumière directionnelle "attachée à la caméra" (headlight), comme dans le viewer :
-        # elle éclaire toujours de face, quel que soit l'angle du modèle.
         n_dot_light = np.clip(-smooth_normals @ forward, 0.0, 1.0)
         shade = AMBIENT + KEY_INTENSITY * n_dot_light
 
@@ -2922,19 +3923,10 @@ def analyze_3d_file(file_path):
 
         already_handled = file_path.replace('\\', '/') in repair_ignored_cache
 
-        # is_watertight ne garantit PAS que les normales sont cohérentes :
-        # un maillage peut être une coque parfaitement fermée (chaque arête
-        # partagée par exactement 2 faces) tout en contenant un îlot de
-        # triangles dont le winding order est inversé (import depuis un
-        # logiciel tiers, booléen mal résolu, etc.). Ces normales inversées
-        # ne cassent pas l'étanchéité, donc le fichier passait pour "sain"
-        # alors que l'aperçu de surplombs (qui se fie directement au sens
-        # des normales) affichait des faux positifs sur des parois pourtant
-        # verticales. is_winding_consistent détecte spécifiquement ce cas.
         try:
             winding_ok = bool(mesh.is_winding_consistent)
         except Exception:
-            winding_ok = True  # propriété coûteuse/instable sur certains maillages : ne pas bloquer dessus
+            winding_ok = True
 
         mesh_is_sane = mesh.is_watertight and winding_ok
 
@@ -3455,9 +4447,6 @@ def api_delete_source(source_id):
                             all_files.extend(scan_smb_folder_recursive(unc_path, '', kwargs, source['name']))
                     except Exception as e:
                         app_logger.warning(f"[DELETE] Erreur source {source.get('name')}: {e}")
-                # même correctif que dans _do_background_scan : voir la note à ce sujet
-                # (deduplicate_files_hybrid jetait silencieusement des fichiers distincts
-                # partageant un même nom).
                 save_file_cache(all_files, sources)
                 app_logger.info(f"[DELETE] Cache mis à jour : {len(all_files)} fichiers")
             finally:
@@ -3511,6 +4500,37 @@ def api_get_account(platform):
     if result.get('session_cookies'):
         result['session_cookies'] = '••••••••'
     return jsonify(result)
+
+@app.route('/api/accounts/<platform>/key', methods=['GET'])
+@login_required
+def api_get_account_key(platform):
+    """Retourne la clé API en clair pour pré-remplir le champ d'édition côté UI.
+
+    Contrairement à GET /api/accounts/<platform> (qui masque la clé), cette
+    route la déchiffre — utilisée uniquement par showAccountKeyInput() côté
+    front pour l'édition. Sert exclusivement en local via la session déjà
+    authentifiée (@login_required), jamais exposée publiquement.
+    """
+    platform = platform.lower()
+    conn = get_db()
+    try:
+        account = conn.execute(
+            "SELECT api_key FROM account_credentials WHERE user_id = ? AND platform = ?",
+            (session['user_id'], platform)
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not account or not account['api_key']:
+        return jsonify({"api_key": None}), 404
+
+    try:
+        clear_key = decrypt_account_secret(account['api_key'])
+    except Exception as e:
+        app_logger.warning(f"[Accounts] Échec déchiffrement clé API ({platform}): {e}")
+        return jsonify({"api_key": None}), 500
+
+    return jsonify({"api_key": clear_key})
 
 @app.route('/api/accounts/thingiverse/validate', methods=['POST'])
 @login_required
@@ -4681,16 +5701,6 @@ def _do_background_scan(sources_list, user_id, blocking=False):
                 app_logger.info(f"    [SCAN] Erreur source {source['name']}: {e}")
                 unreachable_sources.append(source['name'])
 
-        # NOTE: l'ancien appel à deduplicate_files_hybrid(all_files) a été retiré.
-        # Cette fonction ne dédupliquait pas par contenu réel (elle hashait le CHEMIN,
-        # pas les octets du fichier) : elle gardait uniquement le 1er fichier rencontré
-        # pour chaque couple (nom, extension) et jetait silencieusement tous les autres,
-        # même s'il s'agissait de modèles totalement différents portant un nom courant
-        # (ex: "model.stl", "Base.3mf"). C'est ce qui faisait "disparaître" les fichiers
-        # fraîchement téléchargés dès que leur nom existait déjà ailleurs dans les sources.
-        # La détection de vrais doublons reste disponible via la page Doublons
-        # (/api/files/duplicates), qui compare taille + hash du contenu.
-
         try:
             conn2 = get_db()
             file_paths = [f['path'] for f in all_files]
@@ -4775,13 +5785,6 @@ def _do_background_scan(sources_list, user_id, blocking=False):
 # 🔁 SCAN AUTOMATIQUE PÉRIODIQUE (toutes sources)
 # ============================================
 def _auto_scan_scheduler():
-    """Relance périodiquement un scan complet de toutes les sources
-    configurées (dossier local, SMB, NFS, fichier unique) pour détecter les
-    nouveaux fichiers ajoutés depuis l'extérieur (dépôt manuel sur le NAS,
-    autre PC, etc.) sans que l'utilisateur ait besoin de rouvrir la
-    bibliothèque. Réutilise _do_background_scan (diff + auto-tag inclus).
-    Configurable via /api/settings : auto_scan_enabled, auto_scan_interval_minutes.
-    """
     _lower_thread_priority()
     app_logger.info("[AUTO-SCAN] Planificateur démarré")
     while True:
@@ -5152,10 +6155,6 @@ def _is_path_within_sources(file_path, user_id):
         if is_smb_file != is_smb_folder:
             continue
 
-        # Comparaison par préfixe de chaîne (pas de commonpath : sur Windows,
-        # os.path.commonpath() renvoie le séparateur natif '\' même si on lui donne
-        # des chemins en '/', ce qui fait toujours échouer la comparaison avec
-        # norm_folder_cmp et rejette à tort des fichiers pourtant bien dans la source).
         folder_prefix = norm_folder_cmp + '/'
         if norm_file_cmp == norm_folder_cmp or norm_file_cmp.startswith(folder_prefix):
             return True
@@ -6214,6 +7213,47 @@ def get_slice_temp_dir():
     os.makedirs(base, exist_ok=True)
     return base
 
+# Rotations miroir de celles du viewer 3D (script.js: _getViewerOrientationMatrix).
+# Le viewer charge les STL sans remapping d'axes (Z reste vertical comme dans le
+# fichier source), donc ces mêmes angles/axes s'appliquent tels quels via trimesh.
+VIEWER_ORIENTATION_ROTATIONS = {
+    'flipZ': ('x', 180),
+    'posX':  ('y', 90),
+    'negX':  ('y', -90),
+    'posY':  ('x', -90),
+    'negY':  ('x', 90),
+}
+
+def _export_reoriented_mesh(file_path, orientation_key):
+    """Applique la rotation choisie dans le viewer 3D à une copie du mesh et
+    l'exporte dans un fichier STL temporaire. Retourne le chemin du fichier
+    temporaire, ou None si l'orientation est 'default'/inconnue ou si le
+    fichier n'est pas un format mesh supporté par trimesh."""
+    if not orientation_key or orientation_key == 'default':
+        return None
+    axis_deg = VIEWER_ORIENTATION_ROTATIONS.get(orientation_key)
+    if not axis_deg:
+        return None
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext not in ('.stl', '.obj', '.3mf', '.ply'):
+        return None
+
+    try:
+        mesh = trimesh.load(file_path, force='mesh')
+        axis, degrees = axis_deg
+        direction = [1, 0, 0] if axis == 'x' else [0, 1, 0]
+        rot = tra.rotation_matrix(np.radians(degrees), direction)
+        mesh.apply_transform(rot)
+
+        out_dir = get_slice_temp_dir()
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        out_path = os.path.join(out_dir, f"{base_name}_{orientation_key}_{secrets.token_hex(4)}.stl")
+        mesh.export(out_path, file_type='stl')
+        return out_path
+    except Exception as e:
+        app_logger.warning(f"[Slicer] Échec ré-orientation du mesh avant envoi: {e}")
+        return None
+
 def _popen_kwargs_silent():
     kwargs = {}
     if sys.platform == 'win32':
@@ -6821,13 +7861,17 @@ def api_send_to_slicer():
         slicer_path = find_slicer_by_name(slicer_name)
         detected_slicer = os.path.basename(slicer_path).replace('.exe','') if slicer_path else 'Défaut système'
 
+        orientation_key = data.get('orientation') or 'default'
+        reoriented_path = _export_reoriented_mesh(file_path, orientation_key)
+        path_to_open = reoriented_path or file_path
+
         if slicer_path:
-            subprocess.Popen([slicer_path, file_path])
+            subprocess.Popen([slicer_path, path_to_open])
         else:
             if sys.platform == 'win32':
-                os.startfile(file_path)
+                os.startfile(path_to_open)
             else:
-                subprocess.run(['xdg-open', file_path], check=False)
+                subprocess.run(['xdg-open', path_to_open], check=False)
 
         try:
             conn = get_db()
@@ -7140,7 +8184,6 @@ def api_create_download_folder():
                 if not smbclient.path.exists(base_path, **kwargs):
                     smbclient.makedirs(base_path, exist_ok=True, **kwargs)
 
-                # Ajoute le nouveau dossier comme source (comme pour le local)
                 added_as_source = False
                 if add_as_source:
                     try:
@@ -7251,6 +8294,22 @@ def api_download_progress(download_id):
             "total": info.get("total", 0),
         })
     return jsonify({"active": False, "download_id": download_id})
+
+@app.route('/api/download/cancel/<int:download_id>', methods=['POST'])
+@login_required
+def api_download_cancel(download_id):
+    """Marque un téléchargement en cours comme annulé.
+
+    Le thread qui écrit réellement les données (voir api_download_file)
+    vérifie ce flag entre chaque chunk et interrompt le téléchargement
+    au prochain passage — annulation "best effort", pas instantanée si
+    un gros chunk est déjà en cours de lecture réseau.
+    """
+    was_active = download_id in active_downloads
+    cancelled_downloads.add(download_id)
+    active_downloads.pop(download_id, None)
+    app_logger.info(f"[Download] Annulation demandée pour download_id={download_id} (actif={was_active})")
+    return jsonify({"success": True, "download_id": download_id, "was_active": was_active})
 
 # ============================================
 # 🧩 PRINTABLES — API GRAPHQL
@@ -7715,13 +8774,15 @@ def api_download_file():
                             downloaded_bytes = 0
                             with open(dest_path, 'wb') as f_out:
                                 for chunk in r_dl.iter_content(chunk_size=65536):
+                                    if download_id in cancelled_downloads:
+                                        break
                                     if chunk:
                                         f_out.write(chunk)
                                         downloaded_bytes += len(chunk)
                                         base_pct = int(idx * 100 / total_files)
                                         file_pct = int(downloaded_bytes * 100 / total_bytes / total_files) if total_bytes else 0
                                         active_downloads[download_id]['percentage'] = base_pct + file_pct
-                        file_ok = True
+                        file_ok = download_id not in cancelled_downloads
                     except Exception as file_err:
                         app_logger.warning(f"[Download][Thingiverse] Échec sur {fname_item}: {file_err}")
                     finally:
@@ -7737,7 +8798,13 @@ def api_download_file():
                             except OSError as cleanup_err:
                                 app_logger.warning(f"[Download][Thingiverse] Échec suppression fichier partiel {dest_path}: {cleanup_err}")
 
+                    if download_id in cancelled_downloads:
+                        break
+
                 active_downloads.pop(download_id, None)
+                if download_id in cancelled_downloads:
+                    cancelled_downloads.discard(download_id)
+                    return jsonify({"cancelled": True, "download_id": download_id}), 200
                 if not results:
                     return jsonify({"error": "Aucun fichier n'a pu être téléchargé (connexion interrompue)."}), 502
                 fname = results[0]
@@ -7793,13 +8860,15 @@ def api_download_file():
                             downloaded_bytes = 0
                             with open(dest_path, 'wb') as f_out:
                                 for chunk in r_dl.iter_content(chunk_size=65536):
+                                    if download_id in cancelled_downloads:
+                                        break
                                     if chunk:
                                         f_out.write(chunk)
                                         downloaded_bytes += len(chunk)
                                         base_pct = int(idx * 100 / total_files)
                                         file_pct = int(downloaded_bytes * 100 / total_bytes / total_files) if total_bytes else 0
                                         active_downloads[download_id]['percentage'] = base_pct + file_pct
-                        file_ok = True
+                        file_ok = download_id not in cancelled_downloads
                     except Exception as file_err:
                         app_logger.warning(f"[Download][Printables] Échec sur {fname_item}: {file_err}")
                     finally:
@@ -7815,7 +8884,14 @@ def api_download_file():
                             except OSError as cleanup_err:
                                 app_logger.warning(f"[Download][Printables] Échec suppression fichier partiel {dest_path}: {cleanup_err}")
 
+                    if download_id in cancelled_downloads:
+                        break
+
                 active_downloads.pop(download_id, None)
+
+                if download_id in cancelled_downloads:
+                    cancelled_downloads.discard(download_id)
+                    return jsonify({"cancelled": True, "download_id": download_id}), 200
 
                 if not results:
                     return jsonify({
@@ -8039,13 +9115,15 @@ def api_download_file():
             try:
                 with open(dest_path, 'wb') as f_out:
                     for chunk in r.iter_content(chunk_size=65536):
+                        if download_id in cancelled_downloads:
+                            break
                         if chunk:
                             f_out.write(chunk)
                             downloaded += len(chunk)
                             pct = int(downloaded * 100 / total) if total else 0
                             active_downloads[download_id]['current'] = downloaded
                             active_downloads[download_id]['percentage'] = pct
-                download_completed = True
+                download_completed = download_id not in cancelled_downloads
             finally:
                 if download_completed:
                     mark_download_complete_and_refresh_thumbnail(dest_path)
@@ -8057,6 +9135,11 @@ def api_download_file():
                             app_logger.info(f"[Download] Fichier partiel supprimé après échec: {dest_path}")
                     except OSError as cleanup_err:
                         app_logger.warning(f"[Download] Échec suppression fichier partiel {dest_path}: {cleanup_err}")
+
+            if download_id in cancelled_downloads:
+                cancelled_downloads.discard(download_id)
+                active_downloads.pop(download_id, None)
+                return jsonify({"cancelled": True, "download_id": download_id}), 200
 
             file_size = os.path.getsize(dest_path)
             if file_size < 100:
@@ -8101,10 +9184,6 @@ def api_download_file():
 # 🕒 HISTORIQUE TÉLÉCHARGEMENTS WEB
 # ============================================
 def _ensure_download_folder_registered(path, user_id):
-    """Enregistre automatiquement le dossier de téléchargement par défaut comme Source
-    s'il ne l'est pas déjà. Sans ça, les fichiers téléchargés sans dossier de destination
-    choisi n'apparaissent jamais dans la bibliothèque : le scan ne parcourt que les
-    sources enregistrées, jamais tout le disque."""
     try:
         normalized = os.path.normpath(path)
         conn = get_db()
@@ -8606,15 +9685,10 @@ def api_repair_file():
             mesh = trimesh.util.concatenate(geoms)
 
         def _winding_ok(m):
-            # is_watertight ne dit rien sur la cohérence du sens des
-            # normales (winding order) : un maillage peut être une coque
-            # fermée valide tout en ayant un îlot de faces inversées, ce
-            # qui ne casse pas l'étanchéité mais fausse tout ce qui dépend
-            # du sens des normales (aperçu des surplombs notamment).
             try:
                 return bool(m.is_winding_consistent)
             except Exception:
-                return True  # propriété instable sur certains maillages : ne pas bloquer dessus
+                return True
 
         was_watertight_initially = mesh.is_watertight
         if was_watertight_initially and _winding_ok(mesh):
@@ -8625,11 +9699,6 @@ def api_repair_file():
             shutil.copy2(file_path, backup_path)
 
         if was_watertight_initially:
-            # Le maillage est déjà étanche : seul le winding est en cause,
-            # donc on se contente de remettre les normales dans le bon sens
-            # sans repasser par tout le pipeline de comblement de trous /
-            # pymeshfix, qui n'a rien à corriger ici et pourrait même
-            # dégrader inutilement une géométrie déjà saine.
             trimesh.repair.fix_winding(mesh)
             trimesh.repair.fix_normals(mesh, multibody=True)
         else:
@@ -9476,7 +10545,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio-app"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.4.5"
+CURRENT_VERSION = "0.4.9"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
@@ -9547,7 +10616,7 @@ def check_for_updates():
                     break
 
         if not download_url:
-            app_logger.info("[UPDATE] ⚠️ Aucun asset téléchargeable trouvé")
+            app_logger.info("[UPDATE] ⚠️ Aucun asset téléchargeable trouvé (ni patch .zip, ni installeur .exe)")
             return None
 
         app_logger.info(f"[UPDATE] ✅ Nouvelle version disponible: {latest_version} (type: {update_type})")
@@ -9582,8 +10651,10 @@ def install_update(installer_path):
         app_logger.info(f"[UPDATE] 🚀 Lancement de la mise à jour: {installer_path}")
         ext = os.path.splitext(installer_path)[1].lower()
         
+        launcher_exe = os.environ.get('STELLIO_LAUNCHER_EXE')
+
         if sys.platform == 'win32':
-            app_exe = sys.executable if getattr(sys, 'frozen', False) else None
+            app_exe = launcher_exe
             app_dir = os.path.dirname(app_exe) if app_exe else os.path.dirname(os.path.abspath(sys.argv[0]))
             app_subdir = os.path.join(app_dir, 'app')
             os.makedirs(app_subdir, exist_ok=True)
@@ -9600,7 +10671,7 @@ def install_update(installer_path):
                 if os.path.exists(extract_dir):
                     shutil.rmtree(extract_dir, ignore_errors=True)
                 os.makedirs(extract_dir, exist_ok=True)
-                
+
                 with zipfile.ZipFile(installer_path, 'r') as z:
                     app_logger.info(f"[UPDATE] 📦 Contenu du ZIP ({len(z.namelist())} entrées):")
                     for name in z.namelist()[:20]:
@@ -9608,9 +10679,9 @@ def install_update(installer_path):
                     if len(z.namelist()) > 20:
                         app_logger.info(f"  ... et {len(z.namelist()) - 20} autres")
                     safe_extract_zip(z, extract_dir)
-                
+
                 def find_real_content_dir(base_dir):
-                    real_files = {'main.py', 'index.html', 'script.js', 'style.css', 'launcher.py'}
+                    real_files = {'main.py', 'index.html', 'script.js', 'style.css', 'check_deps.py'}
 
                     for root, dirs, files in os.walk(base_dir):
                         entries = set(files) | set(dirs)
@@ -9621,17 +10692,17 @@ def install_update(installer_path):
 
                     app_logger.info(f"[UPDATE] ⚠️ Aucun fichier app reconnu dans le ZIP, on utilise la racine: {base_dir}")
                     return base_dir
-                
+
                 real_content_dir = find_real_content_dir(extract_dir)
                 app_logger.info(f"[UPDATE] 📂 Répertoire source final: {real_content_dir}")
                 app_logger.info(f"[UPDATE]  Contenu final: {os.listdir(real_content_dir)[:15]}")
-                
+
                 install_cmd = (
                     f'xcopy /s /y /e /i /q "{real_content_dir}\\*" "{app_subdir}\\" '
                     f'>> "{log_path}" 2>&1'
                 )
                 app_logger.info(f"[UPDATE] 🔧 Commande: {install_cmd}")
-                
+
             elif ext == '.exe':
                 install_cmd = f'"{installer_path}" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART >> "{log_path}" 2>&1'
             elif ext == '.msi':
@@ -9860,6 +10931,15 @@ def api_add_printer():
         serial = raw_config.get('serial', '')
         api_key = code
         raw_config = {'code': code, 'serial': serial}
+    elif ptype == 'elegoo_cc2':
+        code = raw_config.get('code', '') or '123456'
+        api_key = code
+        raw_config = {'code': code}
+    elif ptype == 'flashforge':
+        code = raw_config.get('code', '')
+        serial = raw_config.get('serial', '')
+        api_key = code
+        raw_config = {'code': code, 'serial': serial}
 
     config = json.dumps(raw_config)
 
@@ -9989,6 +11069,138 @@ def api_printer_set_brand(pid):
     finally:
         conn.close()
 
+@app.route('/api/printers/<int:pid>/power', methods=['PUT'])
+@login_required
+def api_printer_set_power(pid):
+    data = request.json or {}
+    try:
+        power_w = int(round(float(data.get('power_w'))))
+    except (TypeError, ValueError):
+        return jsonify({"error": "power_w invalide"}), 400
+    if power_w < 0 or power_w > 10000:
+        return jsonify({"error": "power_w hors limites"}), 400
+    conn = get_db()
+    try:
+        p = conn.execute(
+            "SELECT id FROM printers WHERE id=? AND user_id=?", (pid, session['user_id'])
+        ).fetchone()
+        if not p:
+            return jsonify({"error": "Not found"}), 404
+        conn.execute(
+            "UPDATE printers SET power_w=? WHERE id=? AND user_id=?",
+            (power_w, pid, session['user_id'])
+        )
+        conn.commit()
+        return jsonify({"message": "Puissance enregistrée", "power_w": power_w}), 200
+    except Exception as e:
+        app_logger.error(f"[API] Erreur non gérée: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/printers/<int:pid>/camera/stream')
+@login_required
+def api_printer_camera_stream(pid):
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT * FROM printers WHERE id=? AND user_id=?", (pid, session['user_id'])
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+
+    row = parse_printer_config(row)
+    if row.get('type') != 'bambu':
+        return jsonify({"error": "Flux disponible uniquement pour Bambu Lab"}), 400
+
+    config = row.get('config') or {}
+    access_code = config.get('code') or row.get('api_key') or ''
+    ip = row.get('ip')
+    if not access_code or not ip:
+        return jsonify({"error": "IP ou code d'accès manquant pour cette imprimante"}), 400
+
+    return Response(
+        _generate_bambu_mjpeg_stream(ip, access_code),
+        mimetype='multipart/x-mixed-replace; boundary=frame'
+    )
+
+
+@app.route('/api/printers/<int:pid>', methods=['PUT'])
+@login_required
+def api_edit_printer(pid):
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            "SELECT * FROM printers WHERE id = ? AND user_id = ?", (pid, session['user_id'])
+        ).fetchone()
+        if not existing:
+            return jsonify({"error": "Imprimante introuvable"}), 404
+
+        data = request.json or {}
+        name = data.get('name')
+        ptype = data.get('type')
+        ip = data.get('ip')
+        raw_config = data.get('config', {}) or {}
+        # Clé absente du payload = on ne touche pas à celle déjà enregistrée
+        # (le frontend n'envoie pas le champ si l'utilisateur l'a laissé vide en édition).
+        has_new_api_key = 'api_key' in data and data.get('api_key')
+
+        if not name or not ip or not ptype:
+            return jsonify({"error": "Champs requis"}), 400
+
+        if ptype == 'bambu':
+            code = raw_config.get('code', '')
+            serial = raw_config.get('serial', '')
+            raw_config = {'code': code, 'serial': serial}
+            if code:
+                has_new_api_key = True
+                data['api_key'] = code
+        elif ptype == 'elegoo_cc2':
+            code = raw_config.get('code', '') or '123456'
+            raw_config = {'code': code}
+            has_new_api_key = True
+            data['api_key'] = code
+        elif ptype == 'flashforge':
+            code = raw_config.get('code', '')
+            serial = raw_config.get('serial', '')
+            raw_config = {'code': code, 'serial': serial}
+            if code:
+                has_new_api_key = True
+                data['api_key'] = code
+
+        config = json.dumps(raw_config)
+        api_key = data.get('api_key', '') if has_new_api_key else decrypt_account_secret(existing['api_key']) if existing['api_key'] else ''
+
+        # On coupe l'ancienne connexion persistante (MQTT/WebSocket) avant de tester
+        # la nouvelle config, quel que soit le type d'origine.
+        _stop_bambu_connection(pid)
+        _stop_elegoo_sdcp_connection(pid)
+        _stop_elegoo_cc2_connection(pid)
+        _stop_creality_connection(pid)
+        _stop_flashforge_connection(pid)
+
+        is_connected = printer_hub.connect_printer({
+            'id': pid, 'type': ptype, 'ip': ip, 'api_key': api_key,
+            'config': json.loads(config) if config else {}
+        })
+
+        conn.execute("""
+            UPDATE printers SET name = ?, type = ?, ip = ?, api_key = ?, config = ?, is_connected = ?
+            WHERE id = ? AND user_id = ?
+        """, (name, ptype, ip, encrypt_password(api_key) if api_key else None, config, is_connected, pid, session['user_id']))
+        conn.commit()
+
+        return jsonify({"message": "Imprimante mise à jour", "connected": is_connected}), 200
+
+    except Exception as e:
+        app_logger.error(f"[API] Erreur non gérée: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+    finally:
+        conn.close()
+
 @app.route('/api/printers/<int:pid>', methods=['DELETE'])
 @login_required
 def api_delete_printer(pid):
@@ -9997,6 +11209,11 @@ def api_delete_printer(pid):
         conn.execute("DELETE FROM printers WHERE id = ? AND user_id = ?",
                      (pid, session['user_id']))
         conn.commit()
+        _stop_bambu_connection(pid)
+        _stop_elegoo_sdcp_connection(pid)
+        _stop_elegoo_cc2_connection(pid)
+        _stop_creality_connection(pid)
+        _stop_flashforge_connection(pid)
         return jsonify({"message": "Imprimante supprimée"}), 200
     except Exception as e:
         app_logger.error(f"[API] Erreur non gérée: {e}")
@@ -10083,6 +11300,35 @@ def api_printer_camera(pid):
                         })
             except Exception as e:
                 pass
+
+        elif ptype == 'bambu':
+            config = printer.get('config', {}) or {}
+            access_code = config.get('code') or printer.get('api_key') or ''
+            if access_code:
+                camera_info.update({
+                    "available": True,
+                    "stream_url": f"{request.host_url.rstrip('/')}/api/printers/{pid}/camera/stream",
+                    "snapshot_url": None,
+                    "name": "Bambu Lab Camera"
+                })
+
+        elif ptype == 'elegoo_sdcp':
+            conn = _ensure_elegoo_sdcp_connection(printer)
+            if conn:
+                video_url, ack = conn.request_video()
+                if ack == 0 and video_url:
+                    if not video_url.startswith(('http://', 'https://')):
+                        video_url = f"http://{video_url}"
+                    camera_info.update({
+                        "available": True,
+                        "stream_url": video_url,
+                        "snapshot_url": None,
+                        "name": "Elegoo Camera"
+                    })
+                elif ack == 2:
+                    app_logger.info(f"[Elegoo SDCP] Pas de caméra sur cette imprimante (printer #{pid})")
+                elif ack is None:
+                    app_logger.info(f"[Elegoo SDCP] Pas de réponse Cmd 386 (printer #{pid}), imprimante hors ligne ?")
 
     except Exception as e:
         pass
@@ -12240,14 +13486,6 @@ def _get_required_weight_for_file(file_path):
     return None, None
 
 def _compute_estimated_cost(file_path, weight_g_hint=None):
-    """Calcule le coût matière + électricité d'une impression, avec la même
-    logique que le calculateur de coût côté client (Réglages > coût
-    d'impression). Utilisé pour persister le coût dans l'historique
-    d'impression et l'agréger dans les statistiques. Retourne
-    (material_cost, elec_cost, total_cost, weight_g) — chaque valeur peut
-    être None si les données nécessaires (poids, prix bobine, prix élec...)
-    ne sont pas disponibles.
-    """
     material_cost = elec_cost = total_cost = None
     try:
         settings = load_settings() or {}
@@ -12257,8 +13495,17 @@ def _compute_estimated_cost(file_path, weight_g_hint=None):
             weight_g, _src = _get_required_weight_for_file(file_path.replace('\\', '/'))
 
         if weight_g:
-            spool_price = float(settings.get('print_cost_spool_price') or 0)
-            spool_weight = float(settings.get('print_cost_spool_weight') or 0)
+            spools = settings.get('print_cost_spools') or []
+            default_spool_id = settings.get('print_cost_default_spool_id')
+            default_spool = next((s for s in spools if s.get('id') == default_spool_id), None) or (spools[0] if spools else None)
+
+            if default_spool:
+                spool_price = float(default_spool.get('price') or 0)
+                spool_weight = float(default_spool.get('weight') or 0)
+            else:
+                spool_price = float(settings.get('print_cost_spool_price') or 0)
+                spool_weight = float(settings.get('print_cost_spool_weight') or 0)
+
             if spool_price > 0 and spool_weight > 0:
                 price_per_gram = spool_price / spool_weight
                 material_cost = round(weight_g * price_per_gram, 4)
@@ -12276,7 +13523,26 @@ def _compute_estimated_cost(file_path, weight_g_hint=None):
                     if precise and precise.get('status') == 'done':
                         time_seconds = precise.get('data', {}).get('time_seconds')
                     if time_seconds:
-                        printer_power = float(settings.get('print_cost_printer_power') or 120)
+                        printer_power = None
+                        printer_id = settings.get('print_cost_printer_id')
+                        if printer_id:
+                            try:
+                                user_id = session.get('user_id')
+                            except RuntimeError:
+                                user_id = None
+                            if user_id:
+                                conn = get_db()
+                                try:
+                                    row = conn.execute(
+                                        "SELECT power_w FROM printers WHERE id=? AND user_id=?",
+                                        (printer_id, user_id)
+                                    ).fetchone()
+                                finally:
+                                    conn.close()
+                                if row and row['power_w'] is not None:
+                                    printer_power = float(row['power_w'])
+                        if printer_power is None:
+                            printer_power = float(settings.get('print_cost_printer_power') or 120)
                         time_hours = time_seconds / 3600
                         elec_cost = round(time_hours * (printer_power / 1000) * elec_price, 4)
 
@@ -13067,7 +14333,36 @@ def api_qrcode():
 @app.route('/api/remote-access', methods=['GET'])
 @login_required
 def api_remote_access():
-    return jsonify(get_remote_state())
+    state = get_remote_state()
+    state['enabled'] = bool((load_settings() or {}).get('remote_access_enabled', False))
+    return jsonify(state)
+
+
+@app.route('/api/remote-access/toggle', methods=['POST'])
+@login_required
+def api_remote_access_toggle():
+    data = request.json or {}
+    enabled = bool(data.get('enabled'))
+
+    current_settings = load_settings() or {}
+    current_settings['remote_access_enabled'] = enabled
+    save_settings(current_settings)
+
+    if enabled:
+        threading.Thread(
+            target=start_remote_access,
+            args=(DATA_DIR, SERVER_PORT, app_logger),
+            kwargs={
+                'token': current_settings.get('cloudflare_tunnel_token') or None,
+                'fixed_url': current_settings.get('cloudflare_fixed_url') or None,
+            },
+            daemon=True
+        ).start()
+        return jsonify({"message": "Accès à distance activé, connexion en cours…", "enabled": True}), 200
+    else:
+        stop_remote_access()
+        _set_remote_state(status="disabled", url=None, error=None, mode="quick")
+        return jsonify({"message": "Accès à distance désactivé", "enabled": False}), 200
 
 
 @app.route('/api/remote-access/configure', methods=['POST'])
@@ -13241,16 +14536,77 @@ if __name__ in ('__main__', 'stellio_main'):
 
                 threading.Thread(target=_background_library_prep, daemon=True).start()
 
+                if HAS_MQTT:
+                    try:
+                        conn_bambu = get_db()
+                        bambu_printers = conn_bambu.execute("SELECT * FROM printers WHERE type = 'bambu'").fetchall()
+                        conn_bambu.close()
+                        for p in bambu_printers:
+                            _ensure_bambu_connection(parse_printer_config(p))
+                        if bambu_printers:
+                            app_logger.info(f"[STARTUP] {len(bambu_printers)} connexion(s) MQTT Bambu persistante(s) démarrée(s)")
+                    except Exception as e:
+                        app_logger.info(f"[STARTUP] Démarrage connexions Bambu ignoré: {e}")
+
+                if HAS_WEBSOCKET:
+                    try:
+                        conn_elg1 = get_db()
+                        elegoo_sdcp_printers = conn_elg1.execute("SELECT * FROM printers WHERE type = 'elegoo_sdcp'").fetchall()
+                        conn_elg1.close()
+                        for p in elegoo_sdcp_printers:
+                            _ensure_elegoo_sdcp_connection(parse_printer_config(p))
+                        if elegoo_sdcp_printers:
+                            app_logger.info(f"[STARTUP] {len(elegoo_sdcp_printers)} connexion(s) WebSocket Elegoo SDCP démarrée(s)")
+                    except Exception as e:
+                        app_logger.info(f"[STARTUP] Démarrage connexions Elegoo SDCP ignoré: {e}")
+
+                if HAS_MQTT:
+                    try:
+                        conn_elg2 = get_db()
+                        elegoo_cc2_printers = conn_elg2.execute("SELECT * FROM printers WHERE type = 'elegoo_cc2'").fetchall()
+                        conn_elg2.close()
+                        for p in elegoo_cc2_printers:
+                            _ensure_elegoo_cc2_connection(parse_printer_config(p))
+                        if elegoo_cc2_printers:
+                            app_logger.info(f"[STARTUP] {len(elegoo_cc2_printers)} connexion(s) MQTT Elegoo CC2 démarrée(s)")
+                    except Exception as e:
+                        app_logger.info(f"[STARTUP] Démarrage connexions Elegoo CC2 ignoré: {e}")
+
+                if HAS_WEBSOCKET:
+                    try:
+                        conn_crea = get_db()
+                        creality_printers = conn_crea.execute("SELECT * FROM printers WHERE type = 'creality'").fetchall()
+                        conn_crea.close()
+                        for p in creality_printers:
+                            _ensure_creality_connection(parse_printer_config(p))
+                        if creality_printers:
+                            app_logger.info(f"[STARTUP] {len(creality_printers)} connexion(s) WebSocket Creality démarrée(s)")
+                    except Exception as e:
+                        app_logger.info(f"[STARTUP] Démarrage connexions Creality ignoré: {e}")
+
+                if HAS_FLASHFORGE:
+                    try:
+                        conn_ff = get_db()
+                        flashforge_printers = conn_ff.execute("SELECT * FROM printers WHERE type = 'flashforge'").fetchall()
+                        conn_ff.close()
+                        for p in flashforge_printers:
+                            _ensure_flashforge_connection(parse_printer_config(p))
+                        if flashforge_printers:
+                            app_logger.info(f"[STARTUP] {len(flashforge_printers)} connexion(s) FlashForge démarrée(s)")
+                    except Exception as e:
+                        app_logger.info(f"[STARTUP] Démarrage connexions FlashForge ignoré: {e}")
+
                 _remote_settings = load_settings() or {}
-                threading.Thread(
-                    target=start_remote_access,
-                    args=(DATA_DIR, SERVER_PORT, app_logger),
-                    kwargs={
-                        'token': _remote_settings.get('cloudflare_tunnel_token') or None,
-                        'fixed_url': _remote_settings.get('cloudflare_fixed_url') or None,
-                    },
-                    daemon=True
-                ).start()
+                if _remote_settings.get('remote_access_enabled', False):
+                    threading.Thread(
+                        target=start_remote_access,
+                        args=(DATA_DIR, SERVER_PORT, app_logger),
+                        kwargs={
+                            'token': _remote_settings.get('cloudflare_tunnel_token') or None,
+                            'fixed_url': _remote_settings.get('cloudflare_fixed_url') or None,
+                        },
+                        daemon=True
+                    ).start()
             return server_ready
         except Exception as e:
             app_logger.info(f"[Startup Error] Le démarrage a rencontré un problème: {e}")
@@ -13393,8 +14749,6 @@ if __name__ in ('__main__', 'stellio_main'):
                         return {"success": False, "error": str(e)}
 
                 def save_diagnostic_logs(self):
-                    """Génère le ZIP de logs/diagnostic et l'enregistre directement dans le
-                    dossier Téléchargements de l'utilisateur (sans boîte de dialogue)."""
                     try:
                         zip_bytes, filename = build_diagnostic_zip_bytes()
                     except Exception as e:
@@ -13406,7 +14760,6 @@ if __name__ in ('__main__', 'stellio_main'):
                         downloads_dir.mkdir(parents=True, exist_ok=True)
 
                         dest_path = downloads_dir / filename
-                        # Évite d'écraser un export existant portant le même nom
                         counter = 1
                         stem, suffix = dest_path.stem, dest_path.suffix
                         while dest_path.exists():
