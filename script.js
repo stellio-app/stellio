@@ -1513,7 +1513,13 @@ if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
 return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 function openModal(modalId) { document.getElementById(modalId)?.classList.remove('hidden'); }
-function closeModal(modalId) { document.getElementById(modalId)?.classList.add('hidden'); }
+function closeModal(modalId) {
+    document.getElementById(modalId)?.classList.add('hidden');
+    // Le popup slicer peut avoir été ouvert depuis le viewer 3D (bouton
+    // "Envoyer au slicer") : si on l'annule/ferme sans envoyer, on
+    // réinitialise juste le drapeau sans toucher au viewer, qui reste ouvert.
+    if (modalId === 'modal-slicer') _slicerLaunchedFromViewer = false;
+}
 // ============================================
 //  MÉTADONNÉES & TOOLTIPS
 // ============================================
@@ -1928,7 +1934,7 @@ const thumbContent = f.has_thumb
     ? `<img src="${thumbUrl}" data-loaded="pending" onload="this.dataset.loaded='true'; this.style.display='block'; this.nextElementSibling?.style.setProperty('display','none','important');" onerror="window.handleThumbnailError(this)" style="width:100%; height:100%; object-fit:cover; display:block;"><div class="file-loading" style="display:none; align-items:center; justify-content:center;"><i class="fa-solid ${icon} thumb-icon" style="font-size:48px; color:var(--text-muted);"></i></div>`
     : `<img src="" data-loaded="false" style="display:none; width:100%; height:100%; object-fit:cover;"><div class="file-loading thumb-pending" data-path="${escapeHtml(f.path)}" style="display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px;"><i class="fa-solid fa-spinner fa-spin" style="font-size:32px; color:var(--text-muted); opacity:0.6;"></i></div>`;
 const checkboxHtml = isSelectionMode ? `<div class="file-checkbox" onclick="event.stopPropagation(); toggleFileSelection('${escapeJs(f.path)}', event)" title="${isSelected ? I18N.t('actions.cancel') : I18N.t('actions.select')}"><i class="fa-solid ${isSelected ? 'fa-check-square' : 'fa-square'}"></i></div>` : '';
-const fileMenuBtnHtml = isSelectionMode ? '' : `<button type="button" class="file-menu-btn" onclick="event.stopPropagation(); openFileCtxMenu(event, '${escapeJs(f.path)}', '${escapeJs(f.name)}')" title="${I18N.t('actions.more') || 'Actions'}"><i class="fa-solid fa-ellipsis"></i></button>`;
+const fileMenuBtnHtml = isSelectionMode ? '' : `<button type="button" class="file-menu-btn" onclick="event.stopPropagation(); openFileCtxMenu(event, '${escapeJs(f.path)}', '${escapeJs(f.name)}')" title="${I18N.t('actions.more') || 'Actions'}"><i class="fa-solid fa-bars"></i></button>`;
 const viewerClick = `onclick="open3DViewer('${escapeJs(f.name)}', '${escapeJs(f.path)}', ${f.plate_count || 1})" style="cursor:pointer;"`;
 const selectedClass = isSelected ? ' selected' : '';
 if (currentView === 'details') {
@@ -1952,7 +1958,7 @@ if (currentView === 'details') {
     ${isArchive ? `<button type="button" class="dv-btn" onclick="event.stopPropagation(); decompressFile('${escapeJs(f.path)}', event)" title="${I18N.t('toast.extract_success')}"><i class="fa-solid fa-file-zipper"></i></button>` : ''}
     ${extractEntryBtnHtml}
     <button type="button" class="dv-btn dv-btn--star ${isFav ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleFavorite('${escapeJs(f.path)}', event)" title="${isFav ? I18N.t('toast.favorites_removed') : I18N.t('toast.favorites_added')}"><i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-star"></i></button>
-    <button type="button" class="dv-btn dv-btn--menu" onclick="event.stopPropagation(); openFileCtxMenu(event, '${escapeJs(f.path)}', '${escapeJs(f.name)}')" title="${I18N.t('actions.more') || 'Actions'}"><i class="fa-solid fa-ellipsis"></i></button>
+    <button type="button" class="dv-btn dv-btn--menu" onclick="event.stopPropagation(); openFileCtxMenu(event, '${escapeJs(f.path)}', '${escapeJs(f.name)}')" title="${I18N.t('actions.more') || 'Actions'}"><i class="fa-solid fa-ellipsis-vertical"></i></button>
   </div>
 </div>`;
 }
@@ -2724,7 +2730,10 @@ console.error(err);
 // ============================================
 // 🔑 COMPTES EXTERNES
 // ============================================
-function updateThingiverseFooterStatus(connected, error = null) { /* Implement */ }
+function updateThingiverseFooterStatus(connected, error = null) {
+    updateAccountBadge('thingiverse', !!connected);
+    if (connected) showAccountKeyConfigured('thingiverse');
+}
 // ============================================
 // ⬇️ TÉLÉCHARGEMENTS
 // ============================================
@@ -2897,6 +2906,7 @@ const download = activeDownloads.find(d => d.id === downloadId);
 if (download) {
 try {
 const res = await fetch(`${API}/api/download/cancel/${downloadId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
 download.status = 'cancelled';
 updateDownloadToast(download, 0, 0, false, I18N.t('download.cancelled'));
 setTimeout(() => { removeDownloadToast(downloadId); }, 2000);
@@ -3148,8 +3158,12 @@ I18N.apply();
 // ============================================
 // ✂️ ENVOI AU SLICER
 // ============================================
-function sendToSlicer(path, name, aiProfile) {
+let currentSlicerOrientation = 'default';
+let _slicerLaunchedFromViewer = false;
+
+function sendToSlicer(path, name, aiProfile, orientation) {
 currentSlicerFile = path;
+currentSlicerOrientation = orientation || 'default';
 document.getElementById('slicer-file-name').textContent = `${I18N.t('modal.selected_file')}: ${name}`;
 _lastAiRecommendedProfile = aiProfile || null;
 const aiBox = document.getElementById('slicer-ai-recommend-result');
@@ -3208,15 +3222,9 @@ try {
 // ============================================
 let viewer3D = null, viewerControls = null, viewerScene = null, viewerCamera = null, viewerMesh = null, viewerRenderer = null;
 let viewerOverhangMode = false;
-const OVERHANG_THRESHOLD_DEG = 45; // seuil standard (angle depuis la verticale au-delà duquel un support est conseillé)
+let viewerCurrentOrientation = 'default';
+const OVERHANG_THRESHOLD_DEG = 45;
 let viewerActive = false, viewerAnimationId = null;
-// Petit repère XYZ affiché dans un coin du viewer, qui suit l'orientation de
-// la caméra (comme le "navigation cube" de Fusion360/Blender). Scène et
-// caméra dédiées, rendues dans un sous-rectangle du même canvas via
-// setScissor, pour permettre à l'utilisateur de savoir en un coup d'œil
-// quel axe est le Z "vertical d'impression" utilisé par le calcul de
-// surplombs, quelle que soit la rotation appliquée avec la TrackballControls
-// (qui autorise un roulis libre, contrairement à des contrôles orbit classiques).
 let viewerGizmoScene = null, viewerGizmoCamera = null;
 
 function disposeViewer3D() {
@@ -3276,16 +3284,30 @@ viewerMesh = null;
 let viewerCurrentPlate = 1;
 let viewerPlateCount = 1;
 let viewerCurrentPath = null;
+let viewerCurrentFileName = null;
 
 function open3DViewer(fileName, filePath, plateCount) {
 document.getElementById('viewer-title').innerHTML = `<i class="fa-solid fa-cube"></i> ${fileName}`;
 openModal('modal-3d-viewer');
 viewerCurrentPath = filePath;
+viewerCurrentFileName = fileName;
 viewerPlateCount = (plateCount && plateCount > 1) ? plateCount : 1;
 viewerCurrentPlate = 1;
 load3DModel(filePath, viewerCurrentPlate);
 updatePlateNavUI();
 }
+
+// Envoie le fichier actuellement ouvert dans le viewer 3D vers le slicer,
+// en conservant l'orientation choisie dans le dropdown du viewer. Le
+// viewer reste ouvert derrière la popup slicer (voir #modal-slicer en CSS)
+// et se refermera automatiquement une fois l'envoi confirmé.
+function sendViewerFileToSlicer() {
+    if (!viewerCurrentPath) return;
+    const orientation = viewerCurrentOrientation || 'default';
+    _slicerLaunchedFromViewer = true;
+    sendToSlicer(viewerCurrentPath, viewerCurrentFileName || viewerCurrentPath, null, orientation);
+}
+window.sendViewerFileToSlicer = sendViewerFileToSlicer;
 
 function updatePlateNavUI() {
     const prevBtn = document.getElementById('viewer-plate-prev');
@@ -3318,24 +3340,19 @@ closeModal('modal-3d-viewer');
 viewerCurrentPath = null;
 viewerPlateCount = 1;
 viewerCurrentPlate = 1;
-// Repart toujours en vue normale à la prochaine ouverture, plutôt que de
-// garder le mode surplombs actif d'un fichier à l'autre sans que ce soit
-// explicitement redemandé.
 viewerOverhangMode = false;
+viewerCurrentOrientation = 'default';
 const overhangBtn = document.getElementById('viewer-overhang-toggle');
 const overhangLegend = document.getElementById('viewer-overhang-legend');
 if (overhangBtn) {
-    overhangBtn.classList.remove('active');
-    overhangBtn.style.background = 'rgba(0,0,0,0.6)';
+    overhangBtn.checked = false;
 }
 if (overhangLegend) overhangLegend.style.display = 'none';
+const orientationSelect = document.getElementById('viewer-orientation-select');
+if (orientationSelect) orientationSelect.value = 'default';
 }
 let viewer3DLoadToken = 0;
 
-// Génère une petite pastille ronde colorée avec une lettre dessus (X/Y/Z),
-// utilisée comme étiquette au bout de chaque brin du repère. Rendue en
-// sprite (toujours face à la caméra) via une texture canvas générée à la
-// volée : plus net qu'un texte 3D et beaucoup plus simple à maintenir.
 function makeAxisLabelSprite(text, hexColor) {
     const canvas = document.createElement('canvas');
     canvas.width = 64;
@@ -3358,11 +3375,6 @@ function makeAxisLabelSprite(text, hexColor) {
     return sprite;
 }
 
-// Construit le repère XYZ du mini-viewport d'orientation (coin du viewer).
-// Convention couleurs standard Three.js/CAD : X = rouge, Y = vert, Z = bleu
-// (Z = axe "vertical d'impression" utilisé par le calcul de surplombs).
-// Chaque axe a un brin positif plein et étiqueté, et un brin négatif court
-// et discret pour donner un repère complet sans surcharger l'affichage.
 function buildAxisGizmo() {
     const group = new THREE.Group();
     const axisLength = 9.5;
@@ -3387,14 +3399,46 @@ function buildAxisGizmo() {
     return group;
 }
 
-// Calcule une couleur par sommet selon l'angle de surplomb de la normale
-// (axe Z = direction d'impression, comme dans les fichiers STL/3MF).
-// Bleu = surface sûre (verticale ou orientée vers le haut). Jaune -> rouge =
-// surface orientée vers le bas au-delà du seuil de surplomb imprimable,
-// rouge = quasi-horizontale vers le bas (support fortement conseillé).
-// Reproduit la même logique que l'aperçu "surplombs" des slicers (Cura,
-// PrusaSlicer), en pur calcul géométrique côté client — pas de simulation
-// de trajectoire, juste l'angle réel des faces du maillage.
+function _getViewerOrientationMatrix(key) {
+    if (key === 'default' || !key) return null;
+    switch (key) {
+        case 'flipZ': return new THREE.Matrix4().makeRotationX(Math.PI);
+        case 'posX': return new THREE.Matrix4().makeRotationY(Math.PI / 2);
+        case 'negX': return new THREE.Matrix4().makeRotationY(-Math.PI / 2);
+        case 'posY': return new THREE.Matrix4().makeRotationX(-Math.PI / 2);
+        case 'negY': return new THREE.Matrix4().makeRotationX(Math.PI / 2);
+        default: return null;
+    }
+}
+
+function setViewerOrientation(key) {
+    if (!viewerMesh) return;
+    const geometry = viewerMesh.geometry;
+    const orig = geometry.userData;
+    if (!orig.originalPosition || !orig.originalNormal) return;
+
+    const posAttr = geometry.getAttribute('position');
+    const normAttr = geometry.getAttribute('normal');
+    posAttr.array.set(orig.originalPosition);
+    normAttr.array.set(orig.originalNormal);
+    posAttr.needsUpdate = true;
+    normAttr.needsUpdate = true;
+
+    const matrix = _getViewerOrientationMatrix(key);
+    if (matrix) geometry.applyMatrix4(matrix);
+
+    const overhangColors = computeOverhangVertexColors(geometry);
+    if (overhangColors) {
+        geometry.setAttribute('color', overhangColors);
+        if (!viewerMesh.userData.overhangMaterial || viewerMesh.userData.overhangMaterial === viewerMesh.userData.shadedMaterial) {
+            viewerMesh.userData.overhangMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+        }
+        if (viewerOverhangMode) viewerMesh.material = viewerMesh.userData.overhangMaterial;
+    }
+    viewerCurrentOrientation = key;
+}
+window.setViewerOrientation = setViewerOrientation;
+
 function computeOverhangVertexColors(geometry, thresholdDeg = OVERHANG_THRESHOLD_DEG) {
     const normalAttr = geometry.getAttribute('normal');
     const posAttr = geometry.getAttribute('position');
@@ -3444,11 +3488,9 @@ function computeOverhangVertexColors(geometry, thresholdDeg = OVERHANG_THRESHOLD
 }
 
 function toggleOverhangView() {
-    viewerOverhangMode = !viewerOverhangMode;
     const btn = document.getElementById('viewer-overhang-toggle');
+    viewerOverhangMode = btn ? btn.checked : !viewerOverhangMode;
     const legend = document.getElementById('viewer-overhang-legend');
-    if (btn) btn.classList.toggle('active', viewerOverhangMode);
-    if (btn) btn.style.background = viewerOverhangMode ? 'var(--accent, #4ea1d3)' : 'rgba(0,0,0,0.6)';
     if (legend) legend.style.display = viewerOverhangMode ? 'block' : 'none';
     if (viewerMesh && viewerMesh.userData) {
         viewerMesh.material = viewerOverhangMode ? viewerMesh.userData.overhangMaterial : viewerMesh.userData.shadedMaterial;
@@ -3487,10 +3529,6 @@ viewerRenderer.setPixelRatio(window.devicePixelRatio);
 container.innerHTML = '';
 container.appendChild(viewerRenderer.domElement);
 
-    // Mini-viewport d'orientation : scène/caméra dédiées, indépendantes du
-    // modèle, rendues par-dessus dans un coin (voir la boucle animate plus
-    // bas). La caméra orthographique évite tout effet de perspective sur le
-    // petit repère, pour des proportions stables quel que soit le zoom.
     viewerGizmoScene = new THREE.Scene();
     viewerGizmoScene.add(buildAxisGizmo());
     viewerGizmoCamera = new THREE.OrthographicCamera(-15, 15, 15, -15, 0.1, 100);
@@ -3530,6 +3568,8 @@ container.appendChild(viewerRenderer.domElement);
         const center = new THREE.Vector3();
         geometry.boundingBox.getCenter(center);
         geometry.translate(-center.x, -center.y, -center.z);
+        geometry.userData.originalPosition = geometry.getAttribute('position').array.slice();
+        geometry.userData.originalNormal = geometry.getAttribute('normal').array.slice();
 
         const overhangColors = computeOverhangVertexColors(geometry);
         let overhangMaterial = shadedMaterial;
@@ -3545,8 +3585,7 @@ container.appendChild(viewerRenderer.domElement);
         const overhangBtn = document.getElementById('viewer-overhang-toggle');
         const overhangLegend = document.getElementById('viewer-overhang-legend');
         if (overhangBtn) {
-            overhangBtn.classList.toggle('active', viewerOverhangMode);
-            overhangBtn.style.background = viewerOverhangMode ? 'var(--accent, #4ea1d3)' : 'rgba(0,0,0,0.6)';
+            overhangBtn.checked = viewerOverhangMode;
         }
         if (overhangLegend) overhangLegend.style.display = viewerOverhangMode ? 'block' : 'none';
         const size = new THREE.Vector3();
@@ -3566,30 +3605,12 @@ container.appendChild(viewerRenderer.domElement);
             const width = container.clientWidth;
             const height = container.clientHeight;
 
-            // autoClear désactivé pour toute la frame : on effectue
-            // nous-mêmes UN SEUL vrai clear (couleur + profondeur) avant le
-            // rendu principal. La passe du gizmo, elle, ne fait ensuite
-            // qu'un clearDepth (pas de clear couleur) : les pixels déjà
-            // dessinés par le rendu principal dans ce coin restent visibles
-            // en dessous du repère, qui apparaît donc bien à fond
-            // transparent plutôt que sur un carré uni. Sans cette
-            // désactivation, render() réappliquerait un clear couleur
-            // automatique dans le rectangle scissor du gizmo, d'où le carré
-            // noir/uni observé auparavant.
             viewerRenderer.autoClear = false;
             viewerRenderer.setViewport(0, 0, width, height);
             viewerRenderer.setScissorTest(false);
             viewerRenderer.clear(true, true, true);
             viewerRenderer.render(viewerScene, viewerCamera);
 
-            // Repère XYZ dans le coin : on copie l'orientation (quaternion)
-            // de la caméra principale sur la caméra du gizmo, en la gardant
-            // à distance fixe de l'origine — comme ça le repère tourne
-            // exactement comme la vue, sans jamais être affecté par le zoom
-            // ou le pan appliqués au modèle. Rendu ensuite dans un petit
-            // rectangle (scissor) en haut à droite du canvas, par-dessus le
-            // rendu principal déjà effectué, sans effacer la couleur
-            // dessous (voir commentaire ci-dessus).
             if (viewerGizmoScene && viewerGizmoCamera) {
                 const gizmoSize = 132;
                 const margin = 16;
@@ -3682,6 +3703,7 @@ const selects = [
     document.getElementById('slicer-ai-printer-select'),
     document.getElementById('nesting-ai-printer-select'),
     document.getElementById('sosprint-printer-select'),
+    document.getElementById('settings-printer-power-select'),
 ];
 selects.forEach(sel => {
     if (!sel) return;
@@ -4446,33 +4468,192 @@ async function loadAutoScanSettings() {
     } catch (e) { console.warn('[AutoScan] Réglages indisponibles'); }
 }
 
+// ============================================
+// 🧵 TARIFS D'IMPRESSION — bobines multiples + imprimante de référence
+// ============================================
+let printCostSpools = [];
+let printCostDefaultSpoolId = null;
+let printCostCurrency = 'EUR';
+
+function formatCost(value) {
+    const amount = Number(value) || 0;
+    return printCostCurrency === 'USD' ? `$${amount.toFixed(2)}` : `${amount.toFixed(2)} €`;
+}
+window.formatCost = formatCost;
+
+function applyCurrencySymbols() {
+    const symbol = printCostCurrency === 'USD' ? '$' : '€';
+    document.querySelectorAll('.currency-symbol').forEach(el => { el.textContent = symbol; });
+}
+window.applyCurrencySymbols = applyCurrencySymbols;
+
+function _genSpoolId() {
+    return (crypto.randomUUID ? crypto.randomUUID() : 'spool_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+}
+
+function renderSpoolsList() {
+    const container = document.getElementById('settings-spools-list');
+    const countBadge = document.getElementById('settings-spools-count');
+    if (countBadge) countBadge.textContent = printCostSpools.length;
+    if (!container) return;
+    if (printCostSpools.length === 0) {
+        container.innerHTML = `<p class="settings-hint" style="margin:0;">${I18N.t('cost.spools_empty') || 'Aucune bobine — ajoute-en une.'}</p>`;
+        return;
+    }
+    container.innerHTML = printCostSpools.map(s => {
+        const isDefault = s.id === printCostDefaultSpoolId;
+        return `
+        <div class="settings-spool-row" data-spool-id="${s.id}" style="display:flex; align-items:center; gap:8px;">
+            <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 8px; color:${isDefault ? 'var(--accent)' : 'var(--text-muted)'};" onclick="setDefaultSpool('${s.id}')" title="${I18N.t('cost.spool_default_title') || 'Bobine par défaut'}">
+                <i class="fa-${isDefault ? 'solid' : 'regular'} fa-star"></i>
+            </button>
+            <input type="color" value="${escapeHtml(s.color || '#888888')}" title="${I18N.t('cost.spool_color_title') || 'Couleur de la bobine'}"
+                oninput="updateSpoolField('${s.id}', 'color', this.value)">
+            <input type="text" value="${escapeHtml(s.name || '')}" placeholder="${I18N.t('cost.spool_name_placeholder') || 'Nom (ex : PLA blanc)'}"
+                oninput="updateSpoolField('${s.id}', 'name', this.value)"
+                style="flex:1; min-width:0; padding:8px 10px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+            <input type="number" min="0" step="0.01" value="${s.price ?? ''}" placeholder="${I18N.t('cost.spool_price_placeholder') || 'Prix'} (${printCostCurrency === 'USD' ? '$' : '€'})"
+                oninput="updateSpoolField('${s.id}', 'price', this.value)"
+                style="width:90px; padding:8px 10px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+            <input type="number" min="1" step="1" value="${s.weight ?? ''}" placeholder="${I18N.t('cost.spool_weight_placeholder') || 'Poids (g)'}"
+                oninput="updateSpoolField('${s.id}', 'weight', this.value)"
+                style="width:90px; padding:8px 10px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+            <button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="removeSpoolRow('${s.id}')" title="${I18N.t('actions.delete') || 'Supprimer'}">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        </div>`;
+    }).join('');
+}
+
+function addSpoolRow() {
+    const id = _genSpoolId();
+    const spoolNumber = printCostSpools.length + 1;
+    printCostSpools.push({ id, name: `${I18N.t('cost.spool_default_name') || 'Bobine'} ${spoolNumber}`, price: 20, weight: 1000, color: '#888888' });
+    if (!printCostDefaultSpoolId) printCostDefaultSpoolId = id;
+    renderSpoolsList();
+}
+
+function removeSpoolRow(id) {
+    printCostSpools = printCostSpools.filter(s => s.id !== id);
+    if (printCostDefaultSpoolId === id) printCostDefaultSpoolId = printCostSpools[0]?.id || null;
+    renderSpoolsList();
+}
+
+function setDefaultSpool(id) {
+    printCostDefaultSpoolId = id;
+    renderSpoolsList();
+}
+
+function updateSpoolField(id, field, value) {
+    const spool = printCostSpools.find(s => s.id === id);
+    if (!spool) return;
+    spool[field] = (field === 'name' || field === 'color') ? value : parseFloat(value);
+}
+window.addSpoolRow = addSpoolRow;
+window.removeSpoolRow = removeSpoolRow;
+window.setDefaultSpool = setDefaultSpool;
+window.updateSpoolField = updateSpoolField;
+
+function onSettingsPrinterPowerSelectChange() {
+    const sel = document.getElementById('settings-printer-power-select');
+    const powerInput = document.getElementById('settings-printer-power');
+    if (!sel || !powerInput) return;
+    if (!sel.value) return;
+    const printer = (printersList || []).find(p => String(p.id) === sel.value);
+    if (printer) powerInput.value = printer.power_w ?? 120;
+}
+window.onSettingsPrinterPowerSelectChange = onSettingsPrinterPowerSelectChange;
+
 async function loadPrintCostSettings() {
     try {
         const res = await fetch(`${API}/api/settings`);
         if (!res.ok) return;
         const data = await res.json();
-        const spoolPrice = document.getElementById('settings-spool-price');
-        const spoolWeight = document.getElementById('settings-spool-weight');
+
+        if (Array.isArray(data.print_cost_spools) && data.print_cost_spools.length > 0) {
+            printCostSpools = data.print_cost_spools.map(s => ({
+                id: s.id || _genSpoolId(),
+                name: s.name || (I18N.t('cost.spool_default_name') || 'Bobine'),
+                price: Number(s.price) || 0,
+                weight: Number(s.weight) || 0,
+                color: s.color || '#888888',
+            }));
+        } else if (data.print_cost_spool_price != null || data.print_cost_spool_weight != null) {
+            // Legacy single-spool format from before multi-spool support — migrate it once.
+            printCostSpools = [{
+                id: _genSpoolId(),
+                name: I18N.t('cost.spool_default_name') || 'Bobine 1',
+                price: data.print_cost_spool_price ?? 20,
+                weight: data.print_cost_spool_weight ?? 1000,
+                color: '#888888',
+            }];
+        } else {
+            // Fresh install / no spool data yet — start empty until the user adds one.
+            printCostSpools = [];
+        }
+        printCostDefaultSpoolId = (data.print_cost_default_spool_id && printCostSpools.some(s => s.id === data.print_cost_default_spool_id))
+            ? data.print_cost_default_spool_id
+            : (printCostSpools[0]?.id || null);
+        renderSpoolsList();
+
+        printCostCurrency = data.print_cost_currency === 'USD' ? 'USD' : 'EUR';
+        const currencySelect = document.getElementById('settings-currency-select');
+        if (currencySelect) currencySelect.value = printCostCurrency;
+        applyCurrencySymbols();
+
         const elecPrice = document.getElementById('settings-elec-price');
         const printerPower = document.getElementById('settings-printer-power');
-        if (spoolPrice) spoolPrice.value = data.print_cost_spool_price ?? 20;
-        if (spoolWeight) spoolWeight.value = data.print_cost_spool_weight ?? 1000;
         if (elecPrice) elecPrice.value = data.print_cost_elec_price ?? '';
         if (printerPower) printerPower.value = data.print_cost_printer_power ?? 120;
+
+        const printerSel = document.getElementById('settings-printer-power-select');
+        if (printerSel) {
+            _populatePrinterSelects();
+            printerSel.value = (data.print_cost_printer_id != null && [...printerSel.options].some(o => o.value == data.print_cost_printer_id))
+                ? String(data.print_cost_printer_id)
+                : '';
+        }
     } catch (e) { console.warn('[PrintCost] Réglages indisponibles'); }
 }
 
 async function savePrintCostSettings() {
-    const spoolPrice = parseFloat(document.getElementById('settings-spool-price')?.value);
-    const spoolWeight = parseFloat(document.getElementById('settings-spool-weight')?.value);
     const elecPriceRaw = document.getElementById('settings-elec-price')?.value;
     const printerPower = parseFloat(document.getElementById('settings-printer-power')?.value);
-    const payload = {};
-    if (Number.isFinite(spoolPrice)) payload.print_cost_spool_price = spoolPrice;
-    if (Number.isFinite(spoolWeight)) payload.print_cost_spool_weight = spoolWeight;
-    payload.print_cost_elec_price = (elecPriceRaw === '' || elecPriceRaw == null) ? '' : parseFloat(elecPriceRaw);
+    const printerSel = document.getElementById('settings-printer-power-select');
+    const selectedPrinterId = printerSel && printerSel.value ? printerSel.value : null;
+
+    const cleanSpools = printCostSpools
+        .map(s => ({ id: s.id, name: (s.name || '').trim() || (I18N.t('cost.spool_default_name') || 'Bobine'), price: Number(s.price) || 0, weight: Number(s.weight) || 0, color: s.color || '#888888' }))
+        .filter(s => s.price > 0 && s.weight > 0);
+
+    if (printCostSpools.length > 0 && cleanSpools.length === 0) {
+        showToast(I18N.t('cost.spools_invalid') || 'Renseigne au moins une bobine valide (prix et poids > 0)', 'error');
+        return;
+    }
+
+    const defaultId = cleanSpools.some(s => s.id === printCostDefaultSpoolId) ? printCostDefaultSpoolId : (cleanSpools[0]?.id || null);
+
+    const currencySelect = document.getElementById('settings-currency-select');
+    const currency = currencySelect && currencySelect.value === 'USD' ? 'USD' : 'EUR';
+
+    const payload = {
+        print_cost_spools: cleanSpools,
+        print_cost_default_spool_id: defaultId,
+        print_cost_currency: currency,
+        print_cost_elec_price: (elecPriceRaw === '' || elecPriceRaw == null) ? '' : parseFloat(elecPriceRaw),
+        print_cost_printer_id: selectedPrinterId,
+    };
     if (Number.isFinite(printerPower)) payload.print_cost_printer_power = printerPower;
+
     try {
+        if (selectedPrinterId && Number.isFinite(printerPower)) {
+            await fetch(`${API}/api/printers/${selectedPrinterId}/power`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ power_w: printerPower })
+            }).catch(() => {});
+        }
+
         const res = await fetch(`${API}/api/settings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -4480,6 +4661,12 @@ async function savePrintCostSettings() {
         });
         if (res.ok) {
             showToast(I18N.t('toast.settings_saved') || 'Réglages enregistrés', 'success');
+            printCostSpools = cleanSpools;
+            printCostDefaultSpoolId = defaultId;
+            printCostCurrency = currency;
+            renderSpoolsList();
+            applyCurrencySymbols();
+            if (selectedPrinterId) loadPrinters(); // rafraîchit printersList avec la puissance à jour
         } else {
             showToast(I18N.t('toast.save_error') || 'Erreur', 'error');
         }
@@ -5129,12 +5316,17 @@ window.renderSpoolmanGrid = renderSpoolmanGrid;
 function updateAccountBadge(platform, connected) {
 const badge = document.getElementById(`${platform}-status-badge`);
 if (!badge) return;
+// On met aussi à jour data-i18n (pas seulement le texte) : sans ça, le
+// moindre I18N.apply() ultérieur (changement de page, de langue, etc.)
+// réécrase le badge avec le texte par défaut codé en dur dans le HTML,
+// même si l'état réel (connecté/non connecté) est correct.
+const key = connected ? 'settings.account_configured' : 'settings.account_not_configured';
+badge.setAttribute('data-i18n', key);
+badge.textContent = I18N.t(key);
 if (connected) {
-badge.textContent = I18N.t('settings.account_configured');
 badge.classList.remove('disconnected');
 badge.classList.add('connected');
 } else {
-badge.textContent = I18N.t('settings.account_not_configured');
 badge.classList.add('disconnected');
 badge.classList.remove('connected');
 }
@@ -5734,6 +5926,7 @@ document.getElementById('select-all-btn')?.addEventListener('click', () => toggl
 document.getElementById('select-toggle-all')?.addEventListener('click', () => selectAllFiles());
 document.getElementById('send-selected-to-slicer-btn')?.addEventListener('click', () => sendSelectedToSlicer());
 document.getElementById('nesting-btn')?.addEventListener('click', () => openNestingModal());
+document.getElementById('add-selected-to-project-btn')?.addEventListener('click', () => openSelectionProjectModal());
 document.getElementById('slicer-profile-file-input')?.addEventListener('change', (e) => {
     importSlicerProfiles(e.target.files);
     e.target.value = '';
@@ -6191,7 +6384,7 @@ document.getElementById('confirm-slicer')?.addEventListener('click', async () =>
     const consumeSpool = document.getElementById('slicer-spool-box')?.style.display !== 'none'
         && document.getElementById('slicer-consume-spool-checkbox')?.checked;
     try {
-        const body = { file_path: currentSlicerFile, consume_spool: !!consumeSpool };
+        const body = { file_path: currentSlicerFile, consume_spool: !!consumeSpool, orientation: currentSlicerOrientation || 'default' };
         if (_lastAiRecommendedProfile && _lastAiRecommendedProfile.id) {
             body.slicer_profile_id = _lastAiRecommendedProfile.id;
             body.slicer_profile_name = _lastAiRecommendedProfile.name;
@@ -6200,7 +6393,12 @@ document.getElementById('confirm-slicer')?.addEventListener('click', async () =>
         const data = await res.json();
         showToast(res.ok ? I18N.t('toast.files_sent') : data.error, res.ok ? 'success' : 'error');
     } catch (err) { showToast(I18N.t('toast.send_error'), 'error'); }
+    currentSlicerOrientation = 'default';
     closeModal('modal-slicer');
+    if (_slicerLaunchedFromViewer) {
+        _slicerLaunchedFromViewer = false;
+        close3DViewer();
+    }
 });
 
 document.querySelectorAll('.modal').forEach(modal => {
@@ -7075,6 +7273,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ═══════════════════════════════════════════════════════════════
 
 window.addPrinter = async function() {
+    const editId = document.getElementById('printer-edit-id')?.value.trim() || '';
     const name = document.getElementById('printer-name').value.trim();
     const type = document.getElementById('printer-type').value;
     const ip = document.getElementById('printer-ip').value.trim();
@@ -7082,6 +7281,9 @@ window.addPrinter = async function() {
     const port = document.getElementById('printer-port').value.trim();
     const bambuCode = document.getElementById('printer-bambu-code').value.trim();
     const bambuSerial = document.getElementById('printer-bambu-serial')?.value.trim() || '';
+    const elegooCc2Code = document.getElementById('printer-elegoo-cc2-code')?.value.trim() || '';
+    const flashforgeSerial = document.getElementById('printer-flashforge-serial')?.value.trim() || '';
+    const flashforgeCode = document.getElementById('printer-flashforge-code')?.value.trim() || '';
 
     if (!name || !ip || !type) {
         showToast(I18N.t('toast.fill_required') || 'Champs requis manquants', 'warning');
@@ -7095,37 +7297,93 @@ window.addPrinter = async function() {
         config.serial = bambuSerial;
         config.user = 'bblp';
     }
+    if (type === 'elegoo_cc2') {
+        config.code = elegooCc2Code || '123456';
+    }
+    if (type === 'flashforge') {
+        config.serial = flashforgeSerial;
+        config.code = flashforgeCode;
+    }
 
-    const btn = document.querySelector('#modal-add-printer .btn-primary');
+    const isEdit = !!editId;
+    const btn = document.getElementById('add-printer-submit-btn');
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${I18N.t('printers.adding')}`;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${I18N.t(isEdit ? 'printers.saving' : 'printers.adding') || '...'}`;
     }
 
     try {
-        const res = await fetch(`${API}/api/printers`, {
-            method: 'POST',
+        const res = await fetch(`${API}/api/printers${isEdit ? '/' + editId : ''}`, {
+            method: isEdit ? 'PUT' : 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, type, ip, api_key: apiKey || null, config })
+            // Clé API laissée vide en édition = on ne touche pas à celle déjà enregistrée.
+            body: JSON.stringify({ name, type, ip, api_key: apiKey || (isEdit ? undefined : null), config })
         });
         const data = await res.json();
         if (res.ok) {
             showToast(`✅ ${data.message}`, 'success');
             closeModal('modal-add-printer');
             document.getElementById('add-printer-form').reset();
+            document.getElementById('printer-edit-id').value = '';
             loadPrinters();
         } else {
             showToast(`❌ ${data.error || I18N.t('toast.printer_add_error')}`, 'error');
         }
     } catch (err) {
-        console.error('[Add Printer]', err);
+        console.error('[Add/Edit Printer]', err);
         showToast(I18N.t('toast.connection_error'), 'error');
     } finally {
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = `<i class="fa-solid fa-plus"></i> ${I18N.t('printers.add')}`;
+            btn.innerHTML = isEdit
+                ? `<i class="fa-solid fa-check"></i> ${I18N.t('printers.save') || 'Enregistrer'}`
+                : `<i class="fa-solid fa-plus"></i> ${I18N.t('printers.add')}`;
         }
     }
+};
+
+// Ouvre la modale d'ajout d'imprimante en mode édition, pré-remplie avec les
+// valeurs actuelles (nom, IP, type, config spécifique au constructeur...).
+window.editPrinter = function(pid) {
+    const p = printersList.find(pr => pr.id === pid);
+    if (!p) return;
+
+    document.getElementById('add-printer-form').reset();
+    document.getElementById('printer-edit-id').value = pid;
+    document.getElementById('printer-name').value = p.name || '';
+    document.getElementById('printer-type').value = p.type || '';
+    document.getElementById('printer-ip').value = p.ip || '';
+    document.getElementById('printer-brand').value = '';
+
+    const cfg = (p.config && typeof p.config === 'object') ? p.config : {};
+    // La clé API générique (OctoPrint/PrusaLink/Klipper) est masquée côté serveur ;
+    // on laisse le champ vide et le backend conserve l'ancienne si rien n'est saisi.
+    const apiKeyField = document.getElementById('printer-api-key');
+    if (apiKeyField) {
+        apiKeyField.value = '';
+        apiKeyField.placeholder = I18N.t('printers.keep_current_key') || 'Laisser vide pour conserver la clé actuelle';
+    }
+    const portField = document.getElementById('printer-port');
+    if (portField) portField.value = cfg.port || PRINTER_DEFAULT_PORTS?.[p.type] || '7125';
+    const bambuCodeField = document.getElementById('printer-bambu-code');
+    if (bambuCodeField) bambuCodeField.value = cfg.code || '';
+    const bambuSerialField = document.getElementById('printer-bambu-serial');
+    if (bambuSerialField) bambuSerialField.value = cfg.serial || '';
+    const elegooCc2CodeField = document.getElementById('printer-elegoo-cc2-code');
+    if (elegooCc2CodeField) elegooCc2CodeField.value = cfg.code || '';
+    const flashforgeSerialField = document.getElementById('printer-flashforge-serial');
+    if (flashforgeSerialField) flashforgeSerialField.value = cfg.serial || '';
+    const flashforgeCodeField = document.getElementById('printer-flashforge-code');
+    if (flashforgeCodeField) flashforgeCodeField.value = cfg.code || '';
+
+    togglePrinterFields();
+
+    const title = document.getElementById('add-printer-modal-title');
+    if (title) title.textContent = I18N.t('printers.edit') || 'Modifier l\'imprimante';
+    const submitBtn = document.getElementById('add-printer-submit-btn');
+    if (submitBtn) submitBtn.innerHTML = `<i class="fa-solid fa-check"></i> ${I18N.t('printers.save') || 'Enregistrer'}`;
+
+    openModal('modal-add-printer');
 };
 
 // ============================================
@@ -7148,9 +7406,9 @@ window.loadStats = async function () {
         document.getElementById('stat-total-prints').textContent = data.total_prints.toLocaleString();
 
         const totalCostEl = document.getElementById('stat-total-cost');
-        if (totalCostEl) totalCostEl.textContent = (data.total_spent || 0).toFixed(2) + ' €';
+        if (totalCostEl) totalCostEl.textContent = formatCost(data.total_spent || 0);
         const avgCostEl = document.getElementById('stat-avg-cost');
-        if (avgCostEl) avgCostEl.textContent = data.avg_cost_per_print != null ? data.avg_cost_per_print.toFixed(2) + ' €' : '—';
+        if (avgCostEl) avgCostEl.textContent = data.avg_cost_per_print != null ? formatCost(data.avg_cost_per_print) : '—';
 
         const fmtEl = document.getElementById('stat-formats');
         const fmtColors = { '.stl':'#63b3ed', '.3mf':'#68d391', '.obj':'#f6ad55', '.zip':'#fc8181', '.rar':'#b794f4' };
@@ -7259,7 +7517,7 @@ function _getRatingReasonLabels() {
 function _renderHistoryCostBadge(entry) {
     if (entry.total_cost != null) {
         return `<span onclick="toggleCostEditor(${entry.id})" style="cursor:pointer;" title="${I18N.t('cost.click_to_edit') || 'Cliquer pour modifier'}">
-            <i class="fa-solid fa-coins"></i> ${Number(entry.total_cost).toFixed(2)} €
+            <i class="fa-solid fa-coins"></i> ${formatCost(entry.total_cost)}
         </span>`;
     }
     return `<span onclick="toggleCostEditor(${entry.id})" style="cursor:pointer; color:var(--text-muted);" title="${I18N.t('cost.click_to_add') || 'Renseigner le coût'}">
@@ -7662,7 +7920,7 @@ function renderPrinters() {
             <div class="printer-header">
                 <i class="mdi ${getPrinterIcon(p.type)}" style="font-size:22px;"></i>
                 <span class="printer-name">${escapeHtml(p.name)}</span>
-                <span class="printer-status ${p.is_connected ? 'connected' : 'disconnected'}">${p.is_connected ? I18N.t('printers.online') : I18N.t('printers.offline')}</span>
+                <span id="printer-status-${p.id}" class="printer-status ${p.is_connected ? 'connected' : 'disconnected'}">${p.is_connected ? I18N.t('printers.online') : I18N.t('printers.offline')}</span>
             </div>
             <div class="printer-body">
                 <p style="font-size: 12px; color: var(--text-muted); margin-bottom:6px;">${p.ip}</p>
@@ -7685,6 +7943,7 @@ function renderPrinters() {
                     <span id="maintenance-badge-${p.id}" style="display:none; position:absolute; top:2px; right:2px; width:7px; height:7px; border-radius:50%; background:var(--danger);"></span>
                 </button>
                 <button class="btn btn-ghost btn-sm" onclick="refreshPrinterStatus(${p.id})" title="${I18N.t('actions.refresh')}"><i class="fa-solid fa-rotate"></i></button>
+                <button class="btn btn-ghost btn-sm" onclick="editPrinter(${p.id})" title="${I18N.t('actions.edit') || 'Modifier'}"><i class="fa-solid fa-pen"></i></button>
                 <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deletePrinter(${p.id})" title="${I18N.t('actions.delete')}"><i class="fa-solid fa-trash"></i></button>
             </div>
         </div>
@@ -7717,9 +7976,21 @@ async function refreshAllPrinters() {
                 const cardProg = document.getElementById(`card-progress-${p.id}`);
                 const cardExt = document.getElementById(`card-ext-${p.id}`);
                 const cardBed = document.getElementById(`card-bed-${p.id}`);
+                const statusBadge = document.getElementById(`printer-status-${p.id}`);
 
                 if (progressBar) progressBar.style.width = `${data.progress || 0}%`;
                 if (cardProg) cardProg.textContent = `${Math.round(data.progress || 0)}%`;
+
+                if (statusBadge) {
+                    // Même règle que le backend (api_printer_status) : en ligne tant que
+                    // le statut n'est pas error/offline/timeout, pour éviter que le badge
+                    // de la carte reste figé sur une ancienne valeur pendant que la modale
+                    // affiche déjà l'état à jour.
+                    const isOnline = !['error', 'offline', 'timeout'].includes(data.status);
+                    statusBadge.className = `printer-status ${isOnline ? 'connected' : 'disconnected'}`;
+                    statusBadge.textContent = isOnline ? I18N.t('printers.online') : I18N.t('printers.offline');
+                    p.is_connected = isOnline;
+                }
 
                 if (cardStatus) {
                     const statusMap = {
@@ -8352,7 +8623,7 @@ async function loadPrinterCamera(pid) {
         container.style.display = 'block';
         const streamUrl = camData.stream_url || '';
         const snapshotUrl = camData.snapshot_url || '';
-        if (streamUrl && streamUrl.includes('action=stream')) {
+        if (streamUrl) {
             content.innerHTML = `<img src="${streamUrl}" alt="${camData.name || I18N.t('printers.camera')}" style="width:100%; height:auto; max-height:400px; object-fit:contain; display:block;" onerror="this.parentElement.innerHTML='<div style=\\'color:var(--danger);padding:20px;text-align:center;\\'>❌ ${I18N.t('printers.stream_unavailable')}</div>'">`;
         } else if (snapshotUrl) {
             const refreshSnapshot = () => {
@@ -8414,6 +8685,13 @@ function deletePrinter(pid) {
 
 window.openAddPrinterModal = function() {
     document.getElementById('add-printer-form').reset();
+    document.getElementById('printer-edit-id').value = '';
+    const title = document.getElementById('add-printer-modal-title');
+    if (title) title.textContent = I18N.t('printers.add') || 'Ajouter une imprimante';
+    const submitBtn = document.getElementById('add-printer-submit-btn');
+    if (submitBtn) submitBtn.innerHTML = `<i class="fa-solid fa-plus"></i> ${I18N.t('printers.add') || 'Ajouter'}`;
+    const apiKeyField = document.getElementById('printer-api-key');
+    if (apiKeyField) apiKeyField.placeholder = I18N.t('printers.octoprint_key_ph') || 'Clé API OctoPrint';
     togglePrinterFields();
     openModal('modal-add-printer');
 }
@@ -8426,6 +8704,10 @@ window.togglePrinterFields = function() {
     document.getElementById('group-octoprint-hint').style.display = type === 'octoprint' ? 'block' : 'none';
     document.getElementById('group-klipper-hint').style.display = type === 'klipper' ? 'block' : 'none';
     document.getElementById('group-prusalink-hint').style.display = type === 'prusalink' ? 'block' : 'none';
+    document.getElementById('group-elegoo-sdcp-hint').style.display = type === 'elegoo_sdcp' ? 'block' : 'none';
+    document.getElementById('group-elegoo-cc2').style.display = type === 'elegoo_cc2' ? 'block' : 'none';
+    document.getElementById('group-creality-hint').style.display = type === 'creality' ? 'block' : 'none';
+    document.getElementById('group-flashforge').style.display = type === 'flashforge' ? 'block' : 'none';
     const apiKeyLabel = document.getElementById('printer-api-key');
     if (apiKeyLabel) {
         apiKeyLabel.placeholder = type === 'prusalink'
@@ -9309,23 +9591,41 @@ startThumbAutoRefresh();
 
     function _costSaveSettings() {
         clearTimeout(_costSaveTimer);
-        _costSaveTimer = setTimeout(() => {
+        _costSaveTimer = setTimeout(async () => {
             const material = document.getElementById('cost-material-select')?.value;
-            const spoolPrice = document.getElementById('cost-spool-price')?.value;
-            const spoolWeight = document.getElementById('cost-spool-weight')?.value;
+            const spoolId = document.getElementById('cost-spool-select')?.value;
+            const spoolPrice = parseFloat(document.getElementById('cost-spool-price')?.value);
+            const spoolWeight = parseFloat(document.getElementById('cost-spool-weight')?.value);
             const elecPrice = document.getElementById('cost-elec-price')?.value;
             const printerPower = document.getElementById('cost-printer-power')?.value;
-            fetch(`${API}/api/settings`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    print_cost_material: material,
-                    print_cost_spool_price: spoolPrice,
-                    print_cost_spool_weight: spoolWeight,
-                    print_cost_elec_price: elecPrice,
-                    print_cost_printer_power: printerPower
-                })
-            }).catch(() => {});
+
+            try {
+                const res = await fetch(`${API}/api/settings`);
+                const settings = res.ok ? await res.json() : {};
+                let spools = Array.isArray(settings.print_cost_spools) ? settings.print_cost_spools.slice() : [];
+                if (spools.length === 0) {
+                    spools = [{
+                        id: (spoolId && spoolId !== '__legacy') ? spoolId : (crypto.randomUUID ? crypto.randomUUID() : 'spool_' + Date.now()),
+                        name: I18N.t('cost.spool_default_name') || 'Bobine',
+                        price: Number.isFinite(spoolPrice) ? spoolPrice : 20,
+                        weight: Number.isFinite(spoolWeight) ? spoolWeight : 1000,
+                    }];
+                } else if (spoolId && spoolId !== '__legacy') {
+                    spools = spools.map(s => s.id === spoolId
+                        ? { ...s, price: Number.isFinite(spoolPrice) ? spoolPrice : s.price, weight: Number.isFinite(spoolWeight) ? spoolWeight : s.weight }
+                        : s);
+                }
+                await fetch(`${API}/api/settings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        print_cost_material: material,
+                        print_cost_spools: spools,
+                        print_cost_elec_price: elecPrice,
+                        print_cost_printer_power: printerPower
+                    })
+                });
+            } catch (_) { /* best-effort */ }
         }, 600);
     }
 
@@ -9375,16 +9675,16 @@ startThumbAutoRefresh();
                 <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
                 <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
                     <span><i class="fa-solid fa-spool" style="width:16px;"></i> ${I18N.t('cost.material_cost_label')}</span>
-                    <strong style="color:var(--text-primary);">${materialCost.toFixed(2)} €</strong>
+                    <strong style="color:var(--text-primary);">${formatCost(materialCost)}</strong>
                 </div>
                 <div style="display:flex; justify-content:space-between; font-size:13px; color:${hasElec ? 'var(--text-secondary)' : 'var(--text-muted)'};">
                     <span><i class="fa-solid fa-bolt" style="width:16px;"></i> ${I18N.t('cost.electricity_cost_label')}</span>
-                    <strong style="color:${hasElec ? 'var(--text-primary)' : 'var(--text-muted)'};">${hasElec ? elecCost.toFixed(2) + ' €' : I18N.t('printers.no_value_set')}</strong>
+                    <strong style="color:${hasElec ? 'var(--text-primary)' : 'var(--text-muted)'};">${hasElec ? formatCost(elecCost) : I18N.t('printers.no_value_set')}</strong>
                 </div>
                 <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:15px;">
                     <span style="color:var(--text-primary); font-weight:600;">${I18N.t('cost.total_estimated_label')}</span>
-                    <strong style="color:var(--accent); font-size:18px;">${total.toFixed(2)} €</strong>
+                    <strong style="color:var(--accent); font-size:18px;">${formatCost(total)}</strong>
                 </div>
 				<div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
 					<span>${I18N.t('cost.slicer_estimate_note')}</span>
@@ -9957,6 +10257,18 @@ startThumbAutoRefresh();
         }
     };
 
+function _applyCostSpoolSelection(spoolId) {
+    const sel = document.getElementById('cost-spool-select');
+    const priceInput = document.getElementById('cost-spool-price');
+    const weightInput = document.getElementById('cost-spool-weight');
+    if (!sel || !priceInput || !weightInput) return;
+    const opt = [...sel.options].find(o => o.value === spoolId);
+    if (!opt) return;
+    priceInput.value = opt.dataset.price;
+    weightInput.value = opt.dataset.weight;
+}
+window._applyCostSpoolSelection = _applyCostSpoolSelection;
+
     window.openPrintCostModal = async function (filePath, fileName) {
         let modal = document.getElementById('modal-print-cost');
         if (!modal) {
@@ -10006,10 +10318,13 @@ startThumbAutoRefresh();
             _costMetadata = data.metadata;
 
             const material = settings.print_cost_material || 'pla';
-            const spoolPrice = settings.print_cost_spool_price ?? 20;
-            const spoolWeight = settings.print_cost_spool_weight ?? 1000;
+            const settingsSpools = Array.isArray(settings.print_cost_spools) ? settings.print_cost_spools : [];
+            const defaultSpool = settingsSpools.find(s => s.id === settings.print_cost_default_spool_id) || settingsSpools[0] || null;
+            const spoolPrice = defaultSpool ? (defaultSpool.price ?? 20) : (settings.print_cost_spool_price ?? 20);
+            const spoolWeight = defaultSpool ? (defaultSpool.weight ?? 1000) : (settings.print_cost_spool_weight ?? 1000);
             const elecPrice = settings.print_cost_elec_price ?? '';
             const printerPower = settings.print_cost_printer_power ?? 120;
+            const spoolOptions = settingsSpools.length > 0 ? settingsSpools : [{ id: '__legacy', name: I18N.t('cost.spool_default_name') || 'Bobine', price: spoolPrice, weight: spoolWeight }];
             const materials = ['pla', 'petg', 'abs', 'tpu', 'nylon'];
             const fieldStyle = 'width:100%; padding:8px 10px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary);';
             const labelStyle = 'display:block; font-size:12px; color:var(--text-secondary); margin-bottom:4px;';
@@ -10025,9 +10340,15 @@ startThumbAutoRefresh();
                             ${materials.map(m => `<option value="${m}" ${m === material ? 'selected' : ''}>${m.toUpperCase()}</option>`).join('')}
                         </select>
                     </div>
+                    <div>
+                        <label style="${labelStyle}">${I18N.t('cost.spool_select_label') || 'Bobine'}</label>
+                        <select id="cost-spool-select" style="${fieldStyle}" onchange="_applyCostSpoolSelection(this.value)">
+                            ${spoolOptions.map(s => `<option value="${escapeHtml(String(s.id))}" data-price="${s.price}" data-weight="${s.weight}" ${s.id === (defaultSpool?.id) ? 'selected' : ''}>${escapeHtml(s.name || (I18N.t('cost.spool_default_name') || 'Bobine'))}</option>`).join('')}
+                        </select>
+                    </div>
                     <div style="display:flex; gap:10px;">
                         <div style="flex:1;">
-                            <label style="${labelStyle}">${I18N.t('cost.spool_price_label')}</label>
+                            <label style="${labelStyle}">${I18N.t('cost.spool_price_label')} (<span class="currency-symbol">${printCostCurrency === 'USD' ? '$' : '€'}</span>)</label>
                             <input type="number" id="cost-spool-price" min="0" step="0.01" value="${spoolPrice}" style="${fieldStyle}">
                         </div>
                         <div style="flex:1;">
@@ -10037,7 +10358,7 @@ startThumbAutoRefresh();
                     </div>
                     <div style="display:flex; gap:10px;">
                         <div style="flex:1;">
-                            <label style="${labelStyle}">${I18N.t('cost.elec_price_label')} <span style="color:var(--text-muted);">${I18N.t('cost.optional_suffix')}</span></label>
+                            <label style="${labelStyle}">${I18N.t('cost.elec_price_label')} (<span class="currency-symbol">${printCostCurrency === 'USD' ? '$' : '€'}</span>/kWh) <span style="color:var(--text-muted);">${I18N.t('cost.optional_suffix')}</span></label>
                             <input type="number" id="cost-elec-price" min="0" step="0.001" value="${elecPrice}" placeholder="ex: 0.2062" style="${fieldStyle}">
                         </div>
                         <div style="flex:1;">
@@ -10129,6 +10450,10 @@ function renderProjectCard(p) {
             <div class="project-card-header">
                 <span class="project-card-color" style="background:${p.color || '#4ea1d3'}"></span>
                 <h4 title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</h4>
+                <div class="project-card-actions">
+                    <button type="button" class="dv-btn" onclick="event.stopPropagation(); openProjectFormModal(${p.id})" title="${I18N.t('actions.rename')}"><i class="fa-solid fa-pencil"></i></button>
+                    <button type="button" class="dv-btn" onclick="event.stopPropagation(); deleteProjectConfirm(${p.id}, '${escapeJs(p.name)}')" title="${I18N.t('modal.delete_file')}" style="color:var(--danger)"><i class="fa-solid fa-trash"></i></button>
+                </div>
             </div>
             ${p.description ? `<p class="project-card-desc">${escapeHtml(p.description)}</p>` : ''}
             <div class="project-progress-bar"><div class="project-progress-fill" style="width:${progress}%; background:${p.color || '#4ea1d3'}"></div></div>
@@ -10137,10 +10462,6 @@ function renderProjectCard(p) {
                 <span>${p.total_printed}/${p.total_needed} ${I18N.t('projects.printed')}</span>
                 <span class="project-status-badge project-status-badge--${p.status}">${statusLabel}</span>
             </div>
-        </div>
-        <div class="project-card-actions">
-            <button type="button" class="dv-btn" onclick="event.stopPropagation(); openProjectFormModal(${p.id})" title="${I18N.t('actions.rename')}"><i class="fa-solid fa-pencil"></i></button>
-            <button type="button" class="dv-btn" onclick="event.stopPropagation(); deleteProjectConfirm(${p.id}, '${escapeJs(p.name)}')" title="${I18N.t('modal.delete_file')}" style="color:var(--danger)"><i class="fa-solid fa-trash"></i></button>
         </div>
     </div>`;
 }
@@ -10183,6 +10504,7 @@ window.openProjectFormModal = function (projectId = null) {
     document.getElementById('project-form-description').value = p?.description || '';
     document.getElementById('project-form-color').value = p?.color || '#4ea1d3';
     modal.dataset.editId = projectId || '';
+    delete modal.dataset.attachSelection;
     openModal('modal-project-form');
     setTimeout(() => document.getElementById('project-form-name')?.focus(), 100);
 };
@@ -10194,18 +10516,26 @@ window.saveProjectForm = async function () {
     const color = document.getElementById('project-form-color')?.value || '#4ea1d3';
     if (!name) { showToast(I18N.t('projects.name_required'), 'warning'); return; }
     const editId = modal?.dataset.editId;
+    const attachSelection = !editId && modal?.dataset.attachSelection === '1';
+    const payload = { name, description, color };
+    if (attachSelection) payload.files = [...selectedFiles].map(path => ({ path, quantity: 1 }));
     try {
         const url = editId ? `${API}/api/projects/${editId}` : `${API}/api/projects`;
         const method = editId ? 'PUT' : 'POST';
         const res = await fetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, description, color })
+            body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (!res.ok) { showToast(data.error || I18N.t('toast.error'), 'error'); return; }
         showToast(editId ? I18N.t('toast.updated') : I18N.t('projects.created'), 'success');
         closeModal('modal-project-form');
+        delete modal.dataset.attachSelection;
+        if (attachSelection) {
+            selectedFiles.clear();
+            toggleSelectionMode();
+        }
         await loadProjects();
         if (editId && _currentProjectDetailId === parseInt(editId)) openProjectDetailModal(parseInt(editId));
     } catch (err) {
@@ -10447,6 +10777,96 @@ window.confirmAddFilesToProject = async function (projectId) {
         console.error('[Projects] confirmAddFilesToProject', err);
     }
 };
+
+// ============================================
+// 📂 SÉLECTION MULTIPLE → PROJET (nouveau ou existant)
+// ============================================
+window.openSelectionProjectModal = function () {
+    if (selectedFiles.size === 0) {
+        showToast(I18N.t('toast.no_selection'), 'warning');
+        return;
+    }
+    let modal = document.getElementById('modal-selection-project');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-selection-project';
+        modal.className = 'modal hidden';
+        modal.innerHTML = `<div class="modal-content small">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-diagram-project"></i> <span id="selection-project-title">${I18N.t('projects.add_to_project')}</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-selection-project')">×</button>
+            </div>
+            <div class="modal-body" id="selection-project-body"></div>
+        </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-selection-project'); });
+    }
+    const count = selectedFiles.size;
+    document.getElementById('selection-project-title').textContent = I18N.tp('common.file_count', count, { count });
+    document.getElementById('selection-project-body').innerHTML = `
+        <button class="btn btn-primary" style="width:100%; margin-bottom:10px; justify-content:flex-start; gap:10px;" onclick="selectionOpenNewProject()">
+            <i class="fa-solid fa-plus"></i> ${I18N.t('projects.create_with_selection') || 'Créer un nouveau projet avec ces fichiers'}
+        </button>
+        <button class="btn btn-sm" style="width:100%; justify-content:flex-start; gap:10px;" onclick="selectionOpenExistingProjectList()">
+            <i class="fa-solid fa-list"></i> ${I18N.t('projects.send_to_existing') || 'Envoyer vers un projet existant'}
+        </button>
+    `;
+    openModal('modal-selection-project');
+};
+
+window.selectionOpenNewProject = function () {
+    closeModal('modal-selection-project');
+    openProjectFormModal();
+    const formModal = document.getElementById('modal-project-form');
+    if (formModal) formModal.dataset.attachSelection = '1';
+};
+
+window.selectionOpenExistingProjectList = async function () {
+    const body = document.getElementById('selection-project-body');
+    body.innerHTML = `<p style="color:var(--text-muted); font-size:13px; padding:10px 0;">${I18N.t('common.loading') || 'Chargement...'}</p>`;
+    await loadProjects();
+    const listHtml = allProjects.length
+        ? allProjects.map(p => `
+            <label class="checkbox-label" style="display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid var(--border);">
+                <input type="checkbox" value="${p.id}" class="selection-project-checkbox">
+                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};"></span>
+                <span style="flex:1;">${escapeHtml(p.name)}</span>
+                <span style="color:var(--text-muted); font-size:12px;">${p.file_count} ${I18N.t('projects.parts')}</span>
+            </label>`).join('')
+        : `<p style="color:var(--text-muted); font-size:13px; padding:10px 0;">${I18N.t('projects.no_projects_yet')}</p>`;
+    body.innerHTML = `
+        <div style="max-height:260px; overflow-y:auto; margin-bottom:12px;">${listHtml}</div>
+        <button class="btn btn-primary" style="width:100%;" onclick="confirmSendSelectionToProjects()">
+            <i class="fa-solid fa-check"></i> ${I18N.t('actions.add')}
+        </button>
+        <button class="btn btn-ghost" style="width:100%; margin-top:8px;" onclick="selectionOpenNewProject()">
+            <i class="fa-solid fa-plus"></i> ${I18N.t('projects.new')}
+        </button>
+    `;
+};
+
+window.confirmSendSelectionToProjects = async function () {
+    const checked = [...document.querySelectorAll('.selection-project-checkbox:checked')].map(el => parseInt(el.value));
+    if (checked.length === 0) { showToast(I18N.t('projects.select_at_least_one'), 'warning'); return; }
+    const files = [...selectedFiles].map(path => ({ path, quantity: 1 }));
+    try {
+        await Promise.all(checked.map(projectId =>
+            fetch(`${API}/api/projects/${projectId}/files`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ files })
+            })
+        ));
+        showToast(I18N.t('projects.added_to_project'), 'success');
+        closeModal('modal-selection-project');
+        selectedFiles.clear();
+        toggleSelectionMode();
+        loadProjects();
+    } catch (err) {
+        showToast(I18N.t('toast.connection_error'), 'error');
+        console.error('[Projects] confirmSendSelectionToProjects', err);
+    }
+};
 window.openQRModal = async function () {
     openModal('modal-qrcode');
     document.getElementById('qr-loading').classList.remove('hidden');
@@ -10470,12 +10890,43 @@ window.openQRModal = async function () {
 // ============================================
 // 🌐 ACCÈS À DISTANCE (Cloudflare Tunnel)
 // ============================================
+window.toggleRemoteAccessEnabled = async function (enabled) {
+    const container = document.getElementById('remote-access-content');
+    if (container) {
+        container.innerHTML = `<p class="settings-hint"><i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="settings.remote_starting">Initialisation de l'accès distant…</span></p>`;
+    }
+    try {
+        const res = await fetch(`${API}/api/remote-access/toggle`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled })
+        });
+        if (res.ok) {
+            showToast(enabled ? (I18N.t('toast.remote_access_enabled') || 'Accès à distance activé') : (I18N.t('toast.remote_access_disabled') || 'Accès à distance désactivé'), 'success');
+            if (enabled) setTimeout(loadRemoteAccess, 2000);
+            else loadRemoteAccess();
+        } else {
+            showToast(I18N.t('toast.save_error') || 'Erreur', 'error');
+        }
+    } catch (e) {
+        showToast(I18N.t('toast.network_error') || 'Erreur de connexion', 'error');
+    }
+};
+
 window.loadRemoteAccess = async function () {
     const container = document.getElementById('remote-access-content');
+    const toggle = document.getElementById('remote-access-enabled-toggle');
     if (!container) return;
     try {
         const res = await fetch(`${API}/api/remote-access`);
         const data = await res.json();
+
+        if (toggle) toggle.checked = !!data.enabled;
+
+        if (!data.enabled) {
+            container.innerHTML = `<p class="settings-hint" data-i18n="settings.remote_access_disabled_hint">Activez l'accès à distance ci-dessus pour générer une adresse publique.</p>`;
+            return;
+        }
 
         if (data.status === 'ready' && data.url) {
             const isFixed = data.mode === 'fixed';
@@ -10500,7 +10951,7 @@ window.loadRemoteAccess = async function () {
                 </p>
                 <div style="display:flex;gap:8px;margin-bottom:10px;">
                     <input type="text" readonly value="${data.url}" class="settings-select" id="remote-url-input" style="flex:1;">
-                    <button class="btn btn-ghost remote-copy-btn" onclick="copyRemoteUrl()" title="Copier">
+                    <button class="btn btn-ghost remote-copy-btn" onclick="copyRemoteUrl()" data-i18n-title="actions.copy" title="${I18N.t('actions.copy') || 'Copier'}">
                         <i class="fa-solid fa-copy"></i>
                     </button>
                 </div>
