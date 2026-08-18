@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/flask-3.0+-green.svg)](https://flask.palletsprojects.com/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)]()
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Raspberry%20Pi%20%2F%20Linux-lightgrey.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
 
 [🚀 Installation](#-installation) • [✨ Fonctionnalités](#-fonctionnalités) • [📖 Documentation](#-documentation) • [🤝 Contribuer](#-contribuer) • [📜 Licence](#-licence)
@@ -90,7 +90,7 @@ Que vous soyez maker débutant ou imprimeur expérimenté avec plusieurs machine
 
 ### 💾 Sauvegarde & Mises à jour
 - 📦 Export/Import de sauvegarde complète (.zip)
-- 🔄 Mises à jour automatiques depuis GitHub
+- 🔄 Mises à jour automatiques depuis GitHub (patch `.zip` — même mécanisme sur Windows et Raspberry Pi/Linux)
 - 📋 Export de logs de diagnostic (secrets masqués)
 
 ---
@@ -120,6 +120,35 @@ Que vous soyez maker débutant ou imprimeur expérimenté avec plusieurs machine
 2. Lancez `Stellio-Setup.exe`
 3. C'est tout ! 🎉
 
+### 🐧 Raspberry Pi / Linux
+
+Fonctionne en mode **serveur headless** (sans interface graphique) : Stellio tourne en arrière-plan et s'utilise depuis un navigateur, sur le Pi lui-même ou depuis n'importe quel appareil du réseau local.
+
+**Prérequis** : Raspberry Pi 4 ou 5 recommandé, Raspberry Pi OS **64 bits**.
+
+```bash
+curl -O https://raw.githubusercontent.com/stellio-app/stellio-app/main/install-pi.sh
+chmod +x install-pi.sh
+./install-pi.sh
+```
+
+Le script installe automatiquement :
+- les dépendances système (`ffmpeg`, `unrar-free`, librairies de rendu 3D)
+- un environnement virtuel Python dédié
+- un **service systemd** (`stellio.service`) qui démarre Stellio au boot et le relance automatiquement en cas de crash
+
+Une fois installé, Stellio est accessible sur `http://<ip-du-pi>:5000`.
+
+```bash
+sudo systemctl status stellio     # État du service
+sudo systemctl restart stellio    # Redémarrer
+sudo journalctl -u stellio -f     # Suivre les logs en direct
+```
+
+> 💡 **Mêmes mises à jour que sous Windows** : le patch `.zip` publié sur chaque release est le même pour les deux plateformes (code source pur, rien de compilé). Stellio le détecte et l'applique tout seul, puis redémarre le service — pas de réinstallation manuelle à faire.
+
+> 🎥 Fonctionnalités identiques à la version Windows, à l'exception de la fenêtre desktop native (remplacée par l'accès navigateur) et de l'IA locale Ollama, qui nécessite un modèle raisonnable pour tourner correctement sur un Pi — pointez `ollama_url` vers un serveur Ollama distant dans les Paramètres si besoin.
+
 ### Slicers supportés
 
 Stellio détecte automatiquement :
@@ -131,11 +160,11 @@ Stellio détecte automatiquement :
 
 ### Imprimantes
 
-| Type | Protocole | Fonctionnalités |<br>
-|------|-----------|-----------------|<br>
-| OctoPrint | HTTP API | Monitoring, upload, caméra |<br>
-| Klipper/Moonraker | HTTP API | Monitoring, upload, caméra, heures exactes |<br>
-| Bambu Lab | MQTT | Monitoring temps réel, AMS, caméra |
+| Type | Protocole | Fonctionnalités |
+|------|-----------|-----------------|
+| OctoPrint | HTTP API | Monitoring, upload, caméra |
+| Klipper/Moonraker | HTTP API | Monitoring, upload, caméra, heures exactes |
+| Bambu Lab | MQTT | Monitoring temps réel, AMS, caméra (JPEG A1/P1, RTSPS X1/X2/H2) |
 
 ---
 
@@ -146,7 +175,7 @@ Stellio détecte automatiquement :
 | Backend | Python 3.8+, Flask, Waitress |
 | Frontend | HTML5, CSS3, JavaScript vanilla |
 | Base de données | SQLite (WAL mode) |
-| Desktop | pywebview |
+| Desktop | pywebview (Windows) / mode headless navigateur (Raspberry Pi, Linux) |
 | Rendu 3D | PyRender, Matplotlib, Three.js |
 | Maillage | trimesh, pymeshfix, shapely |
 | IA | Ollama (local) |
@@ -160,26 +189,29 @@ Stellio détecte automatiquement :
 
 ### Raccourcis clavier
 
-| Raccourci | Action |<br>
-|-----------|--------|<br>
-| `Ctrl+F` | Rechercher |<br>
-| `Ctrl+N` | Nouveau téléchargement |<br>
-| `Ctrl+,` | Paramètres |<br>
-| `Alt+1-8` | Navigation rapide |<br>
-| `F` | Toggle favoris |<br>
-| `T` | Gestionnaire de tags |<br>
-| `?` | Aide raccourcis |<br>
-| `Échap` | Fermer modale / vider recherche |<br>
+| Raccourci | Action |
+|-----------|--------|
+| `Ctrl+F` | Rechercher |
+| `Ctrl+N` | Nouveau téléchargement |
+| `Ctrl+,` | Paramètres |
+| `Alt+1-8` | Navigation rapide |
+| `F` | Toggle favoris |
+| `T` | Gestionnaire de tags |
+| `?` | Aide raccourcis |
+| `Échap` | Fermer modale / vider recherche |
 
 ### Structure du projet
-stellio-app/ <br>
-├── main.py                 # Backend Flask + Desktop<br>
-├── script.js               # Frontend JavaScript<br>
-├── index.html              # Interface principale<br>
-├── style.css               # Styles<br>
-├── assets/                 # Logos, icônes<br>
-├── languages/              # Fichiers de traduction (JSON)<br>
-├── requirements.txt        # Dépendances Python
+```
+stellio-app/
+├── main.py                 # Backend Flask + Desktop
+├── script.js                # Frontend JavaScript
+├── index.html                # Interface principale
+├── style.css                  # Styles
+├── assets/                     # Logos, icônes
+├── languages/                   # Fichiers de traduction (JSON)
+├── requirements-pi.txt           # Dépendances Python (installation Raspberry Pi / Linux)
+├── install-pi.sh                  # Script d'installation Raspberry Pi / Linux (service systemd)
+```
 
 ---
 
