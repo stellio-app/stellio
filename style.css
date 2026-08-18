@@ -1241,9 +1241,9 @@ body {
     position: absolute;
     top: 6px;
     right: 6px;
-    background: rgba(0,0,0,0.65);
+    background: rgba(0,0,0,0.75);
     color: #f87171;
-    border: none;
+    border: 1px solid rgba(248,113,113,0.5);
     border-radius: 4px;
     width: 22px;
     height: 22px;
@@ -1264,6 +1264,7 @@ body {
 .file-delete-btn:hover {
     background: var(--danger);
     color: #fff;
+    border-color: var(--danger);
 }
 
 .files-grid.details .file-ext-badge { 
@@ -1542,9 +1543,9 @@ body {
     position: absolute;
     top: 6px;
     left: 6px;
-    background: rgba(0,0,0,0.6);
-    color: var(--text-muted);
-    border: none;
+    background: rgba(0,0,0,0.75);
+    color: #e5e7eb;
+    border: 1px solid rgba(255,255,255,0.18);
     border-radius: 4px;
     width: 24px;
     height: 24px;
@@ -1564,7 +1565,8 @@ body {
 
 .file-menu-btn:hover {
     color: var(--accent);
-    background: rgba(0,0,0,0.85);
+    background: rgba(0,0,0,0.9);
+    border-color: var(--accent);
 }
 
 .file-favorite-btn {
@@ -2300,6 +2302,57 @@ body {
     border-radius: var(--radius);
 }
 
+.settings-spool-row {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px;
+}
+
+.settings-spool-row input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.settings-spool-row input[type="color"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: none;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.settings-spool-row input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 2px;
+}
+
+.settings-spool-row input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 4px;
+}
+
+.settings-spools-list {
+    max-height: 296px;
+    overflow-y: auto;
+    padding-right: 6px;
+    margin-right: -6px;
+}
+
+@media (max-width: 640px) {
+    .settings-spool-row {
+        flex-wrap: wrap;
+    }
+    .settings-spool-row input[type="text"] {
+        flex-basis: 100%;
+        order: -1;
+    }
+}
+
 .source-info { 
     display: flex; 
     align-items: center; 
@@ -2397,6 +2450,12 @@ body {
 
 #modal-confirm {
     z-index: 1900;
+}
+
+/* Doit passer au-dessus du viewer 3D (z-index 1000) quand on envoie
+   au slicer depuis la popup de visualisation, sans fermer celle-ci. */
+#modal-slicer {
+    z-index: 1050;
 }
 
 .modal-content {
@@ -5257,6 +5316,8 @@ kbd {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
 }
 
 .project-card-desc {
@@ -5303,11 +5364,9 @@ kbd {
 }
 
 .project-card-actions {
-    position: absolute;
-    top: 10px;
-    right: 10px;
     display: flex;
     gap: 4px;
+    flex-shrink: 0;
     opacity: 0;
     transition: opacity 0.15s ease;
 }
