@@ -278,7 +278,7 @@
 					<div class="user-avatar">
 						<i class="fa-solid fa-user"></i>
 					</div>
-					<span id="current-username" style="flex:1; font-size:13px; color:var(--text-secondary);" data-i18n="common.user">Utilisateur</span>					
+					<span id="current-username" style="flex:1; font-size:13px; color:var(--text-secondary);">Utilisateur</span>					
 				</div>
 			</div>
         </aside>
@@ -602,8 +602,8 @@
                         <div class="filter-group">
                             <h3><i class="fa-solid fa-weight-hanging"></i> <span data-i18n="filters.size">Taille (MB)</span></h3>
                             <div class="range-group">
-                                <label data-i18n="filters.min">Min: <input type="number" id="size-min" value="0" min="0"></label>
-                                <label data-i18n="filters.max">Max: <input type="number" id="size-max" value="1000" min="0"></label>
+                                <label data-i18n="filters.min">Min: <input type="number" id="page-filters-size-min" value="0" min="0"></label>
+                                <label data-i18n="filters.max">Max: <input type="number" id="page-filters-size-max" value="1000" min="0"></label>
                             </div>
                         </div>
                         <button id="apply-filters" class="btn btn-primary btn-block">
@@ -694,31 +694,50 @@
                             </div>
                             <div class="accord-body" style="display:flex; flex-direction:column; gap:12px;">
                                 <p class="settings-hint" data-i18n="settings.print_cost_hint">Renseigné ici une seule fois, ce tarif sert de base au calculateur de coût par fichier et à l'historique d'impression.</p>
+
                                 <div class="settings-row">
-                                    <label data-i18n="cost.spool_price_label">Prix de la bobine (€)</label>
-                                    <input type="number" id="settings-spool-price" min="0" step="0.01"
-                                        style="width:100px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+                                    <label data-i18n="cost.currency_label">Devise</label>
+                                    <select id="settings-currency-select" class="settings-select">
+                                        <option value="EUR">€ — Euro</option>
+                                        <option value="USD">$ — Dollar</option>
+                                    </select>
                                 </div>
-                                <div class="settings-row">
-                                    <label data-i18n="cost.spool_weight_label">Poids de la bobine (g)</label>
-                                    <input type="number" id="settings-spool-weight" min="1" step="1"
-                                        style="width:100px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+
+                                <div style="display:flex; flex-direction:column; gap:8px;">
+                                    <label style="font-size:13px; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+                                        <span data-i18n="cost.spools_label">Bobines de filament</span>
+                                        <span id="settings-spools-count" class="badge-count" style="font-size:11px; font-weight:600; color:var(--text-muted); background:var(--bg-tertiary); border:1px solid var(--border); border-radius:999px; padding:1px 8px;">0</span>
+                                    </label>
+                                    <p class="settings-hint" style="margin:0 0 2px;" data-i18n="cost.spools_hint">Ajoute autant de bobines que tu utilises. L'étoile marque la bobine par défaut, utilisée pour le calcul automatique.</p>
+                                    <div id="settings-spools-list" class="settings-spools-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+                                    <button type="button" class="btn btn-ghost btn-sm" style="align-self:flex-start;" onclick="addSpoolRow()">
+                                        <i class="fa-solid fa-plus"></i> <span data-i18n="cost.add_spool">Ajouter une bobine</span>
+                                    </button>
                                 </div>
+
                                 <div class="settings-row">
-                                    <label data-i18n="cost.elec_price_label">Prix électricité (€/kWh)</label>
+                                    <label><span data-i18n="cost.elec_price_label">Prix électricité</span> (<span class="currency-symbol">€</span>/kWh)</label>
                                     <input type="number" id="settings-elec-price" min="0" step="0.001"
                                         style="width:100px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+                                </div>
+                                <div class="settings-row">
+                                    <label data-i18n="cost.printer_select_label">Imprimante de référence</label>
+                                    <select id="settings-printer-power-select" class="settings-select" onchange="onSettingsPrinterPowerSelectChange()">
+                                        <option value="" data-i18n="cost.printer_select_manual">Saisie manuelle</option>
+                                    </select>
                                 </div>
                                 <div class="settings-row">
                                     <label data-i18n="cost.printer_power_label">Puissance imprimante (W)</label>
                                     <input type="number" id="settings-printer-power" min="0" step="1"
                                         style="width:100px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
                                 </div>
-                                <button type="button" class="btn-secondary" style="align-self:flex-start;" onclick="savePrintCostSettings()">
+
+                                <button type="button" class="btn btn-primary btn-sm" style="align-self:flex-start;" onclick="savePrintCostSettings()">
                                     <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="actions.save">Enregistrer</span>
                                 </button>
                             </div>
                         </div>
+
 
                         <div class="accord-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
@@ -972,7 +991,16 @@
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
                             </div>
                             <div class="accord-body" style="text-align:center;">
-                                <p class="settings-hint" style="margin-bottom:14px;" data-i18n="settings.remote_access_hint">Accédez à Stellio depuis n'importe où sur internet, même hors de votre réseau local. Une adresse publique unique est générée automatiquement au démarrage de l'application, gratuitement et sans configuration.</p>
+                                <div class="settings-row" style="align-items:flex-start; text-align:left;">
+                                    <div>
+                                        <label style="font-size:13px; font-weight:500;" data-i18n="settings.remote_access_enable">Activer l'accès à distance</label>
+                                        <p class="settings-hint" style="margin-top:2px;" data-i18n="settings.remote_access_hint">Accédez à Stellio depuis n'importe où sur internet, même hors de votre réseau local. Une adresse publique unique est générée automatiquement au démarrage de l'application, gratuitement et sans configuration.</p>
+                                    </div>
+                                    <label class="nav-toggle-switch" style="margin-top:2px;">
+                                        <input type="checkbox" id="remote-access-enabled-toggle" onchange="toggleRemoteAccessEnabled(this.checked)">
+                                        <span class="nav-toggle-slider"></span>
+                                    </label>
+                                </div>
                                 <div id="remote-access-content">
                                     <p class="settings-hint"><i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="settings.loading">Chargement…</span></p>
                                 </div>
@@ -1424,6 +1452,9 @@
             <button id="nesting-btn" class="btn btn-sm">
                 <i class="fa-solid fa-border-all"></i> <span data-i18n="actions.nesting">Nester + IA</span>
             </button>
+            <button id="add-selected-to-project-btn" class="btn btn-sm">
+                <i class="fa-solid fa-diagram-project"></i> <span data-i18n="actions.add_to_project">Projet</span>
+            </button>
             <button id="regen-selected-thumbs-btn" class="btn btn-sm">
                 <i class="fa-solid fa-arrows-rotate"></i> <span data-i18n="actions.regen_thumbnails">Régénérer miniatures</span>
             </button>
@@ -1741,9 +1772,24 @@
             <div class="viewer-header">
                 <h3 id="viewer-title"><i class="fa-solid fa-cube"></i> <span data-i18n="viewer.3d_title">Visualisation 3D</span></h3>
                 <div class="viewer-controls">
-                    <button type="button" id="viewer-overhang-toggle" class="viewer-plate-nav-btn" onclick="toggleOverhangView()" title="Afficher les surplombs (surfaces nécessitant du support)" style="position:static; width:auto; padding:6px 12px; display:flex; align-items:center; gap:6px; font-size:12px;">
-                        <i class="fa-solid fa-triangle-exclamation"></i>
-                        <span data-i18n="viewer.overhang_toggle">Surplombs</span>
+                    <select id="viewer-orientation-select" class="settings-select" style="min-width:0; width:auto; max-width:170px; font-size:12px; padding:6px 8px;" onchange="setViewerOrientation(this.value)" data-i18n-title="viewer.orientation_title" title="Choisir la face posée sur le plateau">
+                        <option value="default" data-i18n="viewer.orientation_default">Orientation d'origine</option>
+                        <option value="flipZ" data-i18n="viewer.orientation_flip_z">Face opposée (haut ↔ bas)</option>
+                        <option value="posX" data-i18n="viewer.orientation_pos_x">Face +X sur le plateau</option>
+                        <option value="negX" data-i18n="viewer.orientation_neg_x">Face -X sur le plateau</option>
+                        <option value="posY" data-i18n="viewer.orientation_pos_y">Face +Y sur le plateau</option>
+                        <option value="negY" data-i18n="viewer.orientation_neg_y">Face -Y sur le plateau</option>
+                    </select>
+                    <div class="viewer-overhang-toggle-row" data-i18n-title="viewer.overhang_toggle_title" title="Afficher les surplombs (surfaces nécessitant du support)" style="display:flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-triangle-exclamation" style="font-size:12px; color:var(--text-secondary);"></i>
+                        <span data-i18n="viewer.overhang_toggle" style="font-size:12px; color:var(--text-secondary);">Surplombs</span>
+                        <label class="nav-toggle-switch">
+                            <input type="checkbox" id="viewer-overhang-toggle" onchange="toggleOverhangView()">
+                            <span class="nav-toggle-slider"></span>
+                        </label>
+                    </div>
+                    <button type="button" class="btn btn-primary" style="font-size:12px; padding:6px 12px; white-space:nowrap;" onclick="sendViewerFileToSlicer()" data-i18n-title="viewer.send_to_slicer_title" title="Ouvrir dans le slicer avec l'orientation choisie ci-dessus">
+                        <i class="fa-solid fa-paper-plane"></i> <span data-i18n="viewer.send_to_slicer">Envoyer au slicer</span>
                     </button>
                     <button class="modal-close" onclick="close3DViewer()">&times;</button>
                 </div>
@@ -2157,11 +2203,12 @@
 	<div id="modal-add-printer" class="modal hidden">
 		<div class="modal-content">
 			<div class="modal-header">
-				<h3><i class="fa-solid fa-print"></i> <span data-i18n="printers.add">Ajouter une imprimante</span></h3>
+				<h3><i class="fa-solid fa-print"></i> <span id="add-printer-modal-title" data-i18n="printers.add">Ajouter une imprimante</span></h3>
 				<button class="modal-close" onclick="closeModal('modal-add-printer')">×</button>
 			</div>
 			<div class="modal-body">
 				<form id="add-printer-form">
+					<input type="hidden" id="printer-edit-id" value="">
 					<div class="input-group">
 						<label data-i18n="form.name">Nom</label>
 						<input type="text" id="printer-name" data-i18n-placeholder="printers.name_ph" placeholder="Mon imprimante" required>
@@ -2182,6 +2229,10 @@
 							<option value="klipper">Klipper (Moonraker)</option>
 							<option value="prusalink">PrusaLink (Prusa MK4 / MK3.9 / MK3.5 / MINI+ / XL / CORE One)</option>
 							<option value="bambu">Bambu Lab (X1C / P1P / P1S / A1)</option>
+							<option value="elegoo_sdcp">Elegoo (résine Saturn/Mars, ou Centauri Carbon 1)</option>
+							<option value="elegoo_cc2">Elegoo Centauri Carbon 2</option>
+							<option value="creality">Creality (K1 / K2 / Ender-3 V3 / Hi)</option>
+							<option value="flashforge">FlashForge (5M / 5M Pro / AD5X)</option>
 						</select>
 					</div>
 					<div id="group-octoprint-hint" style="display:none; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:12px;">
@@ -2229,11 +2280,48 @@
 							<small style="color:var(--text-muted);font-size:11px;" data-i18n="printers.serial_number_hint">Améliore le monitoring MQTT (Paramètres → Général sur l'imprimante)</small>
 						</div>
 					</div>
+					<div id="group-elegoo-sdcp-hint" style="display:none; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:12px;">
+						<small style="color:var(--text-secondary); font-size:11px; line-height:1.5;" data-i18n="printers.elegoo_sdcp_hint">
+							Pas de code d'accès nécessaire — Stellio détecte automatiquement l'imprimante sur le réseau à partir de son IP (protocole SDCP, sans authentification).
+						</small>
+					</div>
+					<div id="group-elegoo-cc2" style="display:none;">
+						<div style="background:var(--warning)15; border:1px solid var(--warning)40; border-radius:8px; padding:10px 12px; margin-bottom:12px; display:flex; gap:8px; align-items:flex-start;">
+							<i class="fa-solid fa-triangle-exclamation" style="color:var(--warning); margin-top:2px; flex-shrink:0;"></i>
+							<small style="color:var(--text-secondary); font-size:11px; line-height:1.5;" data-i18n="printers.elegoo_cc2_warning">
+								Le code d'accès local par défaut est <strong>123456</strong> tant qu'il n'a pas été changé sur l'imprimante (Réglages → Réseau).
+							</small>
+						</div>
+						<div class="input-group">
+							<label data-i18n="printers.local_access_code">🔑 Code d'accès local</label>
+							<input type="text" id="printer-elegoo-cc2-code" placeholder="123456" autocomplete="off">
+						</div>
+					</div>
+					<div id="group-creality-hint" style="display:none; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:12px;">
+						<small style="color:var(--text-secondary); font-size:11px; line-height:1.5;" data-i18n="printers.creality_hint">
+							Pas de code d'accès nécessaire — assurez-vous que le mode LAN est activé sur l'imprimante (Réglages → Réseau).
+						</small>
+					</div>
+					<div id="group-flashforge" style="display:none;">
+						<div style="background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:12px;">
+							<small style="color:var(--text-secondary); font-size:11px; line-height:1.5;" data-i18n="printers.flashforge_hint">
+								Le numéro de série et le code de vérification sont affichés dans l'écran de l'imprimante, sous Réseau → LAN.
+							</small>
+						</div>
+						<div class="input-group">
+							<label data-i18n="printers.serial_number">Numéro de série</label>
+							<input type="text" id="printer-flashforge-serial" placeholder="SN..." autocomplete="off">
+						</div>
+						<div class="input-group">
+							<label data-i18n="printers.check_code">🔑 Code de vérification</label>
+							<input type="text" id="printer-flashforge-code" autocomplete="off">
+						</div>
+					</div>
 				</form>
 			</div>
 			<div class="modal-footer">
 				<button class="btn btn-ghost" onclick="closeModal('modal-add-printer')" data-i18n="actions.cancel">Annuler</button>
-				<button class="btn btn-primary" onclick="addPrinter()">
+				<button class="btn btn-primary" id="add-printer-submit-btn" onclick="addPrinter()">
 					<i class="fa-solid fa-plus"></i> <span data-i18n="actions.add">Ajouter</span>
 				</button>
 			</div>
