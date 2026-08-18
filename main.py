@@ -515,22 +515,64 @@ def formatSize(bytes):
 # ============================================
 def _setup_rar_tool():
     base_dir = get_base_path()
-    
+    exe_name = 'UnRAR.exe' if sys.platform == 'win32' else 'unrar'
+
     unrar_paths = [
-        os.path.join(base_dir, 'bin', 'UnRAR.exe'),
-        os.path.join(base_dir, 'tools', 'UnRAR.exe'),
-        os.path.join(base_dir, 'UnRAR.exe')
+        os.path.join(base_dir, 'bin', exe_name),
+        os.path.join(base_dir, 'tools', exe_name),
+        os.path.join(base_dir, exe_name)
     ]
     for path in unrar_paths:
         if os.path.exists(path):
             rarfile.UNRAR_TOOL = path
             app_logger.info(f"[RAR] UnRAR configuré: {path}")
             return True
-            
-    app_logger.info("[RAR] UnRAR.exe non trouvé. L'extraction .rar sera désactivée.")
+
+    if sys.platform != 'win32':
+        system_unrar = shutil.which('unrar')
+        if system_unrar:
+            rarfile.UNRAR_TOOL = system_unrar
+            app_logger.info(f"[RAR] UnRAR configuré (PATH système): {system_unrar}")
+            return True
+
+    app_logger.info("[RAR] UnRAR non trouvé. L'extraction .rar sera désactivée.")
     return False
 
 _setup_rar_tool()
+
+# ============================================
+# 🎥 OUTIL FFMPEG (flux caméra RTSPS Bambu X1/X2/H2)
+# ============================================
+FFMPEG_TOOL = None
+
+def _setup_ffmpeg_tool():
+    """Cherche ffmpeg au même endroit que UnRAR (dossier bin/ de l'app),
+    avant de retomber sur le PATH système. Sous Windows: ffmpeg.exe dans
+    bin/. Sous Linux/Docker: paquet système 'ffmpeg' suffit (apt-get)."""
+    global FFMPEG_TOOL
+    base_dir = get_base_path()
+    exe_name = 'ffmpeg.exe' if sys.platform == 'win32' else 'ffmpeg'
+    ffmpeg_paths = [
+        os.path.join(base_dir, 'bin', exe_name),
+        os.path.join(base_dir, 'tools', exe_name),
+        os.path.join(base_dir, exe_name),
+    ]
+    for path in ffmpeg_paths:
+        if os.path.exists(path):
+            FFMPEG_TOOL = path
+            app_logger.info(f"[FFmpeg] Configuré (bin local): {path}")
+            return True
+
+    system_ffmpeg = shutil.which('ffmpeg')
+    if system_ffmpeg:
+        FFMPEG_TOOL = system_ffmpeg
+        app_logger.info(f"[FFmpeg] Configuré (PATH système): {system_ffmpeg}")
+        return True
+
+    app_logger.info("[FFmpeg] ffmpeg introuvable (ni bin/, ni PATH). Flux caméra RTSPS (X1/X2/H2) indisponible.")
+    return False
+
+_setup_ffmpeg_tool()
 
 # ============================================
 # ⚙️ PARAMÈTRES APPLICATION
@@ -1382,6 +1424,72 @@ def _generate_bambu_mjpeg_stream(ip, access_code):
         if ssl_sock:
             try:
                 ssl_sock.close()
+            except Exception:
+                pass
+
+
+# Modèles utilisant le protocole caméra propriétaire sur le port 6000
+# (auth binaire bblp + frames JPEG préfixées par leur taille).
+BAMBU_JPEG_PORT6000_MODELS = {'A1', 'A1_MINI', 'P1P', 'P1S'}
+# Modèles utilisant du RTSPS standard sur le port 322 — protocole
+# complètement différent, nécessite de repasser par ffmpeg pour
+# reconvertir le flux en MJPEG consommable par le <img> du front.
+BAMBU_RTSP_PORT322_MODELS = {'X1', 'X1C', 'X1E', 'X2D', 'H2D', 'H2S', 'H2C', 'P2S'}
+
+
+def _generate_bambu_rtsp_mjpeg_stream(ip, access_code):
+    """Convertit le flux RTSPS (port 322, modèles X1/X2/H2) en MJPEG via
+    ffmpeg, au même format multipart que _generate_bambu_mjpeg_stream()
+    pour que le front (<img src=".../camera/stream">) n'ait rien à changer."""
+    ffmpeg_path = FFMPEG_TOOL
+    if not ffmpeg_path:
+        app_logger.warning("[Bambu Camera RTSP] ffmpeg introuvable (bin/ ou PATH) — flux caméra indisponible pour ce modèle")
+        return
+
+    rtsp_url = f"rtsps://bblp:{access_code}@{ip}:322/streaming/live/1"
+    cmd = [
+        ffmpeg_path,
+        '-rtsp_transport', 'tcp',
+        '-i', rtsp_url,
+        '-an',
+        '-f', 'mjpeg',
+        '-q:v', '5',
+        '-r', '10',
+        '-loglevel', 'error',
+        'pipe:1',
+    ]
+
+    proc = None
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, **_popen_kwargs_silent())
+        jpeg_start = b'\xff\xd8'
+        jpeg_end = b'\xff\xd9'
+        buf = bytearray()
+        while True:
+            chunk = proc.stdout.read(4096)
+            if not chunk:
+                break
+            buf += chunk
+            start = buf.find(jpeg_start)
+            end = buf.find(jpeg_end, start + 2) if start != -1 else -1
+            while start != -1 and end != -1:
+                frame = bytes(buf[start:end + 2])
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n'
+                       b'Content-Length: ' + str(len(frame)).encode() + b'\r\n\r\n' +
+                       frame + b'\r\n')
+                buf = buf[end + 2:]
+                start = buf.find(jpeg_start)
+                end = buf.find(jpeg_end, start + 2) if start != -1 else -1
+    except GeneratorExit:
+        pass
+    except Exception as e:
+        app_logger.info(f"[Bambu Camera RTSP] Flux interrompu ({ip}): {e}")
+    finally:
+        if proc:
+            try:
+                proc.kill()
+                proc.wait(timeout=2)
             except Exception:
                 pass
 
@@ -10646,6 +10754,22 @@ def check_for_updates():
         app_logger.warning(f"[UPDATE] ⚠️ Impossible de vérifier les mises à jour: {str(e)[:80]}")
         return None
 
+def _find_real_content_dir(base_dir):
+    """Localise le sous-dossier du ZIP qui contient réellement les fichiers
+    de l'app (utile si le ZIP a un dossier racine imbriqué type
+    'stellio-1.2.0/'). Partagé entre les branches Windows et Linux/Pi de
+    install_update()."""
+    real_files = {'main.py', 'index.html', 'script.js', 'style.css', 'check_deps.py'}
+    for root, dirs, files in os.walk(base_dir):
+        entries = set(files) | set(dirs)
+        matches = real_files.intersection(entries)
+        if matches:
+            app_logger.info(f"[UPDATE] ✅ Fichiers app trouvés dans: {root} ({matches})")
+            return root
+    app_logger.info(f"[UPDATE] ⚠️ Aucun fichier app reconnu dans le ZIP, on utilise la racine: {base_dir}")
+    return base_dir
+
+
 def install_update(installer_path):
     try:
         app_logger.info(f"[UPDATE] 🚀 Lancement de la mise à jour: {installer_path}")
@@ -10680,20 +10804,7 @@ def install_update(installer_path):
                         app_logger.info(f"  ... et {len(z.namelist()) - 20} autres")
                     safe_extract_zip(z, extract_dir)
 
-                def find_real_content_dir(base_dir):
-                    real_files = {'main.py', 'index.html', 'script.js', 'style.css', 'check_deps.py'}
-
-                    for root, dirs, files in os.walk(base_dir):
-                        entries = set(files) | set(dirs)
-                        matches = real_files.intersection(entries)
-                        if matches:
-                            app_logger.info(f"[UPDATE] ✅ Fichiers app trouvés dans: {root} ({matches})")
-                            return root
-
-                    app_logger.info(f"[UPDATE] ⚠️ Aucun fichier app reconnu dans le ZIP, on utilise la racine: {base_dir}")
-                    return base_dir
-
-                real_content_dir = find_real_content_dir(extract_dir)
+                real_content_dir = _find_real_content_dir(extract_dir)
                 app_logger.info(f"[UPDATE] 📂 Répertoire source final: {real_content_dir}")
                 app_logger.info(f"[UPDATE]  Contenu final: {os.listdir(real_content_dir)[:15]}")
 
@@ -10773,6 +10884,71 @@ def install_update(installer_path):
             time.sleep(1)
             _cleanup_before_exit()
             os._exit(0)
+
+        else:
+            # ============================================
+            # 🐧 MISE À JOUR LINUX / RASPBERRY PI
+            # ============================================
+            # Pas de verrou de fichier comme sous Windows : on peut écraser
+            # les fichiers de l'app directement pendant que le process
+            # tourne encore. Le process en mémoire garde l'ancien code
+            # jusqu'au redémarrage — géré en fin de fonction (systemd
+            # Restart=always si dispo, sinon ré-exec direct du process).
+            app_dir = BASE_DIR
+
+            if ext == '.zip':
+                extract_dir = os.path.join(tempfile.gettempdir(), 'stellio-patch')
+                if os.path.exists(extract_dir):
+                    shutil.rmtree(extract_dir, ignore_errors=True)
+                os.makedirs(extract_dir, exist_ok=True)
+
+                with zipfile.ZipFile(installer_path, 'r') as z:
+                    app_logger.info(f"[UPDATE] 📦 Contenu du ZIP ({len(z.namelist())} entrées)")
+                    safe_extract_zip(z, extract_dir)
+
+                real_content_dir = _find_real_content_dir(extract_dir)
+                app_logger.info(f"[UPDATE] 📂 Copie de {real_content_dir} vers {app_dir}")
+
+                # Copie fichier par fichier (pas shutil.copytree en bloc :
+                # on veut continuer même si un fichier isolé pose problème,
+                # comme le fait xcopy /y /e côté Windows).
+                copied, failed = 0, 0
+                for root, dirs, files in os.walk(real_content_dir):
+                    rel = os.path.relpath(root, real_content_dir)
+                    dest_root = app_dir if rel == '.' else os.path.join(app_dir, rel)
+                    os.makedirs(dest_root, exist_ok=True)
+                    for fname in files:
+                        try:
+                            shutil.copy2(os.path.join(root, fname), os.path.join(dest_root, fname))
+                            copied += 1
+                        except Exception as e:
+                            failed += 1
+                            app_logger.warning(f"[UPDATE] ⚠️ Échec copie {fname}: {e}")
+
+                app_logger.info(f"[UPDATE] ✅ {copied} fichier(s) copié(s), {failed} échec(s)")
+                shutil.rmtree(extract_dir, ignore_errors=True)
+
+            elif ext in ('.exe', '.msi'):
+                app_logger.info("[UPDATE] ⚠️ Asset .exe/.msi ignoré (Linux/Pi attend un patch .zip)")
+                return False
+            else:
+                app_logger.info(f"[UPDATE] ⚠️ Type d'asset non géré sur Linux/Pi: {ext}")
+                return False
+
+            app_logger.info("[UPDATE] 🔁 Redémarrage du service...")
+            _cleanup_before_exit()
+
+            # Sous systemd (service stellio.service avec Restart=always),
+            # il suffit de quitter — systemd relance automatiquement avec
+            # le nouveau code sur disque. Sinon (lancé à la main dans un
+            # terminal), on se ré-exécute soi-même pour ne pas laisser
+            # l'utilisateur avec un process mort après la mise à jour.
+            if os.environ.get('INVOCATION_ID'):
+                app_logger.info("[UPDATE] Service systemd détecté — arrêt (Restart=always s'occupe du redémarrage)")
+                os._exit(0)
+            else:
+                app_logger.info("[UPDATE] Pas de systemd détecté — redémarrage direct du process")
+                os.execv(sys.executable, [sys.executable] + sys.argv)
     except Exception as e:
         app_logger.error(f"[UPDATE] ❌ Erreur installation: {e}")
         import traceback
@@ -11121,6 +11297,15 @@ def api_printer_camera_stream(pid):
     ip = row.get('ip')
     if not access_code or not ip:
         return jsonify({"error": "IP ou code d'accès manquant pour cette imprimante"}), 400
+
+    model = (config.get('model') or 'A1').upper()
+    if model in BAMBU_RTSP_PORT322_MODELS:
+        if not FFMPEG_TOOL:
+            return jsonify({"error": "ffmpeg est requis pour le flux caméra des modèles X1/X2/H2 (RTSPS) — placez ffmpeg.exe dans le dossier bin/ de l'app, à côté de UnRAR.exe"}), 500
+        return Response(
+            _generate_bambu_rtsp_mjpeg_stream(ip, access_code),
+            mimetype='multipart/x-mixed-replace; boundary=frame'
+        )
 
     return Response(
         _generate_bambu_mjpeg_stream(ip, access_code),
