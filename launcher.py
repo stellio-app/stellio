@@ -1,114 +1,254 @@
 #!/usr/bin/env python3
-import sys
+
 import os
-import importlib.util
-
-def _ensure_bundled_dependencies():
-    import nest_asyncio
-    nest_asyncio.apply()
-    import os
-    import sys
-    if sys.platform != 'win32':
-        os.environ['PYOPENGL_PLATFORM'] = 'osmesa'
-        os.environ['PYRENDER_OFFSCREEN'] = '1'
-    import sqlite3
-    import hashlib
-    import json
-    import subprocess
-    import secrets
-    import datetime
-    import logging
-    from logging.handlers import RotatingFileHandler
-    import smtplib
-    import trimesh
-    import numpy as np
-    import smbclient
-    import smbprotocol
-    from smbprotocol.exceptions import SMBOSError
-    from PIL import Image, ImageDraw, ImageFont
-    import base64
-    import matplotlib
-    matplotlib.use('Agg')
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-    from pathlib import Path
-    from functools import wraps
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.base import MIMEBase
-    from email import encoders
-    from flask import Flask, request, jsonify, session, send_file
-    from flask import Response
-    import pyrender
-    import trimesh.transformations as tra
-    import io
-    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-    from cryptography.hazmat.backends import default_backend
-    from cryptography.hazmat.primitives import padding
-    import zipfile
-    import rarfile
-    import tarfile
-    import shutil
-    import xml.etree.ElementTree as ET
-    import time
-    import tempfile
-    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-    import queue
-    import requests
-    import re
-    from bs4 import BeautifulSoup
-    from urllib.parse import urlparse, unquote, urljoin
-    import asyncio
-    import threading
-    import glob
-    import atexit  
-    import ctypes
-    import webview
-    import webbrowser
-    import threading, time, urllib.request, json
-    import tkinter as tk
-    from tkinter import ttk
-    import qrcode
-    import io, base64
-    import socket
+import sys
+import runpy
+import logging
+from pathlib import Path
+from logging.handlers import RotatingFileHandler
 
 
-def get_app_dir():
-    if getattr(sys, 'frozen', False):
-        base = os.path.dirname(sys.executable)
-    else:
-        base = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base, 'app')
+def _app_dir() -> Path:
+    base = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) \
+        else Path(__file__).resolve().parent
+    return base / "app"
 
 
-def main():
-    _ensure_bundled_dependencies()
+def _setup_bootstrap_logger(app_dir: Path) -> logging.Logger:
+    log_dir = app_dir.parent / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    logger = logging.getLogger("stellio.launcher")
+    logger.setLevel(logging.INFO)
+    handler = RotatingFileHandler(
+        log_dir / "launcher.log", maxBytes=2_000_000, backupCount=2, encoding="utf-8"
+    )
+    handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)-8s %(message)s"))
+    logger.addHandler(handler)
+    return logger
 
-    app_dir = get_app_dir()
-    main_path = os.path.join(app_dir, 'main.py')
 
-    if not os.path.isfile(main_path):
+def _show_fatal_error(message: str) -> None:
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(0, message, "Stellio — Erreur au demarrage", 0x10)
+    except Exception:
+        print(message, file=sys.stderr)
+
+
+def _preload_dependencies(log) -> None:
+    try:
+        import sqlite3  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ sqlite3 indisponible a l'import : {e}")
+    try:
+        import ssl  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ ssl indisponible a l'import : {e}")
+    try:
+        import hashlib  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ hashlib indisponible a l'import : {e}")
+    try:
+        import tkinter  
+        from tkinter import ttk  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ tkinter/ttk indisponible a l'import : {e}")
+
+    try:
+        import webbrowser  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ webbrowser indisponible a l'import : {e}")
+    try:
+        import difflib  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ difflib indisponible a l'import : {e}")
+    try:
+        import multiprocessing  
+        import concurrent.futures  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ multiprocessing/concurrent.futures indisponible a l'import : {e}")
+    try:
+        import secrets  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ secrets indisponible a l'import : {e}")
+    try:
+        import shlex  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ shlex indisponible a l'import : {e}")
+    try:
+        import calendar  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ calendar indisponible a l'import : {e}")
+
+    # --- dependances tierces (requirements.txt) ---
+    try:
+        import flask  
+        import werkzeug  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ flask/werkzeug indisponible a l'import : {e}")
+    try:
+        import waitress  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ waitress indisponible a l'import : {e}")
+    try:
+        import webview  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ webview (pywebview) indisponible a l'import : {e}")
+    try:
+        import imageio  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ imageio indisponible a l'import : {e}")
+    try:
+        import trimesh  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ trimesh indisponible a l'import : {e}")
+    try:
+        import pyrender  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ pyrender indisponible a l'import : {e}")
+    try:
+        import OpenGL  
+        import OpenGL.GL  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ OpenGL (PyOpenGL) indisponible a l'import : {e}")
+    try:
+        import numpy  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ numpy indisponible a l'import : {e}")
+    try:
+        import PIL  
+        import PIL.Image  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ PIL (Pillow) indisponible a l'import : {e}")
+    try:
+        import matplotlib 
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ matplotlib indisponible a l'import : {e}")
+    try:
+        import mpl_toolkits  
+        import mpl_toolkits.mplot3d  
+        import mpl_toolkits.mplot3d.art3d  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ mpl_toolkits.mplot3d indisponible a l'import : {e}")
+    try:
+        import fast_simplification  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ fast_simplification indisponible a l'import : {e}")
+    try:
+        import pymeshfix 
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ pymeshfix indisponible a l'import : {e}")
+    try:
+        import shapely  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ shapely indisponible a l'import : {e}")
+    try:
+        import rectpack  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ rectpack indisponible a l'import : {e}")
+    try:
+        import smbclient  
+        import smbprotocol  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ smbclient/smbprotocol indisponible a l'import : {e}")
+    try:
+        import paho.mqtt.client 
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ paho-mqtt indisponible a l'import : {e}")
+    try:
+        import requests  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ requests indisponible a l'import : {e}")
+    try:
+        import cryptography  
+        from cryptography.hazmat.primitives.ciphers import Cipher  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ cryptography indisponible a l'import : {e}")
+    try:
+        import rarfile  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ rarfile indisponible a l'import : {e}")
+    try:
+        import py7zr  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ py7zr indisponible a l'import : {e}")
+    try:
+        import defusedxml  
+        import defusedxml.ElementTree  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ defusedxml indisponible a l'import : {e}")
+    try:
+        import nest_asyncio  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ nest_asyncio indisponible a l'import : {e}")
+    try:
+        import psutil  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ psutil indisponible a l'import : {e}")
+    try:
+        import packaging  
+        import packaging.version  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ packaging indisponible a l'import : {e}")
+    try:
+        import qrcode  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ qrcode indisponible a l'import : {e}")
+    try:
+        import websocket  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ websocket-client indisponible a l'import : {e}")
+    try:
+        import flashforge  
+    except Exception as e:
+        log(f"[PRELOAD] ⚠️ flashforge-python-api indisponible a l'import : {e}")
+
+    if os.environ.get("STELLIO_TELEGRAM_VARIANT", "").strip().lower() in ("1", "true", "yes"):
         try:
-            import ctypes
-            ctypes.windll.user32.MessageBoxW(
-                0,
-                f"Fichier introuvable :\n{main_path}\n\n"
-                f"Le dossier 'app' doit se trouver à côté de Stellio.exe.",
-                "Stellio — Erreur de démarrage",
-                0x10
-            )
-        except Exception:
-            print(f"[Launcher] main.py introuvable : {main_path}")
-        sys.exit(1)
+            import telethon  
+        except Exception as e:
+            log(f"[PRELOAD] ⚠️ telethon indisponible a l'import : {e}")
 
-    sys.path.insert(0, app_dir)
-    os.chdir(app_dir)
 
-    spec = importlib.util.spec_from_file_location("stellio_main", main_path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["stellio_main"] = module
-    spec.loader.exec_module(module)
+def main() -> int:
+    app_dir = _app_dir()
+    logger = _setup_bootstrap_logger(app_dir)
+    log = logger.info
+
+    main_py = app_dir / "main.py"
+    if not main_py.exists():
+        _show_fatal_error(f"main.py introuvable dans {app_dir}.\nInstallation corrompue.")
+        return 1
+
+    log("=== Demarrage de Stellio (launcher, sans runtime Python separe) ===")
+    log(f"app_dir : {app_dir}")
+
+    launcher_exe = sys.executable if getattr(sys, "frozen", False) else str(Path(__file__).resolve())
+    os.environ["STELLIO_LAUNCHER_EXE"] = launcher_exe
+
+    sys.path.insert(0, str(app_dir))
+    os.chdir(str(app_dir))
+
+    _preload_dependencies(log)
+
+    log("Lancement de main.py (in-process, meme interpreteur que le launcher)...")
+    try:
+        runpy.run_path(str(main_py), run_name="stellio_main")
+    except SystemExit as e:
+        code = e.code if isinstance(e.code, int) else (0 if e.code is None else 1)
+        log(f"main.py a demande une sortie explicite (code {code})")
+        return code
+    except Exception as e:
+        logger.exception("Erreur fatale dans main.py")
+        _show_fatal_error(
+            "Stellio a rencontre une erreur fatale au demarrage :\n"
+            f"{e}\n\nVoir logs\\launcher.log pour le detail complet."
+        )
+        return 1
+
+    log("main.py termine normalement")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
