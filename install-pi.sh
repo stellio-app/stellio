@@ -1,6 +1,4 @@
 #!/bin/bash
-# Installation de Stellio sur Raspberry Pi (Raspberry Pi OS 64 bits recommandé).
-# Usage : ./install-pi.sh [/chemin/install]  (par défaut : /opt/stellio)
 set -e
 
 INSTALL_DIR="${1:-/opt/stellio}"
@@ -9,10 +7,6 @@ REPO_URL="https://github.com/stellio-app/stellio-app.git"
 
 echo "==> Installation de Stellio dans $INSTALL_DIR"
 
-# --- Dépendances système ---
-# ffmpeg      : flux caméra RTSPS Bambu X1/X2/H2 (voir _setup_ffmpeg_tool)
-# unrar-free  : extraction .rar (voir _setup_rar_tool)
-# libosmesa6, libgl1 : rendu offscreen des miniatures via pyrender
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
     python3 python3-venv python3-pip \
@@ -20,7 +14,6 @@ sudo apt-get install -y --no-install-recommends \
     libosmesa6 libgl1 libglu1-mesa \
     git
 
-# --- Récupération de l'app ---
 if [ -d "$INSTALL_DIR/.git" ]; then
     echo "==> Mise à jour du dépôt existant"
     sudo -u "$SERVICE_USER" git -C "$INSTALL_DIR" pull
@@ -33,12 +26,10 @@ fi
 
 cd "$INSTALL_DIR"
 
-# --- Environnement virtuel Python ---
 sudo -u "$SERVICE_USER" python3 -m venv "$INSTALL_DIR/venv"
 sudo -u "$SERVICE_USER" "$INSTALL_DIR/venv/bin/pip" install --no-cache-dir --upgrade pip
 sudo -u "$SERVICE_USER" "$INSTALL_DIR/venv/bin/pip" install --no-cache-dir -r requirements-pi.txt
 
-# --- Service systemd ---
 SERVICE_FILE=/etc/systemd/system/stellio.service
 echo "==> Écriture de $SERVICE_FILE"
 sudo tee "$SERVICE_FILE" > /dev/null <<EOF
