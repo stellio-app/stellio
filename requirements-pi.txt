@@ -1,0 +1,30 @@
+# Généré à partir de REQUIRED_MODULES dans main.py.
+# pywebview est volontairement exclu : il ne sert qu'à créer la fenêtre
+# desktop native (mode non-headless), jamais utilisé en mode Pi/serveur
+# headless (STELLIO_HEADLESS=1), et tire des dépendances système
+# GTK/Qt inutiles sur un Raspberry Pi.
+Flask
+Werkzeug
+cryptography
+numpy
+Pillow
+trimesh
+requests
+packaging
+nest_asyncio
+smbprotocol
+rarfile
+waitress
+pymeshfix
+defusedxml
+paho-mqtt
+rectpack
+shapely
+py7zr
+fast-simplification
+pyrender
+matplotlib
+psutil
+qrcode
+websocket-client
+flashforge-python-api
