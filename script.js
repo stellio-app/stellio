@@ -21,11 +21,10 @@ zh: { code: 'zh', name: 'Chinese', native: '中文', dir: 'ltr' },
 en: { code: 'en', name: 'English', native: 'English', dir: 'ltr' },
 es: { code: 'es', name: 'Español', native: 'Español', dir: 'ltr' },
 fr: { code: 'fr', name: 'Français', native: 'Français', dir: 'ltr' },
-de: { code: 'de', name: 'German', native: 'Deutsch', dir: 'ltr' },	
+de: { code: 'de', name: 'German', native: 'Deutsch', dir: 'ltr' },
 it: { code: 'it', name: 'Italian', native: 'Italiano', dir: 'ltr' },
 ja: { code: 'ja', name: 'Japanese', native: '日本語', dir: 'ltr' },
 pt: { code: 'pt', name: 'Portuguese', native: 'Português', dir: 'ltr' }
-
 
 
 },
@@ -186,9 +185,8 @@ this.apply();
 }
 };
 window.I18N = I18N;
-// ============================================
-// 🎬 INITIALISATION GLOBALE
-// ============================================
+
+
 const API = window.location.origin;
 
 function _getCsrfCookie() {
@@ -273,11 +271,8 @@ if (el && I18N.has(field.key)) el.placeholder = I18N.t(field.key);
 }
 document.addEventListener('DOMContentLoaded', async () => {
 console.log('[Stellio] DOM chargé, initialisation...');
-// La requête réseau de checkAuth ne dépend pas des traductions : on la lance
-// tout de suite, en parallèle des fetch de I18N.init(), au lieu de l'enchaîner
-// derrière lui. L'affichage du panneau (showPanel, qui a besoin des
-// traductions) attend toujours la fin de I18N.init — aucun flash de clés
-// non traduites, seulement le round-trip réseau qui se recouvre.
+
+
 const firstLaunchPromise = fetch(`${API}/api/auth/first-launch`)
     .then(r => r.json())
     .catch(() => null);
@@ -292,9 +287,7 @@ setupHoverDelegation();
 setupKeyboardShortcuts();
 });
 
-/* ============================================
-   🐳 CONFIG APPLICATIVE (types de source autorisés en Docker etc.)
-   ============================================ */
+
 let stellioAppConfig = { allowed_source_types: ['folder', 'file', 'smb', 'nfs'], headless: false };
 
 async function loadAppConfig() {
@@ -363,9 +356,7 @@ document.getElementById('local-manual-form')?.addEventListener('submit', async (
     }
 });
 
-/* ============================================
-   💾 SAUVEGARDE / IMPORT / EXPORT
-   ============================================ */
+
 function exportBackup() {
     document.getElementById('backup-options-form')?.reset();
     openModal('modal-backup-options');
@@ -414,7 +405,7 @@ async function runBackupExport(include) {
             try {
                 const data = await res.json();
                 msg = data.error || msg;
-            } catch (e) { /* réponse non-JSON, on garde le message générique */ }
+            } catch (e) {  }
             showToast(msg, 'error');
             return;
         }
@@ -532,9 +523,7 @@ function showBackupRestartPopup() {
     });
 }
 
-/* ============================================
-   🛡️ VÉRIFICATION D'INTÉGRITÉ
-   ============================================ */
+
 let integrityPollInterval = null;
 
 async function startIntegrityCheck() {
@@ -680,7 +669,7 @@ async function repairFileFromIntegrity(path, btn) {
                 : (data.message || I18N.t('toast.repair_success') || 'Fichier réparé');
             showToast(msg, data.watertight === false ? 'warning' : 'success');
 
-            // Retire la ligne de la liste des problèmes et met à jour les compteurs affichés
+
             const row = document.querySelector(`.integrity-result-row[data-path="${CSS.escape(path)}"]`);
             row?.remove();
             const corruptedEl = document.getElementById('integrity-corrupted-count');
@@ -701,9 +690,7 @@ async function repairFileFromIntegrity(path, btn) {
     }
 }
 
-/* ============================================
-   ⌨️ RACCOURCIS CLAVIER
-   ============================================ */
+
 function isTypingContext(e) {
     const tag = (e.target.tagName || '').toLowerCase();
     return tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable;
@@ -864,9 +851,8 @@ const searchInput = document.getElementById('global-search');
 if (searchInput) searchInput.placeholder = I18N.t('search.placeholder');
 I18N.apply();
 });
-// ============================================
-// 🖼️ GÉNÉRATION MINIATURES
-// ============================================
+
+
 window.handleThumbnailError = function (img) {
 if (img.dataset.loaded === 'true') return;
 img.style.display = 'none';
@@ -908,11 +894,11 @@ const observer = new IntersectionObserver((entries, obs) => {
         if (!filePath) return;
         const thumbImg = card.querySelector('.file-thumb img');
         const needsGeneration = (
-            !thumbImg ||                                       
-            !thumbImg.src ||                                   
-            thumbImg.src === window.location.href ||           
-            thumbImg.dataset.loaded === 'false' ||             
-            (thumbImg.src && thumbImg.naturalWidth === 0 && thumbImg.complete) 
+            !thumbImg ||
+            !thumbImg.src ||
+            thumbImg.src === window.location.href ||
+            thumbImg.dataset.loaded === 'false' ||
+            (thumbImg.src && thumbImg.naturalWidth === 0 && thumbImg.complete)
         );
         if (needsGeneration) {
             window.requestThumbGeneration(filePath);
@@ -921,9 +907,8 @@ const observer = new IntersectionObserver((entries, obs) => {
 }, { rootMargin: '300px' });
 cards.forEach(card => observer.observe(card));
 }
-// ============================================
-// 🎨 THÈME & APPEARANCE
-// ============================================
+
+
 (function applyThemeOnLoad() {
 const savedTheme = localStorage.getItem('stellio-theme') || 'dark';
 const savedFabricant = localStorage.getItem('stellio-fabricant') || 'stellio';
@@ -938,9 +923,8 @@ const savedCustomAccent = localStorage.getItem('stellio-custom-accent');
 if (savedCustomAccent) applyCustomAccent(savedCustomAccent);
 console.log('[Theme] ✅ Appliqué:', savedTheme, savedFabricant);
 })();
-// ============================================
-//  GESTION MINIATURES LAZY
-// ============================================
+
+
 window.requestThumbGeneration = async function (filePath) {
 if (generatingThumbs.has(filePath) || pendingThumbRequests.has(filePath)) return;
 if (window.permanentlyIgnoredThumbs && window.permanentlyIgnoredThumbs.has(filePath)) return;
@@ -1025,9 +1009,8 @@ testImg.onerror = function() {
 };
 testImg.src = newSrc;
 }
-// ============================================
-// 📊 MÉTADONNÉES 3D
-// ============================================
+
+
 window.requestMetadataAnalysis = async function (filePath, callback) {
 if (analysisCache[filePath]) {
 callback(analysisCache[filePath]);
@@ -1068,9 +1051,8 @@ callback(null);
 pendingMetadataRequests.delete(filePath);
 }
 };
-// ============================================
-// ⭐ FAVORIS
-// ============================================
+
+
 async function loadFavorites() {
 try {
 const res = await fetch(`${API}/api/favorites`);
@@ -1107,7 +1089,7 @@ body: JSON.stringify({ path: filePath })
 });
 if (res.ok) {
 const data = await res.json();
-if (data.favorited) { 
+if (data.favorited) {
 favoriteFiles.add(filePath);
 showToast(I18N.t('toast.favorites_added'), 'success');
 } else {
@@ -1219,9 +1201,8 @@ if (!showFavoritesOnly) {
     updateFavoritesCount();
 }
 };
-// ============================================
-// 🗜️ DÉCOMPRESSION
-// ============================================
+
+
 async function decompressFile(filePath, event) {
 if (event) {
 event.preventDefault();
@@ -1324,9 +1305,8 @@ setTimeout(() => toast.remove(), 300);
 }
 }
 };
-// ============================================
-// 🔐 AUTHENTIFICATION UTILISATEUR
-// ============================================
+
+
 const REMEMBER_LOGIN_KEY = 'stellio_remember_login';
 
 function _b64encodeUtf8(str) {
@@ -1354,8 +1334,8 @@ function prefillRememberedLogin() {
 
 async function checkAuth(preFetchedFirstLaunch = null) {
 try {
-// Si l'appel a déjà été lancé en parallèle de I18N.init(), on réutilise
-// sa promesse au lieu de refaire la requête réseau.
+
+
 const firstLaunchData = preFetchedFirstLaunch
     ? await preFetchedFirstLaunch
     : await (await fetch(`${API}/api/auth/first-launch`)).json();
@@ -1390,7 +1370,7 @@ loadTags();
 loadFavorites();
 loadSeenFiles();
 loadPrinters();
-loadSlicerProfiles(); // relance après confirmation de session (corrige la course avec initSettings() au démarrage)
+loadSlicerProfiles();
 checkAccountsStatusOnStartup();
 startThumbProgressMonitor();
 startMaintenanceDueChecker();
@@ -1431,9 +1411,8 @@ toast.style.transition = 'all 0.3s ease';
 setTimeout(() => toast.remove(), 300);
 }, 3500);
 }
-// ============================================
-// 📡 MONITORING & AUTO-SCAN
-// ============================================
+
+
 async function checkAccountsStatusOnStartup() {
 try {
 const res = await fetch(`${API}/api/accounts/status`);
@@ -1487,9 +1466,8 @@ console.debug('[AutoScan] Vérification échouée');
 }
 }, 15000);
 }
-// ============================================
-// 🔧 UTILITAIRES
-// ============================================
+
+
 function escapeHtml(str) {
 if (!str) return '';
 const div = document.createElement('div');
@@ -1515,14 +1493,12 @@ return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 function openModal(modalId) { document.getElementById(modalId)?.classList.remove('hidden'); }
 function closeModal(modalId) {
     document.getElementById(modalId)?.classList.add('hidden');
-    // Le popup slicer peut avoir été ouvert depuis le viewer 3D (bouton
-    // "Envoyer au slicer") : si on l'annule/ferme sans envoyer, on
-    // réinitialise juste le drapeau sans toucher au viewer, qui reste ouvert.
+
+
     if (modalId === 'modal-slicer') _slicerLaunchedFromViewer = false;
 }
-// ============================================
-//  MÉTADONNÉES & TOOLTIPS
-// ============================================
+
+
 async function loadFileMetadata(filePath, callback) {
 if (analysisCache[filePath]) {
 callback(analysisCache[filePath]);
@@ -1549,9 +1525,8 @@ console.error('[Metadata] Erreur:', err);
 callback(null);
 }
 }
-// ============================================
-// 📂 SOURCES DE FICHIERS
-// ============================================
+
+
 async function addSource(type, name, path, config) {
 try {
 const res = await fetch(`${API}/api/sources`, {
@@ -1632,9 +1607,8 @@ console.error(err);
 }
 });
 }
-// ============================================
-// 📋 CHARGEMENT & AFFICHAGE FICHIERS
-// ============================================
+
+
 let scanPollingInterval = null;
 let scanBadgeElement = null;
 async function loadFiles() {
@@ -1693,24 +1667,24 @@ scanPollingInterval = setInterval(async () => {
             return;
         }
         const data = await res.json();
-        
+
         if (data.status === 'done' || data.status === 'idle') {
              noChangeCount++;
             if (noChangeCount >= 5 || data.found === 0) {
                 clearInterval(scanPollingInterval);
                 scanPollingInterval = null;
                 hideScanBadge();
-                return;  
+                return;
             }
         } else {
             noChangeCount = 0;
         }
-        
+
         if (data.status === 'scanning' && (data.found !== lastFound || data.status !== lastStatus)) {
             lastFound = data.found;
             lastStatus = data.status;
             updateScanBadge(I18N.t('scan.in_progress', { count: data.found }));
-            
+
             if (data.new_files && data.new_files.length > 0) {
                 allFiles = allFiles.concat(data.new_files);
                 filteredFiles = showFavoritesOnly ? allFiles.filter(f => favoriteFiles.has(f.path)) : [...allFiles];
@@ -1723,7 +1697,7 @@ scanPollingInterval = setInterval(async () => {
         } else if (data.status === 'done') {
             clearInterval(scanPollingInterval);
              scanPollingInterval = null;
-            
+
             if (data.found > 0) {
                 updateScanBadge(I18N.t('scan.done', { count: data.found }), 'success');
                 setTimeout(() => hideScanBadge(), 4000);
@@ -1834,9 +1808,8 @@ default: return 0;
 });
 }
 }
-// ============================================
-// 📊 PROGRESSION GÉNÉRATION MINIATURES
-// ============================================
+
+
 let thumbProgressInterval = null;
 let thumbProgressCompleted = false;
 function startThumbProgressMonitor() {
@@ -1853,9 +1826,9 @@ thumbProgressInterval = setInterval(async () => {
     try {
         const res = await fetch(`${API}/api/thumb/progress`);
         if (!res.ok) return;
-        
+
         const data = await res.json();
-        
+
         if (data.progress === lastProgress && data.pending === lastPending) {
             if (data.files_without_thumb === 0 && data.pending === 0) {
                 if (!container.classList.contains('completed')) {
@@ -1870,19 +1843,19 @@ thumbProgressInterval = setInterval(async () => {
             }
             return;
         }
-        
+
         lastProgress = data.progress;
         lastPending = data.pending;
-        
+
         if (data.is_generating || data.files_without_thumb > 0) {
             container.classList.remove('hidden');
             container.classList.remove('completed');
-            
+
             requestAnimationFrame(() => {
                 progressBar.style.width = `${data.progress}%`;
-                progressText.textContent = `${data.files_with_thumb}/${data.total} (${data.pending} en attente)`;  
+                progressText.textContent = `${data.files_with_thumb}/${data.total} (${data.pending} en attente)`;
             });
-            
+
             if (data.files_without_thumb === 0 && data.pending === 0) {
                 container.classList.add('completed');
                 progressText.textContent = `${data.files_with_thumb}/${data.total}`;
@@ -1902,9 +1875,8 @@ thumbProgressInterval = setInterval(async () => {
     }
 }, 2000);
 }
-// ============================================
-// 🎴 RENDU CARTE FICHIER
-// ============================================
+
+
 function renderFileCard(f, icons) {
 const ext = f.extension || '';
 const icon = icons[ext] || 'fa-file';
@@ -1968,9 +1940,8 @@ const deleteBtnHtml = (!isVirtualEntry && !isSelectionMode)
     : '';
 return `<div class="file-card${selectedClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}><div class="file-thumb" style="position:relative;">${checkboxHtml}${fileMenuBtnHtml}${thumbContent}${tooltipHtml}<span class="file-ext-badge">${ext.replace('.', '')}</span>${deleteBtnHtml}${isArchive ? archiveEntryHtml : ''}${inArchiveBadgeHtml}${multiPlateBadgeHtml}${isNew ? newBadgeHtml : ''}${isArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); decompressFile('${escapeJs(f.path)}', event)" title="${I18N.t('toast.extract_success')}"><i class="fa-solid fa-file-zipper"></i> ${I18N.t('actions.add')}</button>` : ''}${inArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); extractArchiveEntry('${escapeJs(f.archive_path)}', '${escapeJs(f.internal_path)}', event)" title="${I18N.t('actions.extract_single_file') || 'Extraire uniquement ce fichier'}"><i class="fa-solid fa-download"></i></button>` : ''}<button type="button" class="file-favorite-btn ${isFav ? 'favorited' : ''}" onclick="toggleFavorite('${escapeJs(f.path)}', event); return false;" title="${isFav ? I18N.t('toast.favorites_removed') : I18N.t('toast.favorites_added')}"><i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-star"></i></button><button type="button" class="file-tag-btn" onclick="event.stopPropagation(); openTagModal('${escapeJs(f.path)}')" title="${I18N.t('modal.manage_tags')}"><i class="fa-solid fa-tag"></i></button></div><div class="file-info"><div class="file-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>${f.tags?.length ? `<div class="file-tags">${f.tags.map(t => `<span class="file-tag" style="background:${t.color}20;color:${t.color};border-color:${t.color}">${escapeHtml(t.name)}</span>`).join('')}</div>` : ''}</div></div>`;
 }
-// ============================================
-// ✅ SÉLECTION MULTIPLE
-// ============================================
+
+
 window.toggleSelectionMode = function () {
 isSelectionMode = !isSelectionMode;
 selectedFiles.clear();
@@ -2015,7 +1986,10 @@ try {
 const res = await fetch(`${API}/api/slicer/send-batch`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ files: [...selectedFiles] })
+body: JSON.stringify({
+    files: [...selectedFiles],
+    printer_id: document.getElementById('batch-slicer-printer-select')?.value || null
+})
 });
 const data = await res.json();
 if (res.ok) {
@@ -2030,9 +2004,8 @@ showToast(I18N.t('toast.connection_error'), 'error');
 console.error('[Batch Slicer]', err);
 }
 };
-// ============================================
-// 🗑️ SUPPRESSION GROUPÉE
-// ============================================
+
+
 window.deleteSelectedFiles = async function () {
 if (selectedFiles.size === 0) {
 showToast(I18N.t('toast.no_selection'), 'warning');
@@ -2071,9 +2044,8 @@ showToast(I18N.t('toast.connection_error'), 'error');
 console.error('[Batch Delete]', err);
 }
 };
-// ============================================
-// 🔄 RÉGÉNÉRATION GROUPÉE DE MINIATURES
-// ============================================
+
+
 window.regenSelectedThumbnails = async function () {
 if (selectedFiles.size === 0) {
 showToast(I18N.t('toast.no_selection'), 'warning');
@@ -2145,9 +2117,8 @@ showToast(I18N.t('toast.connection_error'), 'error');
 console.error('[Batch Thumb Regen]', err);
 }
 };
-// ============================================
-// 🎨 RENDU GRILLE FICHIERS (AVEC CHUNKING)
-// ============================================
+
+
 function renderFiles(chunkSize = 50) {
 const grid = document.getElementById('files-grid');
 if (!filteredFiles?.length) {
@@ -2291,9 +2262,8 @@ function renderChunk() {
 }
 renderChunk();
 }
-// ============================================
-// 🔄 POLLING MINIATURES EN ATTENTE (spinners)
-// ============================================
+
+
 let _pendingThumbTimer = null;
 function startPendingThumbPolling() {
     if (_pendingThumbTimer) { clearTimeout(_pendingThumbTimer); _pendingThumbTimer = null; }
@@ -2340,9 +2310,7 @@ function startPendingThumbPolling() {
     _pendingThumbTimer = setTimeout(poll, 1500);
 }
 
-// ============================================
-// 🔄 GÉNÉRATION MINIATURES EN BACKGROUND
-// ============================================
+
 function startThumbnailGeneration(limit = 200) {
 const files = filteredFiles;
 if (!files?.length) return;
@@ -2425,7 +2393,7 @@ thumbRefreshInterval = setInterval(async () => {
         const filePath = card.dataset.path;
         if (!filePath) continue;
         pending.push({ card, filePath });
-        if (pending.length >= 10) break; 
+        if (pending.length >= 10) break;
     }
     if (!pending.length) return;
     try {
@@ -2444,13 +2412,11 @@ thumbRefreshInterval = setInterval(async () => {
                 window.requestThumbGeneration(filePath);
             }
         }
-    } catch (err) { /* Silent */ }
-}, 5000); 
+    } catch (err) {  }
+}, 5000);
 }
 
-// ============================================
-// ⚠️ NOTIFICATIONS D'ÉCHEC DE GÉNÉRATION DE MINIATURE
-// ============================================
+
 let thumbFailureInterval = null;
 function startThumbFailureMonitor() {
 if (thumbFailureInterval) clearInterval(thumbFailureInterval);
@@ -2462,14 +2428,14 @@ thumbFailureInterval = setInterval(async () => {
         for (const f of (data.failures || [])) {
             showToast(I18N.t('toast.thumb_error_named', { name: f.name }), 'error');
         }
-    } catch (err) { /* Silent */ }
+    } catch (err) {  }
 
     try {
         const res2 = await fetch(`${API}/api/thumb/summary`);
         if (!res2.ok) return;
         const data2 = await res2.json();
         if (data2.summary) showThumbSummaryModal(data2.summary);
-    } catch (err) { /* Silent */ }
+    } catch (err) {  }
 }, 20000);
 }
 
@@ -2524,9 +2490,8 @@ modal.innerHTML = `<div class="modal-content">
 openModal('modal-thumb-summary');
 I18N.apply();
 }
-// ============================================
-// 🏷️ GESTION DES TAGS
-// ============================================
+
+
 async function loadTags() {
 try {
 const res = await fetch(`${API}/api/tags`);
@@ -2727,16 +2692,14 @@ showToast(I18N.t('toast.fetch_error'), 'error');
 console.error(err);
 }
 };
-// ============================================
-// 🔑 COMPTES EXTERNES
-// ============================================
+
+
 function updateThingiverseFooterStatus(connected, error = null) {
     updateAccountBadge('thingiverse', !!connected);
     if (connected) showAccountKeyConfigured('thingiverse');
 }
-// ============================================
-// ⬇️ TÉLÉCHARGEMENTS
-// ============================================
+
+
 async function loadDownloadSources() {
 const select = document.getElementById('download-source');
 if (!select) return;
@@ -2746,9 +2709,9 @@ const res = await fetch(`${API}/api/sources`);
 if (!res.ok) throw new Error(I18N.t('toast.load_source_error'));
 const sources = await res.json();
 const folderSources = sources.filter(s => s.type === 'folder' || s.type === 'smb' || s.type === 'nfs');
-    if (folderSources.length === 0) { 
-        select.innerHTML += `<option value="" disabled>${I18N.t('download.no_local_folders')}</option>`; 
-        return; 
+    if (folderSources.length === 0) {
+        select.innerHTML += `<option value="" disabled>${I18N.t('download.no_local_folders')}</option>`;
+        return;
     }
 
     folderSources.forEach(source => {
@@ -2818,17 +2781,17 @@ updateDownloadToast(downloadInfo, currentMB, totalMB);
 }
 } catch (err) { console.error('[Progress polling error]', err); }
 }, 500);
-    const res = await fetch(`${API}/api/download`, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ url: downloadInfo.url, target_source_id: downloadInfo.sourceId || null, download_id: downloadInfo.id, preferred_format: downloadInfo.preferredFormat || '' }) 
+    const res = await fetch(`${API}/api/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: downloadInfo.url, target_source_id: downloadInfo.sourceId || null, download_id: downloadInfo.id, preferred_format: downloadInfo.preferredFormat || '' })
     });
     clearInterval(progressPollingInterval);
     const data = await res.json();
-    
+
     if (res.ok) {
-        downloadInfo.status = 'completed'; 
-        downloadInfo.progress = 100; 
+        downloadInfo.status = 'completed';
+        downloadInfo.progress = 100;
         downloadInfo.filename = data.filename || I18N.t('download.file_placeholder');
         updateDownloadToast(downloadInfo, (data.size / 1024 / 1024).toFixed(1), (data.size / 1024 / 1024).toFixed(1), true);
         showToast(`✓ ${downloadInfo.filename} ${I18N.t('toast.download_success')}`, 'success');
@@ -3048,9 +3011,8 @@ await loadDownloadSources();
 showToast(I18N.t('toast.picker_unavailable'), 'warning');
 }
 };
-// ============================================
-// 🔍 FILTRES
-// ============================================
+
+
 function applyFilters() {
 let files = [...allFiles];
 if (activeTypeFilters?.length > 0 && activeTypeFilters.length < 3) files = files.filter(f => activeTypeFilters.includes(f.extension));
@@ -3155,9 +3117,8 @@ else activeTagFilters.delete(e.target.value);
 });
 I18N.apply();
 }
-// ============================================
-// ✂️ ENVOI AU SLICER
-// ============================================
+
+
 let currentSlicerOrientation = 'default';
 let _slicerLaunchedFromViewer = false;
 
@@ -3196,7 +3157,7 @@ try {
         </div>`;
     }).join('');
     box.style.display = 'flex';
-} catch (e) { /* vérification best-effort, on n'empêche jamais l'envoi si elle échoue */ }
+} catch (e) {  }
 }
 document.getElementById('slicer-ai-printer-select')?.addEventListener('change', () => {
 if (currentSlicerFile) _runPrePrintCheck(currentSlicerFile);
@@ -3215,17 +3176,27 @@ try {
     const badge = FILAMENT_SOURCE_BADGES[a.source_type] || '';
     label.textContent = `${badge} ` + _t2('spoolman.consume_on_send', `Décomptera ${a.name || ('#' + a.source_id)}${a.material ? ' (' + a.material + ')' : ''} au lancement de l'impression`, { name: a.name || `#${a.source_id}`, material: a.material ? ` (${a.material})` : '' });
     box.style.display = 'block';
-} catch (e) { /* pas d'assignation trouvée, on laisse la boîte masquée */ }
+} catch (e) {  }
 }
-// ============================================
-// 🎮 VISUALISEUR 3D
-// ============================================
+
+
 let viewer3D = null, viewerControls = null, viewerScene = null, viewerCamera = null, viewerMesh = null, viewerRenderer = null;
 let viewerOverhangMode = false;
 let viewerCurrentOrientation = 'default';
 const OVERHANG_THRESHOLD_DEG = 45;
 let viewerActive = false, viewerAnimationId = null;
 let viewerGizmoScene = null, viewerGizmoCamera = null;
+let viewerHomeCameraPos = null;
+
+
+function recenterViewerCamera() {
+    if (!viewerCamera || !viewerControls || !viewerHomeCameraPos) return;
+    viewerControls.target0.set(0, 0, 0);
+    viewerControls.position0.copy(viewerHomeCameraPos);
+    viewerControls.up0.set(0, 1, 0);
+    viewerControls.reset();
+}
+window.recenterViewerCamera = recenterViewerCamera;
 
 function disposeViewer3D() {
 viewerActive = false;
@@ -3279,6 +3250,7 @@ viewerRenderer = null;
 viewerScene = null;
 viewerCamera = null;
 viewerMesh = null;
+viewerHomeCameraPos = null;
 }
 
 let viewerCurrentPlate = 1;
@@ -3297,10 +3269,7 @@ load3DModel(filePath, viewerCurrentPlate);
 updatePlateNavUI();
 }
 
-// Envoie le fichier actuellement ouvert dans le viewer 3D vers le slicer,
-// en conservant l'orientation choisie dans le dropdown du viewer. Le
-// viewer reste ouvert derrière la popup slicer (voir #modal-slicer en CSS)
-// et se refermera automatiquement une fois l'envoi confirmé.
+
 function sendViewerFileToSlicer() {
     if (!viewerCurrentPath) return;
     const orientation = viewerCurrentOrientation || 'default';
@@ -3451,15 +3420,7 @@ function computeOverhangVertexColors(geometry, thresholdDeg = OVERHANG_THRESHOLD
     const critColor = new THREE.Color(0xff3b30);
     const tmp = new THREE.Color();
 
-    // La face qui repose à plat sur le plateau d'impression (le bas du
-    // modèle dans son orientation actuelle) a forcément une normale
-    // tournée vers le bas, mais elle ne nécessite aucun support puisque
-    // c'est la toute première couche, posée directement sur le plateau.
-    // On exclut donc de la détection toute géométrie proche du point le
-    // plus bas du modèle, sur une tolérance proportionnelle à sa hauteur.
-    // Toujours recalculé ici : le bounding box existant peut dater d'avant
-    // le recentrage du modèle (geometry.translate) et serait alors décalé
-    // par rapport aux positions réelles des sommets.
+
     geometry.computeBoundingBox();
     const minZ = geometry.boundingBox.min.z;
     const heightZ = geometry.boundingBox.max.z - minZ;
@@ -3472,7 +3433,7 @@ function computeOverhangVertexColors(geometry, thresholdDeg = OVERHANG_THRESHOLD
             c = safeColor;
         } else {
             const nz = normalAttr.getZ(i);
-            const downFactor = -nz; // >0 si la normale pointe (au moins en partie) vers le bas
+            const downFactor = -nz;
             if (downFactor > dThreshold) {
                 const t = Math.min(1, (downFactor - dThreshold) / (1 - dThreshold));
                 c = tmp.copy(warnColor).lerp(critColor, t);
@@ -3497,6 +3458,27 @@ function toggleOverhangView() {
     }
 }
 
+
+function _createViewerRenderer() {
+const attemptOptions = [
+    { antialias: true },
+    { antialias: false, failIfMajorPerformanceCaveat: false, powerPreference: 'default' },
+    { antialias: false, failIfMajorPerformanceCaveat: false, powerPreference: 'low-power' },
+];
+let lastError = null;
+for (const opts of attemptOptions) {
+    try {
+        return new THREE.WebGLRenderer(opts);
+    } catch (e) {
+        lastError = e;
+        console.warn('[3D Viewer] Échec création contexte WebGL avec', opts, e);
+    }
+}
+const wrapped = new Error('WEBGL_CONTEXT_UNAVAILABLE');
+wrapped.cause = lastError;
+throw wrapped;
+}
+
 function load3DModel(filePath, plateIndex) {
 disposeViewer3D();
 const myToken = ++viewer3DLoadToken;
@@ -3517,13 +3499,13 @@ if (!res.ok) {
 return res.blob();
 })
 .then(blob => {
-if (myToken !== viewer3DLoadToken) return; // une requête plus récente a pris le relais
+if (myToken !== viewer3DLoadToken) return;
 const url = URL.createObjectURL(blob);
 viewerScene = new THREE.Scene();
 viewerScene.background = new THREE.Color('#1a1d23');
 viewerCamera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 10000);
 viewerCamera.position.set(50, 50, 50);
-viewerRenderer = new THREE.WebGLRenderer({ antialias: true });
+viewerRenderer = _createViewerRenderer();
 viewerRenderer.setSize(container.clientWidth, container.clientHeight);
 viewerRenderer.setPixelRatio(window.devicePixelRatio);
 container.innerHTML = '';
@@ -3542,25 +3524,19 @@ container.appendChild(viewerRenderer.domElement);
 
     const ambientLight = new THREE.AmbientLight(0x404040, 1.3);
     viewerScene.add(ambientLight);
-    // La lumière directionnelle est attachée à la caméra (comme une lampe
-    // frontale) plutôt que fixée dans l'espace du monde : elle suit ainsi
-    // toujours le point de vue au lieu de sembler "tourner" sur le modèle
-    // quand on orbite/tourne autour de celui-ci.
+
+
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
     directionalLight.position.set(0, 0, 1);
     viewerCamera.add(directionalLight);
     viewerScene.add(viewerCamera);
-    
+
     const loader = new THREE.STLLoader();
-    
+
     loader.load(url, function (geometry) {
         if (myToken !== viewer3DLoadToken) { URL.revokeObjectURL(url); return; }
-        // Beaucoup de STL "HD"/haute résolution exportent des normales par
-        // face à zéro (0,0,0), en s'attendant à ce que le viewer les
-        // recalcule. Si on les utilise telles quelles, l'éclairage Phong
-        // n'a rien à quoi répondre et le modèle apparaît tout noir.
-        // On recalcule systématiquement les normales à partir de la
-        // géométrie pour un rendu fiable, quel que soit le fichier source.
+
+
         geometry.deleteAttribute('normal');
         geometry.computeVertexNormals();
         const shadedMaterial = new THREE.MeshPhongMaterial({ color: 0x4ea1d3, specular: 0x111111, shininess: 120, flatShading: false, side: THREE.DoubleSide });
@@ -3593,9 +3569,11 @@ container.appendChild(viewerRenderer.domElement);
         const maxDim = Math.max(size.x, size.y, size.z);
         const fov = viewerCamera.fov * (Math.PI / 180);
         const cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
+        viewerCamera.up.set(0, 1, 0);
         viewerCamera.position.set(cameraZ, cameraZ, cameraZ);
         viewerCamera.lookAt(0, 0, 0);
-        
+        viewerHomeCameraPos = viewerCamera.position.clone();
+
         viewerActive = true;
         function animate() {
             if (!viewerActive) return;
@@ -3627,9 +3605,9 @@ container.appendChild(viewerRenderer.domElement);
             }
         }
         animate();
-        
+
         URL.revokeObjectURL(url);
-        
+
     }, undefined, function (error) {
         if (myToken !== viewer3DLoadToken) return;
         console.error('[3D Viewer] Fichier illisible/corrompu:', error);
@@ -3640,13 +3618,21 @@ container.appendChild(viewerRenderer.domElement);
 .catch(err => {
     if (myToken !== viewer3DLoadToken) return;
     console.error('[3D Viewer]', err);
+    if (err && err.message === 'WEBGL_CONTEXT_UNAVAILABLE') {
+        const hint = I18N.t('viewer.webgl_unavailable_hint') || "Impossible d'initialiser l'affichage 3D sur cette machine (accélération graphique indisponible ou bloquée). Vérifie que l'accélération matérielle n'est pas désactivée, que les pilotes GPU sont à jour, ou qu'un antivirus (Avast, etc.) ne bloque pas le rendu graphique de l'application.";
+        container.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:var(--danger);text-align:center;padding:0 24px;">
+            <i class="fa-solid fa-display-slash fa-2x"></i>
+            <span>${escapeHtml(hint)}</span>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="load3DModel('${escapeHtml(filePath)}', ${plateIndex || 1})"><i class="fa-solid fa-rotate-right"></i> ${I18N.t('actions.retry') || 'Réessayer'}</button>
+        </div>`;
+        return;
+    }
     const message = (err && err.message) ? escapeHtml(err.message) : I18N.t('toast.connection_error');
     container.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;color:var(--danger);text-align:center;padding:0 16px;"><i class="fa-solid fa-triangle-exclamation fa-2x"></i><span>${message}</span></div>`;
 });
 }
-// ============================================
-// ⚙️ PARAMÈTRES & THÈMES
-// ============================================
+
+
 async function loadSlicerSettings() {
 const select = document.getElementById('default-slicer-select');
 const preferredSelect = document.getElementById('preferred-slicer-select');
@@ -3663,9 +3649,7 @@ if (preferredSelect && data.preferred_slicer_id) preferredSelect.value = data.pr
 loadSlicerProfiles();
 }
 
-// ============================================
-// 🧠 ASSISTANT IA — PROFILS SLICER
-// ============================================
+
 const SLICER_NAME_LABELS = {
     prusaslicer: 'PrusaSlicer',
     superslicer: 'SuperSlicer',
@@ -3676,8 +3660,20 @@ const SLICER_NAME_LABELS = {
     anycubic_slicer_next: 'Anycubic Slicer Next',
 };
 
+
+const PROFILE_TYPE_META = {
+    printer:  { icon: 'fa-print',    color: 'var(--accent)',     i18nKey: 'settings.slicer_profiles_type_printer',  fallback: 'Imprimante' },
+    filament: { icon: 'fa-droplet',  color: '#c084fc',           i18nKey: 'settings.slicer_profiles_type_filament', fallback: 'Filament' },
+    process:  { icon: 'fa-sliders',  color: 'var(--text-muted)', i18nKey: 'settings.slicer_profiles_type_process',  fallback: 'Réglages' },
+};
+
+function _profileTypeMeta(type) {
+    return PROFILE_TYPE_META[type] || PROFILE_TYPE_META.process;
+}
+
 let _lastSlicerProfiles = [];
 let _slicerProfilesFilter = 'unassigned';
+let _slicerProfilesTypeFilter = 'all';
 
 async function loadSlicerProfiles() {
 const list = document.getElementById('slicer-profiles-list');
@@ -3696,6 +3692,11 @@ _slicerProfilesFilter = value || 'unassigned';
 renderSlicerProfiles(_lastSlicerProfiles);
 }
 
+function filterSlicerProfilesByType(value) {
+_slicerProfilesTypeFilter = value || 'all';
+renderSlicerProfiles(_lastSlicerProfiles);
+}
+
 function _populatePrinterSelects() {
 const selects = [
     document.getElementById('slicer-profile-import-printer'),
@@ -3704,6 +3705,8 @@ const selects = [
     document.getElementById('nesting-ai-printer-select'),
     document.getElementById('sosprint-printer-select'),
     document.getElementById('settings-printer-power-select'),
+    document.getElementById('batch-slicer-printer-select'),
+    document.getElementById('folder-batch-printer-select'),
 ];
 selects.forEach(sel => {
     if (!sel) return;
@@ -3721,24 +3724,38 @@ selects.forEach(sel => {
 }
 
 function _populateMaterialSelects(profiles) {
-const selects = [
-    document.getElementById('slicer-ai-material-select'),
-    document.getElementById('nesting-ai-material-select'),
-];
-const materials = [...new Set((profiles || []).map(p => p.material_type).filter(Boolean))].sort();
-selects.forEach(sel => {
-    if (!sel) return;
-    const current = sel.value;
-    sel.querySelectorAll('option[data-dynamic]').forEach(o => o.remove());
-    materials.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m;
-        opt.textContent = m;
-        opt.setAttribute('data-dynamic', '1');
-        sel.appendChild(opt);
+    const selects = [
+        document.getElementById('slicer-ai-material-select'),
+        document.getElementById('nesting-ai-material-select'),
+    ];
+
+    (profiles || []).forEach(p => {
+        if (p.profile_type === 'filament' && !p.material_type && p.name) {
+            const nameLower = p.name.toLowerCase();
+            const knownMats = ['pla', 'petg', 'abs', 'tpu', 'asa', 'nylon', 'pc', 'hips', 'pva'];
+            for (const mat of knownMats) {
+                if (nameLower.includes(mat)) {
+                    p.material_type = mat.toUpperCase();
+                    break;
+                }
+            }
+        }
     });
-    if (materials.includes(current)) sel.value = current;
-});
+
+    const materials = [...new Set((profiles || []).map(p => p.material_type).filter(Boolean))].sort();
+    selects.forEach(sel => {
+        if (!sel) return;
+        const current = sel.value;
+        sel.querySelectorAll('option[data-dynamic]').forEach(o => o.remove());
+        materials.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            opt.setAttribute('data-dynamic', '1');
+            sel.appendChild(opt);
+        });
+        if (materials.includes(current)) sel.value = current;
+    });
 }
 
 function renderSlicerProfiles(profiles) {
@@ -3754,7 +3771,9 @@ return;
 }
 
 const filter = _slicerProfilesFilter;
+const typeFilter = _slicerProfilesTypeFilter;
 const filtered = _lastSlicerProfiles.filter(p => {
+    if (typeFilter !== 'all' && p.profile_type !== typeFilter) return false;
     if (filter === 'all') return true;
     if (filter === 'unassigned') return !p.printer_id || p.printer_match_confirmed === false;
     return String(p.printer_id) === String(filter);
@@ -3774,10 +3793,23 @@ list.innerHTML = filtered.map(p => {
     const isSuggested = !!p.printer_id && p.printer_match_confirmed === false;
     const rawDetected = (!p.printer_id && p.compatible_printers && p.compatible_printers.length)
         ? p.compatible_printers[0] : null;
+    const typeMeta = _profileTypeMeta(p.profile_type);
+
+
+    const typeOptions = ['printer', 'filament', 'process'].map(t => {
+        const m = _profileTypeMeta(t);
+        return `<option value="${t}" ${t === p.profile_type ? 'selected' : ''}>${escapeHtml(_t3(m.i18nKey, m.fallback))}</option>`;
+    }).join('');
+    const typeBadge = `<select onchange="reassignSlicerProfileType('${p.id}', this.value)" style="flex-shrink:0; appearance:none; -webkit-appearance:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; padding:2px 18px 2px 7px; border-radius:999px; font-size:10px; font-weight:600; color:${typeMeta.color}; background:color-mix(in srgb, ${typeMeta.color} 16%, transparent) url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 10 6%22><path fill=%22${encodeURIComponent(typeMeta.color)}%22 d=%22M0 0l5 6 5-6z%22/></svg>') no-repeat right 6px center/8px 5px; border:1px solid color-mix(in srgb, ${typeMeta.color} 40%, transparent);" title="${_t3('settings.slicer_profiles_type_hint', 'Nature du profil — corrige si la détection auto s’est trompée')}">
+        ${typeOptions}
+    </select>`;
     return `
     <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; background:var(--bg-input); border:1px solid ${isSuggested ? 'var(--warning, #d9a441)' : 'var(--border)'}; border-radius:var(--radius); font-size:12.5px;">
         <div style="min-width:0; flex:1;">
-            <div style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.name)}</div>
+            <div style="display:flex; align-items:center; gap:6px; min-width:0;">
+                ${typeBadge}
+                <div style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.name)}</div>
+            </div>
             <div style="color:var(--text-muted); font-size:11px; margin-top:2px;">
                 ${escapeHtml(SLICER_NAME_LABELS[p.slicer] || p.slicer)}${p.material_type ? ' · ' + escapeHtml(p.material_type) : ''}${p.layer_height ? ' · ' + p.layer_height + 'mm' : ''}
             </div>
@@ -3815,6 +3847,21 @@ try {
 
 async function confirmSlicerProfileMatch(profileId, printerId) {
     await reassignSlicerProfilePrinter(profileId, printerId);
+}
+
+async function reassignSlicerProfileType(profileId, profileType) {
+try {
+    const res = await fetch(`${API}/api/slicer-profiles/${profileId}/type`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_type: profileType })
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || _t3('toast.error', 'Erreur'), 'error'); return; }
+    renderSlicerProfiles(data.profiles || []);
+    showToast(_t3('settings.slicer_profiles_type_updated', 'Type de profil mis à jour'), 'success');
+} catch (err) {
+    showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error');
+}
 }
 
 async function importSlicerProfiles(fileList) {
@@ -3860,6 +3907,83 @@ window.openSlicerProfileFilePicker = async function () {
     document.getElementById('slicer-profile-file-input').click();
 };
 
+
+let _pendingSlicerImportFiles = [];
+
+window.openSlicerImportAssignModal = function (fileList) {
+    if (!fileList || !fileList.length) return;
+    _pendingSlicerImportFiles = Array.from(fileList);
+    const list = document.getElementById('slicer-import-assign-list');
+    if (!list) { importSlicerProfiles(_pendingSlicerImportFiles); return; }
+
+    const defaultPrinterId = document.getElementById('slicer-profile-import-printer')?.value || '';
+    const printerOptions = (printersList || []).map(pr =>
+        `<option value="${pr.id}" ${String(pr.id) === String(defaultPrinterId) ? 'selected' : ''}>${escapeHtml(pr.name)}</option>`
+    ).join('');
+
+    list.innerHTML = _pendingSlicerImportFiles.map((file, idx) => `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); font-size:12.5px;">
+            <span style="min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(file.name)}</span>
+            <select class="settings-select settings-select-sm" data-file-index="${idx}" style="flex-shrink:0; min-width:150px;">
+                <option value="" ${!defaultPrinterId ? 'selected' : ''}>${_t3('settings.slicer_profiles_no_printer', 'Non assigné')}</option>
+                ${printerOptions}
+            </select>
+        </div>
+    `).join('');
+
+    openModal('modal-slicer-import-assign');
+};
+
+async function confirmSlicerImportAssign() {
+    if (!_pendingSlicerImportFiles.length) { closeModal('modal-slicer-import-assign'); return; }
+
+    const rows = document.querySelectorAll('#slicer-import-assign-list select[data-file-index]');
+    const groups = new Map();
+    rows.forEach(sel => {
+        const idx = parseInt(sel.dataset.fileIndex, 10);
+        const file = _pendingSlicerImportFiles[idx];
+        if (!file) return;
+        const printerId = sel.value || '';
+        if (!groups.has(printerId)) groups.set(printerId, []);
+        groups.get(printerId).push(file);
+    });
+
+    closeModal('modal-slicer-import-assign');
+    showToast(_t3('toast.importing', 'Import en cours...'), 'info');
+
+    let totalImported = 0, hadError = false, lastProfiles = null;
+    for (const [printerId, files] of groups) {
+        const formData = new FormData();
+        for (const file of files) formData.append('profiles', file);
+        if (printerId) formData.append('printer_id', printerId);
+        try {
+            const res = await fetch(`${API}/api/slicer-profiles/import`, { method: 'POST', body: formData });
+            const data = await res.json();
+            if (!res.ok) {
+                hadError = true;
+                showToast(data.error || I18N.t('toast.error') || 'Erreur', 'error');
+                continue;
+            }
+            totalImported += (data.imported || []).length;
+            lastProfiles = data.profiles || lastProfiles;
+            if ((data.errors || []).length) console.warn('[SlicerProfiles] Erreurs:', data.errors);
+        } catch (err) {
+            hadError = true;
+            showToast(I18N.t('toast.connection_error') || 'Erreur de connexion', 'error');
+        }
+    }
+
+    if (lastProfiles) renderSlicerProfiles(lastProfiles);
+    else loadSlicerProfiles();
+
+    if (totalImported > 0) {
+        showToast(_t3('settings.slicer_profiles_imported', `${totalImported} profil(s) importé(s)`, { count: totalImported }), 'success');
+    } else if (!hadError) {
+        showToast(I18N.t('toast.error') || 'Erreur', 'error');
+    }
+    _pendingSlicerImportFiles = [];
+}
+
 async function autoDetectSlicerProfiles() {
 if (!(await _confirmSlicerImportWithoutPrinters())) return;
 const btn = document.getElementById('slicer-profiles-autodetect-btn');
@@ -3867,7 +3991,7 @@ if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${_t3('set
 try {
 const res = await fetch(`${API}/api/slicer-profiles/auto-detect`, { method: 'POST' });
 let data = null;
-try { data = await res.json(); } catch (parseErr) { /* réponse non-JSON, ex: page d'erreur serveur */ }
+try { data = await res.json(); } catch (parseErr) {  }
 if (!res.ok) {
     const msg = (data && data.error) ? data.error : `Erreur serveur (HTTP ${res.status})`;
     showToast(msg, 'error');
@@ -3978,11 +4102,9 @@ box.innerHTML = `
 `;
 }
 
-// ============================================
-// 🧩 NESTING (AUTO-ARRANGEMENT DE PLATEAU)
-// ============================================
+
 let _lastNestingResult = null;
-let _lastAiRecommendedProfile = null; 
+let _lastAiRecommendedProfile = null;
 
 function openNestingModal() {
 if (selectedFiles.size < 2) {
@@ -4016,7 +4138,7 @@ const res = await fetch(`${API}/api/nesting/arrange`, {
     body: JSON.stringify({ paths, bed_width: bedW, bed_height: bedH, bed_height_z: bedZ, spacing })
 });
 let data = null;
-try { data = await res.json(); } catch (e) { /* réponse non-JSON */ }
+try { data = await res.json(); } catch (e) {  }
 if (!res.ok) {
     bedEl.innerHTML = `<div style="padding:20px; color:var(--danger);">${escapeHtml((data && data.error) || `Erreur serveur (HTTP ${res.status})`)}</div>`;
     return;
@@ -4088,7 +4210,7 @@ const res = await fetch(`${API}/api/ollama/recommend-profile-batch`, {
     })
 });
 let data = null;
-try { data = await res.json(); } catch (e) { /* réponse non-JSON */ }
+try { data = await res.json(); } catch (e) {  }
 if (!res.ok) {
     if (data && data.no_profiles) {
         box.innerHTML = `<div style="color:var(--text-muted);"><i class="fa-solid fa-circle-info"></i> ${_t3('modal.ai_recommend_no_profiles', "Aucun profil importé. Ajoute tes profils dans Paramètres → Slicer pour activer l'assistant.")}</div>`;
@@ -4107,7 +4229,7 @@ if (btn) btn.disabled = false;
 
 function sendNestedPlateToSlicer() {
 if (!_lastNestingResult || !_lastNestingResult.output_path) return;
-const aiProfile = _lastAiRecommendedProfile; 
+const aiProfile = _lastAiRecommendedProfile;
 closeModal('modal-nesting');
 sendToSlicer(_lastNestingResult.output_path, _lastNestingResult.output_filename || 'plateau_nesté.3mf', aiProfile);
 }
@@ -4174,7 +4296,7 @@ let savedCustomAccent = null;
 try {
 const res2 = await fetch(`${API}/api/settings`);
 if (res2.ok) savedCustomAccent = (await res2.json()).custom_accent || null;
-} catch (e) { /* ignore */ }
+} catch (e) {  }
 if (!savedCustomAccent || savedCustomAccent === 'undefined') savedCustomAccent = localStorage.getItem('stellio-custom-accent') || null;
 const accentPicker = document.getElementById('custom-accent-picker');
 if (savedCustomAccent) {
@@ -4233,9 +4355,8 @@ loadPrintCostSettings();
 loadAccountBadges();
 loadNavOrder();
 }
-// ============================================
-// 🪗 ACCORDÉONS PARAMÈTRES
-// ============================================
+
+
 function toggleAccord(headerEl) {
     const section = headerEl.closest('.accord-section');
     if (!section) return;
@@ -4253,9 +4374,8 @@ function toggleAccord(headerEl) {
     section.classList.toggle('open');
 }
 window.toggleAccord = toggleAccord;
-// ============================================
-// 🧵 SPOOLMAN — URL DU SERVEUR
-// ============================================
+
+
 function normalizeSpoolmanUrl(raw) {
 let url = (raw || '').trim();
 if (!url) return '';
@@ -4304,10 +4424,30 @@ if (data.spoolman_url) input.value = data.spoolman_url;
 }
 } catch (e) { console.warn('[Spoolman] Réglages indisponibles'); }
 }
+async function deleteSpoolmanUrl() {
+    try {
+        const res = await fetch(`${API}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ spoolman_url: '' })
+        });
+        if (res.ok) {
+            const input = document.getElementById('spoolman-url-input');
+            if (input) input.value = '';
+            localStorage.removeItem('stellio-spoolman-url');
+            showToast(I18N.t('toast.spoolman_url_deleted') || 'URL Spoolman supprimée', 'success');
+            if (typeof loadSpoolmanPage === 'function') loadSpoolmanPage();
+        } else {
+            const data = await res.json().catch(() => ({}));
+            showToast(data.error || I18N.t('toast.save_error'), 'error');
+        }
+    } catch (err) {
+        console.error('[deleteSpoolmanUrl]', err);
+        showToast(I18N.t('toast.network_error_backend'), 'error');
+    }
+}
+window.deleteSpoolmanUrl = deleteSpoolmanUrl;
 
-// ============================================
-// 🤖 OLLAMA — AUTO-TAGGING LOCAL
-// ============================================
 
 async function loadOllamaSettings() {
     try {
@@ -4468,9 +4608,7 @@ async function loadAutoScanSettings() {
     } catch (e) { console.warn('[AutoScan] Réglages indisponibles'); }
 }
 
-// ============================================
-// 🧵 TARIFS D'IMPRESSION — bobines multiples + imprimante de référence
-// ============================================
+
 let printCostSpools = [];
 let printCostDefaultSpoolId = null;
 let printCostCurrency = 'EUR';
@@ -4579,7 +4717,7 @@ async function loadPrintCostSettings() {
                 color: s.color || '#888888',
             }));
         } else if (data.print_cost_spool_price != null || data.print_cost_spool_weight != null) {
-            // Legacy single-spool format from before multi-spool support — migrate it once.
+
             printCostSpools = [{
                 id: _genSpoolId(),
                 name: I18N.t('cost.spool_default_name') || 'Bobine 1',
@@ -4588,7 +4726,7 @@ async function loadPrintCostSettings() {
                 color: '#888888',
             }];
         } else {
-            // Fresh install / no spool data yet — start empty until the user adds one.
+
             printCostSpools = [];
         }
         printCostDefaultSpoolId = (data.print_cost_default_spool_id && printCostSpools.some(s => s.id === data.print_cost_default_spool_id))
@@ -4666,7 +4804,7 @@ async function savePrintCostSettings() {
             printCostCurrency = currency;
             renderSpoolsList();
             applyCurrencySymbols();
-            if (selectedPrinterId) loadPrinters(); // rafraîchit printersList avec la puissance à jour
+            if (selectedPrinterId) loadPrinters();
         } else {
             showToast(I18N.t('toast.save_error') || 'Erreur', 'error');
         }
@@ -4917,9 +5055,7 @@ window.saveOllamaSettings   = saveOllamaSettings;
 window.ollamaAutoTag        = ollamaAutoTag;
 window.ollamaAddSuggestedTag = ollamaAddSuggestedTag;
 
-/* ============================================
-   🩺 S.O.S PRINT — Diagnostic d'échec d'impression (Ollama)
-   ============================================ */
+
 let sosprintPendingQuestions = [];
 let sosprintPhotoFile = null;
 
@@ -5199,7 +5335,7 @@ async function getSpoolmanUrl() {
         const res = await fetch(`${API}/api/settings`);
         if (res.ok) {
             const data = await res.json();
-            if (data.spoolman_url) return data.spoolman_url;
+            if ('spoolman_url' in data) return data.spoolman_url || '';
         }
     } catch (e) {}
     return localStorage.getItem('stellio-spoolman-url') || '';
@@ -5208,26 +5344,24 @@ async function getSpoolmanUrl() {
 async function loadSpoolmanPage() {
     const grid = document.getElementById('spoolman-grid');
     const label = document.getElementById('spoolman-server-label');
+    const addBtn = document.getElementById('add-manual-spool-btn');
     if (!grid) return;
 
     const url = await getSpoolmanUrl();
 
     if (label) {
-        label.innerHTML = url ? `<i class="fa-solid fa-circle-nodes"></i> ${escapeHtml(url)}` : '';
+        label.innerHTML = url
+            ? `<i class="fa-solid fa-circle-nodes"></i> ${escapeHtml(url)}`
+            : `<i class="fa-solid fa-box-open"></i> ${_t2('spoolman.local_inventory_label', 'Inventaire local (sans serveur Spoolman)')}`;
     }
 
     if (!url) {
-        grid.innerHTML = `
-            <div class="empty-state">
-                <i class="fa-solid fa-circle-exclamation"></i>
-                <p>${I18N.t('spoolman.no_server')}</p>
-                <button class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="document.querySelector('.nav-btn[data-page=&quot;settings&quot;]')?.click()">
-                    ${I18N.t('spoolman.configure_in_settings')}
-                </button>
-            </div>`;
+        if (addBtn) addBtn.style.display = '';
+        await loadManualSpoolInventory();
         return;
     }
 
+    if (addBtn) addBtn.style.display = 'none';
     grid.innerHTML = `
         <div class="empty-state">
             <i class="fa-solid fa-spinner fa-spin"></i>
@@ -5237,7 +5371,6 @@ async function loadSpoolmanPage() {
     try {
         const res = await fetch(`${API}/api/spoolman/spools?url=${encodeURIComponent(url)}`);
         const data = await res.json();
-
         if (!res.ok) {
             grid.innerHTML = `
                 <div class="empty-state">
@@ -5247,7 +5380,6 @@ async function loadSpoolmanPage() {
                 </div>`;
             return;
         }
-
         renderSpoolmanGrid(Array.isArray(data) ? data : []);
     } catch (err) {
         console.error('[Spoolman]', err);
@@ -5260,6 +5392,218 @@ async function loadSpoolmanPage() {
     }
 }
 window.loadSpoolmanPage = loadSpoolmanPage;
+
+
+async function loadManualSpoolInventory() {
+    const grid = document.getElementById('spoolman-grid');
+    if (!grid) return;
+    grid.innerHTML = `
+        <div class="empty-state">
+            <i class="fa-solid fa-spinner fa-spin"></i>
+            <p>${I18N.t('spoolman.loading')}</p>
+        </div>`;
+    try {
+        const res = await fetch(`${API}/api/filament/manual`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erreur');
+        renderManualSpoolGrid(Array.isArray(data) ? data : []);
+    } catch (err) {
+        grid.innerHTML = `
+            <div class="empty-state">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <p>${_t2('spoolman.server_unreachable', 'Erreur de connexion')}</p>
+                <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="loadManualSpoolInventory()">${I18N.t('actions.retry')}</button>
+            </div>`;
+    }
+}
+window.loadManualSpoolInventory = loadManualSpoolInventory;
+
+let _manualSpoolCache = [];
+
+function renderManualSpoolGrid(spools) {
+    const grid = document.getElementById('spoolman-grid');
+    if (!grid) return;
+    _manualSpoolCache = spools;
+    if (!spools.length) {
+        grid.innerHTML = `
+            <div class="empty-state">
+                <i class="fa-solid fa-box-open"></i>
+                <p>${_t2('spoolman.no_manual_spools', 'Aucune bobine dans ton inventaire')}</p>
+            </div>`;
+        return;
+    }
+    grid.innerHTML = spools.map(s => {
+        const color = s.color_hex || '#888888';
+        const remaining = typeof s.remaining_g === 'number' ? s.remaining_g : null;
+        const capacity = s.capacity_g || null;
+        const pct = (remaining !== null && capacity) ? Math.max(0, Math.min(100, (remaining / capacity) * 100)) : null;
+        const archived = !!s.archived;
+        return `
+            <div class="spool-card ${archived ? 'archived' : ''}">
+                <div class="spool-card-header">
+                    <span class="spool-color-dot" style="background:${escapeHtml(color)};"></span>
+                    <div class="spool-title">
+                        <span class="spool-name">${escapeHtml(s.name)}</span>
+                        ${s.vendor ? `<span class="spool-vendor">${escapeHtml(s.vendor)}</span>` : ''}
+                    </div>
+                    ${archived ? `<span class="spool-badge">${_t2('spoolman.archived', 'Archivée')}</span>` : ''}
+                </div>
+                <div class="spool-card-body">
+                    ${s.material ? `<span class="spool-material-tag">${escapeHtml(s.material)}</span>` : ''}
+                    ${pct !== null ? `
+                        <div class="spool-weight-row">
+                            <span>${Math.round(remaining)} ${I18N.t('units.g_remaining')}</span>
+                            <span>${Math.round(pct)}%</span>
+                        </div>
+                        <div class="spool-progress-track">
+                            <div class="spool-progress-bar" style="width:${pct}%; background:${escapeHtml(color)};"></div>
+                        </div>
+                    ` : remaining !== null ? `<p class="spool-weight-row"><span>${Math.round(remaining)} ${I18N.t('units.g_remaining')}</span></p>` : ''}
+                    ${s.price ? `<p class="spool-location"><i class="fa-solid fa-tag"></i> ${Number(s.price).toFixed(2)} €</p>` : ''}
+                    ${s.diameter_mm ? `<p class="spool-location"><i class="fa-solid fa-ruler"></i> Ø${s.diameter_mm} mm</p>` : ''}
+                    ${s.notes ? `<p class="spool-location" style="white-space:normal;"><i class="fa-solid fa-note-sticky"></i> ${escapeHtml(s.notes)}</p>` : ''}
+                </div>
+                <div class="spool-card-actions" style="display:flex; gap:6px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+                    <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="openSpoolInventoryModal(${s.id})">
+                        <i class="fa-solid fa-pen"></i> ${_t2('actions.edit', 'Modifier')}
+                    </button>
+                    <button class="btn btn-ghost btn-sm" onclick="toggleArchiveManualSpool(${s.id}, ${!archived})" data-i18n-title="${archived ? 'spoolman.unarchive' : 'spoolman.archive'}" title="${archived ? _t2('spoolman.unarchive', 'Désarchiver') : _t2('spoolman.archive', 'Archiver')}">
+                        <i class="fa-solid ${archived ? 'fa-box-open' : 'fa-box-archive'}"></i>
+                    </button>
+                    <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteManualSpoolFromInventory(${s.id})" data-i18n-title="actions.delete" title="${_t2('actions.delete', 'Supprimer')}">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </div>`;
+    }).join('');
+}
+window.renderManualSpoolGrid = renderManualSpoolGrid;
+
+function openSpoolInventoryModal(spoolId) {
+    const existing = spoolId ? _manualSpoolCache.find(s => s.id === spoolId) : null;
+    let modal = document.getElementById('modal-spool-inventory');
+    if (modal) modal.remove();
+    modal = document.createElement('div');
+    modal.id = 'modal-spool-inventory';
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h2>${existing ? _t2('spoolman.edit_spool', 'Modifier la bobine') : _t2('spoolman.add_spool_btn', 'Ajouter bobine')}</h2>
+                <button class="modal-close" onclick="closeModal('modal-spool-inventory')">×</button>
+            </div>
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:10px;">
+                <div class="input-group">
+                    <label>${_t2('spoolman.name', 'Nom')}</label>
+                    <input type="text" id="spool-inv-name" class="form-input" placeholder="${_t2('spoolman.name', 'Nom')} (ex: PLA Noir Geeetech)" value="${escapeHtml(existing?.name || '')}">
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <div class="input-group" style="flex:1;">
+                        <label>${_t2('spoolman.material', 'Matière')}</label>
+                        <input type="text" id="spool-inv-material" class="form-input" placeholder="PLA, PETG, ABS..." value="${escapeHtml(existing?.material || '')}">
+                    </div>
+                    <div class="input-group" style="width:70px;">
+                        <label>${_t2('spoolman.color', 'Couleur')}</label>
+                        <input type="color" id="spool-inv-color" value="${existing?.color_hex || '#888888'}" style="width:100%; height:38px; padding:2px; border-radius:var(--radius); border:1px solid var(--border); cursor:pointer;">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>${_t2('spoolman.vendor', 'Marque')}</label>
+                    <input type="text" id="spool-inv-vendor" class="form-input" placeholder="${_t2('spoolman.vendor', 'Marque')} (ex: Geeetech, eSun...)" value="${escapeHtml(existing?.vendor || '')}">
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <div class="input-group" style="flex:1;">
+                        <label>${_t2('spoolman.remaining_g', 'Poids restant (g)')}</label>
+                        <input type="number" id="spool-inv-remaining" class="form-input" placeholder="1000" value="${existing?.remaining_g ?? ''}">
+                    </div>
+                    <div class="input-group" style="flex:1;">
+                        <label>${_t2('spoolman.capacity_g', 'Poids total (g)')}</label>
+                        <input type="number" id="spool-inv-capacity" class="form-input" placeholder="1000" value="${existing?.capacity_g ?? 1000}">
+                    </div>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <div class="input-group" style="flex:1;">
+                        <label>${_t2('spoolman.price', 'Prix (€)')}</label>
+                        <input type="number" step="0.01" id="spool-inv-price" class="form-input" placeholder="19.99" value="${existing?.price ?? ''}">
+                    </div>
+                    <div class="input-group" style="flex:1;">
+                        <label>${_t2('spoolman.diameter', 'Diamètre (mm)')}</label>
+                        <input type="number" step="0.01" id="spool-inv-diameter" class="form-input" placeholder="1.75" value="${existing?.diameter_mm ?? 1.75}">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>${_t2('spoolman.notes', 'Notes')}</label>
+                    <textarea id="spool-inv-notes" class="form-input" rows="2" placeholder="${_t2('spoolman.notes_placeholder', 'Remarques, lieu de stockage...')}">${escapeHtml(existing?.notes || '')}</textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" onclick="closeModal('modal-spool-inventory')">${_t2('actions.cancel', 'Annuler')}</button>
+                <button class="btn btn-primary" onclick="saveSpoolInventoryEntry(${existing ? existing.id : 'null'})">
+                    <i class="fa-solid fa-check"></i> ${_t2('actions.save', 'Enregistrer')}
+                </button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-spool-inventory'); });
+    openModal('modal-spool-inventory');
+}
+window.openSpoolInventoryModal = openSpoolInventoryModal;
+
+async function saveSpoolInventoryEntry(spoolId) {
+    const name = document.getElementById('spool-inv-name')?.value.trim();
+    if (!name) { showToast(_t2('spoolman.name_required', 'Le nom est requis'), 'error'); return; }
+    const payload = {
+        name,
+        material: document.getElementById('spool-inv-material')?.value.trim() || '',
+        color_hex: document.getElementById('spool-inv-color')?.value || '#888888',
+        vendor: document.getElementById('spool-inv-vendor')?.value.trim() || '',
+        remaining_g: parseFloat(document.getElementById('spool-inv-remaining')?.value) || null,
+        capacity_g: parseFloat(document.getElementById('spool-inv-capacity')?.value) || 1000,
+        price: parseFloat(document.getElementById('spool-inv-price')?.value) || null,
+        diameter_mm: parseFloat(document.getElementById('spool-inv-diameter')?.value) || 1.75,
+        notes: document.getElementById('spool-inv-notes')?.value.trim() || '',
+    };
+    try {
+        const url = spoolId ? `${API}/api/filament/manual/${spoolId}` : `${API}/api/filament/manual`;
+        const method = spoolId ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.error || _t2('toast.error', 'Erreur'), 'error'); return; }
+        closeModal('modal-spool-inventory');
+        showToast(_t2('spoolman.spool_saved', 'Bobine enregistrée'), 'success');
+        await loadManualSpoolInventory();
+    } catch (err) {
+        showToast(_t2('toast.connection_error', 'Erreur de connexion'), 'error');
+    }
+}
+window.saveSpoolInventoryEntry = saveSpoolInventoryEntry;
+
+async function toggleArchiveManualSpool(spoolId, archived) {
+    try {
+        await fetch(`${API}/api/filament/manual/${spoolId}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ archived: archived ? 1 : 0 })
+        });
+        await loadManualSpoolInventory();
+    } catch (err) {
+        showToast(_t2('toast.connection_error', 'Erreur de connexion'), 'error');
+    }
+}
+window.toggleArchiveManualSpool = toggleArchiveManualSpool;
+
+async function deleteManualSpoolFromInventory(spoolId) {
+    const ok = await showConfirmDialog(_t2('spoolman.confirm_delete', 'Supprimer cette bobine de l\u2019inventaire ?'), { title: _t2('actions.delete', 'Supprimer') });
+    if (!ok) return;
+    try {
+        const res = await fetch(`${API}/api/filament/manual/${spoolId}`, { method: 'DELETE' });
+        if (!res.ok) { showToast(_t2('toast.error', 'Erreur'), 'error'); return; }
+        showToast(_t2('spoolman.spool_deleted', 'Bobine supprimée'), 'success');
+        await loadManualSpoolInventory();
+    } catch (err) {
+        showToast(_t2('toast.connection_error', 'Erreur de connexion'), 'error');
+    }
+}
+window.deleteManualSpoolFromInventory = deleteManualSpoolFromInventory;
 
 function renderSpoolmanGrid(spools) {
     const grid = document.getElementById('spoolman-grid');
@@ -5310,16 +5654,13 @@ function renderSpoolmanGrid(spools) {
     }).join('');
 }
 window.renderSpoolmanGrid = renderSpoolmanGrid;
-// ============================================
-// 🔑 COMPTES EXTERNES — CLÉS API
-// ============================================
+
+
 function updateAccountBadge(platform, connected) {
 const badge = document.getElementById(`${platform}-status-badge`);
 if (!badge) return;
-// On met aussi à jour data-i18n (pas seulement le texte) : sans ça, le
-// moindre I18N.apply() ultérieur (changement de page, de langue, etc.)
-// réécrase le badge avec le texte par défaut codé en dur dans le HTML,
-// même si l'état réel (connecté/non connecté) est correct.
+
+
 const key = connected ? 'settings.account_configured' : 'settings.account_not_configured';
 badge.setAttribute('data-i18n', key);
 badge.textContent = I18N.t(key);
@@ -5353,7 +5694,7 @@ if (input) {
             const data = await res.json();
             if (data.api_key) input.value = data.api_key;
         }
-    } catch (e) { /* Pas de pré-remplissage si erreur */ }
+    } catch (e) {  }
     if (focusInput) input.focus();
 }
 }
@@ -5384,9 +5725,7 @@ showToast(I18N.t('toast.network_error_backend'), 'error');
 }
 window.saveAccountKey = saveAccountKey;
 
-// ============================================
-// 🌍 MAKERWORLD — Connexion en 2 étapes (Bambu Lab)
-// ============================================
+
 let _makerWorldEmail = '';
 
 async function makerWorldStep1() {
@@ -5496,7 +5835,7 @@ async function loadAccountBadges() {
 for (const platform of ['thingiverse']) {
 try {
 const res = await fetch(`${API}/api/accounts/${platform}`);
-if (res.status === 401) continue; 
+if (res.status === 401) continue;
 updateAccountBadge(platform, res.ok);
 if (res.ok) showAccountKeyConfigured(platform);
 else showAccountKeyInput(platform, false);
@@ -5522,11 +5861,10 @@ try {
             if (cr) cr.style.display = 'block';
         }
     }
-} catch (e) { /* silencieux */ }
+} catch (e) {  }
 }
-// ============================================
-// 🧲 RÉORGANISATION DES ÉLÉMENTS DE NAVIGATION 
-// ============================================
+
+
 let draggedNavRow = null;
 function setupNavDragAndDrop() {
 const list = document.getElementById('nav-toggle-list');
@@ -5606,12 +5944,12 @@ if (res.ok) {
 const data = await res.json();
 if (Array.isArray(data.nav_order) && data.nav_order.length) order = data.nav_order;
 }
-} catch (e) { /* backend indisponible */ }
+} catch (e) {  }
 if (!order) {
 try {
 const stored = localStorage.getItem('stellio-nav-order');
 if (stored) order = JSON.parse(stored);
-} catch (e) { /* valeur invalide ignorée */ }
+} catch (e) {  }
 }
 if (Array.isArray(order) && order.length) {
 applyNavOrderToList(order);
@@ -5619,9 +5957,8 @@ applyNavOrderToSidebar(order);
 }
 setupNavDragAndDrop();
 }
-// ============================================
-// 🎧 ÉCOUTEURS D'ÉVÉNEMENTS
-// ============================================
+
+
 function setupEventListeners() {
 document.getElementById('reg-security-question')?.addEventListener('change', (e) => {
     document.getElementById('reg-security-question-custom-group')?.classList.toggle('hidden', e.target.value !== 'custom');
@@ -5811,9 +6148,7 @@ document.getElementById('preferred-slicer-select')?.addEventListener('change', a
     } catch (err) { showToast(I18N.t('toast.error'), 'error'); }
 });
 
-// ============================================
-// 👁️ MASQUAGE CONTEXTUEL DE LA BARRE D'EN-TÊTE
-// ============================================
+
 function updateHeaderVisibilityForPage(page) {
     const isLibrary = page === 'library';
     const libraryOnlyEls = [
@@ -5880,9 +6215,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     });
 });
 
-/* ============================================
-   📱 MENU MOBILE (hamburger)
-   ============================================ */
+
 function openMobileSidebar() {
     document.getElementById('app-sidebar')?.classList.add('mobile-open');
     document.getElementById('sidebar-overlay')?.classList.add('visible');
@@ -5928,21 +6261,19 @@ document.getElementById('send-selected-to-slicer-btn')?.addEventListener('click'
 document.getElementById('nesting-btn')?.addEventListener('click', () => openNestingModal());
 document.getElementById('add-selected-to-project-btn')?.addEventListener('click', () => openSelectionProjectModal());
 document.getElementById('slicer-profile-file-input')?.addEventListener('change', (e) => {
-    importSlicerProfiles(e.target.files);
+    openSlicerImportAssignModal(e.target.files);
     e.target.value = '';
 });
+document.getElementById('confirm-slicer-import-assign')?.addEventListener('click', () => confirmSlicerImportAssign());
 document.getElementById('cancel-selection-btn')?.addEventListener('click', () => toggleSelectionMode());
 document.getElementById('regen-selected-thumbs-btn')?.addEventListener('click', () => regenSelectedThumbnails());
 document.getElementById('delete-selected-btn')?.addEventListener('click', () => deleteSelectedFiles());
 
-// ============================================
-// 📂 DRAG & DROP — ajout de fichiers/dossiers par glisser-déposer
-// ============================================
 
 (function initDragDropSources() {
     const dropZone = document.querySelector('.main-content');
     if (!dropZone) return;
-    let dragCounter = 0; 
+    let dragCounter = 0;
 
     dropZone.addEventListener('dragenter', (e) => {
         e.preventDefault();
@@ -5950,7 +6281,7 @@ document.getElementById('delete-selected-btn')?.addEventListener('click', () => 
         dropZone.classList.add('drop-zone-active');
     });
     dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault(); 
+        e.preventDefault();
     });
     dropZone.addEventListener('dragleave', (e) => {
         e.preventDefault();
@@ -6152,9 +6483,6 @@ async function handleFilePicker(type) {
 
 document.getElementById('refresh-files')?.addEventListener('click', () => { loadFiles(); showToast(I18N.t('toast.refreshing'), 'info'); });
 
-// ============================================
-// 🔍 RECHERCHE — NORMALE + SÉMANTIQUE (Ollama)
-// ============================================
 
 const SEMANTIC_INTENT_WORDS = [
     'je cherche', 'trouver', 'quelque chose', 'un truc', 'un objet', 'une pièce',
@@ -6313,9 +6641,7 @@ const mobileSearchInput = document.getElementById('mobile-search-input');
 globalSearchInput?.addEventListener('input', (e) => handleSearchInput(e.target.value, e.target));
 mobileSearchInput?.addEventListener('input', (e) => handleSearchInput(e.target.value, e.target));
 
-// ============================================
-// ❌ CROIX POUR VIDER LA RECHERCHE
-// ============================================
+
 function clearSearchInput(input) {
     if (!input) return;
     input.value = '';
@@ -6328,9 +6654,7 @@ document.getElementById('mobile-search-clear')?.addEventListener('click', () => 
 window.runSemanticSearch = runSemanticSearch;
 window.setSearchMode     = setSearchMode;
 
-// ============================================
-// 📱 RECHERCHE MOBILE — overlay plein écran
-// ============================================
+
 function openMobileSearch() {
     document.getElementById('mobile-search-overlay')?.classList.add('open');
     setTimeout(() => mobileSearchInput?.focus(), 50);
@@ -6343,9 +6667,7 @@ function closeMobileSearch() {
 document.getElementById('mobile-search-toggle')?.addEventListener('click', openMobileSearch);
 document.getElementById('mobile-search-close')?.addEventListener('click', closeMobileSearch);
 
-// ============================================
-// 🧭 NAVIGATION — toggleNavItem (éléments sidebar)
-// ============================================
+
 function toggleNavItem(navId, visible) {
     try {
         const navBtn = document.querySelector(
@@ -6375,7 +6697,6 @@ document.addEventListener('DOMContentLoaded', function restoreNavPrefs() {
 });
 
 
-
 document.getElementById('sort-select')?.addEventListener('change', (e) => { currentSort = e.target.value; applySorting(); renderFiles(); });
 document.getElementById('apply-filters')?.addEventListener('click', applyFilters);
 
@@ -6384,7 +6705,13 @@ document.getElementById('confirm-slicer')?.addEventListener('click', async () =>
     const consumeSpool = document.getElementById('slicer-spool-box')?.style.display !== 'none'
         && document.getElementById('slicer-consume-spool-checkbox')?.checked;
     try {
-        const body = { file_path: currentSlicerFile, consume_spool: !!consumeSpool, orientation: currentSlicerOrientation || 'default' };
+        const body = {
+            file_path: currentSlicerFile,
+            consume_spool: !!consumeSpool,
+            orientation: currentSlicerOrientation || 'default',
+            printer_id: document.getElementById('slicer-ai-printer-select')?.value || null,
+            material_type: document.getElementById('slicer-ai-material-select')?.value || null
+        };
         if (_lastAiRecommendedProfile && _lastAiRecommendedProfile.id) {
             body.slicer_profile_id = _lastAiRecommendedProfile.id;
             body.slicer_profile_name = _lastAiRecommendedProfile.name;
@@ -6422,7 +6749,7 @@ if (mainContent && scrollToTopBtn) {
 
 document.getElementById('force-refresh-btn')?.addEventListener('click', async () => {
     showToast(I18N.t('toast.refreshing'), 'info');
-    try { await fetch(`${API}/api/files/invalidate-cache`, { method: 'POST' }); } catch (e) { /* Ignore */ }
+    try { await fetch(`${API}/api/files/invalidate-cache`, { method: 'POST' }); } catch (e) {  }
     await loadFiles();
     showToast(I18N.t('toast.refreshed'), 'success');
 });
@@ -6474,9 +6801,8 @@ document.addEventListener('i18n:changed', (e) => {
     I18N.apply();
 });
 }
-// ============================================
-// 📂 SÉLECTION PAR DOSSIER
-// ============================================
+
+
 let selectedFolderFiles = new Set();
 window.selectFolderFiles = function (folderPath, btnElement) {
 const icon = btnElement.querySelector('i');
@@ -6505,8 +6831,9 @@ bar = document.createElement('div');
 bar.id = 'folder-selection-bar';
 bar.className = 'folder-selection-bar';
 bar.style.display = 'flex';
-bar.innerHTML = `<span id="folder-selection-count">${I18N.tp('common.file_count', count, { count })} ${I18N.t('actions.select').toLowerCase()}</span><button onclick="sendFolderSelectionToSlicer()" class="btn btn-primary btn-sm"><i class="fa-solid fa-scissors"></i> ${I18N.t('actions.send_to_slicer')}</button><button onclick="clearFolderSelection()" class="btn btn-ghost btn-sm"><i class="fa-solid fa-times"></i> ${I18N.t('actions.cancel')}</button>`;
+bar.innerHTML = `<span id="folder-selection-count">${I18N.tp('common.file_count', count, { count })} ${I18N.t('actions.select').toLowerCase()}</span><select id="folder-batch-printer-select" class="settings-select" style="min-width:0; width:auto; max-width:150px; font-size:12px; padding:6px 8px;"><option value="" data-i18n="modal.ai_all_printers">Toutes les imprimantes</option></select><button onclick="sendFolderSelectionToSlicer()" class="btn btn-primary btn-sm"><i class="fa-solid fa-scissors"></i> ${I18N.t('actions.send_to_slicer')}</button><button onclick="clearFolderSelection()" class="btn btn-ghost btn-sm"><i class="fa-solid fa-times"></i> ${I18N.t('actions.cancel')}</button>`;
 document.querySelector('.main-content').appendChild(bar);
+_populatePrinterSelects();
 } else {
 bar.style.display = 'flex';
 if (countEl) countEl.textContent = `${I18N.tp('common.file_count', count, { count })} ${I18N.t('actions.select').toLowerCase()}`;
@@ -6518,7 +6845,7 @@ if (bar) bar.style.display = 'none';
 window.sendFolderSelectionToSlicer = async function () {
 if (selectedFolderFiles.size === 0) { showToast(I18N.t('toast.no_selection'), 'warning'); return; }
 try {
-const res = await fetch(`${API}/api/slicer/send-batch`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ files: [...selectedFolderFiles] }) });
+const res = await fetch(`${API}/api/slicer/send-batch`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ files: [...selectedFolderFiles], printer_id: document.getElementById('folder-batch-printer-select')?.value || null }) });
 const data = await res.json();
 if (res.ok) { showToast(`✅ ${data.message}`, 'success'); clearFolderSelection(); }
 else { showToast(data.error || I18N.t('toast.send_error'), 'error'); }
@@ -6535,12 +6862,11 @@ btn.innerHTML = `<i class="fa-regular fa-square"></i> ${I18N.t('actions.select')
 const bar = document.getElementById('folder-selection-bar');
 if (bar) bar.style.display = 'none';
 };
-window.testFolderFiles = async function (sourceId) { /* Implement */ };
-window.testBatchSend = async function (filePaths, slicerPath = null) { /* Implement */ };
-window.testBatchPreview = async function (filePaths) { /* Implement */ };
-// ============================================
-// 🔧 GESTION PAGE RÉPARATION
-// ============================================
+window.testFolderFiles = async function (sourceId) {  };
+window.testBatchSend = async function (filePaths, slicerPath = null) {  };
+window.testBatchPreview = async function (filePaths) {  };
+
+
 let repairFilesList = [];
 let isRepairScanning = false;
 const MAX_FILES_TO_SCAN = 30;
@@ -6551,7 +6877,7 @@ document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
 document.getElementById('page-repair')?.classList.add('active');
 const titleEl = document.getElementById('header-page-title');
 if (titleEl) {
-titleEl.innerHTML = `<i class="fa-solid fa-screwdriver-wrench"></i> ${I18N.t('nav.repair')}`; 
+titleEl.innerHTML = `<i class="fa-solid fa-screwdriver-wrench"></i> ${I18N.t('nav.repair')}`;
 }
 loadRepairFiles();
 });
@@ -6713,9 +7039,8 @@ try {
     showToast(I18N.t('toast.connection_error'), 'error');
 }
 };
-// ============================================
-// 🔁 GESTION PAGE CONVERTISSEUR
-// ============================================
+
+
 let converterAllFiles = [];
 let converterSelectedFiles = new Set();
 
@@ -6752,7 +7077,7 @@ return (converterAllFiles || []).filter(f => {
     const ext = (f.extension || '').toLowerCase();
     if (!['.stl', '.3mf', '.obj'].includes(ext)) return false;
     if (inputFormat !== 'all' && ext !== inputFormat) return false;
-    if (ext === '.' + outputFormat) return false; 
+    if (ext === '.' + outputFormat) return false;
     if (search && !f.name.toLowerCase().includes(search)) return false;
     return true;
 });
@@ -6893,9 +7218,8 @@ try {
     if (typeof loadFiles === 'function') loadFiles();
 }
 });
-// ═══════════════════════════════════════════════════════════════
-// 🖨️ IMPRIMANTES — MODAL
-// ═══════════════════════════════════════════════════════════════
+
+
 const PRINTER_DEFAULT_PORTS = { octoprint: '80', klipper: '7125', marlin: '80' };
 
 window.togglePrinterFields = function() {
@@ -6928,6 +7252,8 @@ window.togglePrinterFields = function() {
 window.openAddPrinterModal = function() {
     openModal('modal-add-printer');
     ['printer-name','printer-ip','printer-api-key','printer-brand','printer-bambu-code','printer-bambu-serial'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const bambuModelReset = document.getElementById('printer-bambu-model');
+    if (bambuModelReset) bambuModelReset.value = 'A1';
     const ts = document.getElementById('printer-type'); if (ts) ts.value = '';
     ['group-ip','group-port','group-api-key','group-bambu'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
     const th = document.getElementById('printer-type-help'); if (th) th.textContent = '';
@@ -6951,9 +7277,7 @@ window.addPrinter = async function() {
     } catch(e) { showToast(I18N.t('toast.connection_error'), 'error'); }
 };
 
-// ============================================
-// 🖨️ COMPATIBILITÉ IMPRIMANTES
-// ============================================
+
 const PRINTER_COMPATIBILITY = {
     'octoprint_generic': {
         status: 'compatible',
@@ -7268,9 +7592,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// ═══════════════════════════════════════════════════════════════
-// 🖨️ NOUVELLE GESTION IMPRIMANTES
-// ═══════════════════════════════════════════════════════════════
 
 window.addPrinter = async function() {
     const editId = document.getElementById('printer-edit-id')?.value.trim() || '';
@@ -7281,6 +7602,7 @@ window.addPrinter = async function() {
     const port = document.getElementById('printer-port').value.trim();
     const bambuCode = document.getElementById('printer-bambu-code').value.trim();
     const bambuSerial = document.getElementById('printer-bambu-serial')?.value.trim() || '';
+    const bambuModel = document.getElementById('printer-bambu-model')?.value || 'A1';
     const elegooCc2Code = document.getElementById('printer-elegoo-cc2-code')?.value.trim() || '';
     const flashforgeSerial = document.getElementById('printer-flashforge-serial')?.value.trim() || '';
     const flashforgeCode = document.getElementById('printer-flashforge-code')?.value.trim() || '';
@@ -7295,6 +7617,7 @@ window.addPrinter = async function() {
     if (type === 'bambu') {
         config.code = bambuCode;
         config.serial = bambuSerial;
+        config.model = bambuModel;
         config.user = 'bblp';
     }
     if (type === 'elegoo_cc2') {
@@ -7316,7 +7639,7 @@ window.addPrinter = async function() {
         const res = await fetch(`${API}/api/printers${isEdit ? '/' + editId : ''}`, {
             method: isEdit ? 'PUT' : 'POST',
             headers: { 'Content-Type': 'application/json' },
-            // Clé API laissée vide en édition = on ne touche pas à celle déjà enregistrée.
+
             body: JSON.stringify({ name, type, ip, api_key: apiKey || (isEdit ? undefined : null), config })
         });
         const data = await res.json();
@@ -7342,8 +7665,7 @@ window.addPrinter = async function() {
     }
 };
 
-// Ouvre la modale d'ajout d'imprimante en mode édition, pré-remplie avec les
-// valeurs actuelles (nom, IP, type, config spécifique au constructeur...).
+
 window.editPrinter = function(pid) {
     const p = printersList.find(pr => pr.id === pid);
     if (!p) return;
@@ -7356,8 +7678,8 @@ window.editPrinter = function(pid) {
     document.getElementById('printer-brand').value = '';
 
     const cfg = (p.config && typeof p.config === 'object') ? p.config : {};
-    // La clé API générique (OctoPrint/PrusaLink/Klipper) est masquée côté serveur ;
-    // on laisse le champ vide et le backend conserve l'ancienne si rien n'est saisi.
+
+
     const apiKeyField = document.getElementById('printer-api-key');
     if (apiKeyField) {
         apiKeyField.value = '';
@@ -7369,6 +7691,8 @@ window.editPrinter = function(pid) {
     if (bambuCodeField) bambuCodeField.value = cfg.code || '';
     const bambuSerialField = document.getElementById('printer-bambu-serial');
     if (bambuSerialField) bambuSerialField.value = cfg.serial || '';
+    const bambuModelField = document.getElementById('printer-bambu-model');
+    if (bambuModelField) bambuModelField.value = cfg.model || 'A1';
     const elegooCc2CodeField = document.getElementById('printer-elegoo-cc2-code');
     if (elegooCc2CodeField) elegooCc2CodeField.value = cfg.code || '';
     const flashforgeSerialField = document.getElementById('printer-flashforge-serial');
@@ -7386,9 +7710,7 @@ window.editPrinter = function(pid) {
     openModal('modal-add-printer');
 };
 
-// ============================================
-// 📊 STATISTIQUES
-// ============================================
+
 window.loadStats = async function () {
     const loading = document.getElementById('stats-loading');
     const content = document.getElementById('stats-content');
@@ -7492,16 +7814,12 @@ window.loadStats = async function () {
     }
 };
 
-// ============================================
-// 🕒 HISTORIQUE DES IMPRESSIONS
-// ============================================
+
 let _historyOffset = 0;
 let _historyEntries = [];
 const HISTORY_LIMIT = 30;
 
-// ============================================
-// ⭐ NOTATION RÉUSSI / RATÉ (alimente l'assistant IA avec de vraies données)
-// ============================================
+
 function _getRatingReasonLabels() {
     return {
         warping:          _t3('history.reason_warping', 'Décollement / warping'),
@@ -7774,9 +8092,7 @@ async function loadDownloadHistory() {
     }
 }
 
-// ============================================
-// 🔗 CLIC SUR UN FICHIER TÉLÉCHARGÉ → BIBLIOTHÈQUE
-// ============================================
+
 document.getElementById('download-history-select')?.addEventListener('change', (e) => {
     const sel = e.target;
     const opt = sel.selectedOptions?.[0];
@@ -7786,7 +8102,7 @@ document.getElementById('download-history-select')?.addEventListener('change', (
 });
 
 window.goToFileInLibrary = function (filePath, fileName) {
-    // Bascule sur la page Bibliothèque
+
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById('page-library')?.classList.add('active');
     if (typeof updateHeaderVisibilityForPage === 'function') updateHeaderVisibilityForPage('library');
@@ -7796,7 +8112,7 @@ window.goToFileInLibrary = function (filePath, fileName) {
     if (headerTitle) headerTitle.innerHTML = `<i class="fa-solid fa-layer-group"></i> ${I18N.t('nav.library')}`;
     closeMobileSidebar?.();
 
-    // Réinitialise tout ce qui pourrait masquer le fichier (favoris, recherche, filtres)
+
     showFavoritesOnly = false;
     if (typeof activeTypeFilters !== 'undefined') activeTypeFilters = [];
     if (typeof currentSizeFilter !== 'undefined') currentSizeFilter = null;
@@ -7823,7 +8139,7 @@ window.goToFileInLibrary = function (filePath, fileName) {
     const tryHighlight = () => {
         const card = document.querySelector(`.file-card[data-path="${CSS.escape(filePath)}"]`);
         if (card) {
-            // Déplie les dossiers parents fermés (mode tri par dossier)
+
             let parent = card.closest('.folder-block');
             while (parent) {
                 if (!parent.classList.contains('folder-block--open')) {
@@ -7935,6 +8251,7 @@ function renderPrinters() {
                     <span title="${I18N.t('printers.extruder')}">🔥 <span id="card-ext-${p.id}">--°C</span></span>
                     <span title="${I18N.t('printers.bed')}">🛏️ <span id="card-bed-${p.id}">--°C</span></span>
                 </div>
+                <div id="card-spools-${p.id}" class="printer-card-spools"></div>
             </div>
             <div class="printer-actions" onclick="event.stopPropagation()">
                 <button class="btn btn-ghost btn-sm" onclick="openPrinterMonitor(${p.id})" title="${I18N.t('printers.monitoring')}"><i class="fa-solid fa-chart-line"></i></button>
@@ -7960,6 +8277,27 @@ function getPrinterIcon(type) {
     return 'mdi-printer';
 }
 
+
+function _renderSpoolChips(ams) {
+    if (!ams || !ams.length) return '';
+    return ams.map(t => {
+        const color = t.color ? `#${String(t.color).replace('#', '').substring(0, 6)}` : 'var(--text-muted)';
+        const label = t.material || t.name || '—';
+        let pct = null;
+        if (typeof t.remain_pct === 'number' && t.remain_pct >= 0) {
+            pct = Math.round(t.remain_pct);
+        } else if (typeof t.remaining_g === 'number' && typeof t.tray_weight === 'number' && t.tray_weight > 0) {
+            pct = Math.round((t.remaining_g / t.tray_weight) * 100);
+        }
+        const tooltip = `${t.name || label}${pct !== null ? ' · ' + pct + '%' : ''}`;
+        return `<span class="spool-chip" title="${escapeHtml(tooltip)}">
+            <span class="spool-chip-dot" style="background:${color};"></span>
+            <span class="spool-chip-label">${escapeHtml(label)}</span>
+            ${pct !== null ? `<span class="spool-chip-pct">${pct}%</span>` : ''}
+        </span>`;
+    }).join('');
+}
+
 let _refreshAllPrintersRunning = false;
 
 async function refreshAllPrinters() {
@@ -7982,10 +8320,8 @@ async function refreshAllPrinters() {
                 if (cardProg) cardProg.textContent = `${Math.round(data.progress || 0)}%`;
 
                 if (statusBadge) {
-                    // Même règle que le backend (api_printer_status) : en ligne tant que
-                    // le statut n'est pas error/offline/timeout, pour éviter que le badge
-                    // de la carte reste figé sur une ancienne valeur pendant que la modale
-                    // affiche déjà l'état à jour.
+
+
                     const isOnline = !['error', 'offline', 'timeout'].includes(data.status);
                     statusBadge.className = `printer-status ${isOnline ? 'connected' : 'disconnected'}`;
                     statusBadge.textContent = isOnline ? I18N.t('printers.online') : I18N.t('printers.offline');
@@ -8007,17 +8343,18 @@ async function refreshAllPrinters() {
                 if (cardExt) cardExt.textContent = `${data.temps?.extruder?.current || 0}°C`;
                 if (cardBed) cardBed.textContent = `${data.temps?.bed?.current || 0}°C`;
 
+                const cardSpools = document.getElementById(`card-spools-${p.id}`);
+                if (cardSpools) cardSpools.innerHTML = _renderSpoolChips(data.ams);
+
                 if (currentMonitorPid === p.id) updateMonitorUI(data);
-            } catch (_) { /* silencieux, non bloquant */ }
+            } catch (_) {  }
         }
     } finally {
         _refreshAllPrintersRunning = false;
     }
 }
 
-// ============================================
-// 🔧 MAINTENANCE IMPRIMANTE
-// ============================================
+
 let _currentMaintenancePid = null;
 
 async function _checkMaintenanceBadge(pid) {
@@ -8029,7 +8366,7 @@ async function _checkMaintenanceBadge(pid) {
         if (!badge) return;
         const hasDue = (data.tasks || []).some(t => t.due);
         badge.style.display = hasDue ? 'block' : 'none';
-    } catch (err) { /* silencieux, non bloquant */ }
+    } catch (err) {  }
 }
 
 function openMaintenanceModal(pid, printerName, brand) {
@@ -8420,7 +8757,7 @@ async function checkMaintenanceDueGlobal() {
             _maintenanceAlertedTaskIds.add(d.task_id);
             showMaintenanceAlertPopup(d.printer_name, d.task_name);
         });
-    } catch (err) { /* silencieux, non bloquant */ }
+    } catch (err) {  }
 }
 
 function showMaintenanceAlertPopup(printerName, taskName) {
@@ -8473,7 +8810,7 @@ function initMonitorUI(printer) {
     const klipperBtn = printer && printer.type === 'klipper' ? `<a href="${klipperUrl}" target="_blank" class="btn btn-sm" style="background:var(--accent); color:white; text-decoration:none; display:inline-flex; align-items:center; gap:6px;"><i class="fa-solid fa-external-link-alt"></i> Klipper</a>` : '';
     const octoprintUrl = printer ? `http://${printer.ip}` : '#';
     const octoprintBtn = printer && printer.type === 'octoprint' ? `<a href="${octoprintUrl}" target="_blank" class="btn btn-sm" style="background:var(--accent); color:white; text-decoration:none; display:inline-flex; align-items:center; gap:6px;"><i class="fa-solid fa-external-link-alt"></i> OctoPrint</a>` : '';
-    
+
     body.innerHTML = `
      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
          <span id="monitor-status-badge" class="monitor-status-badge idle">
@@ -8584,7 +8921,7 @@ function updateMonitorUI(data) {
         }
         bambuExtras.innerHTML = extrasHtml;
     }
-    const progressFill = document.getElementById('monitor-progress-fill'); 
+    const progressFill = document.getElementById('monitor-progress-fill');
     if (progressFill) progressFill.style.width = `${data.progress || 0}%`;
     const progressPct = document.getElementById('monitor-progress-pct');
     if (progressPct) progressPct.textContent = `${Math.round(data.progress || 0)}%`;
@@ -8718,9 +9055,7 @@ window.togglePrinterFields = function() {
     if (help && type === 'bambu') help.textContent = I18N.t('printers.bambu_access_found_hint');
 }
 
-// ============================================
-// 🔍 VÉRIFICATION MANUELLE DES MISES À JOUR
-// ============================================
+
 window.manualCheckUpdate = async function () {
     const btn = document.getElementById('nav-check-update-btn');
     const icon = btn?.querySelector('i');
@@ -8757,9 +9092,8 @@ window.manualCheckUpdate = async function () {
         if (icon) icon.className = originalIcon;
     }
 };
-// ============================================
-// 🔄 GESTION DES MISES À JOUR AUTOMATIQUES
-// ============================================
+
+
 const UpdateManager = {
 lastCheck: 0,
 checkInterval: 6 * 60 * 60 * 1000,
@@ -8794,7 +9128,7 @@ this.showChangelogModal(release);
 localStorage.setItem('stellio-last-seen-version', latestVersion);
 } catch (e) {
 console.warn('[UpdateManager] Erreur check changelog:', e);
-} 
+}
 },
 async checkForUpdates(showModal = true) {
 try {
@@ -8949,9 +9283,8 @@ style.id = 'update-animations';
 style.textContent = `@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } } @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } } @keyframes slideInRight { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } } @keyframes slideOutRight { from { transform: translateX(0); opacity: 1; } to { transform: translateX(400px); opacity: 0; } }`;
 document.head.appendChild(style);
 }
-// ============================================
-// 🚪 CONFIRMATION DE FERMETURE
-// ============================================
+
+
 window.showQuitConfirmation = function() {
 fetch(`${API}/api/app/save-cache`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}), keepalive: true }).catch(() => {});
 const overlay = document.createElement('div');
@@ -8993,14 +9326,12 @@ try {
 navigator.sendBeacon(`${API}/api/app/save-cache`, JSON.stringify({}));
 } catch (err) {}
 });
-// ============================================
-// 📊 BARRE DE PROGRESSION OPTIMISÉE
-// ============================================
+
+
 let lastProgressUpdate = 0;
 const PROGRESS_THROTTLE = 500;
-// ============================================
-// 📌 CHARGEMENT DYNAMIQUE DE LA VERSION
-// ============================================
+
+
 async function loadAppVersion() {
 try {
 const res = await fetch(`${API}/api/update/version`);
@@ -9021,9 +9352,7 @@ if (versionEl) versionEl.textContent = I18N.t('common.unknown') || 'Inconnue';
 }
 }
 
-// ============================================
-// 🩺 CONSOLE DIAGNOSTIC (logs Python en direct)
-// ============================================
+
 let diagConsoleInterval = null;
 let diagConsoleOffset = -1;
 let diagConsoleFetching = false;
@@ -9037,11 +9366,54 @@ function onDiagnosticAccordToggle(headerEl) {
         const box = document.getElementById('diag-console');
         if (box) box.textContent = '';
         startDiagnosticConsolePoll();
+        refreshDebugSessionStatus();
     } else {
         stopDiagnosticConsolePoll();
     }
 }
 window.onDiagnosticAccordToggle = onDiagnosticAccordToggle;
+
+async function refreshDebugSessionStatus() {
+    const hint = document.getElementById('diag-debug-active-hint');
+    if (!hint) return;
+    try {
+        const res = await fetch(`${API}/api/debug/session`);
+        if (!res.ok) return;
+        const data = await res.json();
+        hint.style.display = data.active ? 'block' : 'none';
+    } catch (err) {
+
+    }
+}
+window.refreshDebugSessionStatus = refreshDebugSessionStatus;
+
+async function enableDebugSessionAndRestart(btn) {
+    const confirmMsg = I18N.t('settings.diagnostic_debug_confirm') ||
+        "Stellio va redémarrer et afficher le maximum de logs dans la console pour cette session. Continuer ?";
+    const ok = await showConfirmDialog(confirmMsg, {
+        title: I18N.t('settings.diagnostic_debug_confirm_title') || 'Activer le mode debug ?',
+        confirmLabel: I18N.t('settings.diagnostic_debug_confirm_btn') || 'Redémarrer'
+    });
+    if (!ok) return;
+
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${I18N.t('settings.diagnostic_debug_restarting') || 'Redémarrage...'}`;
+
+    try {
+        const res = await fetch(`${API}/api/debug/enable`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        if (!res.ok) throw new Error();
+    } catch (err) {
+        showToast(I18N.t('toast.connection_error') || 'Erreur de connexion', 'error');
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        return;
+    }
+
+    fetch(`${API}/api/app/quit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}), keepalive: true }).catch(() => {});
+    setTimeout(() => { window.close(); }, 1200);
+}
+window.enableDebugSessionAndRestart = enableDebugSessionAndRestart;
 
 function startDiagnosticConsolePoll() {
     if (diagConsoleInterval) return;
@@ -9099,8 +9471,7 @@ const originalHtml = btn.innerHTML;
 btn.disabled = true;
 btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${I18N.t('settings.diagnostic_exporting') || 'Génération...'}`;
 
-// En mode application desktop (pywebview), on écrit directement dans le
-// dossier Téléchargements de l'utilisateur, sans passer par le navigateur.
+
 if (window.pywebview && window.pywebview.api && window.pywebview.api.save_diagnostic_logs) {
     try {
         const result = await window.pywebview.api.save_diagnostic_logs();
@@ -9144,9 +9515,8 @@ btn.disabled = false;
 btn.innerHTML = originalHtml;
 }
 }
-// ============================================
-// 🎨 VISIBILITY CHANGE
-// ============================================
+
+
 document.addEventListener('visibilitychange', () => {
 if (document.hidden) {
 if (autoScanInterval) { clearInterval(autoScanInterval); autoScanInterval = null; }
@@ -9157,9 +9527,8 @@ startAutoFileMonitor();
 startThumbAutoRefresh();
 }
 });
-// ============================================================
-// ⋯  MODAL ACTIONS FICHIER — 3 points
-// ============================================================
+
+
 (function () {
     let _ctxPath = null;
     let _ctxName = null;
@@ -9462,7 +9831,7 @@ startThumbAutoRefresh();
 			const res = await fetch(`${API}/api/files/move`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ source_path: _movePath, destination_folder: dest })  // ✅ clés corrigées
+				body: JSON.stringify({ source_path: _movePath, destination_folder: dest })
 			});
 			const data = await res.json();
 			if (res.ok) {
@@ -9580,13 +9949,11 @@ startThumbAutoRefresh();
         }
     };
 
-    // ============================================================
-    // 💰 CALCUL DU COÛT D'IMPRESSION
-    // ============================================================
+
     let _costMetadata = null;
     let _costSaveTimer = null;
-    let _preciseEstimate = null;          
-    let _preciseEstimateStatus = 'idle';  
+    let _preciseEstimate = null;
+    let _preciseEstimateStatus = 'idle';
     let _preciseEstimateTimer = null;
 
     function _costSaveSettings() {
@@ -9625,7 +9992,7 @@ startThumbAutoRefresh();
                         print_cost_printer_power: printerPower
                     })
                 });
-            } catch (_) { /* best-effort */ }
+            } catch (_) {  }
         }, 600);
     }
 
@@ -9694,7 +10061,7 @@ startThumbAutoRefresh();
     }
 
     function _handlePreciseEstimateStatus(data, filePath) {
-        if (!data || filePath !== _costCurrentFilePath) return; 
+        if (!data || filePath !== _costCurrentFilePath) return;
         if (data.status === 'done' && data.data) {
             _preciseEstimate = data.data;
             _preciseEstimateStatus = 'done';
@@ -9715,7 +10082,7 @@ startThumbAutoRefresh();
                 const res = await fetch(`${API}/api/slicer/pre-slice-estimate?path=${encodeURIComponent(filePath)}`);
                 const d = await res.json();
                 _handlePreciseEstimateStatus(d, filePath);
-            } catch (e) { /* silencieux, on réessaiera au prochain hover/ouverture */ }
+            } catch (e) {  }
         }, 3000);
     }
 
@@ -9744,6 +10111,9 @@ startThumbAutoRefresh();
             return fallback;
         }
     }
+
+
+    window._t2 = _t2;
 
     const FILAMENT_SOURCE_BADGES = {
         spoolman: '🔵',
@@ -10005,7 +10375,7 @@ startThumbAutoRefresh();
         const isFailed = p.result === 'failed';
         return `
             <div style="position:relative; border-radius:var(--radius); overflow:hidden; background:var(--bg-card); border:1px solid var(--border);">
-                <img src="${API}${p.url}" loading="lazy" style="width:100%; aspect-ratio:1; object-fit:cover; display:block; cursor:pointer;" onclick="window.open('${API}${p.url}', '_blank')">
+                <img src="${API}${p.url}" loading="lazy" style="width:100%; aspect-ratio:1; object-fit:cover; display:block; cursor:pointer;" onclick="openPhotoLightbox('${API}${p.url}', '${escapeHtml(p.file_name)}')">
                 <span style="position:absolute; top:4px; left:4px; padding:2px 7px; border-radius:10px; font-size:10px; font-weight:600; color:#fff; background:${isFailed ? 'rgba(220,53,69,0.85)' : 'rgba(40,167,69,0.85)'};">
                     <i class="fa-solid ${isFailed ? 'fa-xmark' : 'fa-check'}"></i> ${isFailed ? (I18N.t('modal.print_photos_failed') || 'Raté') : (I18N.t('modal.print_photos_success') || 'Réussi')}
                 </span>
@@ -10078,7 +10448,7 @@ startThumbAutoRefresh();
                 const isFailed = p.result === 'failed';
                 return `
                 <div style="position:relative; border-radius:var(--radius); overflow:hidden; background:var(--bg-card); border:1px solid var(--border);">
-                    <img src="${API}${p.url}" loading="lazy" style="width:100%; aspect-ratio:1; object-fit:cover; display:block; cursor:pointer;" onclick="window.open('${API}${p.url}', '_blank')">
+                    <img src="${API}${p.url}" loading="lazy" style="width:100%; aspect-ratio:1; object-fit:cover; display:block; cursor:pointer;" onclick="openPhotoLightbox('${API}${p.url}', '${escapeHtml(p.file_name)}')">
                     <span style="position:absolute; top:4px; left:4px; padding:2px 7px; border-radius:10px; font-size:10px; font-weight:600; color:#fff; background:${isFailed ? 'rgba(220,53,69,0.85)' : 'rgba(40,167,69,0.85)'};">
                         <i class="fa-solid ${isFailed ? 'fa-xmark' : 'fa-check'}"></i> ${isFailed ? (I18N.t('modal.print_photos_failed') || 'Raté') : (I18N.t('modal.print_photos_success') || 'Réussi')}
                     </span>
@@ -10101,6 +10471,87 @@ startThumbAutoRefresh();
         }
     };
 
+
+	window.openPhotoLightbox = function(url, filename) {
+		let overlay = document.getElementById('photo-lightbox-overlay');
+		if (!overlay) {
+			overlay = document.createElement('div');
+			overlay.id = 'photo-lightbox-overlay';
+			overlay.style.cssText = `
+				position: fixed; inset: 0;
+				background: rgba(0,0,0,0.92);
+				backdrop-filter: blur(6px);
+				display: flex; align-items: center; justify-content: center;
+				z-index: 100000;
+				animation: fadeIn 0.2s ease;
+			`;
+			overlay.addEventListener('click', (e) => {
+				if (e.target === overlay) closePhotoLightbox();
+			});
+
+			const img = document.createElement('img');
+			img.id = 'photo-lightbox-img';
+			img.style.cssText = `
+				max-width: 92vw; max-height: 90vh;
+				object-fit: contain;
+				border-radius: 8px;
+				box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+			`;
+			overlay.appendChild(img);
+
+			const caption = document.createElement('div');
+			caption.id = 'photo-lightbox-caption';
+			caption.style.cssText = `
+				position: absolute; bottom: 20px; left: 50%;
+				transform: translateX(-50%);
+				color: #fff; font-size: 13px;
+				background: rgba(0,0,0,0.6);
+				padding: 6px 16px; border-radius: 20px;
+				white-space: nowrap; max-width: 80vw;
+				overflow: hidden; text-overflow: ellipsis;
+			`;
+			overlay.appendChild(caption);
+
+			const closeBtn = document.createElement('button');
+			closeBtn.innerHTML = '×';
+			closeBtn.style.cssText = `
+				position: absolute; top: 16px; right: 20px;
+				background: rgba(0,0,0,0.5); color: #fff;
+				border: none; border-radius: 50%;
+				width: 40px; height: 40px;
+				font-size: 22px; cursor: pointer;
+				display: flex; align-items: center; justify-content: center;
+				transition: background 0.2s;
+			`;
+			closeBtn.addEventListener('mouseenter', () => closeBtn.style.background = 'var(--accent)');
+			closeBtn.addEventListener('mouseleave', () => closeBtn.style.background = 'rgba(0,0,0,0.5)');
+			closeBtn.addEventListener('click', closePhotoLightbox);
+			overlay.appendChild(closeBtn);
+
+			document.body.appendChild(overlay);
+		}
+
+		const imgEl = document.getElementById('photo-lightbox-img');
+		const captionEl = document.getElementById('photo-lightbox-caption');
+		imgEl.src = url;
+		captionEl.textContent = filename || '';
+		overlay.style.display = 'flex';
+
+		document.addEventListener('keydown', _photoLightboxEscHandler);
+	};
+
+	window.closePhotoLightbox = function() {
+		const overlay = document.getElementById('photo-lightbox-overlay');
+		if (overlay) {
+			overlay.style.display = 'none';
+			document.getElementById('photo-lightbox-img').src = '';
+		}
+		document.removeEventListener('keydown', _photoLightboxEscHandler);
+	};
+
+	function _photoLightboxEscHandler(e) {
+		if (e.key === 'Escape') closePhotoLightbox();
+	}
     async function _uploadPrintPhoto(file) {
         if (!file || !_photosCurrentPath) return;
         const note = document.getElementById('print-photo-note-input')?.value || '';
@@ -10181,7 +10632,7 @@ startThumbAutoRefresh();
             });
             const data = await res.json();
             if (res.ok) metadata = data.metadata || null;
-        } catch (e) { /* on affiche quand même les infos de base connues */ }
+        } catch (e) {  }
 
         const dims = metadata?.dimensions ? `${metadata.dimensions.x} × ${metadata.dimensions.y} × ${metadata.dimensions.z} mm` : null;
         const weight = metadata?.weights?.pla ? `${metadata.weights.pla} g (PLA)` : null;
@@ -10299,7 +10750,7 @@ window._applyCostSpoolSelection = _applyCostSpoolSelection;
         try {
             const settingsRes = await fetch(`${API}/api/settings`);
             if (settingsRes.ok) settings = await settingsRes.json();
-        } catch (e) { /* on garde les valeurs par défaut */ }
+        } catch (e) {  }
 
         try {
             const res = await fetch(`${API}/api/files/analyze`, {
@@ -10394,9 +10845,7 @@ window._applyCostSpoolSelection = _applyCostSpoolSelection;
     };
 })();
 
-// ============================================
-// 🧩 PROJETS / ASSEMBLAGES
-// ============================================
+
 let allProjects = [];
 let _currentProjectDetailId = null;
 let _projectPickerSelected = new Set();
@@ -10778,9 +11227,7 @@ window.confirmAddFilesToProject = async function (projectId) {
     }
 };
 
-// ============================================
-// 📂 SÉLECTION MULTIPLE → PROJET (nouveau ou existant)
-// ============================================
+
 window.openSelectionProjectModal = function () {
     if (selectedFiles.size === 0) {
         showToast(I18N.t('toast.no_selection'), 'warning');
@@ -10887,9 +11334,7 @@ window.openQRModal = async function () {
     }
 };
 
-// ============================================
-// 🌐 ACCÈS À DISTANCE (Cloudflare Tunnel)
-// ============================================
+
 window.toggleRemoteAccessEnabled = async function (enabled) {
     const container = document.getElementById('remote-access-content');
     if (container) {
