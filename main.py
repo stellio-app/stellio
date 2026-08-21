@@ -222,15 +222,13 @@ import atexit
 import platform
 import multiprocessing as mp
 
-# ============================================
-# 🌐 VARIABLES GLOBALES & QUEUES
-# ============================================
+
 thumb_generation_queue = queue.Queue()
 metadata_generation_queue = queue.Queue()
 currently_downloading_paths = set()
 is_generation_running = False
-ignored_files_cache = {}  
-IGNORED_FILE_COOLDOWN_S = 600  
+ignored_files_cache = {}
+IGNORED_FILE_COOLDOWN_S = 600
 
 def _is_ignored_recently(path):
     ts = ignored_files_cache.get(path)
@@ -267,20 +265,20 @@ def mark_repair_attempted(file_path):
     repair_ignored_cache.add(normalized)
     _save_repair_ignored()
 
-pyrender_lock = threading.Lock()  
+pyrender_lock = threading.Lock()
 NUM_THUMB_WORKERS = max(2, min(6, (os.cpu_count() or 4) - 1))
 THUMB_GENERATION_TIMEOUT = 90
 THUMB_GENERATION_TIMEOUT_PER_MB = 5
-THUMB_GENERATION_TIMEOUT_MAX = 600 
+THUMB_GENERATION_TIMEOUT_MAX = 600
 thumb_failure_notifications = queue.Queue()
 
 _thumb_session_lock = threading.Lock()
-_thumb_session_active = False       
-_thumb_session_generated = 0        
-_thumb_session_failed = []         
-_thumb_session_total_at_start = 0   
-_thumb_pending_summary = None       
-_thumb_reconciled_this_run = False  
+_thumb_session_active = False
+_thumb_session_generated = 0
+_thumb_session_failed = []
+_thumb_session_total_at_start = 0
+_thumb_pending_summary = None
+_thumb_reconciled_this_run = False
 
 
 def _thumb_session_note_start(extra_count):
@@ -321,6 +319,10 @@ def get_thumb_timeout(file_path):
     except OSError:
         return THUMB_GENERATION_TIMEOUT
     timeout = THUMB_GENERATION_TIMEOUT + size_mb * THUMB_GENERATION_TIMEOUT_PER_MB
+
+
+    if file_path.lower().endswith('.3mf'):
+        timeout *= 1.6
     return min(timeout, THUMB_GENERATION_TIMEOUT_MAX)
 
 
@@ -337,9 +339,7 @@ def _lower_thread_priority():
     except Exception:
         pass
 
-# ============================================
-# 📂 CHEMINS & CONSTANTES
-# ============================================
+
 def get_base_path():
     return os.path.dirname(os.path.abspath(__file__))
 
@@ -371,6 +371,10 @@ UPLOADS_DIR = os.path.join(DATA_DIR, "uploads")
 THUMBNAILS_DIR = os.path.join(DATA_DIR, "thumbnails")
 PRINT_PHOTOS_DIR = os.path.join(DATA_DIR, "print_photos")
 os.makedirs(PRINT_PHOTOS_DIR, exist_ok=True)
+
+
+IMPORTED_PROFILES_DIR = os.path.join(DATA_DIR, "imported_slicer_profiles")
+os.makedirs(IMPORTED_PROFILES_DIR, exist_ok=True)
 CACHE_FILE = os.path.join(DATA_DIR, "file_cache.json")
 CACHE_DURATION = 18000
 CACHE_SCHEMA_VERSION = 2
@@ -380,9 +384,7 @@ repair_ignored_cache = _load_repair_ignored()
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 os.makedirs(THUMBNAILS_DIR, exist_ok=True)
 
-# ============================================
-# 🔐 CHIFFREMENT
-# ============================================
+
 KEY_FILE = os.path.join(DATA_DIR, 'encryption.key')
 if os.path.exists(KEY_FILE):
     with open(KEY_FILE, 'rb') as f:
@@ -399,22 +401,37 @@ else:
     os.chmod(KEY_FILE, 0o600)
     os.chmod(KEY_FILE.replace('.key', '.iv'), 0o600)
 
-# ============================================
-# 📝 CONFIGURATION LOGGING
-# ============================================
+
 LOG_FILE = os.path.join(DATA_DIR, "stellio.log")
 LOG_MAX_SIZE = 5 * 1024 * 1024
 LOG_BACKUP_COUNT = 3
 
+
+DEBUG_FLAG_FILE = os.path.join(DATA_DIR, ".debug_session_pending")
+
+DEBUG_SESSION_ACTIVE = False
+
 def setup_logging():
+    global DEBUG_SESSION_ACTIVE
     try:
         if os.path.exists(LOG_FILE):
             open(LOG_FILE, 'w').close()
     except Exception:
         pass
 
+    debug_requested = os.path.exists(DEBUG_FLAG_FILE)
+    if debug_requested:
+        try:
+            os.remove(DEBUG_FLAG_FILE)
+        except Exception:
+            pass
+    DEBUG_SESSION_ACTIVE = debug_requested
+
+
+    level = logging.DEBUG if debug_requested else logging.WARNING
+
     logger = logging.getLogger('stellio')
-    logger.setLevel(logging.INFO)
+    logger.setLevel(level)
     formatter = logging.Formatter(
         '[%(asctime)s] %(levelname)-8s %(name)s: %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
@@ -425,27 +442,26 @@ def setup_logging():
         backupCount=LOG_BACKUP_COUNT,
         encoding='utf-8'
     )
-    file_handler.setLevel(logging.INFO)
+    file_handler.setLevel(level)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.WARNING)
+    console_handler.setLevel(level)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
     werkzeug_log = logging.getLogger('werkzeug')
-    werkzeug_log.setLevel(logging.ERROR)
+    werkzeug_log.setLevel(logging.DEBUG if debug_requested else logging.ERROR)
+
+    if debug_requested:
+        logger.warning("🐞 [DEBUG] Session de debug active pour ce démarrage — logs au maximum. "
+                        "Redémarrez à nouveau l'app pour revenir au mode normal.")
 
     return logger
 
 app_logger = setup_logging()
 
-# ============================================
-# 📦 VÉRIFICATION DES MODULES PYTHON REQUIS
-# ============================================
-# _REQUIRED_MODULES est défini tout en haut du fichier (utilisé par
-# _auto_install_missing_modules() avant même les premiers imports tiers).
 
 def _check_required_modules(log=True):
     try:
@@ -497,9 +513,7 @@ def _check_required_modules(log=True):
 
 _check_required_modules()
 
-# ============================================
-# 📊 UTILITAIRE TAILLE FICHIER
-# ============================================
+
 def formatSize(bytes):
     if not bytes:
         return '0 B'
@@ -510,9 +524,7 @@ def formatSize(bytes):
     else:
         return f"{bytes / (1024 * 1024):.1f} MB"
 
-# ============================================
-# 🗜️ OUTILS RAR (APRÈS app_logger)
-# ============================================
+
 def _setup_rar_tool():
     base_dir = get_base_path()
     exe_name = 'UnRAR.exe' if sys.platform == 'win32' else 'unrar'
@@ -540,9 +552,7 @@ def _setup_rar_tool():
 
 _setup_rar_tool()
 
-# ============================================
-# 🎥 OUTIL FFMPEG (flux caméra RTSPS Bambu X1/X2/H2)
-# ============================================
+
 FFMPEG_TOOL = None
 
 def _setup_ffmpeg_tool():
@@ -569,14 +579,31 @@ def _setup_ffmpeg_tool():
         app_logger.info(f"[FFmpeg] Configuré (PATH système): {system_ffmpeg}")
         return True
 
-    app_logger.info("[FFmpeg] ffmpeg introuvable (ni bin/, ni PATH). Flux caméra RTSPS (X1/X2/H2) indisponible.")
+
+    try:
+        bin_dir = os.path.join(base_dir, 'bin')
+        archive_hint = next(
+            (f for f in os.listdir(bin_dir)
+             if f.lower().startswith('ffmpeg') and f.lower().endswith(('.zip', '.7z', '.tar.gz', '.tar.xz'))),
+            None
+        ) if os.path.isdir(bin_dir) else None
+    except Exception:
+        archive_hint = None
+
+    if archive_hint:
+        app_logger.warning(
+            f"[FFmpeg] Archive '{archive_hint}' détectée dans bin/ mais non extraite — "
+            f"extrayez {exe_name} (build 'full'/'essentials' statique recommandé, "
+            f"sinon les .dll du build 'shared' doivent aussi être copiées à côté) "
+            f"directement dans bin/, à côté de UnRAR.exe. Flux caméra RTSPS (X1/X2/H2) indisponible en attendant."
+        )
+    else:
+        app_logger.info("[FFmpeg] ffmpeg introuvable (ni bin/, ni PATH). Flux caméra RTSPS (X1/X2/H2) indisponible.")
     return False
 
 _setup_ffmpeg_tool()
 
-# ============================================
-# ⚙️ PARAMÈTRES APPLICATION
-# ============================================
+
 SETTINGS_FILE = os.path.join(DATA_DIR, "app_settings.json")
 _settings_cache = {}
 
@@ -596,9 +623,7 @@ def save_settings(settings):
     with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2, ensure_ascii=False)
 
-# ============================================
-# 💾 SAUVEGARDE CACHE À LA FERMETURE
-# ============================================
+
 _cache_saved = False
 
 def save_cache_on_exit():
@@ -623,12 +648,10 @@ def save_cache_on_exit():
 
 atexit.register(save_cache_on_exit)
 
-# ============================================
-# 🔗 LIENS DE PARTAGE TEMPORAIRES
-# ============================================
+
 _share_lock = threading.Lock()
-_share_links = {}  
-SHARE_LINK_MAX_AGE = 24 * 3600  
+_share_links = {}
+SHARE_LINK_MAX_AGE = 24 * 3600
 
 
 def _cleanup_expired_shares():
@@ -638,9 +661,7 @@ def _cleanup_expired_shares():
         for t in expired:
             _share_links.pop(t, None)
 
-# ============================================
-# 🔐 CHIFFREMENT MOTS DE PASSE
-# ============================================
+
 def encrypt_password(password):
     try:
         if not password:
@@ -681,7 +702,7 @@ def decrypt_password(encrypted_data):
         cipher = Cipher(algorithms.AES(ENCRYPTION_KEY), modes.CFB(iv), backend=default_backend())
         decryptor = cipher.decryptor()
         decrypted = decryptor.update(encrypted_bytes) + decryptor.finalize()
-        
+
         if len(decrypted) > 0:
             padding_length = decrypted[-1]
             if 0 < padding_length <= 16:
@@ -783,9 +804,7 @@ def migrate_printer_api_keys():
     finally:
         conn.close()
 
-# ============================================
-# 💾 BASE DE DONNÉES
-# ============================================
+
 def get_db():
     conn = sqlite3.connect(DB_PATH, timeout=20)
     conn.execute("PRAGMA busy_timeout = 20000")
@@ -1037,7 +1056,7 @@ def migrate_print_history():
         if 'spool_weight_used_g' not in columns:
             c.execute("ALTER TABLE print_history ADD COLUMN spool_weight_used_g REAL")
         if 'result' not in columns:
-            c.execute("ALTER TABLE print_history ADD COLUMN result TEXT DEFAULT ''")  
+            c.execute("ALTER TABLE print_history ADD COLUMN result TEXT DEFAULT ''")
         if 'failure_reason' not in columns:
             c.execute("ALTER TABLE print_history ADD COLUMN failure_reason TEXT DEFAULT ''")
         if 'rating_notes' not in columns:
@@ -1103,15 +1122,40 @@ def migrate_print_photos():
         c.execute("PRAGMA table_info(print_photos)")
         columns = [col[1] for col in c.fetchall()]
         if 'result' not in columns:
-            c.execute("ALTER TABLE print_photos ADD COLUMN result TEXT DEFAULT 'success'")  # 'success' | 'failed'
+            c.execute("ALTER TABLE print_photos ADD COLUMN result TEXT DEFAULT 'success'")
         conn.commit()
     except Exception as e:
         app_logger.info(f"[ERROR] migrate_print_photos: {e}")
     finally:
         conn.close()
 
+def migrate_manual_filament_spools():
+    conn = get_db()
+    c = conn.cursor()
+    try:
+        c.execute("PRAGMA table_info(manual_filament_spools)")
+        columns = [col[1] for col in c.fetchall()]
+        if 'vendor' not in columns:
+            c.execute("ALTER TABLE manual_filament_spools ADD COLUMN vendor TEXT DEFAULT ''")
+        if 'price' not in columns:
+            c.execute("ALTER TABLE manual_filament_spools ADD COLUMN price REAL")
+        if 'diameter_mm' not in columns:
+            c.execute("ALTER TABLE manual_filament_spools ADD COLUMN diameter_mm REAL DEFAULT 1.75")
+        if 'notes' not in columns:
+            c.execute("ALTER TABLE manual_filament_spools ADD COLUMN notes TEXT DEFAULT ''")
+        if 'archived' not in columns:
+            c.execute("ALTER TABLE manual_filament_spools ADD COLUMN archived BOOLEAN DEFAULT 0")
+        if 'updated_at' not in columns:
+            c.execute("ALTER TABLE manual_filament_spools ADD COLUMN updated_at TIMESTAMP")
+        conn.commit()
+    except Exception as e:
+        app_logger.info(f"[ERROR] migrate_manual_filament_spools: {e}")
+    finally:
+        conn.close()
+
 migrate_print_history()
 migrate_printer_maintenance()
+migrate_manual_filament_spools()
 migrate_print_photos()
 
 def migrate_users_recovery_code():
@@ -1136,9 +1180,7 @@ def migrate_users_recovery_code():
 
 migrate_users_recovery_code()
 
-# ============================================
-# 🖨️ GESTION DES IMPRIMANTES
-# ============================================
+
 try:
     import paho.mqtt.client as mqtt
     import ssl
@@ -1419,7 +1461,7 @@ def _generate_bambu_mjpeg_stream(ip, access_code):
     except (ssl.SSLError, OSError, socket.timeout) as e:
         app_logger.info(f"[Bambu Camera] Flux interrompu ({ip}): {e}")
     except GeneratorExit:
-        pass  
+        pass
     finally:
         if ssl_sock:
             try:
@@ -1428,12 +1470,9 @@ def _generate_bambu_mjpeg_stream(ip, access_code):
                 pass
 
 
-# Modèles utilisant le protocole caméra propriétaire sur le port 6000
-# (auth binaire bblp + frames JPEG préfixées par leur taille).
 BAMBU_JPEG_PORT6000_MODELS = {'A1', 'A1_MINI', 'P1P', 'P1S'}
-# Modèles utilisant du RTSPS standard sur le port 322 — protocole
-# complètement différent, nécessite de repasser par ffmpeg pour
-# reconvertir le flux en MJPEG consommable par le <img> du front.
+
+
 BAMBU_RTSP_PORT322_MODELS = {'X1', 'X1C', 'X1E', 'X2D', 'H2D', 'H2S', 'H2C', 'P2S'}
 
 
@@ -1608,7 +1647,7 @@ class ElegooSDCPConnection:
 
     def _on_open(self, ws):
         self.is_connected = True
-        self._send_cmd(0)  
+        self._send_cmd(0)
 
     def _on_close(self, ws, *args):
         self.is_connected = False
@@ -2166,6 +2205,47 @@ def _ensure_elegoo_cc2_connection(db_row):
     return conn
 
 
+def _fetch_klipper_spoolman_active_spool(base):
+    """Interroge le composant Moonraker 'spoolman' (si activé côté Klipper)
+    pour connaître la bobine active définie via SPOOLMAN_SET_ACTIVE_SPOOL,
+    puis résout ses détails (matière, couleur, poids restant) auprès du
+    serveur Spoolman configuré dans les réglages Stellio — exactement ce
+    qu'affichent Mainsail/Fluidd sous forme de badge bobine active."""
+    try:
+        r = requests.get(f"{base}/printer/objects/query?spoolman", timeout=3)
+        if not r.ok:
+            return None
+        status = (r.json().get('result', {}) or {}).get('status', {}) or {}
+        sm = status.get('spoolman') or {}
+        spool_id = sm.get('spool_id')
+        if not spool_id:
+            return None
+        settings = load_settings()
+        spoolman_url = (settings.get('spoolman_url') or '').rstrip('/')
+        if not spoolman_url:
+            return None
+        sr = requests.get(f"{spoolman_url}/api/v1/spool/{spool_id}", timeout=5, headers={"Accept": "application/json"})
+        if not sr.ok:
+            return None
+        spool = sr.json()
+        filament = spool.get('filament') or {}
+        vendor = filament.get('vendor') or {}
+        color_hex = str(filament.get('color_hex') or '').lstrip('#')
+        return {
+            'id': spool_id,
+            'name': filament.get('name') or vendor.get('name') or f"Bobine #{spool_id}",
+            'material': filament.get('material') or '',
+            'color': color_hex,
+            'temp': 0,
+            'remain_pct': None,
+            'tray_weight': filament.get('weight'),
+            'remaining_g': spool.get('remaining_weight'),
+        }
+    except Exception as e:
+        app_logger.info(f"[Klipper] Bobine active Spoolman (best-effort, non bloquant) indisponible: {e}")
+        return None
+
+
 def _stop_elegoo_cc2_connection(pid):
     with _elegoo_cc2_connections_lock:
         conn = _elegoo_cc2_connections.pop(pid, None)
@@ -2396,6 +2476,12 @@ class PrinterManager:
                                 })
                     except Exception as e:
                         app_logger.info(f"[Klipper] CFS/ACE (best-effort, non bloquant) indisponible: {e}")
+
+
+                    if not mm_info:
+                        active_spool = _fetch_klipper_spoolman_active_spool(base)
+                        if active_spool:
+                            mm_info.append(active_spool)
                     return {
                         'status': status,
                         'progress': round(progress, 1),
@@ -2604,9 +2690,7 @@ def parse_printer_config(db_row):
 
 printer_hub = PrinterManager()
 
-# ============================================
-# 🔐 AUTHENTIFICATION
-# ============================================
+
 def is_first_launch():
     conn = get_db()
     try:
@@ -2663,9 +2747,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
-# ============================================
-# 🚀 CRÉATION DE L'APPLICATION FLASK
-# ============================================
+
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path='')
 _SECRET_KEY_FILE = os.path.join(DATA_DIR, 'flask_secret.key')
 if os.path.exists(_SECRET_KEY_FILE):
@@ -2732,9 +2814,7 @@ def _handle_internal_error(e):
 SUPPORTED_EXTENSIONS = {'.stl', '.3mf', '.obj'}
 SUPPORTED_3D_EXTS = {'.stl', '.obj', '.3mf', '.step', '.stp', '.iges', '.igs', '.amf'}
 
-# ============================================
-# 🛡️ EXTRACTION SÉCURISÉE D'ARCHIVES (anti Zip-Slip)
-# ============================================
+
 class UnsafeArchiveError(Exception):
     pass
 
@@ -2778,9 +2858,7 @@ def safe_extract_7z(z, target_dir):
         _assert_safe_member_path(name, target_dir)
     z.extractall(path=target_dir)
 
-# ============================================
-# 📦 EXPLORATION D'ARCHIVES EN MÉMOIRE (Semaine 1)
-# ============================================
+
 ARCHIVE_VIRTUAL_SEP = '::'
 IN_MEMORY_ARCHIVE_EXTS = {'.zip', '.7z'}
 
@@ -2853,9 +2931,7 @@ def read_archive_entry_bytes(archive_path, internal_path):
             return entry.read()
     raise ValueError(f"Format d'archive non supporté pour lecture directe: {ext}")
 
-# ============================================
-# 📊 CACHE FICHIERS
-# ============================================
+
 def get_cache_key(sources):
     src_str = json.dumps(sorted([f"{s['id']}:{s['path']}:{s.get('config', '')}" for s in sources]), sort_keys=True)
     return hashlib.md5(src_str.encode()).hexdigest()
@@ -2938,7 +3014,7 @@ def _migrate_file_cache_schema():
         if not isinstance(cache, dict) or 'files' not in cache:
             return
         if cache.get('schema_version') == CACHE_SCHEMA_VERSION:
-            return 
+            return
 
         files = cache.get('files') or []
         to_patch = [f for f in files if (f.get('extension') or '').lower() == '.3mf'
@@ -2970,7 +3046,7 @@ def _migrate_file_cache_schema():
                     if is_smb:
                         kwargs = smb_sources_by_name.get(f.get('source'))
                         if kwargs is None:
-                            continue 
+                            continue
                         smb_path = path.replace('\\\\', '//').replace('\\', '/')
                         with smbclient.open_file(smb_path, mode='rb', **kwargs) as smb_f:
                             plate_count = get_3mf_plate_count(smb_f)
@@ -2982,7 +3058,7 @@ def _migrate_file_cache_schema():
                     f['multi_plate'] = plate_count > 1
                     patched += 1
                 except Exception:
-                    continue  
+                    continue
 
             if patched:
                 app_logger.info(
@@ -3050,11 +3126,9 @@ def _backfill_multiplate_tags():
     except Exception as e:
         app_logger.info(f"[TAGS] Rattrapage 'Multi plateaux' échoué (sera retenté au prochain démarrage): {e}")
 
-# ============================================
-# 🔄 FILES D'ATTENTE BACKGROUND
-# ============================================
+
 active_downloads = {}
-cancelled_downloads = set()  # download_id marqués pour annulation (voir /api/download/cancel)
+cancelled_downloads = set()
 scan_state = {
     'new_batch': [],
     'status': 'idle',
@@ -3101,7 +3175,7 @@ def process_generation_queue():
                 thumb_path = task.get('thumb_path')
                 if _is_ignored_recently(file_path):
                     app_logger.info(f"[SKIP] Fichier déjà ignoré (retenté dans <10 min): {os.path.basename(file_path)}")
-                    time.sleep(0.05)  
+                    time.sleep(0.05)
                     continue
                 if file_path.replace('\\', '/') in currently_downloading_paths:
                     app_logger.info(f"[SKIP] Téléchargement en cours, miniature différée: {os.path.basename(file_path)}")
@@ -3161,7 +3235,7 @@ def process_generation_queue():
                         _thumb_session_note_result(os.path.basename(file_path), file_path, False, reason)
                     if processed_count and processed_count % 10 == 0:
                         app_logger.info(f"[STATS #{worker_id}] {processed_count} miniatures générées")
-                    time.sleep(0.8)  
+                    time.sleep(0.8)
                 if consecutive_errors > 5:
                     app_logger.info(f"[PAUSE #{worker_id}] Trop d'erreurs consécutives, pause 30s...")
                     time.sleep(30)
@@ -3222,9 +3296,7 @@ def process_generation_queue():
 
     app_logger.info(f"[BACKGROUND] File d'attente lazy active ({NUM_THUMB_WORKERS} workers en parallèle)")
 
-# ============================================
-# 🖼️ MINIATURES 3D
-# ============================================
+
 def _get_transformed_scene_geometries(scene, node_filter=None):
     out = []
     try:
@@ -3256,7 +3328,7 @@ def _concatenate_filtering_outliers(geoms):
         try:
             centroid = g.centroid
             n_verts = len(g.vertices)
-            if n_verts < 4:  
+            if n_verts < 4:
                 continue
             info.append((g, centroid, n_verts))
         except Exception:
@@ -3718,6 +3790,23 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
             if mesh is None or mesh.is_empty or len(mesh.vertices) == 0:
                 return False
 
+
+            MAX_RENDER_FACES = 60000
+            faces_before = len(mesh.faces)
+            if faces_before > MAX_RENDER_FACES:
+                try:
+                    import fast_simplification
+                    mesh = mesh.simplify_quadric_decimation(face_count=MAX_RENDER_FACES)
+                    app_logger.info(
+                        f"[RENDER] Mesh décimé {faces_before} → {len(mesh.faces)} faces "
+                        f"({os.path.basename(stl_path)})"
+                    )
+                except Exception as simplify_err:
+                    app_logger.info(
+                        f"[RENDER] Décimation rapide indisponible ({simplify_err}), "
+                        f"rendu du mesh complet ({faces_before} faces)"
+                    )
+
             mesh.apply_translation(-mesh.centroid)
             rot_fix = tra.rotation_matrix(np.radians(-90), [1, 0, 0])
             mesh.apply_transform(rot_fix)
@@ -3726,17 +3815,6 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
                 mesh.fix_normals()
             except Exception:
                 pass
-
-            MAX_RENDER_FACES = 60000
-            if len(mesh.faces) > MAX_RENDER_FACES:
-                try:
-                    import fast_simplification
-                    mesh = mesh.simplify_quadric_decimation(face_count=MAX_RENDER_FACES)
-                except Exception as simplify_err:
-                    app_logger.info(
-                        f"[RENDER] Décimation rapide indisponible ({simplify_err}), "
-                        f"rendu du mesh complet ({len(mesh.faces)} faces)"
-                    )
 
             try:
                 import pyrender
@@ -3755,8 +3833,8 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
 
                     max_dim = np.linalg.norm(mesh.extents)
                     dist = max(max_dim * 1.8, 0.5)
-                    elev_rad = np.radians(25)  
-                    azim_rad = np.radians(45)   
+                    elev_rad = np.radians(25)
+                    azim_rad = np.radians(45)
 
                     cam_x =  dist * np.cos(elev_rad) * np.sin(azim_rad)
                     cam_y =  dist * np.sin(elev_rad)
@@ -3775,7 +3853,7 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
                     camera_pose = np.eye(4)
                     camera_pose[:3, 0] = right
                     camera_pose[:3, 1] = up_true
-                    camera_pose[:3, 2] = -forward   
+                    camera_pose[:3, 2] = -forward
                     camera_pose[:3, 3] = [cam_x, cam_y, cam_z]
 
                     camera = pyrender.PerspectiveCamera(yfov=np.pi / 4.0, aspectRatio=1.0)
@@ -3881,9 +3959,9 @@ def _generate_thumbnail_raster(mesh, thumb_path, resolution=(768, 768)):
         if len(faces) == 0:
             return False
 
-        AMBIENT = 0x40 / 255.0 * 1.3      
-        KEY_INTENSITY = 0.7                
-        SPECULAR_COLOR, SHININESS = (0x11 / 255.0), 120.0   
+        AMBIENT = 0x40 / 255.0 * 1.3
+        KEY_INTENSITY = 0.7
+        SPECULAR_COLOR, SHININESS = (0x11 / 255.0), 120.0
         base_color = np.array([0x4e, 0xa1, 0xd3], dtype=np.float64)
 
         vertex_normals = mesh.vertex_normals
@@ -3958,7 +4036,7 @@ def _generate_thumbnail_matplotlib(mesh, thumb_path, resolution=(768, 768)):
             except Exception:
                 face_normals = None
 
-            base_color = np.array([0.30, 0.63, 0.83])  
+            base_color = np.array([0.30, 0.63, 0.83])
             if face_normals is not None and len(face_normals) == len(faces):
                 light_dir = np.array([0.4, 0.6, 0.7])
                 light_dir = light_dir / np.linalg.norm(light_dir)
@@ -3971,7 +4049,7 @@ def _generate_thumbnail_matplotlib(mesh, thumb_path, resolution=(768, 768)):
             tri = Poly3DCollection(
                 vertices_normalized[faces],
                 facecolors=face_colors,
-                edgecolors=face_colors,  
+                edgecolors=face_colors,
                 linewidths=0.15,
                 antialiased=True,
                 alpha=1.0
@@ -3993,9 +4071,7 @@ def _generate_thumbnail_matplotlib(mesh, thumb_path, resolution=(768, 768)):
             app_logger.info(f"[ERROR] Fallback matplotlib: {e}")
             return False
 
-# ============================================
-# 📊 ANALYSE 3D
-# ============================================
+
 def analyze_3d_file(file_path):
     try:
         mesh = trimesh.load(file_path, force='mesh')
@@ -4048,7 +4124,7 @@ def analyze_3d_file(file_path):
             'is_manifold': mesh_is_sane or already_handled,
             'needs_repair': (not mesh_is_sane) and not already_handled,
             'is_empty': mesh.is_empty,
-            'estimate_source': 'geometric' 
+            'estimate_source': 'geometric'
         }
     except Exception as e:
         app_logger.info(f"[WARN] Erreur analyse 3D {file_path}: {e}")
@@ -4092,9 +4168,7 @@ def get_cached_3d_analysis(file_path):
 
     return metadata
 
-# ============================================
-# 🌐 ROUTES API PRINCIPALES
-# ============================================
+
 @app.route('/api/files/analyze', methods=['POST'])
 @login_required
 def api_analyze_file():
@@ -4170,7 +4244,7 @@ def api_first_launch():
 _login_attempts = {}
 _login_attempts_lock = threading.Lock()
 LOGIN_MAX_ATTEMPTS = 5
-LOGIN_LOCKOUT_SECONDS = 300  
+LOGIN_LOCKOUT_SECONDS = 300
 
 def _check_rate_limit(bucket, key):
     full_key = f"{bucket}:{(key or '').strip().lower()}"
@@ -4362,9 +4436,7 @@ def api_reset_with_recovery():
 
     return jsonify({"message": "Mot de passe réinitialisé", "recovery_code": new_recovery_code})
 
-# ============================================
-# 📂 SOURCES
-# ============================================
+
 @app.route('/api/app-config', methods=['GET'])
 @login_required
 def api_app_config():
@@ -4565,9 +4637,7 @@ def api_delete_source(source_id):
     threading.Thread(target=_rescan_after_delete, args=(remaining_sources,), daemon=True).start()
     return jsonify({"message": "Source supprimée"}), 200
 
-# ============================================
-# 🔑 COMPTES EXTERNES
-# ============================================
+
 @app.route('/api/accounts', methods=['GET'])
 @login_required
 def api_get_accounts():
@@ -4799,9 +4869,7 @@ def api_delete_account(platform):
         conn.close()
     return jsonify({"message": "Compte supprimé"}), 200
 
-# ============================================
-# 🔷 VIEWER 3D — Serve mesh file (STL/3MF/OBJ → STL)
-# ============================================
+
 @app.route('/api/file/mesh', methods=['GET'])
 @login_required
 def api_file_mesh():
@@ -4941,9 +5009,7 @@ def api_file_plate_count():
         app_logger.warning(f"[3MF] Erreur comptage plateaux {file_path}: {e}")
         return jsonify({"plate_count": 1})
 
-# ============================================
-# 🖼️ MINIATURES
-# ============================================
+
 @app.route('/api/thumb', methods=['GET'])
 @login_required
 def api_get_thumb():
@@ -4966,7 +5032,7 @@ def api_get_thumb():
 
     return jsonify({"error": "Miniature non trouvée"}), 404
 
-MAX_THUMB_FALLBACK_RETRIES = 3 
+MAX_THUMB_FALLBACK_RETRIES = 3
 def update_cache_thumb_status(file_path, has_thumb, is_fallback=False):
     try:
         if not os.path.exists(CACHE_FILE):
@@ -5308,9 +5374,7 @@ def api_analyze_now():
     metadata_generation_queue.put({'path': file_path, 'priority': 'high'})
     return jsonify({"success": True, "message": "Analyse démarrée"})
 
-# ============================================
-# 🏷️ TAGS
-# ============================================
+
 @app.route('/api/tags', methods=['GET'])
 @login_required
 def api_get_tags():
@@ -5409,9 +5473,7 @@ def api_assign_tags():
     finally:
         conn.close()
 
-# ============================================
-# 📋 FICHIERS
-# ============================================
+
 def extract_archive_to_disk(file_path, source_name, extensions_3d=None):
     if extensions_3d is None:
         extensions_3d = {'.stl', '.obj', '.3mf'}
@@ -5661,7 +5723,7 @@ def _get_or_create_tag(conn, name):
         conn.execute("INSERT INTO tags (name, color) VALUES (?, ?)", (name, color))
         conn.commit()
     except sqlite3.IntegrityError:
-        pass  
+        pass
     row = conn.execute("SELECT id FROM tags WHERE LOWER(name) = LOWER(?)", (name,)).fetchone()
     return row[0] if row else None
 
@@ -5889,9 +5951,7 @@ def _do_background_scan(sources_list, user_id, blocking=False):
     finally:
         _background_scan_running.release()
 
-# ============================================
-# 🔁 SCAN AUTOMATIQUE PÉRIODIQUE (toutes sources)
-# ============================================
+
 def _auto_scan_scheduler():
     _lower_thread_priority()
     app_logger.info("[AUTO-SCAN] Planificateur démarré")
@@ -6145,9 +6205,7 @@ def scan_delta():
             "new_files": batch
         })
 
-# ============================================
-# 🗑️ SUPPRIMER UN FICHIER
-# ============================================
+
 @app.route('/api/files/share', methods=['POST'])
 @login_required
 def api_create_share_link():
@@ -6213,7 +6271,7 @@ def _get_all_source_paths(user_id):
             ).fetchall()
         finally:
             conn.close()
-        
+
         folders = [r['path'] for r in rows if r['type'] in ('folder', 'smb', 'nfs')]
         files = [r['path'] for r in rows if r['type'] == 'file']
         return folders, files
@@ -6223,14 +6281,14 @@ def _get_all_source_paths(user_id):
 def _is_path_within_sources(file_path, user_id):
     if not file_path:
         return False
-    
+
     def _normalize_path(p):
         if not p:
             return ''
         norm = p.replace('\\', '/')
         if norm.startswith('//'):
             parts = norm.split('/')
-            cleaned = [x for x in parts if x]  
+            cleaned = [x for x in parts if x]
             if len(cleaned) >= 2:
                 return '//' + '/'.join(cleaned)
             return norm
@@ -6239,20 +6297,20 @@ def _is_path_within_sources(file_path, user_id):
                 return os.path.realpath(norm).replace('\\', '/')
             except Exception:
                 return norm
-    
+
     norm_file = _normalize_path(file_path)
     is_smb_file = norm_file.startswith('//')
-    
+
     try:
         folders, files = _get_all_source_paths(user_id)
     except Exception:
         return False
-    
+
     for f in files:
         norm_f = _normalize_path(f)
         if norm_f == norm_file:
             return True
-    
+
     norm_file_cmp = norm_file.rstrip('/').lower()
 
     for folder in folders:
@@ -6292,7 +6350,7 @@ def _cleanup_empty_parent_dirs(file_path, stop_at_paths=None):
             break
         try:
             if os.listdir(current):
-                break 
+                break
             os.rmdir(current)
             removed.append(current)
             app_logger.info(f"[DELETE] 📁 Dossier vide supprimé: {current}")
@@ -6437,9 +6495,7 @@ def api_delete_files_batch():
         app_logger.error(f"[DELETE] Erreur suppression en lot: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# ✏️ RENOMMER UN FICHIER
-# ============================================
+
 @app.route('/api/files/rename', methods=['POST'])
 @login_required
 def api_rename_file():
@@ -6505,9 +6561,7 @@ def api_rename_file():
         app_logger.error(traceback.format_exc())
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# 🔍 DÉTECTION DES DOUBLONS
-# ============================================
+
 @app.route('/api/files/duplicates', methods=['GET'])
 @login_required
 def api_find_duplicates():
@@ -6552,8 +6606,8 @@ def api_find_duplicates():
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 SIMILAR_DUPLICATES_MAX_FILES = 250
-SIMILAR_DUPLICATES_VOLUME_TOLERANCE = 0.03   
-SIMILAR_DUPLICATES_DIM_TOLERANCE = 0.03      
+SIMILAR_DUPLICATES_VOLUME_TOLERANCE = 0.03
+SIMILAR_DUPLICATES_DIM_TOLERANCE = 0.03
 
 def _geometric_signatures_match(sig_a, sig_b):
     vol_a, dims_a = sig_a
@@ -6662,9 +6716,7 @@ def api_find_similar_duplicates():
         app_logger.error(f"[SIMILAR-DUPLICATES] Erreur: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# 📊 STATISTIQUES DE LA BIBLIOTHÈQUE
-# ============================================
+
 @app.route('/api/stats', methods=['GET'])
 @login_required
 def api_get_stats():
@@ -6795,9 +6847,7 @@ def api_get_stats():
         app_logger.error(f"[Stats] Erreur: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# 🕒 HISTORIQUE DES IMPRESSIONS
-# ============================================
+
 @app.route('/api/print-history', methods=['GET'])
 @login_required
 def api_get_print_history():
@@ -6946,18 +6996,15 @@ def api_set_print_history_cost(entry_id):
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 
-# ============================================
-# 📸 GALERIE DE RÉUSSITES (photos de prints)
-# ============================================
 PRINT_PHOTO_ALLOWED_EXTS = {'.jpg', '.jpeg', '.png', '.webp'}
-PRINT_PHOTO_MAX_SIZE = 15 * 1024 * 1024 
+PRINT_PHOTO_MAX_SIZE = 15 * 1024 * 1024
 
 
 @app.route('/api/print-photos', methods=['GET'])
 @login_required
 def api_get_print_photos():
     file_path = request.args.get('path', '').replace('\\', '/')
-    result_filter = request.args.get('result', '').strip().lower() 
+    result_filter = request.args.get('result', '').strip().lower()
     conn = get_db()
     try:
         query = "SELECT id, file_path, image_filename, note, result, created_at FROM print_photos WHERE user_id=?"
@@ -7017,7 +7064,7 @@ def api_add_print_photo():
             img.thumbnail((1600, 1600))
             img.convert('RGB').save(dest_path, quality=85, optimize=True) if ext in ('.jpg', '.jpeg') else img.save(dest_path)
         except Exception:
-            pass  
+            pass
 
         conn = get_db()
         try:
@@ -7097,9 +7144,7 @@ def api_browse_folder():
         app_logger.error(f"[BROWSE] Erreur: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# 📦 DÉPLACER UN FICHIER (NOUVEAU)
-# ============================================
+
 @app.route('/api/files/move', methods=['POST'])
 @login_required
 def api_move_file():
@@ -7190,9 +7235,7 @@ def api_move_file():
         app_logger.error(f"[API] Erreur non gérée: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# 🗜️ DÉCOMPRESSION
-# ============================================
+
 @app.route('/api/files/decompress', methods=['POST'])
 @login_required
 def api_decompress_archive():
@@ -7313,17 +7356,13 @@ def api_cleanup_archive():
         app_logger.error(f"[API] Erreur non gérée: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# ✂️ SLICER
-# ============================================
+
 def get_slice_temp_dir():
     base = os.path.join(os.environ.get('LOCALAPPDATA', tempfile.gettempdir()), 'Stellio', 'SliceTemp')
     os.makedirs(base, exist_ok=True)
     return base
 
-# Rotations miroir de celles du viewer 3D (script.js: _getViewerOrientationMatrix).
-# Le viewer charge les STL sans remapping d'axes (Z reste vertical comme dans le
-# fichier source), donc ces mêmes angles/axes s'appliquent tels quels via trimesh.
+
 VIEWER_ORIENTATION_ROTATIONS = {
     'flipZ': ('x', 180),
     'posX':  ('y', 90),
@@ -7389,7 +7428,7 @@ def _find_exe_by_glob(relative_patterns):
             except Exception:
                 matches = []
             if matches:
-                return sorted(matches)[-1]  
+                return sorted(matches)[-1]
     return None
 
 def _find_exe_in_registry(exe_names):
@@ -7538,8 +7577,8 @@ def detect_installed_slicers():
                 'id': 'custom',
                 'name': (settings.get('custom_slicer_name') or 'Slicer personnalisé').strip(),
                 'path': custom_path,
-                'args_template': custom_args,  
-                'output_type': (settings.get('custom_slicer_output_type') or 'gcode').strip()  
+                'args_template': custom_args,
+                'output_type': (settings.get('custom_slicer_output_type') or 'gcode').strip()
             })
     except Exception as e:
         app_logger.info(f"[PreSlice] Erreur lecture config slicer personnalisé: {e}")
@@ -7607,21 +7646,21 @@ def _extract_gcode_from_gcode3mf(gcode3mf_path):
         return None
 
 _WEIGHT_PATTERNS = [
-    r'(?:total\s+)?filament used\s*\[g\]\s*[:=]\s*([\d.]+)',           
-    r'total filament weight\s*\[g\]\s*[:=]\s*([\d.]+)',                 
-    r'total[_ ]filament[_ ]used\s*[:=]\s*([\d.]+)\s*g',                
+    r'(?:total\s+)?filament used\s*\[g\]\s*[:=]\s*([\d.]+)',
+    r'total filament weight\s*\[g\]\s*[:=]\s*([\d.]+)',
+    r'total[_ ]filament[_ ]used\s*[:=]\s*([\d.]+)\s*g',
     r'filament_used_g\s*[:=]\s*([\d.]+)',
 ]
 _TIME_PATTERNS = [
-    r'total estimated time\s*[:=]\s*([^\n\r;]+)',                       
-    r'estimated printing time[^=:]*[:=]\s*([^\n\r;]+)',                
-    r'model printing time\s*[:=]\s*([^\n\r;]+)',                        
+    r'total estimated time\s*[:=]\s*([^\n\r;]+)',
+    r'estimated printing time[^=:]*[:=]\s*([^\n\r;]+)',
+    r'model printing time\s*[:=]\s*([^\n\r;]+)',
     r'estimated_time\s*[:=]\s*([^\n\r;]+)',
 ]
 _CURA_TIME_PATTERN = r';TIME:\s*(\d+)'
 _CURA_FILAMENT_LENGTH_PATTERN = r';Filament used:\s*([\d.]+)m'
 DEFAULT_FILAMENT_DIAMETER_MM = 1.75
-DEFAULT_FILAMENT_DENSITY_G_CM3 = 1.24  
+DEFAULT_FILAMENT_DENSITY_G_CM3 = 1.24
 
 def _filament_length_m_to_weight_g(length_m, diameter_mm=DEFAULT_FILAMENT_DIAMETER_MM, density=DEFAULT_FILAMENT_DENSITY_G_CM3):
     radius_cm = (diameter_mm / 10) / 2
@@ -7644,7 +7683,7 @@ def _extract_weight_time_from_gcode_text(blob, is_cura=False):
                 pass
         result = _seconds_to_result(weight_g, seconds)
         if result:
-            result['weight_approximate'] = True  
+            result['weight_approximate'] = True
         return result
 
     for pattern in _WEIGHT_PATTERNS:
@@ -7720,8 +7759,8 @@ def run_silent_slice(stl_path, slicer, timeout=150):
             out_3mf = os.path.join(out_dir, 'preslice.gcode.3mf')
             cmd = [slicer['path'], '--slice', '1', '--allow-newer-file', '--mstpp', str(max(30, timeout - 20))]
 
-            load_settings_str = (settings.get('slicer_profile_settings') or '').strip()   
-            load_filament_str = (settings.get('slicer_profile_filament') or '').strip()   
+            load_settings_str = (settings.get('slicer_profile_settings') or '').strip()
+            load_filament_str = (settings.get('slicer_profile_filament') or '').strip()
             if load_settings_str:
                 cmd += ['--load-settings', load_settings_str]
             if load_filament_str:
@@ -7739,7 +7778,7 @@ def run_silent_slice(stl_path, slicer, timeout=150):
             cmd = [slicer['path'], '--export-gcode', '--output', gcode_path]
 
             profile_key = 'slicer_profile_prusa_ini' if slicer['id'] == 'prusaslicer' else 'slicer_profile_super_ini'
-            ini_str = (settings.get(profile_key) or '').strip()  
+            ini_str = (settings.get(profile_key) or '').strip()
             if ini_str:
                 for ini_path in ini_str.split(';'):
                     ini_path = ini_path.strip()
@@ -7809,7 +7848,7 @@ def run_silent_slice(stl_path, slicer, timeout=150):
 slice_estimate_queue = queue.Queue()
 slice_estimate_results = collections.OrderedDict()
 slice_estimate_lock = threading.Lock()
-NUM_SLICE_WORKERS = 1  
+NUM_SLICE_WORKERS = 1
 
 SLICE_ESTIMATE_CACHE_MAX = 500
 
@@ -7952,6 +7991,84 @@ def api_get_slice_estimate():
         result = slice_estimate_results.get(file_path, {'status': 'unknown'})
     return jsonify(result), 200
 
+_SLICER_FAMILY_BY_FILENAME = {
+    'orca-slicer.exe': 'orcaslicer',
+    'orcaslicer.exe': 'orcaslicer',
+    'bambu-studio.exe': 'bambustudio',
+    'bambustudio.exe': 'bambustudio',
+    'prusa-slicer.exe': 'prusaslicer',
+    'prusa-slicer-console.exe': 'prusaslicer',
+    'superslicer.exe': 'superslicer',
+    'superslicer_console.exe': 'superslicer',
+    'elegooslicer.exe': 'elegooslicer',
+    'anycubicslicernext.exe': 'anycubicslicernext',
+
+
+    'creality print.exe': 'creality_print',
+    'crealityprint.exe': 'creality_print',
+}
+
+
+def _resolve_slicer_family(slicer_path, slicer_name):
+    """Retrouve la famille CLI du slicer réellement lancé, en comparant sans
+    tenir compte de la casse (l'exécutable trouvé sur le disque et le nom
+    stocké dans les réglages n'ont pas toujours exactement la même casse)."""
+    basename = os.path.basename(slicer_path).lower() if slicer_path else ''
+    return (_SLICER_FAMILY_BY_FILENAME.get(basename)
+            or _SLICER_FAMILY_BY_FILENAME.get((slicer_name or '').lower()))
+
+
+_SLICER_LOAD_SETTINGS_FAMILIES = ('orcaslicer', 'bambustudio', 'elegooslicer', 'anycubicslicernext', 'creality_print')
+_SLICER_LOAD_INI_FAMILIES = ('prusaslicer', 'superslicer')
+
+
+def _resolve_slicer_profile_paths(slicer_family, printer_id, material_type=None):
+    """Retrouve, parmi les profils importés, ceux rattachés à l'imprimante
+    choisie dans la popup "Envoyer au Slicer" et compatibles avec le slicer
+    détecté, pour pouvoir les repasser en ligne de commande. Retourne
+    (settings_paths, filament_paths, matched_profile_ids)."""
+    if not printer_id or not slicer_family:
+        return [], [], []
+
+    try:
+        printer_id_int = int(printer_id)
+    except (TypeError, ValueError):
+        return [], [], []
+
+    profiles = load_slicer_profiles()
+    settings_paths, filament_paths, matched_ids = [], [], []
+
+    for p in profiles:
+        if p.get('printer_id') != printer_id_int:
+            continue
+        if not p.get('source_path') or not os.path.exists(p['source_path']):
+            continue
+        p_slicer = (p.get('slicer') or '').strip().lower()
+        if p_slicer and p_slicer != slicer_family:
+            continue
+
+        ptype = p.get('profile_type')
+        if ptype == 'filament':
+            if material_type and (p.get('material_type') or '').strip().lower() != material_type.strip().lower():
+                continue
+            filament_paths.append(p['source_path'])
+            matched_ids.append(p['id'])
+        elif ptype in ('process', 'printer'):
+            settings_paths.append(p['source_path'])
+            matched_ids.append(p['id'])
+
+
+    confirmed_settings = [p['source_path'] for p in profiles
+                           if p.get('printer_id') == printer_id_int and p.get('printer_match_confirmed')
+                           and p.get('profile_type') in ('process', 'printer')
+                           and p.get('source_path') and os.path.exists(p['source_path'])
+                           and (not (p.get('slicer') or '').strip() or (p.get('slicer') or '').strip().lower() == slicer_family)]
+    if confirmed_settings:
+        settings_paths = confirmed_settings
+
+    return settings_paths, filament_paths, matched_ids
+
+
 @app.route('/api/slicer/send', methods=['POST'])
 @login_required
 def api_send_to_slicer():
@@ -7973,8 +8090,32 @@ def api_send_to_slicer():
         reoriented_path = _export_reoriented_mesh(file_path, orientation_key)
         path_to_open = reoriented_path or file_path
 
+
+        applied_profile_ids = []
         if slicer_path:
-            subprocess.Popen([slicer_path, path_to_open])
+            slicer_family = _resolve_slicer_family(slicer_path, slicer_name)
+            printer_id = data.get('printer_id')
+            material_type = data.get('material_type')
+            cmd = [slicer_path]
+
+            if slicer_family and printer_id:
+                settings_paths, filament_paths, matched_ids = _resolve_slicer_profile_paths(
+                    slicer_family, printer_id, material_type
+                )
+                applied_profile_ids = matched_ids
+                if slicer_family in _SLICER_LOAD_SETTINGS_FAMILIES:
+                    if settings_paths:
+                        cmd += ['--load-settings', ';'.join(settings_paths)]
+                    if filament_paths:
+                        cmd += ['--load-filaments', ';'.join(filament_paths)]
+                elif slicer_family in _SLICER_LOAD_INI_FAMILIES:
+                    for ini_path in (settings_paths + filament_paths):
+                        cmd += ['--load', ini_path]
+                if not settings_paths and not filament_paths:
+                    app_logger.info(f"[Slicer] Aucun profil importé rattaché à l'imprimante {printer_id} pour {slicer_family}, ouverture sans --load-settings")
+
+            cmd.append(path_to_open)
+            subprocess.Popen(cmd)
         else:
             if sys.platform == 'win32':
                 os.startfile(path_to_open)
@@ -8011,7 +8152,7 @@ def api_send_to_slicer():
                  os.path.getsize(file_path) if os.path.exists(file_path) else 0,
                  os.path.splitext(file_path)[1].lower(), detected_slicer,
                  detect_platform_from_path(norm), spool_id_logged, weight_used_logged,
-                 data.get('slicer_profile_id') or '', data.get('slicer_profile_name') or '',
+                 data.get('slicer_profile_id') or (applied_profile_ids[0] if applied_profile_ids else ''), data.get('slicer_profile_name') or '',
                  material_cost, elec_cost, total_cost)
             )
             history_id = cur.lastrowid
@@ -8043,55 +8184,62 @@ def api_slicer_send_batch():
         if sys.platform == 'win32':
             file_paths = [p.replace('/', '\\') for p in file_paths]
 
-        slicer_path = None
-        standard_paths = [
-            r"C:\Program Files\OrcaSlicer\orca-slicer.exe",
-            r"C:\Program Files (x86)\OrcaSlicer\orca-slicer.exe",
-            r"C:\Program Files\Bambu Studio\bambu-studio.exe",
-            r"C:\Program Files (x86)\Bambu Studio\bambu-studio.exe",
-            r"C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer.exe",
-            r"C:\Program Files (x86)\Prusa3D\PrusaSlicer\prusa-slicer.exe",
-        ]
-        for path in standard_paths:
-            if os.path.exists(path):
-                slicer_path = path
-                app_logger.info(f"[Slicer] Détecté: {path}")
-                break
 
-        if not slicer_path and sys.platform == 'win32':
-            import glob
-            cura_paths = glob.glob(r"C:\Program Files\Ultimaker Cura*\Cura.exe")
-            cura_paths_x86 = glob.glob(r"C:\Program Files (x86)\Ultimaker Cura*\Cura.exe")
-            all_cura = cura_paths + cura_paths_x86
-            if all_cura:
-                slicer_path = all_cura[0]
-                app_logger.info(f"[Slicer] Détecté (Cura): {slicer_path}")
+        settings = load_settings()
+        slicer_name = settings.get('default_slicer', 'system_default')
+        slicer_path = find_slicer_by_name(slicer_name)
+
+        if not slicer_path:
+            installed = get_cached_installed_slicers()
+            if installed:
+                slicer_path = installed[0]['path']
 
         if not slicer_path:
             return jsonify({
                 "error": "Aucun slicer trouvé. Installez OrcaSlicer, BambuStudio, PrusaSlicer ou Cura."
             }), 404
 
+
+        applied_profile_ids = []
+        cmd = [slicer_path]
+        slicer_family = _resolve_slicer_family(slicer_path, slicer_name)
+        printer_id = data.get('printer_id')
+        material_type = data.get('material_type')
+        if slicer_family and printer_id:
+            settings_paths, filament_paths, matched_ids = _resolve_slicer_profile_paths(
+                slicer_family, printer_id, material_type
+            )
+            applied_profile_ids = matched_ids
+            if slicer_family in _SLICER_LOAD_SETTINGS_FAMILIES:
+                if settings_paths:
+                    cmd += ['--load-settings', ';'.join(settings_paths)]
+                if filament_paths:
+                    cmd += ['--load-filaments', ';'.join(filament_paths)]
+            elif slicer_family in _SLICER_LOAD_INI_FAMILIES:
+                for ini_path in (settings_paths + filament_paths):
+                    cmd += ['--load', ini_path]
+
         app_logger.info(f"[Slicer] Lancement avec {len(file_paths)} fichiers...")
         try:
-            subprocess.Popen([slicer_path] + file_paths)
+            subprocess.Popen(cmd + file_paths)
         except Exception as e:
             app_logger.info(f"[Slicer] Erreur ouverture multiple: {e}")
-            subprocess.Popen([slicer_path, file_paths[0]])
+            subprocess.Popen(cmd + [file_paths[0]])
 
         try:
             conn = get_db()
             try:
                 slicer_label = os.path.basename(slicer_path).replace('.exe', '')
+                profile_id_to_log = applied_profile_ids[0] if applied_profile_ids else ''
                 for fp in file_paths:
                     norm = fp.replace('\\', '/')
                     material_cost, elec_cost, total_cost, _w = _compute_estimated_cost(norm)
                     conn.execute(
-                        "INSERT INTO print_history (user_id, file_path, file_name, file_size, file_ext, slicer, source_platform, material_cost, elec_cost, total_cost) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                        "INSERT INTO print_history (user_id, file_path, file_name, file_size, file_ext, slicer, source_platform, slicer_profile_id, material_cost, elec_cost, total_cost) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                         (session['user_id'], norm, os.path.basename(fp),
                          os.path.getsize(fp) if os.path.exists(fp) else 0,
                          os.path.splitext(fp)[1].lower(), slicer_label,
-                         detect_platform_from_path(norm), material_cost, elec_cost, total_cost)
+                         detect_platform_from_path(norm), profile_id_to_log, material_cost, elec_cost, total_cost)
                     )
                 conn.commit()
             finally:
@@ -8109,9 +8257,7 @@ def api_slicer_send_batch():
         app_logger.error(f"[API] Erreur non gérée: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# 📂 PICKER
-# ============================================
+
 @app.route('/api/picker/folder', methods=['POST'])
 @login_required
 def api_pick_folder():
@@ -8162,9 +8308,7 @@ def api_pick_file():
     except Exception as e:
         return jsonify({"error": f"Erreur: {str(e)}"}), 500
 
-# ============================================
-# 🔌 TEST CONNEXION
-# ============================================
+
 @app.route('/api/test-connection', methods=['POST'])
 @login_required
 def api_test_connection():
@@ -8385,9 +8529,7 @@ def api_create_download_folder():
         app_logger.error(f"[create-folder] Erreur: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# 📥 TÉLÉCHARGEMENT DEPUIS URL
-# ============================================
+
 @app.route('/api/download/progress/<int:download_id>', methods=['GET'])
 @login_required
 def api_download_progress(download_id):
@@ -8419,9 +8561,7 @@ def api_download_cancel(download_id):
     app_logger.info(f"[Download] Annulation demandée pour download_id={download_id} (actif={was_active})")
     return jsonify({"success": True, "download_id": download_id, "was_active": was_active})
 
-# ============================================
-# 🧩 PRINTABLES — API GRAPHQL
-# ============================================
+
 PRINTABLES_API_URL = "https://api.printables.com/graphql/"
 PRINTABLES_HEADERS = {
     "User-Agent": (
@@ -8501,9 +8641,7 @@ def printables_get_download_link(file_id, model_id, file_type):
 
     return None
 
-# ============================================
-# 🌍 MAKERWORLD — API BAMBU LAB (login 2 étapes)
-# ============================================
+
 MAKERWORLD_API = "https://api.bambulab.com"
 MAKERWORLD_DL_HEADERS = {
     "User-Agent": (
@@ -9288,9 +9426,7 @@ def api_download_file():
         app_logger.error(f"[Download] Erreur: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# 🕒 HISTORIQUE TÉLÉCHARGEMENTS WEB
-# ============================================
+
 def _ensure_download_folder_registered(path, user_id):
     try:
         normalized = os.path.normpath(path)
@@ -9372,9 +9508,7 @@ def api_clear_download_history():
         app_logger.error(f"[API] Erreur non gérée: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# 📥 TÉLÉCHARGEMENT FICHIER LOCAL
-# ============================================
+
 @app.route('/api/file/data', methods=['GET'])
 @login_required
 def api_get_file_data():
@@ -9406,9 +9540,7 @@ def api_get_file_data():
         app_logger.error(f"[API] Erreur non gérée: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# ⭐ FAVORIS
-# ============================================
+
 @app.route('/api/favorites', methods=['GET'])
 @login_required
 def api_get_favorites():
@@ -9466,9 +9598,7 @@ def api_toggle_favorite():
         app_logger.error(f"[API] Erreur non gérée: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# 🧩 PROJETS / ASSEMBLAGES
-# ============================================
+
 @app.route('/api/projects', methods=['GET'])
 @login_required
 def api_get_projects():
@@ -9722,9 +9852,7 @@ def api_remove_project_file(project_id):
     conn.close()
     return jsonify({"message": "Retiré du projet"})
 
-# ============================================
-# 📡 STATUT COMPTES
-# ============================================
+
 @app.route('/api/accounts/status', methods=['GET'])
 @login_required
 def api_accounts_status():
@@ -9752,9 +9880,7 @@ def api_accounts_status():
 
     return jsonify(status)
 
-# ============================================
-# 🔧 RÉPARATION MAILLAGE
-# ============================================
+
 @app.route('/api/files/repair', methods=['POST'])
 @login_required
 def api_repair_file():
@@ -9860,9 +9986,7 @@ def api_repair_file():
         app_logger.error(f"[Repair] Erreur: {e}")
         return jsonify({"error": f"Échec: {str(e)}"}), 500
 
-# ============================================
-# 🔁 CONVERTISSEUR DE FORMAT (STL / 3MF / OBJ)
-# ============================================
+
 CONVERT_SUPPORTED_FORMATS = ('stl', '3mf', 'obj')
 CONVERT_UNIT_TO_MM = {
     'mm': 1.0,
@@ -10045,13 +10169,11 @@ def api_convert_file_batch():
     app_logger.info(f"[CONVERT-BATCH] {succeeded}/{len(results)} fichier(s) converti(s) avec succès")
     return jsonify({"success": True, "results": results, "converted": succeeded, "total": len(results)})
 
-# ============================================
-# 🛡️ VÉRIFICATION D'INTÉGRITÉ DE LA BIBLIOTHÈQUE
-# ============================================
-INTEGRITY_CHECK_BASE_TIMEOUT = 45       
-INTEGRITY_CHECK_TIMEOUT_PER_MB = 1.0    
+
+INTEGRITY_CHECK_BASE_TIMEOUT = 45
+INTEGRITY_CHECK_TIMEOUT_PER_MB = 1.0
 INTEGRITY_CHECK_TIMEOUT_MAX = 180
-INTEGRITY_CHECK_WORKERS = 4            
+INTEGRITY_CHECK_WORKERS = 4
 INTEGRITY_REPORT_FILE = os.path.join(DATA_DIR, "integrity_report.json")
 
 
@@ -10160,7 +10282,7 @@ def _run_integrity_check(paths):
 
     executor = ThreadPoolExecutor(max_workers=INTEGRITY_CHECK_WORKERS)
     paths_iter = iter(paths)
-    pending = {}  
+    pending = {}
 
     def _submit_next():
         try:
@@ -10258,9 +10380,6 @@ def api_integrity_progress():
         })
 
 
-# ============================================
-# 💾 SAUVEGARDE / EXPORT / IMPORT
-# ============================================
 BACKUP_MANIFEST_VERSION = 1
 
 BACKUP_CATEGORY_TABLES = {
@@ -10409,9 +10528,7 @@ def api_backup_import():
         except Exception:
             pass
 
-# ============================================
-# 🩺 DIAGNOSTIC / EXPORT DE LOGS (support & bêta-test)
-# ============================================
+
 _SENSITIVE_SETTINGS_KEYS = (
     'password', 'api_key', 'apikey', 'token', 'secret', 'smtp_password', 'code'
 )
@@ -10567,8 +10684,8 @@ def api_export_logs():
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 
-LOG_TAIL_INITIAL_BYTES = 50 * 1024   
-LOG_TAIL_MAX_CHUNK = 200 * 1024      
+LOG_TAIL_INITIAL_BYTES = 50 * 1024
+LOG_TAIL_MAX_CHUNK = 200 * 1024
 
 @app.route('/api/logs/tail', methods=['GET'])
 @login_required
@@ -10610,9 +10727,25 @@ def api_logs_tail():
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 
-# ============================================
-# ⚙️ PARAMÈTRES
-# ============================================
+@app.route('/api/debug/session', methods=['GET'])
+@login_required
+def api_debug_session_status():
+    return jsonify({"active": DEBUG_SESSION_ACTIVE}), 200
+
+
+@app.route('/api/debug/enable', methods=['POST'])
+@login_required
+def api_debug_session_enable():
+    try:
+        with open(DEBUG_FLAG_FILE, 'w', encoding='utf-8') as f:
+            f.write(str(int(time.time())))
+        app_logger.warning("[DEBUG] Mode debug demandé — sera actif dès le prochain démarrage de l'app.")
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        app_logger.error(f"[DEBUG] Erreur activation du mode debug: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+
 @app.route('/api/settings', methods=['GET'])
 @login_required
 def api_get_settings():
@@ -10637,8 +10770,21 @@ def api_save_settings():
             return jsonify({"error": "Données JSON requises"}), 400
 
         current_settings = load_settings() or {}
+        previous_spoolman_url = (current_settings.get('spoolman_url') or '').strip()
         current_settings.update(data)
         save_settings(current_settings)
+
+
+        new_spoolman_url = (current_settings.get('spoolman_url') or '').strip()
+        if previous_spoolman_url and not new_spoolman_url:
+            conn = get_db()
+            try:
+                conn.execute("DELETE FROM filament_assignments WHERE source_type='spoolman'")
+                conn.execute("DELETE FROM spool_assignments")
+                conn.commit()
+                app_logger.info("[Settings] URL Spoolman supprimée — affectations de filament Spoolman nettoyées")
+            finally:
+                conn.close()
 
         return jsonify({"message": "Paramètres sauvegardés", "settings": current_settings}), 200
 
@@ -10646,14 +10792,12 @@ def api_save_settings():
         app_logger.error(f"[API] Erreur non gérée: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# 🔄 MISE À JOUR AUTOMATIQUE
-# ============================================
+
 from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio-app"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.4.9"
+CURRENT_VERSION = "0.5.2"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
@@ -10755,10 +10899,6 @@ def check_for_updates():
         return None
 
 def _find_real_content_dir(base_dir):
-    """Localise le sous-dossier du ZIP qui contient réellement les fichiers
-    de l'app (utile si le ZIP a un dossier racine imbriqué type
-    'stellio-1.2.0/'). Partagé entre les branches Windows et Linux/Pi de
-    install_update()."""
     real_files = {'main.py', 'index.html', 'script.js', 'style.css', 'check_deps.py'}
     for root, dirs, files in os.walk(base_dir):
         entries = set(files) | set(dirs)
@@ -10774,7 +10914,7 @@ def install_update(installer_path):
     try:
         app_logger.info(f"[UPDATE] 🚀 Lancement de la mise à jour: {installer_path}")
         ext = os.path.splitext(installer_path)[1].lower()
-        
+
         launcher_exe = os.environ.get('STELLIO_LAUNCHER_EXE')
 
         if sys.platform == 'win32':
@@ -10783,13 +10923,13 @@ def install_update(installer_path):
             app_subdir = os.path.join(app_dir, 'app')
             os.makedirs(app_subdir, exist_ok=True)
             exe_name = os.path.basename(app_exe) if app_exe else 'Stellio.exe'
-            
+
             app_logger.info(f"[UPDATE] 📂 app_dir: {app_dir}")
             app_logger.info(f"[UPDATE]  app_subdir: {app_subdir}")
-            
+
             batch_path = os.path.join(tempfile.gettempdir(), 'stellio_update_relay.bat')
             log_path = os.path.join(tempfile.gettempdir(), 'stellio_update_relay.log')
-            
+
             if ext == '.zip':
                 extract_dir = os.path.join(tempfile.gettempdir(), 'stellio-patch')
                 if os.path.exists(extract_dir):
@@ -10834,31 +10974,31 @@ def install_update(installer_path):
                 _cleanup_before_exit()
                 os._exit(0)
                 return
-            
+
             relaunch_line = f'start /min "" "{app_exe}"' if app_exe else ''
-            
+
             batch_content = (
                 '@echo off\r\n'
                 'setlocal\r\n'
                 f'echo [Stellio Update] %date% %time% > "{log_path}"\r\n'
                 'ping -n 4 127.0.0.1 >nul\r\n'
                 f'taskkill /f /im "{exe_name}" >nul 2>&1\r\n'
-            
+
                 'ping -n 3 127.0.0.1 >nul\r\n'
                 f'{install_cmd}\r\n'
                 f'echo [Stellio Update] Code de sortie : %errorlevel% >> "{log_path}"\r\n'
-              
+
                 'ping -n 2 127.0.0.1 >nul\r\n'
                 f'{relaunch_line}\r\n'
                 'endlocal\r\n'
                 'del "%~f0"\r\n'
             )
-            
+
             with open(batch_path, 'w', encoding='utf-8') as f:
                 f.write(batch_content)
-            
+
             app_logger.info(f"[UPDATE] 📝 Script relais créé: {batch_path}")
-            
+
             vbs_path = os.path.join(tempfile.gettempdir(), 'stellio_update_relay.vbs')
             vbs_content = (
                 'Set WshShell = CreateObject("WScript.Shell")\r\n'
@@ -10866,17 +11006,17 @@ def install_update(installer_path):
             )
             with open(vbs_path, 'w', encoding='utf-8') as f:
                 f.write(vbs_content)
-            
+
             si = subprocess.STARTUPINFO()
             si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            si.wShowWindow = 0 
-            
+            si.wShowWindow = 0
+
             subprocess.Popen(
                 ['wscript.exe', '//B', vbs_path],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
-                startupinfo=si,  
+                startupinfo=si,
                 creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
                 close_fds=True
             )
@@ -10886,14 +11026,8 @@ def install_update(installer_path):
             os._exit(0)
 
         else:
-            # ============================================
-            # 🐧 MISE À JOUR LINUX / RASPBERRY PI
-            # ============================================
-            # Pas de verrou de fichier comme sous Windows : on peut écraser
-            # les fichiers de l'app directement pendant que le process
-            # tourne encore. Le process en mémoire garde l'ancien code
-            # jusqu'au redémarrage — géré en fin de fonction (systemd
-            # Restart=always si dispo, sinon ré-exec direct du process).
+
+
             app_dir = BASE_DIR
 
             if ext == '.zip':
@@ -10909,9 +11043,7 @@ def install_update(installer_path):
                 real_content_dir = _find_real_content_dir(extract_dir)
                 app_logger.info(f"[UPDATE] 📂 Copie de {real_content_dir} vers {app_dir}")
 
-                # Copie fichier par fichier (pas shutil.copytree en bloc :
-                # on veut continuer même si un fichier isolé pose problème,
-                # comme le fait xcopy /y /e côté Windows).
+
                 copied, failed = 0, 0
                 for root, dirs, files in os.walk(real_content_dir):
                     rel = os.path.relpath(root, real_content_dir)
@@ -10938,11 +11070,7 @@ def install_update(installer_path):
             app_logger.info("[UPDATE] 🔁 Redémarrage du service...")
             _cleanup_before_exit()
 
-            # Sous systemd (service stellio.service avec Restart=always),
-            # il suffit de quitter — systemd relance automatiquement avec
-            # le nouveau code sur disque. Sinon (lancé à la main dans un
-            # terminal), on se ré-exécute soi-même pour ne pas laisser
-            # l'utilisateur avec un process mort après la mise à jour.
+
             if os.environ.get('INVOCATION_ID'):
                 app_logger.info("[UPDATE] Service systemd détecté — arrêt (Restart=always s'occupe du redémarrage)")
                 os._exit(0)
@@ -11071,9 +11199,7 @@ def api_install_update():
     threading.Thread(target=do_install, daemon=True).start()
     return jsonify({'success': True, 'message': 'Installation en cours'}), 200
 
-# ============================================
-# 🖨️ API IMPRIMANTES
-# ============================================
+
 @app.route('/api/printers', methods=['GET'])
 @login_required
 def api_get_printers():
@@ -11329,8 +11455,8 @@ def api_edit_printer(pid):
         ptype = data.get('type')
         ip = data.get('ip')
         raw_config = data.get('config', {}) or {}
-        # Clé absente du payload = on ne touche pas à celle déjà enregistrée
-        # (le frontend n'envoie pas le champ si l'utilisateur l'a laissé vide en édition).
+
+
         has_new_api_key = 'api_key' in data and data.get('api_key')
 
         if not name or not ip or not ptype:
@@ -11359,8 +11485,7 @@ def api_edit_printer(pid):
         config = json.dumps(raw_config)
         api_key = data.get('api_key', '') if has_new_api_key else decrypt_account_secret(existing['api_key']) if existing['api_key'] else ''
 
-        # On coupe l'ancienne connexion persistante (MQTT/WebSocket) avant de tester
-        # la nouvelle config, quel que soit le type d'origine.
+
         _stop_bambu_connection(pid)
         _stop_elegoo_sdcp_connection(pid)
         _stop_elegoo_cc2_connection(pid)
@@ -11520,9 +11645,7 @@ def api_printer_camera(pid):
 
     return jsonify(camera_info)
 
-# ============================================
-# 🔧 MAINTENANCE IMPRIMANTE
-# ============================================
+
 def _fetch_moonraker_total_print_hours(printer):
     try:
         port = printer.get('config', {}).get('port', '7125')
@@ -11541,7 +11664,7 @@ def _serialize_maintenance_task(task, printer_total_hours):
     hours_since = None
     days_since = None
     due = False
-    progress_ratio = None  
+    progress_ratio = None
 
     if task['interval_hours']:
         hours_since = round(printer_total_hours - (task['hours_at_last_reset'] or 0), 1)
@@ -11583,7 +11706,7 @@ def api_printer_maintenance_list(pid):
         return jsonify({"error": "Imprimante introuvable"}), 404
 
     total_hours = printer_row['total_print_hours'] or 0
-    hours_source = 'estimated'  
+    hours_source = 'estimated'
 
     if printer_row['type'] == 'klipper':
         live_hours = _fetch_moonraker_total_print_hours(parse_printer_config(printer_row))
@@ -11837,9 +11960,7 @@ def api_save_cache():
         app_logger.error(f"[API] Erreur non gérée: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# 🤖 OLLAMA — TAGS IA LOCALE
-# ============================================
+
 def get_ollama_base_url():
     settings = load_settings() or {}
     url = (settings.get('ollama_url') or 'http://localhost:11434').strip().rstrip('/')
@@ -11868,7 +11989,7 @@ def _call_ollama(base_url: str, model: str, prompt: str, system: str = "",
                  temperature: float = 0.2, num_predict: int = 200,
                  timeout: int = 300, images: list = None) -> str:
     payload = {"model": model, "prompt": prompt, "stream": False,
-               "think": False,  
+               "think": False,
                "options": {"temperature": temperature, "num_predict": num_predict}}
     if system:
         payload["system"] = system
@@ -11986,7 +12107,7 @@ def _detect_hardware():
                 info['gpu_name'] = parts[0]
                 info['vram_gb'] = round(float(parts[1]) / 1024, 1)
     except FileNotFoundError:
-        pass  
+        pass
     except Exception as e:
         app_logger.info(f"[HW] Détection GPU NVIDIA échouée: {e}")
 
@@ -12007,7 +12128,7 @@ OLLAMA_MODEL_TIERS = [
 
 def _recommend_ollama_model(hw):
     vram = hw.get('vram_gb') or 0
-    ram = hw.get('ram_gb') if hw.get('ram_gb') is not None else 8  
+    ram = hw.get('ram_gb') if hw.get('ram_gb') is not None else 8
 
     for tier in OLLAMA_MODEL_TIERS:
         if vram >= tier['min_vram_gb'] and ram >= tier.get('min_ram_gb', 0):
@@ -12044,9 +12165,7 @@ def api_ollama_recommend_model():
 
     return jsonify({'hardware': hw, 'recommendation': rec}), 200
 
-# ============================================
-# 🏷️ AUTO-TAG
-# ============================================
+
 @app.route('/api/ollama/auto-tag', methods=['POST'])
 @login_required
 def api_ollama_auto_tag():
@@ -12095,9 +12214,6 @@ def api_ollama_auto_tag():
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 
-# ============================================
-# 📝 DESCRIPTION AUTOMATIQUE (IA)
-# ============================================
 @app.route('/api/file-description', methods=['GET'])
 @login_required
 def api_get_file_description():
@@ -12307,7 +12423,7 @@ def api_ollama_sos_print():
             finally:
                 conn.close()
             if not prow:
-                printer_id = None  
+                printer_id = None
             else:
                 printer_name = prow['name']
 
@@ -12433,9 +12549,7 @@ def api_ollama_sos_print():
         app_logger.error(f"[SosPrint] {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# 🔍 RECHERCHE SÉMANTIQUE
-# ============================================
+
 @app.route('/api/ollama/semantic-search', methods=['POST'])
 @login_required
 def api_ollama_semantic_search():
@@ -12498,9 +12612,7 @@ def api_ollama_semantic_search():
         app_logger.error(f"[SemanticSearch] {e}")
         return jsonify({"results": [f['path'] for f in candidates], "fallback": True}), 200
 
-# ============================================
-# 🧠 ASSISTANT IA — PROFILS SLICER & RECOMMANDATION
-# ============================================
+
 SLICER_PROFILES_FILE = os.path.join(DATA_DIR, "slicer_profiles.json")
 _slicer_profiles_cache = None
 
@@ -12615,7 +12727,7 @@ def _guess_compatible_printer_names(raw, name, source_filename):
     return _extract_printer_from_prefix(name) or _extract_printer_from_prefix(source_filename)
 
 
-def _classify_profile_type(raw):
+def _classify_profile_type(raw, hint=None):
     ptype = str(raw.get('type') or '').strip().lower()
     if ptype in ('machine', 'printer'):
         return 'printer'
@@ -12623,12 +12735,25 @@ def _classify_profile_type(raw):
         return 'filament'
     if ptype in ('process', 'print'):
         return 'process'
+    if hint in ('printer', 'filament', 'process'):
+        return hint
     if raw.get('filament_type') or raw.get('material_type') or raw.get('material'):
         return 'filament'
     return 'process'
 
+def _guess_material_type(name, raw_material):
+    if raw_material:
+        return str(raw_material).strip()
+    if not name:
+        return None
+    name_lower = str(name).lower()
+    materials = ['pla', 'petg', 'abs', 'tpu', 'asa', 'nylon', 'pc', 'hips', 'pva']
+    for mat in materials:
+        if mat in name_lower:
+            return mat.upper()
+    return None
 
-def _normalize_profile(raw, slicer, name, source_filename):
+def _normalize_profile(raw, slicer, name, source_filename, source_path=None, type_hint=None):
     def g(*keys):
         return _pick(raw, list(keys))
 
@@ -12638,19 +12763,23 @@ def _normalize_profile(raw, slicer, name, source_filename):
 
     compatible_printers = _guess_compatible_printer_names(raw, name, source_filename)
 
+    raw_material = _first_str(g('filament_type', 'material_type', 'material'))
+    guessed_material = _guess_material_type(name, raw_material)
+
     return {
         "id": secrets.token_hex(8),
         "name": (name or source_filename or "Profil").strip(),
         "slicer": slicer,
         "source_filename": source_filename,
+        "source_path": source_path,
         "imported_at": datetime.datetime.now().isoformat(timespec='seconds'),
-        "printer_id": None,  
-        "printer_match_confirmed": False, 
-        "profile_type": _classify_profile_type(raw),  
-        "compatible_printers": compatible_printers,  
+        "printer_id": None,
+        "printer_match_confirmed": False,
+        "profile_type": _classify_profile_type(raw, hint=type_hint),
+        "compatible_printers": compatible_printers,
         "layer_height": _first_num(g('layer_height')),
         "nozzle_diameter": _first_num(g('nozzle_diameter')),
-        "material_type": _first_str(g('filament_type', 'material_type', 'material')),
+        "material_type": guessed_material,
         "infill_density": _first_num(g('fill_density', 'infill_sparse_density', 'sparse_infill_density')),
         "infill_pattern": _first_str(g('fill_pattern', 'infill_pattern', 'sparse_infill_pattern')),
         "wall_count": int(wall_count) if wall_count is not None else None,
@@ -12663,7 +12792,20 @@ def _normalize_profile(raw, slicer, name, source_filename):
     }
 
 
-def _parse_zip_bundle(filename, content_bytes, slicer_hint):
+def _persist_profile_bytes(content_bytes, suggested_name):
+    safe_base = re.sub(r'[^A-Za-z0-9._-]+', '_', os.path.basename(suggested_name or 'profil'))[:80] or 'profil'
+    unique_name = f"{secrets.token_hex(6)}_{safe_base}"
+    dest_path = os.path.join(IMPORTED_PROFILES_DIR, unique_name)
+    try:
+        with open(dest_path, 'wb') as f:
+            f.write(content_bytes)
+        return dest_path
+    except Exception as e:
+        app_logger.debug(f"[SlicerProfiles] Impossible de persister le profil {suggested_name}: {e}")
+        return None
+
+
+def _parse_zip_bundle(filename, content_bytes, slicer_hint, type_hint=None):
     try:
         zf = zipfile.ZipFile(io.BytesIO(content_bytes))
     except Exception as e:
@@ -12681,27 +12823,31 @@ def _parse_zip_bundle(filename, content_bytes, slicer_hint):
 
         if low.endswith('.json'):
             try:
-                raw = json.loads(zf.read(entry_name).decode('utf-8-sig', errors='ignore'))
+                entry_bytes = zf.read(entry_name)
+                raw = json.loads(entry_bytes.decode('utf-8-sig', errors='ignore'))
             except Exception:
                 continue
             if not isinstance(raw, dict):
                 continue
             raw_lower = {str(k).lower(): v for k, v in raw.items()}
             if not any(k in raw_lower for k in json_marker_keys):
-                continue  
+                continue
             name = raw.get('name') or os.path.splitext(base)[0]
-            profiles.append(_normalize_profile(raw_lower, slicer_hint or 'orcaslicer', name, f"{filename}::{base}"))
+            source_path = _persist_profile_bytes(entry_bytes, base)
+            profiles.append(_normalize_profile(raw_lower, slicer_hint or 'orcaslicer', name, f"{filename}::{base}", source_path=source_path, type_hint=type_hint))
 
         elif low.endswith('.cfg'):
             try:
-                text = zf.read(entry_name).decode('utf-8-sig', errors='ignore')
+                entry_bytes = zf.read(entry_name)
+                text = entry_bytes.decode('utf-8-sig', errors='ignore')
             except Exception:
                 continue
             raw = _parse_kv_text(text)
             if not raw:
                 continue
             name = raw.get('name') or os.path.splitext(base.replace('.inst', ''))[0]
-            profiles.append(_normalize_profile(raw, slicer_hint or 'cura', name, f"{filename}::{base}"))
+            source_path = _persist_profile_bytes(entry_bytes, base)
+            profiles.append(_normalize_profile(raw, slicer_hint or 'cura', name, f"{filename}::{base}", source_path=source_path, type_hint=type_hint))
 
     if not profiles:
         raise ValueError("Aucun profil exploitable trouvé dans cette archive")
@@ -12718,18 +12864,37 @@ SLICER_ZIP_EXTENSIONS = {
     'zip': None,
 }
 
+SLICER_EXT_TYPE_HINTS = {
+    'orca_filament': 'filament',
+    'orca_printer': 'printer',
+    'orca_process': 'process',
+    'bbscfg': 'process',
+    'bbsflmt': 'filament',
+}
 
-def _parse_slicer_profile_file(filename, content_bytes, slicer_hint=None):
+SLICER_SUBDIR_TYPE_HINTS = {
+    'process': 'process',
+    'print': 'process',
+    'filament': 'filament',
+    'machine': 'printer',
+    'printer': 'printer',
+}
+
+
+def _parse_slicer_profile_file(filename, content_bytes, slicer_hint=None, source_path=None, type_hint=None):
     ext = os.path.splitext(filename)[1].lower().lstrip('.')
     base_name = os.path.splitext(os.path.basename(filename))[0]
+    resolved_type_hint = type_hint or SLICER_EXT_TYPE_HINTS.get(ext)
 
     if ext in SLICER_ZIP_EXTENSIONS:
-        return _parse_zip_bundle(filename, content_bytes, SLICER_ZIP_EXTENSIONS[ext] or slicer_hint)
+        return _parse_zip_bundle(filename, content_bytes, SLICER_ZIP_EXTENSIONS[ext] or slicer_hint, type_hint=resolved_type_hint)
 
     try:
         text = content_bytes.decode('utf-8-sig')
     except Exception:
         text = content_bytes.decode('latin-1', errors='ignore')
+
+    resolved_path = source_path or _persist_profile_bytes(content_bytes, filename)
 
     if ext == 'json':
         try:
@@ -12740,7 +12905,7 @@ def _parse_slicer_profile_file(filename, content_bytes, slicer_hint=None):
             raise ValueError("Format JSON inattendu")
         name = raw.get('name') or base_name
         raw_lower = {str(k).lower(): v for k, v in raw.items()}
-        return [_normalize_profile(raw_lower, slicer_hint or 'orcaslicer', name, filename)]
+        return [_normalize_profile(raw_lower, slicer_hint or 'orcaslicer', name, filename, source_path=resolved_path, type_hint=resolved_type_hint)]
 
     if ext in ('ini', 'cfg'):
         raw = _parse_kv_text(text)
@@ -12752,7 +12917,7 @@ def _parse_slicer_profile_file(filename, content_bytes, slicer_hint=None):
             is_cura = 'wall_line_count' in raw or 'infill_sparse_density' in raw or '[general]' in text.lower()
             slicer = 'cura' if is_cura else 'prusaslicer'
         name = raw.get('name') or base_name
-        return [_normalize_profile(raw, slicer, name, filename)]
+        return [_normalize_profile(raw, slicer, name, filename, source_path=resolved_path, type_hint=resolved_type_hint)]
 
     raise ValueError(f"Extension non supportée : .{ext} (attendu : .ini, .json, .cfg, .orca_filament, .orca_printer ou .zip)")
 
@@ -12833,7 +12998,7 @@ def _remember_printer_alias(printer_id, user_id, names):
         app_logger.debug(f"[SlicerProfiles] Échec mémorisation alias imprimante: {e}")
 
 
-def _scan_dir_for_profiles(dir_path, already_imported, imported_out, slicer_hint=None):
+def _scan_dir_for_profiles(dir_path, already_imported, imported_out, slicer_hint=None, type_hint=None):
     if not dir_path or not os.path.isdir(dir_path):
         return
     try:
@@ -12854,7 +13019,9 @@ def _scan_dir_for_profiles(dir_path, already_imported, imported_out, slicer_hint
                 continue
             with open(fpath, 'rb') as f:
                 content = f.read()
-            new_profiles = _parse_slicer_profile_file(fname, content, slicer_hint=slicer_hint)
+
+
+            new_profiles = _parse_slicer_profile_file(fname, content, slicer_hint=slicer_hint, source_path=fpath, type_hint=type_hint)
             imported_out.extend(new_profiles)
             already_imported.add(fname)
         except Exception as e:
@@ -12919,7 +13086,7 @@ def api_slicer_profiles_assign_printer(profile_id):
     for p in profiles:
         if p.get('id') == profile_id:
             p['printer_id'] = printer_id
-            p['printer_match_confirmed'] = bool(printer_id) 
+            p['printer_match_confirmed'] = bool(printer_id)
             target = p
             break
     if not target:
@@ -12930,6 +13097,34 @@ def api_slicer_profiles_assign_printer(profile_id):
     if printer_id and target.get('compatible_printers'):
         _remember_printer_alias(printer_id, session['user_id'], target['compatible_printers'])
 
+    return jsonify({"success": True, "profiles": profiles}), 200
+
+
+@app.route('/api/slicer-profiles/<profile_id>/type', methods=['PATCH'])
+@login_required
+def api_slicer_profiles_assign_type(profile_id):
+    """Permet de corriger manuellement la nature d'un profil (imprimante /
+    filament / réglages) quand la détection automatique s'est trompée —
+    ex. profil filament classé par erreur en 'réglages'."""
+    data = request.json or {}
+    new_type = str(data.get('profile_type') or '').strip().lower()
+    if new_type not in ('printer', 'filament', 'process'):
+        return jsonify({"error": "Type de profil invalide (attendu : printer, filament ou process)"}), 400
+
+    profiles = load_slicer_profiles()
+    target = None
+    for p in profiles:
+        if p.get('id') == profile_id:
+            p['profile_type'] = new_type
+
+
+            p['profile_type_confirmed'] = True
+            target = p
+            break
+    if not target:
+        return jsonify({"error": "Profil introuvable"}), 404
+
+    save_slicer_profiles(profiles)
     return jsonify({"success": True, "profiles": profiles}), 200
 
 
@@ -12973,7 +13168,8 @@ def _scan_versioned_user_dir(base_path, subdirs, already_imported, imported_out,
         if not os.path.isdir(versioned):
             continue
         for sd in subdirs:
-            _scan_dir_for_profiles(os.path.join(versioned, sd), already_imported, imported_out, slicer_hint=slicer_hint)
+            _scan_dir_for_profiles(os.path.join(versioned, sd), already_imported, imported_out, slicer_hint=slicer_hint,
+                                    type_hint=SLICER_SUBDIR_TYPE_HINTS.get(sd))
 
 
 def _scan_creality_print_dir(base_path, already_imported, imported_out):
@@ -12998,7 +13194,8 @@ def _scan_creality_print_dir(base_path, already_imported, imported_out):
             if not os.path.isdir(uid_dir):
                 continue
             for sd in ('process', 'filament', 'machine'):
-                _scan_dir_for_profiles(os.path.join(uid_dir, sd), already_imported, imported_out, slicer_hint='creality_print')
+                _scan_dir_for_profiles(os.path.join(uid_dir, sd), already_imported, imported_out, slicer_hint='creality_print',
+                                        type_hint=SLICER_SUBDIR_TYPE_HINTS.get(sd))
 
 
 @app.route('/api/slicer-profiles/auto-detect', methods=['POST'])
@@ -13016,7 +13213,8 @@ def api_slicer_profiles_autodetect():
         for slicer, (base_rel, subdirs) in SLICER_AUTODETECT_DIRS.items():
             base_path = os.path.join(appdata, base_rel)
             for sd in subdirs:
-                _scan_dir_for_profiles(os.path.join(base_path, sd), already_imported, imported, slicer_hint=slicer)
+                _scan_dir_for_profiles(os.path.join(base_path, sd), already_imported, imported, slicer_hint=slicer,
+                                        type_hint=SLICER_SUBDIR_TYPE_HINTS.get(sd))
 
         for slicer, (base_rel, subdirs) in SLICER_VERSIONED_USER_DIRS.items():
             _scan_versioned_user_dir(os.path.join(appdata, base_rel), subdirs, already_imported, imported, slicer_hint=slicer)
@@ -13033,7 +13231,10 @@ def api_slicer_profiles_autodetect():
             for entry in versions:
                 versioned = os.path.join(family_base, entry)
                 if os.path.isdir(versioned):
-                    _scan_dir_for_profiles(os.path.join(versioned, 'quality_changes'), already_imported, imported, slicer_hint=slicer)
+                    _scan_dir_for_profiles(os.path.join(versioned, 'quality_changes'), already_imported, imported, slicer_hint=slicer,
+                                            type_hint='process')
+
+
                     _scan_dir_for_profiles(os.path.join(versioned, 'user'), already_imported, imported, slicer_hint=slicer)
 
         _scan_creality_print_dir(os.path.join(appdata, 'Creality', 'Creality Print'), already_imported, imported)
@@ -13088,7 +13289,7 @@ def _analyze_mesh_for_recommendation(mesh):
     }
 
 
-MIN_RATING_SAMPLES = 3  
+MIN_RATING_SAMPLES = 3
 
 def _get_profile_success_stats(user_id):
     try:
@@ -13294,9 +13495,7 @@ def api_ollama_recommend_profile():
         app_logger.error(f"[RecommendProfile] {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# 🧩 NESTING (AUTO-ARRANGEMENT DE PLATEAU) + RECOMMANDATION IA
-# ============================================
+
 def _pack_footprints_shelf(items, bed_w, bed_h, spacing=0.0):
     sorted_items = sorted(items, key=lambda it: max(it['w'], it['h']), reverse=True)
 
@@ -13364,14 +13563,14 @@ def _get_polygon_footprint(mesh):
     pts_xy = mesh.vertices[:, :2]
     hull = MultiPoint([tuple(p) for p in pts_xy]).convex_hull
     if hull.geom_type != 'Polygon':
-        hull = hull.buffer(0.5) 
+        hull = hull.buffer(0.5)
     minx, miny, maxx, maxy = hull.bounds
     return shapely_affinity.translate(hull, xoff=-minx, yoff=-miny)
 
 
 def _pack_polygons(items, bed_w, bed_h, spacing=0.0):
     sorted_items = sorted(items, key=lambda it: it['polygon'].area, reverse=True)
-    grid_step = max(2.0, min(bed_w, bed_h) / 80)  
+    grid_step = max(2.0, min(bed_w, bed_h) / 80)
 
     placed_polys, placed_bounds, placed = [], [], []
     unplaced = []
@@ -13495,7 +13694,7 @@ def api_nesting_arrange():
         if rotation_deg:
             mesh.apply_transform(tra.rotation_matrix(np.radians(rotation_deg), [0, 0, 1]))
             b = mesh.bounds
-            mesh.apply_translation([-b[0][0], -b[0][1], 0]) 
+            mesh.apply_translation([-b[0][0], -b[0][1], 0])
         offset = 0 if HAS_SHAPELY else spacing / 2
         mesh.apply_translation([p['x'] + offset, p['y'] + offset, 0])
         combined_parts.append(mesh)
@@ -13618,9 +13817,7 @@ def api_ollama_recommend_profile_batch():
         app_logger.error(f"[RecommendProfileBatch] {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ============================================
-# 🧵 SPOOLMAN PROXY
-# ============================================
+
 @app.route('/api/spoolman/spools', methods=['GET'])
 @login_required
 def api_spoolman_spools():
@@ -13754,9 +13951,6 @@ def _consume_spool_filament(spoolman_url, spool_id, weight_g):
         app_logger.warning(f"[Spoolman] Erreur décrément bobine #{spool_id}: {e}")
         return False
 
-# ============================================
-# 🧵🎨 FILAMENT BRIDGE — multi-sources (Spoolman / AMS Bambu / CFS Creality / manuel)
-# ============================================
 
 def _get_bambu_ams_slots(user_id):
     slots = []
@@ -13780,7 +13974,7 @@ def _get_bambu_ams_slots(user_id):
             for tray in ams_list:
                 material = (tray.get('material') or '').strip()
                 if not material:
-                    continue  
+                    continue
                 color = tray.get('color') or ''
                 slots.append({
                     'source_type': 'bambu_ams',
@@ -14103,7 +14297,8 @@ def api_list_manual_spools():
         conn = get_db()
         try:
             rows = conn.execute(
-                "SELECT id, name, material, color_hex, remaining_g, capacity_g FROM manual_filament_spools WHERE user_id=? ORDER BY created_at DESC",
+                "SELECT id, name, material, color_hex, remaining_g, capacity_g, vendor, price, diameter_mm, notes, archived "
+                "FROM manual_filament_spools WHERE user_id=? ORDER BY archived ASC, created_at DESC",
                 (session['user_id'],)
             ).fetchall()
         finally:
@@ -14124,13 +14319,18 @@ def api_create_manual_spool():
         conn = get_db()
         try:
             cur = conn.execute("""
-                INSERT INTO manual_filament_spools (user_id, name, material, color_hex, remaining_g, capacity_g, source_label)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO manual_filament_spools
+                    (user_id, name, material, color_hex, remaining_g, capacity_g, source_label, vendor, price, diameter_mm, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 session['user_id'], name, (data.get('material') or '').strip(),
                 (data.get('color_hex') or '#888888').strip(),
                 data.get('remaining_g'), data.get('capacity_g') or 1000,
-                (data.get('source_label') or 'Manuel').strip()
+                (data.get('source_label') or 'Manuel').strip(),
+                (data.get('vendor') or '').strip(),
+                data.get('price') if data.get('price') not in ('', None) else None,
+                data.get('diameter_mm') or 1.75,
+                (data.get('notes') or '').strip(),
             ))
             conn.commit()
             new_id = cur.lastrowid
@@ -14147,12 +14347,15 @@ def api_update_manual_spool(spool_id):
     data = request.json or {}
     fields, params = [], []
     for key, col in (('name', 'name'), ('material', 'material'), ('color_hex', 'color_hex'),
-                      ('remaining_g', 'remaining_g'), ('capacity_g', 'capacity_g')):
+                      ('remaining_g', 'remaining_g'), ('capacity_g', 'capacity_g'),
+                      ('vendor', 'vendor'), ('price', 'price'), ('diameter_mm', 'diameter_mm'),
+                      ('notes', 'notes'), ('archived', 'archived')):
         if key in data:
             fields.append(f"{col} = ?")
             params.append(data[key])
     if not fields:
         return jsonify({"error": "Rien à mettre à jour"}), 400
+    fields.append("updated_at = CURRENT_TIMESTAMP")
     params.extend([spool_id, session['user_id']])
     try:
         conn = get_db()
@@ -14214,10 +14417,6 @@ def _consume_filament_slot(source_type, source_id, weight_g, user_id):
     return False
 
 
-
-# ============================================
-# 📱 QR CODE & PWA MANIFEST
-# ============================================
 def get_local_ip():
     import socket
     try:
@@ -14264,20 +14463,17 @@ def pwa_manifest():
         mimetype='application/manifest+json'
     )
 
-# ============================================
-# 🌐 ACCÈS À DISTANCE (Cloudflare Tunnel)
-# ============================================
 
 _remote_lock = threading.Lock()
 _remote_state = {
-    "status": "disabled",   
+    "status": "disabled",
     "url": None,
     "error": None,
-    "mode": "quick",        
+    "mode": "quick",
 }
 _remote_process = None
 _ollama_process = None
-_remote_generation = 0  
+_remote_generation = 0
 
 REMOTE_CLOUDFLARED_DOWNLOAD_URLS = {
     "windows": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe",
@@ -14798,9 +14994,7 @@ if __name__ in ('__main__', 'stellio_main'):
             import traceback; traceback.print_exc()
             return False
 
-    # ============================================
-    # 🐳 MODE HEADLESS (Docker / serveur Linux sans écran)
-    # ============================================
+
     if STELLIO_HEADLESS:
         app_logger.info("[*] Mode headless détecté — pas d'interface graphique (Docker/serveur)")
         ready = run_backend_startup(on_status=lambda key: app_logger.info(f"[STARTUP] {key}..."))
@@ -14814,9 +15008,7 @@ if __name__ in ('__main__', 'stellio_main'):
         except KeyboardInterrupt:
             app_logger.info("[INFO] Arrêt propre.")
 
-    # ============================================
-    # 🖥️  MODE DESKTOP (Windows/Linux/macOS avec écran)
-    # ============================================
+
     else:
         import tkinter as tk
         from tkinter import ttk
