@@ -30,7 +30,7 @@
                 <img src="assets/logo-nom-stellio.png" alt="Stellio Logo" class="stellio-nom-logo-img">
                 <p data-i18n="app.subtitle">Gestionnaire de fichiers 3D</p>
             </div>
-            
+
             <div id="register-panel" class="auth-panel hidden">
                 <h2 data-i18n="auth.create_account">Créer un compte</h2>
                 <p class="auth-subtitle" data-i18n="auth.first_launch">Premier lancement — créez votre compte</p>
@@ -73,10 +73,10 @@
 						<button type="button" class="btn btn-ghost btn-sm" onclick="showPanel('login-panel'); return false;" data-i18n="actions.back">
 							Retour
 						</button>
-					</div>					
+					</div>
                 </form>
             </div>
-            
+
             <div id="login-panel" class="auth-panel hidden">
                 <h2 data-i18n="auth.login">Connexion</h2>
                 <p class="auth-subtitle" data-i18n="auth.login_subtitle">Connectez-vous à Stellio</p>
@@ -104,7 +104,7 @@
                     <a href="#" id="show-forgot" data-i18n="auth.forgot_password">Mot de passe oublié ?</a>
                 </div>
             </div>
-            
+
             <div id="forgot-panel" class="auth-panel hidden">
                 <h2 data-i18n="auth.forgot_title">🔑 Mot de passe oublié ?</h2>
                 <p class="auth-subtitle" data-i18n="auth.forgot_desc_local">Réinitialisation 100% locale, avec le code de récupération et la question secrète définis à la création du compte.</p>
@@ -141,9 +141,9 @@
         </div>
 		<div class="auth-lang-selector">
 		  <select id="language-selector-auth" class="form-select form-select-sm" data-i18n-aria="settings.language" aria-label="Langue">
-			
+
 		  </select>
-		</div>		
+		</div>
     </div>
 
     <div id="recovery-code-modal" class="modal hidden">
@@ -182,7 +182,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="app-screen" class="app-screen hidden">
         <div id="sidebar-overlay" class="sidebar-overlay"></div>
         <aside class="sidebar" id="app-sidebar">
@@ -222,7 +222,7 @@
                     <span data-i18n="nav.favorites">Favoris</span>
                     <span class="badge" id="favorites-count" style="margin-left: auto; background: var(--accent); color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; display: none;">0</span>
                 </button>
-                
+
                 <button class="nav-btn" data-nav-id="filters" onclick="openFiltersModal()" style="cursor: pointer;">
                     <i class="fa-solid fa-filter"></i>
                     <span data-i18n="nav.filters">Filtres</span>
@@ -249,12 +249,12 @@
 				  <span data-i18n="nav.sosprint">S.O.S print</span>
 				</button>
 				<button class="nav-btn" data-nav-id="printers" data-page="printers" data-title-key="nav.printers" data-icon="fa-print">
-					<i class="fa-solid fa-print"></i> 
+					<i class="fa-solid fa-print"></i>
 					<span data-i18n="nav.printers">Imprimantes</span>
 				</button>
 				<button class="nav-btn" data-nav-id="spoolman" data-page="spoolman" data-title-key="nav.spoolman" data-icon="fa-circle-nodes">
 					<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="22"/><line x1="2" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="22" y2="12"/></svg>
-					<span data-i18n="nav.spoolman">Spoolman</span>
+					<span data-i18n="nav.spoolman">Inventaire filament</span>
 				</button>
                 </div>
                 <div class="nav-about-spacer">
@@ -262,7 +262,7 @@
 						<i class="fa-solid fa-arrows-rotate"></i>
 						<span data-i18n="nav.check_update">Mises à jour</span>
 						<span id="update-available-dot" class="badge hidden" style="background:var(--success);">!</span>
-					</button>					
+					</button>
                     <a class="nav-btn" data-nav-id="github" href="https://github.com/stellio-app/stellio-app" target="_blank" rel="noopener noreferrer">
                         <i class="fa-brands fa-github"></i>
                         <span data-i18n="nav.github">GitHub</span>
@@ -278,11 +278,11 @@
 					<div class="user-avatar">
 						<i class="fa-solid fa-user"></i>
 					</div>
-					<span id="current-username" style="flex:1; font-size:13px; color:var(--text-secondary);">Utilisateur</span>					
+					<span id="current-username" style="flex:1; font-size:13px; color:var(--text-secondary);">Utilisateur</span>
 				</div>
 			</div>
         </aside>
-        
+
         <div class="app-wrapper">
             <header class="app-header">
                 <div class="header-left">
@@ -352,7 +352,7 @@
 						border-radius: 6px;
 						transition: all 0.2s;
 						font-size: 14px;
-					" onmouseover="this.style.color='var(--danger)'; this.style.background='rgba(248,113,113,0.1)'" 
+					" onmouseover="this.style.color='var(--danger)'; this.style.background='rgba(248,113,113,0.1)'"
 					   onmouseout="this.style.color='var(--text-muted)'; this.style.background='transparent'">
 						<i class="fa-solid fa-power-off"></i>
 					</button>
@@ -365,7 +365,7 @@
 						border-radius: 6px;
 						transition: all 0.2s;
 						font-size: 14px;
-					" onmouseover="this.style.color='var(--accent)'; this.style.background='var(--bg-hover)'" 
+					" onmouseover="this.style.color='var(--accent)'; this.style.background='var(--bg-hover)'"
 					   onmouseout="this.style.color='var(--text-muted)'; this.style.background='transparent'">
 						<i class="fa-solid fa-right-from-bracket"></i>
 					</button>
@@ -579,7 +579,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div id="page-filters" class="page">
                     <div class="filters-panel">
                         <div class="filter-group">
@@ -611,7 +611,7 @@
                         </button>
                     </div>
                 </div>
-                
+
                 <div id="page-settings" class="page">
                     <div class="settings-grid">
 
@@ -922,6 +922,16 @@
                                         </select>
                                     </div>
 
+                                    <div class="settings-row" style="margin-top:6px; padding-top:0;">
+                                        <label data-i18n="settings.slicer_profiles_type_filter_label">Filtrer par type de profil</label>
+                                        <select id="slicer-profiles-type-filter" class="settings-select" onchange="filterSlicerProfilesByType(this.value)">
+                                            <option value="all" data-i18n="settings.slicer_profiles_type_filter_all">Tous les types</option>
+                                            <option value="printer" data-i18n="settings.slicer_profiles_type_printer">Imprimante</option>
+                                            <option value="filament" data-i18n="settings.slicer_profiles_type_filament">Filament</option>
+                                            <option value="process" data-i18n="settings.slicer_profiles_type_process">Réglages</option>
+                                        </select>
+                                    </div>
+
                                     <div id="slicer-profiles-list" style="margin-top:12px; display:flex; flex-direction:column; gap:6px;">
                                         <p class="settings-hint" data-i18n="settings.slicer_profiles_empty">Aucun profil importé pour le moment.</p>
                                     </div>
@@ -942,6 +952,9 @@
                                             style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;">
                                         <button class="btn btn-primary btn-sm" onclick="saveSpoolmanUrl()">
                                             <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="actions.save">Sauvegarder</span>
+                                        </button>
+                                        <button class="btn btn-danger btn-sm" onclick="deleteSpoolmanUrl()">
+                                            <i class="fa-solid fa-trash"></i> <span data-i18n="actions.delete">Supprimer</span>
                                         </button>
                                     </div>
                                     <p class="settings-hint" data-i18n="settings.spoolman_hint">Entrez l'IP seule — le port 7912 sera ajouté automatiquement.</p>
@@ -968,7 +981,7 @@
 								<div class="nav-toggle-row" draggable="true" data-nav-id="repair"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.repair">Réparation</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="repair" onchange="toggleNavItem('repair',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 							<div class="nav-toggle-row" draggable="true" data-nav-id="converter"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.converter">Convertisseur</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="converter" onchange="toggleNavItem('converter',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 								<div class="nav-toggle-row" draggable="true" data-nav-id="printers"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.printers">Imprimantes</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="printers" onchange="toggleNavItem('printers',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
-								<div class="nav-toggle-row" draggable="true" data-nav-id="spoolman"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.spoolman">Spoolman</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="spoolman" onchange="toggleNavItem('spoolman',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="spoolman"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.spoolman">Inventaire filament</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="spoolman" onchange="toggleNavItem('spoolman',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 								<div class="nav-toggle-row" draggable="true" data-nav-id="sosprint"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.sosprint">S.O.S print</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="sosprint" onchange="toggleNavItem('sosprint',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 								</div>
                             </div>
@@ -1216,11 +1229,20 @@
                                         <i class="fa-solid fa-file-zipper"></i> <span data-i18n="settings.diagnostic_export_btn">Exporter les logs</span>
                                     </button>
                                 </div>
+                                <div style="border-top:1px solid var(--border); padding-top:14px;">
+                                    <p class="settings-hint" style="margin-bottom:10px;" data-i18n="settings.diagnostic_debug_hint">Par défaut, Stellio n'enregistre que le minimum de logs. Le mode debug redémarre l'application et affiche temporairement le maximum de logs dans la console ci-dessus, le temps de cette session. Il se désactive automatiquement au redémarrage suivant.</p>
+                                    <button type="button" class="btn btn-secondary btn-sm" id="diag-debug-btn" onclick="enableDebugSessionAndRestart(this)" style="gap:8px;">
+                                        <i class="fa-solid fa-bug"></i> <span data-i18n="settings.diagnostic_debug_btn">Activer le mode debug (redémarrage)</span>
+                                    </button>
+                                    <p class="settings-hint" id="diag-debug-active-hint" style="display:none; margin-top:8px; color:var(--success);">
+                                        <i class="fa-solid fa-circle-check"></i> <span data-i18n="settings.diagnostic_debug_active">Mode debug actif pour cette session — les logs seront au maximum jusqu'au prochain redémarrage.</span>
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                
+
 				<div id="page-repair" class="page">
 				  <div class="repair-header">
 					<h2 data-i18n="repair.title">Réparation de maillage</h2>
@@ -1432,6 +1454,9 @@
 				<div id="page-spoolman" class="page">
 					<div class="spoolman-toolbar">
 						<div id="spoolman-server-label" class="spoolman-server-label"></div>
+						<button id="add-manual-spool-btn" class="btn btn-primary btn-sm" style="display:none;" onclick="openSpoolInventoryModal()">
+							<i class="fa-solid fa-plus"></i> <span data-i18n="spoolman.add_spool_btn">Ajouter bobine</span>
+						</button>
 						<button class="btn btn-ghost btn-sm" onclick="loadSpoolmanPage()" data-i18n-title="actions.refresh" title="Rafraîchir">
 							<i class="fa-solid fa-rotate"></i> <span data-i18n="actions.refresh">Rafraîchir</span>
 						</button>
@@ -1440,12 +1465,15 @@
 				</div>
             </main>
         </div>
-        
+
         <div id="selection-action-bar" class="selection-action-bar" style="display:none;">
             <span id="selection-count" data-i18n="common.file_count" data-i18n-params='{"count":0}'>0 fichier sélectionné</span>
             <button id="select-toggle-all" class="btn btn-sm" data-i18n-title="library.toggle_select_all" title="Tout sélectionner/désélectionner">
                 <i class="fa-solid fa-square"></i> <span data-i18n="actions.all">Tout</span>
             </button>
+            <select id="batch-slicer-printer-select" class="settings-select" style="min-width:0; width:auto; max-width:150px; font-size:12px; padding:6px 8px;" data-i18n-title="modal.printer_select_hint" title="Charger le profil de cette imprimante dans le slicer à l'envoi">
+                <option value="" data-i18n="modal.ai_all_printers">Toutes les imprimantes</option>
+            </select>
             <button id="send-selected-to-slicer-btn" class="btn btn-primary btn-sm">
                 <i class="fa-solid fa-scissors"></i> <span data-i18n="actions.send_to_slicer">Envoyer au Slicer</span>
             </button>
@@ -1466,7 +1494,7 @@
             </button>
         </div>
     </div>
-    
+
     <div id="modal-select-type" class="modal hidden">
         <div class="modal-content small">
             <div class="modal-header">
@@ -1488,7 +1516,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="modal-backup-options" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
@@ -1610,7 +1638,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="modal-nfs" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
@@ -1647,7 +1675,26 @@
             </div>
         </div>
     </div>
-    
+
+    <div id="modal-slicer-import-assign" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-file-import"></i> <span data-i18n="modal.import_assign_title">Assigner les profils importés</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-slicer-import-assign')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="settings-hint" style="margin-bottom:12px;" data-i18n="modal.import_assign_hint">Choisis, pour chaque fichier, l'imprimante concernée (laisse "Non assigné" si ce réglage vaut pour plusieurs machines ou si tu préfères l'assigner plus tard).</p>
+                <div id="slicer-import-assign-list" style="display:flex; flex-direction:column; gap:6px; max-height:340px; overflow-y:auto;"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost" onclick="closeModal('modal-slicer-import-assign')" data-i18n="actions.cancel">Annuler</button>
+                    <button type="button" id="confirm-slicer-import-assign" class="btn btn-primary">
+                        <i class="fa-solid fa-file-import"></i> <span data-i18n="settings.slicer_profiles_import">Importer un profil</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-slicer" class="modal hidden">
         <div class="modal-content small">
             <div class="modal-header">
@@ -1666,13 +1713,14 @@
 
                 <div style="margin-bottom:15px; padding:10px 12px; border-radius:var(--radius); background:var(--bg-input); border:1px solid var(--border);">
                     <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
-                        <select id="slicer-ai-printer-select" style="flex:1; min-width:110px; font-size:12px;">
+                        <select id="slicer-ai-printer-select" class="settings-select" style="flex:1; min-width:110px; max-width:none;">
                             <option value="" data-i18n="modal.ai_all_printers">Toutes les imprimantes</option>
                         </select>
-                        <select id="slicer-ai-material-select" style="flex:1; min-width:110px; font-size:12px;">
+                        <select id="slicer-ai-material-select" class="settings-select" style="flex:1; min-width:110px; max-width:none;">
                             <option value="" data-i18n="modal.ai_all_materials">Tous les filaments</option>
                         </select>
                     </div>
+                    <div style="margin-bottom:8px; font-size:11px; color:var(--text-muted);" data-i18n="modal.printer_select_hint">Si des profils importés sont rattachés à cette imprimante, ils seront chargés automatiquement dans le slicer à l'envoi.</div>
                     <button id="slicer-ai-recommend-btn" class="btn btn-ghost btn-sm" style="width:100%; justify-content:center;" onclick="requestProfileRecommendation()">
                         <i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="modal.ai_recommend_btn">Analyser & recommander un profil</span>
                     </button>
@@ -1748,7 +1796,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="modal-confirm" class="modal hidden">
         <div class="modal-content small">
             <div class="modal-header">
@@ -1766,7 +1814,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="modal-3d-viewer" class="modal hidden">
         <div class="modal-content viewer-3d">
             <div class="viewer-header">
@@ -1807,6 +1855,9 @@
                     </div>
                     <div style="font-size:10px; color:var(--text-muted); margin-top:2px;" data-i18n="viewer.overhang_hint">Rouge = support fortement conseillé</div>
                 </div>
+                <button type="button" id="viewer-recenter-btn" class="viewer-recenter-btn" onclick="event.stopPropagation(); recenterViewerCamera();" onmousedown="event.stopPropagation();" data-i18n-title="viewer.recenter_title" title="Recentrer la vue">
+                    <i class="fa-solid fa-arrows-to-dot"></i>
+                </button>
                 <button type="button" id="viewer-plate-prev" class="viewer-plate-nav-btn viewer-plate-nav-btn--left" onclick="goToPlate(-1)" title="Plateau précédent" style="display:none;">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
@@ -1822,7 +1873,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="modal-about" class="modal hidden">
         <div class="modal-content modal-about-content">
             <div class="modal-header">
@@ -1851,7 +1902,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="modal-shortcuts" class="modal hidden">
         <div class="modal-content shortcuts-modal-content">
             <div class="modal-header">
@@ -1911,7 +1962,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="modal-filters" class="modal hidden">
         <div class="modal-content small">
             <div class="modal-header">
@@ -2005,7 +2056,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="modal-tag-manager" class="modal hidden">
         <div class="modal-content small">
             <div class="modal-header">
@@ -2016,7 +2067,7 @@
                 <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;" data-i18n="modal.tags_desc">
                     Cliquez sur un fichier puis choisissez ses tags. Les nouveaux tags apparaîtront automatiquement dans les filtres.
                 </p>
-                
+
                 <div class="input-group" style="margin-bottom:15px;">
                     <label data-i18n="modal.selected_file">Fichier sélectionné</label>
                     <input type="text" id="tag-modal-file-path" readonly style="background:var(--bg-tertiary); cursor:default;">
@@ -2055,8 +2106,8 @@
             </div>
         </div>
     </div>
-    
-    
+
+
 	<div id="modal-download" class="modal hidden">
 		<div class="modal-content small">
 			<div class="modal-header">
@@ -2067,19 +2118,19 @@
 				<p style="margin-bottom: 15px; color: var(--text-secondary);" data-i18n="modal.download_desc">
 					Colle l'URL d'un fichier 3D.
 				</p>
-				
+
 				<div style="margin-bottom: 15px;">
-					<button type="button" id="toggle-astuces" class="btn btn-ghost btn-sm btn-block" 
+					<button type="button" id="toggle-astuces" class="btn btn-ghost btn-sm btn-block"
 							style="border: 1px dashed var(--border); justify-content: space-between;">
 						<span><i class="fa-solid fa-lightbulb" style="color: var(--warning); margin-right: 8px;"></i> <span data-i18n="tips.toggle_label">Astuces par plateforme</span></span>
 						<i class="fa-solid fa-chevron-down" id="astuces-icon"></i>
-					</button>                   
+					</button>
 					<div id="astuces-menu" style="display: none; margin-top: 10px; padding: 12px; background: var(--bg-tertiary); border-radius: var(--radius); border: 1px solid var(--border);">
-						
-						<!-- ══════════ 🖨️ PRINTABLES ══════════ -->
+
+
 						<div style="margin-bottom: 8px;">
-							<button type="button" class="btn btn-ghost btn-sm btn-block" 
-									onclick="toggleAstuceSubmenu('printables-astuces')" 
+							<button type="button" class="btn btn-ghost btn-sm btn-block"
+									onclick="toggleAstuceSubmenu('printables-astuces')"
 									style="justify-content: space-between; text-align: left;">
 								<span><i class="fa-solid fa-globe" style="color: #e95b25; margin-right: 8px;"></i> Printables</span>
 								<i class="fa-solid fa-chevron-right" id="printables-astuces-icon"></i>
@@ -2096,12 +2147,12 @@
 									<i class="fa-solid fa-info-circle" style="color: #e95b25;"></i>
 									<small style="color: var(--text-secondary);" data-i18n="tips.printables.note">Aucun compte nécessaire pour les modèles publics</small>
 								</div>
-							</div>							
+							</div>
 						</div>
-						<!-- ══════════ 🌍 MAKERWORLD ══════════ -->
+
 						<div style="margin-bottom: 8px;">
-							<button type="button" class="btn btn-ghost btn-sm btn-block" 
-									onclick="toggleAstuceSubmenu('makerworld-astuces')" 
+							<button type="button" class="btn btn-ghost btn-sm btn-block"
+									onclick="toggleAstuceSubmenu('makerworld-astuces')"
 									style="justify-content: space-between; text-align: left;">
 								<span><i class="fa-solid fa-globe" style="color: #009688; margin-right: 8px;"></i> MakerWorld</span>
 								<i class="fa-solid fa-chevron-right" id="makerworld-astuces-icon"></i>
@@ -2120,10 +2171,10 @@
 							</div>
 						</div>
 
-						<!-- ══════════ 🌐 THINGIVERSE ══════════ -->
+
 						<div style="margin-bottom: 0;">
-							<button type="button" class="btn btn-ghost btn-sm btn-block" 
-									onclick="toggleAstuceSubmenu('thingiverse-astuces')" 
+							<button type="button" class="btn btn-ghost btn-sm btn-block"
+									onclick="toggleAstuceSubmenu('thingiverse-astuces')"
 									style="justify-content: space-between; text-align: left;">
 								<span><i class="fa-solid fa-globe" style="color: #2196F3; margin-right: 8px;"></i> Thingiverse</span>
 								<i class="fa-solid fa-chevron-right" id="thingiverse-astuces-icon"></i>
@@ -2139,11 +2190,11 @@
 									<i class="fa-solid fa-circle-info" style="color: #2196F3;"></i>
 									<small style="color: var(--text-secondary);" data-i18n="tips.thingiverse.note">Téléchargement direct une fois renseigner le token dans les paramètres</small>
 								</div>
-							</div>							
+							</div>
 						</div>
 
 					</div>
-				</div>               
+				</div>
 
 				<form id="download-form">
 					<div class="input-group">
@@ -2158,12 +2209,12 @@
 							<option value="stl">STL</option>
 						</select>
 					</div>
-					
+
 					<div class="input-group">
 						<label data-i18n="form.save_to">Enregistrer dans</label>
 						<select id="download-source" required>
 							<option value="" data-i18n="form.default_folder">Dossier par défaut (Downloads)</option>
-						</select>	
+						</select>
 						<div class="input-group" style="margin-top: 8px; display: flex; gap: 8px; align-items: center;">
 							<button type="button" class="btn btn-ghost btn-sm" onclick="openCreateFolderModal()" style="flex: 1;">
 								<span data-i18n="download.create_folder">Créer un dossier...</span>
@@ -2171,11 +2222,11 @@
 							<button type="button" class="btn btn-ghost btn-sm" onclick="browseDownloadLocation()" data-i18n-title="actions.browse" title="Parcourir">
 								<i class="fa-solid fa-folder-open"></i>
 							</button>
-						</div>							
+						</div>
 						<small style="color: var(--text-muted);" data-i18n="form.save_hint">
 							Choisis où enregistrer le fichier téléchargé.
 						</small>
-					</div>    		
+					</div>
 
 					<div id="download-progress" class="hidden" style="margin: 15px 0;">
 						<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
@@ -2186,7 +2237,7 @@
 						<div class="progress-track" style="height: 6px;">
 							<div id="download-bar" class="progress-bar" style="width: 0%"></div>
 						</div>
-					</div>                    
+					</div>
 
 					<div class="modal-footer">
 						<button type="button" class="btn btn-ghost" onclick="closeModal('modal-download')" data-i18n="actions.cancel">Annuler</button>
@@ -2195,7 +2246,7 @@
 						</button>
 					</div>
 				</form>
-				
+
 				<div id="download-result" style="margin-top: 15px; padding: 10px; border-radius: var(--radius); display: none;"></div>
 			</div>
 		</div>
@@ -2225,7 +2276,7 @@
 					<div class="input-group">
 						<label data-i18n="printers.type">Type</label>
 						<select id="printer-type" onchange="togglePrinterFields()" required>
-							<option value="octoprint">OctoPrint</option> 
+							<option value="octoprint">OctoPrint</option>
 							<option value="klipper">Klipper (Moonraker)</option>
 							<option value="prusalink">PrusaLink (Prusa MK4 / MK3.9 / MK3.5 / MINI+ / XL / CORE One)</option>
 							<option value="bambu">Bambu Lab (X1C / P1P / P1S / A1)</option>
@@ -2268,6 +2319,24 @@
 							<small style="color:var(--text-secondary); font-size:11px; line-height:1.5;" data-i18n="printers.bambu_lan_warning">
 								Sur certains modèles <strong>P1P / P1S / A1</strong> (selon la version du firmware), activer l'accès local MQTT peut nécessiter le <strong>"LAN Only Mode"</strong> sur l'imprimante — ce qui désactive le cloud Bambu (Bambu Handy, monitoring à distance, MakerWorld). Les <strong>X1/X1C</strong> ne sont généralement pas concernés. Vérifiez sur votre imprimante avant d'activer ce mode si vous tenez au cloud.
 							</small>
+						</div>
+						<div class="input-group">
+							<label data-i18n="printers.bambu_model">🖨️ Modèle</label>
+							<select id="printer-bambu-model">
+								<option value="A1" data-i18n="printers.bambu_model_a1">A1</option>
+								<option value="A1_MINI" data-i18n="printers.bambu_model_a1_mini">A1 mini</option>
+								<option value="P1P" data-i18n="printers.bambu_model_p1p">P1P</option>
+								<option value="P1S" data-i18n="printers.bambu_model_p1s">P1S</option>
+								<option value="X1" data-i18n="printers.bambu_model_x1">X1</option>
+								<option value="X1C" data-i18n="printers.bambu_model_x1c">X1 Carbon</option>
+								<option value="X1E" data-i18n="printers.bambu_model_x1e">X1E</option>
+								<option value="X2D" data-i18n="printers.bambu_model_x2d">X2D</option>
+								<option value="P2S" data-i18n="printers.bambu_model_p2s">P2S</option>
+								<option value="H2D" data-i18n="printers.bambu_model_h2d">H2D</option>
+								<option value="H2S" data-i18n="printers.bambu_model_h2s">H2S</option>
+								<option value="H2C" data-i18n="printers.bambu_model_h2c">H2C</option>
+							</select>
+							<small style="color:var(--text-muted);font-size:11px;" data-i18n="printers.bambu_model_hint">Détermine le protocole utilisé pour le flux caméra (port 6000 pour A1/P1, RTSPS port 322 pour X1/X2/H2)</small>
 						</div>
 						<div class="input-group">
 							<label data-i18n="printers.local_access_code">🔑 Code d'accès local</label>
@@ -2649,12 +2718,12 @@
         </div>
     </div>
 
-    <div id="toast-container"></div>    
-    
+    <div id="toast-container"></div>
+
     <button id="scroll-to-top" class="scroll-to-top" data-i18n-title="actions.scroll_to_top" title="Retour en haut">
         <i class="fa-solid fa-arrow-up"></i>
     </button>
-    
+
     <script src="script.js"></script>
 </body>
 </html>
