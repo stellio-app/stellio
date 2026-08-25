@@ -4,6 +4,8 @@ import os
 import subprocess
 import importlib
 import importlib.util
+import warnings
+import math
 
 if sys.platform != 'win32':
     os.environ['PYOPENGL_PLATFORM'] = 'osmesa'
@@ -230,6 +232,32 @@ is_generation_running = False
 ignored_files_cache = {}
 IGNORED_FILE_COOLDOWN_S = 600
 
+# --- Dédoublonnage des tâches de génération de miniatures ---
+# Empêche qu'un même fichier soit ajouté plusieurs fois à la queue (ex: le
+# superviseur de couverture qui repasse toutes les X secondes tant que
+# nb_miniatures != nb_fichiers) tant qu'une tâche pour ce fichier est déjà
+# en attente ou en cours de traitement par un worker.
+_thumb_inflight_lock = threading.Lock()
+_thumb_inflight_paths = set()
+
+
+def _queue_thumb_task(path, thumb_path, priority='low'):
+    """Ajoute une tâche de génération de miniature à la queue, sauf si une
+    tâche pour ce même chemin est déjà en attente/en cours."""
+    normalized = path.replace('\\', '/')
+    with _thumb_inflight_lock:
+        if normalized in _thumb_inflight_paths:
+            return False
+        _thumb_inflight_paths.add(normalized)
+    thumb_generation_queue.put({'path': path, 'thumb_path': thumb_path, 'priority': priority})
+    return True
+
+
+def _release_thumb_inflight(path):
+    normalized = path.replace('\\', '/')
+    with _thumb_inflight_lock:
+        _thumb_inflight_paths.discard(normalized)
+
 def _is_ignored_recently(path):
     ts = ignored_files_cache.get(path)
     if ts is None:
@@ -291,6 +319,7 @@ def _thumb_session_note_start(extra_count):
             _thumb_session_total_at_start = extra_count
         else:
             _thumb_session_total_at_start = max(_thumb_session_total_at_start, extra_count)
+    _prevent_system_sleep(True)
 
 
 def _thumb_session_note_result(name, path, ok, reason=None):
@@ -303,6 +332,7 @@ def _thumb_session_note_result(name, path, ok, reason=None):
 
 def _thumb_session_maybe_finish():
     global _thumb_session_active, _thumb_pending_summary
+    finished = False
     with _thumb_session_lock:
         if _thumb_session_active and thumb_generation_queue.empty():
             _thumb_pending_summary = {
@@ -311,6 +341,9 @@ def _thumb_session_maybe_finish():
                 'failed': list(_thumb_session_failed),
             }
             _thumb_session_active = False
+            finished = True
+    if finished:
+        _prevent_system_sleep(False)
 
 
 def get_thumb_timeout(file_path):
@@ -338,6 +371,41 @@ def _lower_thread_priority():
             os.setpriority(os.PRIO_PROCESS, tid, 5)
     except Exception:
         pass
+
+
+# --- Empêche la mise en veille Windows pendant la génération de miniatures ---
+# Sans ça, si l'utilisateur ne touche pas la souris/clavier, Windows peut mettre
+# le PC en veille (S0 low power idle / veille classique) et geler tous les threads
+# Python en cours, ce qui donne l'impression que la génération "ne bouge plus" et
+# ne reprend qu'au réveil du PC (ex: après un scroll).
+_ES_CONTINUOUS = 0x80000000
+_ES_SYSTEM_REQUIRED = 0x00000001
+_sleep_prevention_lock = threading.Lock()
+_sleep_prevention_active = False
+
+
+def _prevent_system_sleep(enable):
+    """Active/désactive l'inhibition de la veille système (Windows uniquement).
+    N'empêche PAS l'écran de s'éteindre (pas de ES_DISPLAY_REQUIRED), seulement
+    le CPU/le système de partir en veille tant que enable=True."""
+    global _sleep_prevention_active
+    if sys.platform != 'win32':
+        return
+    try:
+        import ctypes
+        with _sleep_prevention_lock:
+            if enable and not _sleep_prevention_active:
+                ctypes.windll.kernel32.SetThreadExecutionState(
+                    _ES_CONTINUOUS | _ES_SYSTEM_REQUIRED
+                )
+                _sleep_prevention_active = True
+                app_logger.info("[POWER] Veille système inhibée (génération de miniatures en cours)")
+            elif not enable and _sleep_prevention_active:
+                ctypes.windll.kernel32.SetThreadExecutionState(_ES_CONTINUOUS)
+                _sleep_prevention_active = False
+                app_logger.info("[POWER] Veille système ré-autorisée (génération terminée)")
+    except Exception as e:
+        app_logger.warning(f"[POWER] Impossible de gérer l'état de veille: {e}")
 
 
 def get_base_path():
@@ -446,10 +514,26 @@ def setup_logging():
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(level)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    console_stream = sys.stderr if sys.stderr is not None else sys.stdout
+    if console_stream is not None:
+        # Sur un build EXE "windowed" (runw.exe, sans console attachée),
+        # sys.stderr peut exister mais garder un encodage par défaut
+        # (souvent cp1252 en France) qui ne supporte pas les emojis utilisés
+        # dans les logs (✅, 🐞, ⚠️...). reconfigure() en UTF-8 avec
+        # errors='replace' évite que le moindre emoji fasse planter tout le
+        # logging (et donc le démarrage de l'app) au lieu de juste logger.
+        try:
+            if hasattr(console_stream, 'reconfigure'):
+                console_stream.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            pass
+        console_handler = logging.StreamHandler(console_stream)
+        console_handler.setLevel(level)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+    # Si ni stderr ni stdout n'existent (EXE windowed lancé sans aucune
+    # console, ex. vérification headless post-build), on se contente du
+    # file_handler ci-dessus — inutile de crasher pour un simple log console.
 
     werkzeug_log = logging.getLogger('werkzeug')
     werkzeug_log.setLevel(logging.DEBUG if debug_requested else logging.ERROR)
@@ -3145,11 +3229,8 @@ def mark_download_complete_and_refresh_thumbnail(dest_path):
         if os.path.exists(thumb_path):
             os.remove(thumb_path)
         ignored_files_cache.pop(normalized, None)
-        thumb_generation_queue.put({
-            'path': dest_path,
-            'thumb_path': thumb_path,
-            'priority': 'high'
-        })
+        _release_thumb_inflight(dest_path)
+        _queue_thumb_task(dest_path, thumb_path, priority='high')
     except Exception as e:
         app_logger.warning(f"[Download] Impossible de replanifier la miniature pour {dest_path}: {e}")
 
@@ -3244,6 +3325,8 @@ def process_generation_queue():
                 app_logger.info(f"[BACKGROUND ERROR #{worker_id}] {e}")
                 time.sleep(2)
             finally:
+                if 'file_path' in locals() and file_path:
+                    _release_thumb_inflight(file_path)
                 thumb_generation_queue.task_done()
                 if thumb_generation_queue.empty():
                     _thumb_session_maybe_finish()
@@ -3278,11 +3361,7 @@ def process_generation_queue():
                                     thumb_filename = hashlib.md5(normalized_path.encode()).hexdigest()
                                     thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
                                     if not os.path.exists(thumb_path):
-                                        thumb_generation_queue.put({
-                                            'path': file_path,
-                                            'thumb_path': thumb_path,
-                                            'priority': 'low'
-                                        })
+                                        _queue_thumb_task(file_path, thumb_path, priority='low')
                 time.sleep(90)
             except queue.Empty:
                 time.sleep(2)
@@ -3290,9 +3369,38 @@ def process_generation_queue():
                 app_logger.info(f"[BACKGROUND ERROR SCAN] {e}")
                 time.sleep(5)
 
+    def thumbnail_coverage_supervisor():
+        """Tourne en continu en tâche de fond, indépendamment du scroll/de
+        l'interface : compare le nombre de fichiers connus au nombre de
+        miniatures réellement présentes sur le disque, et remet en queue
+        tout ce qui manque. Ne relâche l'inhibition de veille (cf.
+        _prevent_system_sleep) que lorsque les deux nombres sont égaux."""
+        _lower_thread_priority()
+        time.sleep(15)  # laisse le temps au premier scan/démarrage de finir
+        app_logger.info("[THUMBS] Superviseur de couverture démarré")
+        while True:
+            try:
+                result = reconcile_thumbnails_with_disk()
+                total = result.get('total', 0)
+                with_thumb = result.get('with_thumb', 0)
+                requeued = result.get('requeued', 0)
+                if total > 0:
+                    app_logger.info(
+                        f"[THUMBS] Couverture: {with_thumb}/{total} miniature(s)"
+                        + (f" — {requeued} remise(s) en file" if requeued else "")
+                    )
+                if requeued > 0 or not thumb_generation_queue.empty():
+                    time.sleep(20)
+                else:
+                    time.sleep(60)
+            except Exception as e:
+                app_logger.info(f"[THUMBS] Erreur superviseur de couverture: {e}")
+                time.sleep(30)
+
     for i in range(NUM_THUMB_WORKERS):
         threading.Thread(target=thumb_worker, args=(i,), daemon=True).start()
     threading.Thread(target=scan_and_metadata_worker, daemon=True).start()
+    threading.Thread(target=thumbnail_coverage_supervisor, daemon=True).start()
 
     app_logger.info(f"[BACKGROUND] File d'attente lazy active ({NUM_THUMB_WORKERS} workers en parallèle)")
 
@@ -3397,114 +3505,186 @@ def _resolve_3mf_plate_mesh(source, wanted_ids):
         is_bytes = isinstance(source, (bytes, bytearray))
         zip_source = io.BytesIO(source) if is_bytes else source
         with zipfile.ZipFile(zip_source, 'r') as zf:
-            model_files = [n for n in zf.namelist() if n.lower().endswith('.model')]
-            model_files.sort(key=lambda n: (0 if '3d/' in n.lower() else 1, n))
+            all_names = zf.namelist()
+            model_files = [n for n in all_names if n.lower().endswith('.model')]
+            if not model_files:
+                return None
 
-            for model_path in model_files:
+            ns = {'ns': 'http://schemas.microsoft.com/3dmanufacturing/core/2015/02'}
+            NS_PROD = 'http://schemas.microsoft.com/3dmanufacturing/production/2015/06'
+
+            def _find(el, tag):
+                found = el.find(f'ns:{tag}', ns)
+                return found if found is not None else el.find(tag)
+
+            def _findall(el, tag):
+                found = el.findall(f'ns:{tag}', ns)
+                return found if found else el.findall(tag)
+
+            def _get_path_attr(el):
+                # Extension "Production" du 3MF (Bambu Studio / OrcaSlicer) :
+                # un <item> ou <component> peut référencer un objet défini
+                # dans un AUTRE fichier .model via l'attribut p:path, plutôt
+                # que dans le fichier courant.
+                return el.get(f'{{{NS_PROD}}}path') or el.get('path')
+
+            def _resolve_part_name(raw_path, referer):
+                if not raw_path:
+                    return None
+                candidate = raw_path.lstrip('/')
+                for n in all_names:
+                    if n.lower() == candidate.lower():
+                        return n
+                base_dir = referer.rsplit('/', 1)[0] if '/' in referer else ''
+                joined = (base_dir + '/' + candidate).lstrip('/') if base_dir else candidate
+                for n in all_names:
+                    if n.lower() == joined.lower():
+                        return n
+                return None
+
+            def _parse_transform(s):
+                if not s:
+                    return np.eye(4)
                 try:
-                    with zf.open(model_path) as xml_file:
-                        tree = _safe_xml_parse(xml_file)
-                        xml_root = tree.getroot()
+                    vals = [float(x) for x in s.split()]
+                    if len(vals) != 12:
+                        return np.eye(4)
+                    m = np.eye(4)
+                    m[0, 0], m[1, 0], m[2, 0] = vals[0], vals[1], vals[2]
+                    m[0, 1], m[1, 1], m[2, 1] = vals[3], vals[4], vals[5]
+                    m[0, 2], m[1, 2], m[2, 2] = vals[6], vals[7], vals[8]
+                    m[0, 3], m[1, 3], m[2, 3] = vals[9], vals[10], vals[11]
+                    return m
                 except Exception:
-                    continue
+                    return np.eye(4)
 
-                ns = {'ns': 'http://schemas.microsoft.com/3dmanufacturing/core/2015/02'}
+            # -- Parsing PARESSEUX avec cache : un fichier .model n'est
+            # réellement lu/parsé que la première fois qu'on en a besoin.
+            # Essentiel sur les fichiers Bambu Studio/OrcaSlicer où chaque
+            # plateau vit dans son propre fichier "3D/Objects/xxx.model" —
+            # parfois plusieurs dizaines/centaines de Mo — pour ne jamais
+            # toucher ceux qui ne concernent pas le plateau demandé.
+            _tree_cache = {}
+            _objs_cache = {}
 
-                def _find(el, tag):
-                    found = el.find(f'ns:{tag}', ns)
-                    return found if found is not None else el.find(tag)
-
-                def _findall(el, tag):
-                    found = el.findall(f'ns:{tag}', ns)
-                    return found if found else el.findall(tag)
-
-                objects_by_id = {}
-                for obj in xml_root.findall('.//ns:object', ns) or xml_root.findall('.//object'):
-                    oid = obj.get('id')
-                    if oid and oid not in objects_by_id:
-                        objects_by_id[oid] = obj
-
-                if not objects_by_id:
-                    continue
-
-                def _parse_transform(s):
-                    if not s:
-                        return np.eye(4)
+            def _get_tree(model_path):
+                if model_path not in _tree_cache:
                     try:
-                        vals = [float(x) for x in s.split()]
-                        if len(vals) != 12:
-                            return np.eye(4)
-                        m = np.eye(4)
-                        m[0, 0], m[1, 0], m[2, 0] = vals[0], vals[1], vals[2]
-                        m[0, 1], m[1, 1], m[2, 1] = vals[3], vals[4], vals[5]
-                        m[0, 2], m[1, 2], m[2, 2] = vals[6], vals[7], vals[8]
-                        m[0, 3], m[1, 3], m[2, 3] = vals[9], vals[10], vals[11]
-                        return m
+                        with zf.open(model_path) as xml_file:
+                            _tree_cache[model_path] = _safe_xml_parse(xml_file).getroot()
                     except Exception:
-                        return np.eye(4)
+                        _tree_cache[model_path] = None
+                return _tree_cache[model_path]
 
-                def _resolve(oid, transform, depth=0):
-                    out = []
-                    if depth > 8 or oid not in objects_by_id:
-                        return out
-                    obj = objects_by_id[oid]
+            def _get_objects(model_path):
+                if model_path not in _objs_cache:
+                    root_el = _get_tree(model_path)
+                    objs = {}
+                    if root_el is not None:
+                        for obj in (root_el.findall('.//ns:object', ns) or root_el.findall('.//object')):
+                            oid = obj.get('id')
+                            if oid and oid not in objs:
+                                objs[oid] = obj
+                    _objs_cache[model_path] = objs
+                return _objs_cache[model_path]
 
-                    obj_type = obj.get('type', 'model')
-                    mesh_el = _find(obj, 'mesh') if obj_type in ('model', 'solid', '') else None
-                    if mesh_el is not None:
-                        verts_el = _find(mesh_el, 'vertices')
-                        tris_el = _find(mesh_el, 'triangles')
-                        if verts_el is not None and tris_el is not None:
-                            vertices, faces = [], []
-                            for v in list(verts_el):
-                                try:
-                                    vertices.append([float(v.get('x', 0)),
-                                                     float(v.get('y', 0)),
-                                                     float(v.get('z', 0))])
-                                except Exception:
-                                    pass
-                            for t in list(tris_el):
-                                try:
-                                    faces.append([int(t.get('v1', 0)),
-                                                  int(t.get('v2', 0)),
-                                                  int(t.get('v3', 0))])
-                                except Exception:
-                                    pass
-                            if vertices and faces:
-                                varr = np.array(vertices, dtype=np.float64)
-                                farr = np.array(faces, dtype=np.int32)
-                                if not np.allclose(transform, np.eye(4)):
-                                    varr = (np.hstack([varr, np.ones((len(varr), 1))]) @ transform.T)[:, :3]
-                                out.append((varr, farr))
-
-                    components_el = _find(obj, 'components')
-                    if components_el is not None:
-                        for comp in _findall(components_el, 'component'):
-                            comp_id = comp.get('objectid')
-                            if not comp_id:
-                                continue
-                            comp_tf = _parse_transform(comp.get('transform'))
-                            out.extend(_resolve(comp_id, transform @ comp_tf, depth + 1))
+            def _resolve(model_path, oid, transform, depth=0):
+                out = []
+                if depth > 8:
                     return out
+                objs = _get_objects(model_path)
+                if not objs or oid not in objs:
+                    return out
+                obj = objs[oid]
 
-                build_el = _find(xml_root, 'build')
-                build_items = []
-                if build_el is not None:
-                    for item in _findall(build_el, 'item'):
-                        item_id = item.get('objectid')
-                        if item_id:
-                            build_items.append((item_id, _parse_transform(item.get('transform'))))
+                obj_type = obj.get('type', 'model')
+                mesh_el = _find(obj, 'mesh') if obj_type in ('model', 'solid', '') else None
+                if mesh_el is not None:
+                    verts_el = _find(mesh_el, 'vertices')
+                    tris_el = _find(mesh_el, 'triangles')
+                    if verts_el is not None and tris_el is not None:
+                        vertices, faces = [], []
+                        for v in list(verts_el):
+                            try:
+                                vertices.append([float(v.get('x', 0)),
+                                                 float(v.get('y', 0)),
+                                                 float(v.get('z', 0))])
+                            except Exception:
+                                pass
+                        for t in list(tris_el):
+                            try:
+                                faces.append([int(t.get('v1', 0)),
+                                              int(t.get('v2', 0)),
+                                              int(t.get('v3', 0))])
+                            except Exception:
+                                pass
+                        if vertices and faces:
+                            varr = np.array(vertices, dtype=np.float64)
+                            farr = np.array(faces, dtype=np.int32)
+                            if not np.allclose(transform, np.eye(4)):
+                                varr = (np.hstack([varr, np.ones((len(varr), 1))]) @ transform.T)[:, :3]
+                            out.append((varr, farr))
 
-                all_parts = []
-                for item_id, item_tf in build_items:
-                    if item_id in wanted_ids:
-                        all_parts.extend(_resolve(item_id, item_tf))
+                components_el = _find(obj, 'components')
+                if components_el is not None:
+                    for comp in _findall(components_el, 'component'):
+                        comp_id = comp.get('objectid')
+                        if not comp_id:
+                            continue
+                        comp_tf = _parse_transform(comp.get('transform'))
+                        target_file = model_path
+                        comp_path_raw = _get_path_attr(comp)
+                        if comp_path_raw:
+                            resolved_name = _resolve_part_name(comp_path_raw, model_path)
+                            if resolved_name:
+                                target_file = resolved_name
+                        out.extend(_resolve(target_file, comp_id, transform @ comp_tf, depth + 1))
+                return out
 
-                if all_parts:
-                    sub_meshes = [trimesh.Trimesh(vertices=v, faces=f, process=False) for v, f in all_parts]
-                    mesh = _concatenate_filtering_outliers(sub_meshes) if len(sub_meshes) > 1 else sub_meshes[0]
-                    if mesh is not None and not mesh.is_empty and len(mesh.vertices) > 0:
-                        return mesh
+            # Le fichier racine conventionnel du 3MF est "3D/3dmodel.model" —
+            # c'est lui qui contient le <build>. On le privilégie pour ne
+            # JAMAIS avoir à ouvrir les gros fichiers d'objets juste pour
+            # vérifier s'ils contiennent un <build> (ils n'en ont jamais).
+            preferred_root = next((n for n in model_files if n.lower() == '3d/3dmodel.model'), None)
+            root_candidates = [preferred_root] if preferred_root else model_files
+
+            all_parts = []
+            found_build = False
+            searched = set()
+            for model_path in root_candidates + model_files:
+                if model_path in searched:
+                    continue
+                searched.add(model_path)
+                root_el = _get_tree(model_path)
+                if root_el is None:
+                    continue
+                build_el = _find(root_el, 'build')
+                if build_el is None:
+                    continue
+                items = _findall(build_el, 'item')
+                if not items:
+                    continue
+                found_build = True
+                for item in items:
+                    item_id = item.get('objectid')
+                    if not item_id or item_id not in wanted_ids:
+                        continue
+                    item_tf = _parse_transform(item.get('transform'))
+                    target_file = model_path
+                    item_path_raw = _get_path_attr(item)
+                    if item_path_raw:
+                        resolved_name = _resolve_part_name(item_path_raw, model_path)
+                        if resolved_name:
+                            target_file = resolved_name
+                    all_parts.extend(_resolve(target_file, item_id, item_tf))
+                if found_build:
+                    break
+
+            if all_parts:
+                sub_meshes = [trimesh.Trimesh(vertices=v, faces=f, process=False) for v, f in all_parts]
+                mesh = _concatenate_filtering_outliers(sub_meshes) if len(sub_meshes) > 1 else sub_meshes[0]
+                if mesh is not None and not mesh.is_empty and len(mesh.vertices) > 0:
+                    return mesh
         return None
     except Exception as e:
         app_logger.debug(f"[3MF] _resolve_3mf_plate_mesh échoué: {e}")
@@ -3637,6 +3817,77 @@ def load_3mf_mesh(source, plate_index=None):
 
     app_logger.warning(f"[3MF] ⚠️  Impossible de charger le mesh: {display_name}")
     return trimesh.Trimesh()
+
+
+def _build_multiplate_overview_mesh(source, max_plates=12):
+    """
+    Construit un mesh de "vue d'ensemble" pour un 3MF multi-plateaux : chaque
+    plateau est isolé séparément (comme pour le viewer), puis disposé côte à
+    côte dans une grille — sans fusionner les pièces de plateaux différents
+    entre elles (chaque plateau garde ses propres pièces à sa place, juste
+    décalé pour ne pas se superposer aux autres).
+
+    Utilise volontairement UNIQUEMENT la résolution XML directe (rapide) pour
+    chaque plateau, pas le repli lent via trimesh.load : sur un fichier où la
+    résolution XML échoue déjà pour un plateau seul, la retenter en boucle
+    pour N plateaux serait beaucoup trop long pour une miniature. Un plateau
+    dont la résolution rapide échoue est simplement omis de la vue d'ensemble
+    plutôt que de bloquer tout le rendu.
+
+    Retourne None si moins de 2 plateaux ont pu être résolus (dans ce cas
+    l'appelant retombe sur le comportement standard : plateau 1 uniquement).
+    """
+    try:
+        display_name = "archive (mémoire)" if isinstance(source, (bytes, bytearray)) else os.path.basename(source)
+
+        plates = _parse_3mf_plate_object_ids(source)
+        if not plates:
+            return None
+
+        plate_keys_sorted = sorted(plates.keys(), key=lambda k: (len(k), k))[:max_plates]
+
+        resolved = []
+        for key in plate_keys_sorted:
+            obj_ids = plates[key]
+            mesh = _resolve_3mf_plate_mesh(source, obj_ids)
+            if mesh is not None and not mesh.is_empty and len(mesh.vertices) > 0:
+                resolved.append((key, mesh))
+            else:
+                app_logger.debug(f"[3MF] Vue d'ensemble : plateau '{key}' omis (résolution rapide infructueuse) pour {display_name}")
+
+        if len(resolved) < 2:
+            return None
+
+        # Taille de cellule de grille = plus grande empreinte XY parmi les
+        # plateaux résolus, avec une marge pour ne pas coller les plateaux.
+        max_extent = 0.0
+        for _, mesh in resolved:
+            ext = mesh.bounds[1][:2] - mesh.bounds[0][:2]
+            max_extent = max(max_extent, float(np.max(ext)))
+        if max_extent <= 0:
+            max_extent = 1.0
+        cell_size = max_extent * 1.35
+
+        grid_cols = max(1, int(math.ceil(math.sqrt(len(resolved)))))
+
+        placed_meshes = []
+        for i, (key, mesh) in enumerate(resolved):
+            row, col = divmod(i, grid_cols)
+            bbox_center = mesh.bounds.mean(axis=0)
+            m = mesh.copy()
+            m.apply_translation(-bbox_center)
+            m.apply_translation([col * cell_size, -row * cell_size, 0])
+            placed_meshes.append(m)
+
+        overview = trimesh.util.concatenate(placed_meshes)
+        app_logger.info(
+            f"[3MF] Vue d'ensemble multi-plateaux : {len(resolved)}/{len(plates)} "
+            f"plateau(x) assemblés côte à côte pour {display_name}"
+        )
+        return overview
+    except Exception as e:
+        app_logger.debug(f"[3MF] _build_multiplate_overview_mesh échoué: {e}")
+        return None
 
 def create_fallback_thumbnail(thumb_path, resolution=(768, 768)):
     try:
@@ -3774,7 +4025,11 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
             ext = os.path.splitext(file_to_load)[1].lower()
 
             if ext == '.3mf':
-                mesh = load_3mf_mesh(file_to_load)
+                mesh = None
+                if get_3mf_plate_count(file_to_load) > 1:
+                    mesh = _build_multiplate_overview_mesh(file_to_load)
+                if mesh is None:
+                    mesh = load_3mf_mesh(file_to_load)
             elif ext == '.obj':
                 mesh = trimesh.load(file_to_load, force='mesh', process=False)
             else:
@@ -3807,12 +4062,34 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
                         f"rendu du mesh complet ({faces_before} faces)"
                     )
 
-            mesh.apply_translation(-mesh.centroid)
+            # Centrage par le centre de la bounding box (cadrage géométrique
+            # simple et robuste pour une vignette, peu importe la topologie
+            # du mesh — contrairement à mesh.centroid qui pondère par aire
+            # de face et peut donc être décentré sur un mesh très asymétrique).
+            bbox_center = mesh.bounds.mean(axis=0)
+            mesh.apply_translation(-bbox_center)
             rot_fix = tra.rotation_matrix(np.radians(-90), [1, 0, 0])
             mesh.apply_transform(rot_fix)
 
             try:
-                mesh.fix_normals()
+                # Sur un mesh multi-pièces (plusieurs objets détachés dans le
+                # même fichier), fix_normals() calcule le volume de chaque
+                # pièce individuellement pour corriger le sens de ses normales.
+                # Une pièce dégénérée (souvent introduite par la décimation
+                # ci-dessus) peut avoir un volume nul, ce qui déclenche des
+                # RuntimeWarning numpy inoffensives ("divide by zero" /
+                # "invalid value") — sans conséquence sur le résultat, mais
+                # bruyantes en console. On les filtre localement ici.
+                with warnings.catch_warnings():
+                    warnings.filterwarnings(
+                        'ignore', category=RuntimeWarning,
+                        message='.*divide by zero encountered in divide.*'
+                    )
+                    warnings.filterwarnings(
+                        'ignore', category=RuntimeWarning,
+                        message='.*invalid value encountered in divide.*'
+                    )
+                    mesh.fix_normals()
             except Exception:
                 pass
 
@@ -5205,8 +5482,8 @@ def reconcile_thumbnails_with_disk():
                         if not _is_ignored_recently(normalized) and normalized not in seen_paths:
                             seen_paths.add(normalized)
                             thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
-                            thumb_generation_queue.put({'path': normalized, 'thumb_path': thumb_path, 'priority': 'low'})
-                            requeued += 1
+                            if _queue_thumb_task(normalized, thumb_path, priority='low'):
+                                requeued += 1
                     elif f.get('thumb_fallback') and f.get('thumb_fallback_retries', 0) < MAX_THUMB_FALLBACK_RETRIES:
                         if not _is_ignored_recently(normalized) and normalized not in seen_paths:
                             seen_paths.add(normalized)
@@ -5216,8 +5493,18 @@ def reconcile_thumbnails_with_disk():
                                     os.remove(thumb_path)
                             except Exception:
                                 pass
-                            thumb_generation_queue.put({'path': normalized, 'thumb_path': thumb_path, 'priority': 'low'})
-                            requeued += 1
+                            if _queue_thumb_task(normalized, thumb_path, priority='low'):
+                                requeued += 1
+                    elif not f.get('has_thumb') and not real_has_thumb:
+                        # Fichier jamais traité (ni vraie miniature, ni fallback) :
+                        # c'est le cas typique d'un fichier nouvellement scanné dont
+                        # la tâche initiale s'est perdue (queue vidée avant traitement,
+                        # redémarrage de l'app, etc.). On le remet dans la queue.
+                        if not _is_ignored_recently(normalized) and normalized not in seen_paths:
+                            seen_paths.add(normalized)
+                            thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
+                            if _queue_thumb_task(normalized, thumb_path, priority='low'):
+                                requeued += 1
                 if changed:
                     try:
                         tmp_path = CACHE_FILE + '.tmp'
@@ -5319,11 +5606,9 @@ def api_generate_thumb_now():
     if os.path.exists(thumb_path) and not force:
         return jsonify({"success": True, "cached": True})
 
-    thumb_generation_queue.put({
-        'path': file_path,
-        'thumb_path': thumb_path,
-        'priority': 'high'
-    })
+    if force:
+        _release_thumb_inflight(file_path)
+    _queue_thumb_task(file_path, thumb_path, priority='high')
 
     return jsonify({"success": True, "message": "Génération démarrée"})
 
@@ -5352,13 +5637,9 @@ def api_regen_thumb_batch():
                 app_logger.warning(f"[REGEN-BATCH] Suppression impossible pour {os.path.basename(file_path)}: {e}")
 
         ignored_files_cache.pop(normalized_path, None)
-
-        thumb_generation_queue.put({
-            'path': file_path,
-            'thumb_path': thumb_path,
-            'priority': 'high'
-        })
-        queued += 1
+        _release_thumb_inflight(file_path)
+        if _queue_thumb_task(file_path, thumb_path, priority='high'):
+            queued += 1
 
     app_logger.info(f"[REGEN-BATCH] {queued} miniature(s) replanifiée(s) pour régénération groupée")
     return jsonify({"success": True, "queued": queued})
@@ -5938,8 +6219,8 @@ def _do_background_scan(sources_list, user_id, blocking=False):
                     seen_paths.add(f['path'])
                     thumb_filename = hashlib.md5(f['path'].encode()).hexdigest()
                     thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
-                    thumb_generation_queue.put({'path': f['path'], 'thumb_path': thumb_path, 'priority': 'low'})
-                    missing_count += 1
+                    if _queue_thumb_task(f['path'], thumb_path, priority='low'):
+                        missing_count += 1
             if missing_count:
                 _thumb_session_note_start(missing_count)
 
@@ -6034,11 +6315,7 @@ def api_get_files():
                         if not _is_ignored_recently(normalized) and normalized not in seen_paths:
                             seen_paths.add(normalized)
                             thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
-                            thumb_generation_queue.put({
-                                'path': normalized,
-                                'thumb_path': thumb_path,
-                                'priority': 'low'
-                            })
+                            _queue_thumb_task(normalized, thumb_path, priority='low')
                     elif real_has_thumb and not f.get('has_thumb'):
                         f['has_thumb'] = True
                         changed = True
@@ -6362,6 +6639,114 @@ def _cleanup_empty_parent_dirs(file_path, stop_at_paths=None):
             break
         current = parent
     return removed
+
+def _show_open_with_dialog_windows(file_path):
+    """Affiche la boîte de dialogue Windows native "Ouvrir avec" via l'API
+    officielle SHOpenWithDialog (shell32.dll), lancée dans un thread dédié
+    avec son propre appartement COM STA.
+
+    Contrairement à "rundll32 shell32.dll,OpenAs_RunDLL" (API interne non
+    documentée utilisée précédemment), SHOpenWithDialog :
+    - affiche TOUJOURS la boîte de dialogue, même si une association par
+      défaut existe déjà pour l'extension (OpenAs_RunDLL, elle, ouvrait
+      parfois silencieusement avec l'appli par défaut sans rien afficher) ;
+    - accepte le flag OAIF_HIDE_REGISTRATION qui masque la case "Toujours
+      utiliser cette application pour ouvrir les fichiers .xxx", ce
+      qu'aucune option de OpenAs_RunDLL ne permet de faire.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    class OPENASINFO(ctypes.Structure):
+        _fields_ = [
+            ("pcszFile", wintypes.LPCWSTR),
+            ("pcszClass", wintypes.LPCWSTR),
+            ("oaifInFlags", wintypes.DWORD),
+        ]
+
+    OAIF_EXEC = 0x00000004
+    OAIF_HIDE_REGISTRATION = 0x00000020
+    COINIT_APARTMENTTHREADED = 0x2
+
+    def _worker():
+        ole32 = ctypes.windll.ole32
+        hr_init = ole32.CoInitializeEx(None, COINIT_APARTMENTTHREADED)
+        try:
+            shell32 = ctypes.windll.shell32
+            info = OPENASINFO(
+                pcszFile=file_path,
+                pcszClass=None,
+                oaifInFlags=OAIF_EXEC | OAIF_HIDE_REGISTRATION,
+            )
+            hr = shell32.SHOpenWithDialog(None, ctypes.byref(info))
+            if hr != 0:
+                # L'utilisateur a probablement annulé la boîte de dialogue
+                # (code d'annulation courant), ou une vraie erreur shell.
+                # On journalise en info, pas en erreur, pour ne pas polluer
+                # les logs à chaque annulation volontaire.
+                app_logger.info(f"[OpenWith] SHOpenWithDialog code retour: {hr:#x}")
+        except Exception as e:
+            app_logger.error(f"[OpenWith] SHOpenWithDialog a échoué: {e}")
+        finally:
+            if hr_init in (0, 1):  # S_OK ou S_FALSE : CoUninitialize requis
+                ole32.CoUninitialize()
+
+    # Thread dédié car SHOpenWithDialog est modale (bloque jusqu'à la
+    # fermeture de la boîte par l'utilisateur) : on ne veut pas bloquer le
+    # thread de la requête Flask ni la réponse HTTP.
+    threading.Thread(target=_worker, daemon=True).start()
+
+
+@app.route('/api/files/open-with', methods=['POST'])
+@login_required
+def api_open_file_with():
+    try:
+        data = request.json
+        file_path = data.get('file_path', '').strip()
+        if not file_path:
+            return jsonify({"error": "Chemin du fichier requis"}), 400
+
+        file_path = file_path.replace('/', '\\') if os.name == 'nt' else file_path.replace('\\', '/')
+
+        if not os.path.exists(file_path):
+            return jsonify({"error": "Fichier introuvable"}), 404
+        if not os.path.isfile(file_path):
+            return jsonify({"error": "Le chemin n'est pas un fichier"}), 400
+
+        if not _is_path_within_sources(file_path, session['user_id']):
+            app_logger.warning(f"[SECURITY] Tentative d'ouverture hors sources: {file_path}")
+            return jsonify({"error": "Ce fichier n'appartient à aucune source configurée"}), 403
+
+        try:
+            if sys.platform == 'win32':
+                # SHOpenWithDialog (API shell officielle) : affiche toujours
+                # la boîte "Ouvrir avec", contrairement à l'ancienne méthode
+                # rundll32 shell32.dll,OpenAs_RunDLL qui pouvait rouvrir
+                # silencieusement avec l'appli par défaut. Le flag
+                # OAIF_HIDE_REGISTRATION masque en plus la case "Toujours
+                # utiliser cette application".
+                _show_open_with_dialog_windows(file_path)
+            elif sys.platform == 'darwin':
+                # macOS : pas de commande native pour forcer la popup "Ouvrir avec".
+                # On révèle le fichier dans le Finder, d'où l'utilisateur peut
+                # faire clic droit > Ouvrir avec.
+                subprocess.run(['open', '-R', file_path], check=False)
+            else:
+                # Linux : pas d'équivalent universel selon l'environnement de bureau,
+                # on retente avec mimeopen si présent (propose une liste au choix),
+                # sinon on retombe sur l'appli par défaut.
+                if shutil.which('mimeopen'):
+                    subprocess.run(['mimeopen', '-a', file_path], check=False)
+                else:
+                    subprocess.run(['xdg-open', file_path], check=False)
+        except Exception as e:
+            app_logger.error(f"[OpenWith] Échec ouverture {file_path}: {e}")
+            return jsonify({"error": f"Impossible d'ouvrir le fichier : {str(e)}"}), 500
+
+        return jsonify({"success": True, "message": "Sélectionnez une application"})
+    except Exception as e:
+        app_logger.error(f"[API] Erreur non gérée: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 @app.route('/api/files/delete', methods=['POST'])
 @login_required
@@ -10105,7 +10490,7 @@ def _convert_single_file(file_path, target_format, delete_original, repair=False
 
         normalized_new = out_path.replace('\\', '/')
         new_thumb_path = os.path.join(THUMBNAILS_DIR, hashlib.md5(normalized_new.encode()).hexdigest() + '.webp')
-        thumb_generation_queue.put({'path': out_path, 'thumb_path': new_thumb_path, 'priority': 'high'})
+        _queue_thumb_task(out_path, new_thumb_path, priority='high')
 
         app_logger.info(
             f"[CONVERT] {os.path.basename(file_path)} → {os.path.basename(out_path)} "
@@ -10797,7 +11182,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio-app"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.5.2"
+CURRENT_VERSION = "0.5.4"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
