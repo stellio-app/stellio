@@ -2846,6 +2846,68 @@ body {
     text-align: center;
 }
 
+/* Portrait mobile : le header du viewer (titre + orientation + surplombs +
+   envoyer au slicer + fermer) ne tient pas sur une seule ligne à l'écran
+   étroit — on passe en plein écran et on empile les contrôles pour que
+   tout reste accessible sans forcer le mode paysage. */
+@media (max-width: 640px) {
+    .modal-content.viewer-3d {
+        width: 100vw;
+        max-width: 100vw;
+        height: 100vh;
+        max-height: 100vh;
+        /* 100vh sur mobile inclut parfois l'espace potentiellement occupé
+           par la barre d'adresse du navigateur (surtout en portrait), ce
+           qui pousse ce panneau centré verticalement au-delà de la zone
+           réellement visible — le header (et sa croix de fermeture) se
+           retrouve alors hors écran. 100dvh s'ajuste dynamiquement à la
+           hauteur visible réelle et corrige ce décalage. Déclaré après
+           100vh pour rester compatible avec les anciens navigateurs qui
+           ignorent simplement dvh. */
+        height: 100dvh;
+        max-height: 100dvh;
+        border-radius: 0;
+    }
+
+    .viewer-header {
+        flex-wrap: wrap;
+        row-gap: 10px;
+        padding: 12px 44px 12px 14px;
+        position: relative;
+    }
+
+    .viewer-header h3 {
+        font-size: 14px;
+        flex: 1 1 100%;
+    }
+
+    .viewer-header .modal-close {
+        position: absolute;
+        top: 8px;
+        right: 10px;
+    }
+
+    .viewer-controls {
+        flex-wrap: wrap;
+        width: 100%;
+        gap: 8px;
+    }
+
+    .viewer-controls #viewer-orientation-select {
+        flex: 1 1 100%;
+        max-width: 100% !important;
+    }
+
+    .viewer-controls .viewer-overhang-toggle-row {
+        flex: 1 1 auto;
+    }
+
+    .viewer-controls .btn-primary {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+}
+
 
 .backup-option-row {
     display: flex;
@@ -4462,6 +4524,40 @@ kbd {
     box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
+.spoolman-search-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    flex: 0 1 220px;
+    min-width: 160px;
+    transition: border-color 0.2s ease;
+}
+
+.spoolman-search-box:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.spoolman-search-box i {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.spoolman-search-box input {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 12px;
+    outline: none;
+    width: 100%;
+    padding: 0;
+}
+
 .settings-select-sm {
     min-width: 0;
     max-width: 130px;
@@ -5216,6 +5312,12 @@ kbd {
     .files-grid.gallery {
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
         gap: 12px;
+    }
+}
+
+@media (min-width: 861px) {
+    .spoolman-filters-mobile-only {
+        display: none !important;
     }
 }
 
