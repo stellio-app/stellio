@@ -295,10 +295,17 @@
                     <i class="fa-solid fa-search"></i>
                 </button>
                 <div class="header-center">
-                    <div class="search-box">
+                    <div class="search-box" id="library-search-wrap">
                         <i class="fa-solid fa-search"></i>
                         <input type="text" id="global-search" data-i18n-placeholder="search.placeholder">
                         <button type="button" id="global-search-clear" class="search-clear-btn" data-i18n-aria="actions.clear_search" aria-label="Effacer la recherche" title="Effacer">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <div class="search-box header-hide" id="spool-header-search-wrap">
+                        <i class="fa-solid fa-search"></i>
+                        <input type="text" id="spool-header-search" data-i18n-placeholder="spoolman.search_placeholder" placeholder="Rechercher (nom, marque, rangement...)">
+                        <button type="button" id="spool-header-search-clear" class="search-clear-btn" data-i18n-aria="actions.clear_search" aria-label="Effacer la recherche" title="Effacer">
                             <i class="fa-solid fa-xmark"></i>
                         </button>
                     </div>
@@ -321,6 +328,21 @@
 					</div>
                 </div>
                 <div class="header-right">
+                    <select id="spool-header-material" class="header-select header-hide" style="width:auto;">
+                        <option value="" data-i18n="spoolman.filter_material_all">Toute matière</option>
+                    </select>
+                    <select id="spool-header-location" class="header-select header-hide" style="width:auto;">
+                        <option value="" data-i18n="spoolman.filter_location_all">Tout rangement</option>
+                    </select>
+                    <select id="spool-header-sort" class="header-select header-hide" style="width:auto;">
+                        <option value="created_desc" data-i18n="spoolman.sort_recent">Plus récent</option>
+                        <option value="name_asc" data-i18n="spoolman.sort_name">Nom (A→Z)</option>
+                        <option value="material_asc" data-i18n="spoolman.sort_material">Matière</option>
+                        <option value="color" data-i18n="spoolman.sort_color">Couleur</option>
+                        <option value="location_asc" data-i18n="spoolman.sort_location">Rangement</option>
+                        <option value="remaining_asc" data-i18n="spoolman.sort_remaining_asc">Poids restant ↑</option>
+                        <option value="remaining_desc" data-i18n="spoolman.sort_remaining_desc">Poids restant ↓</option>
+                    </select>
                     <select id="sort-select" class="header-select" data-i18n-title="library.sort_by" title="Trier par">
 						  <option value="name-asc" data-i18n="sort.name_asc">A → Z</option>
 						  <option value="name-desc" data-i18n="sort.name_desc">Z → A</option>
@@ -1461,6 +1483,27 @@
 							<i class="fa-solid fa-rotate"></i> <span data-i18n="actions.refresh">Rafraîchir</span>
 						</button>
 					</div>
+					<div id="spoolman-filters" class="spoolman-toolbar spoolman-filters-mobile-only" style="display:none; gap:8px; flex-wrap:wrap;">
+						<div class="spoolman-search-box">
+							<i class="fa-solid fa-search"></i>
+							<input type="text" id="spool-filter-search" data-i18n-placeholder="spoolman.search_placeholder" placeholder="Rechercher (nom, marque, rangement...)">
+						</div>
+						<select id="spool-filter-material" class="settings-select" style="width:auto; min-width:110px;">
+							<option value="" data-i18n="spoolman.filter_material_all">Toute matière</option>
+						</select>
+						<select id="spool-filter-location" class="settings-select" style="width:auto; min-width:110px;">
+							<option value="" data-i18n="spoolman.filter_location_all">Tout rangement</option>
+						</select>
+						<select id="spool-sort" class="settings-select" style="width:auto; min-width:130px;">
+							<option value="created_desc" data-i18n="spoolman.sort_recent">Plus récent</option>
+							<option value="name_asc" data-i18n="spoolman.sort_name">Nom (A→Z)</option>
+							<option value="material_asc" data-i18n="spoolman.sort_material">Matière</option>
+							<option value="color" data-i18n="spoolman.sort_color">Couleur</option>
+							<option value="location_asc" data-i18n="spoolman.sort_location">Rangement</option>
+							<option value="remaining_asc" data-i18n="spoolman.sort_remaining_asc">Poids restant ↑</option>
+							<option value="remaining_desc" data-i18n="spoolman.sort_remaining_desc">Poids restant ↓</option>
+						</select>
+					</div>
 					<div id="spoolman-grid" class="grid-spoolman"></div>
 				</div>
             </main>
@@ -2280,7 +2323,7 @@
 							<option value="klipper">Klipper (Moonraker)</option>
 							<option value="prusalink">PrusaLink (Prusa MK4 / MK3.9 / MK3.5 / MINI+ / XL / CORE One)</option>
 							<option value="bambu">Bambu Lab (X1C / P1P / P1S / A1)</option>
-							<option value="elegoo_sdcp">Elegoo (résine Saturn/Mars, ou Centauri Carbon 1)</option>
+							<option value="elegoo_sdcp" data-i18n="printers.elegoo_sdcp_model">Elegoo (résine Saturn/Mars, ou Centauri Carbon 1)</option>
 							<option value="elegoo_cc2">Elegoo Centauri Carbon 2</option>
 							<option value="creality">Creality (K1 / K2 / Ender-3 V3 / Hi)</option>
 							<option value="flashforge">FlashForge (5M / 5M Pro / AD5X)</option>
@@ -2418,6 +2461,11 @@
                 <button class="file-action-row" id="ctx-slicer-btn">
                     <span class="file-action-icon"><i class="fa-solid fa-scissors"></i></span>
                     <span class="file-action-label" data-i18n="actions.send_to_slicer">Envoyer au slicer</span>
+                    <i class="fa-solid fa-chevron-right file-action-arrow"></i>
+                </button>
+                <button class="file-action-row" id="ctx-openwith-btn">
+                    <span class="file-action-icon"><i class="fa-solid fa-pen-to-square"></i></span>
+                    <span class="file-action-label" data-i18n="actions.open_with">Modifier avec...</span>
                     <i class="fa-solid fa-chevron-right file-action-arrow"></i>
                 </button>
                 <button class="file-action-row" id="ctx-share-btn">
