@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
-
 import os
 import sys
+import multiprocessing  
+from pathlib import Path
 import runpy
 import logging
-from pathlib import Path
 from logging.handlers import RotatingFileHandler
 
+def _setup_early_env() -> Path:
+    base = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
+    app_dir = base / "app"
+    if str(app_dir) not in sys.path:
+        sys.path.insert(0, str(app_dir))
+    return app_dir
+
+app_dir = _setup_early_env()
+# ---------------------------------------------------------
 
 def _app_dir() -> Path:
-    base = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) \
-        else Path(__file__).resolve().parent
+    base = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
     return base / "app"
 
 
@@ -35,179 +43,46 @@ def _show_fatal_error(message: str) -> None:
         print(message, file=sys.stderr)
 
 
+_PRELOAD_MODULES = [
+    "sqlite3", "ssl", "hashlib", "tkinter", "tkinter.ttk", "webbrowser",
+    "difflib", "multiprocessing", "concurrent.futures", "secrets", "shlex",
+    "calendar",
+    "flask", "werkzeug", "waitress", "webview", "imageio", "trimesh",
+    "pyrender", "OpenGL", "OpenGL.GL", "numpy", "PIL", "PIL.Image",
+    "matplotlib", "mpl_toolkits.mplot3d", "mpl_toolkits.mplot3d.art3d",
+    "fast_simplification", "pymeshfix", "shapely", "rectpack",
+    "smbclient", "smbprotocol", "paho.mqtt.client", "requests",
+    "cryptography", "cryptography.hazmat.primitives.ciphers", "rarfile",
+    "py7zr", "defusedxml", "defusedxml.ElementTree", "nest_asyncio",
+    "psutil", "packaging", "packaging.version", "qrcode", "websocket",
+    "flashforge",
+]
+
+
+def _try_import(module_name: str):
+    try:
+        __import__(module_name)
+        return module_name, None
+    except Exception as e:
+        return module_name, e
+
+
 def _preload_dependencies(log) -> None:
-    try:
-        import sqlite3  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ sqlite3 indisponible a l'import : {e}")
-    try:
-        import ssl  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ ssl indisponible a l'import : {e}")
-    try:
-        import hashlib  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ hashlib indisponible a l'import : {e}")
-    try:
-        import tkinter  
-        from tkinter import ttk  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ tkinter/ttk indisponible a l'import : {e}")
+    if os.environ.get("STELLIO_DIAG_PRELOAD", "").strip().lower() not in ("1", "true", "yes"):
+        log("[PRELOAD] Verification des dependances ignoree (demarrage plus rapide). "
+            "Definir STELLIO_DIAG_PRELOAD=1 pour la reactiver en cas de probleme d'installation.")
+        return
 
-    try:
-        import webbrowser  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ webbrowser indisponible a l'import : {e}")
-    try:
-        import difflib  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ difflib indisponible a l'import : {e}")
-    try:
-        import multiprocessing  
-        import concurrent.futures  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ multiprocessing/concurrent.futures indisponible a l'import : {e}")
-    try:
-        import secrets  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ secrets indisponible a l'import : {e}")
-    try:
-        import shlex  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ shlex indisponible a l'import : {e}")
-    try:
-        import calendar  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ calendar indisponible a l'import : {e}")
-
-    # --- dependances tierces (requirements.txt) ---
-    try:
-        import flask  
-        import werkzeug  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ flask/werkzeug indisponible a l'import : {e}")
-    try:
-        import waitress  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ waitress indisponible a l'import : {e}")
-    try:
-        import webview  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ webview (pywebview) indisponible a l'import : {e}")
-    try:
-        import imageio  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ imageio indisponible a l'import : {e}")
-    try:
-        import trimesh  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ trimesh indisponible a l'import : {e}")
-    try:
-        import pyrender  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ pyrender indisponible a l'import : {e}")
-    try:
-        import OpenGL  
-        import OpenGL.GL  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ OpenGL (PyOpenGL) indisponible a l'import : {e}")
-    try:
-        import numpy  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ numpy indisponible a l'import : {e}")
-    try:
-        import PIL  
-        import PIL.Image  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ PIL (Pillow) indisponible a l'import : {e}")
-    try:
-        import matplotlib 
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ matplotlib indisponible a l'import : {e}")
-    try:
-        import mpl_toolkits  
-        import mpl_toolkits.mplot3d  
-        import mpl_toolkits.mplot3d.art3d  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ mpl_toolkits.mplot3d indisponible a l'import : {e}")
-    try:
-        import fast_simplification  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ fast_simplification indisponible a l'import : {e}")
-    try:
-        import pymeshfix 
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ pymeshfix indisponible a l'import : {e}")
-    try:
-        import shapely  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ shapely indisponible a l'import : {e}")
-    try:
-        import rectpack  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ rectpack indisponible a l'import : {e}")
-    try:
-        import smbclient  
-        import smbprotocol  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ smbclient/smbprotocol indisponible a l'import : {e}")
-    try:
-        import paho.mqtt.client 
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ paho-mqtt indisponible a l'import : {e}")
-    try:
-        import requests  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ requests indisponible a l'import : {e}")
-    try:
-        import cryptography  
-        from cryptography.hazmat.primitives.ciphers import Cipher  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ cryptography indisponible a l'import : {e}")
-    try:
-        import rarfile  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ rarfile indisponible a l'import : {e}")
-    try:
-        import py7zr  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ py7zr indisponible a l'import : {e}")
-    try:
-        import defusedxml  
-        import defusedxml.ElementTree  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ defusedxml indisponible a l'import : {e}")
-    try:
-        import nest_asyncio  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ nest_asyncio indisponible a l'import : {e}")
-    try:
-        import psutil  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ psutil indisponible a l'import : {e}")
-    try:
-        import packaging  
-        import packaging.version  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ packaging indisponible a l'import : {e}")
-    try:
-        import qrcode  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ qrcode indisponible a l'import : {e}")
-    try:
-        import websocket  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ websocket-client indisponible a l'import : {e}")
-    try:
-        import flashforge  
-    except Exception as e:
-        log(f"[PRELOAD] ⚠️ flashforge-python-api indisponible a l'import : {e}")
-
+    modules = list(_PRELOAD_MODULES)
     if os.environ.get("STELLIO_TELEGRAM_VARIANT", "").strip().lower() in ("1", "true", "yes"):
-        try:
-            import telethon  
-        except Exception as e:
-            log(f"[PRELOAD] ⚠️ telethon indisponible a l'import : {e}")
+        modules.append("telethon")
+
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        for module_name, err in pool.map(_try_import, modules):
+            if err is not None:
+                log(f"[PRELOAD] ⚠️ {module_name} indisponible a l'import : {err}")
+
 
 
 def main() -> int:
@@ -251,4 +126,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
+    
     sys.exit(main())
