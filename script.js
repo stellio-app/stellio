@@ -3122,6 +3122,36 @@ I18N.apply();
 let currentSlicerOrientation = 'default';
 let _slicerLaunchedFromViewer = false;
 
+async function openFileWith(path, name) {
+try {
+    const res = await fetch(`${API}/api/files/open-with`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_path: path })
+    });
+    let data = {};
+    try {
+        data = await res.json();
+    } catch (parseErr) {
+        // Réponse non-JSON (page d'erreur HTML, proxy, etc.) : on affiche au
+        // moins le code HTTP plutôt qu'un message générique inexploitable,
+        // utile pour diagnostiquer sans accès à la console (devtools
+        // désactivés en production, debug=False côté pywebview).
+        showToast(`${I18N.t('toast.error')} (HTTP ${res.status})`, 'error');
+        console.error('[OpenWith] Réponse non-JSON', res.status, parseErr);
+        return;
+    }
+    if (!res.ok) {
+        showToast(data.error || `${I18N.t('toast.error')} (HTTP ${res.status})`, 'error');
+        return;
+    }
+    if (data.message) showToast(data.message, 'success');
+} catch (e) {
+    showToast(`${I18N.t('toast.network_error')}: ${e.message || e}`, 'error');
+    console.error('[OpenWith] Erreur fetch', e);
+}
+}
+
 function sendToSlicer(path, name, aiProfile, orientation) {
 currentSlicerFile = path;
 currentSlicerOrientation = orientation || 'default';
@@ -5345,9 +5375,24 @@ async function loadSpoolmanPage() {
     const grid = document.getElementById('spoolman-grid');
     const label = document.getElementById('spoolman-server-label');
     const addBtn = document.getElementById('add-manual-spool-btn');
+    const filtersBar = document.getElementById('spoolman-filters');
+    const headerFilterEls = [
+        document.getElementById('spool-header-search-wrap'),
+        document.getElementById('spool-header-material'),
+        document.getElementById('spool-header-location'),
+        document.getElementById('spool-header-sort')
+    ];
     if (!grid) return;
 
     const url = await getSpoolmanUrl();
+    // Le filtrage/tri (mobile comme header) n'est proposé que pour
+    // l'inventaire local : un serveur Spoolman distant n'est pas indexé
+    // côté Stellio, donc pas de recherche/tri possible dessus.
+    const isSpoolmanPageActive = document.getElementById('page-spoolman')?.classList.contains('active');
+    headerFilterEls.forEach(el => {
+        if (!el) return;
+        el.classList.toggle('header-hide', !!url || !isSpoolmanPageActive);
+    });
 
     if (label) {
         label.innerHTML = url
@@ -5357,11 +5402,13 @@ async function loadSpoolmanPage() {
 
     if (!url) {
         if (addBtn) addBtn.style.display = '';
+        if (filtersBar) filtersBar.style.display = 'flex';
         await loadManualSpoolInventory();
         return;
     }
 
     if (addBtn) addBtn.style.display = 'none';
+    if (filtersBar) filtersBar.style.display = 'none';
     grid.innerHTML = `
         <div class="empty-state">
             <i class="fa-solid fa-spinner fa-spin"></i>
@@ -5419,16 +5466,133 @@ async function loadManualSpoolInventory() {
 window.loadManualSpoolInventory = loadManualSpoolInventory;
 
 let _manualSpoolCache = [];
+let _manualSpoolFiltersBound = false;
+
+// Recherche / matière / rangement / tri existent en double : une fois dans le
+// header (desktop, page inventaire filament) et une fois dans le bandeau en
+// page (repris uniquement en mobile, header masqué sous 860px — cf. CSS
+// .spoolman-filters-mobile-only). Les deux jeux sont tenus synchronisés.
+const _SPOOL_FILTER_PAIRS = [
+    ['spool-filter-search', 'spool-header-search'],
+    ['spool-filter-material', 'spool-header-material'],
+    ['spool-filter-location', 'spool-header-location'],
+    ['spool-sort', 'spool-header-sort']
+];
+
+function _manualSpoolFilterValue(mobileId, headerId, fallback = '') {
+    const mobileEl = document.getElementById(mobileId);
+    const headerEl = document.getElementById(headerId);
+    // Le champ actuellement visible (l'autre est masqué par CSS selon la
+    // largeur d'écran) fait foi ; à défaut on retombe sur celui qui a une
+    // valeur non vide.
+    if (headerEl && headerEl.offsetParent !== null) return headerEl.value;
+    if (mobileEl && mobileEl.offsetParent !== null) return mobileEl.value;
+    return headerEl?.value || mobileEl?.value || fallback;
+}
+
+function _manualSpoolFilterState() {
+    return {
+        search: _manualSpoolFilterValue('spool-filter-search', 'spool-header-search').trim().toLowerCase(),
+        material: _manualSpoolFilterValue('spool-filter-material', 'spool-header-material'),
+        location: _manualSpoolFilterValue('spool-filter-location', 'spool-header-location'),
+        sort: _manualSpoolFilterValue('spool-sort', 'spool-header-sort', 'created_desc') || 'created_desc'
+    };
+}
+
+function _populateManualSpoolFilterOptions(spools) {
+    const keepFirstOption = (sel) => sel.querySelector('option')?.outerHTML || '';
+    const materials = [...new Set(spools.map(s => (s.material || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const locations = [...new Set(spools.map(s => (s.storage_location || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+    [document.getElementById('spool-filter-material'), document.getElementById('spool-header-material')].forEach(materialSel => {
+        if (!materialSel) return;
+        const prevMaterial = materialSel.value;
+        materialSel.innerHTML = keepFirstOption(materialSel) + materials.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+        if (materials.includes(prevMaterial)) materialSel.value = prevMaterial;
+    });
+
+    [document.getElementById('spool-filter-location'), document.getElementById('spool-header-location')].forEach(locationSel => {
+        if (!locationSel) return;
+        const prevLocation = locationSel.value;
+        locationSel.innerHTML = keepFirstOption(locationSel) + locations.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
+        if (locations.includes(prevLocation)) locationSel.value = prevLocation;
+    });
+}
+
+function _applyManualSpoolFiltersAndSort(spools) {
+    const { search, material, location, sort } = _manualSpoolFilterState();
+    let result = spools.filter(s => {
+        if (material && (s.material || '').trim() !== material) return false;
+        if (location && (s.storage_location || '').trim() !== location) return false;
+        if (search) {
+            const haystack = `${s.name || ''} ${s.vendor || ''} ${s.material || ''} ${s.storage_location || ''} ${s.notes || ''}`.toLowerCase();
+            if (!haystack.includes(search)) return false;
+        }
+        return true;
+    });
+    const cmp = {
+        created_desc: () => 0, // déjà trié par created_at DESC côté serveur
+        name_asc: (a, b) => (a.name || '').localeCompare(b.name || ''),
+        material_asc: (a, b) => (a.material || '').localeCompare(b.material || '') || (a.name || '').localeCompare(b.name || ''),
+        color: (a, b) => (a.color_hex || '').localeCompare(b.color_hex || ''),
+        location_asc: (a, b) => (a.storage_location || '').localeCompare(b.storage_location || '') || (a.name || '').localeCompare(b.name || ''),
+        remaining_asc: (a, b) => (a.remaining_g ?? Infinity) - (b.remaining_g ?? Infinity),
+        remaining_desc: (a, b) => (b.remaining_g ?? -Infinity) - (a.remaining_g ?? -Infinity),
+    }[sort];
+    if (sort !== 'created_desc') result = [...result].sort(cmp);
+    return result;
+}
+
+function _bindManualSpoolFilterListeners() {
+    if (_manualSpoolFiltersBound) return;
+    _manualSpoolFiltersBound = true;
+    _SPOOL_FILTER_PAIRS.forEach(([mobileId, headerId]) => {
+        [mobileId, headerId].forEach((id, idx) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const mirrorId = idx === 0 ? headerId : mobileId;
+            const evt = el.tagName === 'SELECT' ? 'change' : 'input';
+            el.addEventListener(evt, () => {
+                const mirrorEl = document.getElementById(mirrorId);
+                if (mirrorEl) mirrorEl.value = el.value;
+                _renderManualSpoolCards(_applyManualSpoolFiltersAndSort(_manualSpoolCache));
+            });
+        });
+    });
+    document.getElementById('spool-header-search-clear')?.addEventListener('click', () => {
+        const headerInput = document.getElementById('spool-header-search');
+        const mobileInput = document.getElementById('spool-filter-search');
+        if (headerInput) headerInput.value = '';
+        if (mobileInput) mobileInput.value = '';
+        _renderManualSpoolCards(_applyManualSpoolFiltersAndSort(_manualSpoolCache));
+        headerInput?.focus();
+    });
+}
 
 function renderManualSpoolGrid(spools) {
+    _manualSpoolCache = spools;
+    _populateManualSpoolFilterOptions(spools);
+    _bindManualSpoolFilterListeners();
+    _renderManualSpoolCards(_applyManualSpoolFiltersAndSort(spools));
+}
+window.renderManualSpoolGrid = renderManualSpoolGrid;
+
+function _renderManualSpoolCards(spools) {
     const grid = document.getElementById('spoolman-grid');
     if (!grid) return;
-    _manualSpoolCache = spools;
-    if (!spools.length) {
+    if (!_manualSpoolCache.length) {
         grid.innerHTML = `
             <div class="empty-state">
                 <i class="fa-solid fa-box-open"></i>
                 <p>${_t2('spoolman.no_manual_spools', 'Aucune bobine dans ton inventaire')}</p>
+            </div>`;
+        return;
+    }
+    if (!spools.length) {
+        grid.innerHTML = `
+            <div class="empty-state">
+                <i class="fa-solid fa-filter-circle-xmark"></i>
+                <p>${_t2('spoolman.no_matching_spools', 'Aucune bobine ne correspond à ces filtres')}</p>
             </div>`;
         return;
     }
@@ -5459,6 +5623,7 @@ function renderManualSpoolGrid(spools) {
                             <div class="spool-progress-bar" style="width:${pct}%; background:${escapeHtml(color)};"></div>
                         </div>
                     ` : remaining !== null ? `<p class="spool-weight-row"><span>${Math.round(remaining)} ${I18N.t('units.g_remaining')}</span></p>` : ''}
+                    ${s.storage_location ? `<p class="spool-location"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(s.storage_location)}</p>` : ''}
                     ${s.price ? `<p class="spool-location"><i class="fa-solid fa-tag"></i> ${Number(s.price).toFixed(2)} €</p>` : ''}
                     ${s.diameter_mm ? `<p class="spool-location"><i class="fa-solid fa-ruler"></i> Ø${s.diameter_mm} mm</p>` : ''}
                     ${s.notes ? `<p class="spool-location" style="white-space:normal;"><i class="fa-solid fa-note-sticky"></i> ${escapeHtml(s.notes)}</p>` : ''}
@@ -5477,7 +5642,6 @@ function renderManualSpoolGrid(spools) {
             </div>`;
     }).join('');
 }
-window.renderManualSpoolGrid = renderManualSpoolGrid;
 
 function openSpoolInventoryModal(spoolId) {
     const existing = spoolId ? _manualSpoolCache.find(s => s.id === spoolId) : null;
@@ -5533,7 +5697,14 @@ function openSpoolInventoryModal(spoolId) {
                 </div>
                 <div class="input-group">
                     <label>${_t2('spoolman.notes', 'Notes')}</label>
-                    <textarea id="spool-inv-notes" class="form-input" rows="2" placeholder="${_t2('spoolman.notes_placeholder', 'Remarques, lieu de stockage...')}">${escapeHtml(existing?.notes || '')}</textarea>
+                    <textarea id="spool-inv-notes" class="form-input" rows="2" placeholder="${_t2('spoolman.notes_placeholder', 'Remarques...')}">${escapeHtml(existing?.notes || '')}</textarea>
+                </div>
+                <div class="input-group">
+                    <label>${_t2('spoolman.storage_location', 'Rangement')}</label>
+                    <input type="text" id="spool-inv-storage" class="form-input" list="spool-storage-suggestions" placeholder="${_t2('spoolman.storage_placeholder', 'ex: Étagère A3, Tiroir 2...')}" value="${escapeHtml(existing?.storage_location || '')}">
+                    <datalist id="spool-storage-suggestions">
+                        ${[...new Set(_manualSpoolCache.map(s => (s.storage_location || '').trim()).filter(Boolean))].map(l => `<option value="${escapeHtml(l)}">`).join('')}
+                    </datalist>
                 </div>
             </div>
             <div class="modal-footer">
@@ -5562,6 +5733,7 @@ async function saveSpoolInventoryEntry(spoolId) {
         price: parseFloat(document.getElementById('spool-inv-price')?.value) || null,
         diameter_mm: parseFloat(document.getElementById('spool-inv-diameter')?.value) || 1.75,
         notes: document.getElementById('spool-inv-notes')?.value.trim() || '',
+        storage_location: document.getElementById('spool-inv-storage')?.value.trim() || '',
     };
     try {
         const url = spoolId ? `${API}/api/filament/manual/${spoolId}` : `${API}/api/filament/manual`;
@@ -6151,8 +6323,13 @@ document.getElementById('preferred-slicer-select')?.addEventListener('change', a
 
 function updateHeaderVisibilityForPage(page) {
     const isLibrary = page === 'library';
+    const isSpoolman = page === 'spoolman';
+
+    const headerCenter = document.querySelector('.header-center');
+    if (headerCenter) headerCenter.classList.toggle('header-hide', !isLibrary && !isSpoolman);
+
     const libraryOnlyEls = [
-        document.querySelector('.header-center'),
+        document.getElementById('library-search-wrap'),
         document.getElementById('mobile-search-toggle'),
         document.getElementById('sort-select'),
         document.querySelector('.view-modes'),
@@ -6163,6 +6340,17 @@ function updateHeaderVisibilityForPage(page) {
     libraryOnlyEls.forEach(el => {
         if (!el) return;
         el.classList.toggle('header-hide', !isLibrary);
+    });
+
+    const spoolmanOnlyEls = [
+        document.getElementById('spool-header-search-wrap'),
+        document.getElementById('spool-header-material'),
+        document.getElementById('spool-header-location'),
+        document.getElementById('spool-header-sort')
+    ];
+    spoolmanOnlyEls.forEach(el => {
+        if (!el) return;
+        el.classList.toggle('header-hide', !isSpoolman);
     });
 }
 window.updateHeaderVisibilityForPage = updateHeaderVisibilityForPage;
@@ -9543,7 +9731,7 @@ startThumbAutoRefresh();
         if (nameEl) nameEl.textContent = fileName;
 
         const isVirtualEntry = filePath.includes('::');
-        ['ctx-rename-btn', 'ctx-move-btn', 'ctx-share-btn', 'ctx-regen-btn'].forEach(id => {
+        ['ctx-rename-btn', 'ctx-move-btn', 'ctx-share-btn', 'ctx-regen-btn', 'ctx-openwith-btn'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.display = isVirtualEntry ? 'none' : '';
         });
@@ -9567,6 +9755,10 @@ startThumbAutoRefresh();
         document.getElementById('ctx-slicer-btn')?.addEventListener('click', () => {
             closeModal('modal-file-actions');
             sendToSlicer(_ctxPath, _ctxName);
+        });
+        document.getElementById('ctx-openwith-btn')?.addEventListener('click', () => {
+            closeModal('modal-file-actions');
+            openFileWith(_ctxPath, _ctxName);
         });
         document.getElementById('ctx-share-btn')?.addEventListener('click', () => {
             closeModal('modal-file-actions');
