@@ -232,18 +232,11 @@ is_generation_running = False
 ignored_files_cache = {}
 IGNORED_FILE_COOLDOWN_S = 600
 
-# --- Dédoublonnage des tâches de génération de miniatures ---
-# Empêche qu'un même fichier soit ajouté plusieurs fois à la queue (ex: le
-# superviseur de couverture qui repasse toutes les X secondes tant que
-# nb_miniatures != nb_fichiers) tant qu'une tâche pour ce fichier est déjà
-# en attente ou en cours de traitement par un worker.
 _thumb_inflight_lock = threading.Lock()
 _thumb_inflight_paths = set()
 
 
 def _queue_thumb_task(path, thumb_path, priority='low'):
-    """Ajoute une tâche de génération de miniature à la queue, sauf si une
-    tâche pour ce même chemin est déjà en attente/en cours."""
     normalized = path.replace('\\', '/')
     with _thumb_inflight_lock:
         if normalized in _thumb_inflight_paths:
@@ -373,11 +366,6 @@ def _lower_thread_priority():
         pass
 
 
-# --- Empêche la mise en veille Windows pendant la génération de miniatures ---
-# Sans ça, si l'utilisateur ne touche pas la souris/clavier, Windows peut mettre
-# le PC en veille (S0 low power idle / veille classique) et geler tous les threads
-# Python en cours, ce qui donne l'impression que la génération "ne bouge plus" et
-# ne reprend qu'au réveil du PC (ex: après un scroll).
 _ES_CONTINUOUS = 0x80000000
 _ES_SYSTEM_REQUIRED = 0x00000001
 _sleep_prevention_lock = threading.Lock()
@@ -385,9 +373,6 @@ _sleep_prevention_active = False
 
 
 def _prevent_system_sleep(enable):
-    """Active/désactive l'inhibition de la veille système (Windows uniquement).
-    N'empêche PAS l'écran de s'éteindre (pas de ES_DISPLAY_REQUIRED), seulement
-    le CPU/le système de partir en veille tant que enable=True."""
     global _sleep_prevention_active
     if sys.platform != 'win32':
         return
@@ -439,6 +424,8 @@ UPLOADS_DIR = os.path.join(DATA_DIR, "uploads")
 THUMBNAILS_DIR = os.path.join(DATA_DIR, "thumbnails")
 PRINT_PHOTOS_DIR = os.path.join(DATA_DIR, "print_photos")
 os.makedirs(PRINT_PHOTOS_DIR, exist_ok=True)
+SOSPRINT_CONV_PHOTOS_DIR = os.path.join(DATA_DIR, "sosprint_conversation_photos")
+os.makedirs(SOSPRINT_CONV_PHOTOS_DIR, exist_ok=True)
 
 
 IMPORTED_PROFILES_DIR = os.path.join(DATA_DIR, "imported_slicer_profiles")
@@ -516,12 +503,6 @@ def setup_logging():
 
     console_stream = sys.stderr if sys.stderr is not None else sys.stdout
     if console_stream is not None:
-        # Sur un build EXE "windowed" (runw.exe, sans console attachée),
-        # sys.stderr peut exister mais garder un encodage par défaut
-        # (souvent cp1252 en France) qui ne supporte pas les emojis utilisés
-        # dans les logs (✅, 🐞, ⚠️...). reconfigure() en UTF-8 avec
-        # errors='replace' évite que le moindre emoji fasse planter tout le
-        # logging (et donc le démarrage de l'app) au lieu de juste logger.
         try:
             if hasattr(console_stream, 'reconfigure'):
                 console_stream.reconfigure(encoding='utf-8', errors='replace')
@@ -531,9 +512,6 @@ def setup_logging():
         console_handler.setLevel(level)
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
-    # Si ni stderr ni stdout n'existent (EXE windowed lancé sans aucune
-    # console, ex. vérification headless post-build), on se contente du
-    # file_handler ci-dessus — inutile de crasher pour un simple log console.
 
     werkzeug_log = logging.getLogger('werkzeug')
     werkzeug_log.setLevel(logging.DEBUG if debug_requested else logging.ERROR)
@@ -640,9 +618,6 @@ _setup_rar_tool()
 FFMPEG_TOOL = None
 
 def _setup_ffmpeg_tool():
-    """Cherche ffmpeg au même endroit que UnRAR (dossier bin/ de l'app),
-    avant de retomber sur le PATH système. Sous Windows: ffmpeg.exe dans
-    bin/. Sous Linux/Docker: paquet système 'ffmpeg' suffit (apt-get)."""
     global FFMPEG_TOOL
     base_dir = get_base_path()
     exe_name = 'ffmpeg.exe' if sys.platform == 'win32' else 'ffmpeg'
@@ -706,6 +681,66 @@ def save_settings(settings):
     _settings_cache = settings
     with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2, ensure_ascii=False)
+
+
+_STARTUP_REGISTRY_KEY_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
+_STARTUP_REGISTRY_VALUE_NAME = "Stellio"
+_STARTUP_MINIMIZED_FLAG = "--minimized"
+
+def _get_startup_launch_command(minimized=False):
+    launcher_exe = os.environ.get('STELLIO_LAUNCHER_EXE')
+    base = None
+    if launcher_exe and os.path.exists(launcher_exe):
+        base = f'"{launcher_exe}"'
+    elif getattr(sys, 'frozen', False) and os.path.exists(sys.executable):
+        base = f'"{sys.executable}"'
+    if not base:
+        return None
+    return f'{base} {_STARTUP_MINIMIZED_FLAG}' if minimized else base
+
+def _read_startup_registry_command():
+    if sys.platform != 'win32':
+        return None
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _STARTUP_REGISTRY_KEY_PATH, 0, winreg.KEY_READ) as key:
+            value, _ = winreg.QueryValueEx(key, _STARTUP_REGISTRY_VALUE_NAME)
+            return value or None
+    except (OSError, ImportError):
+        return None
+    except Exception as e:
+        app_logger.warning(f"[Startup] Lecture du registre échouée: {e}")
+        return None
+
+def is_startup_enabled():
+    return bool(_read_startup_registry_command())
+
+def is_startup_minimized():
+    command = _read_startup_registry_command()
+    return bool(command) and _STARTUP_MINIMIZED_FLAG in command
+
+def set_startup_enabled(enabled, minimized=False):
+    if sys.platform != 'win32':
+        raise RuntimeError("Le démarrage automatique n'est disponible que sur Windows")
+    import winreg
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _STARTUP_REGISTRY_KEY_PATH, 0, winreg.KEY_SET_VALUE) as key:
+            if enabled:
+                command = _get_startup_launch_command(minimized=minimized)
+                if not command:
+                    raise RuntimeError("Impossible de déterminer le chemin de l'exécutable Stellio (build non figé ?)")
+                winreg.SetValueEx(key, _STARTUP_REGISTRY_VALUE_NAME, 0, winreg.REG_SZ, command)
+                mode = "réduit" if minimized else "fenêtre normale"
+                app_logger.info(f"[Startup] Démarrage automatique activé ({mode}): {command}")
+            else:
+                try:
+                    winreg.DeleteValue(key, _STARTUP_REGISTRY_VALUE_NAME)
+                    app_logger.info("[Startup] Démarrage automatique désactivé")
+                except FileNotFoundError:
+                    pass
+    except Exception as e:
+        app_logger.error(f"[Startup] Erreur lors de la mise à jour du registre: {e}")
+        raise
 
 
 _cache_saved = False
@@ -1083,6 +1118,36 @@ def init_db():
         FOREIGN KEY (printer_id) REFERENCES printers(id)
     )""")
     c.execute("CREATE INDEX IF NOT EXISTS idx_sos_diag_user_printer ON sos_print_diagnostics(user_id, printer_id, created_at)")
+
+    c.execute("""CREATE TABLE IF NOT EXISTS sos_print_conversations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        printer_id INTEGER,
+        material TEXT DEFAULT '',
+        description TEXT NOT NULL,
+        title TEXT DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'open',
+        candidate_causes TEXT DEFAULT '[]',
+        eliminated_causes TEXT DEFAULT '[]',
+        last_causes TEXT DEFAULT '[]',
+        resolution_note TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        resolved_at TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (printer_id) REFERENCES printers(id)
+    )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS sos_print_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id INTEGER NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT DEFAULT '',
+        image_filename TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (conversation_id) REFERENCES sos_print_conversations(id)
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_sos_conv_user_status ON sos_print_conversations(user_id, status, updated_at)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_sos_msg_conv ON sos_print_messages(conversation_id, created_at)")
     conn.commit()
 
     try:
@@ -1561,9 +1626,6 @@ BAMBU_RTSP_PORT322_MODELS = {'X1', 'X1C', 'X1E', 'X2D', 'H2D', 'H2S', 'H2C', 'P2
 
 
 def _generate_bambu_rtsp_mjpeg_stream(ip, access_code):
-    """Convertit le flux RTSPS (port 322, modèles X1/X2/H2) en MJPEG via
-    ffmpeg, au même format multipart que _generate_bambu_mjpeg_stream()
-    pour que le front (<img src=".../camera/stream">) n'ait rien à changer."""
     ffmpeg_path = FFMPEG_TOOL
     if not ffmpeg_path:
         app_logger.warning("[Bambu Camera RTSP] ffmpeg introuvable (bin/ ou PATH) — flux caméra indisponible pour ce modèle")
@@ -1761,8 +1823,6 @@ class ElegooSDCPConnection:
             app_logger.info(f"[Elegoo SDCP] Erreur parsing (printer #{self.pid}): {e}")
 
     def request_video(self, timeout=4):
-        """Demande au firmware l'ouverture du flux vidéo (Cmd 386 du protocole SDCP)
-        et attend la réponse (VideoUrl en MJPEG, ou Ack=2 si l'imprimante n'a pas de caméra)."""
         if not self.is_connected:
             return None, None
         with self.lock:
@@ -2290,11 +2350,6 @@ def _ensure_elegoo_cc2_connection(db_row):
 
 
 def _fetch_klipper_spoolman_active_spool(base):
-    """Interroge le composant Moonraker 'spoolman' (si activé côté Klipper)
-    pour connaître la bobine active définie via SPOOLMAN_SET_ACTIVE_SPOOL,
-    puis résout ses détails (matière, couleur, poids restant) auprès du
-    serveur Spoolman configuré dans les réglages Stellio — exactement ce
-    qu'affichent Mainsail/Fluidd sous forme de badge bobine active."""
     try:
         r = requests.get(f"{base}/printer/objects/query?spoolman", timeout=3)
         if not r.ok:
@@ -3370,13 +3425,8 @@ def process_generation_queue():
                 time.sleep(5)
 
     def thumbnail_coverage_supervisor():
-        """Tourne en continu en tâche de fond, indépendamment du scroll/de
-        l'interface : compare le nombre de fichiers connus au nombre de
-        miniatures réellement présentes sur le disque, et remet en queue
-        tout ce qui manque. Ne relâche l'inhibition de veille (cf.
-        _prevent_system_sleep) que lorsque les deux nombres sont égaux."""
         _lower_thread_priority()
-        time.sleep(15)  # laisse le temps au premier scan/démarrage de finir
+        time.sleep(15)  
         app_logger.info("[THUMBS] Superviseur de couverture démarré")
         while True:
             try:
@@ -3522,10 +3572,6 @@ def _resolve_3mf_plate_mesh(source, wanted_ids):
                 return found if found else el.findall(tag)
 
             def _get_path_attr(el):
-                # Extension "Production" du 3MF (Bambu Studio / OrcaSlicer) :
-                # un <item> ou <component> peut référencer un objet défini
-                # dans un AUTRE fichier .model via l'attribut p:path, plutôt
-                # que dans le fichier courant.
                 return el.get(f'{{{NS_PROD}}}path') or el.get('path')
 
             def _resolve_part_name(raw_path, referer):
@@ -3558,12 +3604,6 @@ def _resolve_3mf_plate_mesh(source, wanted_ids):
                 except Exception:
                     return np.eye(4)
 
-            # -- Parsing PARESSEUX avec cache : un fichier .model n'est
-            # réellement lu/parsé que la première fois qu'on en a besoin.
-            # Essentiel sur les fichiers Bambu Studio/OrcaSlicer où chaque
-            # plateau vit dans son propre fichier "3D/Objects/xxx.model" —
-            # parfois plusieurs dizaines/centaines de Mo — pour ne jamais
-            # toucher ceux qui ne concernent pas le plateau demandé.
             _tree_cache = {}
             _objs_cache = {}
 
@@ -3641,10 +3681,6 @@ def _resolve_3mf_plate_mesh(source, wanted_ids):
                         out.extend(_resolve(target_file, comp_id, transform @ comp_tf, depth + 1))
                 return out
 
-            # Le fichier racine conventionnel du 3MF est "3D/3dmodel.model" —
-            # c'est lui qui contient le <build>. On le privilégie pour ne
-            # JAMAIS avoir à ouvrir les gros fichiers d'objets juste pour
-            # vérifier s'ils contiennent un <build> (ils n'en ont jamais).
             preferred_root = next((n for n in model_files if n.lower() == '3d/3dmodel.model'), None)
             root_candidates = [preferred_root] if preferred_root else model_files
 
@@ -3820,23 +3856,6 @@ def load_3mf_mesh(source, plate_index=None):
 
 
 def _build_multiplate_overview_mesh(source, max_plates=12):
-    """
-    Construit un mesh de "vue d'ensemble" pour un 3MF multi-plateaux : chaque
-    plateau est isolé séparément (comme pour le viewer), puis disposé côte à
-    côte dans une grille — sans fusionner les pièces de plateaux différents
-    entre elles (chaque plateau garde ses propres pièces à sa place, juste
-    décalé pour ne pas se superposer aux autres).
-
-    Utilise volontairement UNIQUEMENT la résolution XML directe (rapide) pour
-    chaque plateau, pas le repli lent via trimesh.load : sur un fichier où la
-    résolution XML échoue déjà pour un plateau seul, la retenter en boucle
-    pour N plateaux serait beaucoup trop long pour une miniature. Un plateau
-    dont la résolution rapide échoue est simplement omis de la vue d'ensemble
-    plutôt que de bloquer tout le rendu.
-
-    Retourne None si moins de 2 plateaux ont pu être résolus (dans ce cas
-    l'appelant retombe sur le comportement standard : plateau 1 uniquement).
-    """
     try:
         display_name = "archive (mémoire)" if isinstance(source, (bytes, bytearray)) else os.path.basename(source)
 
@@ -3858,8 +3877,6 @@ def _build_multiplate_overview_mesh(source, max_plates=12):
         if len(resolved) < 2:
             return None
 
-        # Taille de cellule de grille = plus grande empreinte XY parmi les
-        # plateaux résolus, avec une marge pour ne pas coller les plateaux.
         max_extent = 0.0
         for _, mesh in resolved:
             ext = mesh.bounds[1][:2] - mesh.bounds[0][:2]
@@ -4062,24 +4079,12 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
                         f"rendu du mesh complet ({faces_before} faces)"
                     )
 
-            # Centrage par le centre de la bounding box (cadrage géométrique
-            # simple et robuste pour une vignette, peu importe la topologie
-            # du mesh — contrairement à mesh.centroid qui pondère par aire
-            # de face et peut donc être décentré sur un mesh très asymétrique).
             bbox_center = mesh.bounds.mean(axis=0)
             mesh.apply_translation(-bbox_center)
             rot_fix = tra.rotation_matrix(np.radians(-90), [1, 0, 0])
             mesh.apply_transform(rot_fix)
 
             try:
-                # Sur un mesh multi-pièces (plusieurs objets détachés dans le
-                # même fichier), fix_normals() calcule le volume de chaque
-                # pièce individuellement pour corriger le sens de ses normales.
-                # Une pièce dégénérée (souvent introduite par la décimation
-                # ci-dessus) peut avoir un volume nul, ce qui déclenche des
-                # RuntimeWarning numpy inoffensives ("divide by zero" /
-                # "invalid value") — sans conséquence sur le résultat, mais
-                # bruyantes en console. On les filtre localement ici.
                 with warnings.catch_warnings():
                     warnings.filterwarnings(
                         'ignore', category=RuntimeWarning,
@@ -4959,13 +4964,6 @@ def api_get_account(platform):
 @app.route('/api/accounts/<platform>/key', methods=['GET'])
 @login_required
 def api_get_account_key(platform):
-    """Retourne la clé API en clair pour pré-remplir le champ d'édition côté UI.
-
-    Contrairement à GET /api/accounts/<platform> (qui masque la clé), cette
-    route la déchiffre — utilisée uniquement par showAccountKeyInput() côté
-    front pour l'édition. Sert exclusivement en local via la session déjà
-    authentifiée (@login_required), jamais exposée publiquement.
-    """
     platform = platform.lower()
     conn = get_db()
     try:
@@ -5496,10 +5494,6 @@ def reconcile_thumbnails_with_disk():
                             if _queue_thumb_task(normalized, thumb_path, priority='low'):
                                 requeued += 1
                     elif not f.get('has_thumb') and not real_has_thumb:
-                        # Fichier jamais traité (ni vraie miniature, ni fallback) :
-                        # c'est le cas typique d'un fichier nouvellement scanné dont
-                        # la tâche initiale s'est perdue (queue vidée avant traitement,
-                        # redémarrage de l'app, etc.). On le remet dans la queue.
                         if not _is_ignored_recently(normalized) and normalized not in seen_paths:
                             seen_paths.add(normalized)
                             thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
@@ -6641,19 +6635,6 @@ def _cleanup_empty_parent_dirs(file_path, stop_at_paths=None):
     return removed
 
 def _show_open_with_dialog_windows(file_path):
-    """Affiche la boîte de dialogue Windows native "Ouvrir avec" via l'API
-    officielle SHOpenWithDialog (shell32.dll), lancée dans un thread dédié
-    avec son propre appartement COM STA.
-
-    Contrairement à "rundll32 shell32.dll,OpenAs_RunDLL" (API interne non
-    documentée utilisée précédemment), SHOpenWithDialog :
-    - affiche TOUJOURS la boîte de dialogue, même si une association par
-      défaut existe déjà pour l'extension (OpenAs_RunDLL, elle, ouvrait
-      parfois silencieusement avec l'appli par défaut sans rien afficher) ;
-    - accepte le flag OAIF_HIDE_REGISTRATION qui masque la case "Toujours
-      utiliser cette application pour ouvrir les fichiers .xxx", ce
-      qu'aucune option de OpenAs_RunDLL ne permet de faire.
-    """
     import ctypes
     from ctypes import wintypes
 
@@ -6680,20 +6661,13 @@ def _show_open_with_dialog_windows(file_path):
             )
             hr = shell32.SHOpenWithDialog(None, ctypes.byref(info))
             if hr != 0:
-                # L'utilisateur a probablement annulé la boîte de dialogue
-                # (code d'annulation courant), ou une vraie erreur shell.
-                # On journalise en info, pas en erreur, pour ne pas polluer
-                # les logs à chaque annulation volontaire.
                 app_logger.info(f"[OpenWith] SHOpenWithDialog code retour: {hr:#x}")
         except Exception as e:
             app_logger.error(f"[OpenWith] SHOpenWithDialog a échoué: {e}")
         finally:
-            if hr_init in (0, 1):  # S_OK ou S_FALSE : CoUninitialize requis
+            if hr_init in (0, 1):  
                 ole32.CoUninitialize()
 
-    # Thread dédié car SHOpenWithDialog est modale (bloque jusqu'à la
-    # fermeture de la boîte par l'utilisateur) : on ne veut pas bloquer le
-    # thread de la requête Flask ni la réponse HTTP.
     threading.Thread(target=_worker, daemon=True).start()
 
 
@@ -6719,22 +6693,10 @@ def api_open_file_with():
 
         try:
             if sys.platform == 'win32':
-                # SHOpenWithDialog (API shell officielle) : affiche toujours
-                # la boîte "Ouvrir avec", contrairement à l'ancienne méthode
-                # rundll32 shell32.dll,OpenAs_RunDLL qui pouvait rouvrir
-                # silencieusement avec l'appli par défaut. Le flag
-                # OAIF_HIDE_REGISTRATION masque en plus la case "Toujours
-                # utiliser cette application".
                 _show_open_with_dialog_windows(file_path)
             elif sys.platform == 'darwin':
-                # macOS : pas de commande native pour forcer la popup "Ouvrir avec".
-                # On révèle le fichier dans le Finder, d'où l'utilisateur peut
-                # faire clic droit > Ouvrir avec.
                 subprocess.run(['open', '-R', file_path], check=False)
             else:
-                # Linux : pas d'équivalent universel selon l'environnement de bureau,
-                # on retente avec mimeopen si présent (propose une liste au choix),
-                # sinon on retombe sur l'appli par défaut.
                 if shutil.which('mimeopen'):
                     subprocess.run(['mimeopen', '-a', file_path], check=False)
                 else:
@@ -7757,10 +7719,6 @@ VIEWER_ORIENTATION_ROTATIONS = {
 }
 
 def _export_reoriented_mesh(file_path, orientation_key):
-    """Applique la rotation choisie dans le viewer 3D à une copie du mesh et
-    l'exporte dans un fichier STL temporaire. Retourne le chemin du fichier
-    temporaire, ou None si l'orientation est 'default'/inconnue ou si le
-    fichier n'est pas un format mesh supporté par trimesh."""
     if not orientation_key or orientation_key == 'default':
         return None
     axis_deg = VIEWER_ORIENTATION_ROTATIONS.get(orientation_key)
@@ -8395,9 +8353,6 @@ _SLICER_FAMILY_BY_FILENAME = {
 
 
 def _resolve_slicer_family(slicer_path, slicer_name):
-    """Retrouve la famille CLI du slicer réellement lancé, en comparant sans
-    tenir compte de la casse (l'exécutable trouvé sur le disque et le nom
-    stocké dans les réglages n'ont pas toujours exactement la même casse)."""
     basename = os.path.basename(slicer_path).lower() if slicer_path else ''
     return (_SLICER_FAMILY_BY_FILENAME.get(basename)
             or _SLICER_FAMILY_BY_FILENAME.get((slicer_name or '').lower()))
@@ -8408,10 +8363,6 @@ _SLICER_LOAD_INI_FAMILIES = ('prusaslicer', 'superslicer')
 
 
 def _resolve_slicer_profile_paths(slicer_family, printer_id, material_type=None):
-    """Retrouve, parmi les profils importés, ceux rattachés à l'imprimante
-    choisie dans la popup "Envoyer au Slicer" et compatibles avec le slicer
-    détecté, pour pouvoir les repasser en ligne de commande. Retourne
-    (settings_paths, filament_paths, matched_profile_ids)."""
     if not printer_id or not slicer_family:
         return [], [], []
 
@@ -8933,13 +8884,6 @@ def api_download_progress(download_id):
 @app.route('/api/download/cancel/<int:download_id>', methods=['POST'])
 @login_required
 def api_download_cancel(download_id):
-    """Marque un téléchargement en cours comme annulé.
-
-    Le thread qui écrit réellement les données (voir api_download_file)
-    vérifie ce flag entre chaque chunk et interrompt le téléchargement
-    au prochain passage — annulation "best effort", pas instantanée si
-    un gros chunk est déjà en cours de lecture réseau.
-    """
     was_active = download_id in active_downloads
     cancelled_downloads.add(download_id)
     active_downloads.pop(download_id, None)
@@ -11141,6 +11085,9 @@ def api_get_settings():
         settings.setdefault('ai_enabled', False)
         settings.setdefault('auto_scan_enabled', True)
         settings.setdefault('auto_scan_interval_minutes', 5)
+        settings['launch_at_startup_supported'] = (sys.platform == 'win32')
+        settings['launch_at_startup'] = is_startup_enabled()
+        settings['launch_minimized'] = is_startup_minimized() if settings['launch_at_startup'] else bool(settings.get('launch_minimized', False))
         return jsonify(settings), 200
     except Exception as e:
         app_logger.error(f"[API] Erreur non gérée: {e}")
@@ -11156,7 +11103,18 @@ def api_save_settings():
 
         current_settings = load_settings() or {}
         previous_spoolman_url = (current_settings.get('spoolman_url') or '').strip()
+
+        if 'launch_at_startup' in data or 'launch_minimized' in data:
+            startup_enabled = bool(data.get('launch_at_startup', current_settings.get('launch_at_startup', False)))
+            startup_minimized = bool(data.get('launch_minimized', current_settings.get('launch_minimized', False)))
+            try:
+                set_startup_enabled(startup_enabled, minimized=startup_minimized)
+            except Exception as e:
+                return jsonify({"error": f"Impossible de modifier le démarrage automatique: {e}"}), 500
+
         current_settings.update(data)
+        current_settings['launch_at_startup'] = is_startup_enabled()
+        current_settings['launch_minimized'] = is_startup_minimized() if current_settings['launch_at_startup'] else bool(data.get('launch_minimized', current_settings.get('launch_minimized', False)))
         save_settings(current_settings)
 
 
@@ -11182,7 +11140,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio-app"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.5.4"
+CURRENT_VERSION = "0.5.7"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
@@ -12701,12 +12659,182 @@ def _material_ref_block(material: str) -> str:
                 f"bed {ref['plateau']}, speed {ref['vitesse']}, fan {ref['ventilation']}.")
     return f"No known reference ranges for {material}: use general knowledge of this material."
 
+SOSPRINT_SOFT_QUESTIONS = 4
+SOSPRINT_HARD_MAX_QUESTIONS = 30
+
+def _sosprint_get_conversation(conv_id, user_id):
+    conn = get_db()
+    try:
+        conv = conn.execute(
+            "SELECT * FROM sos_print_conversations WHERE id=? AND user_id=?",
+            (conv_id, user_id)
+        ).fetchone()
+        if not conv:
+            return None, []
+        messages = conn.execute(
+            "SELECT * FROM sos_print_messages WHERE conversation_id=? ORDER BY created_at ASC, id ASC",
+            (conv_id,)
+        ).fetchall()
+        return conv, messages
+    finally:
+        conn.close()
+
+def _sosprint_touch_conversation(conv_id, **fields):
+    if not fields:
+        return
+    sets = ", ".join(f"{k}=?" for k in fields.keys())
+    values = list(fields.values()) + [conv_id]
+    conn = get_db()
+    try:
+        conn.execute(
+            f"UPDATE sos_print_conversations SET {sets}, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            values
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+def _sosprint_add_message(conv_id, role, content='', image_filename=None):
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO sos_print_messages (conversation_id, role, content, image_filename) VALUES (?, ?, ?, ?)",
+            (conv_id, role, content, image_filename)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+def _sosprint_conversation_photos_b64(conv_id, max_photos=3):
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """SELECT image_filename FROM sos_print_messages
+               WHERE conversation_id=? AND image_filename IS NOT NULL
+               ORDER BY created_at DESC, id DESC LIMIT ?""",
+            (conv_id, max_photos)
+        ).fetchall()
+    finally:
+        conn.close()
+    out = []
+    for r in rows:
+        path = os.path.join(SOSPRINT_CONV_PHOTOS_DIR, r['image_filename'])
+        try:
+            with open(path, 'rb') as f:
+                out.append(base64.b64encode(f.read()).decode('utf-8'))
+        except Exception:
+            continue
+    return out
+
+def _sosprint_resolved_reference_cases(user_id, material, description, exclude_conv_id=None, limit=3):
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """SELECT id, material, description, resolution_note, last_causes, updated_at
+               FROM sos_print_conversations
+               WHERE user_id=? AND status='resolved' AND resolution_note != ''
+               ORDER BY updated_at DESC LIMIT 40""",
+            (user_id,)
+        ).fetchall()
+    finally:
+        conn.close()
+
+    stopwords = {
+        'le','la','les','de','des','du','un','une','et','ou','a','au','aux','en','sur','dans',
+        'mon','ma','mes','avec','pour','ce','cette','ces','est','sont','plus','moins','tres',
+        'the','and','with','for','has','have','this','that'
+    }
+    desc_words = {
+        re.sub(r'[^a-zà-ÿ0-9]', '', w.lower())
+        for w in (description or '').split()
+    }
+    desc_words = {w for w in desc_words if len(w) >= 4 and w not in stopwords}
+
+    scored = []
+    for r in rows:
+        if exclude_conv_id and r['id'] == exclude_conv_id:
+            continue
+        score = 0
+        if (r['material'] or '').upper() == (material or '').upper():
+            score += 2
+        row_words = {
+            re.sub(r'[^a-zà-ÿ0-9]', '', w.lower())
+            for w in (r['description'] or '').split()
+        }
+        score += len(desc_words & row_words)
+        if score > 0:
+            scored.append((score, r))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    out = []
+    for score, r in scored[:limit]:
+        try:
+            causes = json.loads(r['last_causes']) if r['last_causes'] else []
+        except Exception:
+            causes = []
+        out.append({
+            "description": r['description'],
+            "resolution_note": r['resolution_note'],
+            "causes": causes,
+        })
+    return out
+
+def _sosprint_reference_cases_block(cases: list) -> str:
+    if not cases:
+        return ""
+    lines = []
+    for c in cases:
+        lines.append(
+            f"- Problem: \"{(c['description'] or '')[:150]}\" → Confirmed working fix: "
+            f"\"{(c['resolution_note'] or '')[:200]}\""
+        )
+    return (
+        "Reference: this user has already SOLVED these similar problems before (confirmed fixes, "
+        "not just hypotheses). Give them real weight if they match the current case:\n"
+        + "\n".join(lines) + "\n"
+    )
+
+def _sosprint_section(raw_text: str, start_marker: str, end_marker: str = None) -> str:
+    idx = raw_text.upper().find(start_marker.upper())
+    if idx == -1:
+        return ""
+    start = idx + len(start_marker)
+    if end_marker:
+        end_idx = raw_text.upper().find(end_marker.upper(), start)
+        if end_idx != -1:
+            return raw_text[start:end_idx].strip()
+    return raw_text[start:].strip()
+
+def _sosprint_parse_causes(block: str, max_items: int = 6) -> list:
+    causes = []
+    for line in block.splitlines():
+        line = line.strip()
+        line = re.sub(r'^[-*•]\s*', '', line)
+        line = re.sub(r'^\d+[\.\)]\s*', '', line)
+        line = line.strip(' .')
+        if line:
+            causes.append(line)
+        if len(causes) >= max_items:
+            break
+    return causes
+
+def _sosprint_parse_eliminated(block: str) -> list:
+    first_line = block.splitlines()[0].strip() if block.strip() else ''
+    if not first_line or first_line.strip('. ').lower() in ('none', 'aucun', 'aucune'):
+        return []
+    return [e.strip(' .') for e in first_line.split(',') if e.strip(' .')]
+
 @app.route('/api/ollama/sos-print/questions', methods=['POST'])
 @login_required
 def api_ollama_sos_print_questions():
     data        = request.json or {}
     material    = (data.get('material') or 'PLA').strip()
     description = (data.get('description') or '').strip()[:600]
+    printer_id  = data.get('printer_id') or None
+    try:
+        printer_id = int(printer_id) if printer_id else None
+    except (TypeError, ValueError):
+        printer_id = None
 
     if not description:
         return jsonify({"error": "Merci de décrire le problème rencontré"}), 400
@@ -12715,34 +12843,199 @@ def api_ollama_sos_print_questions():
     lang_name = LANG_NAMES.get(lang, lang)
     ref_block = _material_ref_block(material)
 
+    reference_cases = _sosprint_resolved_reference_cases(session['user_id'], material, description)
+    reference_block = _sosprint_reference_cases_block(reference_cases)
+
     prompt = (
-        f"FDM 3D printing expert. Material: {material}. {ref_block}\n"
+        f"FDM 3D printing expert conducting a diagnostic investigation, like a detective narrowing "
+        f"down a list of suspects one clue at a time. Material: {material}. {ref_block}\n"
         f"Problem described by the user: \"{description}\"\n"
-        f"Before diagnosing, you need 2 to 3 short clarifying questions to ask the user — "
-        f"only questions whose answer would change your diagnosis, about things the user "
-        f"didn't already mention (e.g. Z-offset, bed leveling, bed surface type, first layer "
-        f"speed, nozzle cleanliness, enclosure, humidity storage). Do not ask about anything "
-        f"already stated in the problem description.\n"
-        f"Each question must be short and answerable in one line.\n"
+        f"{reference_block}"
+        f"Step 1 — list 4 to 6 short plausible causes (hypotheses) for this problem, most likely "
+        f"first, each as a very short label (3-6 words, no explanation). If a reference case above "
+        f"clearly matches, make its confirmed cause one of the top hypotheses.\n"
+        f"Step 2 — pick ONE single clarifying question: the one whose answer would rule out the "
+        f"most hypotheses above. Ask about something the user didn't already mention (e.g. "
+        f"Z-offset, bed leveling, bed surface type, first layer speed, nozzle cleanliness, "
+        f"enclosure, humidity storage, retraction settings, print speed, cooling, hotend "
+        f"cleaning history). Do not ask about anything already stated in the problem description.\n"
+        f"The question must be short and answerable in one line.\n"
         f"Strict format, nothing else:\n"
-        f"1. [Question]\n"
-        f"2. [Question]\n"
-        f"3. [Question]\n"
+        f"CAUSES:\n"
+        f"- [Cause 1]\n"
+        f"- [Cause 2]\n"
+        f"- [Cause 3]\n"
+        f"- [Cause 4]\n"
+        f"QUESTION: [Question]\n"
         f"IMPORTANT: Write your entire response in {lang_name}."
     )
-    system = f"You are an expert in 3D printing failure diagnosis. Ask only the most useful clarifying questions. Be concise. Always reply in {lang_name}."
+    system = (
+        f"You are an expert in 3D printing failure diagnosis conducting a step-by-step "
+        f"investigation, one discriminating question at a time. Be concise. Always reply in {lang_name}."
+    )
 
     try:
-        raw_text, source = _call_ai(prompt, system=system, num_predict=150, temperature=0.2)
-        questions = []
-        for b in re.split(r'\n?\s*(?=\d+[\.\)]\s)', raw_text):
-            b = b.strip()
-            m = re.match(r'^\d+[\.\)]\s*(.+)$', b, re.DOTALL)
-            if m:
-                questions.append(m.group(1).strip())
-            if len(questions) >= 3:
-                break
-        return jsonify({"questions": questions, "raw": raw_text, "source": source}), 200
+        raw_text, source = _call_ai(prompt, system=system, num_predict=220, temperature=0.2)
+
+        causes_block = _sosprint_section(raw_text, 'CAUSES:', 'QUESTION:')
+        candidate_causes = _sosprint_parse_causes(causes_block)
+
+        question_block = _sosprint_section(raw_text, 'QUESTION:')
+        question = question_block.splitlines()[0].strip() if question_block else ''
+
+        conn = get_db()
+        try:
+            conn.execute(
+                """INSERT INTO sos_print_conversations
+                   (user_id, printer_id, material, description, title, status, candidate_causes)
+                   VALUES (?, ?, ?, ?, ?, 'open', ?)""",
+                (session['user_id'], printer_id, material, description,
+                 description[:80], json.dumps(candidate_causes))
+            )
+            conn.commit()
+            conversation_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        finally:
+            conn.close()
+        if question:
+            _sosprint_add_message(conversation_id, 'question', question)
+
+        return jsonify({
+            "conversation_id": conversation_id,
+            "candidate_causes": candidate_causes,
+            "question": question,
+            "reference_cases": reference_cases,
+            "raw": raw_text,
+            "source": source
+        }), 200
+    except AIDisabledError as e:
+        return jsonify({"error": str(e), "ai_disabled": True}), 403
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 503
+    except Exception as e:
+        app_logger.error(f"[SosPrint] {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+@app.route('/api/ollama/sos-print/next-question', methods=['POST'])
+@login_required
+def api_ollama_sos_print_next_question():
+    data             = request.json or {}
+    material         = (data.get('material') or 'PLA').strip()
+    description      = (data.get('description') or '').strip()[:600]
+    qa_history       = data.get('qa_history') or []
+    candidate_causes = data.get('candidate_causes') or []
+    conversation_id  = data.get('conversation_id') or None
+    user_wants_conclusion = bool(data.get('conclude_now'))
+
+    if not description:
+        return jsonify({"error": "Merci de décrire le problème rencontré"}), 400
+    if not isinstance(candidate_causes, list):
+        candidate_causes = []
+    candidate_causes = [str(c).strip()[:120] for c in candidate_causes if str(c).strip()][:8]
+
+    if conversation_id and qa_history:
+        last_qa = qa_history[-1]
+        if isinstance(last_qa, dict) and last_qa.get('answer'):
+            _sosprint_add_message(conversation_id, 'answer', str(last_qa['answer'])[:500])
+
+    qa_lines = []
+    for qa in qa_history:
+        if isinstance(qa, dict) and qa.get('question') and qa.get('answer'):
+            qa_lines.append(f"- {qa['question']} → {qa['answer']}")
+    qa_block = "\n".join(qa_lines) if qa_lines else "(none yet)"
+    asked_count = len(qa_lines)
+    force_conclusion = user_wants_conclusion or asked_count >= SOSPRINT_HARD_MAX_QUESTIONS
+
+    lang      = get_user_lang()
+    lang_name = LANG_NAMES.get(lang, lang)
+    ref_block = _material_ref_block(material)
+    causes_block = "\n".join(f"- {c}" for c in candidate_causes) if candidate_causes else "(none listed yet)"
+
+    if force_conclusion:
+        instruction = (
+            "Do NOT ask another question — conclude now: decide which hypotheses the answers above "
+            "rule out.\n"
+        )
+    elif asked_count >= SOSPRINT_SOFT_QUESTIONS:
+        instruction = (
+            f"You have already asked {asked_count} questions. Only ask one more if it would genuinely "
+            f"and significantly narrow down the remaining hypotheses; otherwise conclude now rather than "
+            f"asking for the sake of it.\n"
+        )
+    else:
+        instruction = (
+            "Decide whether you now have enough information to conclude with confidence, or whether "
+            "one more clarifying question would meaningfully rule out more hypotheses.\n"
+        )
+
+    prompt = (
+        f"FDM 3D printing expert continuing a step-by-step diagnostic investigation. "
+        f"Material: {material}. {ref_block}\n"
+        f"Problem described by the user: \"{description}\"\n"
+        f"Current suspect list (hypotheses):\n{causes_block}\n"
+        f"Questions already asked and answered so far:\n{qa_block}\n"
+        f"{instruction}"
+        f"Strict format, nothing else. If concluding, write exactly:\n"
+        f"STATUS: DONE\n"
+        f"ELIMINATED: [comma-separated hypotheses from the suspect list ruled out by the answers "
+        f"above, or 'none']\n"
+        f"If asking another question, write exactly:\n"
+        f"STATUS: QUESTION\n"
+        f"ELIMINATED: [comma-separated hypotheses from the suspect list ruled out so far by the "
+        f"answers above, or 'none']\n"
+        f"QUESTION: [one short new clarifying question, not already asked, whose answer would rule "
+        f"out the most remaining hypotheses]\n"
+        f"IMPORTANT: Write your entire response in {lang_name}."
+    )
+    system = (
+        f"You are an expert in 3D printing failure diagnosis, conducting an investigation and "
+        f"eliminating hypotheses one answer at a time, like ruling out suspects. Be concise. "
+        f"Always reply in {lang_name}."
+    )
+
+    try:
+        raw_text, source = _call_ai(prompt, system=system, num_predict=200, temperature=0.2)
+
+        status_block = _sosprint_section(raw_text, 'STATUS:', 'ELIMINATED:')
+        is_done = force_conclusion or 'DONE' in status_block.upper()
+
+        eliminated_block = _sosprint_section(
+            raw_text, 'ELIMINATED:', None if is_done else 'QUESTION:'
+        )
+        eliminated = [
+            e for e in _sosprint_parse_eliminated(eliminated_block)
+            if any(e.lower() in c.lower() or c.lower() in e.lower() for c in candidate_causes)
+        ] or [e for e in _sosprint_parse_eliminated(eliminated_block)]
+        remaining_causes = [c for c in candidate_causes if c not in eliminated] or candidate_causes
+
+        if conversation_id:
+            _sosprint_touch_conversation(
+                conversation_id,
+                candidate_causes=json.dumps(remaining_causes),
+                eliminated_causes=json.dumps(eliminated),
+            )
+
+        if not is_done:
+            question_block = _sosprint_section(raw_text, 'QUESTION:')
+            question = question_block.splitlines()[0].strip() if question_block else ''
+            if question:
+                if conversation_id:
+                    _sosprint_add_message(conversation_id, 'question', question)
+                return jsonify({
+                    "status": "question",
+                    "question": question,
+                    "eliminated": eliminated,
+                    "candidate_causes": remaining_causes,
+                    "conversation_id": conversation_id,
+                    "source": source
+                }), 200
+
+        return jsonify({
+            "status": "done",
+            "eliminated": eliminated,
+            "candidate_causes": remaining_causes,
+            "conversation_id": conversation_id,
+            "source": source
+        }), 200
     except AIDisabledError as e:
         return jsonify({"error": str(e), "ai_disabled": True}), 403
     except RuntimeError as e:
@@ -12765,32 +13058,69 @@ def _prepare_sosprint_photo_b64(file_storage) -> str:
         app_logger.warning(f"[SosPrint] Photo illisible, ignorée: {e}")
         return None
 
+def _save_sosprint_conversation_photo(file_storage) -> str:
+    ext = os.path.splitext(file_storage.filename or '')[1].lower()
+    if ext not in ('.jpg', '.jpeg', '.png', '.webp'):
+        ext = '.jpg'
+    image_filename = f"{uuid.uuid4().hex}{ext}"
+    dest_path = os.path.join(SOSPRINT_CONV_PHOTOS_DIR, image_filename)
+    try:
+        file_storage.stream.seek(0)
+        img = Image.open(file_storage.stream).convert('RGB')
+        img.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+        img.save(dest_path, format='JPEG', quality=85)
+        return image_filename
+    except Exception as e:
+        app_logger.warning(f"[SosPrint] Échec sauvegarde photo conversation: {e}")
+        return None
+
 @app.route('/api/ollama/sos-print', methods=['POST'])
 @login_required
 def api_ollama_sos_print():
     image_b64 = None
     is_multipart = request.content_type and 'multipart/form-data' in request.content_type
+    conversation_id = None
+    saved_photo_filename = None
 
     if is_multipart:
         material    = (request.form.get('material') or 'PLA').strip()
         description = (request.form.get('description') or '').strip()[:600]
         printer_id  = request.form.get('printer_id') or None
+        conversation_id = request.form.get('conversation_id') or None
         try:
             answers = json.loads(request.form.get('answers') or '[]')
         except Exception:
             answers = []
+        try:
+            candidate_causes = json.loads(request.form.get('candidate_causes') or '[]')
+        except Exception:
+            candidate_causes = []
         photo = request.files.get('photo')
         if photo and photo.filename:
+            photo.stream.seek(0)
             image_b64 = _prepare_sosprint_photo_b64(photo)
+            photo.stream.seek(0)
+            saved_photo_filename = _save_sosprint_conversation_photo(photo)
     else:
-        data        = request.json or {}
-        material    = (data.get('material') or 'PLA').strip()
-        description = (data.get('description') or '').strip()[:600]
-        answers     = data.get('answers') or []
-        printer_id  = data.get('printer_id') or None
+        data             = request.json or {}
+        material         = (data.get('material') or 'PLA').strip()
+        description      = (data.get('description') or '').strip()[:600]
+        answers          = data.get('answers') or []
+        printer_id       = data.get('printer_id') or None
+        candidate_causes = data.get('candidate_causes') or []
+        conversation_id  = data.get('conversation_id') or None
+
+    if not isinstance(candidate_causes, list):
+        candidate_causes = []
+    candidate_causes = [str(c).strip()[:120] for c in candidate_causes if str(c).strip()][:8]
 
     if not description:
         return jsonify({"error": "Merci de décrire le problème rencontré"}), 400
+
+    try:
+        conversation_id = int(conversation_id) if conversation_id else None
+    except (TypeError, ValueError):
+        conversation_id = None
 
     printer_name = None
     if printer_id:
@@ -12861,16 +13191,40 @@ def api_ollama_sos_print():
         if qa_lines:
             qa_block = "Additional clarifications from the user:\n" + "\n".join(qa_lines) + "\n"
 
-    photo_instruction = (
-        "A photo of the failed/problematic print is attached — examine it carefully and factor "
-        "in what you visually observe (layer adhesion, warping, stringing, blobs, geometry "
-        "issues, etc.) into your diagnosis.\n" if image_b64 else ""
+    if conversation_id and saved_photo_filename:
+        _sosprint_add_message(conversation_id, 'photo', '', image_filename=saved_photo_filename)
+
+    conversation_images = []
+    if conversation_id:
+        conversation_images = _sosprint_conversation_photos_b64(conversation_id, max_photos=3)
+    if not conversation_images and image_b64:
+        conversation_images = [image_b64]
+
+    reference_cases = _sosprint_resolved_reference_cases(
+        session['user_id'], material, description, exclude_conv_id=conversation_id
     )
+    reference_block = _sosprint_reference_cases_block(reference_cases)
+
+    photo_instruction = (
+        "One or more photos of the failed/problematic print are attached — examine them carefully "
+        "and factor in what you visually observe (layer adhesion, warping, stringing, blobs, "
+        "geometry issues, etc.) into your diagnosis.\n" if conversation_images else ""
+    )
+
+    investigation_block = ""
+    if candidate_causes:
+        investigation_block = (
+            f"The clarifying investigation above already narrowed the likely hypotheses down to: "
+            f"{', '.join(candidate_causes)}. Prioritize your final diagnosis among these unless the "
+            f"description, answers, or photo clearly point elsewhere.\n"
+        )
 
     prompt = (
         f"FDM 3D printing expert. Material: {material}. {ref_block}\n"
         f"Problem described by the user: \"{description}\"\n"
         f"{qa_block}"
+        f"{investigation_block}"
+        f"{reference_block}"
         f"{history_block}"
         f"{photo_instruction}"
         f"Give the 3 most likely causes, ranked by likelihood, each with a concrete fix. "
@@ -12885,7 +13239,7 @@ def api_ollama_sos_print():
     try:
         raw_text, source = _call_ai(
             prompt, system=system, num_predict=400, temperature=0.2,
-            images=[image_b64] if image_b64 else None
+            images=conversation_images or None
         )
         causes = []
         for b in re.split(r'\n?\s*(?=\d+[\.\)]\s)', raw_text):
@@ -12900,6 +13254,8 @@ def api_ollama_sos_print():
         if not causes:
             return jsonify({"error": "L'IA n'a retourné aucun diagnostic exploitable"}), 502
 
+        had_photo_final = bool(conversation_images) and source != 'ollama_no_vision'
+
         try:
             conn = get_db()
             try:
@@ -12908,7 +13264,7 @@ def api_ollama_sos_print():
                        (user_id, printer_id, material, description, causes, had_photo)
                        VALUES (?, ?, ?, ?, ?, ?)""",
                     (session['user_id'], printer_id, material, description,
-                     json.dumps(causes), bool(image_b64) and source != 'ollama_no_vision')
+                     json.dumps(causes), had_photo_final)
                 )
                 conn.commit()
             finally:
@@ -12916,15 +13272,21 @@ def api_ollama_sos_print():
         except Exception as e:
             app_logger.warning(f"[SosPrint] Échec enregistrement historique: {e}")
 
+        if conversation_id:
+            _sosprint_add_message(conversation_id, 'diagnosis', json.dumps(causes))
+            _sosprint_touch_conversation(conversation_id, last_causes=json.dumps(causes))
+
         return jsonify({
             "causes": causes,
             "raw": raw_text,
             "source": source,
-            "had_photo": bool(image_b64) and source != 'ollama_no_vision',
-            "photo_ignored": bool(image_b64) and source == 'ollama_no_vision',
+            "had_photo": had_photo_final,
+            "photo_ignored": bool(conversation_images) and source == 'ollama_no_vision',
             "recurring": len(past_diagnostics) >= 2,
             "recurring_history": past_diagnostics if len(past_diagnostics) >= 2 else [],
-            "printer_name": printer_name
+            "printer_name": printer_name,
+            "conversation_id": conversation_id,
+            "reference_cases": reference_cases
         }), 200
     except AIDisabledError as e:
         return jsonify({"error": str(e), "ai_disabled": True}), 403
@@ -12933,6 +13295,189 @@ def api_ollama_sos_print():
     except Exception as e:
         app_logger.error(f"[SosPrint] {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+def _sosprint_serialize_conversation(conv, messages=None):
+    def _jl(v):
+        try:
+            return json.loads(v) if v else []
+        except Exception:
+            return []
+    out = {
+        "id": conv["id"],
+        "printer_id": conv["printer_id"],
+        "material": conv["material"],
+        "description": conv["description"],
+        "title": conv["title"] or conv["description"][:80],
+        "status": conv["status"],
+        "candidate_causes": _jl(conv["candidate_causes"]),
+        "eliminated_causes": _jl(conv["eliminated_causes"]),
+        "last_causes": _jl(conv["last_causes"]),
+        "resolution_note": conv["resolution_note"],
+        "created_at": conv["created_at"],
+        "updated_at": conv["updated_at"],
+        "resolved_at": conv["resolved_at"],
+    }
+    if messages is not None:
+        out["messages"] = [
+            {
+                "id": m["id"],
+                "role": m["role"],
+                "content": m["content"],
+                "image_url": f"/api/sos-print/conversations/photo/{m['image_filename']}" if m["image_filename"] else None,
+                "created_at": m["created_at"],
+            }
+            for m in messages
+        ]
+    return out
+
+
+@app.route('/api/sos-print/conversations', methods=['GET'])
+@login_required
+def api_sos_print_conversations_list():
+    status_filter = (request.args.get('status') or '').strip().lower()
+    conn = get_db()
+    try:
+        if status_filter in ('open', 'resolved'):
+            rows = conn.execute(
+                """SELECT * FROM sos_print_conversations WHERE user_id=? AND status=?
+                   ORDER BY updated_at DESC LIMIT 100""",
+                (session['user_id'], status_filter)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT * FROM sos_print_conversations WHERE user_id=?
+                   ORDER BY updated_at DESC LIMIT 200""",
+                (session['user_id'],)
+            ).fetchall()
+    finally:
+        conn.close()
+    return jsonify({"conversations": [_sosprint_serialize_conversation(r) for r in rows]}), 200
+
+
+@app.route('/api/sos-print/conversations/<int:conv_id>', methods=['GET'])
+@login_required
+def api_sos_print_conversation_get(conv_id):
+    conv, messages = _sosprint_get_conversation(conv_id, session['user_id'])
+    if not conv:
+        return jsonify({"error": "Conversation introuvable"}), 404
+    return jsonify(_sosprint_serialize_conversation(conv, messages)), 200
+
+
+@app.route('/api/sos-print/conversations/<int:conv_id>', methods=['DELETE'])
+@login_required
+def api_sos_print_conversation_delete(conv_id):
+    conn = get_db()
+    try:
+        conv = conn.execute(
+            "SELECT id FROM sos_print_conversations WHERE id=? AND user_id=?",
+            (conv_id, session['user_id'])
+        ).fetchone()
+        if not conv:
+            return jsonify({"error": "Conversation introuvable"}), 404
+        photo_rows = conn.execute(
+            "SELECT image_filename FROM sos_print_messages WHERE conversation_id=? AND image_filename IS NOT NULL",
+            (conv_id,)
+        ).fetchall()
+        conn.execute("DELETE FROM sos_print_messages WHERE conversation_id=?", (conv_id,))
+        conn.execute("DELETE FROM sos_print_conversations WHERE id=?", (conv_id,))
+        conn.commit()
+    finally:
+        conn.close()
+    for r in photo_rows:
+        try:
+            os.remove(os.path.join(SOSPRINT_CONV_PHOTOS_DIR, r['image_filename']))
+        except Exception:
+            pass
+    return jsonify({"success": True}), 200
+
+
+@app.route('/api/sos-print/conversations/photo/<path:filename>', methods=['GET'])
+@login_required
+def api_sos_print_conversation_photo(filename):
+    filename = os.path.basename(filename)
+    conn = get_db()
+    try:
+        owned = conn.execute(
+            """SELECT 1 FROM sos_print_messages m
+               JOIN sos_print_conversations c ON c.id = m.conversation_id
+               WHERE m.image_filename=? AND c.user_id=? LIMIT 1""",
+            (filename, session['user_id'])
+        ).fetchone()
+    finally:
+        conn.close()
+    if not owned:
+        return jsonify({"error": "Introuvable"}), 404
+    img_path = os.path.join(SOSPRINT_CONV_PHOTOS_DIR, filename)
+    if not os.path.exists(img_path):
+        return jsonify({"error": "Fichier image manquant"}), 404
+    return send_file(img_path)
+
+
+@app.route('/api/sos-print/conversations/<int:conv_id>/photo', methods=['POST'])
+@login_required
+def api_sos_print_conversation_add_photo(conv_id):
+    conv, _ = _sosprint_get_conversation(conv_id, session['user_id'])
+    if not conv:
+        return jsonify({"error": "Conversation introuvable"}), 404
+
+    photo = request.files.get('photo')
+    if not photo or not photo.filename:
+        return jsonify({"error": "Image requise"}), 400
+
+    note = (request.form.get('note') or '').strip()[:300]
+    saved_filename = _save_sosprint_conversation_photo(photo)
+    if not saved_filename:
+        return jsonify({"error": "Photo illisible ou format non supporté"}), 400
+
+    _sosprint_add_message(conv_id, 'photo', note, image_filename=saved_filename)
+    _sosprint_touch_conversation(conv_id)
+
+    return jsonify({
+        "success": True,
+        "image_url": f"/api/sos-print/conversations/photo/{saved_filename}"
+    }), 201
+
+
+@app.route('/api/sos-print/conversations/<int:conv_id>/resolve', methods=['POST'])
+@login_required
+def api_sos_print_conversation_resolve(conv_id):
+    conv, _ = _sosprint_get_conversation(conv_id, session['user_id'])
+    if not conv:
+        return jsonify({"error": "Conversation introuvable"}), 404
+
+    data = request.json or {}
+    resolution_note = (data.get('resolution_note') or '').strip()[:500]
+    if not resolution_note:
+        try:
+            last_causes = json.loads(conv['last_causes']) if conv['last_causes'] else []
+        except Exception:
+            last_causes = []
+        resolution_note = last_causes[0][:500] if last_causes else "Résolu"
+
+    _sosprint_touch_conversation(conv_id, status='resolved', resolution_note=resolution_note)
+    conn = get_db()
+    try:
+        conn.execute(
+            "UPDATE sos_print_conversations SET resolved_at=CURRENT_TIMESTAMP WHERE id=?",
+            (conv_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    if resolution_note:
+        _sosprint_add_message(conv_id, 'note', resolution_note)
+
+    return jsonify({"success": True}), 200
+
+
+@app.route('/api/sos-print/conversations/<int:conv_id>/reopen', methods=['POST'])
+@login_required
+def api_sos_print_conversation_reopen(conv_id):
+    conv, _ = _sosprint_get_conversation(conv_id, session['user_id'])
+    if not conv:
+        return jsonify({"error": "Conversation introuvable"}), 404
+    _sosprint_touch_conversation(conv_id, status='open')
+    return jsonify({"success": True}), 200
 
 
 @app.route('/api/ollama/semantic-search', methods=['POST'])
@@ -13488,9 +14033,6 @@ def api_slicer_profiles_assign_printer(profile_id):
 @app.route('/api/slicer-profiles/<profile_id>/type', methods=['PATCH'])
 @login_required
 def api_slicer_profiles_assign_type(profile_id):
-    """Permet de corriger manuellement la nature d'un profil (imprimante /
-    filament / réglages) quand la détection automatique s'est trompée —
-    ex. profil filament classé par erreur en 'réglages'."""
     data = request.json or {}
     new_type = str(data.get('profile_type') or '').strip().lower()
     if new_type not in ('printer', 'filament', 'process'):
@@ -15183,6 +15725,11 @@ if __name__ in ('__main__', 'stellio_main'):
     if not STELLIO_HEADLESS and sys.platform != 'win32' and not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
         STELLIO_HEADLESS = True
 
+    STELLIO_START_MINIMIZED = (
+        '--minimized' in sys.argv
+        or os.environ.get('STELLIO_START_MINIMIZED', '').strip().lower() in ('1', 'true', 'yes')
+    )
+
     if sys.platform == 'win32':
         try:
             sys.stdout.reconfigure(encoding='utf-8')
@@ -15543,7 +16090,7 @@ if __name__ in ('__main__', 'stellio_main'):
                 text_select=True,
                 background_color='#1a1d23',
                 min_size=(1024, 768),
-                maximized=True,
+                maximized=not STELLIO_START_MINIMIZED,
                 confirm_close=True,
                 js_api=StellioDesktopAPI()
             )
@@ -15567,6 +16114,18 @@ if __name__ in ('__main__', 'stellio_main'):
                 window.events.closing += _on_window_closing
             except Exception as ex:
                 app_logger.info(f"[INFO] Binding closing event impossible: {ex}")
+
+            if STELLIO_START_MINIMIZED:
+                def _minimize_on_shown():
+                    try:
+                        window.minimize()
+                        app_logger.info("[INFO] Démarrage en mode réduit")
+                    except Exception as ex:
+                        app_logger.info(f"[INFO] Minimisation au démarrage impossible: {ex}")
+                try:
+                    window.events.shown += _minimize_on_shown
+                except Exception as ex:
+                    app_logger.info(f"[INFO] Binding shown event impossible: {ex}")
 
             def _bind_drag_drop(win):
                 try:
