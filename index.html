@@ -684,6 +684,36 @@
                             </div>
                         </div>
 
+                        <div class="accord-section" id="startup-settings-section">
+                            <div class="accord-header" onclick="toggleAccord(this)">
+                                <span><i class="fa-solid fa-power-off"></i> <span data-i18n="settings.startup">Démarrage</span></span>
+                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                            </div>
+                            <div class="accord-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <div class="settings-row" style="align-items:flex-start;">
+                                    <div>
+                                        <label style="font-size:13px; font-weight:500;" data-i18n="settings.launch_at_startup">Lancer Stellio au démarrage de Windows</label>
+                                        <p class="settings-hint" style="margin-top:2px;" data-i18n="settings.launch_at_startup_hint">Stellio se lance automatiquement (en arrière-plan) à l'ouverture de session Windows.</p>
+                                    </div>
+                                    <label class="nav-toggle-switch" style="margin-top:2px;">
+                                        <input type="checkbox" id="launch-at-startup-toggle" onchange="toggleLaunchAtStartup(this.checked)">
+                                        <span class="nav-toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div id="launch-minimized-block" class="settings-row" style="align-items:flex-start;">
+                                    <div>
+                                        <label style="font-size:13px; font-weight:500;" data-i18n="settings.launch_minimized">Démarrer en mode réduit</label>
+                                        <p class="settings-hint" style="margin-top:2px;" data-i18n="settings.launch_minimized_hint">La fenêtre de Stellio démarre minimisée au lieu de s'ouvrir en plein écran.</p>
+                                    </div>
+                                    <label class="nav-toggle-switch" style="margin-top:2px;">
+                                        <input type="checkbox" id="launch-minimized-toggle" onchange="toggleLaunchMinimized(this.checked)">
+                                        <span class="nav-toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <p id="startup-unsupported-hint" class="settings-hint" style="display:none;" data-i18n="settings.launch_at_startup_unsupported">Disponible uniquement sur la version Windows de Stellio.</p>
+                            </div>
+                        </div>
+
                         <div class="accord-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-arrows-rotate"></i> <span data-i18n="settings.auto_scan">Scan automatique</span></span>
@@ -842,8 +872,8 @@
                                                     <strong data-i18n="settings.ollama_step2_title">Télécharger un modèle</strong>
                                                     <p data-i18n="settings.ollama_step2_text">Ouvrez une invite de commandes (Terminal / PowerShell) et lancez :</p>
                                                     <div class="ollama-guide-cmd">
-                                                        <code>ollama pull llama3</code>
-                                                        <button type="button" class="ollama-guide-copy" onclick="copyOllamaCmd(this, 'ollama pull llama3')" data-i18n-title="actions.copy" title="Copier">
+                                                        <code id="ollama-guide-pull-cmd">ollama pull llama3</code>
+                                                        <button type="button" class="ollama-guide-copy" id="ollama-guide-pull-copy" onclick="copyOllamaGuideCmd(this)" data-i18n-title="actions.copy" title="Copier">
                                                             <i class="fa-regular fa-copy"></i>
                                                         </button>
                                                     </div>
@@ -1377,6 +1407,22 @@
 						<span data-i18n="sosprint.ai_disabled">IA désactivée — réactivez-la dans Paramètres pour utiliser le diagnostic S.O.S print.</span>
 					</div>
 
+					<div class="sosprint-history-panel" id="sosprint-history-panel">
+						<button type="button" class="sosprint-history-toggle" id="sosprint-history-toggle">
+							<i class="fa-solid fa-clock-rotate-left"></i>
+							<span data-i18n="sosprint.history_title">Mes diagnostics</span>
+							<span class="sosprint-history-count" id="sosprint-history-count"></span>
+							<i class="fa-solid fa-chevron-down sosprint-history-chevron" id="sosprint-history-chevron"></i>
+						</button>
+						<div class="sosprint-history-body" id="sosprint-history-body" style="display:none;">
+							<div class="sosprint-history-tabs">
+								<button type="button" class="sosprint-history-tab active" data-status="open" data-i18n="sosprint.history_tab_open">En cours</button>
+								<button type="button" class="sosprint-history-tab" data-status="resolved" data-i18n="sosprint.history_tab_resolved">Résolus</button>
+							</div>
+							<div class="sosprint-history-list" id="sosprint-history-list"></div>
+						</div>
+					</div>
+
 					<div class="sosprint-container">
 						<form id="sosprint-form" class="sosprint-form">
 							<div class="input-group">
@@ -1439,14 +1485,33 @@
 							</button>
 						</form>
 
-						<div id="sosprint-questions" class="sosprint-questions" style="display:none;">
-							<h3><i class="fa-solid fa-circle-question"></i> <span data-i18n="sosprint.questions_title">Quelques précisions avant le diagnostic</span></h3>
-							<p class="sosprint-questions-hint" data-i18n="sosprint.questions_hint">Ces réponses permettent à l'IA de donner un diagnostic plus précis.</p>
-							<div id="sosprint-questions-list" class="sosprint-questions-list"></div>
+						<div id="sosprint-questions" class="sosprint-questions sosprint-investigation" style="display:none;">
+							<h3><i class="fa-solid fa-magnifying-glass"></i> <span data-i18n="sosprint.investigation_title">Enquête en cours</span></h3>
+							<p class="sosprint-questions-hint" data-i18n="sosprint.investigation_hint">L'IA affine son diagnostic question après question, en éliminant les causes les moins probables.</p>
+
+							<div id="sosprint-suspects-list" class="sosprint-suspects-list"></div>
+
+							<div class="sosprint-investigation-progress">
+								<span id="sosprint-question-counter"></span>
+							</div>
+
+							<div class="input-group sosprint-question-item">
+								<label id="sosprint-current-question-label" for="sosprint-current-answer"></label>
+								<input type="text" id="sosprint-current-answer" class="sosprint-answer-input" data-i18n-placeholder="sosprint.answer_placeholder" placeholder="Votre réponse...">
+							</div>
+
+							<div class="sosprint-investigation-photo-row">
+								<input type="file" id="sosprint-extra-photo-input" accept="image/jpeg,image/png,image/webp" hidden>
+								<button type="button" class="btn btn-ghost btn-sm" id="sosprint-add-photo-btn">
+									<i class="fa-solid fa-camera"></i> <span data-i18n="sosprint.add_photo_now">Ajouter une photo</span>
+								</button>
+								<span id="sosprint-extra-photo-status" class="sosprint-extra-photo-status"></span>
+							</div>
+
 							<div class="sosprint-questions-actions">
-								<button type="button" class="btn btn-ghost" id="sosprint-skip-questions-btn" data-i18n="sosprint.skip_questions">Passer ces questions</button>
-								<button type="button" class="btn btn-primary" id="sosprint-confirm-questions-btn">
-									<i class="fa-solid fa-stethoscope"></i> <span data-i18n="sosprint.run_diagnostic">Lancer le diagnostic</span>
+								<button type="button" class="btn btn-ghost" id="sosprint-skip-questions-btn" data-i18n="sosprint.conclude_now">Conclure maintenant</button>
+								<button type="button" class="btn btn-primary" id="sosprint-next-question-btn">
+									<i class="fa-solid fa-arrow-right"></i> <span data-i18n="sosprint.next_question">Suivant</span>
 								</button>
 							</div>
 						</div>
@@ -1456,9 +1521,32 @@
 							<div id="sosprint-recurring-hint-text"></div>
 						</div>
 
+						<div id="sosprint-reference-hint" style="display:none; align-items:flex-start; gap:8px; padding:10px 12px; margin-bottom:14px; background:#22c55e15; border:1px solid #22c55e40; border-radius:var(--radius); color:#22c55e; font-size:12.5px;">
+							<i class="fa-solid fa-circle-check" style="margin-top:2px;"></i>
+							<div id="sosprint-reference-hint-text"></div>
+						</div>
+
 						<div id="sosprint-result" class="sosprint-result" style="display:none;">
 							<h3><i class="fa-solid fa-list-check"></i> <span data-i18n="sosprint.result_title">Causes les plus probables</span></h3>
 							<div id="sosprint-causes-list" class="sosprint-causes-list"></div>
+
+							<div id="sosprint-resolve-box" class="sosprint-resolve-box">
+								<div id="sosprint-resolve-form">
+									<label for="sosprint-resolution-note" data-i18n="sosprint.resolve_prompt">Ce diagnostic a résolu votre problème ? Notez ce qui a fonctionné :</label>
+									<textarea id="sosprint-resolution-note" rows="2" maxlength="500" data-i18n-placeholder="sosprint.resolve_placeholder" placeholder="ex : c'était bien un problème de Z-offset, réglé à -0.15mm"></textarea>
+									<div class="sosprint-resolve-actions">
+										<button type="button" class="btn btn-primary btn-sm" id="sosprint-resolve-btn">
+											<i class="fa-solid fa-check"></i> <span data-i18n="sosprint.mark_resolved">Marquer comme résolu</span>
+										</button>
+										<button type="button" class="btn btn-ghost btn-sm" id="sosprint-not-resolved-btn">
+											<i class="fa-solid fa-rotate-left"></i> <span data-i18n="sosprint.not_resolved">Toujours pas résolu, continuer l'enquête</span>
+										</button>
+									</div>
+								</div>
+								<div id="sosprint-resolved-badge" style="display:none;">
+									<i class="fa-solid fa-circle-check"></i> <span data-i18n="sosprint.resolved_confirmation">Marqué comme résolu — cette solution pourra aider l'IA sur de futurs diagnostics.</span>
+								</div>
+							</div>
 						</div>
 
 						<div id="sosprint-empty-hint" class="sosprint-hint">

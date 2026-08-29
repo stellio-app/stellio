@@ -4381,6 +4381,7 @@ loadSlicerSettings();
 loadSpoolmanSettings();
 loadOllamaSettings();
 loadAutoScanSettings();
+loadStartupSettings();
 loadPrintCostSettings();
 loadAccountBadges();
 loadNavOrder();
@@ -4638,6 +4639,86 @@ async function loadAutoScanSettings() {
     } catch (e) { console.warn('[AutoScan] Réglages indisponibles'); }
 }
 
+function applyLaunchAtStartupUI(enabled, supported) {
+    const block = document.getElementById('launch-minimized-block');
+    if (block) {
+        const active = enabled && supported;
+        block.style.opacity = active ? '1' : '0.45';
+        block.style.pointerEvents = active ? 'auto' : 'none';
+    }
+}
+
+async function toggleLaunchAtStartup(enabled) {
+    const supported = document.getElementById('launch-at-startup-toggle')?.disabled !== true;
+    applyLaunchAtStartupUI(enabled, supported);
+    try {
+        const res = await fetch(`${API}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ launch_at_startup: enabled })
+        });
+        if (res.ok) {
+            showToast(enabled ? I18N.t('toast.launch_at_startup_enabled') : I18N.t('toast.launch_at_startup_disabled'), 'success');
+        } else {
+            const toggle = document.getElementById('launch-at-startup-toggle');
+            if (toggle) toggle.checked = !enabled;
+            applyLaunchAtStartupUI(!enabled, supported);
+            showToast(I18N.t('toast.save_error'), 'error');
+        }
+    } catch (_) {
+        const toggle = document.getElementById('launch-at-startup-toggle');
+        if (toggle) toggle.checked = !enabled;
+        applyLaunchAtStartupUI(!enabled, supported);
+        showToast(I18N.t('toast.network_error'), 'error');
+    }
+}
+window.toggleLaunchAtStartup = toggleLaunchAtStartup;
+
+async function toggleLaunchMinimized(enabled) {
+    try {
+        const res = await fetch(`${API}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ launch_minimized: enabled })
+        });
+        if (res.ok) {
+            showToast(I18N.t('toast.settings_saved'), 'success');
+        } else {
+            const toggle = document.getElementById('launch-minimized-toggle');
+            if (toggle) toggle.checked = !enabled;
+            showToast(I18N.t('toast.save_error'), 'error');
+        }
+    } catch (_) {
+        const toggle = document.getElementById('launch-minimized-toggle');
+        if (toggle) toggle.checked = !enabled;
+        showToast(I18N.t('toast.network_error'), 'error');
+    }
+}
+window.toggleLaunchMinimized = toggleLaunchMinimized;
+
+async function loadStartupSettings() {
+    try {
+        const res = await fetch(`${API}/api/settings`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const toggle = document.getElementById('launch-at-startup-toggle');
+        const minimizedToggle = document.getElementById('launch-minimized-toggle');
+        const unsupportedHint = document.getElementById('startup-unsupported-hint');
+        const supported = data.launch_at_startup_supported === true;
+        const enabled = data.launch_at_startup === true;
+        if (toggle) {
+            toggle.checked = enabled;
+            toggle.disabled = !supported;
+        }
+        if (minimizedToggle) {
+            minimizedToggle.checked = data.launch_minimized === true;
+            minimizedToggle.disabled = !supported;
+        }
+        applyLaunchAtStartupUI(enabled, supported);
+        if (unsupportedHint) unsupportedHint.style.display = supported ? 'none' : 'block';
+    } catch (e) { console.warn('[Startup] Réglages indisponibles'); }
+}
+
 
 let printCostSpools = [];
 let printCostDefaultSpoolId = null;
@@ -4862,6 +4943,12 @@ function copyOllamaCmd(btn, text) {
     }).catch(() => showToast(I18N.t('toast.error'), 'error'));
 }
 
+function copyOllamaGuideCmd(btn) {
+    const code = document.getElementById('ollama-guide-pull-cmd');
+    if (!code) return;
+    copyOllamaCmd(btn, code.textContent.trim());
+}
+
 function ollamaErrorMessage(data, res) {
     const codeMap = {
         ollama_unreachable: 'settings.ollama_err_unreachable',
@@ -4942,6 +5029,13 @@ async function recommendOllamaModel() {
 
         const hw = data.hardware || {};
         const rec = data.recommendation || {};
+
+        // La commande d'installation affichée dans le guide (étape 2) doit toujours pointer
+        // vers le modèle réellement recommandé, pas un "llama3" générique par défaut.
+        const guideCmdEl = document.getElementById('ollama-guide-pull-cmd');
+        if (guideCmdEl) {
+            guideCmdEl.textContent = rec.pull_command || (rec.model ? `ollama pull ${rec.model}` : guideCmdEl.textContent);
+        }
 
         const hwParts = [];
         hwParts.push(`<i class="fa-solid fa-microchip"></i> ${I18N.t('settings.ollama_hw_cores', { count: hw.cpu_cores || '?' })}`);
@@ -5086,8 +5180,15 @@ window.ollamaAutoTag        = ollamaAutoTag;
 window.ollamaAddSuggestedTag = ollamaAddSuggestedTag;
 
 
-let sosprintPendingQuestions = [];
 let sosprintPhotoFile = null;
+let sosprintCandidateCauses = [];
+let sosprintEliminatedCauses = [];
+let sosprintQaHistory = [];
+let sosprintCurrentQuestion = null;
+let sosprintConversationId = null;
+let sosprintLastCauses = [];
+let sosprintHistoryLoaded = { open: false, resolved: false };
+let sosprintHistoryActiveTab = 'open';
 
 function getSosprintFormValues() {
     return {
@@ -5167,8 +5268,47 @@ function clearSosprintPhoto() {
     });
 })();
 
+// --- Ajout d'une photo à n'importe quel moment de l'enquête (pas seulement au démarrage) ---
+(() => {
+    const addBtn = document.getElementById('sosprint-add-photo-btn');
+    const input = document.getElementById('sosprint-extra-photo-input');
+    const statusEl = document.getElementById('sosprint-extra-photo-status');
+
+    addBtn?.addEventListener('click', () => input?.click());
+
+    input?.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!sosprintConversationId) {
+            showToast(_t2('sosprint.no_conversation_yet', "Démarrez d'abord une enquête avant d'ajouter une photo"), 'warning');
+            return;
+        }
+        addBtn.disabled = true;
+        if (statusEl) statusEl.textContent = _t2('sosprint.uploading_photo', 'Envoi de la photo...');
+        try {
+            const formData = new FormData();
+            formData.append('photo', file);
+            const res = await fetch(`${API}/api/sos-print/conversations/${sosprintConversationId}/photo`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            if (statusEl) statusEl.textContent = _t2('sosprint.photo_added', 'Photo ajoutée ✓');
+            showToast(_t2('sosprint.photo_added_toast', "Photo ajoutée à l'enquête, elle sera analysée avec le diagnostic"), 'success');
+        } catch (err) {
+            console.error('[SOS Print Photo]', err);
+            if (statusEl) statusEl.textContent = '';
+            showToast(`${_t2('sosprint.photo_add_error', "Échec de l'ajout de la photo")} : ${err.message}`, 'error');
+        } finally {
+            addBtn.disabled = false;
+            input.value = '';
+        }
+    });
+})();
+
 async function runSosprintDiagnosis(material, description, answers) {
-    const btn = document.getElementById('sosprint-confirm-questions-btn') || document.getElementById('sosprint-submit-btn');
+    const btn = document.getElementById('sosprint-next-question-btn') || document.getElementById('sosprint-submit-btn');
     const skipBtn = document.getElementById('sosprint-skip-questions-btn');
     const resultEl = document.getElementById('sosprint-result');
     const causesEl = document.getElementById('sosprint-causes-list');
@@ -5183,17 +5323,23 @@ async function runSosprintDiagnosis(material, description, answers) {
     if (resultEl) resultEl.style.display = 'none';
     const _recurringHintReset = document.getElementById('sosprint-recurring-hint');
     if (_recurringHintReset) _recurringHintReset.style.display = 'none';
+    const _referenceHintReset = document.getElementById('sosprint-reference-hint');
+    if (_referenceHintReset) _referenceHintReset.style.display = 'none';
+    resetSosprintResolveBox();
 
     try {
         let res;
         const printerId = document.getElementById('sosprint-printer-select')?.value || '';
+        const candidateCauses = sosprintCandidateCauses || [];
         if (sosprintPhotoFile) {
             const formData = new FormData();
             formData.append('material', material);
             formData.append('description', description);
             formData.append('answers', JSON.stringify(answers || []));
+            formData.append('candidate_causes', JSON.stringify(candidateCauses));
             formData.append('photo', sosprintPhotoFile);
             if (printerId) formData.append('printer_id', printerId);
+            if (sosprintConversationId) formData.append('conversation_id', sosprintConversationId);
             res = await fetch(`${API}/api/ollama/sos-print`, {
                 method: 'POST',
                 body: formData
@@ -5202,7 +5348,12 @@ async function runSosprintDiagnosis(material, description, answers) {
             res = await fetch(`${API}/api/ollama/sos-print`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ material, description, answers: answers || [], printer_id: printerId || null })
+                body: JSON.stringify({
+                    material, description, answers: answers || [],
+                    candidate_causes: candidateCauses,
+                    printer_id: printerId || null,
+                    conversation_id: sosprintConversationId || null
+                })
             });
         }
         const data = await res.json();
@@ -5214,6 +5365,9 @@ async function runSosprintDiagnosis(material, description, answers) {
             showToast(I18N.t('toast.sosprint_no_result'), 'warning');
             return;
         }
+
+        if (data.conversation_id) sosprintConversationId = data.conversation_id;
+        sosprintLastCauses = causes.map(c => c.split(/\s*:\s*/)[0].trim()).filter(Boolean);
 
         const sourceBadge = `<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#22c55e;background:#22c55e15;padding:3px 8px;border-radius:20px;margin-bottom:10px;">
                 <i class="fa-solid fa-server"></i> ${I18N.t('sosprint.source_local')}
@@ -5232,27 +5386,27 @@ async function runSosprintDiagnosis(material, description, answers) {
             causesEl.innerHTML = sourceBadge + photoBadge + causes.map((cause, i) => {
                 const parts = cause.split(/\s*:\s*/);
                 const title = parts.length > 1 ? parts[0] : `${I18N.t('sosprint.cause')} ${i + 1}`;
-                const detail = parts.length > 1 ? parts.slice(1).join(' : ') : cause;
-                return `<div class="sosprint-cause-card">
-                    <div class="sosprint-cause-rank">${i + 1}</div>
-                    <div class="sosprint-cause-content">
-                        <div class="sosprint-cause-title">${escapeHtml(title.replace(/^\*\*|\*\*$/g, ''))}</div>
-                        <div class="sosprint-cause-detail">${escapeHtml(detail)}</div>
-                    </div>
-                </div>`;
+                const fix = parts.length > 1 ? parts.slice(1).join(': ') : cause;
+                return `
+                    <div class="sosprint-cause-card">
+                        <div class="sosprint-cause-rank">#${i + 1}</div>
+                        <div class="sosprint-cause-content">
+                            <div class="sosprint-cause-title">${escapeHtml(title)}</div>
+                            <div class="sosprint-cause-detail">${escapeHtml(fix)}</div>
+                        </div>
+                    </div>`;
             }).join('');
         }
-        if (questionsEl) questionsEl.style.display = 'none';
 
         const recurringHint = document.getElementById('sosprint-recurring-hint');
         const recurringHintText = document.getElementById('sosprint-recurring-hint-text');
         if (recurringHint && recurringHintText) {
             if (data.recurring && (data.recurring_history || []).length) {
                 const count = data.recurring_history.length;
-                const printerLabel = data.printer_name ? escapeHtml(data.printer_name) : '';
-                const items = data.recurring_history.slice(0, 3).map(h => {
-                    const cause = (h.causes && h.causes[0]) ? h.causes[0].split(/\s*:\s*/)[0] : '';
-                    const when = h.created_at ? new Date(h.created_at.replace(' ', 'T')).toLocaleDateString() : '';
+                const printerLabel = data.printer_name || '';
+                const items = data.recurring_history.map(h => {
+                    const when = h.created_at ? new Date(h.created_at).toLocaleDateString() : '';
+                    const cause = (h.causes && h.causes[0]) ? h.causes[0] : '';
                     return `<li>${when ? `<strong>${when}</strong> — ` : ''}${escapeHtml(cause)}</li>`;
                 }).join('');
                 recurringHintText.innerHTML = `<strong>${_t2('sosprint.recurring_title', 'Problème potentiellement récurrent')}</strong>
@@ -5264,6 +5418,21 @@ async function runSosprintDiagnosis(material, description, answers) {
             }
         }
 
+        const referenceHint = document.getElementById('sosprint-reference-hint');
+        const referenceHintText = document.getElementById('sosprint-reference-hint-text');
+        if (referenceHint && referenceHintText) {
+            const refs = data.reference_cases || [];
+            if (refs.length) {
+                const items = refs.map(r => `<li><strong>${escapeHtml((r.description || '').slice(0, 80))}</strong> → ${escapeHtml(r.resolution_note || '')}</li>`).join('');
+                referenceHintText.innerHTML = `<strong>${_t2('sosprint.reference_title', 'Diagnostic aidé par vos cas déjà résolus')}</strong>
+                    <ul style="margin:6px 0 0 18px; padding:0;">${items}</ul>`;
+                referenceHint.style.display = 'flex';
+            } else {
+                referenceHint.style.display = 'none';
+            }
+        }
+
+        if (questionsEl) questionsEl.style.display = 'none';
         if (resultEl) {
             resultEl.style.display = 'block';
             resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -5281,6 +5450,357 @@ async function runSosprintDiagnosis(material, description, answers) {
     }
 }
 
+function renderSosprintSuspects() {
+    const listEl = document.getElementById('sosprint-suspects-list');
+    if (!listEl) return;
+    if (!sosprintCandidateCauses.length && !sosprintEliminatedCauses.length) {
+        listEl.innerHTML = '';
+        listEl.style.display = 'none';
+        return;
+    }
+    listEl.style.display = 'flex';
+    const remaining = sosprintCandidateCauses.map(c => `
+        <div class="sosprint-suspect">
+            <i class="fa-solid fa-magnifying-glass"></i> ${escapeHtml(c)}
+        </div>
+    `).join('');
+    const eliminated = sosprintEliminatedCauses.map(c => `
+        <div class="sosprint-suspect sosprint-suspect-eliminated">
+            <i class="fa-solid fa-xmark"></i> <span>${escapeHtml(c)}</span>
+        </div>
+    `).join('');
+    listEl.innerHTML = remaining + eliminated;
+}
+
+function renderSosprintQuestionStep(questionNumber) {
+    const questionsEl = document.getElementById('sosprint-questions');
+    const labelEl = document.getElementById('sosprint-current-question-label');
+    const inputEl = document.getElementById('sosprint-current-answer');
+    const counterEl = document.getElementById('sosprint-question-counter');
+    const nextBtn = document.getElementById('sosprint-next-question-btn');
+    const photoStatusEl = document.getElementById('sosprint-extra-photo-status');
+
+    if (labelEl) labelEl.textContent = sosprintCurrentQuestion || '';
+    if (inputEl) { inputEl.value = ''; inputEl.focus(); }
+    if (photoStatusEl) photoStatusEl.textContent = '';
+    // Plus de limite affichée : le nombre de questions est illimité, l'IA conclut dès qu'elle est confiante.
+    if (counterEl) {
+        counterEl.textContent = _t2('sosprint.question_counter_unlimited', 'Question {n}', { n: questionNumber }).replace('{n}', questionNumber);
+    }
+    if (nextBtn) {
+        nextBtn.disabled = false;
+        nextBtn.innerHTML = `<i class="fa-solid fa-arrow-right"></i> ${I18N.t('sosprint.next_question')}`;
+    }
+    renderSosprintSuspects();
+    if (questionsEl) {
+        questionsEl.style.display = 'flex';
+        questionsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+function resetSosprintInvestigation() {
+    sosprintCandidateCauses = [];
+    sosprintEliminatedCauses = [];
+    sosprintQaHistory = [];
+    sosprintCurrentQuestion = null;
+    sosprintConversationId = null;
+}
+
+function resetSosprintResolveBox() {
+    const formBox = document.getElementById('sosprint-resolve-form');
+    const badge = document.getElementById('sosprint-resolved-badge');
+    const note = document.getElementById('sosprint-resolution-note');
+    if (formBox) formBox.style.display = 'block';
+    if (badge) badge.style.display = 'none';
+    if (note) note.value = '';
+}
+
+document.getElementById('sosprint-resolve-btn')?.addEventListener('click', async () => {
+    if (!sosprintConversationId) {
+        showToast(_t2('sosprint.no_conversation_yet', "Aucune enquête en cours à marquer comme résolue"), 'warning');
+        return;
+    }
+    const btn = document.getElementById('sosprint-resolve-btn');
+    const note = document.getElementById('sosprint-resolution-note')?.value.trim() || '';
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i>`;
+    try {
+        const res = await fetch(`${API}/api/sos-print/conversations/${sosprintConversationId}/resolve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ resolution_note: note })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+        const formBox = document.getElementById('sosprint-resolve-form');
+        const badge = document.getElementById('sosprint-resolved-badge');
+        if (formBox) formBox.style.display = 'none';
+        if (badge) badge.style.display = 'block';
+        showToast(_t2('sosprint.resolved_toast', 'Diagnostic marqué comme résolu'), 'success');
+        sosprintHistoryLoaded = { open: false, resolved: false };
+        if (document.getElementById('sosprint-history-body')?.style.display !== 'none') {
+            loadSosprintHistory(sosprintHistoryActiveTab, true);
+        }
+    } catch (err) {
+        console.error('[SOS Print Resolve]', err);
+        showToast(`${_t2('sosprint.resolve_error', 'Échec du marquage comme résolu')} : ${err.message}`, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+});
+
+document.getElementById('sosprint-not-resolved-btn')?.addEventListener('click', async () => {
+    if (!sosprintConversationId) {
+        showToast(_t2('sosprint.no_conversation_yet', "Aucune enquête en cours à reprendre"), 'warning');
+        return;
+    }
+    const btn = document.getElementById('sosprint-not-resolved-btn');
+    const extraNote = document.getElementById('sosprint-resolution-note')?.value.trim() || '';
+    const { material, description } = getSosprintFormValues();
+
+    const originalHtml2 = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i>`;
+
+    // On informe l'IA que les causes précédemment proposées n'ont pas résolu le problème,
+    // pour qu'elle les élimine et continue l'enquête sur d'autres pistes.
+    const triedCauses = sosprintLastCauses.length
+        ? sosprintLastCauses.join(', ')
+        : _t2('sosprint.not_resolved_unknown_causes', 'le diagnostic précédent');
+    let answerText = _t2('sosprint.not_resolved_answer_template', 'Non, toujours pas résolu après avoir vérifié : {causes}').replace('{causes}', triedCauses);
+    if (extraNote) answerText += ` (${extraNote})`;
+
+    sosprintQaHistory.push({
+        question: _t2('sosprint.not_resolved_question', 'Ce diagnostic a-t-il résolu le problème ?'),
+        answer: answerText
+    });
+    sosprintLastCauses.forEach(c => {
+        if (!sosprintEliminatedCauses.includes(c)) sosprintEliminatedCauses.push(c);
+    });
+    if (!sosprintCandidateCauses.length) sosprintCandidateCauses = sosprintLastCauses.slice();
+
+    const resultEl2 = document.getElementById('sosprint-result');
+    const questionsEl2 = document.getElementById('sosprint-questions');
+    if (resultEl2) resultEl2.style.display = 'none';
+    if (questionsEl2) {
+        questionsEl2.style.display = 'flex';
+        questionsEl2.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    const labelEl2 = document.getElementById('sosprint-current-question-label');
+    if (labelEl2) labelEl2.textContent = I18N.t('sosprint.thinking');
+
+    try {
+        const res = await fetch(`${API}/api/ollama/sos-print/next-question`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                material, description,
+                candidate_causes: sosprintCandidateCauses,
+                qa_history: sosprintQaHistory,
+                conversation_id: sosprintConversationId
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+        (data.eliminated || []).forEach(c => {
+            if (!sosprintEliminatedCauses.includes(c)) sosprintEliminatedCauses.push(c);
+        });
+        sosprintCandidateCauses = data.candidate_causes || sosprintCandidateCauses;
+        if (data.conversation_id) sosprintConversationId = data.conversation_id;
+
+        if (data.status === 'question' && data.question) {
+            sosprintCurrentQuestion = data.question;
+            renderSosprintQuestionStep(sosprintQaHistory.length + 1);
+            showToast(_t2('sosprint.resumed_toast', 'Enquête reprise'), 'success');
+        } else {
+            // L'IA n'a pas de nouvelle piste distincte à explorer : on relance quand même
+            // un diagnostic, qui tiendra compte des causes désormais écartées.
+            await runSosprintDiagnosis(material, description, sosprintQaHistory);
+        }
+    } catch (err) {
+        console.error('[SOS Print Not Resolved]', err);
+        showToast(`${_t2('sosprint.resume_error', 'Impossible de reprendre cette enquête')} : ${err.message}`, 'error');
+        if (questionsEl2) questionsEl2.style.display = 'none';
+        if (resultEl2) resultEl2.style.display = 'block';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml2;
+    }
+});
+
+// --- Historique des conversations : liste, reprise, suppression ---
+
+async function loadSosprintHistory(status, force) {
+    if (!force && sosprintHistoryLoaded[status]) return;
+    const listEl = document.getElementById('sosprint-history-list');
+    const countEl = document.getElementById('sosprint-history-count');
+    if (!listEl) return;
+    listEl.innerHTML = `<div class="sosprint-history-loading"><i class="fa-solid fa-circle-notch fa-spin"></i></div>`;
+    try {
+        const res = await fetch(`${API}/api/sos-print/conversations?status=${status}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        sosprintHistoryLoaded[status] = true;
+        const convs = data.conversations || [];
+        if (countEl) countEl.textContent = convs.length ? `(${convs.length})` : '';
+        if (!convs.length) {
+            listEl.innerHTML = `<div class="sosprint-history-empty">
+                <i class="fa-solid ${status === 'resolved' ? 'fa-circle-check' : 'fa-magnifying-glass'}"></i>
+                <span>${status === 'resolved'
+                ? _t2('sosprint.history_empty_resolved', 'Aucun diagnostic résolu pour le moment')
+                : _t2('sosprint.history_empty_open', 'Aucune enquête en cours')}</span>
+            </div>`;
+            return;
+        }
+        listEl.innerHTML = convs.map(c => {
+            const date = c.updated_at ? new Date(c.updated_at).toLocaleDateString() : '';
+            const badge = status === 'resolved'
+                ? `<span class="sosprint-history-badge resolved"><i class="fa-solid fa-circle-check"></i> ${_t2('sosprint.history_tab_resolved', 'Résolu')}</span>`
+                : `<span class="sosprint-history-badge open"><i class="fa-solid fa-magnifying-glass"></i> ${_t2('sosprint.history_tab_open', 'En cours')}</span>`;
+            return `
+                <div class="sosprint-history-item" data-conv-id="${c.id}">
+                    <div class="sosprint-history-item-main">
+                        <div class="sosprint-history-item-title">${escapeHtml(c.title || c.description)}</div>
+                        <div class="sosprint-history-item-meta">${escapeHtml(c.material || '')} · ${date} ${badge}</div>
+                    </div>
+                    <div class="sosprint-history-item-actions">
+                        <button type="button" class="btn btn-ghost btn-sm sosprint-history-resume" data-conv-id="${c.id}" title="${_t2('sosprint.resume', 'Reprendre')}">
+                            <i class="fa-solid fa-arrow-rotate-right"></i> ${_t2('sosprint.resume', 'Reprendre')}
+                        </button>
+                        <button type="button" class="btn btn-ghost btn-sm sosprint-history-delete" data-conv-id="${c.id}" title="${_t2('actions.delete', 'Supprimer')}">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>`;
+        }).join('');
+    } catch (err) {
+        console.error('[SOS Print History]', err);
+        listEl.innerHTML = `<div class="sosprint-history-empty"><i class="fa-solid fa-triangle-exclamation"></i><span>${_t2('sosprint.history_load_error', "Impossible de charger l'historique")}</span></div>`;
+    }
+}
+
+async function resumeSosprintConversation(convId) {
+    try {
+        const res = await fetch(`${API}/api/sos-print/conversations/${convId}`);
+        const conv = await res.json();
+        if (!res.ok) throw new Error(conv.error || `HTTP ${res.status}`);
+
+        resetSosprintInvestigation();
+        clearSosprintPhoto();
+        resetSosprintResolveBox();
+
+        sosprintConversationId = conv.id;
+        sosprintCandidateCauses = conv.candidate_causes || [];
+        sosprintEliminatedCauses = conv.eliminated_causes || [];
+
+        // Reconstruit l'historique question/réponse à partir des messages persistés.
+        sosprintQaHistory = [];
+        let pendingQuestion = null;
+        (conv.messages || []).forEach(m => {
+            if (m.role === 'question') {
+                pendingQuestion = m.content;
+            } else if (m.role === 'answer' && pendingQuestion) {
+                sosprintQaHistory.push({ question: pendingQuestion, answer: m.content });
+                pendingQuestion = null;
+            }
+        });
+        sosprintCurrentQuestion = pendingQuestion;
+
+        const materialInput = document.querySelector(`input[name="sosprint-material"][value="${CSS.escape(conv.material || 'PLA')}"]`);
+        if (materialInput) materialInput.checked = true;
+        const descEl = document.getElementById('sosprint-description');
+        if (descEl) descEl.value = conv.description || '';
+
+        const resultEl = document.getElementById('sosprint-result');
+        if (resultEl) resultEl.style.display = 'none';
+
+        if (conv.status === 'resolved') {
+            // On affiche le dernier diagnostic connu, en lecture seule (déjà marqué résolu).
+            const causesEl = document.getElementById('sosprint-causes-list');
+            if (causesEl && conv.last_causes && conv.last_causes.length) {
+                causesEl.innerHTML = conv.last_causes.map((cause, i) => {
+                    const parts = cause.split(/\s*:\s*/);
+                    const title = parts.length > 1 ? parts[0] : `${I18N.t('sosprint.cause')} ${i + 1}`;
+                    const fix = parts.length > 1 ? parts.slice(1).join(': ') : cause;
+                    return `<div class="sosprint-cause-card"><div class="sosprint-cause-rank">#${i + 1}</div><div class="sosprint-cause-content"><div class="sosprint-cause-title">${escapeHtml(title)}</div><div class="sosprint-cause-detail">${escapeHtml(fix)}</div></div></div>`;
+                }).join('');
+            }
+            const formBox = document.getElementById('sosprint-resolve-form');
+            const badge = document.getElementById('sosprint-resolved-badge');
+            if (formBox) formBox.style.display = 'none';
+            if (badge) badge.style.display = 'block';
+            if (resultEl) resultEl.style.display = 'block';
+        } else if (sosprintCurrentQuestion) {
+            renderSosprintQuestionStep(sosprintQaHistory.length + 1);
+        } else {
+            await runSosprintDiagnosis(conv.material, conv.description, sosprintQaHistory);
+        }
+
+        document.getElementById('page-sosprint')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        showToast(_t2('sosprint.resumed_toast', 'Enquête reprise'), 'success');
+    } catch (err) {
+        console.error('[SOS Print Resume]', err);
+        showToast(`${_t2('sosprint.resume_error', 'Impossible de reprendre cette enquête')} : ${err.message}`, 'error');
+    }
+}
+
+async function deleteSosprintConversation(convId) {
+    const ok = await showConfirmDialog(
+        _t2('sosprint.delete_confirm', 'Supprimer définitivement ce diagnostic ?'),
+        { title: _t2('actions.delete', 'Supprimer'), danger: true }
+    );
+    if (!ok) return;
+    try {
+        const res = await fetch(`${API}/api/sos-print/conversations/${convId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        sosprintHistoryLoaded = { open: false, resolved: false };
+        loadSosprintHistory(sosprintHistoryActiveTab, true);
+        showToast(_t2('sosprint.deleted_toast', 'Diagnostic supprimé'), 'success');
+    } catch (err) {
+        console.error('[SOS Print Delete]', err);
+        showToast(`${_t2('sosprint.delete_error', 'Échec de la suppression')} : ${err.message}`, 'error');
+    }
+}
+
+(() => {
+    const toggle = document.getElementById('sosprint-history-toggle');
+    const body = document.getElementById('sosprint-history-body');
+    const chevron = document.getElementById('sosprint-history-chevron');
+    const tabs = document.querySelectorAll('.sosprint-history-tab');
+    const list = document.getElementById('sosprint-history-list');
+
+    toggle?.addEventListener('click', () => {
+        const isOpen = body.style.display !== 'none';
+        body.style.display = isOpen ? 'none' : 'block';
+        chevron?.classList.toggle('rotated', !isOpen);
+        if (!isOpen) loadSosprintHistory(sosprintHistoryActiveTab);
+    });
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            sosprintHistoryActiveTab = tab.dataset.status;
+            // Toujours recharger au changement d'onglet : la liste HTML est partagée entre
+            // les deux onglets, donc s'appuyer sur le cache "déjà chargé" affichait le contenu
+            // périmé de l'autre onglet au lieu de rafraîchir celui qu'on vient de sélectionner.
+            loadSosprintHistory(sosprintHistoryActiveTab, true);
+        });
+    });
+
+    list?.addEventListener('click', (e) => {
+        const resumeBtn = e.target.closest('.sosprint-history-resume');
+        const deleteBtn = e.target.closest('.sosprint-history-delete');
+        if (resumeBtn) resumeSosprintConversation(resumeBtn.dataset.convId);
+        else if (deleteBtn) deleteSosprintConversation(deleteBtn.dataset.convId);
+    });
+})();
+
 document.getElementById('sosprint-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -5297,8 +5817,9 @@ document.getElementById('sosprint-form')?.addEventListener('submit', async (e) =
 
     const submitBtn = document.getElementById('sosprint-submit-btn');
     const questionsEl = document.getElementById('sosprint-questions');
-    const questionsListEl = document.getElementById('sosprint-questions-list');
     const resultEl = document.getElementById('sosprint-result');
+
+    resetSosprintInvestigation();
 
     const originalBtnHtml = submitBtn.innerHTML;
     submitBtn.disabled = true;
@@ -5307,33 +5828,33 @@ document.getElementById('sosprint-form')?.addEventListener('submit', async (e) =
     if (questionsEl) questionsEl.style.display = 'none';
 
     try {
+        const printerId = document.getElementById('sosprint-printer-select')?.value || '';
         const res = await fetch(`${API}/api/ollama/sos-print/questions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ material, description })
+            body: JSON.stringify({ material, description, printer_id: printerId || null })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
-        sosprintPendingQuestions = data.questions || [];
+        sosprintConversationId = data.conversation_id || null;
+        sosprintCandidateCauses = data.candidate_causes || [];
+        sosprintCurrentQuestion = data.question || null;
 
-        if (!sosprintPendingQuestions.length) {
+        // Si une photo a déjà été jointe au formulaire initial, on l'attache tout de suite
+        // à la conversation pour qu'elle profite aussi aux questions de clarification.
+        if (sosprintPhotoFile && sosprintConversationId) {
+            const fd = new FormData();
+            fd.append('photo', sosprintPhotoFile);
+            fetch(`${API}/api/sos-print/conversations/${sosprintConversationId}/photo`, { method: 'POST', body: fd }).catch(() => {});
+        }
+
+        if (!sosprintCurrentQuestion) {
             await runSosprintDiagnosis(material, description, []);
             return;
         }
 
-        if (questionsListEl) {
-            questionsListEl.innerHTML = sosprintPendingQuestions.map((q, i) => `
-                <div class="input-group sosprint-question-item">
-                    <label for="sosprint-answer-${i}">${escapeHtml(q)}</label>
-                    <input type="text" id="sosprint-answer-${i}" class="sosprint-answer-input" placeholder="${I18N.t('sosprint.answer_placeholder')}">
-                </div>
-            `).join('');
-        }
-        if (questionsEl) {
-            questionsEl.style.display = 'block';
-            questionsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
+        renderSosprintQuestionStep(1);
     } catch (err) {
         console.error('[SOS Print Questions]', err);
         showToast(`${I18N.t('sosprint.prepare_error')} : ${err.message}`, 'error');
@@ -5344,21 +5865,93 @@ document.getElementById('sosprint-form')?.addEventListener('submit', async (e) =
     }
 });
 
-document.getElementById('sosprint-confirm-questions-btn')?.addEventListener('click', async () => {
+document.getElementById('sosprint-next-question-btn')?.addEventListener('click', async () => {
     const { material, description } = getSosprintFormValues();
-    const answers = sosprintPendingQuestions.map((q, i) => ({
-        question: q,
-        answer: document.getElementById(`sosprint-answer-${i}`)?.value.trim() || ''
-    })).filter(a => a.answer);
+    const inputEl = document.getElementById('sosprint-current-answer');
+    const nextBtn = document.getElementById('sosprint-next-question-btn');
+    const answer = inputEl?.value.trim() || '';
 
-    await runSosprintDiagnosis(material, description, answers);
+    if (sosprintCurrentQuestion) {
+        sosprintQaHistory.push({ question: sosprintCurrentQuestion, answer: answer || I18N.t('sosprint.no_precision') });
+    }
+
+    if (nextBtn) {
+        nextBtn.disabled = true;
+        nextBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${I18N.t('sosprint.thinking')}`;
+    }
+
+    try {
+        const res = await fetch(`${API}/api/ollama/sos-print/next-question`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                material, description,
+                candidate_causes: sosprintCandidateCauses,
+                qa_history: sosprintQaHistory,
+                conversation_id: sosprintConversationId
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+        (data.eliminated || []).forEach(c => {
+            if (!sosprintEliminatedCauses.includes(c)) sosprintEliminatedCauses.push(c);
+        });
+        sosprintCandidateCauses = data.candidate_causes || sosprintCandidateCauses;
+        if (data.conversation_id) sosprintConversationId = data.conversation_id;
+
+        if (data.status === 'done') {
+            await runSosprintDiagnosis(material, description, sosprintQaHistory);
+            return;
+        }
+
+        sosprintCurrentQuestion = data.question;
+        renderSosprintQuestionStep(sosprintQaHistory.length + 1);
+    } catch (err) {
+        console.error('[SOS Print Next Question]', err);
+        showToast(`${I18N.t('sosprint.prepare_error')} : ${err.message}`, 'error');
+        await runSosprintDiagnosis(material, description, sosprintQaHistory);
+    }
+});
+
+document.getElementById('sosprint-current-answer')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('sosprint-next-question-btn')?.click();
+    }
 });
 
 document.getElementById('sosprint-skip-questions-btn')?.addEventListener('click', async () => {
     const { material, description } = getSosprintFormValues();
-    await runSosprintDiagnosis(material, description, []);
+    // "Conclure maintenant" : on demande explicitement à l'IA de conclure avec ce qu'elle a déjà,
+    // plutôt que de forcer un arrêt côté client après un nombre fixe de questions.
+    if (sosprintQaHistory.length === 0 && !sosprintCurrentQuestion) {
+        await runSosprintDiagnosis(material, description, sosprintQaHistory);
+        return;
+    }
+    try {
+        const res = await fetch(`${API}/api/ollama/sos-print/next-question`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                material, description,
+                candidate_causes: sosprintCandidateCauses,
+                qa_history: sosprintQaHistory,
+                conversation_id: sosprintConversationId,
+                conclude_now: true
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        (data.eliminated || []).forEach(c => {
+            if (!sosprintEliminatedCauses.includes(c)) sosprintEliminatedCauses.push(c);
+        });
+        sosprintCandidateCauses = data.candidate_causes || sosprintCandidateCauses;
+    } catch (err) {
+        console.debug('[SOS Print Conclude]', err);
+    }
+    await runSosprintDiagnosis(material, description, sosprintQaHistory);
 });
-
 
 async function getSpoolmanUrl() {
     try {

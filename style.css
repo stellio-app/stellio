@@ -4396,18 +4396,24 @@ kbd {
 
 
 .settings-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    grid-auto-flow: row;
-    gap: 20px;
+    column-count: 2;
+    column-gap: 20px;
     padding: 24px;
-    max-width: 700px;
+    max-width: 1200px;
     margin: 0 auto;
-    align-items: start;
 }
 
 .settings-grid > .accord-section {
-    align-self: start;
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 860px) {
+    .settings-grid {
+        column-count: 1;
+        max-width: 700px;
+    }
 }
 
 .accord-section {
@@ -4813,7 +4819,9 @@ kbd {
 
 .sosprint-header {
     margin-bottom: 24px;
-    max-width: 680px;
+    width: 75%;
+    max-width: 1300px;
+    min-width: 320px;
     margin-left: auto;
     margin-right: auto;
     text-align: center;
@@ -4835,7 +4843,9 @@ kbd {
 }
 
 .sosprint-container {
-    max-width: 680px;
+    width: 75%;
+    max-width: 1300px;
+    min-width: 320px;
     margin-left: auto;
     margin-right: auto;
 }
@@ -5043,6 +5053,54 @@ kbd {
     }
 }
 
+.sosprint-suspects-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.sosprint-suspect {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 12px;
+    transition: opacity 0.25s ease, background 0.25s ease;
+}
+
+.sosprint-suspect i {
+    color: var(--accent);
+    font-size: 11px;
+}
+
+.sosprint-suspect-eliminated {
+    color: var(--text-muted);
+    background: transparent;
+    border-style: dashed;
+    opacity: 0.55;
+}
+
+.sosprint-suspect-eliminated i {
+    color: #ef4444;
+}
+
+.sosprint-suspect-eliminated span {
+    text-decoration: line-through;
+}
+
+.sosprint-investigation-progress {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
 .sosprint-optional-tag {
     font-weight: 400;
     font-size: 12px;
@@ -5117,6 +5175,242 @@ kbd {
 
 .sosprint-photo-remove:hover {
     background: var(--accent);
+}
+
+.sosprint-history-panel {
+    width: 75%;
+    max-width: 1300px;
+    min-width: 320px;
+    margin-left: auto;
+    margin-right: auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+#sosprint-ai-disabled-banner {
+    width: 75%;
+    max-width: 1300px;
+    min-width: 320px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.sosprint-history-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+}
+
+.sosprint-history-toggle i:first-child {
+    color: var(--accent);
+    font-size: 13px;
+}
+
+.sosprint-history-toggle:hover {
+    background: var(--bg-tertiary);
+}
+
+.sosprint-history-count {
+    color: var(--text-secondary);
+    font-weight: 400;
+    font-size: 12.5px;
+}
+
+.sosprint-history-chevron {
+    margin-left: auto;
+    transition: transform 0.2s ease;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.sosprint-history-chevron.rotated {
+    transform: rotate(180deg);
+}
+
+.sosprint-history-body {
+    border-top: 1px solid var(--border);
+    padding: 14px 18px 18px;
+}
+
+.sosprint-history-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.sosprint-history-tab {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.sosprint-history-tab.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+.sosprint-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.sosprint-history-loading,
+.sosprint-history-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-align: center;
+    padding: 22px 12px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.sosprint-history-empty i,
+.sosprint-history-loading i {
+    font-size: 18px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.sosprint-history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.sosprint-history-item-main {
+    min-width: 0;
+    flex: 1;
+}
+
+.sosprint-history-item-title {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sosprint-history-item-meta {
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.sosprint-history-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 8px;
+    border-radius: 20px;
+    font-size: 10.5px;
+    font-weight: 700;
+}
+
+.sosprint-history-badge.open {
+    color: #4ea1d3;
+    background: #4ea1d315;
+}
+
+.sosprint-history-badge.resolved {
+    color: #22c55e;
+    background: #22c55e15;
+}
+
+.sosprint-history-item-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.sosprint-investigation-photo-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.sosprint-extra-photo-status {
+    font-size: 12px;
+    color: #22c55e;
+}
+
+.sosprint-resolve-box {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.sosprint-resolve-box label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.sosprint-resolve-box textarea {
+    width: 100%;
+    resize: vertical;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    color: var(--text-primary);
+    font-size: 13px;
+    margin-bottom: 10px;
+}
+
+.sosprint-resolve-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+#sosprint-resolved-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: #22c55e15;
+    border: 1px solid #22c55e40;
+    border-radius: var(--radius);
+    color: #22c55e;
+    font-size: 13px;
 }
 
 
@@ -5570,4 +5864,94 @@ kbd {
 }
 #photo-lightbox-img:hover {
     transform: scale(1.02);
+}
+
+.app-header {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: var(--header-height);
+    padding: 8px 12px;
+    gap: 8px;
+    align-items: center;
+}
+
+.header-left {
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+.header-left h2 {
+    font-size: 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+.header-left h2 span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.header-center {
+    flex: 1 1 300px;
+    min-width: 200px;
+    max-width: none;
+    margin: 0 8px;
+}
+
+.header-right {
+    flex-shrink: 1;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+@media (max-width: 1200px) and (min-width: 861px) {
+    .header-right .view-modes,
+    .header-right #refresh-files,
+    .header-right #global-logout-btn {
+        display: none;
+    }
+    
+    .header-library-info {
+        display: none;
+    }
+}
+
+@media (max-width: 1000px) and (min-width: 861px) {
+    .header-center {
+        order: 3;
+        flex-basis: 100%;
+        margin: 4px 0 0 0;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border);
+        min-width: 100%;
+    }
+    
+    .header-left h2 span {
+        display: none;
+    }
+    
+    .header-left h2 i {
+        font-size: 18px;
+    }
+    
+    .header-right {
+        justify-content: flex-end;
+    }
+}
+
+.search-box {
+    min-width: 0;
+    flex: 1;
+}
+
+.search-box input {
+    min-width: 0;
+}
+
+#sort-select {
+    max-width: 140px;
+    flex-shrink: 1;
 }
