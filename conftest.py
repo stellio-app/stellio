@@ -1,13 +1,4 @@
-"""
-Stubs pour les dépendances lourdes/natives (trimesh, pyrender, smbclient,
-rarfile, pymeshfix) non disponibles dans cet environnement de test isolé.
 
-Objectif : permettre d'importer le vrai main.py (et donc de tester le vrai
-code, pas une réimplémentation) même quand ces bibliothèques ne sont pas
-installées. Dans l'environnement de dev/CI réel de Stellio, où elles SONT
-installées, ces stubs ne sont jamais utilisés (le "sys.modules.setdefault"
-ne prend effet que si le vrai module est absent).
-"""
 import sys
 import types
 import tempfile
@@ -65,10 +56,6 @@ _try_real_or_stub('rarfile', lambda: {
     'Error': Exception,
 })
 
-# --- Environnement de test isolé pour Stellio (DATA_DIR temporaire) ---
-# main.py lit STELLIO_DATA_DIR au chargement (voir get_data_path()) : on
-# l'utilise pour ne jamais toucher aux vraies données de l'utilisateur
-# pendant les tests, ni dépendre de %APPDATA% (absent hors Windows).
 _TEST_DATA_DIR = tempfile.mkdtemp(prefix='stellio_test_data_')
 os.environ['STELLIO_DATA_DIR'] = _TEST_DATA_DIR
 os.environ.setdefault('STELLIO_PORT', '0')
