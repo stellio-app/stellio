@@ -237,7 +237,7 @@ jobs:
   # ──────────────────────────────────────────────────────────────────────
   sign-and-release:
     needs: [check-version, build]
-    if: needs.check-version.outputs.should_release == 'true'
+    if: needs.check-version.outputs.should_release == 'false' #passer a true apres acceptation signature electronique
     runs-on: windows-latest
     steps:
       - name: Submit signing request to SignPath (installeur uniquement)
