@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title data-i18n="app.title">Stellio - 3D File Manager</title>
+    <link rel="icon" type="image/png" href="assets/logo-stellio.png">
+    <link rel="stylesheet" href="style.css?v=20260513">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
+</head>
+<body>
+    <div id="auth-screen" class="auth-screen">
+        <div class="auth-container">
+            <div class="auth-logo">
+                <img src="assets/logo-nom-stellio.png" alt="Stellio Logo" class="stellio-nom-logo-img">
+                <p data-i18n="app.subtitle">Gestionnaire de fichiers 3D</p>
+            </div>
+            
+            <!-- Register Panel -->
+            <div id="register-panel" class="auth-panel hidden">
+                <h2 data-i18n="auth.create_account">Créer un compte</h2>
+                <p class="auth-subtitle" data-i18n="auth.first_launch">Premier lancement — créez votre compte</p>
+                <form id="register-form">
+                    <div class="input-group">
+                        <i class="fa-solid fa-user"></i>
+                        <input type="text" id="reg-username" data-i18n-placeholder="auth.username" placeholder="Nom d'utilisateur" required autocomplete="off">
+                    </div>
+                    <div class="input-group">
+                        <i class="fa-solid fa-envelope"></i>
+                        <input type="email" id="reg-email" data-i18n-placeholder="auth.email_placeholder" placeholder="Votre email (pour récupérer le mot de passe)" required autocomplete="off">
+                    </div>
+                    <div class="input-group">
+                        <i class="fa-solid fa-lock"></i>
+                        <input type="password" id="reg-password" data-i18n-placeholder="auth.password" placeholder="Mot de passe" required>
+                    </div>
+                    <div class="input-group">
+                        <i class="fa-solid fa-lock"></i>
+                        <input type="password" id="reg-password-confirm" data-i18n-placeholder="auth.confirm_password" placeholder="Confirmer le mot de passe" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" data-i18n="auth.create_account_btn">
+                         Créer le compte
+                    </button>
+                </form>
+            </div>
+            
+            <!-- Login Panel -->
+            <div id="login-panel" class="auth-panel hidden">
+                <h2 data-i18n="auth.login">Connexion</h2>
+                <p class="auth-subtitle" data-i18n="auth.login_subtitle">Connectez-vous à Stellio</p>
+                <form id="login-form">
+                    <div class="input-group">
+                        <i class="fa-solid fa-user"></i>
+                        <input type="text" id="login-username" data-i18n-placeholder="auth.username" placeholder="Nom d'utilisateur" required autocomplete="off">
+                    </div>
+                    <div class="input-group">
+                        <i class="fa-solid fa-lock"></i>
+                        <input type="password" id="login-password" data-i18n-placeholder="auth.password" placeholder="Mot de passe" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-right-to-bracket"></i> <span data-i18n="auth.login_btn">Se connecter</span>
+                    </button>
+                </form>
+                <div class="auth-links">
+                    <a href="#" id="show-register" data-i18n="auth.create_account_link">Créer un compte</a>
+                </div>
+                <div class="auth-links" style="margin-top: 10px;">
+                    <a href="#" id="show-forgot" data-i18n="auth.forgot_password">Mot de passe oublié ?</a>
+                </div>
+            </div>
+            
+            <!-- Forgot Panel -->
+            <div id="forgot-panel" class="auth-panel hidden">
+                <h2 data-i18n="auth.forgot_title">🔑 Mot de passe oublié ?</h2>
+                <p class="auth-subtitle" data-i18n="auth.forgot_desc">Entrez votre email pour recevoir un code.</p>
+                <form id="forgot-form">
+                    <div class="input-group">
+                        <i class="fa-solid fa-envelope"></i>
+                        <input type="email" id="forgot-email" data-i18n-placeholder="auth.email_placeholder" placeholder="Votre email enregistré" required autocomplete="off">
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-paper-plane"></i> <span data-i18n="auth.send_code">Envoyer le code</span>
+                    </button>
+                </form>
+                <div class="auth-links" style="margin-top: 10px;">
+                    <a href="#" onclick="showPanel('login-panel'); return false;" data-i18n="auth.back_to_login">Retour à la connexion</a>
+                </div>
+            </div>
+            
+            <!-- Reset Panel -->
+            <div id="reset-panel" class="auth-panel hidden">
+                <h2 data-i18n="auth.reset_title">🔄 Réinitialiser</h2>
+                <p class="auth-subtitle" data-i18n="auth.reset_subtitle">Vérification pour <span id="reset-email-display" style="color:var(--accent)">...</span></p>
+                <form id="reset-form">
+                    <div class="input-group">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <input type="text" id="reset-code" data-i18n-placeholder="auth.code_placeholder" placeholder="Code à 6 chiffres" required maxlength="6" autocomplete="off">
+                    </div>
+                    <div class="input-group">
+                        <i class="fa-solid fa-lock"></i>
+                        <input type="password" id="reset-password" data-i18n-placeholder="auth.new_password" placeholder="Nouveau mot de passe" required>
+                    </div>
+                    <div class="input-group">
+                        <i class="fa-solid fa-lock"></i>
+                        <input type="password" id="reset-password-confirm" data-i18n-placeholder="auth.confirm_password" placeholder="Confirmer" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-check"></i> <span data-i18n="auth.reset">Réinitialiser</span>
+                    </button>
+                </form>
+                <div class="auth-links" style="margin-top: 10px;">
+                    <a href="#" onclick="showPanel('login-panel'); return false;" data-i18n="actions.cancel">Annuler</a>
+                </div>
+            </div>
+        </div>
+		<div class="auth-lang-selector">
+		  <select id="language-selector-auth" class="form-select form-select-sm" aria-label="Langue">
+			<!-- Peuplé dynamiquement par JS -->
+		  </select>
+		</div>		
+    </div>
+    
+    <!-- App Screen -->
+    <div id="app-screen" class="app-screen hidden">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <img src="assets/logo-stellio.png" alt="Stellio Logo" class="stellio-logo-img">
+                <span><img src="assets/nom-stellio.png" alt="Stellio Logo" class="stellio-nom-img"></span>
+            </div>
+            <nav class="sidebar-nav">
+                <button class="nav-btn active" data-page="library" data-icon="fa-layer-group" data-title-key="Bibliothèque">
+                    <i class="fa-solid fa-layer-group"></i>
+                    <span data-i18n="nav.library">Bibliothèque</span>
+                </button>
+                <button class="nav-btn" id="nav-favorites-btn" onclick="toggleFavoritesFilterFromNav()">
+                    <i class="fa-solid fa-star"></i>
+                    <span data-i18n="nav.favorites">Favoris</span>
+                    <span class="badge" id="favorites-count" style="margin-left: auto; background: var(--accent); color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; display: none;">0</span>
+                </button>
+                
+                <button class="nav-btn" onclick="openFiltersModal()" style="cursor: pointer;">
+                    <i class="fa-solid fa-filter"></i>
+                    <span data-i18n="nav.filters">Filtres</span>
+                </button>
+                <button class="nav-btn" data-page="settings" data-icon="fa-gear" data-title-key="nav.settings">
+                    <i class="fa-solid fa-gear"></i>
+                    <span data-i18n="nav.settings">Paramètres</span>
+                </button>
+                <button class="nav-btn" data-page="contacts" data-icon="fa-envelope" data-title-key="nav.contact">
+                    <i class="fa-solid fa-envelope"></i>
+                    <span data-i18n="nav.contact">Contact</span>
+                </button>
+                <button class="nav-btn" onclick="openDownloadModal()" style="cursor: pointer;">
+                    <i class="fa-solid fa-cloud-arrow-down"></i>
+                    <span data-i18n="nav.download">Télécharger</span>
+                </button>
+				<button class="nav-btn" data-page="repair" data-titleKey="nav.repair" data-icon="fa-screwdriver-wrench">
+				  <i class="fa-solid fa-screwdriver-wrench"></i>
+				  <span data-i18n="nav.repair">Réparation</span>
+				  <span class="badge" id="repair-count" style="display:none;">0</span>
+				</button>
+				<button class="nav-btn" data-page="printers" data-title-key="nav.printers" data-icon="fa-print">
+					<i class="fa-solid fa-print"></i> Imprimantes
+				</button>
+            </nav>
+            <div>
+                <button class="nav-btn" onclick="openModal('modal-about')" style="cursor: pointer;">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span data-i18n="nav.about">À propos de</span>
+                </button>
+            </div>
+			<div class="sidebar-footer">
+				<div class="user-info">
+					<div class="user-avatar">
+						<i class="fa-solid fa-user"></i>
+					</div>
+					<span id="current-username" style="flex:1; font-size:13px; color:var(--text-secondary);">Utilisateur</span>					
+				</div>
+			</div>
+        </aside>
+        
+        <div class="app-wrapper">
+            <header class="app-header">
+                <div class="header-left">
+                    <h2 id="header-page-title"><i class="fa-solid fa-layer-group"></i><span data-i18n="nav.library"></span></h2>
+                </div>
+                <div class="header-center">
+                    <div class="search-box">
+                        <i class="fa-solid fa-search"></i>
+                        <input type="text" id="global-search" data-i18n-placeholder="search.placeholder">
+                    </div>
+					<div id="thumb-progress-container" class="thumb-progress hidden">
+						<div class="progress-text" id="thumb-progress-text">0/0</div>
+						<div class="progress-track">
+							<div class="progress-bar" id="thumb-progress-bar" style="width: 0%"></div>
+						</div>
+					</div>
+                </div>
+                <div class="header-right">
+                    <div id="thumb-progress" class="thumb-progress hidden">
+                        <span id="progress-file" class="progress-text">...</span>
+                        <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
+                    </div>
+						<select id="sort-select" class="header-select" title="Trier par">
+						  <option value="name-asc" data-i18n="sort.name_asc">A → Z</option>
+						  <option value="name-desc" data-i18n="sort.name_desc">Z → A</option>
+						  <option value="folder-asc" data-i18n="sort.folder_asc">Dossier A-Z</option>
+						  <option value="folder-desc" data-i18n="sort.folder_desc">Dossier Z-A</option>
+						  <option value="size-asc" data-i18n="sort.size_asc">Taille ↑</option>
+						  <option value="size-desc" data-i18n="sort.size_desc">Taille ↓</option>
+						  <option value="tag-asc" data-i18n="sort.tag_asc">Tag (A → Z)</option>
+						  <option value="tag-desc" data-i18n="sort.tag_desc">Tag (Z → A)</option>
+						</select>
+                    <div class="view-modes">
+                        <button class="view-btn active" data-view="gallery" title="Galerie"><i class="fa-solid fa-th-large"></i></button>
+                        <button class="view-btn" data-view="details" title="Détails"><i class="fa-solid fa-list-ul"></i></button>
+                    </div>
+                    <button id="refresh-files" class="btn btn-ghost btn-sm" title="Actualiser">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                    </button>
+                    <button id="select-all-btn" class="btn btn-ghost btn-sm" title="Sélectionner plusieurs fichiers">
+                        <i class="fa-solid fa-square-check"></i> <span data-i18n="actions.select">Sélectionner</span>
+                    </button>
+					<button onclick="showQuitConfirmation()" title="Quitter Stellio" style="
+						background: transparent;
+						border: none;
+						color: var(--text-muted);
+						cursor: pointer;
+						padding: 6px 8px;
+						border-radius: 6px;
+						transition: all 0.2s;
+						font-size: 14px;
+					" onmouseover="this.style.color='var(--danger)'; this.style.background='rgba(248,113,113,0.1)'" 
+					   onmouseout="this.style.color='var(--text-muted)'; this.style.background='transparent'">
+						<i class="fa-solid fa-power-off"></i>
+					</button>
+					<!-- Bouton Déconnexion existant -->
+					<button id="global-logout-btn" title="Déconnexion" style="
+						background: transparent;
+						border: none;
+						color: var(--text-muted);
+						cursor: pointer;
+						padding: 6px 8px;
+						border-radius: 6px;
+						transition: all 0.2s;
+						font-size: 14px;
+					" onmouseover="this.style.color='var(--accent)'; this.style.background='var(--bg-hover)'" 
+					   onmouseout="this.style.color='var(--text-muted)'; this.style.background='transparent'">
+						<i class="fa-solid fa-right-from-bracket"></i>
+					</button>			
+                </div>
+            </header>
+            
+            <main class="main-content">
+                <!-- Library Page -->
+                <div id="page-library" class="page active">
+                    <div id="files-grid" class="files-grid gallery">
+                        <div class="empty-state">
+                            <i class="fa-solid fa-inbox"></i>
+                            <p data-i18n="library.no_files">Aucun fichier à afficher.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Filters Page -->
+                <div id="page-filters" class="page">
+                    <div class="filters-panel">
+                        <div class="filter-group">
+                            <h3><i class="fa-solid fa-tags"></i> <span data-i18n="filters.tags">Tags</span></h3>
+                            <div id="filter-tags"></div>
+                            <button id="manage-tags-btn" class="btn btn-ghost btn-sm btn-block" style="margin-top:8px; border:1px dashed var(--border);">
+                                <i class="fa-solid fa-gear"></i> <span data-i18n="filters.manage_tags">Gérer les tags</span>
+                            </button>
+                        </div>
+                        <div class="filter-group">
+                            <h3><i class="fa-solid fa-file"></i> <span data-i18n="filters.file_type">Type de fichier</span></h3>
+                            <label class="checkbox-label"><input type="checkbox" value=".stl" checked class="filter-type"> STL</label>
+                            <label class="checkbox-label"><input type="checkbox" value=".3mf" checked class="filter-type"> 3MF</label>
+                            <label class="checkbox-label"><input type="checkbox" value=".obj" checked class="filter-type"> OBJ</label>
+                        </div>
+                        <div class="filter-group">
+                            <h3><i class="fa-solid fa-hdd"></i> <span data-i18n="filters.source">Source</span></h3>
+                            <div id="filter-sources"></div>
+                        </div>
+                        <div class="filter-group">
+                            <h3><i class="fa-solid fa-weight-hanging"></i> <span data-i18n="filters.size">Taille (MB)</span></h3>
+                            <div class="range-group">
+                                <label data-i18n="filters.min">Min: <input type="number" id="size-min" value="0" min="0"></label>
+                                <label data-i18n="filters.max">Max: <input type="number" id="size-max" value="1000" min="0"></label>
+                            </div>
+                        </div>
+                        <button id="apply-filters" class="btn btn-primary btn-block">
+                            <i class="fa-solid fa-check"></i> <span data-i18n="filters.apply">Appliquer les filtres</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Settings Page -->
+                <div id="page-settings" class="page">
+                    <div class="settings-panel">
+                        <!-- Appearance Section -->
+                        <div class="sources-section" style="margin-bottom: 20px;">
+                            <div class="section-header">
+                                <h3><i class="fa-solid fa-palette"></i> <span data-i18n="settings.appearance">Apparence</span></h3>
+                            </div>
+                            <div style="padding: 16px; display: flex; flex-direction: column; gap: 16px;">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <label style="color: var(--text-primary); font-size: 14px;" data-i18n="settings.theme">Thème</label>
+                                    <select id="theme-selector" style="background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); padding: 8px; border-radius: var(--radius);">
+                                        <option value="dark" data-i18n="settings.theme_dark">Sombre</option>
+                                        <option value="light" data-i18n="settings.theme_light">Clair</option>
+                                        <option value="auto" data-i18n="settings.theme_auto">Système (Auto)</option>
+                                    </select>
+                                </div>
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <label style="color: var(--text-primary); font-size: 14px;" data-i18n="settings.brand_color">Couleur (Marque)</label>
+                                    <select id="fabricant-selector" style="background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); padding: 8px; border-radius: var(--radius);">
+                                        <option value="stellio" data-i18n="settings.brand_stellio">Stellio (Bleu par défaut)</option>
+                                        <option value="bambu" data-i18n="settings.brand_bambu">Bambu Lab (Vert)</option>
+                                        <option value="prusa" data-i18n="settings.brand_prusa">Prusa Research (Orange)</option>
+                                        <option value="voron" data-i18n="settings.brand_voron">Voron (Rouge)</option>
+                                        <option value="creality" data-i18n="settings.brand_creality">Creality (Bleu foncé)</option>
+                                    </select>
+                                </div>
+                                <!-- 🔹 NOUVEAU : Sélecteur de langue -->
+                                <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 16px;">
+                                    <label style="color: var(--text-primary); font-size: 14px;" data-i18n="settings.language">Langue</label>
+                                    <select id="language-selector" style="background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); padding: 8px; border-radius: var(--radius); min-width: 150px;">
+                                        <option value="fr">Français</option>
+                                        <option value="en">English</option>
+                                        <option value="de">Deutsch</option>
+                                        <option value="es">Español</option>
+                                        <option value="it">Italiano</option>
+                                        <option value="pt">Português</option>
+                                        <option value="ja">日本語</option>
+                                        <option value="zh">中文</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Slicer Configuration -->
+                        <div class="sources-section" style="margin-top: 20px;">
+                            <div class="section-header">
+                                <h3><i class="fa-solid fa-cube"></i> <span data-i18n="settings.slicer_config">Configuration Slicer</span></h3>
+                            </div>
+                            <div style="padding: 16px;">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <label style="color: var(--text-primary); font-size: 14px;" data-i18n="settings.default_slicer">Application par défaut</label>
+                                    <select id="default-slicer-select" style="background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); padding: 8px; border-radius: var(--radius); max-width: 250px;">
+                                        <option value="system_default" data-i18n="settings.slicer_select">Selectionnez un slicer</option>
+                                        <option value="orca-slicer.exe">OrcaSlicer</option>
+                                        <option value="bambu-studio.exe">Bambu Studio</option>
+                                        <option value="prusa-slicer.exe">PrusaSlicer</option>
+                                        <option value="Cura.exe">Ultimaker Cura</option>
+                                    </select>
+                                </div>
+                                <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;" data-i18n="settings.slicer_desc">
+                                    Permet d'ouvrir les fichiers 3MF et STL directement avec ton slicer.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- File Sources -->
+                        <div class="sources-section">
+                            <div class="section-header">
+                                <h3><i class="fa-solid fa-database"></i> <span data-i18n="settings.file_sources">Sources de fichiers</span></h3>
+                                <button id="add-source-btn" class="btn btn-primary btn-sm">
+                                     <span data-i18n="actions.add">Ajouter</span>
+                                </button>
+                            </div>
+                            <div id="sources-list" class="sources-list">
+                                <div class="empty-state small"><p data-i18n="settings.no_sources">Aucune source configurée</p></div>
+                            </div>
+                        </div>
+                        
+                        <!-- External Accounts -->
+                        <div class="sources-section" style="margin-top: 30px;">
+                            <div class="section-header">
+                                <h3><i class="fa-solid fa-key"></i> <span data-i18n="settings.external_accounts">Comptes externes</span></h3>
+                                <button id="add-account-btn" class="btn btn-primary btn-sm">
+                                     <span data-i18n="actions.add">Ajouter</span>
+                                </button>
+                            </div>
+                            <div id="accounts-list" class="sources-list">
+                                <div class="empty-state small"><p data-i18n="settings.no_accounts">Aucun compte enregistré</p></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Contact Page -->
+                <div id="page-contacts" class="page">
+                    <div class="contact-form-container">
+                        <h3><i class="fa-solid fa-envelope"></i> <span data-i18n="contact.title">Contacter le support</span></h3>
+                        <p class="contact-subtitle" data-i18n="contact.subtitle">Envoyez un message directement à l'équipe Stellio.</p>
+                        <form id="contact-form" class="contact-form">
+                            <div class="input-group">
+                                <label data-i18n="contact.name">Votre nom</label>
+                                <input type="text" id="contact-name" data-i18n-placeholder="contact.name_placeholder" placeholder="ex: Jean Dupont" required>
+                            </div>
+                            <div class="input-group">
+                                <label data-i18n="contact.email">Votre email</label>
+                                <input type="email" id="contact-email" data-i18n-placeholder="contact.email_placeholder" placeholder="jean@exemple.com" required>
+                            </div>
+                            <div class="input-group">
+                                <label data-i18n="contact.subject">Sujet</label>
+                                <input type="text" id="contact-subject" data-i18n-placeholder="contact.subject_placeholder" placeholder="ex: Problème d'import STL" required>
+                            </div>
+                            <div class="input-group">
+                                <label data-i18n="contact.message">Message</label>
+                                <textarea id="contact-message" rows="5" data-i18n-placeholder="contact.message_placeholder" placeholder="Décrivez votre demande..." required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">
+                                <i class="fa-solid fa-paper-plane"></i> <span data-i18n="contact.send">Envoyer le message</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+				<div id="page-repair" class="page">
+				  <div class="repair-header">
+					<h2 data-i18n="repair.title">Réparation de maillage</h2>
+					<p data-i18n="repair.subtitle">Fichiers détectés comme non-manifold ou avec des trous géométriques</p>
+				  </div>
+				  <div id="repair-grid" class="repair-grid"></div>
+				  <div id="repair-empty" class="empty-state hidden">
+					<i class="fa-solid fa-circle-check"></i>
+					<p data-i18n="repair.all_good">Aucun fichier ne nécessite de réparation.</p>
+				  </div>
+				</div>
+				<div id="page-printers" class="page">
+					<div id="printers-grid" class="grid-printers"></div>
+					<button onclick="openAddPrinterModal()" class="btn btn-primary">
+						<i class="fa-solid fa-plus"></i> Ajouter une imprimante
+					</button>
+				</div>
+            </main>
+        </div>
+        
+        <!-- Selection Action Bar -->
+        <div id="selection-action-bar" class="selection-action-bar" style="display:none;">
+            <span id="selection-count">0 fichier sélectionné</span>
+            <button id="select-toggle-all" class="btn btn-sm" title="Tout sélectionner/désélectionner">
+                <i class="fa-solid fa-square"></i> <span data-i18n="actions.all">Tout</span>
+            </button>
+            <button id="send-selected-to-slicer-btn" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-scissors"></i> <span data-i18n="actions.send_to_slicer">Envoyer au Slicer</span>
+            </button>
+            <button id="cancel-selection-btn" class="btn btn-ghost btn-sm">
+                <i class="fa-solid fa-times"></i> <span data-i18n="actions.cancel">Annuler</span>
+            </button>
+        </div>
+        
+        <!-- Footer Bar -->
+        <div class="footer-bar">
+            
+            <span id="last-update" data-i18n="footer.updated">Mis à jour à</span>
+			<span id="file-count-display">fichier</span>
+        </div>
+    </div>
+    
+    <!-- Modals (with i18n attributes) -->
+    <div id="modal-select-type" class="modal hidden">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-database"></i> <span data-i18n="modal.add_source">Ajouter une source</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-select-type')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-subtitle" data-i18n="modal.select_type">Sélectionnez le type de source à ajouter</p>
+                <div class="source-type-grid">
+                    <button class="type-card" data-type="folder"><i class="fa-solid fa-folder"></i><span data-i18n="source.local_folder">Dossier local</span></button>
+                    <button class="type-card" data-type="file"><i class="fa-solid fa-file"></i><span data-i18n="source.single_file">Fichier unique</span></button>
+                    <button class="type-card" data-type="smb"><i class="fa-solid fa-network-wired"></i><span data-i18n="source.smb_share">Partage SMB</span></button>
+                    <button class="type-card" data-type="nfs"><i class="fa-solid fa-server"></i><span data-i18n="source.nfs_share">Partage NFS</span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- SMB Modal -->
+    <div id="modal-smb" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-network-wired"></i> <span data-i18n="source.smb_share">Partage SMB</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-smb')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="smb-form">
+                    <div class="input-group">
+                        <label data-i18n="form.name">Nom</label>
+                        <input type="text" id="smb-name" data-i18n-placeholder="form.name_placeholder" placeholder="ex: Serveur NAS" required>
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="form.ip_host">Adresse IP / Hôte</label>
+                        <input type="text" id="smb-host" data-i18n-placeholder="form.ip_placeholder" placeholder="192.168.1.10" required>
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="form.share_name">Nom du partage (dossier)</label>
+                        <input type="text" id="smb-share" data-i18n-placeholder="form.share_placeholder" placeholder="public" required>
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="form.username">Identifiant (optionnel)</label>
+                        <input type="text" id="smb-user" data-i18n-placeholder="form.username_placeholder" placeholder="username">
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="form.password">Mot de passe (optionnel)</label>
+                        <input type="password" id="smb-pass" data-i18n-placeholder="form.password_placeholder" placeholder="password">
+                    </div>
+                    <div style="margin: 15px 0;">
+                        <button type="button" id="test-smb-btn" class="btn btn-ghost btn-block" style="border: 1px dashed var(--border);">
+                            <i class="fa-solid fa-plug"></i> <span data-i18n="actions.test_connection">Tester la connexion</span>
+                        </button>
+                        <div id="smb-test-result" style="margin-top: 8px; font-size: 13px;"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-smb')" data-i18n="actions.cancel">Annuler</button>
+                        <button type="submit" id="add-smb-btn" class="btn btn-primary" disabled data-i18n="actions.add">
+                            Ajouter
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- NFS Modal -->
+    <div id="modal-nfs" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-server"></i> <span data-i18n="source.nfs_share">Partage NFS</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-nfs')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="nfs-form">
+                    <div class="input-group">
+                        <label data-i18n="form.name">Nom</label>
+                        <input type="text" id="nfs-name" data-i18n-placeholder="form.name_placeholder" placeholder="ex: Stockage NFS" required>
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="form.ip_host">Adresse IP / Hôte</label>
+                        <input type="text" id="nfs-host" data-i18n-placeholder="form.ip_placeholder" placeholder="192.168.1.20" required>
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="form.export_path">Chemin d'export</label>
+                        <input type="text" id="nfs-path" data-i18n-placeholder="form.path_placeholder" placeholder="/export/data" required>
+                    </div>
+                    <div style="margin: 15px 0;">
+                        <button type="button" id="test-nfs-btn" class="btn btn-ghost btn-block" style="border: 1px dashed var(--border);">
+                            <i class="fa-solid fa-plug"></i> <span data-i18n="actions.test_connection">Tester la connexion</span>
+                        </button>
+                        <div id="nfs-test-result" style="margin-top: 8px; font-size: 13px;"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-nfs')" data-i18n="actions.cancel">Annuler</button>
+                        <button type="submit" id="add-nfs-btn" class="btn btn-primary" disabled data-i18n="actions.add">
+                             Ajouter
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Slicer Modal -->
+    <div id="modal-slicer" class="modal hidden">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-scissors"></i> <span data-i18n="modal.send_to_slicer">Envoyer au Slicer</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-slicer')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="slicer-file-name" style="margin-bottom: 15px; font-weight: bold;"></p>
+                <div class="modal-footer">
+                    <button class="btn btn-ghost" onclick="closeModal('modal-slicer')" data-i18n="actions.cancel">Annuler</button>
+                    <button id="confirm-slicer" class="btn btn-primary">
+                        <i class="fa-solid fa-paper-plane"></i> <span data-i18n="actions.send">Envoyer</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Confirm Modal -->
+    <div id="modal-confirm" class="modal hidden">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-triangle-exclamation"></i> <span data-i18n="modal.confirm_title">Confirmation</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-confirm')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message" style="margin-bottom: 20px; color: var(--text-secondary);"></p>
+                <div class="modal-footer">
+                    <button id="confirm-cancel-btn" class="btn btn-ghost" onclick="closeModal('modal-confirm')" data-i18n="actions.cancel">Annuler</button>
+                    <button id="confirm-ok-btn" class="btn btn-primary" style="background: var(--danger);">
+                        <i class="fa-solid fa-trash"></i> <span data-i18n="actions.delete">Supprimer</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 3D Viewer Modal -->
+    <div id="modal-3d-viewer" class="modal hidden">
+        <div class="modal-content viewer-3d">
+            <div class="viewer-header">
+                <h3 id="viewer-title"><i class="fa-solid fa-cube"></i> <span data-i18n="viewer.3d_title">Visualisation 3D</span></h3>
+                <div class="viewer-controls">
+                    <button class="modal-close" onclick="closeModal('modal-3d-viewer')">&times;</button>
+                </div>
+            </div>
+            <div id="viewer-canvas-container" class="viewer-canvas"></div>
+            <div class="viewer-footer">
+                <p id="viewer-info" style="font-size: 12px; color: var(--text-muted);" data-i18n="viewer.controls">
+                    Clic gauche : Rotation | Clic droit : Pan | Molette : Zoom
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- About Modal -->
+    <div id="modal-about" class="modal hidden">
+        <div class="modal-content modal-about-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-circle-info"></i> <span data-i18n="about.title">À propos de Stellio</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-about')">&times;</button>
+            </div>
+            <div class="modal-body about-body">
+                <div class="about-logo-section">
+                    <img src="assets/logo-stellio.png" alt="Stellio Logo" class="stellio-logo-img">
+                    <h1>STELLIO</h1>
+                    <span class="about-version">Version 0.0.5</span>
+                </div>
+                <p class="about-description" data-i18n="about.description">
+                    Stellio est un gestionnaire de fichiers 3D moderne et léger, conçu pour les makers, imprimeurs 3D et passionnés de modélisation. Il centralise vos fichiers STL, 3MF et OBJ, génère des miniatures haute qualité via PyVista et s'intègre directement avec votre Slicer.
+                </p>
+                <div class="about-section">
+                    <h4><i class="fa-solid fa-microchip"></i> <span data-i18n="about.tech">Technologies utilisées</span></h4>
+                    <div class="tech-tags">
+                        <span>Python</span><span>Flask</span><span>PyVista</span><span>Three.js</span><span>SQLite</span><span>SMTP</span>
+                    </div>
+                </div>
+                <div class="about-section">
+                    <h4><i class="fa-solid fa-copyright"></i> <span data-i18n="about.license">Licence & Droits</span></h4>
+                    <p class="about-legal" data-i18n="about.legal">© 2026 Stellio Project. Tous droits réservés. Développé avec passion pour la communauté Maker.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Rename Source Modal -->
+    <div id="modal-rename-source" class="modal hidden">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-pen"></i> <span data-i18n="modal.rename_source">Renommer la source</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-rename-source')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="rename-source-form">
+                    <input type="hidden" id="rename-source-id">
+                    <div class="input-group">
+                        <label data-i18n="form.source_name">Nom de la source</label>
+                        <input type="text" id="rename-source-name" data-i18n-placeholder="form.source_name_placeholder" placeholder="ex: Mes fichiers STL" required>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-rename-source')" data-i18n="actions.cancel">Annuler</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa-solid fa-check"></i> <span data-i18n="actions.rename">Renommer</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filters Modal -->
+    <div id="modal-filters" class="modal hidden">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-filter"></i> <span data-i18n="nav.filters">Filtres</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-filters')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="filter-group" style="margin-bottom: 20px;">
+                    <h3><i class="fa-solid fa-shapes"></i> <span data-i18n="filters.file_type">Type de fichier</span></h3>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="filter-type" value=".stl" checked>
+                        <i class="fa-solid fa-cube" style="color: var(--accent)"></i>
+                        <span>STL</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="filter-type" value=".3mf" checked>
+                        <i class="fa-solid fa-file-lines" style="color: var(--accent)"></i>
+                        <span>3MF</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="filter-type" value=".obj" checked>
+                        <i class="fa-solid fa-shapes" style="color: var(--accent)"></i>
+                        <span>OBJ</span>
+                    </label>
+                </div>
+
+                <div class="filter-group" style="margin-bottom: 20px;">
+                    <h3><i class="fa-solid fa-weight-hanging"></i> <span data-i18n="filters.size">Taille (MB)</span></h3>
+                    <div class="range-group" style="display: flex; gap: 12px;">
+                        <div style="flex: 1;">
+                            <label data-i18n="filters.min">Min</label>
+                            <input type="number" id="size-min" data-i18n-placeholder="filters.min_placeholder" placeholder="0" min="0" step="0.1" style="width: 100%;">
+                        </div>
+                        <div style="flex: 1;">
+                            <label data-i18n="filters.max">Max</label>
+                            <input type="number" id="size-max" data-i18n-placeholder="filters.max_placeholder" placeholder="∞" min="0" step="0.1" style="width: 100%;">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="filter-group" style="margin-bottom: 20px;">
+                    <h3><i class="fa-solid fa-tags"></i> <span data-i18n="filters.tags">Tags</span></h3>
+                    <div id="filter-tags-modal"></div>
+                    <button id="manage-tags-modal-btn" class="btn btn-ghost btn-sm btn-block" style="margin-top: 8px; border: 1px dashed var(--border);">
+                        <i class="fa-solid fa-gear"></i> <span data-i18n="filters.manage_tags">Gérer les tags</span>
+                    </button>
+                </div>
+
+                <div style="display: flex; gap: 8px; margin-top: 24px;">
+                    <button class="btn btn-ghost" onclick="resetFilters()" style="flex: 1;" data-i18n="filters.reset">
+                        <i class="fa-solid fa-rotate-left"></i> Réinitialiser
+                    </button>
+                    <button class="btn btn-primary" onclick="applyFiltersFromModal()" style="flex: 2;" data-i18n="filters.apply">
+                        <i class="fa-solid fa-check"></i> Appliquer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tag Manager Modal -->
+    <div id="modal-tag-manager" class="modal hidden">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-tags"></i> <span data-i18n="modal.manage_tags">Gérer les tags</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-tag-manager')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;" data-i18n="modal.tags_desc">
+                    Cliquez sur un fichier puis choisissez ses tags. Les nouveaux tags apparaîtront automatiquement dans les filtres.
+                </p>
+                
+                <div class="input-group" style="margin-bottom:15px;">
+                    <label data-i18n="modal.selected_file">Fichier sélectionné</label>
+                    <input type="text" id="tag-modal-file-path" readonly style="background:var(--bg-tertiary); cursor:default;">
+                    <div id="tag-modal-current-tags" style="margin-top:6px; display:flex; flex-wrap:wrap; gap:6px;"></div>
+                </div>
+
+                <div style="max-height:200px; overflow-y:auto; border:1px solid var(--border); border-radius:var(--radius); padding:10px; margin-bottom:15px;">
+                    <label style="font-size:12px; color:var(--text-secondary); font-weight:600;" data-i18n="modal.available_tags">Tags disponibles :</label>
+                    <div id="tag-modal-list" style="display:flex; flex-direction:column; gap:6px; margin-top:8px;"></div>
+                </div>
+
+                <div class="input-group" style="display:flex; gap:8px;">
+                    <div style="flex:1;">
+                        <label data-i18n="modal.new_tag">Nouveau tag</label>
+                        <input type="text" id="tag-modal-new-tag" data-i18n-placeholder="modal.new_tag_placeholder" placeholder="ex: Vis, Écrou, Print-Ready...">
+                    </div>
+                    <button type="button" id="add-tag-to-file-btn" class="btn btn-primary" data-i18n="modal.create_tag"> Créer un tag</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Account Modal -->
+	<div id="modal-account" class="modal hidden">
+		<div class="modal-content small">
+			<div class="modal-header">
+				<h3><i class="fa-solid fa-key"></i> <span id="account-modal-title" data-i18n="modal.add_account">Ajouter un compte</span></h3>
+				<button class="modal-close" onclick="closeModal('modal-account')">&times;</button>
+			</div>
+			<div class="modal-body">
+				<form id="account-form">
+					<input type="hidden" id="account-platform-edit">
+					
+					<div class="input-group">
+						<label data-i18n="form.platform">Plateforme</label>
+						<select id="account-platform" required>
+							<option value="" data-i18n="form.select_platform">Sélectionner...</option>
+							<option value="telegram">Telegram</option>
+							<option value="printables">Printables</option>
+							<!-- <option value="makerworld">MakerWorld</option> -->
+						</select>
+					</div>
+
+					<div id="auth-email-pass-group" style="display: none;">
+						<div class="input-group">
+							<label id="account-email-label" data-i18n="form.email">Email</label>
+							<input type="email" id="account-email" data-i18n-placeholder="form.email_placeholder" placeholder="ton@email.com">
+						</div>
+						<div class="input-group">
+							<label data-i18n="form.password">Mot de passe</label>
+							<input type="password" id="account-password" data-i18n-placeholder="form.password_placeholder" placeholder="••••••••">
+						</div>
+					</div>
+
+					<div id="auth-telegram-group" style="display: none;">
+						<div class="input-group">
+							<label data-i18n="form.phone">Numéro de téléphone</label>
+							<input type="tel" id="account-phone" data-i18n-placeholder="form.phone_placeholder" placeholder="+33612345678">
+						</div>
+						<div class="input-group">
+							<label>🔑 API ID</label>
+							<input type="text" id="account-telegram-api-id" placeholder="1234567">
+						</div>
+						<div class="input-group">
+							<label>🔐 API Hash</label>
+							<input type="text" id="account-telegram-api-hash" placeholder="e0a8f0d8...">
+						</div>
+						<small style="color: var(--text-muted); margin-bottom: 10px; display: block;">
+							<i class="fa-solid fa-circle-info"></i> <span data-i18n="form.telegram_help">Obtenez vos infos sur</span> <a href="https://my.telegram.org" target="_blank" style="color:var(--accent)">my.telegram.org</a>
+						</small>
+					</div>
+
+					<!-- ══════════ 🌍 MAKERWORLD ══════════
+					<div id="auth-makerworld-group" style="display: none;">
+						<div class="input-group">
+							<label>🍪 Cookie de session MakerWorld</label>
+							<textarea 
+								id="account-makerworld-cookie" 
+								placeholder="Collez ici votre cookie de session MakerWorld..."
+								rows="4"
+								style="font-family: monospace; font-size: 12px; resize: vertical; min-height: 80px;"
+							></textarea>
+							<small style="color: var(--text-muted); margin-top: 6px; display: block; line-height: 1.5;">
+								<i class="fa-solid fa-circle-info" style="color: #009688;"></i> 
+								<strong>Optionnel</strong> - Requis uniquement pour les modèles privés.<br>
+								<a href="#" onclick="showMakerWorldCookieHelp(); return false;" style="color: var(--accent);">
+									<i class="fa-solid fa-question-circle"></i> Comment obtenir le cookie ?
+								</a>
+							</small>
+						</div>
+					</div> -->
+
+					<!-- ══════════ 🖨️ PRINTABLES ══════════ -->
+					<div id="auth-printables-group" style="display: none;">
+						<div style="padding: 12px; background: rgba(233, 91, 37, 0.1); border-left: 3px solid #e95b25; border-radius: 6px; margin: 10px 0;">
+							<i class="fa-solid fa-circle-info" style="color: #e95b25;"></i>
+							<small style="color: var(--text-secondary);">
+								<strong>Printables</strong> : Aucun compte requis pour les modèles publics.<br>
+								Vous pouvez télécharger directement sans configuration.
+							</small>
+						</div>
+					</div>
+
+					<div class="modal-footer" style="margin-top: 20px;">
+						<button type="button" class="btn btn-ghost" onclick="closeModal('modal-account')" data-i18n="actions.cancel">Annuler</button>
+						<button type="submit" class="btn btn-primary">
+							<i class="fa-solid fa-check"></i> <span data-i18n="actions.save">Enregistrer</span>
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+    
+    <!-- Download Modal -->
+	<div id="modal-download" class="modal hidden">
+		<div class="modal-content small">
+			<div class="modal-header">
+				<h3><i class="fa-solid fa-cloud-arrow-down"></i> <span data-i18n="modal.download_title">Télécharger depuis un lien</span></h3>
+				<button class="modal-close" onclick="closeModal('modal-download')">&times;</button>
+			</div>
+			<div class="modal-body">
+				<p style="margin-bottom: 15px; color: var(--text-secondary);" data-i18n="modal.download_desc">
+					Colle l'URL d'un fichier 3D.
+				</p>
+				
+				<div style="margin-bottom: 15px;">
+					<button type="button" id="toggle-astuces" class="btn btn-ghost btn-sm btn-block" 
+							style="border: 1px dashed var(--border); justify-content: space-between;">
+						<span><i class="fa-solid fa-lightbulb" style="color: var(--warning); margin-right: 8px;"></i> <span data-i18n="modal.tips_title">Astuces par plateforme</span></span>
+						<i class="fa-solid fa-chevron-down" id="astuces-icon"></i>
+					</button>                   
+					<div id="astuces-menu" style="display: none; margin-top: 10px; padding: 12px; background: var(--bg-tertiary); border-radius: var(--radius); border: 1px solid var(--border);">
+						
+						<!-- ══════════ 📱 TELEGRAM ══════════ -->
+						<div style="margin-bottom: 8px;">
+							<button type="button" class="btn btn-ghost btn-sm btn-block" 
+									onclick="toggleAstuceSubmenu('telegram-astuces')" 
+									style="justify-content: space-between; text-align: left;">
+								<span><i class="fa-brands fa-telegram" style="color: #0088cc; margin-right: 8px;"></i> Telegram</span>
+								<i class="fa-solid fa-chevron-right" id="telegram-astuces-icon"></i>
+							</button>
+							<div id="telegram-astuces" style="display: none; margin-top: 8px; padding: 10px; background: var(--bg-primary); border-radius: 6px; font-size: 12px; line-height: 1.6;">
+								<strong style="color: var(--accent);"><span data-i18n="modal.telegram_tip_title">Comment télécharger depuis Telegram :</span></strong><br>
+								1. <span data-i18n="modal.telegram_tip_1">Ouvre Telegram (Desktop ou Web)</span><br>
+								2. <span data-i18n="modal.telegram_tip_2">Va dans le channel/groupe</span><br>
+								3. <strong><span data-i18n="modal.telegram_tip_3">Clic droit</span></strong> <span data-i18n="modal.telegram_tip_3b">sur le fichier 3D</span><br>
+								4. <span data-i18n="modal.telegram_tip_4">Choisis</span> <strong><span data-i18n="modal.telegram_tip_4b">"Copier le lien du message"</span></strong><br><span data-i18n="modal.telegram_tip_4c">ou</span> <strong><span data-i18n="modal.telegram_tip_4d">"Copy message link"</span></strong><br>
+								5. <span data-i18n="modal.telegram_tip_5">Colle le lien ci-dessus (ex: https://t.me/channel/12345)</span>
+							</div>
+						</div>
+
+						<!-- ══════════ 🖨️ PRINTABLES ══════════ -->
+						<div style="margin-bottom: 8px;">
+							<button type="button" class="btn btn-ghost btn-sm btn-block" 
+									onclick="toggleAstuceSubmenu('printables-astuces')" 
+									style="justify-content: space-between; text-align: left;">
+								<span><i class="fa-solid fa-cube" style="color: #e95b25; margin-right: 8px;"></i> Printables</span>
+								<i class="fa-solid fa-chevron-right" id="printables-astuces-icon"></i>
+							</button>
+							<div id="printables-astuces" style="display: none; margin-top: 8px; padding: 10px; background: var(--bg-primary); border-radius: 6px; font-size: 12px; line-height: 1.6;">
+								<strong style="color: var(--accent);">Comment télécharger depuis Printables :</strong><br>
+								1. Ouvre <a href="https://www.printables.com" target="_blank" style="color: var(--accent);">printables.com</a><br>
+								2. Trouve le modèle 3D que tu veux télécharger<br>
+								3. Copie l'URL de la page du modèle<br>
+								&nbsp;&nbsp;&nbsp;&nbsp;<code style="background:var(--bg-input); padding:2px 6px; border-radius:4px; font-size:11px;">https://www.printables.com/model/123456-nom</code><br>
+								4. Colle le lien ci-dessus<br>
+								5. Clique sur Télécharger<br>
+								<div style="margin-top: 8px; padding: 6px 8px; background: rgba(233, 91, 37, 0.1); border-left: 3px solid #e95b25; border-radius: 4px;">
+									<i class="fa-solid fa-info-circle" style="color: #e95b25;"></i> 
+									<small style="color: var(--text-secondary);">Aucun compte nécessaire pour les modèles publics</small>
+								</div>
+							</div>
+						</div>
+						<!-- ══════════ 🌍 MAKERWORLD ══════════
+						<div style="margin-bottom: 8px;">
+							<button type="button" class="btn btn-ghost btn-sm btn-block" 
+									onclick="toggleAstuceSubmenu('makerworld-astuces')" 
+									style="justify-content: space-between; text-align: left;">
+								<span><i class="fa-solid fa-globe" style="color: #009688; margin-right: 8px;"></i> MakerWorld</span>
+								<i class="fa-solid fa-chevron-right" id="makerworld-astuces-icon"></i>
+							</button>
+							<div id="makerworld-astuces" style="display: none; margin-top: 8px; padding: 10px; background: var(--bg-primary); border-radius: 6px; font-size: 12px; line-height: 1.6;">
+								<strong style="color: var(--accent);">Comment télécharger depuis MakerWorld :</strong><br>
+								1. Ouvre <a href="https://www.makerworld.com" target="_blank" style="color: var(--accent);">makerworld.com</a><br>
+								2. Connecte-toi à ton compte<br>
+								3. Trouve le modèle 3D que tu veux télécharger<br>
+								4. Copie l'URL de la page du modèle<br>
+								&nbsp;&nbsp;&nbsp;&nbsp;<code style="background:var(--bg-input); padding:2px 6px; border-radius:4px; font-size:11px;">https://makerworld.com/en/models/123456</code><br>
+								5. Colle le lien ci-dessus<br>
+								<div style="margin-top: 8px; padding: 6px 8px; background: rgba(0, 150, 136, 0.1); border-left: 3px solid #009688; border-radius: 4px;">
+									<i class="fa-solid fa-cookie-bite" style="color: #009688;"></i> 
+									<small style="color: var(--text-secondary);">
+										<strong>Cookie requis</strong> pour les modèles privés.<br>
+										Ajoute ton compte MakerWorld dans Paramètres → Comptes externes
+									</small>
+								</div>
+							</div>
+						</div> -->
+						<!-- ══════════ 🎨 CULTS3D ══════════ 
+						<div style="margin-bottom: 8px;">
+							<button type="button" class="btn btn-ghost btn-sm btn-block" 
+									onclick="toggleAstuceSubmenu('cults-astuces')" 
+									style="justify-content: space-between; text-align: left;">
+								<span><i class="fa-solid fa-palette" style="color: #e63946; margin-right: 8px;"></i> Cults3D</span>
+								<i class="fa-solid fa-chevron-right" id="cults-astuces-icon"></i>
+							</button>
+							<div id="cults-astuces" style="display: none; margin-top: 8px; padding: 10px; background: var(--bg-primary); border-radius: 6px; font-size: 12px; line-height: 1.6;">
+								<strong style="color: var(--accent);">Comment télécharger depuis Cults3D :</strong><br>
+								1. Connecte-toi à <a href="https://cults3d.com" target="_blank" style="color: var(--accent);">cults3d.com</a><br>
+								2. Va dans <strong>Paramètres → API</strong> (ou Profil)<br>
+								3. Copie ta <strong>clé API</strong> (token)<br>
+								4. Ajoute ton compte Cults3D dans Stellio (section Comptes)<br>
+								5. Copie l'URL du modèle (ex: <code style="background:var(--bg-input); padding:2px 6px; border-radius:4px; font-size:11px;">https://cults3d.com/en/3d-model/...</code>)<br>
+								6. Colle le lien ci-dessus<br>
+								<div style="margin-top: 8px; padding: 6px 8px; background: rgba(230, 57, 70, 0.1); border-left: 3px solid #e63946; border-radius: 4px;">
+									<i class="fa-solid fa-key" style="color: #e63946;"></i> 
+									<small style="color: var(--text-secondary);">Nécessite un compte Cults3D et une clé API</small>
+								</div>
+							</div>
+						</div>-->
+
+						<!-- ══════════ 🌐 THINGIVERSE ══════════ 
+						<div style="margin-bottom: 0;">
+							<button type="button" class="btn btn-ghost btn-sm btn-block" 
+									onclick="toggleAstuceSubmenu('thingiverse-astuces')" 
+									style="justify-content: space-between; text-align: left;">
+								<span><i class="fa-solid fa-globe" style="color: #2196F3; margin-right: 8px;"></i> Thingiverse</span>
+								<i class="fa-solid fa-chevron-right" id="thingiverse-astuces-icon"></i>
+							</button>
+							<div id="thingiverse-astuces" style="display: none; margin-top: 8px; padding: 10px; background: var(--bg-primary); border-radius: 6px; font-size: 12px; line-height: 1.6;">
+								<strong style="color: var(--accent);">Comment télécharger depuis Thingiverse :</strong><br>
+								1. Va sur <a href="https://www.thingiverse.com" target="_blank" style="color: var(--accent);">thingiverse.com</a><br>
+								2. Trouve le modèle à télécharger<br>
+								3. Copie l'URL de la page<br>
+								&nbsp;&nbsp;&nbsp;&nbsp;<code style="background:var(--bg-input); padding:2px 6px; border-radius:4px; font-size:11px;">https://www.thingiverse.com/thing:123456</code><br>
+								4. Colle le lien ci-dessus<br>
+								<div style="margin-top: 8px; padding: 6px 8px; background: rgba(33, 150, 243, 0.1); border-left: 3px solid #2196F3; border-radius: 4px;">
+									<i class="fa-solid fa-circle-info" style="color: #2196F3;"></i> 
+									<small style="color: var(--text-secondary);">Téléchargement direct sans compte nécessaire</small>
+								</div>
+							</div>
+						</div>-->
+
+					</div>
+				</div>               
+
+				<form id="download-form">
+					<div class="input-group">
+						<label data-i18n="form.file_url">URL du fichier</label>
+						<input type="url" id="download-url" data-i18n-placeholder="form.url_placeholder" placeholder="https://..." required>
+					</div>
+					
+					<div class="input-group">
+						<label data-i18n="form.save_to">Enregistrer dans</label>
+						<select id="download-source" required>
+							<option value="" data-i18n="form.default_folder">Dossier par défaut (Downloads)</option>
+						</select>	
+						<div class="input-group" style="margin-top: 8px; display: flex; gap: 8px; align-items: center;">
+							<button type="button" class="btn btn-ghost btn-sm" onclick="openCreateFolderModal()" style="flex: 1;">
+								<span data-i18n="download.create_folder">Créer un dossier...</span>
+							</button>
+							<button type="button" class="btn btn-ghost btn-sm" onclick="browseDownloadLocation()" title="Parcourir">
+								<i class="fa-solid fa-folder-open"></i>
+							</button>
+						</div>							
+						<small style="color: var(--text-muted);" data-i18n="form.save_hint">
+							Choisis où enregistrer le fichier téléchargé.
+						</small>
+					</div>    		
+
+					<div id="download-progress" class="hidden" style="margin: 15px 0;">
+						<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+							<span id="download-status" style="font-size: 13px; color: var(--text-secondary);">
+								<i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="download.preparing">Préparation...</span>
+							</span>
+						</div>
+						<div class="progress-track" style="height: 6px;">
+							<div id="download-bar" class="progress-bar" style="width: 0%"></div>
+						</div>
+					</div>                    
+
+					<div class="modal-footer">
+						<button type="button" class="btn btn-ghost" onclick="closeModal('modal-download')" data-i18n="actions.cancel">Annuler</button>
+						<button type="submit" id="download-btn" class="btn btn-primary">
+							<i class="fa-solid fa-download"></i> <span data-i18n="actions.download">Télécharger</span>
+						</button>
+					</div>
+				</form>
+				
+				<div id="download-result" style="margin-top: 15px; padding: 10px; border-radius: var(--radius); display: none;"></div>
+			</div>
+		</div>
+	</div>
+	<!-- printer modal -->
+	<div id="modal-add-printer" class="modal hidden">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h3><i class="fa-solid fa-print"></i> Ajouter une imprimante</h3>
+				<button class="modal-close" onclick="closeModal('modal-add-printer')">×</button>
+			</div>
+			<div class="modal-body">
+				<form id="add-printer-form">
+					<div class="input-group">
+						<label>Nom</label>
+						<input type="text" id="printer-name" placeholder="Mon imprimante" required>
+					</div>
+					<div class="input-group">
+						<label>Type</label>
+						<select id="printer-type" onchange="togglePrinterFields()" required>
+							<option value="octoprint">OctoPrint</option> 
+							<option value="klipper">Klipper (Moonraker)</option>
+							<!-- <option value="bambu">BambuLab</option> -->
+						</select>
+					</div>
+					<div class="input-group">
+						<label>Adresse IP</label>
+						<input type="text" id="printer-ip" placeholder="192.168.1.100" required>
+					</div>
+					<div class="input-group" id="group-api-key" style="display:none;">
+						<label>Clé API</label>
+						<input type="text" id="printer-api-key" placeholder="Clé API OctoPrint">
+					</div>
+					<div class="input-group" id="group-port" style="display:none;">
+						<label>Port Moonraker</label>
+						<input type="text" id="printer-port" placeholder="7125" value="7125">
+					</div>
+					<div class="input-group" id="group-bambu" style="display:none;">
+						<label>Code d'accès local</label>
+						<input type="text" id="printer-bambu-code" placeholder="Code d'accès Bambu">
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button class="btn btn-ghost" onclick="closeModal('modal-add-printer')">Annuler</button>
+				<button class="btn btn-primary" onclick="addPrinter()">
+					<i class="fa-solid fa-plus"></i> Ajouter
+				</button>
+			</div>
+		</div>
+	</div>
+    <!-- Toast Container -->
+    <div id="toast-container"></div>    
+    
+    <!-- Scroll to Top Button -->
+    <button id="scroll-to-top" class="scroll-to-top" title="Retour en haut">
+        <i class="fa-solid fa-arrow-up"></i>
+    </button>
+    
+    <!-- Scripts -->
+    <script src="script.js"></script>
+</body>
+</html>
