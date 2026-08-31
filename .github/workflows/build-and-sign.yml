@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Build + smoke test uniquement, sans signer ni publier'
+        description: 'Build uniquement, sans publier de release'
         type: boolean
         default: false
 
@@ -50,7 +50,7 @@ jobs:
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
             echo "should_release=false" >> "$GITHUB_OUTPUT"
-            echo "Mode dry_run : build + smoke test uniquement, pas de release."
+            echo "Mode dry_run : build uniquement, pas de release."
           elif git ls-remote --tags origin | grep -q "refs/tags/v$VERSION\$"; then
             echo "should_release=false" >> "$GITHUB_OUTPUT"
             echo "Le tag v$VERSION existe deja — rien a publier (CURRENT_VERSION pas modifiee)."
@@ -163,41 +163,6 @@ jobs:
             }
           }
 
-      # ──────────────────────────────────────────────────────────────────
-      # TEST HEADLESS DÉSACTIVÉ TEMPORAIREMENT
-      # Le backend ne démarre pas correctement dans l'environnement CI GitHub
-      # Pour réactiver : décommenter toutes les lignes ci-dessous
-      # ──────────────────────────────────────────────────────────────────
-      # - name: Headless smoke test
-      #   shell: pwsh
-      #   run: |
-      #     $verifyDir = "$PWD\build\verify-data-Stellio"
-      #     New-Item -ItemType Directory -Force -Path $verifyDir | Out-Null
-      #     New-Item -ItemType File -Force -Path "$verifyDir\.debug_session_pending" | Out-Null
-      #
-      #     $env:STELLIO_HEADLESS = "1"
-      #     $env:STELLIO_DATA_DIR = $verifyDir
-      #     $env:STELLIO_PORT = "58234"
-      #     $env:STELLIO_SERVER_URL = "http://127.0.0.1:58234"
-      #
-      #     $proc = Start-Process -FilePath "dist\Stellio\Stellio.exe" -WorkingDirectory "dist\Stellio" -PassThru
-      #     $logFile = "$verifyDir\stellio.log"
-      #     $ready = $false
-      #     for ($i = 0; $i -lt 60; $i++) {
-      #       Start-Sleep -Seconds 1
-      #       if (Test-Path $logFile) {
-      #         if (Select-String -Path $logFile -Pattern "Stellio est pr.t" -Quiet) { $ready = $true; break }
-      #       }
-      #     }
-      #     Start-Sleep -Seconds 1
-      #     Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-      #
-      #     if (-not $ready) { throw "Le backend n'a pas signale etre pret dans le delai imparti." }
-      #     if (-not (Select-String -Path $logFile -Pattern "Tous les modules requis sont" -Quiet)) {
-      #       throw "Modules manquants detectes au demarrage - voir le log."
-      #     }
-      #     Write-Host "Smoke test OK."
-
       - name: Create patch ZIP for auto-updater
         shell: pwsh
         run: |
@@ -233,45 +198,94 @@ jobs:
           path: output\Stellio-Setup-${{ needs.check-version.outputs.version }}.exe
 
   # ──────────────────────────────────────────────────────────────────────
-  # 3. Signature + publication (seulement si should_release = true)
+  # 3. Publication directe SANS signature (en attendant l'approbation SignPath)
   # ──────────────────────────────────────────────────────────────────────
-  sign-and-release:
+  release:
     needs: [check-version, build]
-    if: needs.check-version.outputs.should_release == 'false' #passer a true apres acceptation signature electronique
+    if: needs.check-version.outputs.should_release == 'true'
     runs-on: windows-latest
     steps:
-      - name: Submit signing request to SignPath (installeur uniquement)
-        uses: signpath/github-action-submit-signing-request@v2
+      - name: Download installer artifact
+        uses: actions/download-artifact@v4
         with:
-          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
-          organization-id: '${{ secrets.SIGNPATH_ORG_ID }}'
-          project-slug: '${{ secrets.SIGNPATH_PROJECT_SLUG }}'
-          signing-policy-slug: '${{ secrets.SIGNPATH_POLICY_SLUG }}'
-          github-artifact-id: '${{ needs.build.outputs.artifact-id }}'
-          wait-for-completion: true
-          output-artifact-directory: 'signed'
-
-      - name: Compute SHA256 checksum of signed installer
-        shell: pwsh
-        run: |
-          $file = Get-ChildItem "signed\*.exe" | Select-Object -First 1
-          $hash = (Get-FileHash -Algorithm SHA256 $file.FullName).Hash.ToLower()
-          "$hash  $($file.Name)" | Out-File -Encoding ascii "signed\$($file.Name).sha256"
+          name: stellio-installer-unsigned
+          path: release-files
 
       - name: Download patch ZIP artifact
         uses: actions/download-artifact@v4
         with:
           name: stellio-patch-zip
-          path: patch
+          path: release-files
 
-      - name: Create GitHub Release (creates the tag automatically)
+      - name: Compute SHA256 checksum of installer
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem "release-files\*.exe" | Select-Object -First 1
+          $hash = (Get-FileHash -Algorithm SHA256 $file.FullName).Hash.ToLower()
+          "$hash  $($file.Name)" | Out-File -Encoding ascii "release-files\$($file.Name).sha256"
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.check-version.outputs.version }}
           name: Stellio v${{ needs.check-version.outputs.version }}
           generate_release_notes: true
           files: |
-            signed/*.exe
-            signed/*.sha256
-            patch/*.zip
-            patch/*.sha256
+            release-files/*.exe
+            release-files/*.sha256
+            release-files/*.zip
+
+  # ──────────────────────────────────────────────────────────────────────
+  # 4. Signature + publication AVEC SignPath (DÉSACTIVÉ pour l'instant)
+  # 
+  # POUR RÉACTIVER LA SIGNATURE :
+  # 1. Supprime ou commente le job "release" ci-dessus
+  # 2. Décommente toutes les lignes ci-dessous (retire les # au début)
+  # 3. Configure les secrets GitHub suivants dans Settings > Secrets and variables > Actions :
+  #    - SIGNPATH_API_TOKEN
+  #    - SIGNPATH_ORG_ID
+  #    - SIGNPATH_PROJECT_SLUG
+  #    - SIGNPATH_POLICY_SLUG
+  # 4. Une fois approuvé par SignPath Foundation, le workflow signera automatiquement
+  #    tes installateurs avant de les publier.
+  # ──────────────────────────────────────────────────────────────────────
+  # sign-and-release:
+  #   needs: [check-version, build]
+  #   if: needs.check-version.outputs.should_release == 'true'
+  #   runs-on: windows-latest
+  #   steps:
+  #     - name: Submit signing request to SignPath (installeur uniquement)
+  #       uses: signpath/github-action-submit-signing-request@v2
+  #       with:
+  #         api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+  #         organization-id: '${{ secrets.SIGNPATH_ORG_ID }}'
+  #         project-slug: '${{ secrets.SIGNPATH_PROJECT_SLUG }}'
+  #         signing-policy-slug: '${{ secrets.SIGNPATH_POLICY_SLUG }}'
+  #         github-artifact-id: '${{ needs.build.outputs.artifact-id }}'
+  #         wait-for-completion: true
+  #         output-artifact-directory: 'signed'
+  #
+  #     - name: Compute SHA256 checksum of signed installer
+  #       shell: pwsh
+  #       run: |
+  #         $file = Get-ChildItem "signed\*.exe" | Select-Object -First 1
+  #         $hash = (Get-FileHash -Algorithm SHA256 $file.FullName).Hash.ToLower()
+  #         "$hash  $($file.Name)" | Out-File -Encoding ascii "signed\$($file.Name).sha256"
+  #
+  #     - name: Download patch ZIP artifact
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: stellio-patch-zip
+  #         path: patch
+  #
+  #     - name: Create GitHub Release (creates the tag automatically)
+  #       uses: softprops/action-gh-release@v2
+  #       with:
+  #         tag_name: v${{ needs.check-version.outputs.version }}
+  #         name: Stellio v${{ needs.check-version.outputs.version }}
+  #         generate_release_notes: true
+  #         files: |
+  #           signed/*.exe
+  #           signed/*.sha256
+  #           patch/*.zip
+  #           patch/*.sha256
