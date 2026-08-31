@@ -1,0 +1,36 @@
+# Dossiers Python et environnements virtuels
+python/
+Lib/
+Scripts/
+redist/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Dossiers de compilation et de sortie (recréés automatiquement)
+build/
+dist/
+output/
+release/
+
+# Dossiers de données locales et logs
+stellio-data/
+*.log
+*.sqlite
+*.db
+
+# Fichiers lourds ou sensibles
+*WebView2RuntimeInstaller*
+VC_redist*.exe
+token*.txt
+*.env
+.env
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+desktop.ini

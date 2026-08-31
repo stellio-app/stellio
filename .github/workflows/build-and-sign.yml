@@ -1,0 +1,272 @@
+name: Build, sign and release Stellio
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'main.py'
+      - 'index.html'
+      - 'script.js'
+      - 'style.css'
+      - 'launcher.py'
+      - 'check_deps.py'
+      - 'requirements.txt'
+      - 'stellio-setup.iss'
+      - 'assets/**'
+      - 'languages/**'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Build + smoke test uniquement, sans signer ni publier'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write  
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────
+  # 1. Détecte la version courante et decide si une release est necessaire
+  # ──────────────────────────────────────────────────────────────────────
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      should_release: ${{ steps.check.outputs.should_release }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version and compare to existing tags
+        id: check
+        run: |
+          VERSION=$(grep -E '^CURRENT_VERSION' main.py | head -1 | sed -E "s/^CURRENT_VERSION[[:space:]]*=[[:space:]]*//; s/[\"']//g" | tr -d '[:space:]')
+          if [ -z "$VERSION" ]; then
+            echo "CURRENT_VERSION introuvable dans main.py"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version detectee : $VERSION"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "Mode dry_run : build + smoke test uniquement, pas de release."
+          elif git ls-remote --tags origin | grep -q "refs/tags/v$VERSION\$"; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "Le tag v$VERSION existe deja — rien a publier (CURRENT_VERSION pas modifiee)."
+          else
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "Nouvelle version : v$VERSION va etre construite et publiee."
+          fi
+
+  # ──────────────────────────────────────────────────────────────────────
+  # 2. Build (tourne toujours, meme en dry_run, pour valider le code)
+  # ──────────────────────────────────────────────────────────────────────
+  build:
+    needs: check-version
+    runs-on: windows-latest
+    outputs:
+      artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m venv venv
+          venv\Scripts\python.exe -m pip install --upgrade pip
+          venv\Scripts\python.exe -m pip install --upgrade -r requirements.txt
+          venv\Scripts\python.exe -m pip install pyinstaller
+
+      - name: Check dependencies (fix)
+        run: venv\Scripts\python.exe check_deps.py --fix
+
+      - name: Final dependency check (no fix)
+        run: venv\Scripts\python.exe check_deps.py
+
+      - name: Build with PyInstaller
+        run: |
+          venv\Scripts\python.exe -m PyInstaller `
+            --name "Stellio" `
+            --onedir `
+            --windowed `
+            --noconfirm `
+            --clean `
+            --hidden-import sqlite3 `
+            --hidden-import ssl `
+            --hidden-import hashlib `
+            --hidden-import tkinter `
+            --hidden-import tkinter.ttk `
+            --collect-all tkinter `
+            --collect-all webview `
+            --collect-all trimesh `
+            --collect-all pyrender `
+            --collect-all imageio `
+            --collect-all OpenGL `
+            --collect-all numpy `
+            --collect-all PIL `
+            --collect-all matplotlib `
+            --collect-all mpl_toolkits `
+            --collect-all fast_simplification `
+            --collect-all pymeshfix `
+            --collect-all shapely `
+            --collect-all rectpack `
+            --collect-all smbprotocol `
+            --collect-all smbclient `
+            --collect-all paho `
+            --collect-all cryptography `
+            --collect-all rarfile `
+            --collect-all py7zr `
+            --collect-all defusedxml `
+            --collect-all qrcode `
+            --collect-all websocket `
+            --collect-all flashforge `
+            --collect-all waitress `
+            --collect-all flask `
+            --collect-all werkzeug `
+            --copy-metadata imageio `
+            --copy-metadata pyrender `
+            --copy-metadata trimesh `
+            --copy-metadata Pillow `
+            --copy-metadata PyOpenGL `
+            --copy-metadata numpy `
+            --icon="assets\logo-nom-stellio.ico" "launcher.py"
+
+      - name: Verify PyInstaller output exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist\Stellio\Stellio.exe")) {
+            throw "dist\Stellio\Stellio.exe introuvable - la compilation a echoue"
+          }
+
+      - name: Copy patchable files into dist\Stellio\app
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "dist\Stellio\app" | Out-Null
+          Copy-Item "main.py"          "dist\Stellio\app\main.py"
+          Copy-Item "check_deps.py"    "dist\Stellio\app\check_deps.py"
+          Copy-Item "index.html"       "dist\Stellio\app\index.html"
+          Copy-Item "script.js"        "dist\Stellio\app\script.js"
+          Copy-Item "style.css"        "dist\Stellio\app\style.css"
+          Copy-Item -Recurse "assets"    "dist\Stellio\app\assets"
+          Copy-Item -Recurse "languages" "dist\Stellio\app\languages"
+          if (Test-Path "bin") { Copy-Item -Recurse "bin" "dist\Stellio\app\bin" }
+
+          foreach ($f in @("main.py","check_deps.py","index.html","script.js","style.css")) {
+            if (-not (Test-Path "dist\Stellio\app\$f")) {
+              throw "Echec de copie : dist\Stellio\app\$f"
+            }
+          }
+
+      - name: Headless smoke test
+        shell: pwsh
+        run: |
+          $verifyDir = "$PWD\build\verify-data-Stellio"
+          New-Item -ItemType Directory -Force -Path $verifyDir | Out-Null
+          New-Item -ItemType File -Force -Path "$verifyDir\.debug_session_pending" | Out-Null
+
+          $env:STELLIO_HEADLESS = "1"
+          $env:STELLIO_DATA_DIR = $verifyDir
+          $env:STELLIO_PORT = "58234"
+          $env:STELLIO_SERVER_URL = "http://127.0.0.1:58234"
+
+          $proc = Start-Process -FilePath "dist\Stellio\Stellio.exe" -WorkingDirectory "dist\Stellio" -PassThru
+          $logFile = "$verifyDir\stellio.log"
+          $ready = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            Start-Sleep -Seconds 1
+            if (Test-Path $logFile) {
+              if (Select-String -Path $logFile -Pattern "Stellio est pr.t" -Quiet) { $ready = $true; break }
+            }
+          }
+          Start-Sleep -Seconds 1
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+
+          if (-not $ready) { throw "Le backend n'a pas signale etre pret dans le delai imparti." }
+          if (-not (Select-String -Path $logFile -Pattern "Tous les modules requis sont" -Quiet)) {
+            throw "Modules manquants detectes au demarrage - voir le log."
+          }
+          Write-Host "Smoke test OK."
+
+      - name: Create patch ZIP for auto-updater
+        shell: pwsh
+        run: |
+          $zipName = "Stellio-v${{ needs.check-version.outputs.version }}-patch.zip"
+          Compress-Archive -Path "dist\Stellio\app\*" -DestinationPath $zipName -Force
+          if (-not (Test-Path $zipName)) { throw "Echec de creation du ZIP de patch." }
+          $hash = (Get-FileHash -Algorithm SHA256 $zipName).Hash.ToLower()
+          "$hash  $zipName" | Out-File -Encoding ascii "$zipName.sha256"
+
+      - name: Upload patch ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stellio-patch-zip
+          path: |
+            Stellio-v${{ needs.check-version.outputs.version }}-patch.zip
+            Stellio-v${{ needs.check-version.outputs.version }}-patch.zip.sha256
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DMyAppVersion=${{ needs.check-version.outputs.version }}" `
+            "stellio-setup.iss"
+
+      - name: Upload unsigned installer artifact
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: stellio-installer-unsigned
+          path: output\Stellio-Setup-${{ needs.check-version.outputs.version }}.exe
+
+  # ──────────────────────────────────────────────────────────────────────
+  # 3. Signature + publication (seulement si should_release = true)
+  # ──────────────────────────────────────────────────────────────────────
+  sign-and-release:
+    needs: [check-version, build]
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: windows-latest
+    steps:
+      - name: Submit signing request to SignPath (installeur uniquement)
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id: '${{ secrets.SIGNPATH_ORG_ID }}'
+          project-slug: '${{ secrets.SIGNPATH_PROJECT_SLUG }}'
+          signing-policy-slug: '${{ secrets.SIGNPATH_POLICY_SLUG }}'
+          github-artifact-id: '${{ needs.build.outputs.artifact-id }}'
+          wait-for-completion: true
+          output-artifact-directory: 'signed'
+
+      - name: Compute SHA256 checksum of signed installer
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem "signed\*.exe" | Select-Object -First 1
+          $hash = (Get-FileHash -Algorithm SHA256 $file.FullName).Hash.ToLower()
+          "$hash  $($file.Name)" | Out-File -Encoding ascii "signed\$($file.Name).sha256"
+
+      - name: Download patch ZIP artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: stellio-patch-zip
+          path: patch
+
+      - name: Create GitHub Release (creates the tag automatically)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.check-version.outputs.version }}
+          name: Stellio v${{ needs.check-version.outputs.version }}
+          generate_release_notes: true
+          files: |
+            signed/*.exe
+            signed/*.sha256
+            patch/*.zip
+            patch/*.sha256
