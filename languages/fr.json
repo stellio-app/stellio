@@ -280,6 +280,7 @@
   "history.reason_adhesion": "Mauvaise adhérence plateau",
   "history.reason_layer_shift": "Décalage de couches",
   "history.reason_other": "Autre",
+  "history.reason_custom_placeholder": "Préciser...",
   "history.reason_spaghetti": "Spaghetti",
   "history.reason_stringing": "Filage (stringing)",
   "history.reason_support_failure": "Échec des supports",

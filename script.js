@@ -8734,16 +8734,37 @@ function toggleFailureReasonPicker(id) {
     const wrap = document.getElementById(`rating-pending-${id}`);
     if (!wrap) return;
     wrap.innerHTML = `
-        <select id="failure-reason-${id}" class="history-reason-select">
+        <select id="failure-reason-${id}" class="history-reason-select" onchange="_onFailureReasonChange(${id})">
             ${Object.entries(_getRatingReasonLabels()).map(([k, label]) => `<option value="${k}">${escapeHtml(label)}</option>`).join('')}
         </select>
+        <input type="text" id="failure-reason-custom-${id}" class="history-reason-select hidden" style="width:140px;"
+            placeholder="${_t3('history.reason_custom_placeholder','Préciser...')}" maxlength="100"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();confirmFailureRating(${id});}">
         <button class="history-rate-btn" onclick="confirmFailureRating(${id})" title="${_t3('actions.confirm','Confirmer')}"><i class="fa-solid fa-check"></i></button>
     `;
 }
 
+function _onFailureReasonChange(id) {
+    const sel = document.getElementById(`failure-reason-${id}`);
+    const custom = document.getElementById(`failure-reason-custom-${id}`);
+    if (!sel || !custom) return;
+    if (sel.value === 'other') {
+        custom.classList.remove('hidden');
+        custom.focus();
+    } else {
+        custom.classList.add('hidden');
+    }
+}
+window._onFailureReasonChange = _onFailureReasonChange;
+
 function confirmFailureRating(id) {
     const sel = document.getElementById(`failure-reason-${id}`);
-    rateHistoryEntry(id, 'failed', sel ? sel.value : 'other');
+    const custom = document.getElementById(`failure-reason-custom-${id}`);
+    let reason = sel ? sel.value : 'other';
+    if (reason === 'other' && custom && custom.value.trim()) {
+        reason = custom.value.trim();
+    }
+    rateHistoryEntry(id, 'failed', reason);
 }
 
 async function rateHistoryEntry(id, result, failureReason) {
