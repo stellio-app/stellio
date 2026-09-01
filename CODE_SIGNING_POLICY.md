@@ -81,6 +81,9 @@ control, not a formality.
    signing a binary already compromised through a malicious dependency.
 3. **Signing**: performed only in a controlled CI/CD pipeline or by an
    authorized operator, never manually on an unaudited personal machine.
+   Every signing request must be explicitly authorized by an **Approver**
+   (see §8) before submission to the signing service; requests without
+   Approver sign-off are rejected.
 4. **Timestamping**: every signature includes an RFC 3161 timestamp
    token (from the CA's TSA server), so the signature remains valid
    after the certificate expires.
@@ -125,11 +128,28 @@ If the private key or token is suspected to be compromised:
 
 ## 8. Roles and Responsibilities
 
-| Role | Responsibility |
-|---|---|
-| Publisher / lead maintainer | Owns the relationship with the CA, approves every signing campaign |
-| Build/CI operator | Runs the signing pipeline, never holds the key in plaintext |
-| Reviewer (code audit) | Confirms the signed source matches the published tag |
+This project follows a three-tier Author / Reviewer / Approver model.
+No signing request is submitted without passing through all three
+roles, and no single person may hold more than one role on the same
+change.
+
+| Role | Member(s) | Responsibility |
+|---|---|---|
+| **Author** | Stellio contributors / committers | Writes and commits source code changes; opens the pull request or tag that will eventually be built and signed. Authors cannot approve their own signing requests. |
+| **Reviewer** | Stellio maintainer(s) | Reviews the proposed changes (code review) before they are merged, checking for correctness and absence of malicious or unintended behavior. |
+| **Approver** | Project publisher / lead maintainer | Gives final sign-off on the release candidate and explicitly approves the signing request submitted to the signing service (e.g. SignPath). Only Approvers can authorize a build to be signed. |
+
+> **Current staffing note**: Stellio is currently maintained by a small
+> team (in some cases a single maintainer acting in multiple
+> capacities). Where the same individual temporarily holds more than
+> one role, this is documented here and reviewed as the project and
+> its contributor base grow; the long-term goal is to have Author,
+> Reviewer, and Approver held by distinct people.
+
+Every signing request must be traceable to: the Author(s) of the
+underlying commits, the Reviewer(s) who approved the corresponding
+pull request/merge, and the Approver who authorized the release for
+signing.
 
 ## 9. Policy Review
 
