@@ -11,7 +11,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Raspberry%20Pi%20%2F%20Linux-lightgrey.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
 
-[🇬🇧 English](README.md) | [🇫🇷 Français](docs/readme/README.fr.md) | 🇩🇪 **Deutsch** | [🇪🇸 Español](docs/readme/README.es.md) | [🇮🇹 Italiano](docs/readme/README.it.md) | [🇵🇹 Português](docs/readme/README.pt.md) | [🇯🇵 日本語](docs/readme/README.ja.md) | [🇨🇳 中文](docs/readme/README.zh.md)
+[🇬🇧 English](../README.md) | [🇫🇷 Français](docs/readme/README.fr.md) | 🇩🇪 **Deutsch** | [🇪🇸 Español](docs/readme/README.es.md) | [🇮🇹 Italiano](docs/readme/README.it.md) | [🇵🇹 Português](docs/readme/README.pt.md) | [🇯🇵 日本語](docs/readme/README.ja.md) | [🇨🇳 中文](docs/readme/README.zh.md)
 
 [🚀 Installation](#-installation) • [✨ Funktionen](#-funktionen) • [📖 Dokumentation](#-dokumentation) • [🤝 Mitwirken](#-mitwirken) • [📜 Lizenz](#-lizenz)
 
