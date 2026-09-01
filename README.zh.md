@@ -4,7 +4,7 @@
 
 ### 面向创客与 3D 打印用户的终极 3D 文件管理工具
 
-[![Version](https://img.shields.io/badge/version-0.5.9-blue.svg)](https://github.com/stellio-app/stellio-app/releases)
+[![Version](https://img.shields.io/badge/version-0.6.2-blue.svg)](https://github.com/stellio-app/stellio-app/releases)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/flask-3.0+-green.svg)](https://flask.palletsprojects.com/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
