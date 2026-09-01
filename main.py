@@ -1314,6 +1314,8 @@ def migrate_manual_filament_spools():
             c.execute("ALTER TABLE manual_filament_spools ADD COLUMN diameter_mm REAL DEFAULT 1.75")
         if 'notes' not in columns:
             c.execute("ALTER TABLE manual_filament_spools ADD COLUMN notes TEXT DEFAULT ''")
+        if 'storage_location' not in columns:
+            c.execute("ALTER TABLE manual_filament_spools ADD COLUMN storage_location TEXT DEFAULT ''")
         if 'archived' not in columns:
             c.execute("ALTER TABLE manual_filament_spools ADD COLUMN archived BOOLEAN DEFAULT 0")
         if 'updated_at' not in columns:
@@ -11213,7 +11215,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.6.2"
+CURRENT_VERSION = "0.6.3"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
@@ -15378,7 +15380,7 @@ def api_list_manual_spools():
         conn = get_db()
         try:
             rows = conn.execute(
-                "SELECT id, name, material, color_hex, remaining_g, capacity_g, vendor, price, diameter_mm, notes, archived "
+                "SELECT id, name, material, color_hex, remaining_g, capacity_g, vendor, price, diameter_mm, notes, archived, storage_location "
                 "FROM manual_filament_spools WHERE user_id=? ORDER BY archived ASC, created_at DESC",
                 (session['user_id'],)
             ).fetchall()
@@ -15401,8 +15403,8 @@ def api_create_manual_spool():
         try:
             cur = conn.execute("""
                 INSERT INTO manual_filament_spools
-                    (user_id, name, material, color_hex, remaining_g, capacity_g, source_label, vendor, price, diameter_mm, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (user_id, name, material, color_hex, remaining_g, capacity_g, source_label, vendor, price, diameter_mm, notes, storage_location)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 session['user_id'], name, (data.get('material') or '').strip(),
                 (data.get('color_hex') or '#888888').strip(),
@@ -15412,6 +15414,7 @@ def api_create_manual_spool():
                 data.get('price') if data.get('price') not in ('', None) else None,
                 data.get('diameter_mm') or 1.75,
                 (data.get('notes') or '').strip(),
+                (data.get('storage_location') or '').strip(),
             ))
             conn.commit()
             new_id = cur.lastrowid
@@ -15430,7 +15433,8 @@ def api_update_manual_spool(spool_id):
     for key, col in (('name', 'name'), ('material', 'material'), ('color_hex', 'color_hex'),
                       ('remaining_g', 'remaining_g'), ('capacity_g', 'capacity_g'),
                       ('vendor', 'vendor'), ('price', 'price'), ('diameter_mm', 'diameter_mm'),
-                      ('notes', 'notes'), ('archived', 'archived')):
+                      ('notes', 'notes'), ('archived', 'archived'),
+                      ('storage_location', 'storage_location')):
         if key in data:
             fields.append(f"{col} = ?")
             params.append(data[key])
