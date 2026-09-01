@@ -4,7 +4,7 @@
 
 ### Der ultimative 3D-Dateimanager für Maker und 3D-Druck-Besitzer
 
-[![Version](https://img.shields.io/badge/version-0.6.2-blue.svg)](https://github.com/stellio-app/stellio-app/releases)
+[![Version](https://img.shields.io/github/v/release/stellio-app/stellio?color=blue)](https://github.com/stellio-app/stellio/releases)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/flask-3.0+-green.svg)](https://flask.palletsprojects.com/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
