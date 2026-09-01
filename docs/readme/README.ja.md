@@ -254,6 +254,18 @@ stellio-app/
 
 ---
 
+## 🔒 プライバシー
+
+Stellioは「ローカルファースト」です：データはあなたのマシンに留まり、デフォルトでは何も収集されず外部サーバーに送信されることもありません。詳細は[プライバシーポリシー](./docs/privacy/PRIVACY.ja.md)をご覧ください。
+
+---
+
+## 🔏 コード署名ポリシー
+
+[Releases](https://github.com/stellio-app/stellio-app/releases) で公開されているWindows実行ファイルはデジタル署名されています。署名プロセスと秘密鍵の保護方法の詳細については [CODE_SIGNING_POLICY.md](./CODE_SIGNING_POLICY.md) をご覧ください。
+
+---
+
 ## 🙏 謝辞
 
 - ローカルAIを提供する [Ollama](https://ollama.com/)

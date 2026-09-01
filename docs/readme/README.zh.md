@@ -254,6 +254,18 @@ stellio-app/
 
 ---
 
+## 🔒 隐私
+
+Stellio 是"本地优先"的：您的数据留在您的设备上，默认情况下不会收集或发送任何内容到外部服务器。详情请参阅我们的[隐私政策](./docs/privacy/PRIVACY.zh.md)。
+
+---
+
+## 🔏 代码签名策略
+
+在 [Releases](https://github.com/stellio-app/stellio-app/releases) 中发布的 Windows 可执行文件均已进行数字签名。有关签名流程和私钥保护措施的详细信息，请参阅 [CODE_SIGNING_POLICY.md](./CODE_SIGNING_POLICY.md)。
+
+---
+
 ## 🙏 鸣谢
 
 - [Ollama](https://ollama.com/)——本地 AI 支持

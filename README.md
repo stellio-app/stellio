@@ -254,6 +254,18 @@ This project is licensed under the **GNU Affero General Public License v3.0** �
 
 ---
 
+## 🔒 Privacy
+
+Stellio is local-first: your data stays on your machine, nothing is collected or sent to external servers by default. See our [Privacy Policy](./docs/privacy/PRIVACY.md) for full details.
+
+---
+
+## 🔏 Code Signing Policy
+
+Windows executables published in [Releases](https://github.com/stellio-app/stellio-app/releases) are digitally signed. See [CODE_SIGNING_POLICY.md](./CODE_SIGNING_POLICY.md) for details on our signing process and private key protection practices.
+
+---
+
 ## 🙏 Acknowledgments
 
 - [Ollama](https://ollama.com/) for local AI
