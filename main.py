@@ -11211,9 +11211,9 @@ def api_save_settings():
 
 from packaging import version
 
-GITHUB_REPO = "stellio-app/stellio-app"
+GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.6.1"
+CURRENT_VERSION = "0.6.2"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
@@ -11240,6 +11240,29 @@ def _fetch_expected_sha256(release_data, target_filename):
     except Exception as e:
         app_logger.info(f"[UPDATE] Lecture checksum impossible: {e}")
         return None
+
+SUPPORTED_UPDATE_LANGS = ('fr', 'en', 'de', 'es', 'it', 'pt', 'ja', 'zh')
+
+def _extract_release_notes_for_lang(body, lang, fallback='en'):
+    """Extrait le bloc <!--xx--> ... correspondant à `lang` dans le body Markdown
+    d'une release GitHub. Si `lang` est absent, retombe sur `fallback`, puis sur
+    le body entier (rétrocompatibilité avec les anciennes releases non balisées)."""
+    if not body:
+        return body
+    pattern = r"<!--{}-->\s*(.*?)(?=<!--\w{{2}}-->|\Z)"
+    for candidate in (lang, fallback):
+        match = re.search(pattern.format(re.escape(candidate)), body, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+    return body.strip()
+
+def get_current_app_language():
+    try:
+        settings = load_settings() or {}
+        lang = settings.get('lang', 'fr')
+        return lang if lang in SUPPORTED_UPDATE_LANGS else 'fr'
+    except Exception:
+        return 'fr'
 
 def get_current_version():
     return CURRENT_VERSION
@@ -11296,12 +11319,16 @@ def check_for_updates():
         else:
             app_logger.info(f"[UPDATE] ⚠️ Pas de checksum publié pour {asset_filename} — intégrité vérifiée par HTTPS uniquement")
 
+        raw_body = release_data.get('body', '') or ''
+        app_lang = get_current_app_language()
+        localized_notes = _extract_release_notes_for_lang(raw_body, app_lang) if raw_body else 'Corrections de bugs et améliorations.'
+
         return {
             'version': latest_version,
             'current_version': current_version,
             'download_url': download_url,
             'update_type': update_type,
-            'release_notes': release_data.get('body', 'Corrections de bugs et améliorations.'),
+            'release_notes': localized_notes,
             'published_at': release_data.get('published_at', ''),
             'release_url': release_data.get('html_url', ''),
             'expected_sha256': expected_sha256
