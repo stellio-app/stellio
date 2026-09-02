@@ -6214,7 +6214,12 @@ function _renderManualSpoolCards(spools) {
                     ${archived ? `<span class="spool-badge">${_t2('spoolman.archived', 'Archivée')}</span>` : ''}
                 </div>
                 <div class="spool-card-body">
-                    ${s.material ? `<span class="spool-material-tag">${escapeHtml(s.material)}</span>` : ''}
+                    ${(s.material || s.storage_location) ? `
+                        <div class="spool-tags-row">
+                            ${s.material ? `<span class="spool-material-tag">${escapeHtml(s.material)}</span>` : ''}
+                            ${s.storage_location ? `<span class="spool-storage-tag"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(s.storage_location)}</span>` : ''}
+                        </div>
+                    ` : ''}
                     ${pct !== null ? `
                         <div class="spool-weight-row">
                             <span>${Math.round(remaining)} ${I18N.t('units.g_remaining')}</span>
@@ -6224,7 +6229,6 @@ function _renderManualSpoolCards(spools) {
                             <div class="spool-progress-bar" style="width:${pct}%; background:${escapeHtml(color)};"></div>
                         </div>
                     ` : remaining !== null ? `<p class="spool-weight-row"><span>${Math.round(remaining)} ${I18N.t('units.g_remaining')}</span></p>` : ''}
-                    ${s.storage_location ? `<p class="spool-location"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(s.storage_location)}</p>` : ''}
                     ${s.price ? `<p class="spool-location"><i class="fa-solid fa-tag"></i> ${Number(s.price).toFixed(2)} €</p>` : ''}
                     ${s.diameter_mm ? `<p class="spool-location"><i class="fa-solid fa-ruler"></i> Ø${s.diameter_mm} mm</p>` : ''}
                     ${s.notes ? `<p class="spool-location" style="white-space:normal;"><i class="fa-solid fa-note-sticky"></i> ${escapeHtml(s.notes)}</p>` : ''}

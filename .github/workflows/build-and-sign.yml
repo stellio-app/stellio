@@ -102,6 +102,7 @@ jobs:
             --hidden-import hashlib `
             --hidden-import tkinter `
             --hidden-import tkinter.ttk `
+            --hidden-import nest_asyncio `
             --collect-all tkinter `
             --collect-all webview `
             --collect-all trimesh `
