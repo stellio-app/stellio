@@ -11,7 +11,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Raspberry%20Pi%20%2F%20Linux-lightgrey.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
 
-[🇬🇧 English](../README.md) | [🇫🇷 Français](docs/readme/README.fr.md) | [🇩🇪 Deutsch](docs/readme/README.de.md) | [🇪🇸 Español](docs/readme/README.es.md) | 🇮🇹 **Italiano** | [🇵🇹 Português](docs/readme/README.pt.md) | [🇯🇵 日本語](docs/readme/README.ja.md) | [🇨🇳 中文](docs/readme/README.zh.md)
+[🇬🇧 English](../../README.md) | [🇫🇷 Français](docs/readme/README.fr.md) | [🇩🇪 Deutsch](docs/readme/README.de.md) | [🇪🇸 Español](docs/readme/README.es.md) | 🇮🇹 **Italiano** | [🇵🇹 Português](docs/readme/README.pt.md) | [🇯🇵 日本語](docs/readme/README.ja.md) | [🇨🇳 中文](docs/readme/README.zh.md)
 
 [🚀 Installazione](#-installazione) • [✨ Funzionalità](#-funzionalità) • [📖 Documentazione](#-documentazione) • [🤝 Contribuire](#-contribuire) • [📜 Licenza](#-licenza)
 
@@ -102,12 +102,12 @@ Che tu sia un maker alle prime armi o un utente esperto con più macchine, Stell
 <div align="center">
 <table>
 <tr></tr>
-<td><img src="library.png" alt="Libreria" width="400"/><br><em>Libreria con miniature</em></td>
-<td><img src="monitoring.png" alt="Stampanti" width="400"/><br><em>Monitoraggio stampanti</em></td>
+<td><img src="../../library.png" alt="Libreria" width="400"/><br><em>Libreria con miniature</em></td>
+<td><img src="../../monitoring.png" alt="Stampanti" width="400"/><br><em>Monitoraggio stampanti</em></td>
 </tr>
 <tr>
-<td><img src="slicer.png" alt="Slicer" width="400"/><br><em>Raccomandazione profilo IA</em></td>
-<td><img src="nesting.png" alt="Nesting" width="400"/><br><em>Nesting automatico</em></td>
+<td><img src="../../slicer.png" alt="Slicer" width="400"/><br><em>Raccomandazione profilo IA</em></td>
+<td><img src="../../nesting.png" alt="Nesting" width="400"/><br><em>Nesting automatico</em></td>
 </tr>
 </table>
 </div>

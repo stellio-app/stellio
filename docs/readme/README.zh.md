@@ -11,7 +11,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Raspberry%20Pi%20%2F%20Linux-lightgrey.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
 
-[🇬🇧 English](../README.md) | [🇫🇷 Français](docs/readme/README.fr.md) | [🇩🇪 Deutsch](docs/readme/README.de.md) | [🇪🇸 Español](docs/readme/README.es.md) | [🇮🇹 Italiano](docs/readme/README.it.md) | [🇵🇹 Português](docs/readme/README.pt.md) | [🇯🇵 日本語](docs/readme/README.ja.md) | 🇨🇳 **中文**
+[🇬🇧 English](../../README.md) | [🇫🇷 Français](docs/readme/README.fr.md) | [🇩🇪 Deutsch](docs/readme/README.de.md) | [🇪🇸 Español](docs/readme/README.es.md) | [🇮🇹 Italiano](docs/readme/README.it.md) | [🇵🇹 Português](docs/readme/README.pt.md) | [🇯🇵 日本語](docs/readme/README.ja.md) | 🇨🇳 **中文**
 
 [🚀 安装](#-安装) • [✨ 功能](#-功能) • [📖 文档](#-文档) • [🤝 贡献](#-贡献) • [📜 许可证](#-许可证)
 
@@ -102,12 +102,12 @@
 <div align="center">
 <table>
 <tr></tr>
-<td><img src="library.png" alt="文件库" width="400"/><br><em>带缩略图的文件库</em></td>
-<td><img src="monitoring.png" alt="打印机" width="400"/><br><em>打印机监控</em></td>
+<td><img src="../../library.png" alt="文件库" width="400"/><br><em>带缩略图的文件库</em></td>
+<td><img src="../../monitoring.png" alt="打印机" width="400"/><br><em>打印机监控</em></td>
 </tr>
 <tr>
-<td><img src="slicer.png" alt="切片软件" width="400"/><br><em>AI 配置文件推荐</em></td>
-<td><img src="nesting.png" alt="排版" width="400"/><br><em>自动排版</em></td>
+<td><img src="../../slicer.png" alt="切片软件" width="400"/><br><em>AI 配置文件推荐</em></td>
+<td><img src="../../nesting.png" alt="排版" width="400"/><br><em>自动排版</em></td>
 </tr>
 </table>
 </div>

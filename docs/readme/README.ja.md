@@ -11,7 +11,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Raspberry%20Pi%20%2F%20Linux-lightgrey.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
 
-[🇬🇧 English](../README.md) | [🇫🇷 Français](docs/readme/README.fr.md) | [🇩🇪 Deutsch](docs/readme/README.de.md) | [🇪🇸 Español](docs/readme/README.es.md) | [🇮🇹 Italiano](docs/readme/README.it.md) | [🇵🇹 Português](docs/readme/README.pt.md) | 🇯🇵 **日本語** | [🇨🇳 中文](docs/readme/README.zh.md)
+[🇬🇧 English](../../README.md) | [🇫🇷 Français](docs/readme/README.fr.md) | [🇩🇪 Deutsch](docs/readme/README.de.md) | [🇪🇸 Español](docs/readme/README.es.md) | [🇮🇹 Italiano](docs/readme/README.it.md) | [🇵🇹 Português](docs/readme/README.pt.md) | 🇯🇵 **日本語** | [🇨🇳 中文](docs/readme/README.zh.md)
 
 [🚀 インストール](#-インストール) • [✨ 機能](#-機能) • [📖 ドキュメント](#-ドキュメント) • [🤝 貢献](#-貢献) • [📜 ライセンス](#-ライセンス)
 
@@ -102,12 +102,12 @@
 <div align="center">
 <table>
 <tr></tr>
-<td><img src="library.png" alt="ライブラリ" width="400"/><br><em>サムネイル付きライブラリ</em></td>
-<td><img src="monitoring.png" alt="プリンター" width="400"/><br><em>プリンターモニタリング</em></td>
+<td><img src="../../library.png" alt="ライブラリ" width="400"/><br><em>サムネイル付きライブラリ</em></td>
+<td><img src="../../monitoring.png" alt="プリンター" width="400"/><br><em>プリンターモニタリング</em></td>
 </tr>
 <tr>
-<td><img src="slicer.png" alt="スライサー" width="400"/><br><em>AIによるプロファイル推奨</em></td>
-<td><img src="nesting.png" alt="ネスティング" width="400"/><br><em>自動ネスティング</em></td>
+<td><img src="../../slicer.png" alt="スライサー" width="400"/><br><em>AIによるプロファイル推奨</em></td>
+<td><img src="../../nesting.png" alt="ネスティング" width="400"/><br><em>自動ネスティング</em></td>
 </tr>
 </table>
 </div>

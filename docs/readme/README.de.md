@@ -11,7 +11,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Raspberry%20Pi%20%2F%20Linux-lightgrey.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
 
-[🇬🇧 English](../README.md) | [🇫🇷 Français](docs/readme/README.fr.md) | 🇩🇪 **Deutsch** | [🇪🇸 Español](docs/readme/README.es.md) | [🇮🇹 Italiano](docs/readme/README.it.md) | [🇵🇹 Português](docs/readme/README.pt.md) | [🇯🇵 日本語](docs/readme/README.ja.md) | [🇨🇳 中文](docs/readme/README.zh.md)
+[🇬🇧 English](../../README.md) | [🇫🇷 Français](docs/readme/README.fr.md) | 🇩🇪 **Deutsch** | [🇪🇸 Español](docs/readme/README.es.md) | [🇮🇹 Italiano](docs/readme/README.it.md) | [🇵🇹 Português](docs/readme/README.pt.md) | [🇯🇵 日本語](docs/readme/README.ja.md) | [🇨🇳 中文](docs/readme/README.zh.md)
 
 [🚀 Installation](#-installation) • [✨ Funktionen](#-funktionen) • [📖 Dokumentation](#-dokumentation) • [🤝 Mitwirken](#-mitwirken) • [📜 Lizenz](#-lizenz)
 
@@ -102,12 +102,12 @@ Ob Sie Einsteiger oder erfahrener Betreiber mehrerer Drucker sind – Stellio sp
 <div align="center">
 <table>
 <tr></tr>
-<td><img src="library.png" alt="Bibliothek" width="400"/><br><em>Bibliothek mit Vorschaubildern</em></td>
-<td><img src="monitoring.png" alt="Drucker" width="400"/><br><em>Drucker-Monitoring</em></td>
+<td><img src="../../library.png" alt="Bibliothek" width="400"/><br><em>Bibliothek mit Vorschaubildern</em></td>
+<td><img src="../../monitoring.png" alt="Drucker" width="400"/><br><em>Drucker-Monitoring</em></td>
 </tr>
 <tr>
-<td><img src="slicer.png" alt="Slicer" width="400"/><br><em>KI-Profilempfehlung</em></td>
-<td><img src="nesting.png" alt="Nesting" width="400"/><br><em>Automatisches Nesting</em></td>
+<td><img src="../../slicer.png" alt="Slicer" width="400"/><br><em>KI-Profilempfehlung</em></td>
+<td><img src="../../nesting.png" alt="Nesting" width="400"/><br><em>Automatisches Nesting</em></td>
 </tr>
 </table>
 </div>

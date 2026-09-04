@@ -11,7 +11,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Raspberry%20Pi%20%2F%20Linux-lightgrey.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
 
-[🇬🇧 English](../README.md) | [🇫🇷 Français](docs/readme/README.fr.md) | [🇩🇪 Deutsch](docs/readme/README.de.md) | [🇪🇸 Español](docs/readme/README.es.md) | [🇮🇹 Italiano](docs/readme/README.it.md) | 🇵🇹 **Português** | [🇯🇵 日本語](docs/readme/README.ja.md) | [🇨🇳 中文](docs/readme/README.zh.md)
+[🇬🇧 English](../../README.md) | [🇫🇷 Français](docs/readme/README.fr.md) | [🇩🇪 Deutsch](docs/readme/README.de.md) | [🇪🇸 Español](docs/readme/README.es.md) | [🇮🇹 Italiano](docs/readme/README.it.md) | 🇵🇹 **Português** | [🇯🇵 日本語](docs/readme/README.ja.md) | [🇨🇳 中文](docs/readme/README.zh.md)
 
 [🚀 Instalação](#-instalação) • [✨ Funcionalidades](#-funcionalidades) • [📖 Documentação](#-documentação) • [🤝 Contribuir](#-contribuir) • [📜 Licença](#-licença)
 
@@ -102,12 +102,12 @@ Quer seja um maker iniciante ou um utilizador experiente com várias máquinas, 
 <div align="center">
 <table>
 <tr></tr>
-<td><img src="library.png" alt="Biblioteca" width="400"/><br><em>Biblioteca com miniaturas</em></td>
-<td><img src="monitoring.png" alt="Impressoras" width="400"/><br><em>Monitorização de impressoras</em></td>
+<td><img src="../../library.png" alt="Biblioteca" width="400"/><br><em>Biblioteca com miniaturas</em></td>
+<td><img src="../../monitoring.png" alt="Impressoras" width="400"/><br><em>Monitorização de impressoras</em></td>
 </tr>
 <tr>
-<td><img src="slicer.png" alt="Slicer" width="400"/><br><em>Recomendação de perfil por IA</em></td>
-<td><img src="nesting.png" alt="Nesting" width="400"/><br><em>Nesting automático</em></td>
+<td><img src="../../slicer.png" alt="Slicer" width="400"/><br><em>Recomendação de perfil por IA</em></td>
+<td><img src="../../nesting.png" alt="Nesting" width="400"/><br><em>Nesting automático</em></td>
 </tr>
 </table>
 </div>
