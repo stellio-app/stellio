@@ -1217,5 +1217,19 @@
   "spoolman.filter_location_all": "All storage locations",
   "spoolman.sort_remaining_asc": "Remaining weight ↑",
   "spoolman.sort_remaining_desc": "Remaining weight ↓",
-  "printers.elegoo_sdcp_model": "Elegoo (Saturn/Mars resin, or Centauri Carbon 1)"
+  "printers.elegoo_sdcp_model": "Elegoo (Saturn/Mars resin, or Centauri Carbon 1)",
+  "settings.tigertag_connect_hint": "Log in with your TigerTag account to display your spools in the filament inventory (read-only).",
+  "accounts.tigertag_email_ph": "TigerTag email...",
+  "settings.tigertag_unofficial_hint": "Unofficial integration (undocumented TigerTag API) — read-only, never modifies your TigerTag inventory.",
+  "actions.buy": "Buy",
+  "spoolman.low_stock_title": "Spool almost empty",
+  "spoolman.low_stock_summary_message_plural": "You have {{count}} spools under 100g, consider restocking.",
+  "spoolman.low_stock_summary_message_single": "You have 1 spool under 100g, consider restocking.",
+  "spoolman.low_stock_list_title": "Spools to restock",
+  "spoolman.low_stock_remaining": "{{g}} g remaining",
+  "spoolman.no_matching_spools": "No spools match these filters",
+  "spoolman.no_spool_selected": "No spool selected — stock won't be deducted.",
+  "spoolman.storage_placeholder": "e.g. Shelf A3, Drawer 2...",
+  "modal.slicer_spool_none": "None (don't deduct)",
+  "modal.insufficient_filament_message": "The spool of the selected color ({{name}}) doesn't have enough material."
 }

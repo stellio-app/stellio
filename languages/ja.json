@@ -1217,5 +1217,19 @@
   "spoolman.filter_location_all": "すべての保管場所",
   "spoolman.sort_remaining_asc": "残量 ↑",
   "spoolman.sort_remaining_desc": "残量 ↓",
-  "printers.elegoo_sdcp_model": "Elegoo（Saturn/Mars レジン、または Centauri Carbon 1）"
+  "printers.elegoo_sdcp_model": "Elegoo（Saturn/Mars レジン、または Centauri Carbon 1）",
+  "settings.tigertag_connect_hint": "TigerTagアカウントでログインすると、フィラメント在庫にスプールが表示されます（読み取り専用）。",
+  "accounts.tigertag_email_ph": "TigerTagのメールアドレス...",
+  "settings.tigertag_unofficial_hint": "非公式の連携機能です（TigerTag APIは非公開）。読み取り専用で、TigerTagの在庫を変更することはありません。",
+  "actions.buy": "購入",
+  "spoolman.low_stock_title": "スプールがほぼ空です",
+  "spoolman.low_stock_summary_message_plural": "100g未満のスプールが{{count}}個あります。買い足しをご検討ください。",
+  "spoolman.low_stock_summary_message_single": "100g未満のスプールが1個あります。買い足しをご検討ください。",
+  "spoolman.low_stock_list_title": "買い足すスプール",
+  "spoolman.low_stock_remaining": "残り{{g}}g",
+  "spoolman.no_matching_spools": "この条件に一致するスプールはありません",
+  "spoolman.no_spool_selected": "スプールが選択されていません — 在庫は減算されません。",
+  "spoolman.storage_placeholder": "例: 棚A3、引き出し2...",
+  "modal.slicer_spool_none": "なし（減算しない）",
+  "modal.insufficient_filament_message": "選択した色のスプール（{{name}}）には十分な材料がありません。"
 }

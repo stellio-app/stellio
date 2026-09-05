@@ -1217,5 +1217,19 @@
   "spoolman.filter_location_all": "Todo almacenamiento",
   "spoolman.sort_remaining_asc": "Peso restante ↑",
   "spoolman.sort_remaining_desc": "Peso restante ↓",
-  "printers.elegoo_sdcp_model": "Elegoo (resina Saturn/Mars, o Centauri Carbon 1)"
+  "printers.elegoo_sdcp_model": "Elegoo (resina Saturn/Mars, o Centauri Carbon 1)",
+  "settings.tigertag_connect_hint": "Inicia sesión con tu cuenta de TigerTag para mostrar tus bobinas en el inventario de filamento (solo lectura).",
+  "accounts.tigertag_email_ph": "Email de TigerTag...",
+  "settings.tigertag_unofficial_hint": "Integración no oficial (API de TigerTag no documentada) — solo lectura, nunca modifica tu inventario de TigerTag.",
+  "actions.buy": "Comprar",
+  "spoolman.low_stock_title": "Bobina casi vacía",
+  "spoolman.low_stock_summary_message_plural": "Tienes {{count}} bobinas por debajo de 100g, piensa en reponerlas.",
+  "spoolman.low_stock_summary_message_single": "Tienes 1 bobina por debajo de 100g, piensa en reponerla.",
+  "spoolman.low_stock_list_title": "Bobinas para reponer",
+  "spoolman.low_stock_remaining": "{{g}} g restantes",
+  "spoolman.no_matching_spools": "Ninguna bobina coincide con estos filtros",
+  "spoolman.no_spool_selected": "Ninguna bobina seleccionada — no se descontará stock.",
+  "spoolman.storage_placeholder": "ej: Estante A3, Cajón 2...",
+  "modal.slicer_spool_none": "Ninguna (no descontar)",
+  "modal.insufficient_filament_message": "La bobina del color seleccionado ({{name}}) no tiene suficiente material."
 }

@@ -1217,5 +1217,19 @@
   "spoolman.filter_location_all": "所有存放位置",
   "spoolman.sort_remaining_asc": "剩余重量 ↑",
   "spoolman.sort_remaining_desc": "剩余重量 ↓",
-  "printers.elegoo_sdcp_model": "Elegoo（Saturn/Mars 光敏树脂系列，或 Centauri Carbon 1）"
+  "printers.elegoo_sdcp_model": "Elegoo（Saturn/Mars 光敏树脂系列，或 Centauri Carbon 1）",
+  "settings.tigertag_connect_hint": "使用您的 TigerTag 账户登录，即可在耗材库存中查看您的线轴（只读）。",
+  "accounts.tigertag_email_ph": "TigerTag 邮箱...",
+  "settings.tigertag_unofficial_hint": "非官方集成（TigerTag API 未公开文档）— 仅只读，绝不会修改您的 TigerTag 库存。",
+  "actions.buy": "购买",
+  "spoolman.low_stock_title": "线轴即将用完",
+  "spoolman.low_stock_summary_message_plural": "您有 {{count}} 个线轴低于 100g，请考虑补货。",
+  "spoolman.low_stock_summary_message_single": "您有 1 个线轴低于 100g，请考虑补货。",
+  "spoolman.low_stock_list_title": "需要补货的线轴",
+  "spoolman.low_stock_remaining": "剩余 {{g}} g",
+  "spoolman.no_matching_spools": "没有符合这些筛选条件的线轴",
+  "spoolman.no_spool_selected": "未选择线轴 — 库存不会被扣减。",
+  "spoolman.storage_placeholder": "例如：A3货架，2号抽屉...",
+  "modal.slicer_spool_none": "无（不扣减）",
+  "modal.insufficient_filament_message": "所选颜色的线轴（{{name}}）材料不足。"
 }

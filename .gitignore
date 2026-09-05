@@ -19,6 +19,7 @@ output/
 release/
 
 # Dossiers de données locales et logs
+test/
 stellio-data/
 *.log
 *.sqlite

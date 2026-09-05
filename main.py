@@ -287,15 +287,10 @@ def mark_repair_attempted(file_path):
     _save_repair_ignored()
 
 pyrender_lock = threading.Lock()
-# Renderer pyrender réutilisé entre les appels : créer/détruire un contexte
-# OpenGL/OSMesa à chaque miniature a un coût fixe non négligeable, répété pour
-# chaque fichier. On garde une seule instance tant que la résolution demandée
-# ne change pas (protégée par pyrender_lock comme le reste du rendu).
 _persistent_renderer = None
 _persistent_renderer_size = None
 
 def _release_persistent_renderer():
-    """Libère le renderer pyrender réutilisé, s'il existe. À appeler à la fermeture de l'app."""
     global _persistent_renderer, _persistent_renderer_size
     with pyrender_lock:
         if _persistent_renderer is not None:
@@ -4168,10 +4163,6 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
                     headlight = pyrender.DirectionalLight(color=[1.0, 1.0, 1.0], intensity=2.2)
                     scene.add(headlight, pose=camera_pose)
 
-                    # Supersampling réduit à 1x : le rendu se fait directement à la
-                    # résolution finale (768px), ce qui divise par 4 le nombre de
-                    # pixels calculés par rapport à l'ancien x2. Léger compromis sur
-                    # l'anticrénelage, gain de vitesse important sur le rendu.
                     ss = 1
                     render_w, render_h = resolution[0] * ss, resolution[1] * ss
                     global _persistent_renderer, _persistent_renderer_size
@@ -5344,21 +5335,11 @@ def api_get_thumb():
 
 MAX_THUMB_FALLBACK_RETRIES = 3
 
-# --- Écritures groupées du statut des miniatures ---------------------------
-# Avant : chaque miniature générée déclenchait un cycle complet lecture+écriture
-# du fichier de cache entier sous cache_file_lock. Avec des centaines/milliers
-# de fichiers scannés (SMB notamment), ce verrou était pris en continu par les
-# workers de miniatures, ce qui pouvait bloquer plusieurs secondes la sauvegarde
-# de fermeture (save_cache_on_exit) en attente du même verrou.
-# Maintenant : les mises à jour sont accumulées en mémoire (_pending_thumb_updates)
-# et le cache disque n'est réécrit qu'une fois par lot (THUMB_CACHE_BATCH_SIZE)
-# ou toutes les THUMB_CACHE_FLUSH_INTERVAL secondes — un seul cycle
-# lecture/écriture pour N mises à jour au lieu de N cycles.
 _pending_thumb_lock = threading.Lock()
 _pending_thumb_updates = {}
 _last_thumb_flush = 0.0
 THUMB_CACHE_BATCH_SIZE = 25
-THUMB_CACHE_FLUSH_INTERVAL = 2.0  # secondes
+THUMB_CACHE_FLUSH_INTERVAL = 2.0  
 
 def update_cache_thumb_status(file_path, has_thumb, is_fallback=False):
     global _last_thumb_flush
@@ -5372,9 +5353,6 @@ def update_cache_thumb_status(file_path, has_thumb, is_fallback=False):
         flush_pending_thumb_updates()
 
 def flush_pending_thumb_updates():
-    """Écrit d'un coup toutes les mises à jour de statut de miniature en attente.
-    Appelée automatiquement par lot/intervalle, et explicitement à la fermeture
-    (voir save_cache_on_exit) pour ne jamais perdre les dernières mises à jour."""
     global _last_thumb_flush
     with _pending_thumb_lock:
         if not _pending_thumb_updates:
@@ -11215,7 +11193,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.6.4"
+CURRENT_VERSION = "0.6.5"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
@@ -11246,9 +11224,6 @@ def _fetch_expected_sha256(release_data, target_filename):
 SUPPORTED_UPDATE_LANGS = ('fr', 'en', 'de', 'es', 'it', 'pt', 'ja', 'zh')
 
 def _extract_release_notes_for_lang(body, lang, fallback='en'):
-    """Extrait le bloc <!--xx--> ... correspondant à `lang` dans le body Markdown
-    d'une release GitHub. Si `lang` est absent, retombe sur `fallback`, puis sur
-    le body entier (rétrocompatibilité avec les anciennes releases non balisées)."""
     if not body:
         return body
     pattern = r"<!--{}-->\s*(.*?)(?=<!--\w{{2}}-->|\Z)"
@@ -12560,11 +12535,6 @@ def _detect_hardware():
     except Exception as e:
         app_logger.info(f"[HW] Détection GPU NVIDIA échouée: {e}")
 
-    # Repli WMI (Windows uniquement) : nvidia-smi n'est présent que si le pilote
-    # NVIDIA complet est installé (via l'app NVIDIA / GeForce Experience). Un
-    # pilote posé par Windows Update ne l'inclut pas, ce qui faisait passer une
-    # machine avec GPU dédiée pour une machine "CPU seul". WMI, lui, est
-    # toujours disponible sur Windows, peu importe le pilote installé.
     if not info['gpu_name'] and sys.platform == 'win32':
         try:
             ps_cmd = (
@@ -12578,9 +12548,6 @@ def _detect_hardware():
             if result.returncode == 0 and result.stdout.strip():
                 data = json.loads(result.stdout.strip())
                 candidates = data if isinstance(data, list) else [data]
-                # On cherche une carte dédiée : NVIDIA ou AMD "Radeon" non-intégrée
-                # (on écarte les Radeon "Graphics" accolées au CPU, ex. "780M",
-                # qui sont des iGPU, pas des cartes dédiées).
                 dedicated = [
                     c for c in candidates
                     if c.get('Name') and (
@@ -12593,11 +12560,6 @@ def _detect_hardware():
                     info['gpu_name'] = best['Name'].strip()
                     ram_bytes = best.get('AdapterRAM') or 0
                     vram_gb = ram_bytes / (1024 ** 3)
-                    # AdapterRAM est un DWORD 32 bits côté WMI : pour les GPU avec
-                    # plus de ~4 Go de VRAM, la valeur déborde et devient fausse
-                    # (souvent 0 ou une valeur aberrante). Dans ce cas on ne peut
-                    # pas connaître la VRAM exacte : on part sur une estimation
-                    # prudente plutôt que sur une valeur WMI erronée.
                     if 0 < vram_gb <= 32:
                         info['vram_gb'] = round(vram_gb, 1)
                     else:

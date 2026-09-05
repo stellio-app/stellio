@@ -44,10 +44,11 @@ echo  !OUT_NAME!  —  version detectee : !VERSION!
 echo ============================================
 echo  [1] Lancer en mode test 
 echo  [2] Lancer en mode test (DEBUG - logs detailles)
-echo  [3] Verifier / installer les dependances
-echo  [4] Quitter
+echo  [3] Lancer le dossier "test" (nouvelles fonctionnalites)
+echo  [4] Verifier / installer les dependances
+echo  [5] Quitter
 echo.
-set /p "ACTION=Votre choix (1 a 4) : "
+set /p "ACTION=Votre choix (1 a 5) : "
 set "ACTION=%ACTION: =%"
 
 if "%ACTION%"=="1" (
@@ -59,12 +60,16 @@ if "%ACTION%"=="2" (
     goto :ACTION_MENU
 )
 if "%ACTION%"=="3" (
+    call :DO_LAUNCH_TEST_FOLDER
+    goto :ACTION_MENU
+)
+if "%ACTION%"=="4" (
     call :CHECK_VENV
     call :INSTALL_AND_CHECK_DEPS
     pause
     goto :ACTION_MENU
 )
-if "%ACTION%"=="4" (
+if "%ACTION%"=="5" (
     echo.
     echo ============================================
     echo A bientot !
@@ -156,6 +161,67 @@ echo.
 echo ============================================
 echo Toutes les dependances sont installees et fonctionnelles.
 echo ============================================
+exit /b 0
+
+:DO_LAUNCH_TEST_FOLDER
+setlocal
+set "TEST_DIR=%~dp0test"
+
+if not exist "!TEST_DIR!" (
+    echo.
+    echo ============================================
+    echo [X] ERREUR : dossier "test" introuvable a la racine du projet.
+    echo Chemin attendu : !TEST_DIR!
+    echo ============================================
+    pause
+    endlocal & exit /b 1
+)
+
+set "TEST_MISSING="
+for %%F in (main.py script.js style.css index.html) do (
+    if not exist "!TEST_DIR!\%%F" set "TEST_MISSING=!TEST_MISSING! %%F"
+)
+if not exist "!TEST_DIR!\assets" set "TEST_MISSING=!TEST_MISSING! assets\"
+
+if defined TEST_MISSING (
+    echo.
+    echo ============================================
+    echo [X] ERREUR : fichier(s^)/dossier(s^) manquant(s^) dans !TEST_DIR! :
+    echo !TEST_MISSING!
+    echo ============================================
+    pause
+    endlocal & exit /b 1
+)
+
+set "PYTHONUTF8=1"
+set "PYTHONIOENCODING=utf-8"
+
+call :CHECK_VENV
+if errorlevel 1 (endlocal & exit /b 1)
+call :INSTALL_AND_CHECK_DEPS
+if errorlevel 1 (endlocal & exit /b 1)
+
+set "STELLIO_DATA_DIR=%~dp0stellio-data-test"
+if not exist "!STELLIO_DATA_DIR!" mkdir "!STELLIO_DATA_DIR!"
+if not exist "!STELLIO_DATA_DIR!\uploads" mkdir "!STELLIO_DATA_DIR!\uploads"
+
+cls
+echo ================================
+echo   STELLIO  (dossier test^)
+echo ================================
+echo.
+echo [*] Lancement depuis : !TEST_DIR!
+echo [*] Donnees isolees dans : !STELLIO_DATA_DIR!
+echo.
+
+pushd "!TEST_DIR!"
+"%~dp0venv\Scripts\python.exe" main.py
+popd
+
+echo.
+echo [INFO] L'application s'est arretee.
+pause
+endlocal
 exit /b 0
 
 :DO_LAUNCH_TEST_DEBUG

@@ -1217,5 +1217,19 @@
   "spoolman.filter_location_all": "Alle Lagerorte",
   "spoolman.sort_remaining_asc": "Restgewicht ↑",
   "spoolman.sort_remaining_desc": "Restgewicht ↓",
-  "printers.elegoo_sdcp_model": "Elegoo (Saturn/Mars Resin, oder Centauri Carbon 1)"
+  "printers.elegoo_sdcp_model": "Elegoo (Saturn/Mars Resin, oder Centauri Carbon 1)",
+  "settings.tigertag_connect_hint": "Melde dich mit deinem TigerTag-Konto an, um deine Spulen im Filamentbestand anzuzeigen (nur lesend).",
+  "accounts.tigertag_email_ph": "TigerTag-E-Mail...",
+  "settings.tigertag_unofficial_hint": "Inoffizielle Integration (undokumentierte TigerTag-API) — nur lesend, ändert nie deinen TigerTag-Bestand.",
+  "actions.buy": "Kaufen",
+  "spoolman.low_stock_title": "Spule fast leer",
+  "spoolman.low_stock_summary_message_plural": "Du hast {{count}} Spulen unter 100g, denk ans Nachkaufen.",
+  "spoolman.low_stock_summary_message_single": "Du hast 1 Spule unter 100g, denk ans Nachkaufen.",
+  "spoolman.low_stock_list_title": "Nachzukaufende Spulen",
+  "spoolman.low_stock_remaining": "{{g}} g übrig",
+  "spoolman.no_matching_spools": "Keine Spulen entsprechen diesen Filtern",
+  "spoolman.no_spool_selected": "Keine Spule ausgewählt — der Bestand wird nicht abgezogen.",
+  "spoolman.storage_placeholder": "z. B. Regal A3, Schublade 2...",
+  "modal.slicer_spool_none": "Keine (nicht abziehen)",
+  "modal.insufficient_filament_message": "Die Spule der gewählten Farbe ({{name}}) enthält nicht genug Material."
 }
