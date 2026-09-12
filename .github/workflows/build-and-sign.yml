@@ -546,7 +546,8 @@ jobs:
             release-files/*.AppImage
             release-files/*.sha256
             release-files/*.zip
-
+            
+  #
   # ──────────────────────────────────────────────────────────────────────
   # 4. Signature + publication AVEC SignPath (DÉSACTIVÉ pour l'instant)
   # 
