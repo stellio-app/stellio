@@ -384,23 +384,38 @@ _ES_CONTINUOUS = 0x80000000
 _ES_SYSTEM_REQUIRED = 0x00000001
 _sleep_prevention_lock = threading.Lock()
 _sleep_prevention_active = False
+_sleep_prevention_proc = None  
 
 
 def _prevent_system_sleep(enable):
-    global _sleep_prevention_active
-    if sys.platform != 'win32':
-        return
+    global _sleep_prevention_active, _sleep_prevention_proc
     try:
-        import ctypes
         with _sleep_prevention_lock:
             if enable and not _sleep_prevention_active:
-                ctypes.windll.kernel32.SetThreadExecutionState(
-                    _ES_CONTINUOUS | _ES_SYSTEM_REQUIRED
-                )
+                if sys.platform == 'win32':
+                    import ctypes
+                    ctypes.windll.kernel32.SetThreadExecutionState(
+                        _ES_CONTINUOUS | _ES_SYSTEM_REQUIRED
+                    )
+                elif sys.platform == 'darwin':
+                    _sleep_prevention_proc = subprocess.Popen(['caffeinate', '-d', '-i'])
+                else:
+                    if shutil.which('systemd-inhibit'):
+                        _sleep_prevention_proc = subprocess.Popen([
+                            'systemd-inhibit', '--what=idle:sleep', '--why=Stellio: génération en cours',
+                            'sleep', 'infinity'
+                        ])
+                    else:
+                        app_logger.info("[POWER] systemd-inhibit indisponible — veille non inhibée sur ce système")
                 _sleep_prevention_active = True
                 app_logger.info("[POWER] Veille système inhibée (génération de miniatures en cours)")
             elif not enable and _sleep_prevention_active:
-                ctypes.windll.kernel32.SetThreadExecutionState(_ES_CONTINUOUS)
+                if sys.platform == 'win32':
+                    import ctypes
+                    ctypes.windll.kernel32.SetThreadExecutionState(_ES_CONTINUOUS)
+                elif _sleep_prevention_proc is not None:
+                    _sleep_prevention_proc.terminate()
+                    _sleep_prevention_proc = None
                 _sleep_prevention_active = False
                 app_logger.info("[POWER] Veille système ré-autorisée (génération terminée)")
     except Exception as e:
@@ -712,6 +727,20 @@ def _get_startup_launch_command(minimized=False):
         return None
     return f'{base} {_STARTUP_MINIMIZED_FLAG}' if minimized else base
 
+def _get_startup_launch_args():
+    launcher_exe = os.environ.get('STELLIO_LAUNCHER_EXE')
+    if launcher_exe and os.path.exists(launcher_exe):
+        return [launcher_exe]
+    if getattr(sys, 'frozen', False) and os.path.exists(sys.executable):
+        return [sys.executable]
+    return None
+
+def _macos_launch_agent_path():
+    return Path.home() / 'Library' / 'LaunchAgents' / 'com.stellio.app.plist'
+
+def _linux_autostart_desktop_path():
+    return Path.home() / '.config' / 'autostart' / 'stellio.desktop'
+
 def _read_startup_registry_command():
     if sys.platform != 'win32':
         return None
@@ -727,33 +756,106 @@ def _read_startup_registry_command():
         return None
 
 def is_startup_enabled():
-    return bool(_read_startup_registry_command())
+    if sys.platform == 'win32':
+        return bool(_read_startup_registry_command())
+    elif sys.platform == 'darwin':
+        return _macos_launch_agent_path().exists()
+    else:
+        return _linux_autostart_desktop_path().exists()
 
 def is_startup_minimized():
-    command = _read_startup_registry_command()
-    return bool(command) and _STARTUP_MINIMIZED_FLAG in command
+    try:
+        if sys.platform == 'win32':
+            command = _read_startup_registry_command()
+            return bool(command) and _STARTUP_MINIMIZED_FLAG in command
+        elif sys.platform == 'darwin':
+            path = _macos_launch_agent_path()
+            return path.exists() and _STARTUP_MINIMIZED_FLAG in path.read_text(encoding='utf-8')
+        else:
+            path = _linux_autostart_desktop_path()
+            return path.exists() and _STARTUP_MINIMIZED_FLAG in path.read_text(encoding='utf-8')
+    except Exception:
+        return False
 
 def set_startup_enabled(enabled, minimized=False):
-    if sys.platform != 'win32':
-        raise RuntimeError("Le démarrage automatique n'est disponible que sur Windows")
-    import winreg
     try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _STARTUP_REGISTRY_KEY_PATH, 0, winreg.KEY_SET_VALUE) as key:
+        if sys.platform == 'win32':
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _STARTUP_REGISTRY_KEY_PATH, 0, winreg.KEY_SET_VALUE) as key:
+                if enabled:
+                    command = _get_startup_launch_command(minimized=minimized)
+                    if not command:
+                        raise RuntimeError("Impossible de déterminer le chemin de l'exécutable Stellio (build non figé ?)")
+                    winreg.SetValueEx(key, _STARTUP_REGISTRY_VALUE_NAME, 0, winreg.REG_SZ, command)
+                    mode = "réduit" if minimized else "fenêtre normale"
+                    app_logger.info(f"[Startup] Démarrage automatique activé ({mode}): {command}")
+                else:
+                    try:
+                        winreg.DeleteValue(key, _STARTUP_REGISTRY_VALUE_NAME)
+                        app_logger.info("[Startup] Démarrage automatique désactivé")
+                    except FileNotFoundError:
+                        pass
+
+        elif sys.platform == 'darwin':
+            plist_path = _macos_launch_agent_path()
             if enabled:
-                command = _get_startup_launch_command(minimized=minimized)
-                if not command:
+                args = _get_startup_launch_args()
+                if not args:
                     raise RuntimeError("Impossible de déterminer le chemin de l'exécutable Stellio (build non figé ?)")
-                winreg.SetValueEx(key, _STARTUP_REGISTRY_VALUE_NAME, 0, winreg.REG_SZ, command)
+                if minimized:
+                    args = args + [_STARTUP_MINIMIZED_FLAG]
+                args_xml = "\n".join(f"        <string>{a}</string>" for a in args)
+                plist_content = (
+                    '<?xml version="1.0" encoding="UTF-8"?>\n'
+                    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+                    '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+                    '<plist version="1.0">\n<dict>\n'
+                    '    <key>Label</key>\n    <string>com.stellio.app</string>\n'
+                    '    <key>ProgramArguments</key>\n    <array>\n'
+                    f'{args_xml}\n'
+                    '    </array>\n'
+                    '    <key>RunAtLoad</key>\n    <true/>\n'
+                    '</dict>\n</plist>\n'
+                )
+                plist_path.parent.mkdir(parents=True, exist_ok=True)
+                plist_path.write_text(plist_content, encoding='utf-8')
                 mode = "réduit" if minimized else "fenêtre normale"
-                app_logger.info(f"[Startup] Démarrage automatique activé ({mode}): {command}")
+                app_logger.info(f"[Startup] Démarrage automatique activé ({mode}, LaunchAgent): {plist_path}")
             else:
                 try:
-                    winreg.DeleteValue(key, _STARTUP_REGISTRY_VALUE_NAME)
+                    plist_path.unlink()
+                    app_logger.info("[Startup] Démarrage automatique désactivé")
+                except FileNotFoundError:
+                    pass
+
+        else:
+            desktop_path = _linux_autostart_desktop_path()
+            if enabled:
+                args = _get_startup_launch_args()
+                if not args:
+                    raise RuntimeError("Impossible de déterminer le chemin de l'exécutable Stellio (build non figé ?)")
+                exec_line = ' '.join(f'"{a}"' for a in args)
+                if minimized:
+                    exec_line += f' {_STARTUP_MINIMIZED_FLAG}'
+                desktop_content = (
+                    "[Desktop Entry]\n"
+                    "Type=Application\n"
+                    "Name=Stellio\n"
+                    f"Exec={exec_line}\n"
+                    "X-GNOME-Autostart-enabled=true\n"
+                )
+                desktop_path.parent.mkdir(parents=True, exist_ok=True)
+                desktop_path.write_text(desktop_content, encoding='utf-8')
+                mode = "réduit" if minimized else "fenêtre normale"
+                app_logger.info(f"[Startup] Démarrage automatique activé ({mode}, autostart): {desktop_path}")
+            else:
+                try:
+                    desktop_path.unlink()
                     app_logger.info("[Startup] Démarrage automatique désactivé")
                 except FileNotFoundError:
                     pass
     except Exception as e:
-        app_logger.error(f"[Startup] Erreur lors de la mise à jour du registre: {e}")
+        app_logger.error(f"[Startup] Erreur lors de la configuration du démarrage automatique: {e}")
         raise
 
 
@@ -1757,6 +1859,283 @@ def _elegoo_cc2_discover(ip, timeout=3):
     except Exception as e:
         app_logger.info(f"[Elegoo CC2] Découverte échouée pour {ip}: {e}")
         return None
+
+
+def _discover_bambu_ssdp(timeout=2.5):
+    """Découverte des imprimantes Bambu Lab sur le réseau local via SSDP
+    (multicast 239.255.255.250:2021, M-SEARCH bambulab-com). Basé sur le
+    protocole reverse-engineered utilisé par plusieurs projets tiers — à
+    valider sur un vrai X1C/A1/P1, les noms d'en-têtes exacts peuvent varier
+    légèrement selon le firmware."""
+    found = []
+    try:
+        msg = (
+            "M-SEARCH * HTTP/1.1\r\n"
+            "HOST: 239.255.255.250:2021\r\n"
+            "MAN: \"ssdp:discover\"\r\n"
+            "MX: 3\r\n"
+            "ST: urn:bambulab-com:device:3dprinter:1\r\n\r\n"
+        ).encode('utf-8')
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.settimeout(timeout)
+        sock.sendto(msg, ('239.255.255.250', 2021))
+        seen_ips = set()
+        end_time = time.time() + timeout
+        while time.time() < end_time:
+            try:
+                data, addr = sock.recvfrom(4096)
+            except socket.timeout:
+                break
+            ip = addr[0]
+            if ip in seen_ips:
+                continue
+            seen_ips.add(ip)
+            headers = {}
+            for line in data.decode('utf-8', errors='ignore').split('\r\n')[1:]:
+                if ':' in line:
+                    k, _, v = line.partition(':')
+                    headers[k.strip().upper()] = v.strip()
+            usn = headers.get('USN', '')
+            serial = usn.split('_')[-1] if '_' in usn else usn
+            model = headers.get('DEVMODEL.BAMBU.COM', '')
+            name = headers.get('DEVNAME.BAMBU.COM', '') or f"Bambu Lab ({ip})"
+            found.append({
+                'type': 'bambu', 'ip': ip, 'name': name, 'model': model,
+                'serial': serial, 'source': 'broadcast'
+            })
+        sock.close()
+    except Exception as e:
+        app_logger.info(f"[Discover] SSDP Bambu échoué: {e}")
+    return found
+
+
+def _discover_elegoo_broadcast(timeout=2.5):
+    """Découverte des imprimantes Elegoo (SDCP résine/Centauri Carbon 1, et
+    Centauri Carbon 2) via broadcast UDP — même protocole que
+    _elegoo_sdcp_discover / _elegoo_cc2_discover, envoyé à 255.255.255.255
+    au lieu d'une IP connue."""
+    found = []
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.settimeout(timeout)
+        sock.sendto(b"M99999", ('255.255.255.255', 3000))
+        seen = set()
+        end_time = time.time() + timeout
+        while time.time() < end_time:
+            try:
+                data, addr = sock.recvfrom(8192)
+            except socket.timeout:
+                break
+            ip = addr[0]
+            if ip in seen:
+                continue
+            try:
+                payload = json.loads(data.decode('utf-8'))
+                data_dict = payload.get('Data', payload)
+                attrs = data_dict.get('Attributes', data_dict)
+                seen.add(ip)
+                found.append({
+                    'type': 'elegoo_sdcp', 'ip': ip,
+                    'name': attrs.get('Name', '') or f"Elegoo ({ip})",
+                    'model': attrs.get('MachineName', ''),
+                    'serial': attrs.get('MainboardID', ''),
+                    'source': 'broadcast'
+                })
+            except Exception:
+                pass
+        sock.close()
+    except Exception as e:
+        app_logger.info(f"[Discover] Broadcast Elegoo SDCP échoué: {e}")
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.settimeout(timeout)
+        sock.sendto(json.dumps({"id": 0, "method": 7000}).encode('utf-8'), ('255.255.255.255', 52700))
+        seen = set()
+        end_time = time.time() + timeout
+        while time.time() < end_time:
+            try:
+                data, addr = sock.recvfrom(8192)
+            except socket.timeout:
+                break
+            ip = addr[0]
+            if ip in seen:
+                continue
+            try:
+                payload = json.loads(data.decode('utf-8'))
+                result = payload.get('result', payload)
+                seen.add(ip)
+                found.append({
+                    'type': 'elegoo_cc2', 'ip': ip,
+                    'name': result.get('host_name', '') or f"Elegoo CC2 ({ip})",
+                    'model': result.get('machine_model', ''),
+                    'serial': result.get('sn', ''),
+                    'source': 'broadcast'
+                })
+            except Exception:
+                pass
+        sock.close()
+    except Exception as e:
+        app_logger.info(f"[Discover] Broadcast Elegoo CC2 échoué: {e}")
+
+    return found
+
+
+def _discover_flashforge(timeout=3):
+    """Découverte des imprimantes FlashForge modernes (Adventurer 5M / 5M Pro /
+    AD5X) via le module de découverte UDP intégré à flashforge-python-api
+    (broadcast port 48899, écoute port 18007). Le code de vérification n'est
+    jamais renvoyé par la découverte — il reste à saisir manuellement."""
+    if not HAS_FLASHFORGE:
+        return []
+    try:
+        from flashforge import PrinterDiscovery, DiscoveryOptions
+    except Exception as e:
+        app_logger.info(f"[Discover] Import PrinterDiscovery (FlashForge) échoué: {e}")
+        return []
+
+    async def _run():
+        discovery = PrinterDiscovery()
+        try:
+            return await discovery.discover(DiscoveryOptions(timeout=int(timeout * 1000), idle_timeout=1000, max_retries=3))
+        except TypeError:
+            return await discovery.discover()
+
+    try:
+        loop = asyncio.new_event_loop()
+        try:
+            printers = loop.run_until_complete(_run())
+        finally:
+            loop.close()
+    except Exception as e:
+        app_logger.info(f"[Discover] FlashForge échoué: {e}")
+        return []
+
+    found = []
+    for p in (printers or []):
+        ip = getattr(p, 'ip_address', '') or getattr(p, 'ip', '')
+        found.append({
+            'type': 'flashforge', 'ip': ip,
+            'name': getattr(p, 'name', '') or f"FlashForge ({ip})",
+            'model': '',
+            'serial': getattr(p, 'serial_number', '') or getattr(p, 'serial', ''),
+            'source': 'broadcast'
+        })
+    return found
+
+
+def _get_all_lan_prefixes():
+    """Retourne les préfixes /24 (ex: '192.168.1') de toutes les interfaces
+    réseau locales actives. Gère les machines multi-cartes (Wi-Fi + Ethernet,
+    VPN, adaptateurs virtuels Docker/Hyper-V/VirtualBox) où get_local_ip()
+    seul ne renvoie que l'interface de la route par défaut et peut donc rater
+    des imprimantes sur un autre segment. Repli sur get_local_ip() si psutil
+    n'est pas disponible."""
+    prefixes = set()
+    try:
+        import psutil
+        for addrs in psutil.net_if_addrs().values():
+            for addr in addrs:
+                if addr.family == socket.AF_INET and addr.address and not addr.address.startswith('127.'):
+                    prefixes.add('.'.join(addr.address.split('.')[:3]))
+    except Exception as e:
+        app_logger.info(f"[Discover] Liste des interfaces réseau indisponible (psutil manquant ?): {e}")
+
+    if not prefixes:
+        local_ip = get_local_ip()
+        if local_ip != '127.0.0.1' and local_ip.count('.') == 3:
+            prefixes.add('.'.join(local_ip.split('.')[:3]))
+
+    return list(prefixes)
+
+
+def _scan_lan_for_printers(timeout=0.5, max_parallel=96):
+    """Scan des /24 de toutes les interfaces locales pour les imprimantes
+    sans broadcast dédié (Klipper/Moonraker, OctoPrint, PrusaLink, Creality).
+    Même approche que _scan_lan_for_spoolman, étendue au multi-interface."""
+    prefixes = _get_all_lan_prefixes()[:4]
+    if not prefixes:
+        app_logger.info("[Discover] Aucune interface réseau locale exploitable, scan annulé.")
+        return []
+    app_logger.info(f"[Discover] Scan imprimantes sur les préfixes: {prefixes}")
+
+    candidates = []
+    for prefix in prefixes:
+        candidates.extend(f"{prefix}.{i}" for i in range(1, 255))
+
+    found = []
+    lock = threading.Lock()
+
+    def _check(ip):
+        try:
+            r = requests.get(f"http://{ip}:7125/server/info", timeout=timeout)
+            if r.ok and 'result' in (r.json() or {}):
+                with lock:
+                    found.append({'type': 'klipper', 'ip': ip, 'name': f"Klipper ({ip})",
+                                  'model': '', 'serial': '', 'source': 'scan'})
+                return
+        except Exception:
+            pass
+        try:
+            r = requests.get(f"http://{ip}/api/version", timeout=timeout)
+            if r.ok:
+                data = r.json()
+                if isinstance(data, dict):
+                    text = (data.get('text') or '')
+                    if 'prusa' in text.lower():
+                        with lock:
+                            found.append({'type': 'prusalink', 'ip': ip, 'name': f"PrusaLink ({ip})",
+                                          'model': text, 'serial': '', 'source': 'scan'})
+                        return
+                    if 'api' in data and 'server' in data:
+                        with lock:
+                            found.append({'type': 'octoprint', 'ip': ip, 'name': f"OctoPrint ({ip})",
+                                          'model': '', 'serial': '', 'source': 'scan'})
+                        return
+        except Exception:
+            pass
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(timeout)
+            s.connect((ip, 9999))
+            req = (
+                "GET / HTTP/1.1\r\n"
+                f"Host: {ip}:9999\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                "Sec-WebSocket-Key: c3RlbGxpb2Rpc2NvdmVy\r\n"
+                "Sec-WebSocket-Version: 13\r\n\r\n"
+            ).encode('utf-8')
+            s.sendall(req)
+            resp = s.recv(200)
+            s.close()
+            if b"101" in resp and b"Upgrade" in resp:
+                with lock:
+                    found.append({'type': 'creality', 'ip': ip, 'name': f"Creality ({ip})",
+                                  'model': '', 'serial': '', 'source': 'scan'})
+        except Exception:
+            pass
+
+    batch = []
+    for ip in candidates:
+        t = threading.Thread(target=_check, args=(ip,), daemon=True)
+        batch.append(t)
+        t.start()
+        if len(batch) >= max_parallel:
+            for th in batch:
+                th.join(timeout=timeout + 0.5)
+            batch = []
+    for th in batch:
+        th.join(timeout=timeout + 0.5)
+
+    app_logger.info(f"[Discover] Scan /24 terminé, {len(found)} imprimante(s) trouvée(s) (hors broadcast).")
+    return found
 
 
 ELEGOO_SDCP_STATUS_MAP = {
@@ -6606,6 +6985,26 @@ def download_shared_file(token):
     response.call_on_close(_invalidate_token)
     return response
 
+
+# ---------------------------------------------------------------------------
+# Instances Stellio — échange direct de fichiers entre deux installations de
+# Stellio sur le même réseau local, sans passer par un serveur cloud.
+#
+# Modèle de confiance volontairement simple (appairage manuel par clé
+# partagée), adapté à un usage FabLab/domicile plutôt qu'une vraie découverte
+# automatique mDNS/Bonjour (qui aurait demandé d'ajouter une dépendance
+# supplémentaire — le paquet Python "zeroconf" — au build PyInstaller, ce que
+# je ne voulais pas faire sans en parler d'abord). L'ajout d'instance reste
+# donc manuel : chacune génère sa propre "clé locale" dans ses Paramètres,
+# qu'on copie-colle sur l'autre instance en l'ajoutant.
+#
+# Le transfert de fichier réutilise le système de lien de partage existant
+# (_share_links) : l'instance qui envoie crée un lien à usage unique, et
+# c'est l'instance qui reçoit qui va chercher le fichier via ce lien — aucun
+# nouvel endpoint d'upload à sécuriser, on capitalise sur un mécanisme déjà
+# audité.
+# ---------------------------------------------------------------------------
+
 def _get_or_create_local_peer_key():
     settings = load_settings()
     if not settings.get('local_peer_key'):
@@ -6614,6 +7013,9 @@ def _get_or_create_local_peer_key():
     return settings['local_peer_key']
 
 def _get_primary_user_id():
+    """Stellio est une appli mono-utilisateur par installation : on prend le
+    premier compte comme propriétaire pour les requêtes venant d'une autre
+    instance (qui n'ont pas de session navigateur)."""
     conn = get_db()
     try:
         row = conn.execute("SELECT id FROM users ORDER BY id LIMIT 1").fetchone()
@@ -6724,6 +7126,9 @@ def api_remote_instances_ping(instance_id):
 @app.route('/api/remote-instances/<int:instance_id>/send', methods=['POST'])
 @login_required
 def api_remote_instances_send(instance_id):
+    """Envoie un fichier local vers une autre instance Stellio : on crée un lien
+    de partage à usage unique et on demande à l'autre instance d'aller le
+    récupérer elle-même — Stellio n'upload jamais directement de fichier."""
     data = request.json or {}
     file_path = (data.get('file_path') or '').strip()
     if not file_path or not os.path.isfile(file_path):
@@ -6784,6 +7189,9 @@ def api_peer_handshake():
 @app.route('/api/peer/receive-file', methods=['POST'])
 @require_peer_key
 def api_peer_receive_file():
+    """Appelée par une autre instance Stellio pour nous signaler qu'un fichier
+    l'attend : on va le chercher nous-mêmes via son lien de partage à usage
+    unique et on l'enregistre dans le dossier de réception configuré."""
     data = request.json or {}
     share_url = (data.get('url') or '').strip()
     filename = secure_filename((data.get('filename') or '').strip()) or 'fichier_recu'
@@ -7417,6 +7825,8 @@ def api_get_stats():
             spent_this_month = round(cost_row[2] or 0, 2)
             avg_cost_per_print = round(total_spent / costed_prints, 2) if costed_prints else None
 
+            # 5b — Coût de l'échec : met en avant le coût cumulé (matière + élec) des
+            # impressions marquées en échec, pas seulement celui des réussites.
             failed_cost_row = conn.execute(
                 """SELECT COALESCE(SUM(total_cost), 0), COUNT(*)
                    FROM print_history WHERE user_id=? AND result='failed' AND total_cost IS NOT NULL""",
@@ -8109,117 +8519,267 @@ def _locate_slicer(relative_patterns, registry_exe_names):
         return found
     return _find_exe_in_registry(registry_exe_names)
 
-def detect_installed_slicers():
-    candidates = [
-        ('orcaslicer', 'OrcaSlicer', [
-            "OrcaSlicer/orca-slicer.exe",
-            "OrcaSlicer*/orca-slicer.exe",
-        ], ['orca-slicer.exe', 'OrcaSlicer.exe']),
-        ('bambustudio', 'Bambu Studio', [
-            "Bambu Studio/bambu-studio.exe",
-            "Bambu Studio*/bambu-studio.exe",
-        ], ['bambu-studio.exe']),
-        ('prusaslicer', 'PrusaSlicer', [
-            "Prusa3D/PrusaSlicer/prusa-slicer-console.exe",
-            "Prusa3D/PrusaSlicer/prusa-slicer.exe",
-            "PrusaSlicer/prusa-slicer-console.exe",
-            "PrusaSlicer/prusa-slicer.exe",
-        ], ['prusa-slicer-console.exe', 'prusa-slicer.exe']),
-        ('superslicer', 'SuperSlicer', [
-            "SuperSlicer/superslicer_console.exe",
-            "SuperSlicer/superslicer.exe",
-        ], ['superslicer_console.exe', 'superslicer.exe']),
-        ('crealityprint', 'Creality Print', [
-            "Creality Print/*/Creality Print.exe",
-            "Creality Print/Creality Print.exe",
-            "CrealityPrint/*/CrealityPrint.exe",
-        ], ['Creality Print.exe', 'CrealityPrint.exe']),
-        ('elegooslicer', 'Elegoo Slicer', [
-            "ElegooSlicer/ElegooSlicer.exe",
-            "ElegooSlicer*/ElegooSlicer.exe",
-        ], ['ElegooSlicer.exe']),
-        ('anycubicslicernext', 'Anycubic Slicer Next', [
-            "Anycubic Slicer Next/AnycubicSlicerNext.exe",
-            "Anycubic Slicer Next*/AnycubicSlicerNext.exe",
-            "AnycubicSlicerNext/AnycubicSlicerNext.exe",
-        ], ['AnycubicSlicerNext.exe']),
-        ('anycubicslicer', 'Anycubic Slicer', [
-            "AnycubicSlicer/Anycubic-Slicer.exe",
-        ], ['Anycubic-Slicer.exe']),
-        ('simplify3d', 'Simplify3D', [
-            "Simplify3D*/Simplify3D.exe",
-        ], ['Simplify3D.exe']),
-        ('ideamaker', 'ideaMaker', [
-            "Raise3D/ideaMaker/ideaMaker.exe",
-            "ideaMaker/ideaMaker.exe",
-            "ideaMaker*/ideaMaker.exe",
-        ], ['ideaMaker.exe']),
-        ('flashprint', 'FlashPrint', [
-            "FlashPrint/FlashPrint.exe",
-            "FlashPrint*/FlashPrint.exe",
-        ], ['FlashPrint.exe']),
-        ('lycheeslicer', 'Lychee Slicer', [
-            "LycheeSlicer/LycheeSlicer.exe",
-            "LycheeSlicer*/LycheeSlicer.exe",
-        ], ['LycheeSlicer.exe']),
-        ('craftware', 'CraftWare', [
-            "CraftWare/CraftWare.exe",
-            "CraftWare*/CraftWare.exe",
-            "CraftWarePro/CraftWarePro.exe",
-        ], ['CraftWare.exe', 'CraftWarePro.exe']),
-        ('mattercontrol', 'MatterControl', [
-            "MatterControl/MatterControl.exe",
-            "MatterHackers/MatterControl/MatterControl.exe",
-        ], ['MatterControl.exe']),
-        ('makerbotprint', 'MakerBot Print', [
-            "MakerBot Print/MakerBotPrint.exe",
-            "MakerBot Print*/MakerBotPrint.exe",
-        ], ['MakerBotPrint.exe']),
-        ('voxelizer', 'Voxelizer', [
-            "Voxelizer/Voxelizer.exe",
-            "ZMorph*/Voxelizer.exe",
-        ], ['Voxelizer.exe']),
-        ('slic3r', 'Slic3r', [
-            "Slic3r/slic3r.exe",
-        ], ['slic3r.exe', 'slic3r-console.exe']),
-        ('kisslicer', 'KISSlicer', [
-            "KISSlicer*/KISSlicer.exe",
-            "KISSlicer*/KISSlicer-x64.exe",
-        ], ['KISSlicer.exe', 'KISSlicer-x64.exe']),
-    ]
-    found = []
-    for slicer_id, label, patterns, registry_names in candidates:
-        path = _locate_slicer(patterns, registry_names)
-        if path:
-            found.append({'id': slicer_id, 'name': label, 'path': path})
+def _macos_search_roots():
+    roots = ['/Applications', os.path.expanduser('~/Applications')]
+    return [r for r in roots if os.path.isdir(r)]
 
+
+def _macos_bundle_executable(app_bundle_path):
+    macos_dir = os.path.join(app_bundle_path, 'Contents', 'MacOS')
+    info_plist = os.path.join(app_bundle_path, 'Contents', 'Info.plist')
+    exec_name = None
+    if os.path.exists(info_plist):
+        try:
+            import plistlib
+            with open(info_plist, 'rb') as f:
+                exec_name = plistlib.load(f).get('CFBundleExecutable')
+        except Exception:
+            exec_name = None
+    if exec_name:
+        candidate = os.path.join(macos_dir, exec_name)
+        if os.path.exists(candidate):
+            return candidate
+    if os.path.isdir(macos_dir):
+        try:
+            executables = [
+                e for e in os.listdir(macos_dir)
+                if os.access(os.path.join(macos_dir, e), os.X_OK)
+                and os.path.isfile(os.path.join(macos_dir, e))
+            ]
+            if executables:
+                return os.path.join(macos_dir, executables[0])
+        except Exception:
+            pass
+    return None
+
+
+def _find_app_bundle(name_patterns):
+    for root in _macos_search_roots():
+        for pattern in name_patterns:
+            try:
+                matches = glob.glob(os.path.join(root, pattern))
+            except Exception:
+                matches = []
+            matches = [m for m in matches if m.endswith('.app')]
+            if matches:
+                return sorted(matches)[-1]
+    return None
+
+
+def _locate_slicer_macos(name_patterns):
+    if not name_patterns:
+        return None
+    bundle = _find_app_bundle(name_patterns)
+    if not bundle:
+        return None
+    return _macos_bundle_executable(bundle)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Table unique des slicers connus, utilisée à la fois par
+# detect_installed_slicers() (liste tous les slicers présents) et
+# find_slicer_by_name() (retrouve un slicer précis par son identifiant
+# stable, ex: 'orca-slicer.exe' — voir SLICER_ID_TO_DEFAULT_VALUE plus bas).
+#   'win'   : (patterns glob relatifs à _slicer_search_roots(), noms d'exe pour la recherche registre)
+#   'mac'   : patterns de noms de bundle .app relatifs à _macos_search_roots()
+#   'linux' : noms de binaires cherchés dans le PATH (liste vide = pas de version Linux connue)
+# ──────────────────────────────────────────────────────────────────────
+_SLICER_CANDIDATES = {
+    'orcaslicer': {
+        'name': 'OrcaSlicer',
+        'win': (["OrcaSlicer/orca-slicer.exe", "OrcaSlicer*/orca-slicer.exe"],
+                ['orca-slicer.exe', 'OrcaSlicer.exe']),
+        'mac': ['OrcaSlicer.app', 'OrcaSlicer*.app'],
+        'linux': ['orca-slicer', 'orcaslicer'],
+    },
+    'bambustudio': {
+        'name': 'Bambu Studio',
+        'win': (["Bambu Studio/bambu-studio.exe", "Bambu Studio*/bambu-studio.exe"],
+                ['bambu-studio.exe']),
+        'mac': ['Bambu Studio.app', 'BambuStudio.app'],
+        'linux': ['bambu-studio', 'bambustudio'],
+    },
+    'prusaslicer': {
+        'name': 'PrusaSlicer',
+        'win': (["Prusa3D/PrusaSlicer/prusa-slicer-console.exe", "Prusa3D/PrusaSlicer/prusa-slicer.exe",
+                 "PrusaSlicer/prusa-slicer-console.exe", "PrusaSlicer/prusa-slicer.exe"],
+                ['prusa-slicer-console.exe', 'prusa-slicer.exe']),
+        'mac': ['PrusaSlicer.app', 'Original Prusa Drivers/PrusaSlicer.app'],
+        'linux': ['prusa-slicer', 'prusa-slicer-console'],
+    },
+    'superslicer': {
+        'name': 'SuperSlicer',
+        'win': (["SuperSlicer/superslicer_console.exe", "SuperSlicer/superslicer.exe"],
+                ['superslicer_console.exe', 'superslicer.exe']),
+        'mac': ['SuperSlicer.app'],
+        'linux': ['superslicer', 'superslicer_console'],
+    },
+    'crealityprint': {
+        'name': 'Creality Print',
+        'win': (["Creality Print/*/Creality Print.exe", "Creality Print/Creality Print.exe",
+                 "CrealityPrint/*/CrealityPrint.exe"],
+                ['Creality Print.exe', 'CrealityPrint.exe']),
+        'mac': ['Creality Print.app', 'CrealityPrint.app'],
+        'linux': ['creality-print', 'CrealityPrint'],
+    },
+    'elegooslicer': {
+        'name': 'Elegoo Slicer',
+        'win': (["ElegooSlicer/ElegooSlicer.exe", "ElegooSlicer*/ElegooSlicer.exe"], ['ElegooSlicer.exe']),
+        'mac': ['ElegooSlicer.app'],
+        'linux': ['elegooslicer', 'ElegooSlicer'],
+    },
+    'anycubicslicernext': {
+        'name': 'Anycubic Slicer Next',
+        'win': (["Anycubic Slicer Next/AnycubicSlicerNext.exe", "Anycubic Slicer Next*/AnycubicSlicerNext.exe",
+                 "AnycubicSlicerNext/AnycubicSlicerNext.exe"], ['AnycubicSlicerNext.exe']),
+        'mac': ['Anycubic Slicer Next.app', 'AnycubicSlicerNext.app'],
+        'linux': ['anycubicslicernext'],
+    },
+    'anycubicslicer': {
+        'name': 'Anycubic Slicer',
+        'win': (["AnycubicSlicer/Anycubic-Slicer.exe"], ['Anycubic-Slicer.exe']),
+        'mac': ['Anycubic Slicer.app', 'AnycubicSlicer.app'],
+        'linux': ['anycubic-slicer'],
+    },
+    'simplify3d': {
+        'name': 'Simplify3D',
+        'win': (["Simplify3D*/Simplify3D.exe"], ['Simplify3D.exe']),
+        'mac': ['Simplify3D.app', 'Simplify3D*.app'],
+        'linux': ['simplify3d'],
+    },
+    'ideamaker': {
+        'name': 'ideaMaker',
+        'win': (["Raise3D/ideaMaker/ideaMaker.exe", "ideaMaker/ideaMaker.exe", "ideaMaker*/ideaMaker.exe"],
+                ['ideaMaker.exe']),
+        'mac': ['ideaMaker.app'],
+        'linux': ['ideamaker'],
+    },
+    'flashprint': {
+        'name': 'FlashPrint',
+        'win': (["FlashPrint/FlashPrint.exe", "FlashPrint*/FlashPrint.exe"], ['FlashPrint.exe']),
+        'mac': ['FlashPrint.app'],
+        'linux': ['flashprint'],
+    },
+    'lycheeslicer': {
+        'name': 'Lychee Slicer',
+        'win': (["LycheeSlicer/LycheeSlicer.exe", "LycheeSlicer*/LycheeSlicer.exe"], ['LycheeSlicer.exe']),
+        'mac': ['Lychee Slicer.app', 'LycheeSlicer.app'],
+        'linux': ['lycheeslicer'],
+    },
+    'craftware': {
+        'name': 'CraftWare',
+        'win': (["CraftWare/CraftWare.exe", "CraftWare*/CraftWare.exe", "CraftWarePro/CraftWarePro.exe"],
+                ['CraftWare.exe', 'CraftWarePro.exe']),
+        'mac': ['CraftWare.app'],
+        'linux': ['craftware'],
+    },
+    'mattercontrol': {
+        'name': 'MatterControl',
+        'win': (["MatterControl/MatterControl.exe", "MatterHackers/MatterControl/MatterControl.exe"],
+                ['MatterControl.exe']),
+        'mac': ['MatterControl.app'],
+        'linux': ['mattercontrol'],
+    },
+    'makerbotprint': {
+        'name': 'MakerBot Print',
+        'win': (["MakerBot Print/MakerBotPrint.exe", "MakerBot Print*/MakerBotPrint.exe"],
+                ['MakerBotPrint.exe']),
+        'mac': ['MakerBot Print.app'],
+        'linux': [],  # pas de version Linux connue
+    },
+    'voxelizer': {
+        'name': 'Voxelizer',
+        'win': (["Voxelizer/Voxelizer.exe", "ZMorph*/Voxelizer.exe"], ['Voxelizer.exe']),
+        'mac': [],    # pas de version macOS connue
+        'linux': [],  # pas de version Linux connue
+    },
+    'slic3r': {
+        'name': 'Slic3r',
+        'win': (["Slic3r/slic3r.exe"], ['slic3r.exe', 'slic3r-console.exe']),
+        'mac': ['Slic3r.app'],
+        'linux': ['slic3r'],
+    },
+    'kisslicer': {
+        'name': 'KISSlicer',
+        'win': (["KISSlicer*/KISSlicer.exe", "KISSlicer*/KISSlicer-x64.exe"],
+                ['KISSlicer.exe', 'KISSlicer-x64.exe']),
+        'mac': ['KISSlicer.app'],
+        'linux': ['kisslicer'],
+    },
+}
+
+
+def locate_slicer_by_id(slicer_id):
+    """Localise l'exécutable d'un slicer connu (clé de _SLICER_CANDIDATES) sur la plateforme courante."""
+    entry = _SLICER_CANDIDATES.get(slicer_id)
+    if not entry:
+        return None
+    if sys.platform == 'win32':
+        patterns, registry_names = entry['win']
+        return _locate_slicer(patterns, registry_names)
+    elif sys.platform == 'darwin':
+        return _locate_slicer_macos(entry['mac'])
+    else:
+        for bin_name in entry['linux']:
+            path = shutil.which(bin_name)
+            if path:
+                return path
+        return None
+
+
+def _detect_cura():
+    """Cas particulier : Cura n'est pas un simple exécutable — l'usage en pré-slicing nécessite
+    le chemin de CuraEngine ET son dossier de définitions d'imprimantes."""
     try:
-        cura_patterns = [
-            "Ultimaker Cura*", "UltiMaker Cura*", "Cura*",
-            "Elegoo Cura*", "Creality Slicer*", "CrealitySlicer*",
-            "Cura LulzBot*", "LulzBot Cura*", "Longer3D Cura*", "Sovol Cura*",
-        ]
-        for root in _slicer_search_roots():
-            found_cura = False
-            for pattern in cura_patterns:
-                for install_dir in glob.glob(os.path.join(root, pattern)):
-                    engine_path = os.path.join(install_dir, 'CuraEngine.exe')
-                    definitions_dir = os.path.join(install_dir, 'share', 'cura', 'resources', 'definitions')
-                    if not os.path.exists(definitions_dir):
-                        definitions_dir = os.path.join(install_dir, 'resources', 'definitions')
-                    if os.path.exists(engine_path) and os.path.exists(definitions_dir):
-                        found.append({
-                            'id': 'cura', 'name': 'Cura', 'path': engine_path,
-                            'definitions_dir': definitions_dir
-                        })
-                        found_cura = True
-                        break
-                if found_cura:
-                    break
-            if found_cura:
-                break
-    except Exception:
-        pass
+        if sys.platform == 'win32':
+            cura_patterns = [
+                "Ultimaker Cura*", "UltiMaker Cura*", "Cura*",
+                "Elegoo Cura*", "Creality Slicer*", "CrealitySlicer*",
+                "Cura LulzBot*", "LulzBot Cura*", "Longer3D Cura*", "Sovol Cura*",
+            ]
+            for root in _slicer_search_roots():
+                for pattern in cura_patterns:
+                    for install_dir in glob.glob(os.path.join(root, pattern)):
+                        engine_path = os.path.join(install_dir, 'CuraEngine.exe')
+                        definitions_dir = os.path.join(install_dir, 'share', 'cura', 'resources', 'definitions')
+                        if not os.path.exists(definitions_dir):
+                            definitions_dir = os.path.join(install_dir, 'resources', 'definitions')
+                        if os.path.exists(engine_path) and os.path.exists(definitions_dir):
+                            return {'id': 'cura', 'name': 'Cura', 'path': engine_path,
+                                    'definitions_dir': definitions_dir}
+        elif sys.platform == 'darwin':
+            bundle = _find_app_bundle([
+                'UltiMaker Cura.app', 'Ultimaker Cura.app', 'Cura.app',
+                'Elegoo Cura.app', 'Creality Slicer.app', 'CrealitySlicer.app',
+            ])
+            if bundle:
+                engine_path = os.path.join(bundle, 'Contents', 'MacOS', 'CuraEngine')
+                definitions_dir = os.path.join(bundle, 'Contents', 'Resources', 'resources', 'definitions')
+                if os.path.exists(engine_path) and os.path.exists(definitions_dir):
+                    return {'id': 'cura', 'name': 'Cura', 'path': engine_path,
+                            'definitions_dir': definitions_dir}
+        else:
+            engine_path = shutil.which('CuraEngine')
+            if engine_path:
+                # Pas de convention standard pour le dossier de définitions sur Linux
+                # (dépend du packaging : AppImage, flatpak, .deb...) — pré-slicing Cura
+                # non disponible dans ce cas, mais l'entrée reste utilisable pour "Envoyer au slicer".
+                return {'id': 'cura', 'name': 'Cura', 'path': engine_path}
+    except Exception as e:
+        app_logger.info(f"[PreSlice] Détection Cura échouée: {e}")
+    return None
+
+
+def detect_installed_slicers():
+    found = []
+    for slicer_id, entry in _SLICER_CANDIDATES.items():
+        path = locate_slicer_by_id(slicer_id)
+        if path:
+            found.append({'id': slicer_id, 'name': entry['name'], 'path': path})
+
+    cura = _detect_cura()
+    if cura:
+        found.append(cura)
 
     try:
         settings = load_settings()
@@ -8578,33 +9138,15 @@ def find_slicer_by_name(slicer_name):
     if not slicer_name or slicer_name == 'system_default':
         return None
 
-    known_slicers = {
-        'orca-slicer.exe': (["OrcaSlicer/orca-slicer.exe", "OrcaSlicer*/orca-slicer.exe"], ['orca-slicer.exe', 'OrcaSlicer.exe']),
-        'bambu-studio.exe': (["Bambu Studio/bambu-studio.exe", "Bambu Studio*/bambu-studio.exe"], ['bambu-studio.exe']),
-        'prusa-slicer.exe': (["Prusa3D/PrusaSlicer/prusa-slicer.exe", "PrusaSlicer/prusa-slicer.exe"], ['prusa-slicer.exe', 'prusa-slicer-console.exe']),
-        'superslicer.exe': (["SuperSlicer/superslicer.exe"], ['superslicer.exe', 'superslicer_console.exe']),
-        'Creality Print.exe': (["Creality Print/*/Creality Print.exe", "Creality Print/Creality Print.exe", "CrealityPrint/*/CrealityPrint.exe"], ['Creality Print.exe', 'CrealityPrint.exe']),
-        'Cura.exe': (["Ultimaker Cura*/Cura.exe", "UltiMaker Cura*/Cura.exe"], ['Cura.exe']),
-        'ElegooSlicer.exe': (["ElegooSlicer/ElegooSlicer.exe", "ElegooSlicer*/ElegooSlicer.exe"], ['ElegooSlicer.exe']),
-        'AnycubicSlicerNext.exe': (["Anycubic Slicer Next/AnycubicSlicerNext.exe", "Anycubic Slicer Next*/AnycubicSlicerNext.exe", "AnycubicSlicerNext/AnycubicSlicerNext.exe"], ['AnycubicSlicerNext.exe']),
-        'Anycubic-Slicer.exe': (["AnycubicSlicer/Anycubic-Slicer.exe"], ['Anycubic-Slicer.exe']),
-        'Simplify3D.exe': (["Simplify3D*/Simplify3D.exe"], ['Simplify3D.exe']),
-        'ideaMaker.exe': (["Raise3D/ideaMaker/ideaMaker.exe", "ideaMaker/ideaMaker.exe", "ideaMaker*/ideaMaker.exe"], ['ideaMaker.exe']),
-        'FlashPrint.exe': (["FlashPrint/FlashPrint.exe", "FlashPrint*/FlashPrint.exe"], ['FlashPrint.exe']),
-        'LycheeSlicer.exe': (["LycheeSlicer/LycheeSlicer.exe", "LycheeSlicer*/LycheeSlicer.exe"], ['LycheeSlicer.exe']),
-        'CraftWare.exe': (["CraftWare/CraftWare.exe", "CraftWare*/CraftWare.exe", "CraftWarePro/CraftWarePro.exe"], ['CraftWare.exe', 'CraftWarePro.exe']),
-        'MatterControl.exe': (["MatterControl/MatterControl.exe", "MatterHackers/MatterControl/MatterControl.exe"], ['MatterControl.exe']),
-        'MakerBotPrint.exe': (["MakerBot Print/MakerBotPrint.exe", "MakerBot Print*/MakerBotPrint.exe"], ['MakerBotPrint.exe']),
-        'Voxelizer.exe': (["Voxelizer/Voxelizer.exe", "ZMorph*/Voxelizer.exe"], ['Voxelizer.exe']),
-        'slic3r.exe': (["Slic3r/slic3r.exe"], ['slic3r.exe', 'slic3r-console.exe']),
-        'KISSlicer.exe': (["KISSlicer*/KISSlicer.exe", "KISSlicer*/KISSlicer-x64.exe"], ['KISSlicer.exe', 'KISSlicer-x64.exe']),
-    }
-
-    entry = known_slicers.get(slicer_name)
-    if not entry:
+    # 'slicer_name' est la valeur stable stockée dans les réglages (ex: 'orca-slicer.exe'),
+    # identique quelle que soit la plateforme — voir SLICER_ID_TO_DEFAULT_VALUE plus bas dans ce fichier.
+    slicer_id = next((k for k, v in SLICER_ID_TO_DEFAULT_VALUE.items() if v == slicer_name), None)
+    if not slicer_id:
         return None
-    patterns, registry_names = entry
-    return _locate_slicer(patterns, registry_names)
+    if slicer_id == 'cura':
+        cura = _detect_cura()
+        return cura['path'] if cura else None
+    return locate_slicer_by_id(slicer_id)
 
 @app.route('/api/slicer/pre-slice-estimate', methods=['POST'])
 @login_required
@@ -8635,6 +9177,7 @@ def api_request_slice_estimate():
     return jsonify(result), 202
 
 def _get_cached_slice_estimate_seconds(file_path):
+    """Renvoie le temps estimé (en secondes) déjà calculé par le pré-slice silencieux pour ce fichier, si disponible."""
     with slice_estimate_lock:
         entry = slice_estimate_results.get(file_path)
     if entry and entry.get('status') == 'done':
@@ -8772,6 +9315,8 @@ def api_send_to_slicer():
         else:
             if sys.platform == 'win32':
                 os.startfile(path_to_open)
+            elif sys.platform == 'darwin':
+                subprocess.run(['open', path_to_open], check=False)
             else:
                 subprocess.run(['xdg-open', path_to_open], check=False)
 
@@ -11407,7 +11952,7 @@ def api_get_settings():
         settings.setdefault('ai_enabled', False)
         settings.setdefault('auto_scan_enabled', True)
         settings.setdefault('auto_scan_interval_minutes', 5)
-        settings['launch_at_startup_supported'] = (sys.platform == 'win32')
+        settings['launch_at_startup_supported'] = True
         settings['launch_at_startup'] = is_startup_enabled()
         settings['launch_minimized'] = is_startup_minimized() if settings['launch_at_startup'] else bool(settings.get('launch_minimized', False))
         return jsonify(settings), 200
@@ -11450,6 +11995,9 @@ def api_save_settings():
                 app_logger.info("[Settings] URL Spoolman supprimée — affectations de filament Spoolman nettoyées")
             finally:
                 conn.close()
+            if current_settings.get('spoolman_discover_declined'):
+                current_settings['spoolman_discover_declined'] = False
+                save_settings(current_settings)
 
         return jsonify({"message": "Paramètres sauvegardés", "settings": current_settings}), 200
 
@@ -11462,7 +12010,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.6.6"
+CURRENT_VERSION = "0.6.7"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
@@ -11544,16 +12092,25 @@ def check_for_updates():
                 app_logger.info(f"[UPDATE] 📦 Patch trouvé: {asset['name']}")
                 break
 
+        if sys.platform == 'win32':
+            full_installer_suffix = '.exe'
+        elif sys.platform == 'darwin':
+            full_installer_suffix = '.dmg'
+        else:
+            full_installer_suffix = '.appimage'
+
         if not download_url:
             for asset in release_data.get('assets', []):
-                if asset['name'].endswith('.exe'):
+                if asset['name'].lower().endswith(full_installer_suffix):
                     download_url = asset['browser_download_url']
                     update_type = 'full'
                     app_logger.info(f"[UPDATE] 📦 Installateur complet: {asset['name']}")
                     break
 
         if not download_url:
-            app_logger.info("[UPDATE] ⚠️ Aucun asset téléchargeable trouvé (ni patch .zip, ni installeur .exe)")
+            app_logger.info(
+                f"[UPDATE] ⚠️ Aucun asset téléchargeable trouvé (ni patch .zip, ni installeur {full_installer_suffix})"
+            )
             return None
 
         app_logger.info(f"[UPDATE] ✅ Nouvelle version disponible: {latest_version} (type: {update_type})")
@@ -11716,6 +12273,96 @@ def install_update(installer_path):
 
         else:
 
+            if ext == '.dmg' and sys.platform == 'darwin':
+                app_exe = launcher_exe or (sys.executable if getattr(sys, 'frozen', False) else None)
+                if not app_exe:
+                    app_logger.error("[UPDATE] ❌ Impossible de localiser l'exécutable Stellio (build non figé ?)")
+                    return False
+
+                app_bundle = None
+                p = Path(app_exe).resolve()
+                for parent in [p] + list(p.parents):
+                    if parent.suffix == '.app':
+                        app_bundle = parent
+                        break
+                if not app_bundle:
+                    app_logger.error(f"[UPDATE] ❌ Impossible de localiser le bundle .app depuis {app_exe}")
+                    return False
+
+                mount_point = os.path.join(tempfile.gettempdir(), 'stellio_update_mount')
+                relay_path = os.path.join(tempfile.gettempdir(), 'stellio_update_relay.sh')
+                log_path = os.path.join(tempfile.gettempdir(), 'stellio_update_relay.log')
+
+                relay_script = (
+                    "#!/bin/bash\n"
+                    f'exec > "{log_path}" 2>&1\n'
+                    'echo "[Stellio Update] $(date)"\n'
+                    'sleep 2\n'
+                    f'mkdir -p "{mount_point}"\n'
+                    f'hdiutil attach "{installer_path}" -nobrowse -readonly -mountpoint "{mount_point}"\n'
+                    f'NEW_APP=$(find "{mount_point}" -maxdepth 1 -name "*.app" | head -1)\n'
+                    'if [ -z "$NEW_APP" ]; then\n'
+                    '    echo "Aucun .app trouve dans le DMG"\n'
+                    f'    hdiutil detach "{mount_point}" -quiet\n'
+                    '    exit 1\n'
+                    'fi\n'
+                    f'rm -rf "{app_bundle}"\n'
+                    f'cp -R "$NEW_APP" "{app_bundle}"\n'
+                    f'hdiutil detach "{mount_point}" -quiet\n'
+                    f'xattr -dr com.apple.quarantine "{app_bundle}" 2>/dev/null || true\n'
+                    f'open "{app_bundle}"\n'
+                    'rm -f "$0"\n'
+                )
+                with open(relay_path, 'w', encoding='utf-8') as f:
+                    f.write(relay_script)
+                os.chmod(relay_path, 0o755)
+
+                subprocess.Popen(
+                    ['/bin/bash', relay_path],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+                    start_new_session=True
+                )
+                app_logger.info("[UPDATE] ✅ Script relais macOS lancé (remplacement du .app), fermeture...")
+                time.sleep(1)
+                _cleanup_before_exit()
+                os._exit(0)
+                return
+
+            if ext == '.appimage':
+                target_path = os.environ.get('APPIMAGE') or launcher_exe
+                if not target_path:
+                    app_logger.error("[UPDATE] ❌ Impossible de localiser l'AppImage Stellio en cours d'exécution")
+                    return False
+                target_path = os.path.realpath(target_path)
+
+                relay_path = os.path.join(tempfile.gettempdir(), 'stellio_update_relay.sh')
+                log_path = os.path.join(tempfile.gettempdir(), 'stellio_update_relay.log')
+
+                relay_script = (
+                    "#!/bin/bash\n"
+                    f'exec > "{log_path}" 2>&1\n'
+                    'echo "[Stellio Update] $(date)"\n'
+                    'sleep 2\n'
+                    f'cp "{installer_path}" "{target_path}.new"\n'
+                    f'chmod +x "{target_path}.new"\n'
+                    f'mv "{target_path}.new" "{target_path}"\n'
+                    f'nohup "{target_path}" >/dev/null 2>&1 &\n'
+                    'rm -f "$0"\n'
+                )
+                with open(relay_path, 'w', encoding='utf-8') as f:
+                    f.write(relay_script)
+                os.chmod(relay_path, 0o755)
+
+                subprocess.Popen(
+                    ['/bin/bash', relay_path],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+                    start_new_session=True
+                )
+                app_logger.info("[UPDATE] ✅ Script relais Linux lancé (remplacement de l'AppImage), fermeture...")
+                time.sleep(1)
+                _cleanup_before_exit()
+                os._exit(0)
+                return
 
             app_dir = BASE_DIR
 
@@ -11777,7 +12424,8 @@ def download_update(download_url, progress_callback=None, expected_sha256=None):
         app_logger.info(f"[UPDATE] ⬇️ Téléchargement depuis: {download_url}")
         temp_dir = tempfile.gettempdir()
         url_path = download_url.split("?")[0]
-        ext = os.path.splitext(url_path)[1] or '.exe'
+        _default_ext = '.exe' if sys.platform == 'win32' else ('.dmg' if sys.platform == 'darwin' else '.appimage')
+        ext = os.path.splitext(url_path)[1] or _default_ext
         temp_file = os.path.join(temp_dir, f"Stellio-Update-{int(time.time())}{ext}")
 
         response = requests.get(download_url, stream=True, timeout=60, headers={
@@ -11957,6 +12605,49 @@ def api_add_printer():
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
     finally:
         conn.close()
+
+@app.route('/api/printers/discover', methods=['GET'])
+@login_required
+def api_discover_printers():
+    conn = get_db()
+    try:
+        existing_ips = {row['ip'] for row in conn.execute(
+            "SELECT ip FROM printers WHERE user_id = ?", (session['user_id'],)
+        ).fetchall()}
+    finally:
+        conn.close()
+
+    results = []
+    results_lock = threading.Lock()
+
+    def _run(fn):
+        try:
+            r = fn()
+            with results_lock:
+                results.extend(r)
+        except Exception as e:
+            app_logger.info(f"[Discover] Erreur méthode de découverte: {e}")
+
+    threads = [
+        threading.Thread(target=_run, args=(_discover_bambu_ssdp,), daemon=True),
+        threading.Thread(target=_run, args=(_discover_elegoo_broadcast,), daemon=True),
+        threading.Thread(target=_run, args=(_discover_flashforge,), daemon=True),
+        threading.Thread(target=_run, args=(_scan_lan_for_printers,), daemon=True),
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=15)
+
+    seen_ips, filtered = set(), []
+    for r in results:
+        if not r.get('ip') or r['ip'] in existing_ips or r['ip'] in seen_ips:
+            continue
+        seen_ips.add(r['ip'])
+        filtered.append(r)
+
+    return jsonify({"printers": filtered}), 200
+
 
 @app.route('/api/printers/<int:pid>/status', methods=['GET'])
 @login_required
@@ -12318,6 +13009,27 @@ def api_printer_camera(pid):
                     "snapshot_url": None,
                     "name": "Bambu Lab Camera"
                 })
+
+        elif ptype == 'creality':
+            camera_info.update({
+                "available": True,
+                "stream_url": f"http://{ip}:8080/?action=stream",
+                "snapshot_url": f"http://{ip}:8080/?action=snapshot",
+                "name": "Creality Camera"
+            })
+
+        elif ptype == 'flashforge':
+            if HAS_FLASHFORGE:
+                conn = _ensure_flashforge_connection(printer)
+                info = conn.get_state_snapshot() if conn else None
+                if info and getattr(info, 'has_camera', False):
+                    stream_url = getattr(info, 'camera_stream_url', '') or f"http://{ip}:8080/?action=stream"
+                    camera_info.update({
+                        "available": True,
+                        "stream_url": stream_url,
+                        "snapshot_url": None,
+                        "name": "FlashForge Camera"
+                    })
 
         elif ptype == 'elegoo_sdcp':
             conn = _ensure_elegoo_sdcp_connection(printer)
@@ -12849,6 +13561,27 @@ def _detect_hardware():
         except Exception as e:
             app_logger.info(f"[HW] Repli WMI GPU échoué: {e}")
 
+    if not info['gpu_name'] and sys.platform == 'darwin':
+        try:
+            result = subprocess.run(
+                ['system_profiler', 'SPDisplaysDataType', '-json'],
+                capture_output=True, text=True, timeout=8
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                data = json.loads(result.stdout.strip())
+                displays = data.get('SPDisplaysDataType', [])
+                if displays:
+                    gpu = displays[0]
+                    info['gpu_name'] = gpu.get('sppci_model') or gpu.get('_name')
+                    vram_str = gpu.get('spdisplays_vram') or gpu.get('spdisplays_vram_shared', '')
+                    digits = ''.join(c for c in vram_str if c.isdigit())
+                    if digits:
+                        vram_val = float(digits)
+                        info['vram_gb'] = round(vram_val / 1024, 1) if vram_val > 256 else round(vram_val, 1)
+                    app_logger.info(f"[HW] GPU détectée via system_profiler: {info['gpu_name']} (~{info['vram_gb']} Go)")
+        except Exception as e:
+            app_logger.info(f"[HW] Repli system_profiler GPU échoué: {e}")
+
     return info
 
 OLLAMA_MODEL_TIERS = [
@@ -12902,7 +13635,6 @@ def api_ollama_recommend_model():
     )
 
     return jsonify({'hardware': hw, 'recommendation': rec}), 200
-
 
 
 MIN_SAMPLES_FOR_CORRECTION = 3
@@ -14200,6 +14932,17 @@ def _classify_profile_type(raw, hint=None):
         return hint
     if raw.get('filament_type') or raw.get('material_type') or raw.get('material'):
         return 'filament'
+    has_nozzle_temp = _pick(raw, ['temperature', 'first_layer_temperature',
+                                   'material_print_temperature', 'nozzle_temperature']) not in (None, '')
+    if has_nozzle_temp:
+        return 'filament'
+    has_printer_only_keys = any(
+        raw.get(k) not in (None, '')
+        for k in ('bed_shape', 'retract_length', 'max_print_height', 'printer_technology',
+                  'gcode_flavor', 'machine_max_acceleration_x', 'z_offset', 'nozzle_diameter')
+    )
+    if has_printer_only_keys:
+        return 'printer'
     return 'process'
 
 def _guess_material_type(name, raw_material):
@@ -14543,11 +15286,12 @@ def _refresh_stale_slicer_profiles(profiles):
 def api_slicer_profiles_list():
     profiles = load_slicer_profiles()
     _refresh_stale_slicer_profiles(profiles)  
+    newly_imported = []
     try:
-        _autodetect_new_slicer_profiles(profiles, session['user_id'])  
+        newly_imported = _autodetect_new_slicer_profiles(profiles, session['user_id'])  
     except Exception as e:
         app_logger.debug(f"[SlicerProfiles] Auto-détection silencieuse ignorée: {e}")
-    return jsonify({"profiles": profiles}), 200
+    return jsonify({"profiles": profiles, "newly_imported": newly_imported}), 200
 
 
 @app.route('/api/slicer-profiles/import', methods=['POST'])
@@ -14722,7 +15466,7 @@ def api_slicer_profiles_refresh():
 def _autodetect_new_slicer_profiles(profiles, user_id):
     appdata = os.environ.get('APPDATA')
     if not appdata:
-        return [] 
+        return []  
 
     already_imported = {p.get('source_filename') for p in profiles}
     imported = []
@@ -15546,7 +16290,6 @@ def _compute_estimated_cost(file_path, weight_g_hint=None):
 
     return material_cost, elec_cost, total_cost, weight_g
 
-
 MATERIAL_CO2_FACTORS_KG_PER_KG = {
     'pla': 1.4, 'petg': 2.0, 'abs': 2.6, 'asa': 2.7, 'tpu': 2.5,
     'nylon': 5.0, 'pa': 5.0, 'pc': 3.5, 'pva': 2.2, 'hips': 2.4,
@@ -15689,7 +16432,7 @@ def _get_manual_filament_slots(user_id):
         conn = get_db()
         try:
             rows = conn.execute(
-                "SELECT id, name, material, color_hex, remaining_g, capacity_g, source_label FROM manual_filament_spools WHERE user_id=? ORDER BY created_at DESC",
+                "SELECT id, name, material, color_hex, remaining_g, capacity_g, source_label, price FROM manual_filament_spools WHERE user_id=? ORDER BY created_at DESC",
                 (user_id,)
             ).fetchall()
         finally:
@@ -15703,7 +16446,8 @@ def _get_manual_filament_slots(user_id):
                 'color_hex': r['color_hex'] or '#888888',
                 'remaining_g': r['remaining_g'],
                 'capacity_g': r['capacity_g'] or 1000,
-                'source_label': r['source_label'] or 'Manuel'
+                'source_label': r['source_label'] or 'Manuel',
+                'price': r['price'] if r['price'] is not None else None,
             })
     except Exception as e:
         app_logger.warning(f"[FilamentBridge] Lecture bobines manuelles impossible: {e}")
@@ -15725,6 +16469,9 @@ def _get_spoolman_slots(url):
             filament = s.get('filament', {}) or {}
             vendor = filament.get('vendor', {}) or {}
             color = filament.get('color_hex')
+            price = s.get('price')
+            if price is None:
+                price = filament.get('price')
             slots.append({
                 'source_type': 'spoolman',
                 'source_id': str(s.get('id')),
@@ -15733,13 +16480,24 @@ def _get_spoolman_slots(url):
                 'color_hex': f"#{str(color).replace('#', '')}" if color else '#888888',
                 'remaining_g': s.get('remaining_weight'),
                 'capacity_g': filament.get('weight') or s.get('initial_weight') or 1000,
-                'spoolman_url': url
+                'spoolman_url': url,
+                'price': price if isinstance(price, (int, float)) else None,
             })
     except requests.exceptions.ConnectionError:
         return slots, f"Connexion refusée — Spoolman démarré sur {url} ?"
     except Exception as e:
         return slots, str(e)
     return slots, None
+
+@app.route('/api/filament/spools', methods=['GET'])
+@login_required
+def api_filament_spools():
+    settings = load_settings() or {}
+    url = (settings.get('spoolman_url') or '').rstrip('/')
+    slots = _get_manual_filament_slots(session['user_id'])
+    spoolman_slots, spoolman_err = _get_spoolman_slots(url)
+    slots.extend(spoolman_slots)
+    return jsonify({"slots": slots, "spoolman_error": spoolman_err}), 200
 
 @app.route('/api/files/pre-print-check', methods=['POST'])
 @login_required
@@ -16122,29 +16880,159 @@ def get_local_ip():
     except Exception:
         return '127.0.0.1'
 
+
+def _scan_lan_for_spoolman(timeout=0.35, port=7912, max_parallel=64):
+    local_ip = get_local_ip()
+    if local_ip == '127.0.0.1' or local_ip.count('.') != 3:
+        return None
+    prefix = '.'.join(local_ip.split('.')[:3])
+    candidates = [f"{prefix}.{i}" for i in range(1, 255)]
+
+    found = {'url': None}
+    lock = threading.Lock()
+
+    def _check(ip):
+        if found['url']:
+            return
+        try:
+            r = requests.get(f"http://{ip}:{port}/api/v1/info", timeout=timeout)
+            if r.ok:
+                data = r.json()
+                if isinstance(data, dict) and ('version' in data or 'debug_mode' in data):
+                    with lock:
+                        if not found['url']:
+                            found['url'] = f"http://{ip}:{port}"
+        except Exception:
+            pass
+
+    batch = []
+    for ip in candidates:
+        if found['url']:
+            break
+        t = threading.Thread(target=_check, args=(ip,), daemon=True)
+        batch.append(t)
+        t.start()
+        if len(batch) >= max_parallel:
+            for th in batch:
+                th.join(timeout=timeout + 0.5)
+            batch = []
+    for th in batch:
+        th.join(timeout=timeout + 0.5)
+
+    return found['url']
+
+
+@app.route('/api/spoolman/discover', methods=['GET'])
+@login_required
+def api_spoolman_discover():
+    settings = load_settings() or {}
+    if settings.get('spoolman_url'):
+        return jsonify({"found": False, "reason": "already_configured"}), 200
+    if settings.get('spoolman_discover_declined'):
+        return jsonify({"found": False, "reason": "declined"}), 200
+    url = _scan_lan_for_spoolman()
+    if url:
+        return jsonify({"found": True, "url": url}), 200
+    return jsonify({"found": False}), 200
+
+
+@app.route('/api/spoolman/discover/decline', methods=['POST'])
+@login_required
+def api_spoolman_discover_decline():
+    settings = load_settings() or {}
+    settings['spoolman_discover_declined'] = True
+    save_settings(settings)
+    return jsonify({"ok": True}), 200
+
+
+SLICER_ID_TO_DEFAULT_VALUE = {
+    'orcaslicer': 'orca-slicer.exe',
+    'bambustudio': 'bambu-studio.exe',
+    'prusaslicer': 'prusa-slicer.exe',
+    'superslicer': 'superslicer.exe',
+    'crealityprint': 'Creality Print.exe',
+    'cura': 'Cura.exe',
+    'elegooslicer': 'ElegooSlicer.exe',
+    'anycubicslicernext': 'AnycubicSlicerNext.exe',
+    'anycubicslicer': 'Anycubic-Slicer.exe',
+    'simplify3d': 'Simplify3D.exe',
+    'ideamaker': 'ideaMaker.exe',
+    'flashprint': 'FlashPrint.exe',
+    'lycheeslicer': 'LycheeSlicer.exe',
+    'craftware': 'CraftWare.exe',
+    'mattercontrol': 'MatterControl.exe',
+    'makerbotprint': 'MakerBotPrint.exe',
+    'voxelizer': 'Voxelizer.exe',
+    'slic3r': 'slic3r.exe',
+    'kisslicer': 'KISSlicer.exe',
+}
+
+
+@app.route('/api/slicers/discover', methods=['GET'])
+@login_required
+def api_slicers_discover():
+    settings = load_settings() or {}
+    default_configured = bool(settings.get('default_slicer')) and settings.get('default_slicer') != 'system_default'
+    preferred_configured = bool(settings.get('preferred_slicer_id'))
+    if default_configured and preferred_configured:
+        return jsonify({"found": False, "reason": "already_configured"}), 200
+    if settings.get('slicer_default_prompt_declined'):
+        return jsonify({"found": False, "reason": "declined"}), 200
+
+    try:
+        installed = get_cached_installed_slicers(force=True) or []
+    except Exception as e:
+        app_logger.debug(f"[SlicerDiscover] Détection échouée: {e}")
+        installed = []
+
+    if not installed:
+        return jsonify({"found": False}), 200
+
+    slicers = [{
+        "id": s.get('id'),
+        "name": s.get('name'),
+        "default_value": SLICER_ID_TO_DEFAULT_VALUE.get(s.get('id'))
+    } for s in installed]
+
+    return jsonify({
+        "found": True,
+        "slicers": slicers,
+        "default_slicer": settings.get('default_slicer') or 'system_default',
+        "preferred_slicer_id": settings.get('preferred_slicer_id') or ''
+    }), 200
+
+
+@app.route('/api/slicers/discover/decline', methods=['POST'])
+@login_required
+def api_slicers_discover_decline():
+    settings = load_settings() or {}
+    settings['slicer_default_prompt_declined'] = True
+    save_settings(settings)
+    return jsonify({"ok": True}), 200
+
+
 @app.route('/manifest.json')
 def pwa_manifest():
-    ip = get_local_ip()
-    port = 5000
-    start_url = f'http://{ip}:{port}/'
     manifest = {
+        "id": "/",
         "name": "Stellio 3D",
         "short_name": "Stellio",
         "description": "Gestionnaire de fichiers 3D",
-        "start_url": start_url,
+        "start_url": "/",
+        "scope": "/",
         "display": "standalone",
         "background_color": "#1a1d2e",
         "theme_color": "#1a1d2e",
         "orientation": "portrait-primary",
         "icons": [
             {
-                "src": f"http://{ip}:{port}/assets/logo-stellio.png",
+                "src": "assets/logo-stellio.png",
                 "sizes": "192x192",
                 "type": "image/png",
                 "purpose": "any maskable"
             },
             {
-                "src": f"http://{ip}:{port}/assets/logo-stellio.png",
+                "src": "assets/logo-stellio.png",
                 "sizes": "512x512",
                 "type": "image/png",
                 "purpose": "any maskable"
@@ -16156,6 +17044,23 @@ def pwa_manifest():
         json.dumps(manifest, ensure_ascii=False),
         mimetype='application/manifest+json'
     )
+
+
+@app.route('/api/network-info', methods=['GET'])
+def api_network_info():
+    remote = get_remote_state()
+    return jsonify({
+        "local_url": f"http://{get_local_ip()}:5000",
+        "remote_url": remote.get('url'),
+        "remote_ready": remote.get('status') == 'ready',
+    }), 200
+
+
+@app.route('/api/ping', methods=['GET'])
+def api_ping():
+    response = jsonify({"ok": True})
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    return response, 200
 
 
 _remote_lock = threading.Lock()
@@ -16372,17 +17277,30 @@ def api_qrcode():
     try:
         import qrcode
         import io, base64
+        from urllib.parse import quote
+
         source = request.args.get('source', 'local')
+        fmt = request.args.get('format', 'web')  
+
+        local_ip = get_local_ip()
+        local_url = f'http://{local_ip}:5000/'
+        remote_state = get_remote_state()
+        remote_url = remote_state['url'] if remote_state.get('status') == 'ready' else None
 
         if source == 'remote':
-            state = get_remote_state()
-            if state['status'] != 'ready' or not state['url']:
+            if not remote_url:
                 return jsonify({'error': "Accès distant non disponible pour le moment"}), 503
-            url = state['url']
+            url = remote_url
         else:
-            ip = get_local_ip()
-            port = 5000
-            url = f'http://{ip}:{port}/'
+            url = local_url
+
+        if fmt == 'app':
+            payload = f'stellio://connect?local={quote(local_url, safe=":/")}'
+            if remote_url:
+                payload += f'&remote={quote(remote_url, safe=":/")}'
+            data_for_qr = payload
+        else:
+            data_for_qr = url
 
         qr = qrcode.QRCode(
             version=None,
@@ -16390,14 +17308,14 @@ def api_qrcode():
             box_size=10,
             border=2,
         )
-        qr.add_data(url)
+        qr.add_data(data_for_qr)
         qr.make(fit=True)
         img = qr.make_image(fill_color='#1a1d2e', back_color='white')
         buf = io.BytesIO()
         img.save(buf, format='PNG')
         buf.seek(0)
         b64 = base64.b64encode(buf.read()).decode('utf-8')
-        return jsonify({'qr_image': b64, 'url': url}), 200
+        return jsonify({'qr_image': b64, 'url': url, 'format': fmt}), 200
     except ImportError:
         return jsonify({'error': "Module 'qrcode' manquant. Installez-le : pip install qrcode[pil]"}), 500
     except Exception as e:

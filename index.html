@@ -1,6 +1,33 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+    <script>
+    (function () {
+        try {
+            if (sessionStorage.getItem('stellio_probe_done')) return;
+            sessionStorage.setItem('stellio_probe_done', '1');
+
+            fetch('/api/network-info', { cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (info) {
+                    var localUrl = info.local_url;
+                    if (!localUrl || window.location.origin === localUrl) return;
+
+                    var controller = new AbortController();
+                    var timer = setTimeout(function () { controller.abort(); }, 1200);
+                    fetch(localUrl + '/api/ping', { mode: 'cors', signal: controller.signal, cache: 'no-store' })
+                        .then(function (r) {
+                            clearTimeout(timer);
+                            if (r.ok) {
+                                window.location.replace(localUrl + window.location.pathname + window.location.search);
+                            }
+                        })
+                        .catch(function () { clearTimeout(timer); });
+                })
+                .catch(function () { /* réseau indisponible au tout premier chargement : on continue normalement */ });
+        } catch (e) { /* navigateur trop ancien : on continue normalement */ }
+    })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title data-i18n="app.title">Stellio - 3D File Manager</title>
@@ -259,6 +286,10 @@
 				</button>
                 </div>
                 <div class="nav-about-spacer">
+					<button class="nav-btn hidden" id="pwa-install-btn" onclick="installStellioApp()" data-i18n-title="pwa.install_hint" title="Installer Stellio comme application sur cet appareil">
+						<i class="fa-solid fa-download"></i>
+						<span data-i18n="pwa.install">Installer l'application</span>
+					</button>
 					<button class="nav-btn" id="nav-check-update-btn" onclick="manualCheckUpdate()" data-i18n-title="update.check_button" title="Vérifier les mises à jour">
 						<i class="fa-solid fa-arrows-rotate"></i>
 						<span data-i18n="nav.check_update">Mises à jour</span>
@@ -644,7 +675,7 @@
 
                 <div id="page-settings" class="page">
                     <div class="settings-grid">
-                        <div class="settings-col" style="display:flex; flex-direction:column; gap:16px;">
+                        <div class="settings-col">
 
                         <div class="accord-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
@@ -769,10 +800,10 @@
                                         <span data-i18n="cost.spools_label">Bobines de filament</span>
                                         <span id="settings-spools-count" class="badge-count" style="font-size:11px; font-weight:600; color:var(--text-muted); background:var(--bg-tertiary); border:1px solid var(--border); border-radius:999px; padding:1px 8px;">0</span>
                                     </label>
-                                    <p class="settings-hint" style="margin:0 0 2px;" data-i18n="cost.spools_hint">Ajoute autant de bobines que tu utilises. L'étoile marque la bobine par défaut, utilisée pour le calcul automatique.</p>
+                                    <p class="settings-hint" style="margin:0 0 2px;" data-i18n="cost.spools_hint">Bobines récupérées automatiquement depuis l'inventaire filament (Spoolman + manuel). L'étoile marque la bobine par défaut, utilisée pour le calcul automatique ; le prix reste modifiable ici si Spoolman ne le renseigne pas.</p>
                                     <div id="settings-spools-list" class="settings-spools-list" style="display:flex; flex-direction:column; gap:8px;"></div>
-                                    <button type="button" class="btn btn-ghost btn-sm" style="align-self:flex-start;" onclick="addSpoolRow()">
-                                        <i class="fa-solid fa-plus"></i> <span data-i18n="cost.add_spool">Ajouter une bobine</span>
+                                    <button type="button" class="btn btn-ghost btn-sm" style="align-self:flex-start;" onclick="loadCostSpoolsFromInventory()">
+                                        <i class="fa-solid fa-rotate"></i> <span data-i18n="cost.refresh_spools">Actualiser depuis l'inventaire</span>
                                     </button>
                                 </div>
 
@@ -800,7 +831,7 @@
                         </div>
 
 
-                        <div class="accord-section">
+                        <div class="accord-section" id="account-security-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-shield-halved"></i> <span data-i18n="settings.security">Sécurité du compte</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
@@ -820,7 +851,7 @@
                             <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="settings.ai">Intelligence artificielle</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
-                            </div>
+                            </div>							
                             <div class="accord-body" style="display:flex; flex-direction:column; gap:12px;">
                                 <div class="settings-row" style="align-items:flex-start;">
                                     <div>
@@ -836,7 +867,7 @@
 
                                     <div>
                                         <label style="font-size:13px; color:var(--text-secondary); font-weight:500;" data-i18n="settings.ollama_model">Modèle</label>
-                                        <div style="display:flex; gap:8px; margin-top:6px;">
+                                        <div class="ollama-model-row" style="display:flex; gap:8px; margin-top:6px;">
                                             <select id="ollama-model-select"
                                                 style="flex:1; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
                                                 <option value="" data-i18n="settings.ollama_test_first">— Testez d'abord la connexion —</option>
@@ -894,7 +925,7 @@
                             </div>
                         </div>
 
-                        <div class="accord-section">
+                        <div class="accord-section" id="slicer-settings-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-cube"></i> <span data-i18n="settings.slicer_config">Slicer</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
@@ -1002,8 +1033,6 @@
                                 </div>
                             </div>
                         </div>
-                        </div>
-                        <div class="settings-col" style="display:flex; flex-direction:column; gap:16px;">
 
                         <div class="accord-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
@@ -1011,7 +1040,16 @@
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
                             </div>
                             <div class="accord-body">
-                                <div style="display:flex;flex-direction:column;gap:8px;">
+                                <div id="spoolman-configured-view" style="display:none;flex-direction:column;gap:8px;">
+                                    <label style="font-size:13px;color:var(--text-secondary);" data-i18n="settings.server_url">URL du serveur</label>
+                                    <div style="display:flex;gap:8px;align-items:center;">
+                                        <span id="spoolman-configured-address" style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+                                        <button class="btn btn-danger btn-sm" onclick="deleteSpoolmanUrl()">
+                                            <i class="fa-solid fa-trash"></i> <span data-i18n="actions.delete">Supprimer</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="spoolman-manual-view" style="display:flex;flex-direction:column;gap:8px;">
                                     <label style="font-size:13px;color:var(--text-secondary);" data-i18n="settings.server_url">URL du serveur</label>
                                     <div style="display:flex;gap:8px;">
                                         <input id="spoolman-url-input" type="text" placeholder="192.168.1.x ou http://192.168.1.x:7912"
@@ -1019,14 +1057,14 @@
                                         <button class="btn btn-primary btn-sm" onclick="saveSpoolmanUrl()">
                                             <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="actions.save">Sauvegarder</span>
                                         </button>
-                                        <button class="btn btn-danger btn-sm" onclick="deleteSpoolmanUrl()">
-                                            <i class="fa-solid fa-trash"></i> <span data-i18n="actions.delete">Supprimer</span>
-                                        </button>
                                     </div>
-                                    <p class="settings-hint" data-i18n="settings.spoolman_hint">Entrez l'IP seule — le port 7912 sera ajouté automatiquement.</p>
+                                    <p class="settings-hint" data-i18n="settings.spoolman_hint">Entrez l'IP seule — le port 7912 sera ajouté automatiquement. Stellio recherche aussi automatiquement un serveur sur le réseau à la connexion.</p>
                                 </div>
                             </div>
                         </div>
+
+                        </div>
+                        <div class="settings-col">
 
                         <div class="accord-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
@@ -1053,69 +1091,61 @@
                             </div>
                         </div>
                         <div class="accord-section">
-                            <div class="accord-header" onclick="toggleAccord(this)">
-                                <span><i class="fa-solid fa-mobile-screen"></i> <span data-i18n="settings.mobile_access">Accès mobile</span></span>
-                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
-                            </div>
-                            <div class="accord-body" style="text-align:center;">
-                                <p class="settings-hint" style="margin-bottom:14px;" data-i18n="settings.phone-hint">Scannez ce QR code depuis votre téléphone ou tablette pour accéder à Stellio et l'installer comme raccourci sur votre écran d'accueil.</p>
-                                <button class="btn btn-primary" onclick="openQRModal()" style="width:100%;">
-                                    <i class="fa-solid fa-qrcode"></i><span data-i18n="settings.qr-code"> Générer le QR code</span>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="accord-section">
                             <div class="accord-header" onclick="toggleAccord(this); loadRemoteAccess();">
-                                <span><i class="fa-solid fa-globe"></i> <span data-i18n="settings.remote_access">Accès à distance</span></span>
+                                <span><i class="fa-solid fa-mobile-screen"></i> <span data-i18n="settings.mobile_remote_access">Accès mobile &amp; à distance</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
                             </div>
                             <div class="accord-body" style="text-align:center;">
-                                <div class="settings-row" style="align-items:flex-start; text-align:left;">
-                                    <div>
-                                        <label style="font-size:13px; font-weight:500;" data-i18n="settings.remote_access_enable">Activer l'accès à distance</label>
-                                        <p class="settings-hint" style="margin-top:2px;" data-i18n="settings.remote_access_hint">Accédez à Stellio depuis n'importe où sur internet, même hors de votre réseau local. Une adresse publique unique est générée automatiquement au démarrage de l'application, gratuitement et sans configuration.</p>
-                                    </div>
-                                    <label class="nav-toggle-switch" style="margin-top:2px;">
-                                        <input type="checkbox" id="remote-access-enabled-toggle" onchange="toggleRemoteAccessEnabled(this.checked)">
-                                        <span class="nav-toggle-slider"></span>
-                                    </label>
-                                </div>
-                                <div id="remote-access-content">
-                                    <p class="settings-hint"><i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="settings.loading">Chargement…</span></p>
-                                </div>
+                                <p class="settings-hint" style="margin-bottom:14px;">Activez l'accès à distance ci-dessous pour générer un QR code et accéder à Stellio depuis votre téléphone ou votre tablette.</p>
 
-                                <div class="accord-section" style="margin-top:14px;box-shadow:none;">
-                                    <div class="accord-header" onclick="toggleAccord(this)" style="background:var(--bg-input);">
-                                        <span><i class="fa-solid fa-lock"></i> <span data-i18n="settings.fixed_url_title">Avancé : obtenir une URL fixe</span></span>
-                                        <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                                <div>
+                                    <div class="settings-row" style="align-items:flex-start; text-align:left;">
+                                        <div>
+                                            <label style="font-size:13px; font-weight:500;" data-i18n="settings.remote_access_enable">Activer l'accès à distance</label>
+                                            <p class="settings-hint" style="margin-top:2px;" data-i18n="settings.remote_access_hint">Accédez à Stellio depuis n'importe où sur internet, même hors de votre réseau local. Une adresse publique unique est générée automatiquement au démarrage de l'application, gratuitement et sans configuration.</p>
+                                        </div>
+                                        <label class="nav-toggle-switch" style="margin-top:2px;">
+                                            <input type="checkbox" id="remote-access-enabled-toggle" onchange="toggleRemoteAccessEnabled(this.checked)">
+                                            <span class="nav-toggle-slider"></span>
+                                        </label>
                                     </div>
-                                    <div class="accord-body" style="text-align:left;">
-                                        <p class="settings-hint" style="margin-bottom:12px;" data-i18n="settings.fixed_url_hint">
-                                            Par défaut, l'adresse change à chaque redémarrage de Stellio. Pour obtenir une adresse fixe et permanente, créez gratuitement un tunnel nommé sur votre compte Cloudflare, puis collez ci-dessous le <strong>Tunnel Token</strong> et l'<strong>URL</strong> que vous avez choisie.
-                                        </p>
-                                        <p class="settings-hint" style="margin-bottom:14px;">
-											<a href="https://one.dash.cloudflare.com/" style="color:var(--accent)" target="_blank" rel="noopener noreferrer">
-                                                <i class="fa-solid fa-arrow-up-right-from-square"></i> <span data-i18n="settings.fixed_url_dashboard_link">Ouvrir le dashboard Cloudflare Zero Trust</span>
-                                            </a>
-                                            <span data-i18n="settings.fixed_url_dashboard_steps"> → Réseaux → Tunnels → Créer un tunnel → copiez le Token et configurez un Public Hostname pointant vers <code>http://localhost:5000</code>.</span>
-                                        </p>
-                                        <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:6px;">
-                                            <label data-i18n="settings.fixed_url_token_label">Tunnel Token</label>
-                                            <input type="password" id="cf-tunnel-token" class="settings-select" placeholder="eyJhIjoixxxxxxxxxxxxxxxxxxxxxx...">
+                                    <div id="remote-access-content">
+                                        <p class="settings-hint"><i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="settings.loading">Chargement…</span></p>
+                                    </div>
+
+                                    <div class="accord-section" id="fixed-url-section" style="margin-top:14px;box-shadow:none;display:none;">
+                                        <div class="accord-header" onclick="toggleAccord(this)" style="background:var(--bg-input);">
+                                            <span><i class="fa-solid fa-lock"></i> <span data-i18n="settings.fixed_url_title">Avancé : obtenir une URL fixe</span></span>
+                                            <i class="fa-solid fa-chevron-down accord-arrow"></i>
                                         </div>
-                                        <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:6px;margin-top:10px;">
-                                            <label data-i18n="settings.fixed_url_hostname_label">URL fixe (ex: stellio.mondomaine.com)</label>
-                                            <input type="text" id="cf-fixed-url" class="settings-select" placeholder="stellio.mondomaine.com">
+                                        <div class="accord-body" style="text-align:left;">
+                                            <p class="settings-hint" style="margin-bottom:12px;" data-i18n="settings.fixed_url_hint">
+                                                Par défaut, l'adresse change à chaque redémarrage de Stellio. Pour obtenir une adresse fixe et permanente, créez gratuitement un tunnel nommé sur votre compte Cloudflare, puis collez ci-dessous le <strong>Tunnel Token</strong> et l'<strong>URL</strong> que vous avez choisie.
+                                            </p>
+                                            <p class="settings-hint" style="margin-bottom:14px;">
+												<a href="https://one.dash.cloudflare.com/" style="color:var(--accent)" target="_blank" rel="noopener noreferrer">
+                                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> <span data-i18n="settings.fixed_url_dashboard_link">Ouvrir le dashboard Cloudflare Zero Trust</span>
+                                                </a>
+                                                <span data-i18n="settings.fixed_url_dashboard_steps"> → Réseaux → Tunnels → Créer un tunnel → copiez le Token et configurez un Public Hostname pointant vers <code>http://localhost:5000</code>.</span>
+                                            </p>
+                                            <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+                                                <label data-i18n="settings.fixed_url_token_label">Tunnel Token</label>
+                                                <input type="password" id="cf-tunnel-token" class="settings-select" placeholder="eyJhIjoixxxxxxxxxxxxxxxxxxxxxx...">
+                                            </div>
+                                            <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:6px;margin-top:10px;">
+                                                <label data-i18n="settings.fixed_url_hostname_label">URL fixe (ex: stellio.mondomaine.com)</label>
+                                                <input type="text" id="cf-fixed-url" class="settings-select" placeholder="stellio.mondomaine.com">
+                                            </div>
+                                            <div style="display:flex;gap:8px;margin-top:14px;">
+                                                <button class="btn btn-primary" onclick="saveFixedRemoteAccess()" style="flex:1;">
+                                                    <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="actions.save">Enregistrer</span>
+                                                </button>
+                                                <button class="btn btn-ghost" onclick="disableFixedRemoteAccess()">
+                                                    <i class="fa-solid fa-rotate-left"></i> <span data-i18n="settings.fixed_url_revert">Revenir au mode rapide</span>
+                                                </button>
+                                            </div>
+                                            <p id="cf-fixed-url-status" class="settings-hint" style="margin-top:10px;"></p>
                                         </div>
-                                        <div style="display:flex;gap:8px;margin-top:14px;">
-                                            <button class="btn btn-primary" onclick="saveFixedRemoteAccess()" style="flex:1;">
-                                                <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="actions.save">Enregistrer</span>
-                                            </button>
-                                            <button class="btn btn-ghost" onclick="disableFixedRemoteAccess()">
-                                                <i class="fa-solid fa-rotate-left"></i> <span data-i18n="settings.fixed_url_revert">Revenir au mode rapide</span>
-                                            </button>
-                                        </div>
-                                        <p id="cf-fixed-url-status" class="settings-hint" style="margin-top:10px;"></p>
                                     </div>
                                 </div>
                             </div>
@@ -1229,7 +1259,7 @@
                                 </div>
                             </div>
 
-                        <div class="accord-section">
+                        <div class="accord-section" id="save-data-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-box-archive"></i> <span data-i18n="settings.backup">Sauvegarde et données</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
@@ -1255,7 +1285,7 @@
                             </div>
                         </div>
 
-                        <div class="accord-section">
+                        <div class="accord-section" id="shortcuts-settings-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-keyboard"></i> <span data-i18n="shortcuts.title">Raccourcis clavier</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
@@ -1501,7 +1531,7 @@
 							<div class="input-group">
 								<label for="sosprint-photo-input"><span data-i18n="sosprint.photo_label">Photo de la pièce ratée</span> <span class="sosprint-optional-tag" data-i18n="sosprint.optional">(facultatif)</span></label>
 								<div class="sosprint-photo-zone" id="sosprint-photo-zone">
-									<input type="file" id="sosprint-photo-input" accept="image/jpeg,image/png,image/webp" hidden>
+									<input type="file" id="sosprint-photo-input" accept="image/jpeg,image/png,image/webp" capture="environment" hidden>
 									<div class="sosprint-photo-placeholder" id="sosprint-photo-placeholder">
 										<i class="fa-solid fa-camera"></i>
 										<span data-i18n="sosprint.add_photo">Ajouter une photo pour un diagnostic plus précis</span>
@@ -1536,7 +1566,7 @@
 							</div>
 
 							<div class="sosprint-investigation-photo-row">
-								<input type="file" id="sosprint-extra-photo-input" accept="image/jpeg,image/png,image/webp" hidden>
+								<input type="file" id="sosprint-extra-photo-input" accept="image/jpeg,image/png,image/webp" capture="environment" hidden>
 								<button type="button" class="btn btn-ghost btn-sm" id="sosprint-add-photo-btn">
 									<i class="fa-solid fa-camera"></i> <span data-i18n="sosprint.add_photo_now">Ajouter une photo</span>
 								</button>
@@ -1659,6 +1689,67 @@
                 <i class="fa-solid fa-times"></i> <span data-i18n="actions.cancel">Annuler</span>
             </button>
         </div>
+
+        <nav class="bottom-nav" id="mobile-bottom-nav">
+            <div class="bottom-nav-scroll-hint bottom-nav-scroll-hint--left" id="bottom-nav-hint-left" aria-hidden="true">
+                <i class="fa-solid fa-chevron-left"></i>
+            </div>
+            <div class="bottom-nav-scroll-hint bottom-nav-scroll-hint--right" id="bottom-nav-hint-right" aria-hidden="true">
+                <i class="fa-solid fa-chevron-right"></i>
+            </div>
+            <button class="nav-btn bottom-nav-btn active" data-page="library" data-icon="fa-layer-group" data-title-key="nav.library">
+                <i class="fa-solid fa-layer-group"></i>
+                <span data-i18n="nav.library">Bibliothèque</span>
+            </button>
+            <button class="nav-btn bottom-nav-btn" data-page="printers" data-nav-id="printers" data-title-key="nav.printers" data-icon="fa-print">
+                <i class="fa-solid fa-print"></i>
+                <span data-i18n="nav.printers">Imprimantes</span>
+            </button>
+            <button class="nav-btn bottom-nav-btn" data-page="spoolman" data-nav-id="spoolman" data-title-key="nav.spoolman" data-icon="fa-circle-nodes">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="22"/><line x1="2" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="22" y2="12"/></svg>
+                <span data-i18n="nav.spoolman_short">Filament</span>
+            </button>
+            <button class="nav-btn bottom-nav-btn" data-page="stats" data-nav-id="stats" data-title-key="nav.stats" data-icon="fa-chart-pie">
+                <i class="fa-solid fa-chart-pie"></i>
+                <span data-i18n="nav.stats_short">Stats</span>
+            </button>
+            <button class="nav-btn bottom-nav-btn" data-page="settings" data-icon="fa-gear" data-title-key="nav.settings">
+                <i class="fa-solid fa-gear"></i>
+                <span data-i18n="nav.settings">Paramètres</span>
+            </button>
+            <button class="nav-btn bottom-nav-btn" data-page="projects" data-nav-id="projects" data-icon="fa-diagram-project" data-title-key="nav.projects">
+                <i class="fa-solid fa-diagram-project"></i>
+                <span data-i18n="nav.projects">Projets</span>
+            </button>
+            <button class="nav-btn bottom-nav-btn" data-page="history" data-nav-id="history" data-icon="fa-clock-rotate-left" data-title-key="nav.history">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span data-i18n="nav.history">Historique</span>
+            </button>
+            <button class="nav-btn bottom-nav-btn" data-page="gallery" data-nav-id="gallery" data-icon="fa-camera" data-title-key="nav.gallery">
+                <i class="fa-solid fa-camera"></i>
+                <span data-i18n="nav.gallery">Galerie</span>
+            </button>
+            <button class="nav-btn bottom-nav-btn" data-nav-id="favorites" onclick="toggleFavoritesFilterFromNav()">
+                <i class="fa-solid fa-star"></i>
+                <span data-i18n="nav.favorites">Favoris</span>
+            </button>
+            <button class="nav-btn bottom-nav-btn" data-nav-id="filters" onclick="openFiltersModal()">
+                <i class="fa-solid fa-filter"></i>
+                <span data-i18n="nav.filters">Filtres</span>
+            </button>
+            <button class="nav-btn bottom-nav-btn" data-nav-id="download" onclick="openDownloadModal()">
+                <i class="fa-solid fa-cloud-arrow-down"></i>
+                <span data-i18n="nav.download">Télécharger</span>
+            </button>
+            <button class="nav-btn bottom-nav-btn" data-nav-id="duplicates" onclick="openDuplicatesModal()">
+                <i class="fa-solid fa-copy"></i>
+                <span data-i18n="nav.duplicates">Doublons</span>
+            </button>
+            <button class="nav-btn bottom-nav-btn" data-page="sosprint" data-nav-id="sosprint" data-icon="fa-kit-medical" data-title-key="nav.sosprint">
+                <i class="fa-solid fa-kit-medical"></i>
+                <span data-i18n="nav.sosprint">S.O.S print</span>
+            </button>
+        </nav>
     </div>
 
     <div id="modal-select-type" class="modal hidden">
@@ -2468,6 +2559,12 @@
 				<button class="modal-close" onclick="closeModal('modal-add-printer')">×</button>
 			</div>
 			<div class="modal-body">
+				<div id="printer-discover-section" style="margin-bottom:14px;">
+					<button type="button" class="btn" id="printer-discover-btn" onclick="discoverPrinters()" style="width:100%; background:var(--accent)15; border:1.5px dashed var(--accent); color:var(--accent); font-weight:600;">
+						<i class="fa-solid fa-satellite-dish"></i> <span data-i18n="printers.discover_btn">Détecter automatiquement sur le réseau</span>
+					</button>
+					<div id="printer-discover-results" style="display:none; margin-top:8px;"></div>
+				</div>
 				<form id="add-printer-form">
 					<input type="hidden" id="printer-edit-id" value="">
 					<div class="input-group">
@@ -2693,7 +2790,7 @@
             <div class="modal-body">
                 <p id="print-photos-file-name" style="font-size:12px; color:var(--text-muted); margin-bottom:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></p>
                 <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
-                    <input type="file" id="print-photo-file-input" accept="image/png,image/jpeg,image/webp" style="display:none;">
+                    <input type="file" id="print-photo-file-input" accept="image/png,image/jpeg,image/webp" capture="environment" style="display:none;">
                     <button class="btn btn-primary btn-sm" onclick="document.getElementById('print-photo-file-input').click()">
                         <i class="fa-solid fa-plus"></i> <span data-i18n="modal.print_photos_add">Ajouter une photo</span>
                     </button>
@@ -2858,48 +2955,6 @@
         </div>
     </div>
 
-    <div id="modal-qrcode" class="modal hidden">
-        <div class="modal-content small" style="max-width:360px;">
-            <div class="modal-header">
-                <h3><i class="fa-solid fa-qrcode"></i> <span data-i18n="settings.mobile_access">Accès mobile</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-qrcode')">&times;</button>
-            </div>
-            <div class="modal-body" style="text-align:center; padding:24px 20px;">
-                <div id="qr-loading" style="padding:30px;">
-                    <i class="fa-solid fa-spinner fa-spin fa-2x" style="color:var(--accent);"></i>
-                    <p style="margin-top:12px; color:var(--text-muted); font-size:13px;" data-i18n="qr.generating">Génération en cours…</p>
-                </div>
-                <div id="qr-content" class="hidden">
-                    <div style="background:#fff; border-radius:12px; padding:16px; display:inline-block; margin-bottom:16px;">
-                        <img id="qr-image" src="" alt="QR Code Stellio" data-i18n-alt="qr.alt_local" style="width:200px; height:200px; display:block;">
-                    </div>
-                    <p style="font-size:13px; color:var(--text-secondary); margin-bottom:6px;">
-                        <i class="fa-solid fa-wifi" style="color:var(--accent);"></i>
-                        <span data-i18n="qr.wifi_hint">Connectez votre téléphone au <strong>même réseau Wi-Fi</strong></span>
-                    </p>
-                    <p id="qr-url-display" style="font-size:12px; color:var(--text-muted); word-break:break-all; background:var(--bg-input); padding:8px 12px; border-radius:8px; margin:10px 0;"></p>
-                    <div style="background:var(--accent)15; border:1px solid var(--accent)30; border-radius:8px; padding:12px; margin-top:12px; text-align:left;">
-                        <p style="font-size:12px; color:var(--text-secondary); margin:0 0 6px 0; font-weight:600;">
-                            <i class="fa-brands fa-apple"></i> iPhone / iPad
-                        </p>
-                        <p style="font-size:11px; color:var(--text-muted); margin:0;" data-i18n="qr.iphone_steps">Scannez → Safari → <i class="fa-solid fa-arrow-up-from-bracket" style="font-size:10px;"></i> Partager → <strong>Sur l'écran d'accueil</strong></p>
-                        <p style="font-size:12px; color:var(--text-secondary); margin:10px 0 6px 0; font-weight:600;">
-                            <i class="fa-brands fa-android"></i> Android
-                        </p>
-                        <p style="font-size:11px; color:var(--text-muted); margin:0;" data-i18n="qr.android_steps">Scannez → Chrome → <i class="fa-solid fa-ellipsis-vertical" style="font-size:10px;"></i> → <strong>Ajouter à l'écran d'accueil</strong></p>
-                    </div>
-                </div>
-                <div id="qr-error" class="hidden">
-                    <i class="fa-solid fa-triangle-exclamation fa-2x" style="color:var(--danger);"></i>
-                    <p style="margin-top:12px; color:var(--text-muted); font-size:13px;" id="qr-error-msg" data-i18n="qr.error">Impossible de générer le QR code.</p>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-ghost" onclick="closeModal('modal-qrcode')" data-i18n="actions.close">Fermer</button>
-            </div>
-        </div>
-    </div>
-
     <div id="modal-qrcode-remote" class="modal hidden">
         <div class="modal-content small" style="max-width:360px;">
             <div class="modal-header">
@@ -2920,6 +2975,21 @@
                         <span data-i18n="qr.remote_hint">Fonctionne depuis n'importe quel réseau, pas besoin d'être sur le même Wi-Fi</span>
                     </p>
                     <p id="qr-remote-url-display" style="font-size:12px; color:var(--text-muted); word-break:break-all; background:var(--bg-input); padding:8px 12px; border-radius:8px; margin:10px 0;"></p>
+                    <div id="qr-remote-browser-hint"></div>
+                    <div style="background:var(--accent)15; border:1px solid var(--accent)30; border-radius:8px; padding:12px; margin-top:12px; text-align:left;">
+                        <p style="font-size:12px; color:var(--text-secondary); margin:0 0 6px 0; font-weight:600;">
+                            <i class="fa-solid fa-star"></i> <span data-i18n="qr.remote_install_recommended">Recommandé pour l'installation sur mobile</span>
+                        </p>
+                        <p style="font-size:11px; color:var(--text-muted); margin:0 0 8px 0;" data-i18n="qr.remote_install_hint">Cette adresse fonctionne toujours, même hors de la maison — et Stellio bascule automatiquement sur le réseau local (plus rapide) dès que vous êtes chez vous.</p>
+                        <p style="font-size:12px; color:var(--text-secondary); margin:0 0 6px 0; font-weight:600;">
+                            <i class="fa-brands fa-apple"></i> iPhone / iPad
+                        </p>
+                        <p style="font-size:11px; color:var(--text-muted); margin:0;" data-i18n="qr.iphone_steps">Scannez → Safari → <i class="fa-solid fa-arrow-up-from-bracket" style="font-size:10px;"></i> Partager → <strong>Sur l'écran d'accueil</strong></p>
+                        <p style="font-size:12px; color:var(--text-secondary); margin:10px 0 6px 0; font-weight:600;">
+                            <i class="fa-brands fa-android"></i> Android
+                        </p>
+                        <p style="font-size:11px; color:var(--text-muted); margin:0;" data-i18n="qr.android_steps">Scannez → Chrome → <i class="fa-solid fa-ellipsis-vertical" style="font-size:10px;"></i> → <strong>Ajouter à l'écran d'accueil</strong></p>
+                    </div>
                     <div style="background:var(--danger)15; border:1px solid var(--danger)30; border-radius:8px; padding:12px; margin-top:12px; text-align:left;">
                         <p style="font-size:11px; color:var(--text-secondary); margin:0;">
                             <i class="fa-solid fa-triangle-exclamation" style="color:var(--danger);"></i>

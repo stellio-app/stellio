@@ -1,3 +1,12 @@
+# NOTE multiplateforme :
+#   - Windows : rien de plus, pywebview utilise WebView2 (installe par stellio-setup.iss).
+#   - macOS   : pywebview installe automatiquement pyobjc-framework-* (dependances
+#               declarees par le paquet lui-meme pour ce systeme) : rien a ajouter ici.
+#   - Linux   : pywebview a besoin du binding GTK ou QT, non installable par pip seul.
+#               Installer en plus : pip install "pywebview[gtk]"
+#               et les paquets systeme : libgtk-3-0 libwebkit2gtk-4.1-0
+#               (voir build-and-sign.yml, job build-linux, pour la liste complete
+#               des paquets systeme necessaires a la compilation).
 pyinstaller
 flask
 werkzeug

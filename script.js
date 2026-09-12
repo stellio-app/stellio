@@ -189,6 +189,31 @@ window.I18N = I18N;
 
 const API = window.location.origin;
 
+// PWA : enregistrement du service worker (app shell en cache, installation
+// native possible) + gestion du bouton d'installation Android/Chrome.
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch((e) => console.debug('[PWA] Service worker non enregistré:', e));
+    });
+}
+let _deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _deferredInstallPrompt = e;
+    document.getElementById('pwa-install-btn')?.classList.remove('hidden');
+});
+async function installStellioApp() {
+    if (!_deferredInstallPrompt) return;
+    _deferredInstallPrompt.prompt();
+    await _deferredInstallPrompt.userChoice;
+    _deferredInstallPrompt = null;
+    document.getElementById('pwa-install-btn')?.classList.add('hidden');
+}
+window.installStellioApp = installStellioApp;
+window.addEventListener('appinstalled', () => {
+    document.getElementById('pwa-install-btn')?.classList.add('hidden');
+});
+
 function _getCsrfCookie() {
     const match = document.cookie.match(/(?:^|;\s*)stellio_csrf=([^;]*)/);
     return match ? decodeURIComponent(match[1]) : null;
@@ -1410,6 +1435,8 @@ loadSlicerProfiles();
 checkAccountsStatusOnStartup();
 startThumbProgressMonitor();
 startMaintenanceDueChecker();
+checkSpoolmanAutoDiscovery();
+checkSlicerDefaultDiscovery();
 if (filesPromise) {
     filesPromise.then(async (cachedFiles) => {
         if (cachedFiles && Array.isArray(cachedFiles)) {
@@ -1448,6 +1475,124 @@ setTimeout(() => toast.remove(), 300);
 }, 3500);
 }
 
+
+async function checkSpoolmanAutoDiscovery() {
+    try {
+        const res = await fetch(`${API}/api/spoolman/discover`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.found || !data.url) return;
+        const confirmed = await showConfirmDialog(
+            `${I18N.t('settings.spoolman_found') || 'Serveur Spoolman trouvé'} (${data.url}) — ${I18N.t('settings.spoolman_add_question') || 'voulez-vous l\u2019ajouter ?'}`,
+            {
+                confirmLabel: I18N.t('actions.add') || 'Ajouter',
+                icon: 'fa-print',
+                danger: false
+            }
+        );
+        if (confirmed) {
+            try {
+                const saveRes = await fetch(`${API}/api/settings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ spoolman_url: data.url })
+                });
+                if (saveRes.ok) {
+                    showToast(I18N.t('toast.spoolman_url_saved'), 'success');
+                    loadSpoolmanSettings();
+                }
+            } catch (e) { console.error('[SpoolmanDiscover] Sauvegarde impossible', e); }
+        } else {
+            fetch(`${API}/api/spoolman/discover/decline`, { method: 'POST' }).catch(() => {});
+        }
+    } catch (e) { console.warn('[SpoolmanDiscover] Scan indisponible'); }
+}
+
+async function checkSlicerDefaultDiscovery() {
+    try {
+        const res = await fetch(`${API}/api/slicers/discover`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.found || !Array.isArray(data.slicers) || data.slicers.length === 0) return;
+        showSlicerDefaultPopup(data);
+    } catch (e) { console.warn('[SlicerDefaultDiscover] Détection indisponible'); }
+}
+
+function showSlicerDefaultPopup(data) {
+    const openOptions = data.slicers
+        .filter(s => s.default_value)
+        .map(s => `<option value="${escapeHtml(s.default_value)}">${escapeHtml(s.name)}</option>`).join('');
+    const preslicedOptions = data.slicers
+        .map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('');
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 100000; backdrop-filter: blur(5px);`;
+    const popup = document.createElement('div');
+    popup.style.cssText = `background: var(--bg-secondary); color: var(--text-primary); padding: 28px; border-radius: 14px; max-width: 460px; width: 90%; box-shadow: 0 12px 35px rgba(0,0,0,0.6); text-align: left; border: 1px solid var(--border);`;
+    popup.innerHTML = `
+        <h3 style="margin:0 0 10px 0; font-size:19px; font-weight:600; text-align:center;"><i class="fa-solid fa-cube" style="color:var(--accent, #4f8cff);"></i> ${I18N.t('settings.slicer_discover_title') || 'Slicers détectés'}</h3>
+        <p style="color:var(--text-muted); margin:0 0 20px 0; line-height:1.5; font-size:14px; text-align:center;">${I18N.t('settings.slicer_discover_message') || `${data.slicers.length} slicer(s) trouvé(s) sur cette machine — configure tes préférences :`}</p>
+
+        <div style="margin-bottom:14px;">
+            <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:4px;">${I18N.t('settings.default_slicer') || 'Application par défaut (ouverture de fichier)'}</label>
+            <select id="slicer-discover-default" class="settings-select" style="width:100%;">
+                <option value="system_default">${I18N.t('settings.slicer_select') || 'Sélectionnez un slicer'}</option>
+                ${openOptions}
+            </select>
+        </div>
+        <div style="margin-bottom:22px;">
+            <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:4px;">${I18N.t('settings.preferred_slicer') || 'Slicer préféré (pré-slicing / estimation auto)'}</label>
+            <select id="slicer-discover-preferred" class="settings-select" style="width:100%;">
+                <option value="">${I18N.t('settings.slicer_select') || 'Sélectionnez un slicer'}</option>
+                ${preslicedOptions}
+            </select>
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:center;">
+            <button id="slicer-discover-skip" class="btn btn-ghost">${I18N.t('actions.skip') || 'Plus tard'}</button>
+            <button id="slicer-discover-save" class="btn btn-primary">${I18N.t('actions.save') || 'Enregistrer'}</button>
+        </div>
+    `;
+    overlay.appendChild(popup);
+    document.body.appendChild(overlay);
+
+    const defaultSelect = document.getElementById('slicer-discover-default');
+    const preferredSelect = document.getElementById('slicer-discover-preferred');
+    if (data.default_slicer && [...defaultSelect.options].some(o => o.value === data.default_slicer)) defaultSelect.value = data.default_slicer;
+    if (data.preferred_slicer_id && [...preferredSelect.options].some(o => o.value === data.preferred_slicer_id)) preferredSelect.value = data.preferred_slicer_id;
+
+    const cleanup = () => overlay.remove();
+
+    document.getElementById('slicer-discover-skip').addEventListener('click', () => {
+        cleanup();
+        fetch(`${API}/api/slicers/discover/decline`, { method: 'POST' }).catch(() => {});
+    });
+
+    document.getElementById('slicer-discover-save').addEventListener('click', async () => {
+        const payload = {};
+        if (defaultSelect.value && defaultSelect.value !== 'system_default') payload.default_slicer = defaultSelect.value;
+        if (preferredSelect.value) payload.preferred_slicer_id = preferredSelect.value;
+        cleanup();
+        if (Object.keys(payload).length === 0) return;
+        try {
+            const saveRes = await fetch(`${API}/api/settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (saveRes.ok) {
+                showToast(I18N.t('toast.settings_saved') || 'Préférences enregistrées', 'success');
+                loadSlicerSettings();
+            }
+        } catch (e) { console.error('[SlicerDefaultDiscover] Sauvegarde impossible', e); }
+    });
+
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(); });
+    const onKey = (e) => {
+        if (e.key === 'Escape') { cleanup(); document.removeEventListener('keydown', onKey); }
+    };
+    document.addEventListener('keydown', onKey);
+}
 
 async function checkAccountsStatusOnStartup() {
 try {
@@ -4123,9 +4268,58 @@ try {
 const res = await fetch(`${API}/api/slicer-profiles`);
 const data = await res.json();
 renderSlicerProfiles(data.profiles || []);
+if (Array.isArray(data.newly_imported) && data.newly_imported.length > 0) {
+    showSlicerAutoImportPopup(data.newly_imported);
+}
 } catch (err) {
 console.warn('[SlicerProfiles] Échec du chargement:', err);
 }
+}
+
+function showSlicerAutoImportPopup(newlyImported) {
+    const printerCount = newlyImported.filter(p => p.profile_type === 'printer').length;
+    const filamentCount = newlyImported.filter(p => p.profile_type === 'filament').length;
+    const otherCount = newlyImported.length - printerCount - filamentCount;
+
+    const parts = [];
+    if (printerCount) parts.push(`${printerCount} ${printerCount > 1 ? (I18N.t('settings.slicer_profiles_type_printer_plural') || 'profils imprimante') : (I18N.t('settings.slicer_profiles_type_printer') || 'profil imprimante')}`);
+    if (filamentCount) parts.push(`${filamentCount} ${filamentCount > 1 ? (I18N.t('settings.slicer_profiles_type_filament_plural') || 'profils filament') : (I18N.t('settings.slicer_profiles_type_filament') || 'profil filament')}`);
+    if (otherCount) parts.push(`${otherCount} ${otherCount > 1 ? (I18N.t('settings.slicer_profiles_type_process_plural') || 'profils de réglages') : (I18N.t('settings.slicer_profiles_type_process') || 'profil de réglages')}`);
+    if (!parts.length) return;
+
+    const listText = parts.join(', ');
+    const namesPreview = newlyImported.slice(0, 5).map(p => escapeHtml(p.name || '?')).join(', ') + (newlyImported.length > 5 ? '…' : '');
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 100000; backdrop-filter: blur(5px);`;
+    const popup = document.createElement('div');
+    popup.style.cssText = `background: var(--bg-secondary); color: var(--text-primary); padding: 28px; border-radius: 14px; max-width: 440px; width: 90%; box-shadow: 0 12px 35px rgba(0,0,0,0.6); text-align: center; border: 1px solid var(--border);`;
+    popup.innerHTML = `
+        <h3 style="margin:0 0 10px 0; font-size:19px; font-weight:600;"><i class="fa-solid fa-file-import" style="color:var(--accent, #4f8cff);"></i> ${I18N.t('settings.slicer_autoimport_title') || 'Profils slicer importés'}</h3>
+        <p style="color:var(--text-muted); margin:0 0 10px 0; line-height:1.5; font-size:14px;">${(I18N.t('settings.slicer_autoimport_message') || 'Stellio a détecté et importé automatiquement : {{list}}.').replace('{{list}}', escapeHtml(listText))}</p>
+        <p style="color:var(--text-muted); margin:0 0 24px 0; line-height:1.4; font-size:12px; opacity:0.85;">${namesPreview}</p>
+        <div style="display:flex; gap:10px; justify-content:center;">
+            <button id="slicer-autoimport-dismiss" class="btn btn-ghost">${I18N.t('actions.close') || 'Fermer'}</button>
+            <button id="slicer-autoimport-view" class="btn btn-primary">${I18N.t('settings.slicer_autoimport_view') || 'Voir les profils'}</button>
+        </div>
+    `;
+    overlay.appendChild(popup);
+    document.body.appendChild(overlay);
+
+    const cleanup = () => overlay.remove();
+    document.getElementById('slicer-autoimport-dismiss').addEventListener('click', cleanup);
+    document.getElementById('slicer-autoimport-view').addEventListener('click', () => {
+        cleanup();
+        document.querySelector('.nav-btn[data-page="settings"]')?.click();
+        setTimeout(() => {
+            document.getElementById('slicer-profiles-list')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 200);
+    });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(); });
+    const onKey = (e) => {
+        if (e.key === 'Escape') { cleanup(); document.removeEventListener('keydown', onKey); }
+    };
+    document.addEventListener('keydown', onKey);
 }
 
 function filterSlicerProfiles(value) {
@@ -4741,67 +4935,41 @@ if (!themeSelector || !fabricantSelector) {
 console.warn('[Theme] ⚠️ Sélecteurs introuvables');
 return;
 }
-let savedTheme = 'dark', savedFabricant = 'stellio';
-try {
-const res = await fetch(`${API}/api/settings`);
-if (res.ok) {
-const data = await res.json();
-savedTheme = data.theme || savedTheme;
-savedFabricant = data.fabricant || savedFabricant;
-}
-} catch (e) { console.warn('[Theme] Backend indisponible'); }
-if (!savedTheme || savedTheme === 'undefined') savedTheme = localStorage.getItem('stellio-theme') || 'dark';
-if (!savedFabricant || savedFabricant === 'undefined') savedFabricant = localStorage.getItem('stellio-fabricant') || 'stellio';
+let savedTheme = localStorage.getItem('stellio-theme') || 'dark';
+let savedFabricant = localStorage.getItem('stellio-fabricant') || 'stellio';
 themeSelector.value = savedTheme;
 fabricantSelector.value = savedFabricant;
 applyTheme(savedTheme);
 applyFabricant(savedFabricant);
 
-let savedCustomAccent = null;
-try {
-const res2 = await fetch(`${API}/api/settings`);
-if (res2.ok) savedCustomAccent = (await res2.json()).custom_accent || null;
-} catch (e) {  }
-if (!savedCustomAccent || savedCustomAccent === 'undefined') savedCustomAccent = localStorage.getItem('stellio-custom-accent') || null;
+let savedCustomAccent = localStorage.getItem('stellio-custom-accent') || null;
 const accentPicker = document.getElementById('custom-accent-picker');
 if (savedCustomAccent) {
 if (accentPicker) accentPicker.value = savedCustomAccent;
 applyCustomAccent(savedCustomAccent);
 }
-accentPicker?.addEventListener('input', async (e) => {
+accentPicker?.addEventListener('input', (e) => {
 const hex = e.target.value;
 applyCustomAccent(hex);
 localStorage.setItem('stellio-custom-accent', hex);
-try {
-    await fetch(`${API}/api/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ custom_accent: hex }) });
-} catch (err) { console.warn('[Theme] Échec sauvegarde couleur:', err); }
 });
-document.getElementById('custom-accent-reset-btn')?.addEventListener('click', async () => {
+document.getElementById('custom-accent-reset-btn')?.addEventListener('click', () => {
 clearCustomAccent();
 localStorage.removeItem('stellio-custom-accent');
 if (accentPicker) accentPicker.value = '#4ea1d3';
-try {
-    await fetch(`${API}/api/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ custom_accent: null }) });
-} catch (err) { console.warn('[Theme] Échec réinitialisation couleur:', err); }
 showToast(I18N.t('toast.custom_accent_reset') || 'Couleur réinitialisée', 'info');
 });
-themeSelector.addEventListener('change', async (e) => {
+themeSelector.addEventListener('change', (e) => {
 const mode = e.target.value;
 localStorage.setItem('stellio-theme', mode);
-try {
-await fetch(`${API}/api/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: mode }) });
-} catch (err) { console.warn('[Theme] Échec sauvegarde:', err); }
 applyTheme(mode);
 });
-fabricantSelector.addEventListener('change', async (e) => {
+fabricantSelector.addEventListener('change', (e) => {
 const fabricant = e.target.value;
 localStorage.setItem('stellio-fabricant', fabricant);
 clearCustomAccent();
 localStorage.removeItem('stellio-custom-accent');
 if (accentPicker) accentPicker.value = '#4ea1d3';
-try {
-await fetch(`${API}/api/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fabricant, custom_accent: null }) });
-} catch (err) { console.warn('[Theme] Échec sauvegarde:', err); }
 applyFabricant(fabricant);
 });
 if (window.matchMedia) {
@@ -4874,6 +5042,7 @@ if (res.ok) {
 localStorage.setItem('stellio-spoolman-url', url);
 input.value = url;
 showToast(I18N.t('toast.spoolman_url_saved'), 'success');
+loadSpoolmanSettings();
 } else {
 const data = await res.json().catch(() => ({}));
 showToast(data.error || I18N.t('toast.save_error'), 'error');
@@ -4885,13 +5054,24 @@ showToast(I18N.t('toast.network_error_backend'), 'error');
 }
 window.saveSpoolmanUrl = saveSpoolmanUrl;
 async function loadSpoolmanSettings() {
+const configuredView = document.getElementById('spoolman-configured-view');
+const manualView = document.getElementById('spoolman-manual-view');
+const addressSpan = document.getElementById('spoolman-configured-address');
 const input = document.getElementById('spoolman-url-input');
-if (!input) return;
+if (!configuredView || !manualView) return;
 try {
 const res = await fetch(`${API}/api/settings`);
 if (res.ok) {
 const data = await res.json();
-if (data.spoolman_url) input.value = data.spoolman_url;
+if (data.spoolman_url) {
+if (addressSpan) addressSpan.textContent = data.spoolman_url;
+configuredView.style.display = 'flex';
+manualView.style.display = 'none';
+} else {
+configuredView.style.display = 'none';
+manualView.style.display = 'flex';
+if (input) input.value = '';
+}
 }
 } catch (e) { console.warn('[Spoolman] Réglages indisponibles'); }
 }
@@ -4903,10 +5083,9 @@ async function deleteSpoolmanUrl() {
             body: JSON.stringify({ spoolman_url: '' })
         });
         if (res.ok) {
-            const input = document.getElementById('spoolman-url-input');
-            if (input) input.value = '';
             localStorage.removeItem('stellio-spoolman-url');
             showToast(I18N.t('toast.spoolman_url_deleted') || 'URL Spoolman supprimée', 'success');
+            loadSpoolmanSettings();
             if (typeof loadSpoolmanPage === 'function') loadSpoolmanPage();
         } else {
             const data = await res.json().catch(() => ({}));
@@ -5172,6 +5351,7 @@ async function loadStartupSettings() {
 
 let printCostSpools = [];
 let printCostDefaultSpoolId = null;
+let printCostPriceOverrides = {};
 let printCostCurrency = 'EUR';
 
 function formatCost(value) {
@@ -5186,8 +5366,10 @@ function applyCurrencySymbols() {
 }
 window.applyCurrencySymbols = applyCurrencySymbols;
 
-function _genSpoolId() {
-    return (crypto.randomUUID ? crypto.randomUUID() : 'spool_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+function _sourceLabelFor(sourceType) {
+    if (sourceType === 'manual') return I18N.t('spoolman.source_manual') || 'Manuel';
+    if (sourceType === 'spoolman') return 'Spoolman';
+    return sourceType;
 }
 
 function renderSpoolsList() {
@@ -5196,62 +5378,78 @@ function renderSpoolsList() {
     if (countBadge) countBadge.textContent = printCostSpools.length;
     if (!container) return;
     if (printCostSpools.length === 0) {
-        container.innerHTML = `<p class="settings-hint" style="margin:0;">${I18N.t('cost.spools_empty') || 'Aucune bobine — ajoute-en une.'}</p>`;
+        container.innerHTML = `<p class="settings-hint" style="margin:0;">${I18N.t('cost.spools_empty') || 'Aucune bobine trouvée dans l\u2019inventaire filament (Spoolman ou manuel) — ajoutes-en une depuis la page Inventaire filament.'}</p>`;
         return;
     }
     container.innerHTML = printCostSpools.map(s => {
         const isDefault = s.id === printCostDefaultSpoolId;
+        const remainingLabel = (typeof s.remaining_g === 'number') ? `${Math.round(s.remaining_g)} ${I18N.t('units.g_remaining') || 'g restants'}` : '';
+        const metaParts = [(s.material || '').toUpperCase(), _sourceLabelFor(s.source_type), `${Math.round(s.weight)} g`];
+        if (remainingLabel) metaParts.push(remainingLabel);
         return `
         <div class="settings-spool-row" data-spool-id="${s.id}" style="display:flex; align-items:center; gap:8px;">
             <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 8px; color:${isDefault ? 'var(--accent)' : 'var(--text-muted)'};" onclick="setDefaultSpool('${s.id}')" title="${I18N.t('cost.spool_default_title') || 'Bobine par défaut'}">
                 <i class="fa-${isDefault ? 'solid' : 'regular'} fa-star"></i>
             </button>
-            <input type="color" value="${escapeHtml(s.color || '#888888')}" title="${I18N.t('cost.spool_color_title') || 'Couleur de la bobine'}"
-                oninput="updateSpoolField('${s.id}', 'color', this.value)">
-            <input type="text" value="${escapeHtml(s.name || '')}" placeholder="${I18N.t('cost.spool_name_placeholder') || 'Nom (ex : PLA blanc)'}"
-                oninput="updateSpoolField('${s.id}', 'name', this.value)"
-                style="flex:1; min-width:0; padding:8px 10px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
-            <input type="number" min="0" step="0.01" value="${s.price ?? ''}" placeholder="${I18N.t('cost.spool_price_placeholder') || 'Prix'} (${printCostCurrency === 'USD' ? '$' : '€'})"
-                oninput="updateSpoolField('${s.id}', 'price', this.value)"
+            <span style="width:14px; height:14px; border-radius:50%; flex-shrink:0; background:${escapeHtml(s.color || '#888888')}; border:1px solid var(--border);"></span>
+            <div style="flex:1; min-width:0;">
+                <div style="font-size:13px; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.name)}</div>
+                <div style="font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(metaParts.filter(Boolean).join(' · '))}</div>
+            </div>
+            <input type="number" min="0" step="0.01" value="${s.price || ''}" placeholder="${I18N.t('cost.spool_price_placeholder') || 'Prix'} (${printCostCurrency === 'USD' ? '$' : '€'})"
+                oninput="updateSpoolPrice('${s.id}', this.value)"
                 style="width:90px; padding:8px 10px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
-            <input type="number" min="1" step="1" value="${s.weight ?? ''}" placeholder="${I18N.t('cost.spool_weight_placeholder') || 'Poids (g)'}"
-                oninput="updateSpoolField('${s.id}', 'weight', this.value)"
-                style="width:90px; padding:8px 10px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
-            <button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="removeSpoolRow('${s.id}')" title="${I18N.t('actions.delete') || 'Supprimer'}">
-                <i class="fa-solid fa-trash"></i>
-            </button>
         </div>`;
     }).join('');
 }
 
-function addSpoolRow() {
-    const id = _genSpoolId();
-    const spoolNumber = printCostSpools.length + 1;
-    printCostSpools.push({ id, name: `${I18N.t('cost.spool_default_name') || 'Bobine'} ${spoolNumber}`, price: 20, weight: 1000, color: '#888888' });
-    if (!printCostDefaultSpoolId) printCostDefaultSpoolId = id;
+async function loadCostSpoolsFromInventory() {
+    const container = document.getElementById('settings-spools-list');
+    if (container) container.innerHTML = `<p class="settings-hint" style="margin:0;"><i class="fa-solid fa-spinner fa-spin"></i> ${I18N.t('cost.spools_loading') || 'Chargement des bobines…'}</p>`;
+    try {
+        const res = await fetch(`${API}/api/filament/spools`);
+        const data = await res.json();
+        const slots = Array.isArray(data.slots) ? data.slots : [];
+        printCostSpools = slots.map(s => {
+            const id = `${s.source_type}:${s.source_id}`;
+            const hasSourcePrice = typeof s.price === 'number' && s.price > 0;
+            const override = printCostPriceOverrides[id];
+            return {
+                id,
+                source_type: s.source_type,
+                source_id: s.source_id,
+                name: s.name || (I18N.t('cost.spool_default_name') || 'Bobine'),
+                material: s.material || '',
+                color: s.color_hex || '#888888',
+                weight: Number(s.capacity_g) || 1000,
+                remaining_g: (typeof s.remaining_g === 'number') ? s.remaining_g : null,
+                price: hasSourcePrice ? Number(s.price) : (override != null ? Number(override) : 0),
+            };
+        });
+        if (!printCostSpools.some(s => s.id === printCostDefaultSpoolId)) {
+            printCostDefaultSpoolId = printCostSpools[0]?.id || null;
+        }
+    } catch (e) {
+        console.warn('[PrintCost] Chargement des bobines impossible', e);
+        printCostSpools = [];
+    }
     renderSpoolsList();
 }
+window.loadCostSpoolsFromInventory = loadCostSpoolsFromInventory;
 
-function removeSpoolRow(id) {
-    printCostSpools = printCostSpools.filter(s => s.id !== id);
-    if (printCostDefaultSpoolId === id) printCostDefaultSpoolId = printCostSpools[0]?.id || null;
-    renderSpoolsList();
+function updateSpoolPrice(id, value) {
+    const spool = printCostSpools.find(s => s.id === id);
+    if (!spool) return;
+    spool.price = parseFloat(value) || 0;
 }
+window.updateSpoolPrice = updateSpoolPrice;
 
 function setDefaultSpool(id) {
     printCostDefaultSpoolId = id;
     renderSpoolsList();
 }
-
-function updateSpoolField(id, field, value) {
-    const spool = printCostSpools.find(s => s.id === id);
-    if (!spool) return;
-    spool[field] = (field === 'name' || field === 'color') ? value : parseFloat(value);
-}
-window.addSpoolRow = addSpoolRow;
-window.removeSpoolRow = removeSpoolRow;
 window.setDefaultSpool = setDefaultSpool;
-window.updateSpoolField = updateSpoolField;
+
 
 function onSettingsPrinterPowerSelectChange() {
     const sel = document.getElementById('settings-printer-power-select');
@@ -5269,31 +5467,10 @@ async function loadPrintCostSettings() {
         if (!res.ok) return;
         const data = await res.json();
 
-        if (Array.isArray(data.print_cost_spools) && data.print_cost_spools.length > 0) {
-            printCostSpools = data.print_cost_spools.map(s => ({
-                id: s.id || _genSpoolId(),
-                name: s.name || (I18N.t('cost.spool_default_name') || 'Bobine'),
-                price: Number(s.price) || 0,
-                weight: Number(s.weight) || 0,
-                color: s.color || '#888888',
-            }));
-        } else if (data.print_cost_spool_price != null || data.print_cost_spool_weight != null) {
+        printCostDefaultSpoolId = data.print_cost_default_spool_id || null;
+        printCostPriceOverrides = (data.print_cost_price_overrides && typeof data.print_cost_price_overrides === 'object') ? data.print_cost_price_overrides : {};
 
-            printCostSpools = [{
-                id: _genSpoolId(),
-                name: I18N.t('cost.spool_default_name') || 'Bobine 1',
-                price: data.print_cost_spool_price ?? 20,
-                weight: data.print_cost_spool_weight ?? 1000,
-                color: '#888888',
-            }];
-        } else {
-
-            printCostSpools = [];
-        }
-        printCostDefaultSpoolId = (data.print_cost_default_spool_id && printCostSpools.some(s => s.id === data.print_cost_default_spool_id))
-            ? data.print_cost_default_spool_id
-            : (printCostSpools[0]?.id || null);
-        renderSpoolsList();
+        await loadCostSpoolsFromInventory();
 
         printCostCurrency = data.print_cost_currency === 'USD' ? 'USD' : 'EUR';
         const currencySelect = document.getElementById('settings-currency-select');
@@ -5321,14 +5498,12 @@ async function savePrintCostSettings() {
     const printerSel = document.getElementById('settings-printer-power-select');
     const selectedPrinterId = printerSel && printerSel.value ? printerSel.value : null;
 
-    const cleanSpools = printCostSpools
-        .map(s => ({ id: s.id, name: (s.name || '').trim() || (I18N.t('cost.spool_default_name') || 'Bobine'), price: Number(s.price) || 0, weight: Number(s.weight) || 0, color: s.color || '#888888' }))
-        .filter(s => s.price > 0 && s.weight > 0);
-
-    if (printCostSpools.length > 0 && cleanSpools.length === 0) {
-        showToast(I18N.t('cost.spools_invalid') || 'Renseigne au moins une bobine valide (prix et poids > 0)', 'error');
-        return;
-    }
+    const cleanSpools = printCostSpools.map(s => ({
+        id: s.id, name: s.name, price: Number(s.price) || 0, weight: Number(s.weight) || 0, color: s.color || '#888888',
+        source_type: s.source_type, source_id: s.source_id,
+    }));
+    const priceOverrides = {};
+    printCostSpools.forEach(s => { priceOverrides[s.id] = Number(s.price) || 0; });
 
     const defaultId = cleanSpools.some(s => s.id === printCostDefaultSpoolId) ? printCostDefaultSpoolId : (cleanSpools[0]?.id || null);
 
@@ -5338,6 +5513,7 @@ async function savePrintCostSettings() {
     const payload = {
         print_cost_spools: cleanSpools,
         print_cost_default_spool_id: defaultId,
+        print_cost_price_overrides: priceOverrides,
         print_cost_currency: currency,
         print_cost_elec_price: (elecPriceRaw === '' || elecPriceRaw == null) ? '' : parseFloat(elecPriceRaw),
         print_cost_printer_id: selectedPrinterId,
@@ -5360,8 +5536,8 @@ async function savePrintCostSettings() {
         });
         if (res.ok) {
             showToast(I18N.t('toast.settings_saved') || 'Réglages enregistrés', 'success');
-            printCostSpools = cleanSpools;
             printCostDefaultSpoolId = defaultId;
+            printCostPriceOverrides = priceOverrides;
             printCostCurrency = currency;
             renderSpoolsList();
             applyCurrencySymbols();
@@ -7438,7 +7614,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         document.getElementById('header-page-title').innerHTML = `<i class="fa-solid ${btn.dataset.icon || 'fa-layer-group'}"></i> ${I18N.t(titleKey)}`;
         updateHeaderVisibilityForPage(page);
         if (page === 'library') loadFiles();
-        if (page === 'printers') loadPrinters();
+        if (page === 'printers') loadPrinters(); else stopAllPrinterCardCameras();
         if (page === 'settings') { loadSources(); loadRemoteInstances(); }
         else stopDiagnosticConsolePoll();
         if (page === 'spoolman') loadSpoolmanPage();
@@ -8908,6 +9084,8 @@ window.editPrinter = function(pid) {
 
     document.getElementById('add-printer-form').reset();
     document.getElementById('printer-edit-id').value = pid;
+    const discoverSection = document.getElementById('printer-discover-section');
+    if (discoverSection) discoverSection.style.display = 'none';
     document.getElementById('printer-name').value = p.name || '';
     document.getElementById('printer-type').value = p.type || '';
     document.getElementById('printer-ip').value = p.ip || '';
@@ -9517,6 +9695,7 @@ function renderPrinters() {
                     <span title="${I18N.t('printers.bed')}">🛏️ <span id="card-bed-${p.id}">--°C</span></span>
                 </div>
                 <div id="card-spools-${p.id}" class="printer-card-spools"></div>
+                <div class="printer-card-camera" data-pid="${p.id}" style="margin-top:8px; border-radius:8px; overflow:hidden; background:#000; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-video" style="color:var(--text-muted); font-size:16px;"></i></div>
             </div>
             <div class="printer-actions" onclick="event.stopPropagation()">
                 <button class="btn btn-ghost btn-sm" onclick="openPrinterMonitor(${p.id})" title="${I18N.t('printers.monitoring')}"><i class="fa-solid fa-chart-line"></i></button>
@@ -9533,7 +9712,59 @@ function renderPrinters() {
     refreshAllPrinters();
     printersList.forEach(p => _checkMaintenanceBadge(p.id));
     _populatePrinterSelects();
+    _setupPrinterCardCameras();
 }
+
+let _printerCardCameraObserver = null;
+
+function _setupPrinterCardCameras() {
+    if (_printerCardCameraObserver) _printerCardCameraObserver.disconnect();
+    const cards = document.querySelectorAll('.printer-card-camera');
+    if (!cards.length) return;
+    _printerCardCameraObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            const el = entry.target;
+            const pid = el.dataset.pid;
+            if (entry.isIntersecting) {
+                _startPrinterCardCamera(el, pid);
+            } else {
+                _stopPrinterCardCamera(el);
+            }
+        });
+    }, { rootMargin: '100px', threshold: 0.1 });
+    cards.forEach(el => _printerCardCameraObserver.observe(el));
+}
+
+async function _startPrinterCardCamera(el, pid) {
+    if (!el || el.dataset.active === 'true') return;
+    el.dataset.active = 'true';
+    try {
+        const res = await fetch(`${API}/api/printers/${pid}/camera`);
+        const data = await res.json();
+        if (!el.isConnected || el.dataset.active !== 'true') return;
+        if (data.available && data.stream_url) {
+            el.innerHTML = `<img src="${data.stream_url}" alt="${I18N.t('printers.camera')}" style="width:100%; height:100%; object-fit:cover; display:block;" onerror="this.parentElement.innerHTML='<i class=\\'fa-solid fa-video-slash\\' style=\\'color:var(--text-muted); font-size:16px;\\'></i>';">`;
+        } else {
+            el.innerHTML = `<i class="fa-solid fa-video-slash" style="color:var(--text-muted); font-size:16px;"></i>`;
+        }
+    } catch (e) {
+        el.innerHTML = `<i class="fa-solid fa-video-slash" style="color:var(--text-muted); font-size:16px;"></i>`;
+    }
+}
+
+function _stopPrinterCardCamera(el) {
+    if (!el) return;
+    el.dataset.active = 'false';
+    const img = el.querySelector('img');
+    if (img) img.src = '';
+    el.innerHTML = `<i class="fa-solid fa-video" style="color:var(--text-muted); font-size:16px;"></i>`;
+}
+
+function stopAllPrinterCardCameras() {
+    if (_printerCardCameraObserver) { _printerCardCameraObserver.disconnect(); _printerCardCameraObserver = null; }
+    document.querySelectorAll('.printer-card-camera').forEach(el => _stopPrinterCardCamera(el));
+}
+window.stopAllPrinterCardCameras = stopAllPrinterCardCameras;
 
 function getPrinterIcon(type) {
     if (type === 'klipper') return 'mdi-printer-3d-nozzle';
@@ -10051,6 +10282,8 @@ function openPrinterMonitor(pid) {
     const printer = printersList.find(p => p.id === pid);
     if (!printer) return;
     currentMonitorPid = pid;
+    const cardCam = document.querySelector(`.printer-card-camera[data-pid="${pid}"]`);
+    if (cardCam) _stopPrinterCardCamera(cardCam);
     let modal = document.getElementById('modal-printer-monitor');
     if (!modal) {
         modal = document.createElement('div');
@@ -10089,7 +10322,7 @@ function initMonitorUI(printer) {
      </div>
      <div id="printer-camera-container" class="monitor-card full" style="display:none;">
          <h4><i class="fa-solid fa-camera"></i> ${I18N.t('printers.camera')}</h4>
-         <div id="camera-content" style="position:relative; width:100%; min-height:200px; background:#000; border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center;">
+         <div id="camera-content" style="position:relative; width:100%; aspect-ratio:16/9; min-height:200px; background:#000; border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center;">
              <div style="color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> ${I18N.t('common.loading')}</div>
          </div>
      </div>
@@ -10226,13 +10459,13 @@ async function loadPrinterCamera(pid) {
         const streamUrl = camData.stream_url || '';
         const snapshotUrl = camData.snapshot_url || '';
         if (streamUrl) {
-            content.innerHTML = `<img src="${streamUrl}" alt="${camData.name || I18N.t('printers.camera')}" style="width:100%; height:auto; max-height:400px; object-fit:contain; display:block;" onerror="this.parentElement.innerHTML='<div style=\\'color:var(--danger);padding:20px;text-align:center;\\'>❌ ${I18N.t('printers.stream_unavailable')}</div>'">`;
+            content.innerHTML = `<img src="${streamUrl}" alt="${camData.name || I18N.t('printers.camera')}" style="width:100%; height:100%; object-fit:cover; display:block;" onerror="this.parentElement.innerHTML='<div style=\\'color:var(--danger);padding:20px;text-align:center;\\'>❌ ${I18N.t('printers.stream_unavailable')}</div>'">`;
         } else if (snapshotUrl) {
             const refreshSnapshot = () => {
                 const img = content.querySelector('#camera-snapshot');
                 if (img) img.src = snapshotUrl + (snapshotUrl.includes('?') ? '&' : '?') + '_t=' + Date.now();
             };
-            content.innerHTML = `<img id="camera-snapshot" src="${snapshotUrl}?_t=${Date.now()}" alt="${camData.name || I18N.t('printers.camera')}" style="width:100%; height:auto; max-height:400px; object-fit:contain; display:block;" onerror="this.parentElement.innerHTML='<div style=\\'color:var(--danger);padding:20px;text-align:center;\\'>${I18N.t('printers.snapshot_unavailable')}</div>'">`;
+            content.innerHTML = `<img id="camera-snapshot" src="${snapshotUrl}?_t=${Date.now()}" alt="${camData.name || I18N.t('printers.camera')}" style="width:100%; height:100%; object-fit:cover; display:block;" onerror="this.parentElement.innerHTML='<div style=\\'color:var(--danger);padding:20px;text-align:center;\\'>${I18N.t('printers.snapshot_unavailable')}</div>'">`;
             if (window.cameraRefreshInterval) clearInterval(window.cameraRefreshInterval);
             window.cameraRefreshInterval = setInterval(refreshSnapshot, 2000);
         } else {
@@ -10249,8 +10482,13 @@ function closePrinterMonitor() {
     closeModal('modal-printer-monitor');
     if (printerMonitorInterval) { clearInterval(printerMonitorInterval); printerMonitorInterval = null; }
     if (window.cameraRefreshInterval) { clearInterval(window.cameraRefreshInterval); window.cameraRefreshInterval = null; }
+    const closedPid = currentMonitorPid;
     cameraLoadedForPid = null;
     currentMonitorPid = null;
+    if (closedPid != null) {
+        const cardCam = document.querySelector(`.printer-card-camera[data-pid="${closedPid}"]`);
+        if (cardCam) _startPrinterCardCamera(cardCam, closedPid);
+    }
 }
 
 function renderTempRow(label, data) {
@@ -10294,9 +10532,84 @@ window.openAddPrinterModal = function() {
     if (submitBtn) submitBtn.innerHTML = `<i class="fa-solid fa-plus"></i> ${I18N.t('printers.add') || 'Ajouter'}`;
     const apiKeyField = document.getElementById('printer-api-key');
     if (apiKeyField) apiKeyField.placeholder = I18N.t('printers.octoprint_key_ph') || 'Clé API OctoPrint';
+    const discoverSection = document.getElementById('printer-discover-section');
+    if (discoverSection) discoverSection.style.display = '';
+    const discoverResults = document.getElementById('printer-discover-results');
+    if (discoverResults) { discoverResults.style.display = 'none'; discoverResults.innerHTML = ''; }
     togglePrinterFields();
     openModal('modal-add-printer');
 }
+
+function _printerTypeLabel(type) {
+    const opt = document.querySelector(`#printer-type option[value="${type}"]`);
+    return opt ? opt.textContent.trim() : type;
+}
+
+window.discoverPrinters = async function() {
+    const btn = document.getElementById('printer-discover-btn');
+    const resultsDiv = document.getElementById('printer-discover-results');
+    if (!btn || !resultsDiv) return;
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${I18N.t('printers.discovering') || 'Recherche en cours...'}`;
+    resultsDiv.style.display = 'none';
+    resultsDiv.innerHTML = '';
+
+    try {
+        const res = await fetch(`${API}/api/printers/discover`);
+        const data = await res.json();
+        const printers = data.printers || [];
+
+        if (printers.length === 0) {
+            resultsDiv.innerHTML = `<div style="padding:10px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; font-size:12px; color:var(--text-secondary);">${I18N.t('printers.discover_none') || "Aucune imprimante détectée automatiquement. Vous pouvez toujours l'ajouter manuellement ci-dessous."}</div>`;
+        } else {
+            window._discoveredPrinters = printers;
+            resultsDiv.innerHTML = printers.map((p, i) => `
+                <div onclick="applyDiscoveredPrinter(${i})" style="cursor:pointer; padding:10px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <strong>${escapeHtml(p.name || p.ip)}</strong>
+                        <div style="font-size:11px; color:var(--text-secondary);">${escapeHtml(p.model || '')} — ${escapeHtml(p.ip)} — ${escapeHtml(_printerTypeLabel(p.type))}</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right" style="color:var(--text-muted);"></i>
+                </div>
+            `).join('');
+        }
+        resultsDiv.style.display = 'block';
+    } catch (e) {
+        console.error('[Discover Printers]', e);
+        resultsDiv.innerHTML = `<div style="padding:10px 12px; color:var(--danger); font-size:12px;">${I18N.t('printers.discover_error') || 'Erreur lors de la détection réseau.'}</div>`;
+        resultsDiv.style.display = 'block';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+};
+
+window.applyDiscoveredPrinter = function(index) {
+    const p = window._discoveredPrinters?.[index];
+    if (!p) return;
+    const typeField = document.getElementById('printer-type');
+    if (typeField) typeField.value = p.type;
+    togglePrinterFields();
+    const ipField = document.getElementById('printer-ip');
+    if (ipField) ipField.value = p.ip;
+    if (p.model) {
+        const brandField = document.getElementById('printer-brand');
+        if (brandField) brandField.value = p.model;
+    }
+    const nameField = document.getElementById('printer-name');
+    if (nameField && !nameField.value) nameField.value = p.name || p.model || p.ip;
+    if (p.type === 'bambu' && p.serial) {
+        const serialField = document.getElementById('printer-bambu-serial');
+        if (serialField) serialField.value = p.serial;
+    }
+    if (p.type === 'flashforge' && p.serial) {
+        const ffSerialField = document.getElementById('printer-flashforge-serial');
+        if (ffSerialField) ffSerialField.value = p.serial;
+    }
+    const resultsDiv = document.getElementById('printer-discover-results');
+    if (resultsDiv) resultsDiv.style.display = 'none';
+};
 
 window.togglePrinterFields = function() {
     const type = document.getElementById('printer-type').value;
@@ -11240,6 +11553,7 @@ startThumbAutoRefresh();
             const spoolWeight = parseFloat(document.getElementById('cost-spool-weight')?.value);
             const elecPrice = document.getElementById('cost-elec-price')?.value;
             const printerPower = document.getElementById('cost-printer-power')?.value;
+            const printerId = document.getElementById('cost-printer-select')?.value || null;
 
             try {
                 const res = await fetch(`${API}/api/settings`);
@@ -11264,7 +11578,8 @@ startThumbAutoRefresh();
                         print_cost_material: material,
                         print_cost_spools: spools,
                         print_cost_elec_price: elecPrice,
-                        print_cost_printer_power: printerPower
+                        print_cost_printer_power: printerPower,
+                        print_cost_printer_id: printerId
                     })
                 });
             } catch (_) {  }
@@ -12044,6 +12359,18 @@ function _applyCostSpoolSelection(spoolId) {
 }
 window._applyCostSpoolSelection = _applyCostSpoolSelection;
 
+function _applyCostPrinterSelection(printerId) {
+    const sel = document.getElementById('cost-printer-select');
+    const powerInput = document.getElementById('cost-printer-power');
+    if (!sel || !powerInput || !printerId) return;
+    const opt = [...sel.options].find(o => o.value === printerId);
+    if (!opt || opt.dataset.power == null) return;
+    powerInput.value = opt.dataset.power;
+    _recomputeCost();
+    _costSaveSettings();
+}
+window._applyCostPrinterSelection = _applyCostPrinterSelection;
+
     window.openPrintCostModal = async function (filePath, fileName) {
         let modal = document.getElementById('modal-print-cost');
         if (!modal) {
@@ -12100,7 +12427,10 @@ window._applyCostSpoolSelection = _applyCostSpoolSelection;
             const spoolPrice = defaultSpool ? (defaultSpool.price ?? 20) : (settings.print_cost_spool_price ?? 20);
             const spoolWeight = defaultSpool ? (defaultSpool.weight ?? 1000) : (settings.print_cost_spool_weight ?? 1000);
             const elecPrice = settings.print_cost_elec_price ?? '';
-            const printerPower = settings.print_cost_printer_power ?? 120;
+            const defaultPrinterId = settings.print_cost_printer_id != null ? String(settings.print_cost_printer_id) : '';
+            const matchedPrinter = (typeof printersList !== 'undefined' ? printersList : []).find(p => String(p.id) === defaultPrinterId);
+            const printerPower = matchedPrinter ? (matchedPrinter.power_w ?? 120) : (settings.print_cost_printer_power ?? 120);
+            const printerOptions = (typeof printersList !== 'undefined' ? printersList : []);
             const spoolOptions = settingsSpools.length > 0 ? settingsSpools : [{ id: '__legacy', name: I18N.t('cost.spool_default_name') || 'Bobine', price: spoolPrice, weight: spoolWeight }];
             const materials = ['pla', 'petg', 'abs', 'tpu', 'nylon'];
             const fieldStyle = 'width:100%; padding:8px 10px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary);';
@@ -12111,6 +12441,13 @@ window._applyCostSpoolSelection = _applyCostSpoolSelection;
                     <i class="fa-solid fa-cube"></i> ${escapeHtml(fileName)}
                 </p>
                 <div style="display:flex; flex-direction:column; gap:12px;">
+                    <div>
+                        <label style="${labelStyle}">${I18N.t('cost.printer_select_label') || 'Imprimante'}</label>
+                        <select id="cost-printer-select" style="${fieldStyle}" onchange="_applyCostPrinterSelection(this.value)">
+                            <option value="" ${!matchedPrinter ? 'selected' : ''}>${I18N.t('cost.printer_manual_option') || 'Personnalisée (saisie manuelle)'}</option>
+                            ${printerOptions.map(p => `<option value="${p.id}" data-power="${p.power_w ?? 120}" ${matchedPrinter && p.id === matchedPrinter.id ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
+                        </select>
+                    </div>
                     <div>
                         <label style="${labelStyle}">${I18N.t('cost.material_label')}</label>
                         <select id="cost-material-select" style="${fieldStyle}">
@@ -12640,29 +12977,110 @@ window.confirmSendSelectionToProjects = async function () {
         console.error('[Projects] confirmSendSelectionToProjects', err);
     }
 };
-window.openQRModal = async function () {
-    openModal('modal-qrcode');
-    document.getElementById('qr-loading').classList.remove('hidden');
-    document.getElementById('qr-content').classList.add('hidden');
-    document.getElementById('qr-error').classList.add('hidden');
+function _detectMobileBrowserContext(targetUrl) {
+    const ua = navigator.userAgent || '';
+    const isAndroid = /Android/i.test(ua);
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
+    const isFirefox = /Firefox|FxiOS/i.test(ua);
+    const isSamsung = /SamsungBrowser/i.test(ua);
+    const isEdge = /EdgA|EdgiOS|Edge/i.test(ua);
+    const isChrome = /Chrome|CriOS/i.test(ua) && !isSamsung && !isEdge;
+    let isSecureTarget = true;
     try {
-        const res = await fetch(`${API}/api/qrcode`);
+        isSecureTarget = /^https:/i.test(targetUrl) || /^https:/i.test(window.location.protocol);
+    } catch (e) { /* garde la valeur par défaut */ }
+    return { ua, isAndroid, isIOS, isFirefox, isSamsung, isEdge, isChrome, isSecureTarget };
+}
+
+function _renderPwaBrowserHint(elId, targetUrl, isRemote) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const ctx = _detectMobileBrowserContext(targetUrl);
+    if (!ctx.isAndroid) { el.innerHTML = ''; return; }
+
+    let html = '';
+    if (!ctx.isSecureTarget) {
+        html = `<div style="background:var(--warning, #d9822b)15; border:1px solid var(--warning, #d9822b)30; border-radius:8px; padding:12px; margin-top:12px; text-align:left;">
+            <p style="font-size:11px; color:var(--text-secondary); margin:0;">
+                <i class="fa-solid fa-triangle-exclamation" style="color:var(--warning, #d9822b);"></i>
+                ${_t3('qr.hint_http_shortcut_only', "Cette adresse locale est en HTTP : Chrome ne pourra créer qu'un simple raccourci (avec barre d'adresse), pas une installation plein écran. Pour une vraie installation, utilise plutôt le QR « Accès à distance » (en HTTPS), puis l'app basculera automatiquement sur le réseau local une fois chez toi.")}
+            </p>
+        </div>`;
+    } else if (ctx.isFirefox) {
+        html = `<div style="background:var(--warning, #d9822b)15; border:1px solid var(--warning, #d9822b)30; border-radius:8px; padding:12px; margin-top:12px; text-align:left;">
+            <p style="font-size:11px; color:var(--text-secondary); margin:0;">
+                <i class="fa-brands fa-firefox"></i>
+                ${_t3('qr.hint_firefox', "Sur Firefox, cherche une option « Installer » dans le menu ⋮ (différente de « Ajouter à l'écran d'accueil », qui ne crée qu'un simple raccourci). Si elle n'existe pas, utilise plutôt Chrome pour une installation plein écran fiable.")}
+            </p>
+        </div>`;
+    } else if (ctx.isChrome && isRemote) {
+        html = `<div style="background:var(--success, #2e9e5b)15; border:1px solid var(--success, #2e9e5b)30; border-radius:8px; padding:12px; margin-top:12px; text-align:left;">
+            <p style="font-size:11px; color:var(--text-secondary); margin:0;">
+                <i class="fa-brands fa-chrome"></i>
+                ${_t3('qr.hint_chrome_https_ok', "Sur Chrome, cette adresse HTTPS permet une vraie installation en plein écran : cherche « Installer l'application » dans le menu ⋮.")}
+            </p>
+        </div>`;
+    }
+    el.innerHTML = html;
+}
+
+window.openRemoteQRModal = async function () {
+    openModal('modal-qrcode-remote');
+    _qrFormatState.remote = 'app';
+    await _loadQrCode('remote', 'app');
+};
+
+const _qrFormatState = { local: 'web', remote: 'web' };
+
+window.setQrFormat = async function (which, format) {
+    _qrFormatState[which] = format;
+    const prefix = which === 'remote' ? 'qr-remote' : 'qr';
+    const webBtn = document.getElementById(`${prefix}-format-web-btn`);
+    const appBtn = document.getElementById(`${prefix}-format-app-btn`);
+    if (webBtn && appBtn) {
+        webBtn.className = format === 'web' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-ghost';
+        appBtn.className = format === 'app' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-ghost';
+    }
+    await _loadQrCode(which, format);
+};
+
+async function _loadQrCode(which, format) {
+    const isRemote = which === 'remote';
+    const prefix = isRemote ? 'qr-remote' : 'qr';
+    const source = isRemote ? 'remote' : 'local';
+    document.getElementById(`${prefix}-loading`).classList.remove('hidden');
+    document.getElementById(`${prefix}-content`).classList.add('hidden');
+    document.getElementById(`${prefix}-error`).classList.add('hidden');
+    try {
+        const res = await fetch(`${API}/api/qrcode?source=${source}&format=${format}`);
         const data = await res.json();
         if (!res.ok || !data.qr_image) throw new Error(data.error || 'Erreur serveur');
-        document.getElementById('qr-image').src = 'data:image/png;base64,' + data.qr_image;
-        document.getElementById('qr-url-display').textContent = data.url;
-        document.getElementById('qr-loading').classList.add('hidden');
-        document.getElementById('qr-content').classList.remove('hidden');
+        document.getElementById(`${prefix}-image`).src = 'data:image/png;base64,' + data.qr_image;
+        document.getElementById(`${prefix}-url-display`).textContent = data.url;
+        if (format === 'app') {
+            document.getElementById(`${prefix}-browser-hint`).innerHTML = `<div style="background:var(--accent)15; border:1px solid var(--accent)30; border-radius:8px; padding:12px; margin-top:12px; text-align:left;">
+                <p style="font-size:11px; color:var(--text-secondary); margin:0;">
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    ${_t3('qr.hint_app_format', "Ce QR n'est reconnu que par l'app compagnon Stellio installée sur le téléphone — il ne s'ouvre pas dans un navigateur. Installe d'abord l'app, puis scanne ce code pour la connecter automatiquement.")}
+                </p>
+            </div>`;
+        } else {
+            _renderPwaBrowserHint(`${prefix}-browser-hint`, data.url, isRemote);
+        }
+        document.getElementById(`${prefix}-loading`).classList.add('hidden');
+        document.getElementById(`${prefix}-content`).classList.remove('hidden');
     } catch (e) {
-        document.getElementById('qr-loading').classList.add('hidden');
-        document.getElementById('qr-error-msg').textContent = e.message || I18N.t('qr.error');
-        document.getElementById('qr-error').classList.remove('hidden');
+        document.getElementById(`${prefix}-loading`).classList.add('hidden');
+        document.getElementById(`${prefix}-error-msg`).textContent = e.message || I18N.t('qr.error');
+        document.getElementById(`${prefix}-error`).classList.remove('hidden');
     }
-};
+}
 
 
 window.toggleRemoteAccessEnabled = async function (enabled) {
     const container = document.getElementById('remote-access-content');
+    const fixedUrlSection = document.getElementById('fixed-url-section');
+    if (fixedUrlSection) fixedUrlSection.style.display = enabled ? '' : 'none';
     if (container) {
         container.innerHTML = `<p class="settings-hint"><i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="settings.remote_starting">Initialisation de l'accès distant…</span></p>`;
     }
@@ -12687,12 +13105,14 @@ window.toggleRemoteAccessEnabled = async function (enabled) {
 window.loadRemoteAccess = async function () {
     const container = document.getElementById('remote-access-content');
     const toggle = document.getElementById('remote-access-enabled-toggle');
+    const fixedUrlSection = document.getElementById('fixed-url-section');
     if (!container) return;
     try {
         const res = await fetch(`${API}/api/remote-access`);
         const data = await res.json();
 
         if (toggle) toggle.checked = !!data.enabled;
+        if (fixedUrlSection) fixedUrlSection.style.display = data.enabled ? '' : 'none';
 
         if (!data.enabled) {
             container.innerHTML = `<p class="settings-hint" data-i18n="settings.remote_access_disabled_hint">Activez l'accès à distance ci-dessus pour générer une adresse publique.</p>`;
@@ -12812,23 +13232,90 @@ window.copyRemoteUrl = function () {
         if (typeof showToast === 'function') showToast(I18N.t('settings.remote_copied') || 'Adresse copiée', 'success');
     }).catch(() => {});
 };
+/* =========================================================
+   Barre de navigation basse mobile + bottom sheets tactiles
+   ========================================================= */
+(function () {
+    // Garde en phase les boutons de nav dupliqués (barre basse + menu latéral)
+    document.querySelectorAll('.nav-btn[data-page]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const page = btn.dataset.page;
+            if (!page) return;
+            setTimeout(() => {
+                document.querySelectorAll(`.nav-btn[data-page]`).forEach(el => {
+                    el.classList.toggle('active', el.dataset.page === page);
+                });
+            }, 0);
+        });
+    });
 
-window.openRemoteQRModal = async function () {
-    openModal('modal-qrcode-remote');
-    document.getElementById('qr-remote-loading').classList.remove('hidden');
-    document.getElementById('qr-remote-content').classList.add('hidden');
-    document.getElementById('qr-remote-error').classList.add('hidden');
-    try {
-        const res = await fetch(`${API}/api/qrcode?source=remote`);
-        const data = await res.json();
-        if (!res.ok || !data.qr_image) throw new Error(data.error || 'Erreur serveur');
-        document.getElementById('qr-remote-image').src = 'data:image/png;base64,' + data.qr_image;
-        document.getElementById('qr-remote-url-display').textContent = data.url;
-        document.getElementById('qr-remote-loading').classList.add('hidden');
-        document.getElementById('qr-remote-content').classList.remove('hidden');
-    } catch (e) {
-        document.getElementById('qr-remote-loading').classList.add('hidden');
-        document.getElementById('qr-remote-error-msg').textContent = e.message || I18N.t('qr.error');
-        document.getElementById('qr-remote-error').classList.remove('hidden');
+    // Ferme la barre "Plus" si on repasse en bureau
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 860 && typeof closeMobileSidebar === 'function') {
+            closeMobileSidebar();
+        }
+    });
+
+    // Glisser vers le bas pour fermer (menu latéral en feuille + fenêtres popup)
+    function enableSwipeToDismiss(handleSelector, onDismiss) {
+        document.addEventListener('touchstart', (e) => {
+            const handle = e.target.closest(handleSelector);
+            if (!handle || window.innerWidth > 860) return;
+            const sheet = handle.closest('.sidebar, .modal-content');
+            if (!sheet) return;
+            const startY = e.touches[0].clientY;
+            let currentY = startY;
+            let dragging = true;
+
+            function onMove(ev) {
+                if (!dragging) return;
+                currentY = ev.touches[0].clientY;
+                const delta = Math.max(0, currentY - startY);
+                if (delta > 0) {
+                    sheet.style.transition = 'none';
+                    sheet.style.transform = `translateY(${delta}px)`;
+                }
+            }
+            function onEnd() {
+                if (!dragging) return;
+                dragging = false;
+                sheet.style.transition = '';
+                const delta = currentY - startY;
+                sheet.style.transform = '';
+                if (delta > 90) {
+                    onDismiss(sheet);
+                }
+                document.removeEventListener('touchmove', onMove);
+                document.removeEventListener('touchend', onEnd);
+            }
+            document.addEventListener('touchmove', onMove, { passive: true });
+            document.addEventListener('touchend', onEnd);
+        }, { passive: true });
     }
-};
+
+    enableSwipeToDismiss('.sidebar-header', () => {
+        if (typeof closeMobileSidebar === 'function') closeMobileSidebar();
+    });
+
+    enableSwipeToDismiss('.modal-header', (sheet) => {
+        const modal = sheet.closest('.modal');
+        if (modal && !modal.id) return;
+        if (modal) modal.classList.add('hidden');
+    });
+
+    const MORE_LABELS = { fr: 'Plus', en: 'More', es: 'Más', de: 'Mehr', it: 'Altro', ja: 'その他', zh: '更多', pt: 'Mais' };
+    function patchMoreLabel() {
+        const span = document.querySelector('#mobile-more-toggle span');
+        if (!span) return;
+        if (span.textContent === 'nav.more') {
+            span.textContent = MORE_LABELS[I18N.lang] || MORE_LABELS.fr;
+        }
+    }
+    patchMoreLabel();
+    document.addEventListener('i18n:ready', patchMoreLabel);
+    const _originalApply = I18N.apply.bind(I18N);
+    I18N.apply = function (...args) {
+        _originalApply(...args);
+        patchMoreLabel();
+    };
+})();

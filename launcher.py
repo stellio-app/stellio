@@ -7,19 +7,37 @@ import runpy
 import logging
 from logging.handlers import RotatingFileHandler
 
+def _app_dir() -> Path:
+    """
+    Localise le dossier "app/" contenant main.py + les ressources.
+    - Windows/Linux (--onedir) : il est copie a cote de l'executable -> dist/Stellio/app
+    - macOS (--windowed, empaquete en .app) : l'executable vit dans Stellio.app/Contents/MacOS/,
+      le dossier "app" est copie dans Stellio.app/Contents/Resources/app pour respecter la
+      convention Apple (donnees dans Resources, binaires dans MacOS).
+    - Mode source (non fige) : a cote de ce fichier.
+    """
+    if getattr(sys, "frozen", False):
+        exe_path = Path(sys.executable).resolve()
+        if sys.platform == "darwin" and "MacOS" in exe_path.parent.name:
+            # exe_path = .../Stellio.app/Contents/MacOS/Stellio -> Contents/Resources/app
+            contents_dir = exe_path.parent.parent
+            resources_app = contents_dir / "Resources" / "app"
+            if resources_app.exists():
+                return resources_app
+        base = exe_path.parent
+    else:
+        base = Path(__file__).resolve().parent
+    return base / "app"
+
+
 def _setup_early_env() -> Path:
-    base = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
-    app_dir = base / "app"
+    app_dir = _app_dir()
     if str(app_dir) not in sys.path:
         sys.path.insert(0, str(app_dir))
     return app_dir
 
 app_dir = _setup_early_env()
 # ---------------------------------------------------------
-
-def _app_dir() -> Path:
-    base = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
-    return base / "app"
 
 
 def _setup_bootstrap_logger(app_dir: Path) -> logging.Logger:
@@ -37,8 +55,18 @@ def _setup_bootstrap_logger(app_dir: Path) -> logging.Logger:
 
 def _show_fatal_error(message: str) -> None:
     try:
-        import ctypes
-        ctypes.windll.user32.MessageBoxW(0, message, "Stellio — Erreur au demarrage", 0x10)
+        if sys.platform == "win32":
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(0, message, "Stellio — Erreur au demarrage", 0x10)
+            return
+        # macOS / Linux : pas de MessageBoxW, on tente une boite de dialogue Tk,
+        # sinon on retombe sur stderr.
+        import tkinter as tk
+        from tkinter import messagebox
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror("Stellio — Erreur au demarrage", message)
+        root.destroy()
     except Exception:
         print(message, file=sys.stderr)
 
