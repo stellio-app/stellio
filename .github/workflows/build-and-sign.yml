@@ -378,7 +378,8 @@ jobs:
           python3 -m venv venv
           venv/bin/python -m pip install --upgrade pip
           venv/bin/python -m pip install --upgrade -r requirements.txt
-          venv/bin/python -m pip install "pywebview[gtk]" pyinstaller
+          venv/bin/python -m pip install --upgrade "PyGObject>=3.52" pycairo
+          venv/bin/python -m pip install pyinstaller
 
       - name: Check dependencies (fix)
         run: venv/bin/python check_deps.py --fix
