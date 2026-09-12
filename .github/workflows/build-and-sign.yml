@@ -203,7 +203,14 @@ jobs:
   # ──────────────────────────────────────────────────────────────────────
   build-macos:
     needs: check-version
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - runner: macos-latest
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -336,17 +343,17 @@ jobs:
           cp -R "dist/Stellio.app" dmg-root/
           ln -s /Applications dmg-root/Applications
           hdiutil create -volname "Stellio" -srcfolder dmg-root -ov -format UDZO \
-            "Stellio-v${{ needs.check-version.outputs.version }}-macOS.dmg"
-          shasum -a 256 "Stellio-v${{ needs.check-version.outputs.version }}-macOS.dmg" \
-            > "Stellio-v${{ needs.check-version.outputs.version }}-macOS.dmg.sha256"
+            "Stellio-v${{ needs.check-version.outputs.version }}-macOS-${{ matrix.arch }}.dmg"
+          shasum -a 256 "Stellio-v${{ needs.check-version.outputs.version }}-macOS-${{ matrix.arch }}.dmg" \
+            > "Stellio-v${{ needs.check-version.outputs.version }}-macOS-${{ matrix.arch }}.dmg.sha256"
 
       - name: Upload macOS installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: stellio-macos-dmg
+          name: stellio-macos-dmg-${{ matrix.arch }}
           path: |
-            Stellio-v${{ needs.check-version.outputs.version }}-macOS.dmg
-            Stellio-v${{ needs.check-version.outputs.version }}-macOS.dmg.sha256
+            Stellio-v${{ needs.check-version.outputs.version }}-macOS-${{ matrix.arch }}.dmg
+            Stellio-v${{ needs.check-version.outputs.version }}-macOS-${{ matrix.arch }}.dmg.sha256
 
   # ──────────────────────────────────────────────────────────────────────
   # 2ter. Build Linux (AppImage)
@@ -514,11 +521,12 @@ jobs:
           name: stellio-patch-zip
           path: release-files
 
-      - name: Download macOS .dmg artifact
+      - name: Download macOS .dmg artifacts (arm64 + x86_64)
         uses: actions/download-artifact@v4
         with:
-          name: stellio-macos-dmg
+          pattern: stellio-macos-dmg-*
           path: release-files
+          merge-multiple: true
 
       - name: Download Linux AppImage artifact
         uses: actions/download-artifact@v4
@@ -546,8 +554,7 @@ jobs:
             release-files/*.AppImage
             release-files/*.sha256
             release-files/*.zip
-            
-  #
+
   # ──────────────────────────────────────────────────────────────────────
   # 4. Signature + publication AVEC SignPath (DÉSACTIVÉ pour l'instant)
   # 
