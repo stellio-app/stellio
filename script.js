@@ -189,8 +189,6 @@ window.I18N = I18N;
 
 const API = window.location.origin;
 
-// PWA : enregistrement du service worker (app shell en cache, installation
-// native possible) + gestion du bouton d'installation Android/Chrome.
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').catch((e) => console.debug('[PWA] Service worker non enregistré:', e));
@@ -1726,12 +1724,6 @@ console.error('[addSource]', err);
 return false;
 }
 }
-// ---------------------------------------------------------------------------
-// Instances Stellio — échange direct de fichiers entre deux installations sur
-// le même réseau local (voir _get_or_create_local_peer_key côté backend pour
-// le modèle de confiance : appairage manuel par clé partagée, pas de vraie
-// découverte mDNS/Bonjour automatique).
-// ---------------------------------------------------------------------------
 
 async function loadRemoteInstances() {
     try {
@@ -3514,10 +3506,6 @@ try {
     try {
         data = await res.json();
     } catch (parseErr) {
-        // Réponse non-JSON (page d'erreur HTML, proxy, etc.) : on affiche au
-        // moins le code HTTP plutôt qu'un message générique inexploitable,
-        // utile pour diagnostiquer sans accès à la console (devtools
-        // désactivés en production, debug=False côté pywebview).
         showToast(`${I18N.t('toast.error')} (HTTP ${res.status})`, 'error');
         console.error('[OpenWith] Réponse non-JSON', res.status, parseErr);
         return;
@@ -3861,14 +3849,6 @@ function computeOverhangVertexColors(geometry, thresholdDeg = OVERHANG_THRESHOLD
     return new THREE.BufferAttribute(colors, 3);
 }
 
-// ---------------------------------------------------------------------------
-// Suggestion d'orientation — calcul géométrique pur (pas d'appel IA/slicer).
-// Pour chaque orientation candidate (les 6 déjà proposées dans le menu),
-// on rejoue le même calcul que computeOverhangVertexColors mais par triangle,
-// pour obtenir des surfaces exploitables : surface en surplomb, surface de
-// contact avec le plateau, hauteur totale. On combine ça en un score simple
-// pour classer les orientations, sans jamais modifier le mesh affiché.
-// ---------------------------------------------------------------------------
 
 const ORIENTATION_CANDIDATE_KEYS = ['default', 'flipZ', 'posX', 'negX', 'posY', 'negY'];
 
@@ -3879,7 +3859,6 @@ function _scoreMeshOrientation(origPosition, key, thresholdDeg = OVERHANG_THRESH
     const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), n = new THREE.Vector3();
     const dThreshold = Math.cos(THREE.MathUtils.degToRad(thresholdDeg));
 
-    // Passe 1 : bounding box en Z une fois orientée, pour situer le plateau.
     let minZ = Infinity, maxZ = -Infinity;
     for (let i = 2; i < origPosition.length; i += 3) {
         let z = origPosition[i];
@@ -3935,9 +3914,6 @@ function computeOrientationSuggestions() {
         const overhangRatio = r.totalArea > 0 ? r.overhangArea / r.totalArea : 0;
         const contactRatio = r.totalArea > 0 ? r.contactArea / r.totalArea : 0;
         const heightRatio = r.height / maxHeight;
-        // Score heuristique — plus bas = meilleur. Les surplombs pèsent le plus
-        // (support matière + risque d'échec), la surface de contact aide
-        // l'adhésion, la hauteur influe sur le temps et le risque de warping.
         r.score = overhangRatio * 0.6 - contactRatio * 0.25 + heightRatio * 0.15;
         r.overhangPct = Math.round(overhangRatio * 1000) / 10;
         r.contactPct = Math.round(contactRatio * 1000) / 10;
@@ -4997,15 +4973,11 @@ function toggleAccord(headerEl) {
     const isOpening = !section.classList.contains('open');
 
     if (isOpening) {
-        // .settings-grid (Paramètres) est scindée en 2 colonnes fixes pour éviter que les
-        // sections ne changent de côté visuellement à l'ouverture — mais on garde le
-        // comportement "une seule section ouverte à la fois" sur toute la page, pas juste
-        // dans la colonne courante.
         const grid = headerEl.closest('.settings-grid');
         const scope = grid || section.parentElement;
         scope.querySelectorAll('.accord-section.open').forEach(other => {
             if (other === section) return;
-            if (other.contains(section) || section.contains(other)) return; // accordéons imbriqués : ne pas toucher ancêtres/descendants
+            if (other.contains(section) || section.contains(other)) return; 
             other.classList.remove('open');
         });
     }
@@ -5656,8 +5628,6 @@ async function recommendOllamaModel() {
         const hw = data.hardware || {};
         const rec = data.recommendation || {};
 
-        // La commande d'installation affichée dans le guide (étape 2) doit toujours pointer
-        // vers le modèle réellement recommandé, pas un "llama3" générique par défaut.
         const guideCmdEl = document.getElementById('ollama-guide-pull-cmd');
         if (guideCmdEl) {
             guideCmdEl.textContent = rec.pull_command || (rec.model ? `ollama pull ${rec.model}` : guideCmdEl.textContent);
@@ -5894,7 +5864,6 @@ function clearSosprintPhoto() {
     });
 })();
 
-// --- Ajout d'une photo à n'importe quel moment de l'enquête (pas seulement au démarrage) ---
 (() => {
     const addBtn = document.getElementById('sosprint-add-photo-btn');
     const input = document.getElementById('sosprint-extra-photo-input');
@@ -6109,7 +6078,6 @@ function renderSosprintQuestionStep(questionNumber) {
     if (labelEl) labelEl.textContent = sosprintCurrentQuestion || '';
     if (inputEl) { inputEl.value = ''; inputEl.focus(); }
     if (photoStatusEl) photoStatusEl.textContent = '';
-    // Plus de limite affichée : le nombre de questions est illimité, l'IA conclut dès qu'elle est confiante.
     if (counterEl) {
         counterEl.textContent = _t2('sosprint.question_counter_unlimited', 'Question {n}', { n: questionNumber }).replace('{n}', questionNumber);
     }
@@ -6191,8 +6159,6 @@ document.getElementById('sosprint-not-resolved-btn')?.addEventListener('click', 
     btn.disabled = true;
     btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i>`;
 
-    // On informe l'IA que les causes précédemment proposées n'ont pas résolu le problème,
-    // pour qu'elle les élimine et continue l'enquête sur d'autres pistes.
     const triedCauses = sosprintLastCauses.length
         ? sosprintLastCauses.join(', ')
         : _t2('sosprint.not_resolved_unknown_causes', 'le diagnostic précédent');
@@ -6243,8 +6209,6 @@ document.getElementById('sosprint-not-resolved-btn')?.addEventListener('click', 
             renderSosprintQuestionStep(sosprintQaHistory.length + 1);
             showToast(_t2('sosprint.resumed_toast', 'Enquête reprise'), 'success');
         } else {
-            // L'IA n'a pas de nouvelle piste distincte à explorer : on relance quand même
-            // un diagnostic, qui tiendra compte des causes désormais écartées.
             await runSosprintDiagnosis(material, description, sosprintQaHistory);
         }
     } catch (err) {
@@ -6258,7 +6222,6 @@ document.getElementById('sosprint-not-resolved-btn')?.addEventListener('click', 
     }
 });
 
-// --- Historique des conversations : liste, reprise, suppression ---
 
 async function loadSosprintHistory(status, force) {
     if (!force && sosprintHistoryLoaded[status]) return;
@@ -6323,7 +6286,6 @@ async function resumeSosprintConversation(convId) {
         sosprintCandidateCauses = conv.candidate_causes || [];
         sosprintEliminatedCauses = conv.eliminated_causes || [];
 
-        // Reconstruit l'historique question/réponse à partir des messages persistés.
         sosprintQaHistory = [];
         let pendingQuestion = null;
         (conv.messages || []).forEach(m => {
@@ -6345,7 +6307,6 @@ async function resumeSosprintConversation(convId) {
         if (resultEl) resultEl.style.display = 'none';
 
         if (conv.status === 'resolved') {
-            // On affiche le dernier diagnostic connu, en lecture seule (déjà marqué résolu).
             const causesEl = document.getElementById('sosprint-causes-list');
             if (causesEl && conv.last_causes && conv.last_causes.length) {
                 causesEl.innerHTML = conv.last_causes.map((cause, i) => {
@@ -6412,9 +6373,6 @@ async function deleteSosprintConversation(convId) {
             tabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
             sosprintHistoryActiveTab = tab.dataset.status;
-            // Toujours recharger au changement d'onglet : la liste HTML est partagée entre
-            // les deux onglets, donc s'appuyer sur le cache "déjà chargé" affichait le contenu
-            // périmé de l'autre onglet au lieu de rafraîchir celui qu'on vient de sélectionner.
             loadSosprintHistory(sosprintHistoryActiveTab, true);
         });
     });
@@ -6467,8 +6425,6 @@ document.getElementById('sosprint-form')?.addEventListener('submit', async (e) =
         sosprintCandidateCauses = data.candidate_causes || [];
         sosprintCurrentQuestion = data.question || null;
 
-        // Si une photo a déjà été jointe au formulaire initial, on l'attache tout de suite
-        // à la conversation pour qu'elle profite aussi aux questions de clarification.
         if (sosprintPhotoFile && sosprintConversationId) {
             const fd = new FormData();
             fd.append('photo', sosprintPhotoFile);
@@ -6549,8 +6505,6 @@ document.getElementById('sosprint-current-answer')?.addEventListener('keydown', 
 
 document.getElementById('sosprint-skip-questions-btn')?.addEventListener('click', async () => {
     const { material, description } = getSosprintFormValues();
-    // "Conclure maintenant" : on demande explicitement à l'IA de conclure avec ce qu'elle a déjà,
-    // plutôt que de forcer un arrêt côté client après un nombre fixe de questions.
     if (sosprintQaHistory.length === 0 && !sosprintCurrentQuestion) {
         await runSosprintDiagnosis(material, description, sosprintQaHistory);
         return;
@@ -6604,9 +6558,6 @@ async function loadSpoolmanPage() {
     if (!grid) return;
 
     const url = await getSpoolmanUrl();
-    // Le filtrage/tri (mobile comme header) n'est proposé que pour
-    // l'inventaire local : un serveur Spoolman distant n'est pas indexé
-    // côté Stellio, donc pas de recherche/tri possible dessus.
     const isSpoolmanPageActive = document.getElementById('page-spoolman')?.classList.contains('active');
     headerFilterEls.forEach(el => {
         if (!el) return;
@@ -6687,10 +6638,6 @@ window.loadManualSpoolInventory = loadManualSpoolInventory;
 let _manualSpoolCache = [];
 let _manualSpoolFiltersBound = false;
 
-// Recherche / matière / rangement / tri existent en double : une fois dans le
-// header (desktop, page inventaire filament) et une fois dans le bandeau en
-// page (repris uniquement en mobile, header masqué sous 860px — cf. CSS
-// .spoolman-filters-mobile-only). Les deux jeux sont tenus synchronisés.
 const _SPOOL_FILTER_PAIRS = [
     ['spool-filter-search', 'spool-header-search'],
     ['spool-filter-material', 'spool-header-material'],
@@ -6701,9 +6648,6 @@ const _SPOOL_FILTER_PAIRS = [
 function _manualSpoolFilterValue(mobileId, headerId, fallback = '') {
     const mobileEl = document.getElementById(mobileId);
     const headerEl = document.getElementById(headerId);
-    // Le champ actuellement visible (l'autre est masqué par CSS selon la
-    // largeur d'écran) fait foi ; à défaut on retombe sur celui qui a une
-    // valeur non vide.
     if (headerEl && headerEl.offsetParent !== null) return headerEl.value;
     if (mobileEl && mobileEl.offsetParent !== null) return mobileEl.value;
     return headerEl?.value || mobileEl?.value || fallback;
@@ -13232,11 +13176,7 @@ window.copyRemoteUrl = function () {
         if (typeof showToast === 'function') showToast(I18N.t('settings.remote_copied') || 'Adresse copiée', 'success');
     }).catch(() => {});
 };
-/* =========================================================
-   Barre de navigation basse mobile + bottom sheets tactiles
-   ========================================================= */
 (function () {
-    // Garde en phase les boutons de nav dupliqués (barre basse + menu latéral)
     document.querySelectorAll('.nav-btn[data-page]').forEach(btn => {
         btn.addEventListener('click', () => {
             const page = btn.dataset.page;
@@ -13249,14 +13189,12 @@ window.copyRemoteUrl = function () {
         });
     });
 
-    // Ferme la barre "Plus" si on repasse en bureau
     window.addEventListener('resize', () => {
         if (window.innerWidth > 860 && typeof closeMobileSidebar === 'function') {
             closeMobileSidebar();
         }
     });
 
-    // Glisser vers le bas pour fermer (menu latéral en feuille + fenêtres popup)
     function enableSwipeToDismiss(handleSelector, onDismiss) {
         document.addEventListener('touchstart', (e) => {
             const handle = e.target.closest(handleSelector);

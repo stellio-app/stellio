@@ -14,6 +14,7 @@ on:
       - 'stellio-setup.iss'
       - 'assets/**'
       - 'languages/**'
+      - 'bin/**'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -157,13 +158,34 @@ jobs:
           Copy-Item "style.css"        "dist\Stellio\app\style.css"
           Copy-Item -Recurse "assets"    "dist\Stellio\app\assets"
           Copy-Item -Recurse "languages" "dist\Stellio\app\languages"
-          if (Test-Path "bin") { Copy-Item -Recurse "bin" "dist\Stellio\app\bin" }
+          if (Test-Path "bin\win") { Copy-Item -Recurse "bin\win" "dist\Stellio\app\bin" }
 
           foreach ($f in @("main.py","check_deps.py","index.html","script.js","style.css")) {
             if (-not (Test-Path "dist\Stellio\app\$f")) {
               throw "Echec de copie : dist\Stellio\app\$f"
             }
           }
+
+      - name: Download ffmpeg (not committed to the repo, fetched fresh each build)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "dist\Stellio\app\bin" | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip" -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_extracted
+          $binDir = (Get-ChildItem -Path ffmpeg_extracted -Recurse -Directory -Filter "bin" | Select-Object -First 1).FullName
+          Copy-Item "$binDir\*" "dist\Stellio\app\bin\" -Force
+          if (-not (Test-Path "dist\Stellio\app\bin\ffmpeg.exe")) { throw "ffmpeg.exe manquant apres telechargement" }
+
+      - name: Download UnRAR (not committed to the repo, fetched fresh each build)
+        shell: pwsh
+        run: |
+          # unrarw64.exe est l'auto-extractible freeware officiel de RARLAB (URL stable, sans numero de version).
+          Invoke-WebRequest -Uri "https://www.rarlab.com/rar/unrarw64.exe" -OutFile unrarw64.exe
+          # C'est un module SFX RAR : on l'extrait avec 7-Zip (preinstalle sur les runners GitHub) plutot que
+          # de deviner ses switches silencieux internes.
+          & "C:\Program Files\7-Zip\7z.exe" x unrarw64.exe -ounrar_extracted -y | Out-Null
+          Copy-Item "unrar_extracted\UnRAR.exe" "dist\Stellio\app\bin\UnRAR.exe" -Force
+          if (-not (Test-Path "dist\Stellio\app\bin\UnRAR.exe")) { throw "UnRAR.exe manquant apres telechargement" }
 
       - name: Create patch ZIP for auto-updater
         shell: pwsh
@@ -314,10 +336,38 @@ jobs:
           cp style.css "$APP_DIR/style.css"
           cp -R assets "$APP_DIR/assets"
           cp -R languages "$APP_DIR/languages"
-          [ -d bin ] && cp -R bin "$APP_DIR/bin" || true
+          [ -d bin/mac ] && cp -R bin/mac "$APP_DIR/bin" || true
           for f in main.py check_deps.py index.html script.js style.css; do
             [ -f "$APP_DIR/$f" ] || { echo "Echec de copie : $APP_DIR/$f"; exit 1; }
           done
+
+      - name: Download ffmpeg (not committed to the repo, fetched fresh each build)
+        run: |
+          APP_DIR="dist/Stellio.app/Contents/Resources/app"
+          mkdir -p "$APP_DIR/bin"
+          curl -L -o ffmpeg.zip "https://evermeet.cx/ffmpeg/getrelease/zip"
+          unzip -o ffmpeg.zip -d ffmpeg_extracted
+          cp ffmpeg_extracted/ffmpeg "$APP_DIR/bin/ffmpeg"
+          chmod +x "$APP_DIR/bin/ffmpeg"
+
+      - name: Download unrar (not committed to the repo, fetched fresh each build)
+        run: |
+          APP_DIR="dist/Stellio.app/Contents/Resources/app"
+          # Homebrew a retire unrar de son depot officiel (licence non-libre) : on recupere donc le
+          # binaire officiel RARLAB pour macOS, en parsant la page de download pour suivre la derniere
+          # version disponible sans avoir a la coder en dur (comme pour ffmpeg).
+          case "${{ matrix.arch }}" in
+            arm64) RAR_ARCH="arm" ;;
+            x86_64) RAR_ARCH="x64" ;;
+          esac
+          URL=$(curl -s https://www.rarlab.com/download.htm | grep -oE "https://www\.rarlab\.com/rar/rarmacos-${RAR_ARCH}-[0-9a-z]+\.tar\.gz" | head -1)
+          if [ -z "$URL" ]; then echo "Impossible de trouver l'URL RAR macOS ${RAR_ARCH}"; exit 1; fi
+          echo "Telechargement depuis $URL"
+          curl -L -o rar.tar.gz "$URL"
+          mkdir -p rar_extracted
+          tar -xzf rar.tar.gz -C rar_extracted
+          cp rar_extracted/rar/unrar "$APP_DIR/bin/unrar"
+          chmod +x "$APP_DIR/bin/unrar"
 
       - name: Code sign (Developer ID if available, else ad-hoc)
         env:
@@ -463,10 +513,30 @@ jobs:
           cp style.css "$APP_DIR/style.css"
           cp -R assets "$APP_DIR/assets"
           cp -R languages "$APP_DIR/languages"
-          [ -d bin ] && cp -R bin "$APP_DIR/bin" || true
+          [ -d bin/linux ] && cp -R bin/linux "$APP_DIR/bin" || true
           for f in main.py check_deps.py index.html script.js style.css; do
             [ -f "$APP_DIR/$f" ] || { echo "Echec de copie : $APP_DIR/$f"; exit 1; }
           done
+
+      - name: Download ffmpeg (not committed to the repo, fetched fresh each build)
+        run: |
+          APP_DIR="dist/Stellio/app"
+          mkdir -p "$APP_DIR/bin"
+          curl -L -o ffmpeg.tar.xz "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"
+          mkdir -p ffmpeg_extracted
+          tar -xf ffmpeg.tar.xz -C ffmpeg_extracted --strip-components=1
+          cp ffmpeg_extracted/bin/ffmpeg "$APP_DIR/bin/ffmpeg"
+          chmod +x "$APP_DIR/bin/ffmpeg"
+
+      - name: Download unrar (not committed to the repo, fetched fresh each build)
+        run: |
+          APP_DIR="dist/Stellio/app"
+          # unrar (le vrai, freeware RARLAB, pas unrar-free) est disponible dans le depot "multiverse"
+          # d'Ubuntu, deja active par defaut sur les runners GitHub. Rien a compiler ni a versionner a la main.
+          sudo apt-get update -qq
+          sudo apt-get install -y unrar
+          cp "$(command -v unrar)" "$APP_DIR/bin/unrar"
+          chmod +x "$APP_DIR/bin/unrar"
 
       - name: Assemble AppDir
         run: |

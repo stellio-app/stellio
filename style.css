@@ -2846,24 +2846,12 @@ body {
     text-align: center;
 }
 
-/* Portrait mobile : le header du viewer (titre + orientation + surplombs +
-   envoyer au slicer + fermer) ne tient pas sur une seule ligne à l'écran
-   étroit — on passe en plein écran et on empile les contrôles pour que
-   tout reste accessible sans forcer le mode paysage. */
 @media (max-width: 640px) {
     .modal-content.viewer-3d {
         width: 100vw;
         max-width: 100vw;
         height: 100vh;
         max-height: 100vh;
-        /* 100vh sur mobile inclut parfois l'espace potentiellement occupé
-           par la barre d'adresse du navigateur (surtout en portrait), ce
-           qui pousse ce panneau centré verticalement au-delà de la zone
-           réellement visible — le header (et sa croix de fermeture) se
-           retrouve alors hors écran. 100dvh s'ajuste dynamiquement à la
-           hauteur visible réelle et corrige ce décalage. Déclaré après
-           100vh pour rester compatible avec les anciens navigateurs qui
-           ignorent simplement dvh. */
         height: 100dvh;
         max-height: 100dvh;
         border-radius: 0;

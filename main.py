@@ -6985,26 +6985,6 @@ def download_shared_file(token):
     response.call_on_close(_invalidate_token)
     return response
 
-
-# ---------------------------------------------------------------------------
-# Instances Stellio — échange direct de fichiers entre deux installations de
-# Stellio sur le même réseau local, sans passer par un serveur cloud.
-#
-# Modèle de confiance volontairement simple (appairage manuel par clé
-# partagée), adapté à un usage FabLab/domicile plutôt qu'une vraie découverte
-# automatique mDNS/Bonjour (qui aurait demandé d'ajouter une dépendance
-# supplémentaire — le paquet Python "zeroconf" — au build PyInstaller, ce que
-# je ne voulais pas faire sans en parler d'abord). L'ajout d'instance reste
-# donc manuel : chacune génère sa propre "clé locale" dans ses Paramètres,
-# qu'on copie-colle sur l'autre instance en l'ajoutant.
-#
-# Le transfert de fichier réutilise le système de lien de partage existant
-# (_share_links) : l'instance qui envoie crée un lien à usage unique, et
-# c'est l'instance qui reçoit qui va chercher le fichier via ce lien — aucun
-# nouvel endpoint d'upload à sécuriser, on capitalise sur un mécanisme déjà
-# audité.
-# ---------------------------------------------------------------------------
-
 def _get_or_create_local_peer_key():
     settings = load_settings()
     if not settings.get('local_peer_key'):
@@ -7013,9 +6993,6 @@ def _get_or_create_local_peer_key():
     return settings['local_peer_key']
 
 def _get_primary_user_id():
-    """Stellio est une appli mono-utilisateur par installation : on prend le
-    premier compte comme propriétaire pour les requêtes venant d'une autre
-    instance (qui n'ont pas de session navigateur)."""
     conn = get_db()
     try:
         row = conn.execute("SELECT id FROM users ORDER BY id LIMIT 1").fetchone()
@@ -7126,9 +7103,6 @@ def api_remote_instances_ping(instance_id):
 @app.route('/api/remote-instances/<int:instance_id>/send', methods=['POST'])
 @login_required
 def api_remote_instances_send(instance_id):
-    """Envoie un fichier local vers une autre instance Stellio : on crée un lien
-    de partage à usage unique et on demande à l'autre instance d'aller le
-    récupérer elle-même — Stellio n'upload jamais directement de fichier."""
     data = request.json or {}
     file_path = (data.get('file_path') or '').strip()
     if not file_path or not os.path.isfile(file_path):
@@ -7189,9 +7163,6 @@ def api_peer_handshake():
 @app.route('/api/peer/receive-file', methods=['POST'])
 @require_peer_key
 def api_peer_receive_file():
-    """Appelée par une autre instance Stellio pour nous signaler qu'un fichier
-    l'attend : on va le chercher nous-mêmes via son lien de partage à usage
-    unique et on l'enregistre dans le dossier de réception configuré."""
     data = request.json or {}
     share_url = (data.get('url') or '').strip()
     filename = secure_filename((data.get('filename') or '').strip()) or 'fichier_recu'
@@ -7825,8 +7796,6 @@ def api_get_stats():
             spent_this_month = round(cost_row[2] or 0, 2)
             avg_cost_per_print = round(total_spent / costed_prints, 2) if costed_prints else None
 
-            # 5b — Coût de l'échec : met en avant le coût cumulé (matière + élec) des
-            # impressions marquées en échec, pas seulement celui des réussites.
             failed_cost_row = conn.execute(
                 """SELECT COALESCE(SUM(total_cost), 0), COUNT(*)
                    FROM print_history WHERE user_id=? AND result='failed' AND total_cost IS NOT NULL""",
@@ -8193,13 +8162,9 @@ def api_delete_print_photo(photo_id):
 @login_required
 def api_browse_folder():
     try:
-        import tkinter as tk
-        from tkinter import filedialog
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
-        folder = filedialog.askdirectory(title="Choisir le dossier de destination")
-        root.destroy()
+        import webview
+        result = webview.windows[0].create_file_dialog(webview.FOLDER_DIALOG)
+        folder = result[0] if result else None
 
         if folder:
             folder = folder.replace('/', '\\') if os.name == 'nt' else folder
@@ -8574,16 +8539,6 @@ def _locate_slicer_macos(name_patterns):
         return None
     return _macos_bundle_executable(bundle)
 
-
-# ──────────────────────────────────────────────────────────────────────
-# Table unique des slicers connus, utilisée à la fois par
-# detect_installed_slicers() (liste tous les slicers présents) et
-# find_slicer_by_name() (retrouve un slicer précis par son identifiant
-# stable, ex: 'orca-slicer.exe' — voir SLICER_ID_TO_DEFAULT_VALUE plus bas).
-#   'win'   : (patterns glob relatifs à _slicer_search_roots(), noms d'exe pour la recherche registre)
-#   'mac'   : patterns de noms de bundle .app relatifs à _macos_search_roots()
-#   'linux' : noms de binaires cherchés dans le PATH (liste vide = pas de version Linux connue)
-# ──────────────────────────────────────────────────────────────────────
 _SLICER_CANDIDATES = {
     'orcaslicer': {
         'name': 'OrcaSlicer',
@@ -8685,13 +8640,13 @@ _SLICER_CANDIDATES = {
         'win': (["MakerBot Print/MakerBotPrint.exe", "MakerBot Print*/MakerBotPrint.exe"],
                 ['MakerBotPrint.exe']),
         'mac': ['MakerBot Print.app'],
-        'linux': [],  # pas de version Linux connue
+        'linux': [],  
     },
     'voxelizer': {
         'name': 'Voxelizer',
         'win': (["Voxelizer/Voxelizer.exe", "ZMorph*/Voxelizer.exe"], ['Voxelizer.exe']),
-        'mac': [],    # pas de version macOS connue
-        'linux': [],  # pas de version Linux connue
+        'mac': [],    
+        'linux': [],  
     },
     'slic3r': {
         'name': 'Slic3r',
@@ -8710,7 +8665,6 @@ _SLICER_CANDIDATES = {
 
 
 def locate_slicer_by_id(slicer_id):
-    """Localise l'exécutable d'un slicer connu (clé de _SLICER_CANDIDATES) sur la plateforme courante."""
     entry = _SLICER_CANDIDATES.get(slicer_id)
     if not entry:
         return None
@@ -8728,8 +8682,6 @@ def locate_slicer_by_id(slicer_id):
 
 
 def _detect_cura():
-    """Cas particulier : Cura n'est pas un simple exécutable — l'usage en pré-slicing nécessite
-    le chemin de CuraEngine ET son dossier de définitions d'imprimantes."""
     try:
         if sys.platform == 'win32':
             cura_patterns = [
@@ -8761,9 +8713,6 @@ def _detect_cura():
         else:
             engine_path = shutil.which('CuraEngine')
             if engine_path:
-                # Pas de convention standard pour le dossier de définitions sur Linux
-                # (dépend du packaging : AppImage, flatpak, .deb...) — pré-slicing Cura
-                # non disponible dans ce cas, mais l'entrée reste utilisable pour "Envoyer au slicer".
                 return {'id': 'cura', 'name': 'Cura', 'path': engine_path}
     except Exception as e:
         app_logger.info(f"[PreSlice] Détection Cura échouée: {e}")
@@ -9138,8 +9087,6 @@ def find_slicer_by_name(slicer_name):
     if not slicer_name or slicer_name == 'system_default':
         return None
 
-    # 'slicer_name' est la valeur stable stockée dans les réglages (ex: 'orca-slicer.exe'),
-    # identique quelle que soit la plateforme — voir SLICER_ID_TO_DEFAULT_VALUE plus bas dans ce fichier.
     slicer_id = next((k for k, v in SLICER_ID_TO_DEFAULT_VALUE.items() if v == slicer_name), None)
     if not slicer_id:
         return None
@@ -9177,7 +9124,6 @@ def api_request_slice_estimate():
     return jsonify(result), 202
 
 def _get_cached_slice_estimate_seconds(file_path):
-    """Renvoie le temps estimé (en secondes) déjà calculé par le pré-slice silencieux pour ce fichier, si disponible."""
     with slice_estimate_lock:
         entry = slice_estimate_results.get(file_path)
     if entry and entry.get('status') == 'done':
@@ -9465,22 +9411,15 @@ def api_slicer_send_batch():
 @login_required
 def api_pick_folder():
     try:
-        import tkinter as tk
-        from tkinter import filedialog
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
-        root.update()
-        folder = filedialog.askdirectory(title="Sélectionner un dossier", initialdir=os.path.expanduser("~"))
-        root.destroy()
+        import webview
+        result = webview.windows[0].create_file_dialog(webview.FOLDER_DIALOG)
+        folder = result[0] if result else None
 
         if folder:
             return jsonify({"path": folder.replace("\\", "/")})
         else:
             return jsonify({"error": "Annulé"}), 400
 
-    except ImportError as e:
-        return jsonify({"error": "tkinter manquant"}), 500
     except Exception as e:
         return jsonify({"error": f"Erreur: {str(e)}"}), 500
 
@@ -9488,26 +9427,19 @@ def api_pick_folder():
 @login_required
 def api_pick_file():
     try:
-        import tkinter as tk
-        from tkinter import filedialog
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
-        root.update()
-        files = filedialog.askopenfilenames(
-            title="Sélectionner des fichiers 3D",
-            initialdir=os.path.expanduser("~"),
-            filetypes=[("Fichiers 3D", "*.stl *.3mf *.obj"), ("STL", "*.stl"), ("3MF", "*.3mf"), ("OBJ", "*.obj"), ("Tous", "*.*")]
+        import webview
+        result = webview.windows[0].create_file_dialog(
+            webview.OPEN_DIALOG,
+            allow_multiple=True,
+            file_types=('Fichiers 3D (*.stl;*.3mf;*.obj)', 'STL (*.stl)', '3MF (*.3mf)', 'OBJ (*.obj)', 'Tous les fichiers (*.*)')
         )
-        root.destroy()
+        files = result if result else []
 
         if files:
             return jsonify({"paths": [f.replace("\\", "/") for f in files]})
         else:
             return jsonify({"error": "Annulé"}), 400
 
-    except ImportError as e:
-        return jsonify({"error": "tkinter manquant"}), 500
     except Exception as e:
         return jsonify({"error": f"Erreur: {str(e)}"}), 500
 
@@ -12010,7 +11942,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.6.7"
+CURRENT_VERSION = "0.6.7b"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
