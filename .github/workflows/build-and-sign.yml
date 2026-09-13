@@ -121,6 +121,7 @@ jobs:
             --collect-all smbclient `
             --collect-all paho `
             --collect-all cryptography `
+            --collect-all requests `
             --collect-all rarfile `
             --collect-all py7zr `
             --collect-all defusedxml `
@@ -277,6 +278,7 @@ jobs:
             --collect-all smbclient \
             --collect-all paho \
             --collect-all cryptography \
+            --collect-all requests \
             --collect-all rarfile \
             --collect-all py7zr \
             --collect-all defusedxml \
@@ -425,6 +427,7 @@ jobs:
             --collect-all smbclient \
             --collect-all paho \
             --collect-all cryptography \
+            --collect-all requests \
             --collect-all rarfile \
             --collect-all py7zr \
             --collect-all defusedxml \
@@ -554,57 +557,3 @@ jobs:
             release-files/*.AppImage
             release-files/*.sha256
             release-files/*.zip
-
-  # ──────────────────────────────────────────────────────────────────────
-  # 4. Signature + publication AVEC SignPath (DÉSACTIVÉ pour l'instant)
-  # 
-  # POUR RÉACTIVER LA SIGNATURE :
-  # 1. Supprime ou commente le job "release" ci-dessus
-  # 2. Décommente toutes les lignes ci-dessous (retire les # au début)
-  # 3. Configure les secrets GitHub suivants dans Settings > Secrets and variables > Actions :
-  #    - SIGNPATH_API_TOKEN
-  #    - SIGNPATH_ORG_ID
-  #    - SIGNPATH_PROJECT_SLUG
-  #    - SIGNPATH_POLICY_SLUG
-  # ──────────────────────────────────────────────────────────────────────
-  # sign-and-release:
-  #   needs: [check-version, build]
-  #   if: needs.check-version.outputs.should_release == 'true'
-  #   runs-on: windows-latest
-  #   steps:
-  #     - name: Submit signing request to SignPath (installeur uniquement)
-  #       uses: signpath/github-action-submit-signing-request@v2
-  #       with:
-  #         api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
-  #         organization-id: '${{ secrets.SIGNPATH_ORG_ID }}'
-  #         project-slug: '${{ secrets.SIGNPATH_PROJECT_SLUG }}'
-  #         signing-policy-slug: '${{ secrets.SIGNPATH_POLICY_SLUG }}'
-  #         github-artifact-id: '${{ needs.build.outputs.artifact-id }}'
-  #         wait-for-completion: true
-  #         output-artifact-directory: 'signed'
-  #
-  #     - name: Compute SHA256 checksum of signed installer
-  #       shell: pwsh
-  #       run: |
-  #         $file = Get-ChildItem "signed\*.exe" | Select-Object -First 1
-  #         $hash = (Get-FileHash -Algorithm SHA256 $file.FullName).Hash.ToLower()
-  #         "$hash  $($file.Name)" | Out-File -Encoding ascii "signed\$($file.Name).sha256"
-  #
-  #     - name: Download patch ZIP artifact
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: stellio-patch-zip
-  #         path: patch
-  #
-  #     - name: Create GitHub Release (Draft)
-  #       uses: softprops/action-gh-release@v2
-  #       with:
-  #         tag_name: v${{ needs.check-version.outputs.version }}
-  #         name: Stellio v${{ needs.check-version.outputs.version }}
-  #         draft: true                      # ← Ajouté pour cohérence future
-  #         generate_release_notes: false    # ← Ajouté pour cohérence future
-  #         files: |
-  #           signed/*.exe
-  #           signed/*.sha256
-  #           patch/*.zip
-  #           patch/*.sha256
