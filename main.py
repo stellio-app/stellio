@@ -12010,7 +12010,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.6.7b"
+CURRENT_VERSION = "0.6.7"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
@@ -17407,7 +17407,7 @@ if __name__ in ('__main__', 'stellio_main'):
     import sys, os, threading, time, urllib.request, json
 
     STELLIO_HEADLESS = os.environ.get('STELLIO_HEADLESS', '').strip().lower() in ('1', 'true', 'yes')
-    if not STELLIO_HEADLESS and sys.platform != 'win32' and not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
+    if not STELLIO_HEADLESS and sys.platform.startswith('linux') and not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
         STELLIO_HEADLESS = True
 
     STELLIO_START_MINIMIZED = (
