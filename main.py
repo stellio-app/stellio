@@ -11942,7 +11942,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.6.7b"
+CURRENT_VERSION = "0.6.7c"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
@@ -17559,84 +17559,96 @@ if __name__ in ('__main__', 'stellio_main'):
 
 
     else:
-        import tkinter as tk
-        from tkinter import ttk
+        if sys.platform == 'darwin':
+            # IMPORTANT (macOS uniquement) : pas de splash Tkinter ici.
+            # Tkinter (port Aqua/Tcl-Tk) et pywebview (backend Cocoa) se disputent tous les deux
+            # le run loop Cocoa (NSApplication) du thread principal. Faire tourner root.mainloop()
+            # jusqu'a son terme puis demarrer webview.start() juste apres, dans le meme process,
+            # laisse l'etat Cocoa incoherent : la fenetre pywebview s'affiche blanche et le pont JS
+            # (window.pywebview.api) ne s'initialise pas correctement. On saute donc le splash
+            # graphique sur Mac et on attend la fin du demarrage backend avant d'ouvrir la fenetre.
+            app_logger.info("[*] macOS : démarrage backend sans splash Tkinter (évite le conflit Tk/Cocoa avec pywebview)...")
+            run_backend_startup(on_status=lambda key: app_logger.info(f"[STARTUP] {key}..."))
+        else:
+            import tkinter as tk
+            from tkinter import ttk
 
-        def load_splash_translations():
-            lang = 'fr'
-            try:
-                if os.path.exists(SETTINGS_FILE):
-                    with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-                        settings = json.load(f)
-                    lang = settings.get('lang', 'fr')
-            except:
-                pass
-            translations = {}
-            lang_file = os.path.join(BASE_DIR, 'languages', f'{lang}.json')
-            fallback_file = os.path.join(BASE_DIR, 'languages', 'fr.json')
-            for file_path in [lang_file, fallback_file]:
-                if os.path.exists(file_path):
-                    try:
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            translations.update(json.load(f))
-                        if file_path == lang_file:
-                            break
-                    except:
-                        pass
-            return {
-                'init': translations.get('splash.init', 'Initialisation du moteur 3D...'),
-                'database': translations.get('splash.database', 'Chargement de la base de données...'),
-                'server': translations.get('splash.server', 'Démarrage du serveur web...'),
-                'thumbnails': translations.get('splash.thumbnails', 'Préparation des miniatures 3D...'),
-                'version': translations.get('splash.version', 'Version {version}')
-            }
+            def load_splash_translations():
+                lang = 'fr'
+                try:
+                    if os.path.exists(SETTINGS_FILE):
+                        with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                            settings = json.load(f)
+                        lang = settings.get('lang', 'fr')
+                except:
+                    pass
+                translations = {}
+                lang_file = os.path.join(BASE_DIR, 'languages', f'{lang}.json')
+                fallback_file = os.path.join(BASE_DIR, 'languages', 'fr.json')
+                for file_path in [lang_file, fallback_file]:
+                    if os.path.exists(file_path):
+                        try:
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                translations.update(json.load(f))
+                            if file_path == lang_file:
+                                break
+                        except:
+                            pass
+                return {
+                    'init': translations.get('splash.init', 'Initialisation du moteur 3D...'),
+                    'database': translations.get('splash.database', 'Chargement de la base de données...'),
+                    'server': translations.get('splash.server', 'Démarrage du serveur web...'),
+                    'thumbnails': translations.get('splash.thumbnails', 'Préparation des miniatures 3D...'),
+                    'version': translations.get('splash.version', 'Version {version}')
+                }
 
-        SPLASH_TEXTS = load_splash_translations()
-        root = tk.Tk()
-        root.overrideredirect(True)
-        root.attributes('-topmost', True)
-        root.configure(bg='#1a1d23')
-        width, height = 650, 500
-        screen_w = root.winfo_screenwidth()
-        screen_h = root.winfo_screenheight()
-        x = (screen_w - width) // 2
-        y = (screen_h - height) // 2
-        root.geometry(f"{width}x{height}+{x}+{y}")
-        logo_path = os.path.join(BASE_DIR, 'assets', 'logo-nom-stellio.png')
-        if os.path.exists(logo_path):
-            try:
-                from PIL import Image, ImageTk
-                img = Image.open(logo_path)
-                photo = ImageTk.PhotoImage(img)
-                lbl_logo = tk.Label(root, image=photo, bg='#1a1d23')
-                lbl_logo.image = photo
-                lbl_logo.pack(pady=(40, 10))
-            except Exception as e:
-                app_logger.info(f"[Splash] Erreur chargement logo: {e}")
-        tk.Label(root, text=SPLASH_TEXTS['version'].format(version=CURRENT_VERSION),
-                 font=("Segoe UI", 10), fg="#9ca3af", bg='#1a1d23').pack(pady=(5, 20))
-        lbl_status = tk.Label(root, text=SPLASH_TEXTS['init'],
-                              font=("Segoe UI", 11), fg="#e6e6e6", bg='#1a1d23')
-        lbl_status.pack(pady=10)
-        style = ttk.Style()
-        style.theme_use('clam')
-        style.configure("Custom.Horizontal.TProgressbar",
-                        troughcolor='#2a2f3a',
-                        background='#4ea1d3',
-                        thickness=8)
-        progress = ttk.Progressbar(root, style="Custom.Horizontal.TProgressbar",
-                                   mode='indeterminate', length=400)
-        progress.pack(pady=15)
-        progress.start(20)
+            SPLASH_TEXTS = load_splash_translations()
+            root = tk.Tk()
+            root.overrideredirect(True)
+            root.attributes('-topmost', True)
+            root.configure(bg='#1a1d23')
+            width, height = 650, 500
+            screen_w = root.winfo_screenwidth()
+            screen_h = root.winfo_screenheight()
+            x = (screen_w - width) // 2
+            y = (screen_h - height) // 2
+            root.geometry(f"{width}x{height}+{x}+{y}")
+            logo_path = os.path.join(BASE_DIR, 'assets', 'logo-nom-stellio.png')
+            if os.path.exists(logo_path):
+                try:
+                    from PIL import Image, ImageTk
+                    img = Image.open(logo_path)
+                    photo = ImageTk.PhotoImage(img)
+                    lbl_logo = tk.Label(root, image=photo, bg='#1a1d23')
+                    lbl_logo.image = photo
+                    lbl_logo.pack(pady=(40, 10))
+                except Exception as e:
+                    app_logger.info(f"[Splash] Erreur chargement logo: {e}")
+            tk.Label(root, text=SPLASH_TEXTS['version'].format(version=CURRENT_VERSION),
+                     font=("Segoe UI", 10), fg="#9ca3af", bg='#1a1d23').pack(pady=(5, 20))
+            lbl_status = tk.Label(root, text=SPLASH_TEXTS['init'],
+                                  font=("Segoe UI", 11), fg="#e6e6e6", bg='#1a1d23')
+            lbl_status.pack(pady=10)
+            style = ttk.Style()
+            style.theme_use('clam')
+            style.configure("Custom.Horizontal.TProgressbar",
+                            troughcolor='#2a2f3a',
+                            background='#4ea1d3',
+                            thickness=8)
+            progress = ttk.Progressbar(root, style="Custom.Horizontal.TProgressbar",
+                                       mode='indeterminate', length=400)
+            progress.pack(pady=15)
+            progress.start(20)
 
-        def heavy_backend_startup():
-            def on_status(key):
-                root.after(0, lambda: lbl_status.config(text=SPLASH_TEXTS[key]))
-            ready = run_backend_startup(on_status=on_status)
-            root.after(1500 if ready else 5000, root.destroy)
+            def heavy_backend_startup():
+                def on_status(key):
+                    root.after(0, lambda: lbl_status.config(text=SPLASH_TEXTS[key]))
+                ready = run_backend_startup(on_status=on_status)
+                root.after(1500 if ready else 5000, root.destroy)
 
-        threading.Thread(target=heavy_backend_startup, daemon=True).start()
-        root.mainloop()
+            threading.Thread(target=heavy_backend_startup, daemon=True).start()
+            root.mainloop()
+
         app_logger.info("[OK] Splash fermé, lancement de l'interface principale...")
         try:
             import webview
