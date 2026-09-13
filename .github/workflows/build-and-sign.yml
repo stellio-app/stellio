@@ -353,19 +353,26 @@ jobs:
       - name: Download unrar (not committed to the repo, fetched fresh each build)
         run: |
           APP_DIR="dist/Stellio.app/Contents/Resources/app"
-          # Homebrew a retire unrar de son depot officiel (licence non-libre) : on recupere donc le
-          # binaire officiel RARLAB pour macOS, en parsant la page de download pour suivre la derniere
-          # version disponible sans avoir a la coder en dur (comme pour ffmpeg).
+          # Homebrew a retire unrar de son depot officiel (licence non-libre), donc on recupere le
+          # binaire officiel RARLAB pour macOS directement.
+          # NOTE: rarlab.com bloque les requetes "robot" (curl sans UA de navigateur) depuis les IP de
+          # datacenter comme celles des runners GitHub -> on ne peut pas scraper leur page de download
+          # depuis la CI de facon fiable. On fixe donc une version connue (a bumper manuellement de temps
+          # en temps si RARLAB en sort une nouvelle - verifier sur https://www.rarlab.com/download.htm).
+          RAR_VERSION="723"
           case "${{ matrix.arch }}" in
             arm64) RAR_ARCH="arm" ;;
             x86_64) RAR_ARCH="x64" ;;
           esac
-          URL=$(curl -s https://www.rarlab.com/download.htm | grep -oE "https://www\.rarlab\.com/rar/rarmacos-${RAR_ARCH}-[0-9a-z]+\.tar\.gz" | head -1)
-          if [ -z "$URL" ]; then echo "Impossible de trouver l'URL RAR macOS ${RAR_ARCH}"; exit 1; fi
+          URL="https://www.rarlab.com/rar/rarmacos-${RAR_ARCH}-${RAR_VERSION}.tar.gz"
           echo "Telechargement depuis $URL"
-          curl -L -o rar.tar.gz "$URL"
+          curl -fL -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36" \
+            -o rar.tar.gz "$URL"
           mkdir -p rar_extracted
-          tar -xzf rar.tar.gz -C rar_extracted
+          if ! tar -xzf rar.tar.gz -C rar_extracted; then
+            echo "Echec d'extraction : RARLAB a probablement change de version. Mettre a jour RAR_VERSION dans ce step (voir https://www.rarlab.com/download.htm)."
+            exit 1
+          fi
           cp rar_extracted/rar/unrar "$APP_DIR/bin/unrar"
           chmod +x "$APP_DIR/bin/unrar"
 
