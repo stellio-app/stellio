@@ -7,7 +7,11 @@ import importlib.util
 import warnings
 import math
 
-if sys.platform != 'win32':
+if sys.platform.startswith('linux'):
+    # OSMesa (rendu logiciel headless) n'a de sens que sur Linux/serveur sans affichage.
+    # Sur macOS, OSMesa n'est pas dispo nativement : forcer ce backend fait planter pyrender
+    # a l'import ("Failed to load dynlib/dll 'OSMesa'"). Mac et Windows utilisent donc le
+    # backend par defaut de pyrender (Pyglet, avec un vrai contexte OpenGL natif).
     os.environ['PYOPENGL_PLATFORM'] = 'osmesa'
     os.environ['PYRENDER_OFFSCREEN'] = '1'
 
@@ -12017,7 +12021,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.6.7d"
+CURRENT_VERSION = "0.6.7e"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
