@@ -400,23 +400,27 @@ document.getElementById('backup-options-form')?.addEventListener('submit', async
 });
 
 async function runBackupExport(include) {
-    if (window.pywebview && window.pywebview.api && window.pywebview.api.save_backup) {
-        showToast(I18N.t('toast.backup_exporting') || 'Préparation de la sauvegarde...', 'info');
-        try {
-            const result = await window.pywebview.api.save_backup(include);
-            if (result && result.success) {
-                showToast(I18N.t('toast.backup_export_done') || `Sauvegarde enregistrée : ${result.path}`, 'success');
-            } else if (result && result.cancelled) {
-            } else {
-                showToast((result && result.error) || I18N.t('toast.error') || 'Erreur', 'error');
-            }
-        } catch (err) {
-            showToast(I18N.t('toast.connection_error') || 'Erreur de connexion', 'error');
+    showToast(I18N.t('toast.backup_exporting') || 'Préparation de la sauvegarde...', 'info');
+
+    try {
+        const res = await fetch(`${API}/api/backup/export-native`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ include })
+        });
+        const result = await res.json().catch(() => ({}));
+        if (res.ok && result.success) {
+            showToast(I18N.t('toast.backup_export_done') || `Sauvegarde enregistrée : ${result.path}`, 'success');
+            return;
         }
-        return;
+        if (result.cancelled) {
+            return;
+        }
+    } catch (err) {
+        // Route native indisponible — on retombe sur le téléchargement navigateur ci-dessous.
     }
 
-    showToast(I18N.t('toast.backup_exporting') || 'Préparation de la sauvegarde...', 'info');
     try {
         const res = await fetch(`${API}/api/backup/export`, {
             method: 'POST',
@@ -10993,22 +10997,22 @@ const originalHtml = btn.innerHTML;
 btn.disabled = true;
 btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${I18N.t('settings.diagnostic_exporting') || 'Génération...'}`;
 
-
-if (window.pywebview && window.pywebview.api && window.pywebview.api.save_diagnostic_logs) {
-    try {
-        const result = await window.pywebview.api.save_diagnostic_logs();
-        if (result && result.success) {
-            showToast(I18N.t('toast.logs_exported') || `Logs exportés : ${result.path}`, 'success');
-        } else if (!(result && result.cancelled)) {
-            showToast((result && result.error) || I18N.t('toast.connection_error'), 'error');
-        }
-    } catch (err) {
-        showToast(err.message || I18N.t('toast.connection_error'), 'error');
-    } finally {
+try {
+    const res = await fetch(`${API}/api/logs/export-native`, { method: 'POST' });
+    const result = await res.json().catch(() => ({}));
+    if (res.ok && result.success) {
+        showToast(I18N.t('toast.logs_exported') || `Logs exportés : ${result.path}`, 'success');
         btn.disabled = false;
         btn.innerHTML = originalHtml;
+        return;
     }
-    return;
+    if (result.error === 'Annulé') {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        return;
+    }
+} catch (err) {
+    // Route native indisponible (ex: accès hors app desktop) — on retombe sur le téléchargement navigateur ci-dessous.
 }
 
 try {

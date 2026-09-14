@@ -9259,12 +9259,22 @@ def api_send_to_slicer():
             cmd.append(path_to_open)
             subprocess.Popen(cmd)
         else:
-            if sys.platform == 'win32':
-                os.startfile(path_to_open)
-            elif sys.platform == 'darwin':
-                subprocess.run(['open', path_to_open], check=False)
-            else:
-                subprocess.run(['xdg-open', path_to_open], check=False)
+            try:
+                if sys.platform == 'win32':
+                    os.startfile(path_to_open)
+                elif sys.platform == 'darwin':
+                    result = subprocess.run(['open', path_to_open], check=False, capture_output=True, text=True)
+                    if result.returncode != 0:
+                        raise RuntimeError(result.stderr.strip() or f"'open' a échoué (code {result.returncode})")
+                else:
+                    result = subprocess.run(['xdg-open', path_to_open], check=False, capture_output=True, text=True)
+                    if result.returncode != 0:
+                        raise RuntimeError(result.stderr.strip() or f"'xdg-open' a échoué (code {result.returncode})")
+            except Exception as open_err:
+                app_logger.warning(f"[Slicer] Aucun slicer configuré et ouverture par défaut du système impossible : {open_err}")
+                return jsonify({
+                    "error": "Aucun slicer n'est renseigné (et aucune application par défaut n'est associée à ce type de fichier sur votre système). Configurez votre slicer dans Paramètres > Slicer."
+                }), 400
 
         try:
             conn = get_db()
@@ -11597,6 +11607,43 @@ def api_backup_export():
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 
+@app.route('/api/backup/export-native', methods=['POST'])
+@login_required
+def api_backup_export_native():
+    try:
+        data = request.get_json(silent=True) or {}
+        include = data.get('include') or {}
+        zip_bytes, suggested_name = build_backup_zip_bytes(include=include)
+    except Exception as e:
+        app_logger.error(f"[BACKUP] Échec génération pour Enregistrer sous : {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    try:
+        import webview
+        result = webview.windows[0].create_file_dialog(
+            webview.SAVE_DIALOG,
+            directory=str(Path.home() / 'Downloads'),
+            save_filename=suggested_name,
+            file_types=('Archive ZIP (*.zip)', 'Tous les fichiers (*.*)')
+        )
+    except Exception as e:
+        app_logger.error(f"[BACKUP] Échec ouverture boîte de dialogue : {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    dest_path = result[0] if isinstance(result, (list, tuple)) else result
+    if not dest_path:
+        return jsonify({"success": False, "cancelled": True}), 200
+
+    try:
+        with open(dest_path, 'wb') as f:
+            f.write(zip_bytes)
+        app_logger.info(f"[BACKUP] 📦 Sauvegarde enregistrée : {dest_path}")
+        return jsonify({"success": True, "path": dest_path}), 200
+    except Exception as e:
+        app_logger.error(f"[BACKUP] Échec écriture fichier : {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route('/api/backup/import', methods=['POST'])
 @login_required
 def api_backup_import():
@@ -11812,6 +11859,34 @@ def api_export_logs():
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 
+@app.route('/api/logs/export-native', methods=['POST'])
+@login_required
+def api_export_logs_native():
+    try:
+        import webview
+        zip_bytes, filename = build_diagnostic_zip_bytes()
+
+        result = webview.windows[0].create_file_dialog(
+            webview.SAVE_DIALOG,
+            directory=str(Path.home() / 'Downloads'),
+            save_filename=filename
+        )
+        dest_path = result[0] if isinstance(result, (list, tuple)) else result
+
+        if not dest_path:
+            return jsonify({"success": False, "error": "Annulé"}), 200
+
+        with open(dest_path, 'wb') as f:
+            f.write(zip_bytes)
+
+        app_logger.info(f"[LogsExport] 📋 Logs exportés : {dest_path}")
+        return jsonify({"success": True, "path": dest_path}), 200
+
+    except Exception as e:
+        app_logger.error(f"[LogsExport] Erreur (native): {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 LOG_TAIL_INITIAL_BYTES = 50 * 1024
 LOG_TAIL_MAX_CHUNK = 200 * 1024
 
@@ -11942,7 +12017,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.6.7c"
+CURRENT_VERSION = "0.6.7d"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
@@ -17648,7 +17723,6 @@ if __name__ in ('__main__', 'stellio_main'):
 
             threading.Thread(target=heavy_backend_startup, daemon=True).start()
             root.mainloop()
-
         app_logger.info("[OK] Splash fermé, lancement de l'interface principale...")
         try:
             import webview
