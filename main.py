@@ -564,8 +564,20 @@ def _check_required_modules(log=True):
     except ImportError:
         importlib_metadata = None
 
+    if log:
+        try:
+            app_logger.info("[MODULES] === Vérification complète des modules Python ===")
+        except Exception:
+            pass
+
     results = []
     for import_name, pip_name, expected_attr, _conflicting in _REQUIRED_MODULES:
+        if log:
+            try:
+                app_logger.info(f"[MODULES]   {import_name:<42} -> (import en cours...)")
+            except Exception:
+                pass
+
         ok, reason = _deep_check_module(import_name, expected_attr)
 
         version_str = None
@@ -583,17 +595,19 @@ def _check_required_modules(log=True):
             "version": version_str,
         })
 
+        if log:
+            try:
+                if ok:
+                    status = f"OK (v{version_str})" if version_str not in (None, "?") else "OK"
+                else:
+                    status = f"PROBLÈME ({reason})"
+                app_logger.info(f"[MODULES]   {import_name:<42} -> {status}")
+            except Exception:
+                pass
+
     if log:
         try:
             broken = [r for r in results if not r["installed"]]
-
-            app_logger.info("[MODULES] === Vérification complète des modules Python ===")
-            for r in results:
-                if r["installed"]:
-                    status = f"OK (v{r['version']})" if r["version"] not in (None, "?") else "OK"
-                else:
-                    status = f"PROBLÈME ({r['reason']})"
-                app_logger.info(f"[MODULES]   {r['import']:<42} -> {status}")
 
             if broken:
                 names = ", ".join(r["pip"] for r in broken)
@@ -12021,7 +12035,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.6.7e"
+CURRENT_VERSION = "0.6.7f"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
