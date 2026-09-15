@@ -432,10 +432,25 @@ jobs:
           mkdir -p dmg-root
           cp -R "dist/Stellio.app" dmg-root/
           ln -s /Applications dmg-root/Applications
-          hdiutil create -volname "Stellio" -srcfolder dmg-root -ov -format UDZO \
-            "Stellio-v${{ needs.check-version.outputs.version }}-macOS-${{ matrix.arch }}.dmg"
-          shasum -a 256 "Stellio-v${{ needs.check-version.outputs.version }}-macOS-${{ matrix.arch }}.dmg" \
-            > "Stellio-v${{ needs.check-version.outputs.version }}-macOS-${{ matrix.arch }}.dmg.sha256"
+
+          if [ -d "/Volumes/Stellio" ]; then
+            hdiutil detach "/Volumes/Stellio" -force || true
+          fi
+
+          DMG_NAME="Stellio-v${{ needs.check-version.outputs.version }}-macOS-${{ matrix.arch }}.dmg"
+          n=0
+          until [ $n -ge 5 ]; do
+            hdiutil create -volname "Stellio" -srcfolder dmg-root -ov -format UDZO "$DMG_NAME" && break
+            n=$((n+1))
+            echo "hdiutil create a echoue (tentative $n/5), nouvelle tentative dans 10s..."
+            sleep 10
+          done
+          if [ $n -ge 5 ]; then
+            echo "hdiutil create a echoue apres 5 tentatives"
+            exit 1
+          fi
+
+          shasum -a 256 "$DMG_NAME" > "$DMG_NAME.sha256"
 
       - name: Upload macOS installer artifact
         uses: actions/upload-artifact@v4
