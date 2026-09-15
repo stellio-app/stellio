@@ -377,6 +377,25 @@ jobs:
           cp rar_extracted/rar/unrar "$APP_DIR/bin/unrar"
           chmod +x "$APP_DIR/bin/unrar"
 
+      - name: Write entitlements (requis pour le hardened runtime + bootloader PyInstaller)
+        run: |
+          cat > entitlements.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>com.apple.security.cs.allow-jit</key>
+              <true/>
+              <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+              <true/>
+              <key>com.apple.security.cs.disable-library-validation</key>
+              <true/>
+              <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+
       - name: Code sign (Developer ID if available, else ad-hoc)
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
@@ -390,10 +409,21 @@ jobs:
             security unlock-keychain -p actions build.keychain
             security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
             security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
-            codesign --deep --force --options runtime --sign "$MACOS_SIGNING_IDENTITY" "dist/Stellio.app"
+
+            # Signature "inside-out" (recommandee par Apple a la place de --deep) :
+            # on signe d'abord tous les binaires/dylibs imbriques (du plus profond au plus haut),
+            # puis le bundle .app en dernier.
+            find "dist/Stellio.app" -type f \( -name "*.so" -o -name "*.dylib" -o -perm -111 \) -print0 | \
+              xargs -0 -I{} codesign --force --options runtime --timestamp \
+                --entitlements entitlements.plist --sign "$MACOS_SIGNING_IDENTITY" "{}"
+
+            codesign --force --options runtime --timestamp \
+              --entitlements entitlements.plist --sign "$MACOS_SIGNING_IDENTITY" "dist/Stellio.app"
+
+            codesign --verify --deep --strict --verbose=2 "dist/Stellio.app"
             echo "Signe avec le certificat Developer ID."
           else
-            codesign --deep --force --sign - "dist/Stellio.app"
+            codesign --force --deep --sign - --entitlements entitlements.plist "dist/Stellio.app"
             echo "Aucun certificat Developer ID configure — signature ad-hoc uniquement (secrets MACOS_CERTIFICATE / MACOS_CERTIFICATE_PWD / MACOS_SIGNING_IDENTITY absents)."
           fi
 

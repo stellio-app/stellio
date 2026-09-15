@@ -12035,7 +12035,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.6.7f"
+CURRENT_VERSION = "0.6.7g"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
