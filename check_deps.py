@@ -47,6 +47,7 @@ REQUIRED_MODULES = [
     ("py7zr",                                   "py7zr",                  "SevenZipFile",       None),
     ("fast_simplification",                     "fast-simplification",    None,                 None),
     ("pyrender",                                "pyrender",               "OffscreenRenderer",  None),
+    ("OpenGL",                                  "PyOpenGL",               "__version__",        None),
     ("matplotlib",                              "matplotlib",             "use",                None),
     ("psutil",                                  "psutil",                 "virtual_memory",     None),
     ("qrcode",                                  "qrcode",                 "QRCode",             None),
@@ -99,7 +100,7 @@ def auto_install_missing_modules(modules=None, python_executable=None, log=_safe
     for import_name, pip_name, expected_attr, conflicting, reason in problems:
         top_level = import_name.split('.')[0]
 
-        wrong_module_installed = "attribut" in reason
+        wrong_module_installed = "mauvais paquet install" in reason
         bad_packages = set(conflicting or [])
         if wrong_module_installed:
             bad_packages.update(find_owning_packages(top_level))

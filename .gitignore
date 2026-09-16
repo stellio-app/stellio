@@ -32,8 +32,16 @@ VC_redist*.exe
 token*.txt
 *.env
 .env
+*.p12
+*.pfx
+*.pem
+certificate.p12
 
 # Fichiers système
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Editeurs
+.vscode/
+.idea/

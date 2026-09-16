@@ -15,6 +15,9 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
+; Force le mode natif 64 bits (evite la redirection registre WOW6432Node qui
+; fait echouer IsVCRedistInstalled sur un runtime deja installe)
+ArchitecturesInstallIn64BitMode=x64compatible
 ; Installation globale dans ProgramData
 DefaultDirName={commonappdata}\{#MyAppName}
 DefaultGroupName={#MyAppName}

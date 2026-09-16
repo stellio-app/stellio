@@ -109,6 +109,7 @@ jobs:
             --collect-all trimesh `
             --collect-all pyrender `
             --collect-all imageio `
+            --collect-all pyglet `
             --collect-all OpenGL `
             --collect-all numpy `
             --collect-all PIL `
@@ -150,6 +151,7 @@ jobs:
       - name: Copy patchable files into dist\Stellio\app
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           New-Item -ItemType Directory -Force -Path "dist\Stellio\app" | Out-Null
           Copy-Item "main.py"          "dist\Stellio\app\main.py"
           Copy-Item "check_deps.py"    "dist\Stellio\app\check_deps.py"

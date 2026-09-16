@@ -48,6 +48,7 @@ except ImportError:
         ("py7zr",                                   "py7zr",                  "SevenZipFile",       None),
         ("fast_simplification",                     "fast-simplification",    None,                 None),
         ("pyrender",                                "pyrender",               "OffscreenRenderer",  None),
+        ("OpenGL",                                  "PyOpenGL",               "__version__",       None),
         ("matplotlib",                              "matplotlib",             "use",                None),
         ("psutil",                                  "psutil",                 "virtual_memory",     None),
         ("qrcode",                                  "qrcode",                 "QRCode",             None),
@@ -99,7 +100,7 @@ def _auto_install_missing_modules():
     for import_name, pip_name, expected_attr, conflicting, reason in problems:
         top_level = import_name.split('.')[0]
 
-        wrong_module_installed = "attribut" in reason
+        wrong_module_installed = "mauvais paquet install" in reason
         bad_packages = set(conflicting or [])
         if wrong_module_installed:
             bad_packages.update(_find_owning_packages(top_level))
@@ -9922,7 +9923,7 @@ def makerworld_get_model_files(model_id, bearer_token=None, profile_id=None, pre
                     app_logger.warning(f"[MakerWorld] Deux essais échoués pour instance id={pid_fallback} profileId={pid_primary}: {r_dl.status_code} {r_dl.text[:200]}")
 
             except Exception as ep:
-                app_logger.warning(f"[MakerWorld] Erreur iot-service/profile/{pid}: {ep}")
+                app_logger.warning(f"[MakerWorld] Erreur iot-service/profile/{pid_fallback}: {ep}")
 
         if not files or (preferred_format == 'stl' and not any(f['format'] == 'stl' for f in files)):
             app_logger.info(f"[MakerWorld] Tentative endpoint STL direct...")
@@ -12035,7 +12036,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.6.7h"
+CURRENT_VERSION = "0.6.7i"
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
