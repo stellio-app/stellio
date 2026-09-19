@@ -1096,6 +1096,20 @@
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
                             </div>
                             <div class="accord-body" style="text-align:center;">
+                                <div class="accord-section" style="margin-bottom:14px;box-shadow:none;">
+                                    <div class="accord-header" onclick="toggleAccord(this)" style="background:var(--bg-input);">
+                                        <span><i class="fa-brands fa-android"></i> <span data-i18n="settings.companion_apk_title">App compagnon Android (APK)</span></span>
+                                        <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                                    </div>
+                                    <div class="accord-body" style="text-align:left;">
+                                        <p class="settings-hint" style="margin-bottom:14px;" data-i18n="settings.companion_apk_hint">
+                                            Scannez ce QR code depuis votre téléphone Android pour télécharger et installer l'app compagnon Stellio (fichier APK).
+                                        </p>
+                                        <button class="btn btn-primary" onclick="openApkQRModal()" style="width:100%;">
+                                            <i class="fa-solid fa-qrcode"></i> <span data-i18n="settings.companion_apk_qr">Afficher le QR code de téléchargement</span>
+                                        </button>
+                                    </div>
+                                </div>
                                 <p class="settings-hint" style="margin-bottom:14px;">Activez l'accès à distance ci-dessous pour générer un QR code et accéder à Stellio depuis votre téléphone ou votre tablette.</p>
 
                                 <div>
@@ -1145,21 +1159,6 @@
                                                 </button>
                                             </div>
                                             <p id="cf-fixed-url-status" class="settings-hint" style="margin-top:10px;"></p>
-                                        </div>
-                                    </div>
-
-                                    <div class="accord-section" style="margin-top:14px;box-shadow:none;">
-                                        <div class="accord-header" onclick="toggleAccord(this)" style="background:var(--bg-input);">
-                                            <span><i class="fa-brands fa-android"></i> <span data-i18n="settings.companion_apk_title">App compagnon Android (APK)</span></span>
-                                            <i class="fa-solid fa-chevron-down accord-arrow"></i>
-                                        </div>
-                                        <div class="accord-body" style="text-align:left;">
-                                            <p class="settings-hint" style="margin-bottom:14px;" data-i18n="settings.companion_apk_hint">
-                                                Scannez ce QR code depuis votre téléphone Android pour télécharger et installer l'app compagnon Stellio (fichier APK).
-                                            </p>
-                                            <button class="btn btn-primary" onclick="openApkQRModal()" style="width:100%;">
-                                                <i class="fa-solid fa-qrcode"></i> <span data-i18n="settings.companion_apk_qr">Afficher le QR code de téléchargement</span>
-                                            </button>
                                         </div>
                                     </div>
                                 </div>

@@ -12192,7 +12192,7 @@ STELLIO_CHANGELOG = [
     {
         "version": "0.6.7",
         "items": [
-            "Détection automatique des imprimantes sur le réseau (Bambu Lab, Elegoo, FlashForge, Klipper, OctoPrint/PrusaLink, Creality)",
+            "Détection automatique des imprimantes sur le réseau",
             "Intégration TigerTag en lecture seule pour l'inventaire filament",
             "QR code dédié pour télécharger l'app compagnon Android (APK) depuis les paramètres d'accès mobile",
             "Alertes de stock filament faible au démarrage, avec lien rapide pour en racheter",
