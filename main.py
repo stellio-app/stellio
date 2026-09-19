@@ -3361,7 +3361,7 @@ def login_required(f):
     return decorated
 
 
-STELLIO_COMPANION_APK_URL = "https://www.github.com/stellio-app/stellio/apk/stellio.apk"
+STELLIO_COMPANION_APK_URL = "https://github.com/stellio-app/stellio/raw/main/apk/stellio.apk"
 
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path='')
 _SECRET_KEY_FILE = os.path.join(DATA_DIR, 'flask_secret.key')

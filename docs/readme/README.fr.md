@@ -1,31 +1,46 @@
-<div align="center">
+<p align="center">
+  <img src="https://stellio-app.com/assets/logo-nom-stellio.png" alt="Logo Stellio" width="360">
+</p>
 
-#  <img src="https://stellio-app.com/assets/logo-nom-stellio.png" alt="Stellio Logo" width="200"/>
+<h3 align="center">Le gestionnaire de fichiers 3D ultime pour les makers et propriétaires d'imprimantes 3D</h3>
 
-### Le gestionnaire de fichiers 3D ultime pour makers et imprimeurs 3D
+<p align="center">
+  <a href="https://github.com/stellio-app/stellio/releases"><img src="https://img.shields.io/github/v/release/stellio-app/stellio?color=blue" alt="Version"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python"></a>
+  <a href="https://flask.palletsprojects.com/"><img src="https://img.shields.io/badge/flask-3.0+-green.svg" alt="Flask"></a>
+  <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg" alt="License: AGPL v3"></a>
+  <a href="https://github.com/stellio-app/stellio/blob/main"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20Raspberry%20Pi%20%2F%20Linux-lightgrey.svg" alt="Platform"></a>
+  <a href="https://github.com/stellio-app/stellio/blob/main"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
+</p>
 
-[![Version](https://img.shields.io/github/v/release/stellio-app/stellio?color=blue)](https://github.com/stellio-app/stellio/releases)
-[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
-[![Flask](https://img.shields.io/badge/flask-3.0+-green.svg)](https://flask.palletsprojects.com/)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Raspberry%20Pi%20%2F%20Linux-lightgrey.svg)]()
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
+<p align="center">
+  <a href="../../README.md">🇬🇧 English</a> |
+  🇫🇷 <strong>Français</strong> |
+  <a href="README.de.md">🇩🇪 Deutsch</a> |
+  <a href="README.es.md">🇪🇸 Español</a> |
+  <a href="README.it.md">🇮🇹 Italiano</a> |
+  <a href="README.pt.md">🇵🇹 Português</a> |
+  <a href="README.ja.md">🇯🇵 日本語</a> |
+  <a href="README.zh.md">🇨🇳 中文</a>
+</p>
 
-[🇬🇧 English](../../README.md) | 🇫🇷 **Français** | [🇩🇪 Deutsch](docs/readme/README.de.md) | [🇪🇸 Español](docs/readme/README.es.md) | [🇮🇹 Italiano](docs/readme/README.it.md) | [🇵🇹 Português](docs/readme/README.pt.md) | [🇯🇵 日本語](docs/readme/README.ja.md) | [🇨🇳 中文](docs/readme/README.zh.md)
-
-[🚀 Installation](#-installation) • [✨ Fonctionnalités](#-fonctionnalités) • [📖 Documentation](#-documentation) • [🤝 Contribuer](#-contribuer) • [📜 Licence](#-licence)
-
-</div>
+<p align="center">
+  <a href="#-installation">🚀 Installation</a> •
+  <a href="#-fonctionnalités">✨ Fonctionnalités</a> •
+  <a href="#-documentation">📖 Documentation</a> •
+  <a href="#-contribuer">🤝 Contribuer</a> •
+  <a href="#-licence">📜 Licence</a>
+</p>
 
 ---
 
 ## 🎯 Présentation
 
-**Stellio** est une application desktop moderne qui centralise toute votre bibliothèque 3D (STL, 3MF, OBJ), automatise les tâches répétitives et s'intègre parfaitement à votre flux de travail d'impression 3D.
+**Stellio** est une application de bureau moderne qui centralise toute votre bibliothèque 3D (STL, 3MF, OBJ), automatise les tâches répétitives et s'intègre parfaitement à votre workflow d'impression 3D.
 
-Que vous soyez maker débutant ou imprimeur expérimenté avec plusieurs machines, Stellio vous fait gagner un temps précieux grâce à l'**IA locale** (Ollama), la **gestion intelligente des imprimantes** et une **interface pensée pour la productivité**.
+Que vous soyez un maker débutant ou un propriétaire expérimenté gérant plusieurs machines, Stellio vous fait gagner un temps précieux grâce à l'**IA locale** (Ollama), une **gestion intelligente des imprimantes** et une **interface pensée pour la productivité**.
 
-> 💡 **Philosophie** : Vos données restent chez vous. Tout fonctionne en local.
+> 💡 **Philosophie** : Vos données restent chez vous. Tout tourne en local.
 
 ---
 
@@ -33,54 +48,59 @@ Que vous soyez maker débutant ou imprimeur expérimenté avec plusieurs machine
 
 ### 📚 Gestion de bibliothèque
 - 🗂️ **Sources multiples** : dossiers locaux, fichiers uniques, partages SMB/NFS
-- 🖼️ **Miniatures 3D automatiques** via PyRender (rendu haute qualité) ou Matplotlib (fallback)
-- 🏷️ **Tags personnalisés** avec couleurs + auto-tagging IA
-- 🔍 **Recherche sémantique** assistée par IA ("je cherche un support pour...")
+- 🖼️ **Miniatures 3D automatiques** via PyRender (rendu haute qualité) ou un rasteriseur CPU numpy (solution de repli)
+- 🏷️ **Tags personnalisés** avec couleurs + auto-tagging par IA
+- 🔍 **Recherche sémantique assistée par IA** ("je cherche un support pour...")
 - ⭐ **Favoris** et filtres avancés (type, taille, poids, statut d'impression)
-- 🧩 **Projets/Assemblages** : regroupez plusieurs fichiers pour un même objet
-- 📊 **Statistiques** détaillées (formats, plateformes, fiabilité des profils)
+- 🧩 **Projets/Assemblages** : regrouper plusieurs fichiers pour un même objet, avec support multi-plateaux 3MF (navigation entre plateaux dans le viewer)
+- 🔁 **Détection de doublons** (exacts et similaires par géométrie)
+- 📊 **Statistiques détaillées** (formats, plateformes, fiabilité des profils)
 
-### 🤖 Intelligence Artificielle (Ollama local)
+### 🤖 Intelligence artificielle (Ollama local)
 - 🏷️ **Auto-tagging** intelligent des fichiers
 - 📝 **Description automatique** des modèles
 - 🔎 **Recherche sémantique** en langage naturel
-- 🎯 **Recommandation de profil slicer** basée sur la géométrie + historique de réussite
-- 🩺 **S.O.S Print** : diagnostic d'échec d'impression (avec analyse photo)
+- 📐 **Analyse d'imprimabilité** (détection des porte-à-faux)
+- 🎯 **Recommandation de profil slicer** basée sur la géométrie + l'historique de réussite
+- 🩺 **S.O.S Print** : diagnostic de raté d'impression adaptatif, question par question — Stellio pose une question à la fois, réduit une liste d'hypothèses au fur et à mesure de vos réponses (4 questions maximum), puis délivre un diagnostic final ; l'analyse photo est disponible à tout moment
 
 ### 🖨️ Gestion des imprimantes
-- 🔌 Support **OctoPrint**, **Klipper/Moonraker**, **Bambu Lab** (MQTT)
-- 📡 Monitoring temps réel (températures, progression, caméra)
-- 🔧 **Maintenance prédictive** avec recommandations par marque (Bambu, Prusa, Creality, etc.)
+- 🔌 Support **OctoPrint**, **Klipper/Moonraker**, **Bambu Lab** (MQTT), **Creality** (WebSocket), **FlashForge**
+- 📡 **Détection automatique sur le réseau** : Stellio scanne votre réseau local (SSDP pour Bambu Lab, broadcast UDP pour Elegoo/Centauri/FlashForge, sondage ciblé pour Klipper/OctoPrint/PrusaLink/Creality) et vous permet d'ajouter les imprimantes détectées en un clic
+- 📡 Suivi en temps réel (températures, progression, caméra)
+- 🔧 **Maintenance prédictive** avec suivi des tâches et recommandations par marque (Bambu, Prusa, Creality, etc.)
 - ⏱️ Compteur d'heures d'impression automatique
-- 📤 Envoi direct au slicer ou upload vers l'imprimante
+- 📤 Envoi direct au slicer, avec un sélecteur de bobine pour assigner le bon filament directement depuis la fenêtre d'envoi, ou upload vers l'imprimante
 
 ### 🧵 Gestion du filament
 - 🔗 Intégration **Spoolman** (serveur de gestion de bobines)
+- 🏷️ Intégration de l'inventaire **TigerTag** (lecture seule)
 - 🟠 Support **AMS Bambu Lab** (lecture des slots)
 - 🟢 Support **CFS Creality**
 - ⚪ Bobines manuelles
-- 📉 Décompte automatique à l'envoi au slicer
-- ✅ Vérification de compatibilité (quantité suffisante ?)
+- 📉 Suivi automatique de la consommation lors de l'envoi au slicer, avec vérification de compatibilité avant impression (quantité suffisante ?)
+- 🔔 **Alertes de stock faible** au démarrage, avec un lien rapide pour racheter
 
-### 📥 Téléchargement depuis plateformes
+### 📥 Téléchargement depuis les plateformes
 - 🟠 **Printables** (API GraphQL)
-- 🟢 **MakerWorld** (login 2 étapes Bambu Lab)
+- 🟢 **MakerWorld** (connexion Bambu Lab en 2 étapes)
 - 🔵 **Thingiverse** (via clé API)
+- 🟣 **Cults3D**
 - 📁 Téléchargement direct vers vos sources configurées
 
 ### 🧩 Outils avancés
-- 🎨 **Nesting automatique** du plateau (rectpack ou silhouette réelle via shapely)
-- 🔧 **Réparation de maillage** (trimesh + pymeshfix)
-- 🔄 **Convertisseur de formats** (STL ↔ 3MF ↔ OBJ)
+- 🎨 **Nesting automatique sur plateau** (rectpack ou silhouette réelle via shapely)
+- 🔧 **Réparation de mesh** (trimesh + pymeshfix)
+- 🔄 **Convertisseur de format** (STL ↔ 3MF ↔ OBJ)
 - 🛡️ **Vérification d'intégrité** (fichiers corrompus/manquants)
-- 💰 **Calcul du coût d'impression** (matériau + électricité)
-- 📸 **Galerie de photos** d'impression (réussies/ratées)
-- 🕒 **Historique** avec notation réussi/raté (nourrit l'IA)
-- 🔍 **Détection de doublons** (exacts et similaires par géométrie)
+- 💰 **Calcul du coût d'impression** (matière + électricité)
+- 📸 **Galerie photo d'impressions** (réussies/échouées)
+- 🕒 **Historique** avec notation succès/échec (nourrit l'IA)
 
-### 🌐 Accès distant & mobile
-- 📱 **QR Code** pour accès mobile (PWA installable)
-- 🌍 **Accès distant** via Cloudflare Tunnel (gratuit, URL aléatoire ou fixe)
+### 🌐 Accès mobile et à distance
+- 📱 **QR code** pour accéder à votre bibliothèque depuis mobile (PWA installable)
+- 📲 **App compagnon Android** : un QR code dédié permet de télécharger et installer l'APK de l'app compagnon Stellio directement depuis les paramètres d'accès mobile
+- 🌍 **Accès à distance** via Cloudflare Tunnel (gratuit, URL aléatoire ou fixe)
 - 🔗 **Liens de partage** temporaires (24h, usage unique)
 
 ### 🎨 Personnalisation
@@ -88,29 +108,21 @@ Que vous soyez maker débutant ou imprimeur expérimenté avec plusieurs machine
 - 🎨 Thèmes de marque : Stellio, Bambu, Prusa, Voron, Creality
 - 🎯 Couleur d'accent personnalisée
 - 🌍 **8 langues** : FR, EN, DE, ES, IT, PT, JA, ZH
-- 🧲 Réorganisation drag & drop de la navigation
+- 🧲 Réorganisation de la navigation par glisser-déposer
 
-### 💾 Sauvegarde & Mises à jour
-- 📦 Export/Import de sauvegarde complète (.zip)
+### 💾 Sauvegarde et mises à jour
+- 📦 Export/import de sauvegarde complète (.zip)
 - 🔄 Mises à jour automatiques depuis GitHub (patch `.zip` — même mécanisme sur Windows et Raspberry Pi/Linux)
 - 📋 Export de logs de diagnostic (secrets masqués)
 
 ---
 
-## 🖼️ Screenshots
+## 🖼️ Captures d'écran
 
-<div align="center">
-<table>
-<tr></tr>
-<td><img src="../../library.png" alt="Bibliothèque" width="400"/><br><em>Bibliothèque avec miniatures</em></td>
-<td><img src="../../monitoring.png" alt="Imprimantes" width="400"/><br><em>Monitoring imprimantes</em></td>
-</tr>
-<tr>
-<td><img src="../../slicer.png" alt="Slicer" width="400"/><br><em>Recommandation IA de profil</em></td>
-<td><img src="../../nesting.png" alt="Nesting" width="400"/><br><em>Nesting automatique</em></td>
-</tr>
-</table>
-</div>
+| | |
+|---|---|
+| ![Bibliothèque](../../library.png) *Bibliothèque avec miniatures* | ![Imprimantes](../../monitoring.png) *Suivi d'imprimante* |
+| ![Slicer](../../slicer.png) *Recommandation de profil par IA* | ![Nesting](../../nesting.png) *Nesting automatique* |
 
 ---
 
@@ -118,38 +130,38 @@ Que vous soyez maker débutant ou imprimeur expérimenté avec plusieurs machine
 
 ### 🪟 Windows (recommandé)
 
-1. Téléchargez le dernier installateur depuis les [Releases](https://github.com/stellio-app/stellio-app/releases)
+1. Téléchargez le dernier installeur depuis les [Releases](https://github.com/stellio-app/stellio/releases)
 2. Lancez `Stellio-Setup.exe`
-3. C'est tout ! 🎉
+3. C'est fait ! 🎉
 
 ### 🐧 Raspberry Pi / Linux
 
-Fonctionne en mode **serveur headless** (sans interface graphique) : Stellio tourne en arrière-plan et s'utilise depuis un navigateur, sur le Pi lui-même ou depuis n'importe quel appareil du réseau local.
+Fonctionne en **mode serveur headless** (sans interface graphique) : Stellio tourne en arrière-plan et se pilote depuis un navigateur, que ce soit sur le Pi lui-même ou depuis n'importe quel appareil du réseau local.
 
 **Prérequis** : Raspberry Pi 4 ou 5 recommandé, Raspberry Pi OS **64 bits**.
 
 ```bash
-curl -O https://raw.githubusercontent.com/stellio-app/stellio-app/main/install-pi.sh
+curl -O https://raw.githubusercontent.com/stellio-app/stellio/main/install-pi.sh
 chmod +x install-pi.sh
 ./install-pi.sh
 ```
 
 Le script installe automatiquement :
-- les dépendances système (`ffmpeg`, `unrar-free`, librairies de rendu 3D)
+- les dépendances système (`ffmpeg`, `unrar-free`, bibliothèques de rendu 3D)
 - un environnement virtuel Python dédié
-- un **service systemd** (`stellio.service`) qui démarre Stellio au boot et le relance automatiquement en cas de crash
+- un **service systemd** (`stellio.service`) qui démarre Stellio au boot et le redémarre automatiquement en cas de crash
 
 Une fois installé, Stellio est accessible sur `http://<ip-du-pi>:5000`.
 
 ```bash
-sudo systemctl status stellio     # État du service
+sudo systemctl status stellio     # Statut du service
 sudo systemctl restart stellio    # Redémarrer
 sudo journalctl -u stellio -f     # Suivre les logs en direct
 ```
 
-> 💡 **Mêmes mises à jour que sous Windows** : le patch `.zip` publié sur chaque release est le même pour les deux plateformes (code source pur, rien de compilé). Stellio le détecte et l'applique tout seul, puis redémarre le service — pas de réinstallation manuelle à faire.
-
-> 🎥 Fonctionnalités identiques à la version Windows, à l'exception de la fenêtre desktop native (remplacée par l'accès navigateur) et de l'IA locale Ollama, qui nécessite un modèle raisonnable pour tourner correctement sur un Pi — pointez `ollama_url` vers un serveur Ollama distant dans les Paramètres si besoin.
+> 💡 **Mêmes mises à jour que sur Windows** : le patch `.zip` publié à chaque version est identique sur les deux plateformes (code source pur, rien de compilé). Stellio le détecte et l'applique automatiquement, puis redémarre le service — aucune réinstallation manuelle nécessaire.
+>
+> 🎥 Mêmes fonctionnalités que la version Windows, à l'exception de la fenêtre de bureau native (remplacée par l'accès navigateur) et de l'IA Ollama locale, qui nécessite un modèle raisonnablement performant pour bien tourner sur un Pi — pointez `ollama_url` vers un serveur Ollama distant dans les Paramètres si besoin.
 
 ### Slicers supportés
 
@@ -163,26 +175,29 @@ Stellio détecte automatiquement :
 ### Imprimantes
 
 | Type | Protocole | Fonctionnalités |
-|------|-----------|-----------------|
-| OctoPrint | HTTP API | Monitoring, upload, caméra |
-| Klipper/Moonraker | HTTP API | Monitoring, upload, caméra, heures exactes |
-| Bambu Lab | MQTT | Monitoring temps réel, AMS, caméra (JPEG A1/P1, RTSPS X1/X2/H2) |
+|---|---|---|
+| OctoPrint / PrusaLink | API HTTP | Suivi, upload, caméra |
+| Klipper/Moonraker | API HTTP | Suivi, upload, caméra, heures exactes |
+| Bambu Lab | MQTT (cloud + LAN) | Suivi temps réel, AMS, caméra (JPEG A1/P1, RTSPS X1/X2/H2), détection SSDP |
+| Creality | WebSocket | Suivi, CFS, détection UDP |
+| FlashForge | API propriétaire | Suivi, détection UDP |
+| Elegoo | SDCP sur WebSocket | Suivi, détection UDP |
 
 ---
 
-## 🛠️ Technologies
+## 🛠️ Technologie
 
 | Composant | Technologie |
-|-----------|-------------|
+|---|---|
 | Backend | Python 3.8+, Flask, Waitress |
 | Frontend | HTML5, CSS3, JavaScript vanilla |
-| Base de données | SQLite (WAL mode) |
-| Desktop | pywebview (Windows) / mode headless navigateur (Raspberry Pi, Linux) |
-| Rendu 3D | PyRender, Matplotlib, Three.js |
-| Maillage | trimesh, pymeshfix, shapely |
+| Base de données | SQLite (mode WAL) |
+| Bureau | pywebview (Windows) / mode navigateur headless (Raspberry Pi, Linux) |
+| Rendu 3D | PyRender, rasteriseur CPU numpy, Three.js |
+| Mesh et nesting | trimesh, pymeshfix, shapely, rectpack |
 | IA | Ollama (local) |
 | Réseau | paho-mqtt, smbclient, requests |
-| Chiffrement | cryptography (AES-CFB) |
+| Chiffrement | cryptography (AES, IV aléatoire par appel) |
 | Archives | zipfile, rarfile, py7zr, tarfile |
 
 ---
@@ -192,32 +207,36 @@ Stellio détecte automatiquement :
 ### Raccourcis clavier
 
 | Raccourci | Action |
-|-----------|--------|
-| `Ctrl+F` | Rechercher |
+|---|---|
+| `Ctrl+F` | Recherche |
 | `Ctrl+N` | Nouveau téléchargement |
 | `Ctrl+,` | Paramètres |
 | `Alt+1-8` | Navigation rapide |
-| `F` | Toggle favoris |
+| `F` | Basculer les favoris |
 | `T` | Gestionnaire de tags |
 | `?` | Aide raccourcis |
-| `Échap` | Fermer modale / vider recherche |
+| `Échap` | Fermer la modale / vider la recherche |
 
 ### Structure du projet
+
 ```
-stellio-app/
+stellio/
 ├── main.py                 # Backend Flask + Desktop
-├── script.js                # Frontend JavaScript
+├── script.js                # JavaScript frontend
 ├── index.html                # Interface principale
 ├── style.css                  # Styles
-├── assets/                     # Logos, icônes
-├── languages/                   # Fichiers de traduction (JSON)
-├── requirements-pi.txt           # Dépendances Python (installation Raspberry Pi / Linux)
-├── install-pi.sh                  # Script d'installation Raspberry Pi / Linux (service systemd)
+├── launcher.py                  # Lanceur léger / bootstrap runtime
+├── check_deps.py                 # Vérificateur de dépendances auto-réparant
+├── worker.py                       # Worker en arrière-plan (miniatures, scans)
+├── assets/                          # Logos, icônes
+├── languages/                        # Fichiers de traduction (JSON)
+├── apk/                                # Package de l'app compagnon Android
+├── docs/                                # Documentation, politique de confidentialité, READMEs traduits
+├── requirements.txt                      # Dépendances Python
+├── install-pi.sh                          # Script d'installation Raspberry Pi / Linux (service systemd)
 ```
 
----
-
-Vous avez une idée ? [Ouvrez une issue](https://github.com/stellio-app/stellio-app/issues) !
+Une idée ? [Ouvrez une issue](https://github.com/stellio-app/stellio/issues) !
 
 ---
 
@@ -225,44 +244,45 @@ Vous avez une idée ? [Ouvrez une issue](https://github.com/stellio-app/stellio-
 
 Les contributions sont les bienvenues ! 🎉
 
-1. **Fork** le projet
-2. Créez votre branche (`git checkout -b feature/AmazingFeature`)
-3. Committez vos changements (`git commit -m 'Add AmazingFeature'`)
-4. Push vers la branche (`git push origin feature/AmazingFeature`)
+1. **Forkez** le projet
+2. Créez votre branche (`git checkout -b feature/MaSuperFonctionnalite`)
+3. Commitez vos changements (`git commit -m 'Ajout de MaSuperFonctionnalite'`)
+4. Poussez la branche (`git push origin feature/MaSuperFonctionnalite`)
 5. Ouvrez une **Pull Request**
 
-### Guidelines
+### Recommandations
 - Respectez le style de code existant
-- Ajoutez des commentaires en français ou anglais
-- Testez vos modifications sur Windows si possible
+- Ajoutez des commentaires en français ou en anglais
+- Testez vos changements sur Windows si possible
 - Mettez à jour la documentation si nécessaire
 
 ### Signaler un bug
-Utilisez le template de bug report et incluez :
-- Version de Stellio
-- Système d'exploitation
-- Étapes pour reproduire
-- Logs d'erreur (exportables depuis Paramètres → Diagnostic)
+
+Utilisez le modèle de rapport de bug et incluez :
+- La version de Stellio
+- Le système d'exploitation
+- Les étapes de reproduction
+- Les logs d'erreur (exportables depuis Paramètres → Diagnostic)
 
 ---
 
 ## 📜 Licence
 
-Ce projet est sous licence libre **GNU Affero General Public License v3.0** - consultez le fichier [LICENSE](./LICENSE) pour plus de détails.
+Ce projet est sous licence **GNU Affero General Public License v3.0** — voir le fichier [LICENSE](../../LICENSE) pour les détails.
 
-> 💡 **En résumé** : Vous êtes libre de copier, modifier et distribuer ce logiciel. Si vous modifiez Stellio ou l'utilisez pour fournir un service hébergé sur un réseau, vous devez publier l'intégralité du code source sous la même licence AGPLv3.
+> 💡 **En résumé** : vous êtes libre de copier, modifier et distribuer ce logiciel. Si vous modifiez Stellio ou l'utilisez pour proposer un service hébergé en réseau, vous devez publier le code source complet sous la même licence AGPLv3.
 
 ---
 
 ## 🔒 Confidentialité
 
-Stellio est « local-first » : vos données restent sur votre machine, rien n'est collecté ni envoyé vers des serveurs externes par défaut. Consultez notre [Politique de confidentialité](./docs/privacy/PRIVACY.fr.md) pour tous les détails.
+Stellio est local-first : vos données restent sur votre machine, rien n'est collecté ni envoyé vers des serveurs externes par défaut. Consultez notre [Politique de confidentialité](../privacy/PRIVACY.md) pour tous les détails.
 
 ---
 
 ## 🔏 Politique de signature de code
 
-Les exécutables Windows publiés dans les [Releases](https://github.com/stellio-app/stellio-app/releases) sont signés numériquement. Consultez [CODE_SIGNING_POLICY.md](./CODE_SIGNING_POLICY.md) pour plus de détails sur notre processus de signature et la protection de la clé privée.
+Les exécutables Windows publiés dans les [Releases](https://github.com/stellio-app/stellio/releases) sont signés numériquement. Voir [CODE_SIGNING_POLICY.md](../../CODE_SIGNING_POLICY.md) pour le détail de notre procédure de signature et la protection de la clé privée.
 
 ---
 
@@ -271,16 +291,16 @@ Les exécutables Windows publiés dans les [Releases](https://github.com/stellio
 - [Ollama](https://ollama.com/) pour l'IA locale
 - [Flask](https://flask.palletsprojects.com/) pour le backend
 - [Three.js](https://threejs.org/) pour le rendu 3D web
-- [trimesh](https://github.com/mikedh/trimesh) pour le traitement de maillage
-- La communauté maker pour les retours et suggestions
+- [trimesh](https://github.com/mikedh/trimesh) pour le traitement de mesh
+- La communauté des makers pour ses retours et suggestions
 - Tous les contributeurs ❤️
 
 ---
 
-## 📞 Contact & Support
+## 📞 Contact et support
 
-- 🐛 **Bug report** : [GitHub Issues](https://github.com/stellio-app/stellio-app/issues)
-- 💡 **Feature request** : [GitHub Discussions](https://github.com/stellio-app/stellio-app/discussions)
+- 🐛 **Signaler un bug** : [GitHub Issues](https://github.com/stellio-app/stellio/issues)
+- 💡 **Demande de fonctionnalité** : [GitHub Discussions](https://github.com/stellio-app/stellio/discussions)
 - 📧 **Email** : contact@stellio-app.com
 - 🌐 **Site web** : [stellio-app.com](https://stellio-app.com)
 
@@ -289,17 +309,17 @@ Les exécutables Windows publiés dans les [Releases](https://github.com/stellio
 ## ⭐ Soutenir le projet
 
 Si Stellio vous est utile, pensez à :
-- Mettre une **étoile** ⭐ sur GitHub
+- Lui mettre une **star** ⭐ sur GitHub
 - Partager le projet autour de vous
-- [Contribuer au code](#-contribuer) ou à la traduction
-- Signaler des bugs pour améliorer l'application
+- [Contribuer au code](#-contribuer) ou aux traductions
+- Signaler des bugs pour aider à améliorer l'app
 
 ---
 
-<div align="center">
+<p align="center"><strong>Fait avec ❤️ pour la communauté des makers</strong></p>
 
-**Fait avec ❤️ pour la communauté maker**
-
-[⭐ Star this repo](https://github.com/stellio-app/stellio-app) • [🐛 Report a bug](https://github.com/stellio-app/stellio-app/issues) • [💡 Request a feature](https://github.com/stellio-app/stellio-app/discussions)
-
-</div>
+<p align="center">
+  <a href="https://github.com/stellio-app/stellio">⭐ Star ce dépôt</a> •
+  <a href="https://github.com/stellio-app/stellio/issues">🐛 Signaler un bug</a> •
+  <a href="https://github.com/stellio-app/stellio/discussions">💡 Proposer une fonctionnalité</a>
+</p>
