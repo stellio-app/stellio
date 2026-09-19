@@ -1276,5 +1276,12 @@
   "settings.slicer_profiles_type_process_plural": "工艺设置",
   "settings.spoolman_add_question": "是否要添加它？",
   "settings.spoolman_found": "已找到 Spoolman 服务器",
-  "spoolman.source_manual": "手动"
+  "spoolman.source_manual": "手动",
+  "settings.companion_apk_title": "Android 配套应用（APK）",
+  "settings.companion_apk_hint": "用您的 Android 手机扫描此二维码，下载并安装 Stellio 配套应用（APK 文件）。",
+  "settings.companion_apk_qr": "显示下载二维码",
+  "qr.alt_apk": "APK 下载二维码",
+  "qr.apk_hint": "用 Android 手机相机扫描以下载 APK",
+  "qr.apk_open_link": "打开链接",
+  "qr.apk_unknown_sources_hint": "Android 可能会要求允许「未知来源」安装 —— 对于 Play 商店之外分发的 APK，这是正常现象。"
 }

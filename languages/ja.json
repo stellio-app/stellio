@@ -1276,5 +1276,12 @@
   "settings.slicer_profiles_type_process_plural": "プロセス設定",
   "settings.spoolman_add_question": "追加しますか？",
   "settings.spoolman_found": "Spoolmanサーバーが見つかりました",
-  "spoolman.source_manual": "手動"
+  "spoolman.source_manual": "手動",
+  "settings.companion_apk_title": "Androidコンパニオンアプリ（APK）",
+  "settings.companion_apk_hint": "AndroidスマートフォンでこのQRコードをスキャンして、Stellioコンパニオンアプリ（APKファイル）をダウンロード・インストールしてください。",
+  "settings.companion_apk_qr": "ダウンロード用QRコードを表示",
+  "qr.alt_apk": "APKダウンロード用QRコード",
+  "qr.apk_hint": "AndroidスマートフォンのカメラでスキャンしてAPKをダウンロード",
+  "qr.apk_open_link": "リンクを開く",
+  "qr.apk_unknown_sources_hint": "Androidが「不明な提供元」からのインストールを許可するか確認する場合があります。Play Store以外で配布されるAPKでは通常のことです。"
 }

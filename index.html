@@ -1147,6 +1147,21 @@
                                             <p id="cf-fixed-url-status" class="settings-hint" style="margin-top:10px;"></p>
                                         </div>
                                     </div>
+
+                                    <div class="accord-section" style="margin-top:14px;box-shadow:none;">
+                                        <div class="accord-header" onclick="toggleAccord(this)" style="background:var(--bg-input);">
+                                            <span><i class="fa-brands fa-android"></i> <span data-i18n="settings.companion_apk_title">App compagnon Android (APK)</span></span>
+                                            <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                                        </div>
+                                        <div class="accord-body" style="text-align:left;">
+                                            <p class="settings-hint" style="margin-bottom:14px;" data-i18n="settings.companion_apk_hint">
+                                                Scannez ce QR code depuis votre téléphone Android pour télécharger et installer l'app compagnon Stellio (fichier APK).
+                                            </p>
+                                            <button class="btn btn-primary" onclick="openApkQRModal()" style="width:100%;">
+                                                <i class="fa-solid fa-qrcode"></i> <span data-i18n="settings.companion_apk_qr">Afficher le QR code de téléchargement</span>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -3004,6 +3019,52 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-ghost" onclick="closeModal('modal-qrcode-remote')" data-i18n="actions.close">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-qrcode-apk" class="modal hidden">
+        <div class="modal-content small" style="max-width:360px;">
+            <div class="modal-header">
+                <h3><i class="fa-brands fa-android"></i> <span data-i18n="settings.companion_apk_title">App compagnon Android (APK)</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-qrcode-apk')">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align:center; padding:24px 20px;">
+                <div id="qr-apk-loading" style="padding:30px;">
+                    <i class="fa-solid fa-spinner fa-spin fa-2x" style="color:var(--accent);"></i>
+                    <p style="margin-top:12px; color:var(--text-muted); font-size:13px;" data-i18n="qr.generating">Génération en cours…</p>
+                </div>
+                <div id="qr-apk-content" class="hidden">
+                    <div style="background:#fff; border-radius:12px; padding:16px; display:inline-block; margin-bottom:16px;">
+                        <img id="qr-apk-image" src="" alt="QR Code téléchargement APK Stellio" data-i18n-alt="qr.alt_apk" style="width:200px; height:200px; display:block;">
+                    </div>
+                    <p style="font-size:13px; color:var(--text-secondary); margin-bottom:6px;">
+                        <i class="fa-brands fa-android" style="color:var(--accent);"></i>
+                        <span data-i18n="qr.apk_hint">Scannez avec l'appareil photo de votre téléphone Android pour télécharger l'APK</span>
+                    </p>
+                    <p id="qr-apk-url-display" style="font-size:12px; color:var(--text-muted); word-break:break-all; background:var(--bg-input); padding:8px 12px; border-radius:8px; margin:10px 0;"></p>
+                    <div style="display:flex; gap:8px; margin-top:10px;">
+                        <a id="qr-apk-download-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-ghost" style="flex:1;">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> <span data-i18n="qr.apk_open_link">Ouvrir le lien</span>
+                        </a>
+                        <button class="btn btn-ghost" onclick="copyApkDownloadUrl()" data-i18n-title="actions.copy" title="Copier">
+                            <i class="fa-solid fa-copy"></i>
+                        </button>
+                    </div>
+                    <div style="background:var(--warning, #d9822b)15; border:1px solid var(--warning, #d9822b)30; border-radius:8px; padding:12px; margin-top:12px; text-align:left;">
+                        <p style="font-size:11px; color:var(--text-secondary); margin:0;">
+                            <i class="fa-solid fa-triangle-exclamation" style="color:var(--warning, #d9822b);"></i>
+                            <span data-i18n="qr.apk_unknown_sources_hint">Android peut demander d'autoriser l'installation depuis « sources inconnues » : c'est normal pour un APK distribué hors du Play Store.</span>
+                        </p>
+                    </div>
+                </div>
+                <div id="qr-apk-error" class="hidden">
+                    <i class="fa-solid fa-triangle-exclamation fa-2x" style="color:var(--danger);"></i>
+                    <p style="margin-top:12px; color:var(--text-muted); font-size:13px;" id="qr-apk-error-msg" data-i18n="qr.error">Impossible de générer le QR code.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" onclick="closeModal('modal-qrcode-apk')" data-i18n="actions.close">Fermer</button>
             </div>
         </div>
     </div>

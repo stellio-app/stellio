@@ -1276,5 +1276,12 @@
   "settings.slicer_autoimport_view": "Voir les profils",
   "settings.slicer_profiles_type_printer_plural": "Imprimantes",
   "settings.slicer_profiles_type_filament_plural": "Filaments",
-  "settings.slicer_profiles_type_process_plural": "Réglages"
+  "settings.slicer_profiles_type_process_plural": "Réglages",
+  "settings.companion_apk_title": "App compagnon Android (APK)",
+  "settings.companion_apk_hint": "Scannez ce QR code depuis votre téléphone Android pour télécharger et installer l'app compagnon Stellio (fichier APK).",
+  "settings.companion_apk_qr": "Afficher le QR code de téléchargement",
+  "qr.alt_apk": "QR code de téléchargement de l'APK",
+  "qr.apk_hint": "Scannez avec l'appareil photo de votre téléphone Android pour télécharger l'APK",
+  "qr.apk_open_link": "Ouvrir le lien",
+  "qr.apk_unknown_sources_hint": "Android peut demander d'autoriser l'installation depuis « sources inconnues » : c'est normal pour un APK distribué hors du Play Store."
 }

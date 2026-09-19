@@ -1276,5 +1276,12 @@
   "settings.slicer_profiles_type_process_plural": "Process settings",
   "settings.spoolman_add_question": "would you like to add it?",
   "settings.spoolman_found": "Spoolman server found",
-  "spoolman.source_manual": "Manual"
+  "spoolman.source_manual": "Manual",
+  "settings.companion_apk_title": "Android companion app (APK)",
+  "settings.companion_apk_hint": "Scan this QR code with your Android phone to download and install the Stellio companion app (APK file).",
+  "settings.companion_apk_qr": "Show download QR code",
+  "qr.alt_apk": "APK download QR code",
+  "qr.apk_hint": "Scan with your Android phone's camera to download the APK",
+  "qr.apk_open_link": "Open link",
+  "qr.apk_unknown_sources_hint": "Android may ask you to allow installs from \"unknown sources\" — that's normal for an APK distributed outside the Play Store."
 }

@@ -473,6 +473,42 @@ repair_ignored_cache = _load_repair_ignored()
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 os.makedirs(THUMBNAILS_DIR, exist_ok=True)
 
+TRASH_DIR = os.path.join(DATA_DIR, "trash")
+os.makedirs(TRASH_DIR, exist_ok=True)
+TRASH_RETENTION_SECONDS = 300  # fenêtre d'annulation (Ctrl+Z) : 5 minutes
+_trash_registry = {}  # batch_id -> {"created_at": ts, "entries": [{"original": str, "trashed": str}]}
+_trash_registry_lock = threading.Lock()
+
+def _purge_expired_trash():
+    """Supprime définitivement les fichiers en corbeille dont la fenêtre d'annulation est expirée."""
+    now = time.time()
+    with _trash_registry_lock:
+        expired_ids = [bid for bid, entry in _trash_registry.items()
+                       if now - entry["created_at"] > TRASH_RETENTION_SECONDS]
+        for bid in expired_ids:
+            entry = _trash_registry.pop(bid, None)
+            if not entry:
+                continue
+            batch_dir = os.path.join(TRASH_DIR, bid)
+            try:
+                shutil.rmtree(batch_dir, ignore_errors=True)
+            except Exception as e:
+                app_logger.warning(f"[Trash] Erreur purge lot {bid}: {e}")
+
+def _move_file_to_trash(file_path, batch_id):
+    """Déplace un fichier vers la corbeille temporaire et retourne son chemin dans la corbeille."""
+    batch_dir = os.path.join(TRASH_DIR, batch_id)
+    os.makedirs(batch_dir, exist_ok=True)
+    filename = os.path.basename(file_path)
+    trashed_path = os.path.join(batch_dir, filename)
+    counter = 1
+    base, ext = os.path.splitext(filename)
+    while os.path.exists(trashed_path):
+        trashed_path = os.path.join(batch_dir, f"{base}_{counter}{ext}")
+        counter += 1
+    shutil.move(file_path, trashed_path)
+    return trashed_path
+
 
 KEY_FILE = os.path.join(DATA_DIR, 'encryption.key')
 if os.path.exists(KEY_FILE):
@@ -3324,6 +3360,8 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
+
+STELLIO_COMPANION_APK_URL = "https://www.github.com/stellio-app/stellio/apk/stellio.apk"
 
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path='')
 _SECRET_KEY_FILE = os.path.join(DATA_DIR, 'flask_secret.key')
@@ -6221,6 +6259,38 @@ def api_assign_tags():
         conn.close()
 
 
+@app.route('/api/files/tags/bulk-add', methods=['POST'])
+@login_required
+def api_assign_tags_bulk_add():
+    data = request.json or {}
+    paths = data.get('paths', [])
+    tags = data.get('tags', [])
+
+    if not paths or not isinstance(paths, list):
+        return jsonify({"error": "Liste de fichiers requise"}), 400
+    tags = [t.strip() for t in tags if t and t.strip()]
+    if not tags:
+        return jsonify({"error": "Au moins un tag requis"}), 400
+
+    conn = get_db()
+    try:
+        tag_ids = []
+        for tag_name in tags:
+            conn.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", (tag_name,))
+            tid = conn.execute("SELECT id FROM tags WHERE name = ?", (tag_name,)).fetchone()[0]
+            tag_ids.append(tid)
+        for file_path in paths:
+            for tid in tag_ids:
+                conn.execute("INSERT OR IGNORE INTO file_tags (file_path, tag_id) VALUES (?, ?)", (file_path, tid))
+        conn.commit()
+        return jsonify({"message": "Assignés", "files_count": len(paths), "tags_count": len(tag_ids)}), 200
+    except Exception as e:
+        app_logger.error(f"[API] Erreur tag bulk-add: {e}")
+        return jsonify({"error": "Erreur"}), 500
+    finally:
+        conn.close()
+
+
 def extract_archive_to_disk(file_path, source_name, extensions_3d=None):
     if extensions_3d is None:
         extensions_3d = {'.stl', '.obj', '.3mf'}
@@ -7412,6 +7482,7 @@ def api_open_file_with():
 @login_required
 def api_delete_file():
     try:
+        _purge_expired_trash()
         data = request.json
         file_path = data.get('file_path', '').strip()
         if not file_path:
@@ -7448,8 +7519,15 @@ def api_delete_file():
                 except Exception as e:
                     app_logger.warning(f"[DELETE] Erreur suppression miniature: {e}")
 
-        os.remove(file_path)
-        app_logger.info(f"[DELETE] ✅ Fichier supprimé: {filename}")
+        batch_id = uuid.uuid4().hex
+        trashed_path = _move_file_to_trash(file_path, batch_id)
+        with _trash_registry_lock:
+            _trash_registry[batch_id] = {
+                "created_at": time.time(),
+                "user_id": session['user_id'],
+                "entries": [{"original": file_path, "trashed": trashed_path}],
+            }
+        app_logger.info(f"[DELETE] ✅ Fichier déplacé vers la corbeille: {filename} (lot {batch_id})")
 
         try:
             _cleanup_empty_parent_dirs(file_path, stop_at_paths=_get_source_root_paths(session['user_id']))
@@ -7460,7 +7538,9 @@ def api_delete_file():
 
         return jsonify({
             "success": True,
-            "message": f"Fichier '{filename}' supprimé avec succès"
+            "message": f"Fichier '{filename}' supprimé avec succès",
+            "batch_id": batch_id,
+            "undo_seconds": TRASH_RETENTION_SECONDS,
         }), 200
 
     except PermissionError:
@@ -7474,11 +7554,14 @@ def api_delete_file():
 @login_required
 def api_delete_files_batch():
     try:
+        _purge_expired_trash()
         data = request.json or {}
         file_paths = data.get('file_paths') or []
         if not file_paths:
             return jsonify({"error": "Aucun fichier à supprimer"}), 400
 
+        batch_id = uuid.uuid4().hex
+        trash_entries = []
         deleted, errors = [], []
         source_roots = _get_source_root_paths(session['user_id'])
         for raw_path in file_paths:
@@ -7515,7 +7598,8 @@ def api_delete_files_batch():
                         except Exception as e:
                             app_logger.warning(f"[DELETE] Erreur suppression miniature: {e}")
 
-                os.remove(norm_path)
+                trashed_path = _move_file_to_trash(norm_path, batch_id)
+                trash_entries.append({"original": norm_path, "trashed": trashed_path})
                 deleted.append(filename)
                 try:
                     _cleanup_empty_parent_dirs(norm_path, stop_at_paths=source_roots)
@@ -7528,16 +7612,82 @@ def api_delete_files_batch():
 
         if deleted:
             invalidate_cache()
-            app_logger.info(f"[DELETE] ✅ {len(deleted)} fichier(s) supprimé(s) en lot")
+            app_logger.info(f"[DELETE] ✅ {len(deleted)} fichier(s) déplacé(s) vers la corbeille (lot {batch_id})")
+            with _trash_registry_lock:
+                _trash_registry[batch_id] = {
+                    "created_at": time.time(),
+                    "user_id": session['user_id'],
+                    "entries": trash_entries,
+                }
 
         return jsonify({
             "success": len(errors) == 0,
             "deleted_count": len(deleted),
             "deleted": deleted,
-            "errors": errors
+            "errors": errors,
+            "batch_id": batch_id if deleted else None,
+            "undo_seconds": TRASH_RETENTION_SECONDS,
         }), 200
     except Exception as e:
         app_logger.error(f"[DELETE] Erreur suppression en lot: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+
+@app.route('/api/files/restore-batch', methods=['POST'])
+@login_required
+def api_restore_trash_batch():
+    try:
+        data = request.json or {}
+        batch_id = (data.get('batch_id') or '').strip()
+        if not batch_id:
+            return jsonify({"error": "Identifiant de lot requis"}), 400
+
+        with _trash_registry_lock:
+            entry = _trash_registry.get(batch_id)
+        if not entry:
+            return jsonify({"error": "Ce lot n'est plus disponible pour une restauration (délai expiré ou déjà restauré)"}), 404
+        if entry.get('user_id') != session['user_id']:
+            return jsonify({"error": "Ce lot n'appartient pas à cet utilisateur"}), 403
+
+        restored, errors = [], []
+        for item in entry["entries"]:
+            trashed_path = item["trashed"]
+            original_path = item["original"]
+            try:
+                if not os.path.exists(trashed_path):
+                    errors.append({"path": original_path, "error": "Fichier introuvable en corbeille"})
+                    continue
+                os.makedirs(os.path.dirname(original_path), exist_ok=True)
+                dest_path = original_path
+                if os.path.exists(dest_path):
+                    base, ext = os.path.splitext(original_path)
+                    dest_path = f"{base}_restauré{ext}"
+                shutil.move(trashed_path, dest_path)
+                restored.append(os.path.basename(dest_path))
+            except Exception as e:
+                errors.append({"path": original_path, "error": str(e)})
+
+        with _trash_registry_lock:
+            _trash_registry.pop(batch_id, None)
+        batch_dir = os.path.join(TRASH_DIR, batch_id)
+        try:
+            if os.path.isdir(batch_dir) and not os.listdir(batch_dir):
+                os.rmdir(batch_dir)
+        except Exception:
+            pass
+
+        if restored:
+            invalidate_cache()
+            app_logger.info(f"[RESTORE] ✅ {len(restored)} fichier(s) restauré(s) depuis la corbeille (lot {batch_id})")
+
+        return jsonify({
+            "success": len(errors) == 0,
+            "restored_count": len(restored),
+            "restored": restored,
+            "errors": errors,
+        }), 200
+    except Exception as e:
+        app_logger.error(f"[RESTORE] Erreur: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 
@@ -12036,7 +12186,52 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.6.7i"
+CURRENT_VERSION = "0.6.7"
+
+STELLIO_CHANGELOG = [
+    {
+        "version": "0.6.7",
+        "items": [
+            "Détection automatique des imprimantes sur le réseau (Bambu Lab, Elegoo, FlashForge, Klipper, OctoPrint/PrusaLink, Creality)",
+            "Intégration TigerTag en lecture seule pour l'inventaire filament",
+            "QR code dédié pour télécharger l'app compagnon Android (APK) depuis les paramètres d'accès mobile",
+            "Alertes de stock filament faible au démarrage, avec lien rapide pour en racheter",
+            "Sélecteur de bobine directement dans la fenêtre d'envoi au slicer",
+        ],
+    },
+]
+
+@app.route('/api/changelog/latest', methods=['GET'])
+@login_required
+def api_changelog_latest():
+    try:
+        settings = load_settings() or {}
+        last_seen = settings.get('last_seen_changelog_version')
+        latest = STELLIO_CHANGELOG[0] if STELLIO_CHANGELOG else None
+        return jsonify({
+            'version': latest['version'] if latest else CURRENT_VERSION,
+            'items': latest['items'] if latest else [],
+            'seen': (last_seen == (latest['version'] if latest else CURRENT_VERSION)),
+        }), 200
+    except Exception as e:
+        app_logger.error(f"[API] Erreur changelog: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+
+@app.route('/api/changelog/seen', methods=['POST'])
+@login_required
+def api_changelog_seen():
+    try:
+        data = request.get_json(silent=True) or {}
+        version = data.get('version') or (STELLIO_CHANGELOG[0]['version'] if STELLIO_CHANGELOG else CURRENT_VERSION)
+        settings = load_settings() or {}
+        settings['last_seen_changelog_version'] = version
+        save_settings(settings)
+        return jsonify({'message': 'ok', 'version': version}), 200
+    except Exception as e:
+        app_logger.error(f"[API] Erreur changelog/seen: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
 
 def _fetch_expected_sha256(release_data, target_filename):
     try:
@@ -17307,6 +17502,24 @@ def api_qrcode():
 
         source = request.args.get('source', 'local')
         fmt = request.args.get('format', 'web')  
+
+        if source == 'apk':
+            url = STELLIO_COMPANION_APK_URL
+            data_for_qr = url
+            qr = qrcode.QRCode(
+                version=None,
+                error_correction=qrcode.constants.ERROR_CORRECT_M,
+                box_size=10,
+                border=2,
+            )
+            qr.add_data(data_for_qr)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color='#1a1d2e', back_color='white')
+            buf = io.BytesIO()
+            img.save(buf, format='PNG')
+            buf.seek(0)
+            b64 = base64.b64encode(buf.read()).decode('utf-8')
+            return jsonify({'qr_image': b64, 'url': url, 'format': 'apk'}), 200
 
         local_ip = get_local_ip()
         local_url = f'http://{local_ip}:5000/'

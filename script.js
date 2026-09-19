@@ -12978,6 +12978,37 @@ window.openRemoteQRModal = async function () {
     await _loadQrCode('remote', 'app');
 };
 
+window.openApkQRModal = async function () {
+    openModal('modal-qrcode-apk');
+    document.getElementById('qr-apk-loading').classList.remove('hidden');
+    document.getElementById('qr-apk-content').classList.add('hidden');
+    document.getElementById('qr-apk-error').classList.add('hidden');
+    try {
+        const res = await fetch(`${API}/api/qrcode?source=apk`);
+        const data = await res.json();
+        if (!res.ok || !data.qr_image) throw new Error(data.error || 'Erreur serveur');
+        document.getElementById('qr-apk-image').src = 'data:image/png;base64,' + data.qr_image;
+        document.getElementById('qr-apk-url-display').textContent = data.url;
+        const link = document.getElementById('qr-apk-download-link');
+        if (link) link.href = data.url;
+        document.getElementById('qr-apk-loading').classList.add('hidden');
+        document.getElementById('qr-apk-content').classList.remove('hidden');
+    } catch (e) {
+        document.getElementById('qr-apk-loading').classList.add('hidden');
+        document.getElementById('qr-apk-error-msg').textContent = e.message || I18N.t('qr.error');
+        document.getElementById('qr-apk-error').classList.remove('hidden');
+    }
+};
+
+window.copyApkDownloadUrl = function () {
+    const el = document.getElementById('qr-apk-url-display');
+    const url = el ? el.textContent : '';
+    if (!url) return;
+    navigator.clipboard.writeText(url).then(() => {
+        showToast(_t2('toast.copied', 'Copié !'), 'success');
+    }).catch(() => {});
+};
+
 const _qrFormatState = { local: 'web', remote: 'web' };
 
 window.setQrFormat = async function (which, format) {

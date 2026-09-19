@@ -25,6 +25,7 @@ stellio-data/
 *.log
 *.sqlite
 *.db
+StellioCompanion/
 
 # Fichiers lourds ou sensibles
 *WebView2RuntimeInstaller*

@@ -1276,5 +1276,12 @@
   "settings.slicer_profiles_type_process_plural": "Definições de processo",
   "settings.spoolman_add_question": "deseja adicioná-lo?",
   "settings.spoolman_found": "Servidor Spoolman encontrado",
-  "spoolman.source_manual": "Manual"
+  "spoolman.source_manual": "Manual",
+  "settings.companion_apk_title": "App complementar Android (APK)",
+  "settings.companion_apk_hint": "Escaneie este QR code com seu celular Android para baixar e instalar o app complementar do Stellio (arquivo APK).",
+  "settings.companion_apk_qr": "Mostrar QR code de download",
+  "qr.alt_apk": "QR Code de download do APK",
+  "qr.apk_hint": "Escaneie com a câmera do seu celular Android para baixar o APK",
+  "qr.apk_open_link": "Abrir link",
+  "qr.apk_unknown_sources_hint": "O Android pode pedir para permitir a instalação de «fontes desconhecidas» — isso é normal para um APK distribuído fora da Play Store."
 }
