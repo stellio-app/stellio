@@ -74,7 +74,6 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 
 ### 🧵 Filamentverwaltung
 - 🔗 **Spoolman**-Integration (Server zur Spulenverwaltung)
-- 🏷️ **TigerTag**-Bestandsintegration (nur Lesezugriff)
 - 🟠 **Bambu Lab AMS**-Unterstützung (Slot-Auslesung)
 - 🟢 **Creality CFS**-Unterstützung
 - ⚪ Manuelle Spulen
