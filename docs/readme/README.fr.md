@@ -74,7 +74,6 @@ Que vous soyez un maker débutant ou un propriétaire expérimenté gérant plus
 
 ### 🧵 Gestion du filament
 - 🔗 Intégration **Spoolman** (serveur de gestion de bobines)
-- 🏷️ Intégration de l'inventaire **TigerTag** (lecture seule)
 - 🟠 Support **AMS Bambu Lab** (lecture des slots)
 - 🟢 Support **CFS Creality**
 - ⚪ Bobines manuelles

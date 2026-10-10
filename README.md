@@ -74,7 +74,6 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 
 ### 🧵 Filament management
 - 🔗 **Spoolman** integration (spool management server)
-- 🏷️ **TigerTag** inventory integration (read-only)
 - 🟠 **Bambu Lab AMS** support (slot reading)
 - 🟢 **Creality CFS** support
 - ⚪ Manual spools
