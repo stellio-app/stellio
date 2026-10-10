@@ -216,6 +216,8 @@ function _getCsrfCookie() {
     const match = document.cookie.match(/(?:^|;\s*)stellio_csrf=([^;]*)/);
     return match ? decodeURIComponent(match[1]) : null;
 }
+let IS_VIEWER = false;
+let _viewerToastAt = 0;
 const _nativeFetch = window.fetch.bind(window);
 window.fetch = function (input, init = {}) {
     const url = typeof input === 'string' ? input : (input?.url || '');
@@ -229,7 +231,19 @@ window.fetch = function (input, init = {}) {
             init.headers.set('X-CSRF-Token', token);
         }
     }
-    return _nativeFetch(input, init);
+    const _p = _nativeFetch(input, init);
+    if (!isSameOrigin || method === 'GET') return _p;
+    const _reqUrl = typeof input === 'string' ? input : ((input && input.url) || '');
+    return _p.then((res) => {
+        if (res.ok && /\/api\/(slicer|print-history)/.test(_reqUrl)) {
+            try { _printStatusCache.clear(); } catch (e) { /* cache pas encore initialisé */ }
+        }
+        if (res.status === 403 && IS_VIEWER && Date.now() - _viewerToastAt > 3000) {
+            _viewerToastAt = Date.now();
+            try { showToast(_t3('viewer.readonly_toast', 'Compte invité : lecture seule'), 'warning'); } catch (e) { /* ignore */ }
+        }
+        return res;
+    });
 };
 
 let allFiles = [];
@@ -244,8 +258,33 @@ let activeTypeFilters = [];
 let currentSizeFilter = null;
 let currentWeightFilter = null;
 let printStatusFilter = '';
+let stockFilter = '';
+let stockPrintableMap = null;
 let noThumbFilterOnly = false;
 let failedThumbFilterOnly = false;
+let currentSearchQuery = '';
+
+function hasActiveFilters() {
+    return (activeTypeFilters?.length > 0 && activeTypeFilters.length < 3) ||
+        !!currentSizeFilter || !!currentWeightFilter || !!printStatusFilter || !!stockFilter ||
+        activeTagFilters.size > 0 || noThumbFilterOnly || failedThumbFilterOnly;
+}
+
+function clearSearchAndFilters() {
+    currentSearchQuery = '';
+    [globalSearchInput, mobileSearchInput].forEach(input => { if (input) input.value = ''; });
+    if (hasActiveFilters()) {
+        resetFilters();
+    } else {
+        filteredFiles = (typeof showFavoritesOnly !== 'undefined' && showFavoritesOnly)
+            ? allFiles.filter(f => favoriteFiles.has(f.path))
+            : [...allFiles];
+        applySorting();
+        renderFiles();
+        updateSidebarCounts(filteredFiles);
+    }
+}
+window.clearSearchAndFilters = clearSearchAndFilters;
 let favoriteFiles = new Set();
 let seenFilesSet = new Set();
 let showFavoritesOnly = false;
@@ -546,7 +585,7 @@ function showBackupRestartPopup() {
     overlay.appendChild(popup);
     document.body.appendChild(overlay);
     document.getElementById('backup-restart-btn').addEventListener('click', () => {
-        fetch(`${API}/api/app/quit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}), keepalive: true }).catch(() => {});
+        fetch(`${API}/api/app/quit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ restart: true }), keepalive: true }).catch(() => {});
         setTimeout(() => { window.close(); }, 1200);
     });
 }
@@ -667,11 +706,11 @@ async function deleteFileFromIntegrity(path) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ file_path: path })
         });
+        const data = await res.json().catch(() => ({}));
         if (res.ok) {
-            showToast(I18N.t('toast.file_deleted') || 'Fichier supprimé', 'success');
+            showUndoToast(data.message || I18N.t('toast.file_deleted') || 'Fichier supprimé', data.batch_id, data.undo_seconds);
             document.querySelector(`.integrity-result-row[data-path="${CSS.escape(path)}"]`)?.remove();
         } else {
-            const data = await res.json().catch(() => ({}));
             showToast(data.error || I18N.t('toast.error') || 'Erreur', 'error');
         }
     } catch (err) {
@@ -724,10 +763,70 @@ function isTypingContext(e) {
     return tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable;
 }
 
+let _keyboardFocusIndex = -1;
+
+function _getGridColumnCount() {
+    const grid = document.getElementById('files-grid');
+    if (!grid) return 1;
+    const cards = grid.querySelectorAll('.file-card');
+    if (cards.length < 2) return 1;
+    const firstTop = cards[0].offsetTop;
+    let count = 0;
+    for (const c of cards) {
+        if (c.offsetTop === firstTop) count++;
+        else break;
+    }
+    return Math.max(1, count);
+}
+
+function _updateKeyboardFocusVisual() {
+    document.querySelectorAll('.file-card.keyboard-focused').forEach(el => el.classList.remove('keyboard-focused'));
+    if (_keyboardFocusIndex < 0) return;
+    const path = filteredFiles[_keyboardFocusIndex]?.path;
+    if (!path) return;
+    const card = document.querySelector(`.file-card[data-path="${CSS.escape(path)}"]`);
+    if (card) {
+        card.classList.add('keyboard-focused');
+        card.scrollIntoView({ block: 'nearest' });
+    }
+}
+
 function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
         const typing = isTypingContext(e);
         const ctrlOrCmd = e.ctrlKey || e.metaKey;
+
+        if (ctrlOrCmd && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            const overlay = document.getElementById('command-palette');
+            if (overlay && !overlay.classList.contains('hidden')) {
+                closeCommandPalette();
+            } else {
+                openCommandPalette();
+            }
+            return;
+        }
+
+        if (!typing && !ctrlOrCmd && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key)
+            && document.getElementById('page-library')?.classList.contains('active')
+            && !document.querySelector('.modal:not(.hidden)')
+            && filteredFiles?.length) {
+            const cols = _getGridColumnCount();
+            if (_keyboardFocusIndex < 0) _keyboardFocusIndex = 0;
+            if (e.key === 'ArrowRight') { e.preventDefault(); _keyboardFocusIndex = Math.min(_keyboardFocusIndex + 1, filteredFiles.length - 1); _updateKeyboardFocusVisual(); return; }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); _keyboardFocusIndex = Math.max(_keyboardFocusIndex - 1, 0); _updateKeyboardFocusVisual(); return; }
+            if (e.key === 'ArrowDown') { e.preventDefault(); _keyboardFocusIndex = Math.min(_keyboardFocusIndex + cols, filteredFiles.length - 1); _updateKeyboardFocusVisual(); return; }
+            if (e.key === 'ArrowUp') { e.preventDefault(); _keyboardFocusIndex = Math.max(_keyboardFocusIndex - cols, 0); _updateKeyboardFocusVisual(); return; }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const f = filteredFiles[_keyboardFocusIndex];
+                if (f) {
+                    if (isSelectionMode) toggleFileSelection(f.path);
+                    else open3DViewer(f.name, f.path, f.plate_count || 1);
+                }
+                return;
+            }
+        }
 
         if (e.key === 'Escape') {
             const openModalEl = document.querySelector('.modal:not(.hidden)');
@@ -770,6 +869,15 @@ function setupKeyboardShortcuts() {
             return;
         }
 
+        if (ctrlOrCmd && !typing && e.key.toLowerCase() === 'z') {
+            const undoBtn = document.querySelector('.toast-undo .toast-undo-btn');
+            if (undoBtn) {
+                e.preventDefault();
+                undoBtn.click();
+            }
+            return;
+        }
+
         if (e.altKey && !ctrlOrCmd) {
             const navMap = {
                 '1': 'library', '2': 'stats', '3': 'projects', '4': 'history',
@@ -798,6 +906,32 @@ function setupKeyboardShortcuts() {
         }
     });
 }
+const _printStatusCache = new Map();
+async function loadFilePrintStatus(path) {
+    const safeId = path.replace(/[^\w]/g, '-');
+    const sentEl = document.getElementById(`sent-${safeId}`);
+    const okEl = document.getElementById(`ok-${safeId}`);
+    if (!sentEl || !okEl) return;
+    const yes = I18N.t('card.yes') || 'Oui', no = I18N.t('card.no') || 'Non';
+    const paint = (st) => {
+        sentEl.textContent = st.sent ? yes : no;
+        sentEl.className = `meta-val ${st.sent ? 'meta-yes' : 'meta-no'}`;
+        okEl.textContent = st.success ? yes : no;
+        okEl.className = `meta-val ${st.success ? 'meta-yes' : 'meta-no'}`;
+        okEl.title = (!st.success && st.sent) ? (I18N.t('card.print_success_hint') || "Aucune impression notée comme réussie — note-les dans l'Historique") : '';
+    };
+    const cached = _printStatusCache.get(path);
+    if (cached && Date.now() - cached.t < 15000) { paint(cached.st); return; }
+    try {
+        const res = await fetch(`${API}/api/print-history/file-status?path=${encodeURIComponent(path)}`);
+        if (!res.ok) return;
+        const st = await res.json();
+        _printStatusCache.set(path, { t: Date.now(), st });
+        if (_printStatusCache.size > 500) _printStatusCache.delete(_printStatusCache.keys().next().value);
+        paint(st);
+    } catch (e) { /* l'infobulle reste sur « … » */ }
+}
+
 function setupHoverDelegation() {
 const grid = document.getElementById('files-grid');
 if (!grid) return;
@@ -838,6 +972,10 @@ if (!path) return;
         card.dataset.thumbChecked = 'true';
     }
 
+    if (!card.classList.contains('file-card--details')) {
+        loadFilePrintStatus(path);
+        return;
+    }
     loadFileMetadata(path, (meta) => {
         if (!meta) return;
         const safeId = path.replace(/[^\w]/g, '-');
@@ -951,6 +1089,49 @@ const savedCustomAccent = localStorage.getItem('stellio-custom-accent');
 if (savedCustomAccent) applyCustomAccent(savedCustomAccent);
 console.log('[Theme] ✅ Appliqué:', savedTheme, savedFabricant);
 })();
+
+(function applyAccessibilityOnLoad() {
+    document.documentElement.classList.toggle('high-contrast', localStorage.getItem('stellio-high-contrast') === '1');
+    document.documentElement.classList.toggle('reduce-motion', localStorage.getItem('stellio-reduce-motion') === '1');
+})();
+
+window.toggleHighContrast = function (enabled) {
+    document.documentElement.classList.toggle('high-contrast', enabled);
+    localStorage.setItem('stellio-high-contrast', enabled ? '1' : '0');
+};
+
+window.toggleReduceMotion = function (enabled) {
+    document.documentElement.classList.toggle('reduce-motion', enabled);
+    localStorage.setItem('stellio-reduce-motion', enabled ? '1' : '0');
+};
+
+async function _checkSettingsUndoAvailable() {
+    const banner = document.getElementById('settings-undo-banner');
+    if (!banner) return;
+    try {
+        const res = await fetch(`${API}/api/settings`);
+        const data = await res.json();
+        banner.classList.toggle('hidden', !data.has_settings_undo);
+    } catch (err) {
+        console.debug('[SettingsUndo] Erreur:', err);
+    }
+}
+
+window.undoLastSettingsChange = async function () {
+    try {
+        const res = await fetch(`${API}/api/settings/undo`, { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+            showToast(_t2('settings.undo_success', 'Paramètres restaurés — rechargement...'), 'success');
+            setTimeout(() => location.reload(), 900);
+        } else {
+            showToast(data.error || I18N.t('toast.error'), 'error');
+            document.getElementById('settings-undo-banner')?.classList.add('hidden');
+        }
+    } catch (err) {
+        showToast(I18N.t('toast.connection_error'), 'error');
+    }
+};
 
 
 window.requestThumbGeneration = async function (filePath) {
@@ -1178,6 +1359,159 @@ showToast(I18N.t('toast.error'), 'error');
 }
 return false;
 };
+
+// --- File d'attente d'impression ("à imprimer bientôt") ---
+let printQueuePaths = new Set();
+let printQueueData = []; // liste ordonnée [{path, note, added_at}], source de vérité pour la page dédiée
+
+async function loadPrintQueueSet() {
+    try {
+        const res = await fetch(`${API}/api/print-queue`);
+        if (res.ok) {
+            printQueueData = await res.json();
+            printQueuePaths = new Set(printQueueData.map(q => q.path));
+            updatePrintQueueCount();
+        }
+    } catch (err) {
+        console.error('[PrintQueue] Erreur chargement:', err);
+    }
+}
+
+function updatePrintQueueCount() {
+    const n = printQueuePaths.size;
+    ['print-queue-count', 'print-queue-count-mobile'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = n;
+        el.style.display = n > 0 ? '' : 'none';
+    });
+}
+
+window.togglePrintQueue = async function (filePath) {
+    const isQueued = printQueuePaths.has(filePath);
+    try {
+        const res = await fetch(`${API}/api/print-queue`, {
+            method: isQueued ? 'DELETE' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: filePath })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+            if (isQueued) {
+                printQueuePaths.delete(filePath);
+                printQueueData = printQueueData.filter(q => q.path !== filePath);
+                showToast(I18N.t('toast.queue_removed') || 'Retiré de la file d\'attente', 'info');
+            } else {
+                printQueuePaths.add(filePath);
+                printQueueData.push({ path: filePath, note: null, added_at: new Date().toISOString() });
+                showToast(I18N.t('toast.queue_added') || "Ajouté à imprimer bientôt", 'success');
+            }
+            updatePrintQueueCount();
+            if (document.getElementById('page-print-queue')?.classList.contains('active')) {
+                renderPrintQueue();
+            }
+        } else {
+            showToast(data.error || I18N.t('toast.error'), 'error');
+        }
+    } catch (err) {
+        console.error('[PrintQueue] Erreur:', err);
+        showToast(I18N.t('toast.connection_error'), 'error');
+    }
+};
+
+async function loadPrintQueue() {
+    document.getElementById('print-queue-loading')?.classList.remove('hidden');
+    document.getElementById('print-queue-empty')?.classList.add('hidden');
+    document.getElementById('print-queue-list')?.classList.add('hidden');
+    await loadPrintQueueSet();
+    renderPrintQueue();
+}
+window.loadPrintQueue = loadPrintQueue;
+
+function renderPrintQueue() {
+    document.getElementById('print-queue-loading')?.classList.add('hidden');
+    const listEl = document.getElementById('print-queue-list');
+    const emptyEl = document.getElementById('print-queue-empty');
+    if (!printQueueData.length) {
+        emptyEl?.classList.remove('hidden');
+        listEl?.classList.add('hidden');
+        return;
+    }
+    emptyEl?.classList.add('hidden');
+    listEl?.classList.remove('hidden');
+
+    listEl.innerHTML = printQueueData.map((item, idx) => {
+        const file = allFiles.find(f => f.path === item.path);
+        const name = file ? file.name : item.path.split(/[\\/]/).pop();
+        const thumbSrc = file?.has_thumb ? `${API}/api/thumb?path=${encodeURIComponent(item.path)}` : '';
+        return `
+        <div class="print-queue-item" draggable="true" data-path="${escapeHtml(item.path)}" data-idx="${idx}">
+            <i class="fa-solid fa-grip-vertical print-queue-drag-handle"></i>
+            <span class="print-queue-position">${idx + 1}</span>
+            <div class="print-queue-thumb">${thumbSrc ? `<img src="${thumbSrc}" loading="lazy">` : '<i class="fa-solid fa-cube"></i>'}</div>
+            <div class="print-queue-info">
+                <div class="print-queue-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+            </div>
+            <div class="print-queue-actions">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="sendToSlicer('${escapeJs(item.path)}', '${escapeJs(name)}')" data-i18n-title="modal.send_to_slicer" title="Envoyer au slicer">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="togglePrintQueue('${escapeJs(item.path)}')" data-i18n-title="queue.remove_action" title="Retirer de la file">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>`;
+    }).join('');
+
+    setupPrintQueueDragDrop(listEl);
+}
+
+function setupPrintQueueDragDrop(listEl) {
+    let draggedEl = null;
+    listEl.querySelectorAll('.print-queue-item').forEach(item => {
+        item.addEventListener('dragstart', () => {
+            draggedEl = item;
+            setTimeout(() => item.classList.add('dragging'), 0);
+        });
+        item.addEventListener('dragend', () => {
+            item.classList.remove('dragging');
+            draggedEl = null;
+            persistPrintQueueOrder(listEl);
+        });
+        item.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            if (!draggedEl || draggedEl === item) return;
+            const rect = item.getBoundingClientRect();
+            const before = (e.clientY - rect.top) < rect.height / 2;
+            listEl.insertBefore(draggedEl, before ? item : item.nextSibling);
+        });
+    });
+}
+
+async function persistPrintQueueOrder(listEl) {
+    const order = [...listEl.querySelectorAll('.print-queue-item')].map(el => el.dataset.path);
+    printQueueData.sort((a, b) => order.indexOf(a.path) - order.indexOf(b.path));
+    listEl.querySelectorAll('.print-queue-item').forEach((el, idx) => {
+        el.dataset.idx = idx;
+        const posEl = el.querySelector('.print-queue-position');
+        if (posEl) posEl.textContent = idx + 1;
+    });
+    try {
+        await fetch(`${API}/api/print-queue/reorder`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order })
+        });
+    } catch (err) {
+        console.error('[PrintQueue] Erreur réordonnancement:', err);
+    }
+}
+
+document.getElementById('ctx-queue-btn')?.addEventListener('click', () => {
+    closeModal('modal-file-actions');
+    togglePrintQueue(_ctxPath);
+});
+
 function updateFavoritesCount() {
 const countEl = document.getElementById('favorites-count');
 if (countEl) {
@@ -1425,20 +1759,30 @@ function showApp(user, filesPromise = null) {
 document.getElementById('auth-screen').classList.add('hidden');
 document.getElementById('app-screen').classList.remove('hidden');
 document.getElementById('current-username').textContent = user.username;
+applyRoleUI(user);
 loadAppVersion();
 loadAppConfig();
 loadSources();
-loadAccountBadges();
+if (!IS_VIEWER) loadAccountBadges();
 loadTags();
 loadFavorites();
 loadSeenFiles();
 loadPrinters();
 loadSlicerProfiles();
-checkAccountsStatusOnStartup();
+if (!IS_VIEWER) checkAccountsStatusOnStartup();
 startThumbProgressMonitor();
-startMaintenanceDueChecker();
-checkSpoolmanAutoDiscovery();
-checkSlicerDefaultDiscovery();
+if (!IS_VIEWER) startMaintenanceDueChecker();
+checkLowStockOnStartup();
+startTigerTagAutoRefresh();
+if (!IS_VIEWER) checkSpoolmanAutoDiscovery();
+if (!IS_VIEWER) checkSlicerDefaultDiscovery();
+if (!IS_VIEWER) checkWhatsNew();
+loadPrintQueueSet();
+loadDashboard();
+startNotificationPolling();
+if (!IS_VIEWER) maybeAutoStartTour();
+startPresence();
+checkStellioExtrasAlerts();
 if (filesPromise) {
     filesPromise.then(async (cachedFiles) => {
         if (cachedFiles && Array.isArray(cachedFiles)) {
@@ -1460,6 +1804,1361 @@ startThumbAutoRefresh();
 startAutoFileMonitor();
 startThumbFailureMonitor();
 }
+async function checkWhatsNew() {
+    try {
+        const res = await fetch(`${API}/api/changelog/latest`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.seen || !data.items?.length) return;
+        document.getElementById('whatsnew-version').textContent = `${_t2('whatsnew.version_label', 'Version')} ${data.version}`;
+        document.getElementById('whatsnew-list').innerHTML = data.items.map(item => `<li>${escapeHtml(item)}</li>`).join('');
+        window._whatsNewVersion = data.version;
+        openModal('modal-whats-new');
+    } catch (err) {
+        console.debug('[WhatsNew] Erreur:', err);
+    }
+}
+
+async function dismissWhatsNew() {
+    closeModal('modal-whats-new');
+    try {
+        await fetch(`${API}/api/changelog/seen`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ version: window._whatsNewVersion }),
+        });
+    } catch (err) {
+        console.debug('[WhatsNew] Erreur marquage vu:', err);
+    }
+}
+window.dismissWhatsNew = dismissWhatsNew;
+
+// --- Tableau de bord ---
+const DASHBOARD_WIDGET_IDS = ['printers', 'stock', 'history', 'recent', 'sos', 'favorites', 'projects', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'suggestions'];
+let _dashboardEditMode = false;
+let _draggedDashboardWidget = null;
+
+async function loadDashboard() {
+    await applyDashboardConfig();
+    _loadOnboardingChecklist();
+    _loadDashboardPrinters();
+    _loadDashboardHistory();
+    _loadDashboardStock();
+    _loadDashboardRecentFiles();
+    _loadDashboardSos();
+    _loadDashboardFavorites();
+    _loadDashboardProjects();
+    _loadDashboardStats();
+    _loadDashboardMaintenance();
+    _loadDashboardQueue();
+    _loadDashboardDownloads();
+    _loadDashboardUpdate();
+    _loadDashboardInstances();
+    _loadDashboardSuggestions();
+}
+window.loadDashboard = loadDashboard;
+
+async function _loadOnboardingChecklist() {
+    const box = document.getElementById('onboarding-checklist');
+    if (!box) return;
+    try {
+        const res = await fetch(`${API}/api/onboarding/status`);
+        const data = await res.json();
+        if (data.dismissed || data.completed) {
+            box.classList.add('hidden');
+            return;
+        }
+        const steps = data.steps || {};
+        const items = [
+            { key: 'source_added', icon: 'fa-folder-plus', label: _t2('onboarding.step_source', 'Ajouter une source'), action: () => openModal('modal-select-type') },
+            { key: 'printer_added', icon: 'fa-print', label: _t2('onboarding.step_printer', 'Connecter une imprimante'), action: () => document.querySelector('.nav-btn[data-page="printers"]')?.click() },
+            { key: 'first_print_sent', icon: 'fa-paper-plane', label: _t2('onboarding.step_slicer', 'Envoyer un fichier au slicer'), action: () => document.querySelector('.nav-btn[data-page="library"]')?.click() },
+            { key: 'first_tag_created', icon: 'fa-tag', label: _t2('onboarding.step_tag', 'Créer un tag'), action: () => document.querySelector('.nav-btn[data-page="library"]')?.click() },
+        ];
+        document.getElementById('onboarding-checklist-items').innerHTML = items.map((item, idx) => `
+            <div class="onboarding-checklist-item ${steps[item.key] ? 'done' : ''}" onclick="${steps[item.key] ? '' : `_runOnboardingAction(${idx})`}">
+                <i class="fa-solid ${steps[item.key] ? 'fa-circle-check' : item.icon}"></i>
+                <span>${escapeHtml(item.label)}</span>
+            </div>
+        `).join('');
+        window._onboardingActions = items.map(i => i.action);
+        box.classList.remove('hidden');
+    } catch (err) {
+        console.error('[Onboarding] Erreur:', err);
+        box.classList.add('hidden');
+    }
+}
+
+window._runOnboardingAction = function (idx) {
+    window._onboardingActions?.[idx]?.();
+};
+
+window.dismissOnboardingChecklist = async function () {
+    document.getElementById('onboarding-checklist')?.classList.add('hidden');
+    try {
+        await fetch(`${API}/api/onboarding/dismiss`, { method: 'POST' });
+    } catch (err) {
+        console.error('[Onboarding] Erreur fermeture:', err);
+    }
+};
+
+function _getStoredDashboardConfig() {
+    try {
+        const raw = localStorage.getItem('stellio-dashboard-config');
+        if (raw) return JSON.parse(raw);
+    } catch {}
+    return null;
+}
+
+async function applyDashboardConfig() {
+    let config = null;
+    try {
+        const res = await fetch(`${API}/api/settings`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.dashboard_config) config = data.dashboard_config;
+        }
+    } catch {}
+    if (!config) config = _getStoredDashboardConfig();
+    if (!config) config = { order: [...DASHBOARD_WIDGET_IDS], hidden: [] };
+
+    // Ajoute automatiquement les nouveaux widgets (ex: futures fonctionnalités) qui n'existaient pas
+    // encore dans une config déjà sauvegardée par l'utilisateur.
+    DASHBOARD_WIDGET_IDS.forEach(id => { if (!config.order.includes(id)) config.order.push(id); });
+
+    const grid = document.getElementById('dashboard-grid');
+    if (grid) {
+        config.order.forEach(id => {
+            const el = grid.querySelector(`[data-widget-id="${id}"]`);
+            if (el) grid.appendChild(el);
+        });
+        grid.querySelectorAll('.dashboard-widget').forEach(el => {
+            el.classList.toggle('dashboard-widget-hidden-flag', config.hidden.includes(el.dataset.widgetId));
+        });
+    }
+    _renderHiddenWidgetsPanel(config.hidden);
+    return config;
+}
+
+function _getCurrentDashboardOrder() {
+    return [...document.querySelectorAll('#dashboard-grid .dashboard-widget')].map(el => el.dataset.widgetId);
+}
+
+function _getCurrentDashboardHidden() {
+    return [...document.querySelectorAll('#dashboard-grid .dashboard-widget.dashboard-widget-hidden-flag')].map(el => el.dataset.widgetId);
+}
+
+async function _saveDashboardConfig() {
+    const config = { order: _getCurrentDashboardOrder(), hidden: _getCurrentDashboardHidden() };
+    try { localStorage.setItem('stellio-dashboard-config', JSON.stringify(config)); } catch {}
+    try {
+        await fetch(`${API}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dashboard_config: config }),
+        });
+    } catch (err) {
+        console.warn('[Dashboard] Échec sauvegarde config:', err);
+    }
+    _renderHiddenWidgetsPanel(config.hidden);
+}
+
+function _widgetLabel(id) {
+    const el = document.querySelector(`#dashboard-grid [data-widget-id="${id}"] h3`);
+    return el ? el.textContent.trim() : id;
+}
+
+function _renderHiddenWidgetsPanel(hiddenIds) {
+    const panel = document.getElementById('dashboard-hidden-widgets');
+    const list = document.getElementById('dashboard-hidden-widgets-list');
+    if (!panel || !list) return;
+    if (!_dashboardEditMode || !hiddenIds.length) {
+        panel.classList.add('hidden');
+        return;
+    }
+    panel.classList.remove('hidden');
+    list.innerHTML = hiddenIds.map(id => `
+        <div class="dashboard-hidden-widget-chip" onclick="showDashboardWidget('${id}')">
+            <i class="fa-solid fa-eye"></i> ${escapeHtml(_widgetLabel(id))}
+        </div>
+    `).join('');
+}
+
+window.hideDashboardWidget = function (id) {
+    document.querySelector(`#dashboard-grid [data-widget-id="${id}"]`)?.classList.add('dashboard-widget-hidden-flag');
+    _saveDashboardConfig();
+};
+
+window.showDashboardWidget = function (id) {
+    document.querySelector(`#dashboard-grid [data-widget-id="${id}"]`)?.classList.remove('dashboard-widget-hidden-flag');
+    _saveDashboardConfig();
+};
+
+window.toggleDashboardEditMode = function () {
+    _dashboardEditMode = !_dashboardEditMode;
+    const grid = document.getElementById('dashboard-grid');
+    const btn = document.getElementById('dashboard-customize-btn');
+    if (grid) grid.classList.toggle('edit-mode', _dashboardEditMode);
+    if (btn) {
+        btn.innerHTML = _dashboardEditMode
+            ? `<i class="fa-solid fa-check"></i> <span>${_t2('dashboard.customize_done', 'Terminé')}</span>`
+            : `<i class="fa-solid fa-sliders"></i> <span>${_t2('dashboard.customize', 'Personnaliser')}</span>`;
+    }
+    grid?.querySelectorAll('.dashboard-widget').forEach(w => w.setAttribute('draggable', _dashboardEditMode ? 'true' : 'false'));
+    if (_dashboardEditMode) {
+        _setupDashboardDragAndDrop();
+        _renderHiddenWidgetsPanel(_getCurrentDashboardHidden());
+    } else {
+        document.getElementById('dashboard-hidden-widgets')?.classList.add('hidden');
+    }
+};
+
+let _dashboardDropTarget = null;
+let _dashboardDropAfter = false;
+
+function _setupDashboardDragAndDrop() {
+    const grid = document.getElementById('dashboard-grid');
+    if (!grid || grid.dataset.dndBound === '1') return;
+    grid.dataset.dndBound = '1';
+
+    // Délégation d'événements sur la grille entière : un seul jeu d'écouteurs, posé une fois pour
+    // toutes, quel que soit le nombre de fois où le mode "Personnaliser" est ouvert/fermé.
+    grid.addEventListener('dragstart', (e) => {
+        const widget = e.target.closest('.dashboard-widget');
+        if (!widget || widget.getAttribute('draggable') !== 'true') return;
+        _draggedDashboardWidget = widget;
+        setTimeout(() => widget.classList.add('dragging'), 0);
+    });
+
+    grid.addEventListener('dragover', (e) => {
+        if (!_draggedDashboardWidget) return;
+        const widget = e.target.closest('.dashboard-widget');
+        if (!widget || widget === _draggedDashboardWidget) return;
+        e.preventDefault();
+        const rect = widget.getBoundingClientRect();
+        _dashboardDropTarget = widget;
+        _dashboardDropAfter = (e.clientX - rect.left) > rect.width / 2;
+        // Simple retour visuel pendant le survol — on NE déplace PAS le nœud en cours de glisser ici.
+        // Le reparenter à chaque dragover (qui se déclenche des dizaines de fois par seconde) pendant
+        // qu'un glisser HTML5 natif est actif est un anti-pattern connu : le navigateur peut alors
+        // mettre plusieurs secondes à relâcher proprement le glisser une fois la souris relâchée.
+        grid.querySelectorAll('.drop-target-before, .drop-target-after').forEach(w => w.classList.remove('drop-target-before', 'drop-target-after'));
+        widget.classList.add(_dashboardDropAfter ? 'drop-target-after' : 'drop-target-before');
+    });
+
+    grid.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (_draggedDashboardWidget && _dashboardDropTarget && _dashboardDropTarget !== _draggedDashboardWidget) {
+            grid.insertBefore(_draggedDashboardWidget, _dashboardDropAfter ? _dashboardDropTarget.nextSibling : _dashboardDropTarget);
+        }
+    });
+
+    grid.addEventListener('dragend', () => {
+        grid.querySelectorAll('.drop-target-before, .drop-target-after').forEach(w => w.classList.remove('drop-target-before', 'drop-target-after'));
+        _draggedDashboardWidget?.classList.remove('dragging');
+        _draggedDashboardWidget = null;
+        _dashboardDropTarget = null;
+        _saveDashboardConfig();
+    });
+}
+
+async function _loadDashboardSos() {
+    const body = document.getElementById('dashboard-sos-body');
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/api/sos-print/conversations`);
+        const data = await res.json();
+        const conv = (data.conversations || [])[0];
+        if (!conv) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-stethoscope"></i><p>${_t2('dashboard.no_sos', "Aucun diagnostic S.O.S Print pour l'instant")}</p></div>`;
+            return;
+        }
+        const d = new Date(conv.updated_at + 'Z');
+        const timeStr = d.toLocaleDateString(I18N.lang, { day: 'numeric', month: 'short' });
+        const causes = (conv.last_causes || []).slice(0, 2).join(', ');
+        const statusLabel = conv.status === 'resolved'
+            ? `<span style="color:var(--success,#22c55e);"><i class="fa-solid fa-circle-check"></i> ${_t2('dashboard.sos_resolved', 'Résolu')}</span>`
+            : `<span style="color:var(--accent);"><i class="fa-solid fa-circle-question"></i> ${_t2('dashboard.sos_open', 'En cours')}</span>`;
+        body.innerHTML = `
+            <div class="dashboard-row" onclick="document.querySelector('.nav-btn[data-page=&quot;printers&quot;]')?.click();" style="cursor:pointer;">
+                <div class="dashboard-row-icon"><i class="fa-solid fa-stethoscope"></i></div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title" title="${escapeHtml(conv.title)}">${escapeHtml(conv.title)}</div>
+                    <div class="dashboard-row-sub">${causes ? escapeHtml(causes) + ' — ' : ''}${timeStr}</div>
+                </div>
+                <div class="dashboard-row-meta">${statusLabel}</div>
+            </div>
+        `;
+    } catch (err) {
+        console.error('[Dashboard] Erreur S.O.S Print:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
+async function _loadDashboardFavorites() {
+    const body = document.getElementById('dashboard-favorites-body');
+    if (!body) return;
+    try {
+        let files = allFiles;
+        if (!files || !files.length) {
+            const res = await fetch(`${API}/api/files`);
+            const data = await res.json();
+            files = Array.isArray(data) ? data : [];
+        }
+        const favs = files.filter(f => favoriteFiles.has(f.path)).slice(0, 5);
+        if (!favs.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-star"></i><p>${_t2('dashboard.no_favorites', 'Aucun favori pour l\'instant')}</p></div>`;
+            return;
+        }
+        body.innerHTML = favs.map(f => `
+            <div class="dashboard-row" onclick="goToFileInLibrary('${escapeJs(f.name)}')" style="cursor:pointer;">
+                <div class="dashboard-row-thumb">${f.has_thumb ? `<img src="${API}/api/thumb?path=${encodeURIComponent(f.path)}" loading="lazy">` : '<i class="fa-solid fa-cube"></i>'}</div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>
+                    <div class="dashboard-row-sub">${formatSize(f.size)}</div>
+                </div>
+                <div class="dashboard-row-meta"><i class="fa-solid fa-star" style="color:#f5b301;"></i></div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('[Dashboard] Erreur favoris:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
+async function _loadDashboardProjects() {
+    const body = document.getElementById('dashboard-projects-body');
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/api/projects`);
+        const projects = await res.json();
+        const active = (Array.isArray(projects) ? projects : []).filter(p => p.status !== 'done' && p.status !== 'archived').slice(0, 5);
+        if (!active.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-diagram-project"></i><p>${_t2('projects.empty_title', 'Aucun projet pour l\'instant')}</p></div>`;
+            return;
+        }
+        body.innerHTML = active.map(p => `
+            <div class="dashboard-row" onclick="document.querySelector('.nav-btn[data-page=&quot;projects&quot;]')?.click();" style="cursor:pointer;">
+                <div class="dashboard-row-icon" style="background:${p.color || 'var(--accent)'}22;color:${p.color || 'var(--accent)'};"><i class="fa-solid fa-diagram-project"></i></div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>
+                    <div class="progress-track" style="margin-top:4px;"><div class="progress-bar" style="width:${p.progress || 0}%;"></div></div>
+                </div>
+                <div class="dashboard-row-meta">${p.progress || 0}%</div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('[Dashboard] Erreur projets:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
+async function _loadDashboardStats() {
+    const body = document.getElementById('dashboard-stats-body');
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/api/stats`);
+        const s = await res.json();
+        const tiles = [
+            { icon: 'fa-layer-group', value: s.total_files ?? 0, label: _t2('dashboard.stat_files', 'Fichiers') },
+            { icon: 'fa-print', value: s.total_prints ?? 0, label: _t2('dashboard.stat_prints', 'Impressions') },
+            { icon: 'fa-star', value: s.fav_count ?? 0, label: _t2('dashboard.stat_favorites', 'Favoris') },
+            { icon: 'fa-plus', value: s.new_this_month ?? 0, label: _t2('dashboard.stat_new_month', 'Ce mois-ci') },
+        ];
+        body.innerHTML = `<div class="dashboard-stats-tiles">${tiles.map(t => `
+            <div class="dashboard-stat-tile">
+                <i class="fa-solid ${t.icon}"></i>
+                <div class="dashboard-stat-value">${t.value}</div>
+                <div class="dashboard-stat-label">${t.label}</div>
+            </div>
+        `).join('')}</div>`;
+    } catch (err) {
+        console.error('[Dashboard] Erreur stats:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
+async function _loadDashboardMaintenance() {
+    const body = document.getElementById('dashboard-maintenance-body');
+    if (!body) return;
+    try {
+        let printers = printersList;
+        if (!printers || !printers.length) {
+            const res = await fetch(`${API}/api/printers`);
+            printers = await res.json();
+        }
+        const results = await Promise.all(printers.map(async p => {
+            try {
+                const res = await fetch(`${API}/api/printers/${p.id}/maintenance`);
+                const data = await res.json();
+                return (data.tasks || []).filter(t => t.due).map(t => ({ printer: p.name, task: t.name }));
+            } catch { return []; }
+        }));
+        const due = results.flat().slice(0, 6);
+        if (!due.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty dashboard-widget-empty--ok"><i class="fa-solid fa-circle-check"></i><p>${_t2('dashboard.maintenance_ok', 'Aucune maintenance à prévoir')}</p></div>`;
+            return;
+        }
+        body.innerHTML = due.map(d => `
+            <div class="dashboard-row" onclick="document.querySelector('.nav-btn[data-page=&quot;printers&quot;]')?.click();" style="cursor:pointer;">
+                <div class="dashboard-row-icon"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title">${escapeHtml(d.task)}</div>
+                    <div class="dashboard-row-sub">${escapeHtml(d.printer)}</div>
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('[Dashboard] Erreur maintenance:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
+async function _loadDashboardQueue() {
+    const body = document.getElementById('dashboard-queue-body');
+    if (!body) return;
+    try {
+        if (!printQueueData || !printQueuePaths) await loadPrintQueueSet();
+        const items = (printQueueData || []).slice(0, 5);
+        if (!items.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-list-ol"></i><p>${_t2('queue.empty_title', 'File d\'attente vide')}</p></div>`;
+            return;
+        }
+        body.innerHTML = items.map((item, idx) => {
+            const file = allFiles.find(f => f.path === item.path);
+            const name = file ? file.name : item.path.split(/[\\/]/).pop();
+            return `
+            <div class="dashboard-row" onclick="document.querySelector('.nav-btn[data-page=&quot;print-queue&quot;]')?.click();" style="cursor:pointer;">
+                <div class="dashboard-row-icon"><span style="font-size:11px; font-weight:700;">${idx + 1}</span></div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+                </div>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        console.error('[Dashboard] Erreur file d\'attente:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
+async function _loadDashboardDownloads() {
+    const body = document.getElementById('dashboard-downloads-body');
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/api/download-history`);
+        const data = await res.json();
+        const recent = (Array.isArray(data) ? data : []).slice(0, 5);
+        if (!recent.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-download"></i><p>${_t2('dashboard.no_downloads', 'Aucun téléchargement pour l\'instant')}</p></div>`;
+            return;
+        }
+        body.innerHTML = recent.map(d => {
+            const dt = new Date(d.downloaded_at + 'Z');
+            const timeStr = dt.toLocaleDateString(I18N.lang, { day: 'numeric', month: 'short' });
+            return `
+            <div class="dashboard-row">
+                <div class="dashboard-row-icon"><i class="fa-solid fa-download"></i></div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title" title="${escapeHtml(d.file_name)}">${escapeHtml(d.file_name)}</div>
+                    <div class="dashboard-row-sub">${escapeHtml(d.platform || '')} — ${timeStr}</div>
+                </div>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        console.error('[Dashboard] Erreur téléchargements:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
+let _dashboardUpdateChecked = false;
+async function _loadDashboardInstances() {
+    const body = document.getElementById('dashboard-instances-body');
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/api/remote-instances/status`);
+        if (!res.ok) throw new Error('http');
+        const data = await res.json();
+        const list = data.instances || [];
+        if (!list.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-network-wired"></i><p>${escapeHtml(_t2('dashboard.instances_none', 'Aucune instance configurée'))}</p></div>`;
+            return;
+        }
+        body.innerHTML = list.map(inst => {
+            const ok = !!inst.online;
+            const color = ok ? '#4ade80' : '#f87171';
+            const label = ok ? _t2('dashboard.instance_online', 'Disponible') : _t2('dashboard.instance_offline', 'Indisponible');
+            return `
+            <div class="dashboard-row" onclick="document.querySelector('.nav-btn[data-page=&quot;settings&quot;]')?.click();" style="cursor:pointer;" title="${escapeHtml(label)}">
+                <div class="dashboard-row-icon" style="background:${color}22;color:${color};"><i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i></div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title">${escapeHtml(inst.name)}</div>
+                    <div class="dashboard-row-sub">${escapeHtml(inst.url)} · ${escapeHtml(label)}</div>
+                </div>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        console.error('[Dashboard] Erreur instances:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+window._loadDashboardInstances = _loadDashboardInstances;
+
+// Rafraîchit la disponibilité des instances toutes les 30 s tant que le widget est visible
+setInterval(() => {
+    const body = document.getElementById('dashboard-instances-body');
+    if (body && body.offsetParent !== null && !document.hidden) _loadDashboardInstances();
+}, 30000);
+
+async function _loadDashboardUpdate() {
+    const body = document.getElementById('dashboard-update-body');
+    if (!body) return;
+    try {
+        // Ne vérifie qu'une fois par session pour éviter de solliciter l'API GitHub à chaque visite du tableau de bord.
+        if (_dashboardUpdateChecked && window._dashboardUpdateCache) {
+            _renderDashboardUpdate(body, window._dashboardUpdateCache);
+            return;
+        }
+        const res = await fetch(`${API}/api/update/check`);
+        const data = await res.json();
+        _dashboardUpdateChecked = true;
+        window._dashboardUpdateCache = data;
+        _renderDashboardUpdate(body, data);
+    } catch (err) {
+        console.error('[Dashboard] Erreur mise à jour:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
+function _renderDashboardUpdate(body, data) {
+    if (!data.update_available) {
+        body.innerHTML = `<div class="dashboard-widget-empty dashboard-widget-empty--ok"><i class="fa-solid fa-circle-check"></i><p>${_t2('dashboard.up_to_date', 'Stellio est à jour')} (v${data.current_version})</p></div>`;
+        return;
+    }
+    body.innerHTML = `
+        <div class="dashboard-row" onclick="document.querySelector('.nav-btn[data-page=&quot;settings&quot;]')?.click();" style="cursor:pointer;">
+            <div class="dashboard-row-icon" style="background:var(--accent)22;color:var(--accent);"><i class="fa-solid fa-arrow-up-right-dots"></i></div>
+            <div class="dashboard-row-body">
+                <div class="dashboard-row-title">${_t2('dashboard.update_available', 'Mise à jour disponible')} — v${escapeHtml(data.version)}</div>
+                <div class="dashboard-row-sub">${_t2('dashboard.update_current', 'Version actuelle')} : v${escapeHtml(data.current_version)}</div>
+            </div>
+        </div>
+    `;
+}
+
+async function _loadDashboardSuggestions() {
+    const body = document.getElementById('dashboard-suggestions-body');
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/api/suggestions`);
+        const data = await res.json();
+        const suggestions = data.suggestions || [];
+        if (!suggestions.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-lightbulb"></i><p>${_t2('dashboard.no_suggestions', "Rien à signaler pour l'instant")}</p></div>`;
+            return;
+        }
+        body.innerHTML = suggestions.map(s => {
+            if (s.type === 'reprint') {
+                return `
+                <div class="dashboard-row" onclick="goToFileInLibrary('${escapeJs(s.file_name)}')" style="cursor:pointer;">
+                    <div class="dashboard-row-icon"><i class="fa-solid fa-arrows-rotate"></i></div>
+                    <div class="dashboard-row-body">
+                        <div class="dashboard-row-title" title="${escapeHtml(s.file_name)}">${escapeHtml(s.file_name)}</div>
+                        <div class="dashboard-row-sub">${_t2('dashboard.suggestion_reprint', 'Imprimé {{count}} fois, pas revu depuis un moment — le réimprimer ?', { count: s.count })}</div>
+                    </div>
+                </div>`;
+            }
+            if (s.type === 'profile_failures') {
+                return `
+                <div class="dashboard-row" onclick="document.querySelector('.nav-btn[data-page=&quot;printers&quot;]')?.click();" style="cursor:pointer;">
+                    <div class="dashboard-row-icon" style="color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <div class="dashboard-row-body">
+                        <div class="dashboard-row-title" title="${escapeHtml(s.profile_name)}">${escapeHtml(s.profile_name)}</div>
+                        <div class="dashboard-row-sub">${_t2('dashboard.suggestion_profile_failures', '{{failures}} échec(s) sur {{total}} envois — profil à revoir ?', { failures: s.failures, total: s.total })}</div>
+                    </div>
+                </div>`;
+            }
+            return '';
+        }).join('');
+    } catch (err) {
+        console.error('[Dashboard] Erreur suggestions:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
+
+function goToFileInLibrary(fileName) {
+    document.querySelector('.nav-btn[data-page="library"]')?.click();
+    setTimeout(() => {
+        if (globalSearchInput) {
+            globalSearchInput.value = fileName;
+            handleSearchInput(fileName, globalSearchInput);
+        }
+    }, 50);
+}
+window.goToFileInLibrary = goToFileInLibrary;
+
+// --- Centre de notifications ---
+let _notifPollInterval = null;
+let _notifPanelOpen = false;
+
+async function loadNotifications() {
+    try {
+        const res = await fetch(`${API}/api/notifications?limit=30`);
+        const data = await res.json();
+        _updateNotifBadge(data.unread_count || 0);
+        maybeFireBrowserNotifications(data.notifications || []);
+        if (_notifPanelOpen) _renderNotifList(data.notifications || []);
+        return data;
+    } catch (err) {
+        console.error('[Notifications] Erreur chargement:', err);
+        return { notifications: [], unread_count: 0 };
+    }
+}
+window.loadNotifications = loadNotifications;
+
+function _updateNotifBadge(count) {
+    const badge = document.getElementById('notif-bell-badge');
+    if (!badge) return;
+    badge.textContent = count > 99 ? '99+' : count;
+    badge.style.display = count > 0 ? '' : 'none';
+}
+
+function _renderNotifList(notifications) {
+    const listEl = document.getElementById('notif-panel-list');
+    if (!listEl) return;
+    if (!notifications.length) {
+        listEl.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-bell-slash"></i><p>${_t2('notif.empty', 'Aucune notification')}</p></div>`;
+        return;
+    }
+    const icons = {
+        maintenance: 'fa-screwdriver-wrench',
+        print_finished: 'fa-check-circle',
+        print_failed: 'fa-triangle-exclamation',
+        low_stock: 'fa-circle-exclamation',
+        update: 'fa-arrow-up-right-dots',
+        info: 'fa-bell',
+    };
+    listEl.innerHTML = notifications.map(n => {
+        const d = new Date(n.created_at + 'Z');
+        const timeStr = _formatRelativeTime(d);
+        return `
+        <div class="notif-item ${n.is_read ? '' : 'unread'}" data-id="${n.id}" onclick="handleNotificationClick(${n.id}, ${n.link_page ? `'${escapeJs(n.link_page)}'` : 'null'})">
+            <div class="notif-item-icon"><i class="fa-solid ${icons[n.type] || icons.info}"></i></div>
+            <div class="notif-item-body">
+                <div class="notif-item-title">${escapeHtml(n.title)}</div>
+                ${n.message ? `<div class="notif-item-message">${escapeHtml(n.message)}</div>` : ''}
+                <div class="notif-item-time">${timeStr}</div>
+            </div>
+            <button type="button" class="notif-item-close" onclick="event.stopPropagation(); deleteNotificationItem(${n.id})"><i class="fa-solid fa-xmark"></i></button>
+        </div>`;
+    }).join('');
+}
+
+function _formatRelativeTime(date) {
+    const diffSec = Math.max(0, (Date.now() - date.getTime()) / 1000);
+    if (diffSec < 60) return _t2('notif.time_now', "à l'instant");
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)} ${_t2('notif.time_min', 'min')}`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} ${_t2('notif.time_hour', 'h')}`;
+    return date.toLocaleDateString(I18N.lang, { day: 'numeric', month: 'short' });
+}
+
+window.toggleNotificationPanel = async function () {
+    const panel = document.getElementById('notif-panel');
+    if (!panel) return;
+    _notifPanelOpen = panel.classList.contains('hidden');
+    if (_notifPanelOpen) {
+        panel.classList.remove('hidden');
+        const data = await loadNotifications();
+        _renderNotifList(data.notifications || []);
+    } else {
+        panel.classList.add('hidden');
+    }
+};
+
+document.addEventListener('click', (e) => {
+    const panel = document.getElementById('notif-panel');
+    const bellBtn = document.getElementById('notif-bell-btn');
+    if (!panel || panel.classList.contains('hidden')) return;
+    if (!panel.contains(e.target) && !bellBtn?.contains(e.target)) {
+        panel.classList.add('hidden');
+        _notifPanelOpen = false;
+    }
+});
+
+window.handleNotificationClick = async function (id, linkPage) {
+    try {
+        await fetch(`${API}/api/notifications/${id}/read`, { method: 'POST' });
+    } catch {}
+    document.querySelector(`.notif-item[data-id="${id}"]`)?.classList.remove('unread');
+    loadNotifications();
+    if (linkPage) {
+        document.getElementById('notif-panel')?.classList.add('hidden');
+        _notifPanelOpen = false;
+        document.querySelector(`.nav-btn[data-page="${linkPage}"]`)?.click();
+    }
+};
+
+window.markAllNotificationsRead = async function () {
+    try {
+        await fetch(`${API}/api/notifications/read-all`, { method: 'POST' });
+        const data = await loadNotifications();
+        _renderNotifList(data.notifications || []);
+    } catch (err) {
+        console.error('[Notifications] Erreur marquage global:', err);
+    }
+};
+
+window.deleteNotificationItem = async function (id) {
+    try {
+        await fetch(`${API}/api/notifications/${id}`, { method: 'DELETE' });
+        const data = await loadNotifications();
+        _renderNotifList(data.notifications || []);
+    } catch (err) {
+        console.error('[Notifications] Erreur suppression:', err);
+    }
+};
+
+async function createNotification(type, title, message, linkPage, dedupKey) {
+    if (IS_VIEWER) return;
+    try {
+        await fetch(`${API}/api/notifications`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type, title, message, link_page: linkPage, dedup_key: dedupKey }),
+        });
+        loadNotifications();
+    } catch (err) {
+        console.error('[Notifications] Erreur création:', err);
+    }
+}
+window.createNotification = createNotification;
+
+function startNotificationPolling() {
+    loadNotifications();
+    if (_notifPollInterval) clearInterval(_notifPollInterval);
+    _notifPollInterval = setInterval(loadNotifications, 60000);
+}
+window.startNotificationPolling = startNotificationPolling;
+
+// --- Présence légère (mode collaboratif) ---
+function _getPresenceClientId() {
+    let id = localStorage.getItem('stellio-client-id');
+    if (!id) {
+        id = (crypto.randomUUID ? crypto.randomUUID() : `c${Date.now()}${Math.random().toString(36).slice(2)}`);
+        localStorage.setItem('stellio-client-id', id);
+    }
+    return id;
+}
+
+let _presenceOthers = [];
+let _presenceInterval = null;
+window._presenceViewingFile = null; // { path, name } quand le viewer 3D est ouvert
+
+function _currentPageName() {
+    return document.querySelector('.page.active')?.id?.replace('page-', '') || '';
+}
+
+async function _sendPresenceHeartbeat() {
+    try {
+        await fetch(`${API}/api/presence/heartbeat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                client_id: _getPresenceClientId(),
+                page: _currentPageName(),
+                file_path: window._presenceViewingFile?.path || null,
+                file_name: window._presenceViewingFile?.name || null,
+            }),
+        });
+        const res = await fetch(`${API}/api/presence/active?client_id=${encodeURIComponent(_getPresenceClientId())}`);
+        const data = await res.json();
+        _presenceOthers = data.others || [];
+        _renderPresenceIndicator();
+    } catch (err) {
+        console.debug('[Presence] Erreur:', err);
+    }
+}
+
+function _renderPresenceIndicator() {
+    const badge = document.getElementById('presence-indicator');
+    if (!badge) return;
+    const n = _presenceOthers.length;
+    badge.classList.toggle('hidden', n === 0);
+    document.getElementById('presence-count').textContent = n;
+    if (n > 0) {
+        badge.title = _presenceOthers.map(o => {
+            const where = o.file_name
+                ? `${_t2('presence.viewing', 'consulte')} ${o.file_name}`
+                : `${_t2('presence.on_page', 'sur la page')} ${o.page || '?'}`;
+            return `• ${where}`;
+        }).join('\n');
+    }
+}
+
+function startPresence() {
+    _sendPresenceHeartbeat();
+    if (_presenceInterval) clearInterval(_presenceInterval);
+    _presenceInterval = setInterval(_sendPresenceHeartbeat, 10000);
+}
+window.startPresence = startPresence;
+
+/** Vrai si un autre appareil est en train de consulter ce fichier (pour le badge sur la carte). */
+function isFileViewedByOther(filePath) {
+    return _presenceOthers.some(o => o.file_path && o.file_path === filePath);
+}
+window.isFileViewedByOther = isFileViewedByOther;
+
+// --- Notifications navigateur (Web Notifications API) ---
+// Complète les notifications OS natives de Windows (plyer, côté serveur) pour tout accès par
+// navigateur : Raspberry Pi/Linux headless, ou simplement un onglet ouvert en arrière-plan.
+const BROWSER_NOTIF_LAST_ID_KEY = 'stellio_last_notif_id_seen';
+
+function updateBrowserNotifStatus() {
+    const statusEl = document.getElementById('browser-notif-status');
+    const btnEl = document.getElementById('enable-browser-notif-btn');
+    if (!statusEl || !('Notification' in window)) {
+        if (statusEl) statusEl.textContent = _t2('settings.browser_notif_unsupported', "Votre navigateur ne supporte pas les notifications.");
+        if (btnEl) btnEl.disabled = true;
+        return;
+    }
+    if (Notification.permission === 'granted') {
+        statusEl.textContent = _t2('settings.browser_notif_enabled', 'Notifications activées.');
+        if (btnEl) { btnEl.disabled = true; btnEl.innerHTML = `<i class="fa-solid fa-check"></i> ${_t2('settings.browser_notif_enabled_btn', 'Activées')}`; }
+    } else if (Notification.permission === 'denied') {
+        statusEl.textContent = _t2('settings.browser_notif_denied', "Bloquées au niveau du navigateur — vérifiez les réglages du site.");
+    } else {
+        statusEl.textContent = '';
+    }
+}
+
+window.requestBrowserNotifPermission = async function () {
+    if (!('Notification' in window)) return;
+    try {
+        await Notification.requestPermission();
+    } catch {}
+    updateBrowserNotifStatus();
+};
+
+function maybeFireBrowserNotifications(notifications) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (!notifications.length) return;
+    let lastSeenId = parseInt(localStorage.getItem(BROWSER_NOTIF_LAST_ID_KEY) || '0', 10);
+    const newest = Math.max(...notifications.map(n => n.id));
+    const freshOnes = notifications.filter(n => n.id > lastSeenId);
+    // Ne notifie que si on avait déjà une référence (évite une salve de notifs au tout premier chargement)
+    if (lastSeenId > 0) {
+        freshOnes.slice(0, 5).forEach(n => {
+            try {
+                const notif = new Notification(n.title, { body: n.message || '', tag: `stellio-notif-${n.id}` });
+                notif.onclick = () => { window.focus(); if (n.link_page) document.querySelector(`.nav-btn[data-page="${n.link_page}"]`)?.click(); };
+            } catch (err) { console.debug('[BrowserNotif] Erreur affichage:', err); }
+        });
+    }
+    if (newest > lastSeenId) localStorage.setItem(BROWSER_NOTIF_LAST_ID_KEY, String(newest));
+}
+
+// --- Visite guidée ---
+const TOUR_DONE_KEY = 'stellio_tour_done_v1';
+
+function getTourSteps() {
+    return [
+        {
+            page: 'dashboard', selector: '.nav-btn[data-page="dashboard"]',
+            title: _t2('tour.step1_title', 'Bienvenue sur votre tableau de bord'),
+            desc: _t2('tour.step1_desc', "Impressions en cours, stock filament, dernières impressions et fichiers récents en un coup d'œil. Astuce : Ctrl+K ouvre la palette de commandes n'importe où dans l'app."),
+        },
+        {
+            page: 'dashboard', selector: '#dashboard-customize-btn',
+            title: _t2('tour.step_customize_title', 'Personnalisez votre tableau de bord'),
+            desc: _t2('tour.step_customize_desc', 'Glissez-déposez pour réordonner les widgets, ou masquez ceux qui ne vous servent pas — 12 widgets sont disponibles.'),
+        },
+        {
+            page: 'dashboard', selector: '#mini-printer-widget', optional: true,
+            title: _t2('tour.step_widget_title', 'Suivi en direct'),
+            desc: _t2('tour.step_widget_desc', "Pendant une impression, cette bulle reste visible sur toutes les pages avec la progression en temps réel."),
+        },
+        {
+            page: 'library', selector: '#library-search-wrap',
+            title: _t2('tour.step2_title', 'Recherche intelligente'),
+            desc: _t2('tour.step2_desc', "Cherchez par nom ou en langage naturel grâce à l'IA locale (\"un support pour...\") ; vos recherches récentes sont mémorisées."),
+        },
+        {
+            page: 'library', selector: '.nav-btn[data-page="print-queue"]',
+            title: _t2('tour.step3_title', 'À imprimer bientôt'),
+            desc: _t2('tour.step3_desc', 'Une file d\'attente distincte de vos favoris — glissez pour réordonner, envoyez directement au slicer.'),
+        },
+        {
+            page: 'library', selector: '.nav-btn[data-page="printers"]',
+            title: _t2('tour.step4_title', 'Imprimantes & S.O.S Print'),
+            desc: _t2('tour.step4_desc', 'Détection automatique sur le réseau, suivi en temps réel, et en cas de raté : le diagnostic S.O.S Print vous guide question par question.'),
+        },
+        {
+            page: 'library', selector: '.nav-btn[data-page="spoolman"]',
+            title: _t2('tour.step5_title', 'Filament centralisé'),
+            desc: _t2('tour.step5_desc', 'Spoolman, AMS Bambu, CFS Creality, bobines manuelles et inventaire TigerTag réunis au même endroit.'),
+        },
+        {
+            page: 'library', selector: '.nav-btn[data-page="projects"]',
+            title: _t2('tour.step_projects_title', 'Projets & assemblages'),
+            desc: _t2('tour.step_projects_desc', "Regroupez plusieurs fichiers qui composent un même objet et suivez leur progression d'impression."),
+        },
+        {
+            page: 'library', selector: '#notif-bell-btn',
+            title: _t2('tour.step6_title', 'Centre de notifications'),
+            desc: _t2('tour.step6_desc', "Fin d'impression, maintenance à prévoir, stock bas : tout arrive ici, avec la possibilité d'activer les notifications du navigateur."),
+        },
+        {
+            page: 'library', selector: '.nav-btn[data-page="settings"]',
+            title: _t2('tour.step7_title', 'Paramètres'),
+            desc: _t2('tour.step7_desc', "Thèmes, langues, accès mobile & app compagnon Android, undo (Ctrl+Z) : tout se configure ici. Vous pouvez relancer cette visite quand vous voulez."),
+        },
+    ];
+}
+
+let _tourIndex = 0;
+
+window.startTour = function () {
+    _tourIndex = 0;
+    document.getElementById('tour-overlay')?.classList.remove('hidden');
+    _showTourStepAt(0);
+};
+
+function _showTourStepAt(idx) {
+    const steps = getTourSteps();
+    if (idx < 0) { _tourIndex = 0; return; }
+    if (idx >= steps.length) { endTour(); return; }
+    _tourIndex = idx;
+    const step = steps[idx];
+
+    const currentActivePage = document.querySelector('.page.active')?.id;
+    const needsPageSwitch = step.page && currentActivePage !== `page-${step.page}`;
+    if (needsPageSwitch) {
+        document.querySelector(`.nav-btn[data-page="${step.page}"]`)?.click();
+    }
+
+    setTimeout(() => _positionTourStep(step, idx, steps.length), needsPageSwitch ? 220 : 30);
+}
+
+function _isTourTargetVisible(el) {
+    if (!el || !el.offsetParent) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+}
+
+function _positionTourStep(step, idx, total) {
+    const target = document.querySelector(step.selector);
+    const spotlight = document.getElementById('tour-spotlight');
+    const tooltip = document.getElementById('tour-tooltip');
+    if (!target || !spotlight || !tooltip || !_isTourTargetVisible(target)) {
+        // Cible introuvable ou invisible (élément optionnel non affiché, masqué sur cette taille d'écran,
+        // etc.) : on passe silencieusement à l'étape suivante plutôt que de bloquer la visite.
+        _showTourStepAt(idx + 1);
+        return;
+    }
+    target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+
+    const rect = target.getBoundingClientRect();
+    const pad = 6;
+    spotlight.style.top = `${rect.top - pad}px`;
+    spotlight.style.left = `${rect.left - pad}px`;
+    spotlight.style.width = `${rect.width + pad * 2}px`;
+    spotlight.style.height = `${rect.height + pad * 2}px`;
+
+    document.getElementById('tour-step-counter').textContent = `${idx + 1} / ${total}`;
+    document.getElementById('tour-title').textContent = step.title;
+    document.getElementById('tour-desc').textContent = step.desc;
+    document.getElementById('tour-prev-btn').style.visibility = idx === 0 ? 'hidden' : 'visible';
+    document.getElementById('tour-next-btn').innerHTML = idx === total - 1
+        ? `<span>${_t2('tour.finish', 'Terminer')}</span>`
+        : `<span>${_t2('tour.next', 'Suivant')}</span>`;
+
+    // Positionne le tooltip sous la cible si la place le permet, sinon au-dessus.
+    const tooltipHeight = tooltip.offsetHeight || 160;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    let top = spaceBelow > tooltipHeight + 20 ? rect.bottom + 14 : rect.top - tooltipHeight - 14;
+    top = Math.max(12, Math.min(top, window.innerHeight - tooltipHeight - 12));
+    let left = rect.left;
+    left = Math.max(12, Math.min(left, window.innerWidth - tooltip.offsetWidth - 12));
+    tooltip.style.top = `${top}px`;
+    tooltip.style.left = `${left}px`;
+}
+
+window.nextTourStep = function () {
+    _showTourStepAt(_tourIndex + 1);
+};
+
+window.prevTourStep = function () {
+    _showTourStepAt(_tourIndex - 1);
+};
+
+window.skipTour = function () {
+    endTour();
+};
+
+function endTour() {
+    document.getElementById('tour-overlay')?.classList.add('hidden');
+    localStorage.setItem(TOUR_DONE_KEY, '1');
+}
+
+function maybeAutoStartTour() {
+    if (!localStorage.getItem(TOUR_DONE_KEY)) {
+        setTimeout(() => startTour(), 1200);
+    }
+}
+
+// --- Palette de commandes (Ctrl+K) ---
+let _cmdPaletteSelectedIdx = 0;
+let _cmdPaletteResults = [];
+
+function _staticCommands() {
+    const cmds = [
+        { icon: 'fa-plus', label: _t2('cmdpalette.add_source', 'Ajouter une source'), action: () => openModal('modal-select-type') },
+        { icon: 'fa-square-check', label: _t2('cmdpalette.select_files', 'Sélectionner plusieurs fichiers'), action: () => document.getElementById('select-all-btn')?.click() },
+        { icon: 'fa-map-signs', label: _t2('tour.settings_restart', 'Relancer la visite guidée'), action: () => startTour() },
+        { icon: 'fa-bell', label: _t2('settings.browser_notif_enable', 'Activer les notifications'), action: () => requestBrowserNotifPermission() },
+        { icon: 'fa-download', label: _t2('cmdpalette.backup', 'Exporter une sauvegarde'), action: () => document.querySelector('.nav-btn[data-page="settings"]')?.click() },
+        { icon: 'fa-arrows-rotate', label: _t2('actions.refresh', 'Actualiser'), action: () => document.getElementById('refresh-files')?.click() },
+    ];
+    return cmds.map(c => ({ ...c, type: 'action' }));
+}
+
+function _navCommands() {
+    const seen = new Set();
+    return [...document.querySelectorAll('.nav-btn[data-page]')].filter(btn => {
+        const page = btn.dataset.page;
+        if (seen.has(page) || getComputedStyle(btn).display === 'none') return false;
+        seen.add(page);
+        return true;
+    }).map(btn => ({
+        type: 'nav',
+        icon: (btn.querySelector('i')?.className.match(/fa-[\w-]+/g) || []).slice(-1)[0] || 'fa-arrow-right',
+        label: btn.querySelector('span')?.textContent?.trim() || btn.dataset.page,
+        action: () => btn.click(),
+    }));
+}
+
+function _fileCommands(query) {
+    if (!query || query.length < 2 || !allFiles?.length) return [];
+    const q = query.toLowerCase();
+    return allFiles
+        .filter(f => f.name.toLowerCase().includes(q))
+        .sort((a, b) => a.name.toLowerCase().indexOf(q) - b.name.toLowerCase().indexOf(q))
+        .slice(0, 5)
+        .map(f => ({
+            type: 'file',
+            icon: 'fa-cube',
+            label: f.name,
+            action: () => goToFileInLibrary(f.name),
+        }));
+}
+
+function _tagCommands(query) {
+    if (!query || query.length < 2 || !allTags?.length) return [];
+    const q = query.toLowerCase();
+    return allTags
+        .filter(t => t.name.toLowerCase().includes(q))
+        .slice(0, 4)
+        .map(t => ({
+            type: 'tag',
+            icon: 'fa-tag',
+            label: `${_t2('cmdpalette.tag_prefix', 'Tag')} : ${t.name}`,
+            action: () => {
+                document.querySelector('.nav-btn[data-page="library"]')?.click();
+                activeTagFilters = new Set([t.id]);
+                applyFilters();
+            },
+        }));
+}
+
+let _cmdPaletteSpoolsCache = null;
+let _cmdPaletteProfilesCache = null;
+
+function _filamentCommands(query) {
+    if (!query || query.length < 2 || !_cmdPaletteSpoolsCache?.length) return [];
+    const q = query.toLowerCase();
+    return _cmdPaletteSpoolsCache
+        .filter(s => (s.name || '').toLowerCase().includes(q) || (s.material || '').toLowerCase().includes(q))
+        .slice(0, 4)
+        .map(s => ({
+            type: 'spool',
+            icon: 'fa-circle',
+            label: `${s.name}${s.material ? ' — ' + s.material : ''}`,
+            action: () => document.querySelector('.nav-btn[data-page="spoolman"]')?.click(),
+        }));
+}
+
+function _slicerProfileCommands(query) {
+    if (!query || query.length < 2 || !_cmdPaletteProfilesCache?.length) return [];
+    const q = query.toLowerCase();
+    return _cmdPaletteProfilesCache
+        .filter(p => (p.name || '').toLowerCase().includes(q))
+        .slice(0, 4)
+        .map(p => ({
+            type: 'profile',
+            icon: 'fa-sliders',
+            label: `${_t2('cmdpalette.profile_prefix', 'Profil')} : ${p.name}`,
+            action: () => document.querySelector('.nav-btn[data-page="settings"]')?.click(),
+        }));
+}
+
+function _loadCommandPaletteCaches() {
+    if (_cmdPaletteSpoolsCache === null) {
+        fetch(`${API}/api/filament/spools`).then(r => r.json()).then(data => {
+            _cmdPaletteSpoolsCache = data.slots || [];
+            if (!document.getElementById('command-palette')?.classList.contains('hidden')) _rebuildCommandResults();
+        }).catch(() => { _cmdPaletteSpoolsCache = []; });
+    }
+    if (_cmdPaletteProfilesCache === null) {
+        fetch(`${API}/api/slicer-profiles`).then(r => r.json()).then(data => {
+            _cmdPaletteProfilesCache = Array.isArray(data) ? data : (data.profiles || []);
+            if (!document.getElementById('command-palette')?.classList.contains('hidden')) _rebuildCommandResults();
+        }).catch(() => { _cmdPaletteProfilesCache = []; });
+    }
+}
+
+function _filterAndScore(commands, query) {
+    if (!query) return commands;
+    const q = query.toLowerCase();
+    return commands
+        .filter(c => c.label.toLowerCase().includes(q))
+        .sort((a, b) => a.label.toLowerCase().indexOf(q) - b.label.toLowerCase().indexOf(q));
+}
+
+function _rebuildCommandResults() {
+    const query = document.getElementById('cmd-palette-input')?.value.trim() || '';
+    const navResults = _filterAndScore(_navCommands(), query).slice(0, 6);
+    const actionResults = _filterAndScore(_staticCommands(), query).slice(0, 6);
+    const fileResults = _fileCommands(query);
+    const tagResults = _tagCommands(query);
+    const spoolResults = _filamentCommands(query);
+    const profileResults = _slicerProfileCommands(query);
+
+    _cmdPaletteResults = [...navResults, ...actionResults, ...fileResults, ...tagResults, ...spoolResults, ...profileResults];
+    _cmdPaletteSelectedIdx = 0;
+
+    const container = document.getElementById('cmd-palette-results');
+    if (!container) return;
+    if (!_cmdPaletteResults.length) {
+        container.innerHTML = `<div class="cmd-palette-empty">${_t2('cmdpalette.no_results', 'Aucun résultat')}</div>`;
+        return;
+    }
+
+    let html = '';
+    let globalIdx = 0;
+    const renderGroup = (label, items) => {
+        if (!items.length) return '';
+        let h = `<div class="cmd-palette-section-label">${label}</div>`;
+        items.forEach(item => {
+            h += `<div class="cmd-palette-item ${globalIdx === 0 ? 'selected' : ''}" data-idx="${globalIdx}"><i class="fa-solid ${item.icon}"></i><span>${escapeHtml(item.label)}</span></div>`;
+            globalIdx++;
+        });
+        return h;
+    };
+    html += renderGroup(_t2('cmdpalette.section_pages', 'Pages'), navResults);
+    html += renderGroup(_t2('cmdpalette.section_actions', 'Actions'), actionResults);
+    html += renderGroup(_t2('cmdpalette.section_files', 'Fichiers'), fileResults);
+    html += renderGroup(_t2('cmdpalette.section_tags', 'Tags'), tagResults);
+    html += renderGroup(_t2('cmdpalette.section_filament', 'Filament'), spoolResults);
+    html += renderGroup(_t2('cmdpalette.section_profiles', 'Profils slicer'), profileResults);
+    container.innerHTML = html;
+
+    container.querySelectorAll('.cmd-palette-item').forEach(el => {
+        el.addEventListener('click', () => _executeCommand(parseInt(el.dataset.idx, 10)));
+        el.addEventListener('mouseenter', () => {
+            _cmdPaletteSelectedIdx = parseInt(el.dataset.idx, 10);
+            _highlightSelectedCommand();
+        });
+    });
+}
+
+function _highlightSelectedCommand() {
+    document.querySelectorAll('.cmd-palette-item').forEach(el => {
+        el.classList.toggle('selected', parseInt(el.dataset.idx, 10) === _cmdPaletteSelectedIdx);
+    });
+    document.querySelector(`.cmd-palette-item[data-idx="${_cmdPaletteSelectedIdx}"]`)?.scrollIntoView({ block: 'nearest' });
+}
+
+function _executeCommand(idx) {
+    const cmd = _cmdPaletteResults[idx];
+    if (!cmd) return;
+    closeCommandPalette();
+    setTimeout(() => cmd.action(), 30);
+}
+
+window.openCommandPalette = function () {
+    const overlay = document.getElementById('command-palette');
+    if (!overlay) return;
+    overlay.classList.remove('hidden');
+    const input = document.getElementById('cmd-palette-input');
+    if (input) { input.value = ''; input.focus(); }
+    _loadCommandPaletteCaches();
+    _rebuildCommandResults();
+};
+
+window.closeCommandPalette = function () {
+    document.getElementById('command-palette')?.classList.add('hidden');
+};
+
+document.getElementById('cmd-palette-input')?.addEventListener('input', () => _rebuildCommandResults());
+document.getElementById('cmd-palette-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        _cmdPaletteSelectedIdx = Math.min(_cmdPaletteSelectedIdx + 1, _cmdPaletteResults.length - 1);
+        _highlightSelectedCommand();
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        _cmdPaletteSelectedIdx = Math.max(_cmdPaletteSelectedIdx - 1, 0);
+        _highlightSelectedCommand();
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        _executeCommand(_cmdPaletteSelectedIdx);
+    } else if (e.key === 'Escape') {
+        closeCommandPalette();
+    }
+});
+
+
+async function _loadDashboardPrinters() {
+    const body = document.getElementById('dashboard-printers-body');
+    if (!body) return;
+    try {
+        let printers = printersList;
+        if (!printers || !printers.length) {
+            const res = await fetch(`${API}/api/printers`);
+            printers = await res.json();
+        }
+        if (!printers.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-print"></i><p>${I18N.t('printers.none')}</p></div>`;
+            return;
+        }
+        const statuses = await Promise.all(printers.slice(0, 8).map(async p => {
+            try {
+                const res = await fetch(`${API}/api/printers/${p.id}/status`);
+                const data = await res.json();
+                return { printer: p, status: data };
+            } catch {
+                return { printer: p, status: null };
+            }
+        }));
+        const active = statuses.filter(s => s.status && ['printing', 'paused'].includes(s.status.status));
+        if (!active.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-mug-hot"></i><p>${_t2('dashboard.no_active_prints', 'Aucune impression en cours')}</p></div>`;
+            return;
+        }
+        body.innerHTML = active.map(({ printer, status }) => `
+            <div class="dashboard-row" onclick="openPrinterMonitor(${printer.id})" style="cursor:pointer;">
+                <div class="dashboard-row-icon"><i class="mdi ${getPrinterIcon(printer.type)}"></i></div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title">${escapeHtml(printer.name)}</div>
+                    <div class="progress-track" style="margin-top:4px;"><div class="progress-bar" style="width:${status.progress || 0}%;"></div></div>
+                </div>
+                <div class="dashboard-row-meta">${Math.round(status.progress || 0)}% ${status.status === 'paused' ? '⏸️' : ''}</div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('[Dashboard] Erreur imprimantes:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
+async function _loadDashboardHistory() {
+    const body = document.getElementById('dashboard-history-body');
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/api/print-history?limit=5&offset=0`);
+        const data = await res.json();
+        if (!res.ok || !data.history?.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-clock-rotate-left"></i><p>${_t2('dashboard.no_history', 'Rien envoyé au slicer pour l\'instant')}</p></div>`;
+            return;
+        }
+        body.innerHTML = data.history.map(entry => {
+            const d = new Date(entry.sent_at);
+            const timeStr = d.toLocaleDateString(I18N.lang, { day: 'numeric', month: 'short' }) + ' · ' + d.toLocaleTimeString(I18N.lang, { hour: '2-digit', minute: '2-digit' });
+            return `
+            <div class="dashboard-row">
+                <div class="dashboard-row-icon"><i class="fa-solid fa-cube"></i></div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title" title="${escapeHtml(entry.file_name)}">${escapeHtml(entry.file_name)}</div>
+                    <div class="dashboard-row-sub">${timeStr}</div>
+                </div>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        console.error('[Dashboard] Erreur historique:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
+async function _loadDashboardStock() {
+    const body = document.getElementById('dashboard-stock-body');
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/api/filament/spools`);
+        const data = await res.json();
+        const slots = data.slots || [];
+        const low = slots.filter(s => {
+            if (s.remaining_g == null || !s.capacity_g) return false;
+            return (s.remaining_g / s.capacity_g) < 0.15 || s.remaining_g < 100;
+        });
+        if (!low.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty dashboard-widget-empty--ok"><i class="fa-solid fa-circle-check"></i><p>${_t2('dashboard.stock_ok', 'Tous les stocks sont suffisants')}</p></div>`;
+            return;
+        }
+        low.forEach(s => {
+            const today = new Date().toISOString().slice(0, 10);
+            createNotification(
+                'low_stock',
+                _t2('notif.low_stock_title', 'Stock filament faible'),
+                `${s.name} — ${Math.round(s.remaining_g)}g ${_t2('dashboard.stock_remaining', 'restants')}`,
+                'spoolman',
+                `low_stock_${s.source_type}_${s.source_id}_${today}`
+            );
+        });
+        body.innerHTML = low.map(s => `
+            <div class="dashboard-row">
+                <div class="dashboard-row-icon" style="background:${s.color_hex}22;color:${s.color_hex};"><i class="fa-solid fa-circle"></i></div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title">${escapeHtml(s.name)}</div>
+                    <div class="dashboard-row-sub">${s.material || ''} — ${Math.round(s.remaining_g)}g ${_t2('dashboard.stock_remaining', 'restants')}</div>
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('[Dashboard] Erreur stock:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
+async function _loadDashboardRecentFiles() {
+    const body = document.getElementById('dashboard-recent-body');
+    if (!body) return;
+    try {
+        let files = allFiles;
+        if (!files || !files.length) {
+            const res = await fetch(`${API}/api/files`);
+            const data = await res.json();
+            files = Array.isArray(data) ? data : [];
+        }
+        if (!files.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-layer-group"></i><p>${I18N.t('library.no_files')}</p></div>`;
+            return;
+        }
+        const recent = [...files].sort((a, b) => (b.mtime || 0) - (a.mtime || 0)).slice(0, 5);
+        body.innerHTML = recent.map(f => `
+            <div class="dashboard-row" onclick="goToFileInLibrary('${escapeJs(f.name)}')" style="cursor:pointer;">
+                <div class="dashboard-row-thumb">${f.has_thumb ? `<img src="${API}/api/thumb?path=${encodeURIComponent(f.path)}" loading="lazy">` : '<i class="fa-solid fa-cube"></i>'}</div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>
+                    <div class="dashboard-row-sub">${formatSize(f.size)}</div>
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('[Dashboard] Erreur fichiers récents:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
 function showToast(message, type = 'info') {
 const translated = I18N.has(`toast.${message}`) ? I18N.t(`toast.${message}`) : message;
 const container = document.getElementById('toast-container');
@@ -1476,6 +3175,162 @@ toast.style.transition = 'all 0.3s ease';
 setTimeout(() => toast.remove(), 300);
 }, 3500);
 }
+
+/**
+ * Toast avec bouton "Annuler" pour les suppressions (restauration depuis la corbeille temporaire).
+ * @param {string} message - Texte déjà traduit (ex: "3 fichiers supprimés").
+ * @param {string} batchId - Identifiant de lot renvoyé par /api/files/delete ou /api/files/delete-batch.
+ * @param {number} undoSeconds - Durée pendant laquelle l'annulation reste possible (fenêtre serveur).
+ */
+function showUndoToast(message, batchId, undoSeconds = 300) {
+    const container = document.getElementById('toast-container');
+    if (!container || !batchId) { showToast(message, 'success'); return; }
+    const toast = document.createElement('div');
+    toast.className = 'toast success toast-undo';
+    toast.innerHTML = `<i class="fa-solid fa-trash-can"></i><span class="toast-message">${escapeHtml(message)}</span><button type="button" class="toast-undo-btn"><i class="fa-solid fa-rotate-left"></i> ${_t2('actions.undo', 'Annuler')}</button>`;
+    container.appendChild(toast);
+
+    // Le toast reste affiché plus longtemps (10s) pour laisser le temps de cliquer sur Annuler,
+    // même si la fenêtre de restauration côté serveur (undoSeconds) est bien plus large.
+    const displaySeconds = Math.min(10, undoSeconds);
+    const dismissTimer = setTimeout(() => dismiss(), displaySeconds * 1000);
+
+    function dismiss() {
+        clearTimeout(dismissTimer);
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        toast.style.transition = 'all 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }
+
+    toast.querySelector('.toast-undo-btn')?.addEventListener('click', async () => {
+        clearTimeout(dismissTimer);
+        toast.querySelector('.toast-undo-btn').disabled = true;
+        toast.querySelector('.toast-undo-btn').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        try {
+            const res = await fetch(`${API}/api/files/restore-batch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ batch_id: batchId }),
+            });
+            const data = await res.json().catch(() => ({}));
+            dismiss();
+            if (res.ok && data.restored_count > 0) {
+                showToast(I18N.tp('toast.undo_success', data.restored_count, { count: data.restored_count }) || 'Restauré', 'success');
+                if (typeof loadFiles === 'function') loadFiles();
+            } else {
+                showToast(data.error || I18N.t('toast.undo_error') || "Impossible d'annuler", 'error');
+            }
+        } catch {
+            dismiss();
+            showToast(I18N.t('toast.connection_error'), 'error');
+        }
+    });
+}
+
+/**
+ * Toast avec bouton "Annuler" générique : appelle `onUndo` (async) quand on clique dessus,
+ * plutôt que de taper en dur l'endpoint de restauration des fichiers comme showUndoToast().
+ * Utilisé pour la suppression de tag, de projet et de source.
+ * @param {string} message - Texte déjà traduit (ex: "Tag supprimé").
+ * @param {Function} onUndo - Fonction async appelée au clic sur "Annuler"; doit renvoyer {success, message}.
+ * @param {number} displaySeconds - Durée d'affichage du toast (défaut 8s).
+ */
+function showGenericUndoToast(message, onUndo, displaySeconds = 8) {
+    const container = document.getElementById('toast-container');
+    if (!container || typeof onUndo !== 'function') { showToast(message, 'success'); return; }
+    const toast = document.createElement('div');
+    toast.className = 'toast success toast-undo';
+    toast.innerHTML = `<i class="fa-solid fa-trash-can"></i><span class="toast-message">${escapeHtml(message)}</span><button type="button" class="toast-undo-btn"><i class="fa-solid fa-rotate-left"></i> ${_t2('actions.undo', 'Annuler')}</button>`;
+    container.appendChild(toast);
+
+    const dismissTimer = setTimeout(() => dismiss(), displaySeconds * 1000);
+
+    function dismiss() {
+        clearTimeout(dismissTimer);
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        toast.style.transition = 'all 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }
+
+    toast.querySelector('.toast-undo-btn')?.addEventListener('click', async () => {
+        clearTimeout(dismissTimer);
+        const btn = toast.querySelector('.toast-undo-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        try {
+            const result = await onUndo();
+            dismiss();
+            if (result && result.success) {
+                showToast(result.message || I18N.tp('toast.undo_success', 1, { count: 1 }) || 'Restauré', 'success');
+            } else {
+                showToast((result && result.message) || I18N.t('toast.undo_error') || "Impossible d'annuler", 'error');
+            }
+        } catch {
+            dismiss();
+            showToast(I18N.t('toast.connection_error'), 'error');
+        }
+    });
+}
+
+
+
+// --- Aperçu au survol des miniatures ---
+(function setupThumbHoverPreview() {
+    let hoverTimer = null;
+    let currentThumb = null;
+
+    function hidePreview() {
+        clearTimeout(hoverTimer);
+        currentThumb = null;
+        document.getElementById('thumb-hover-preview')?.classList.remove('visible');
+    }
+
+    function showPreview(thumbEl, imgEl) {
+        const preview = document.getElementById('thumb-hover-preview');
+        const previewImg = document.getElementById('thumb-hover-preview-img');
+        if (!preview || !previewImg) return;
+        previewImg.src = imgEl.src;
+
+        const rect = thumbEl.getBoundingClientRect();
+        const previewSize = 240;
+        let left = rect.right + 12;
+        if (left + previewSize > window.innerWidth - 12) left = rect.left - previewSize - 12;
+        if (left < 12) left = Math.max(12, rect.left);
+        let top = rect.top + rect.height / 2 - previewSize / 2;
+        top = Math.max(12, Math.min(top, window.innerHeight - previewSize - 12));
+
+        preview.style.left = `${left}px`;
+        preview.style.top = `${top}px`;
+        preview.classList.add('visible');
+    }
+
+    document.addEventListener('mouseover', (e) => {
+        if (isSelectionMode) return;
+        const thumb = e.target.closest('.file-thumb');
+        if (!thumb || thumb === currentThumb) return;
+        if (!thumb.closest('#files-grid')) return;
+        const img = thumb.querySelector('img[data-loaded="true"], img:not([data-loaded])');
+        if (!img || !img.src || img.style.display === 'none') return;
+
+        currentThumb = thumb;
+        clearTimeout(hoverTimer);
+        hoverTimer = setTimeout(() => {
+            if (currentThumb === thumb) showPreview(thumb, img);
+        }, 400);
+    });
+
+    document.addEventListener('mouseout', (e) => {
+        const thumb = e.target.closest('.file-thumb');
+        if (thumb && thumb === currentThumb && !thumb.contains(e.relatedTarget)) {
+            hidePreview();
+        }
+    });
+
+    document.addEventListener('scroll', hidePreview, true);
+})();
+
 
 
 async function checkSpoolmanAutoDiscovery() {
@@ -1673,13 +3528,145 @@ if (bytes < 1024) return bytes + ' B';
 if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
 return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
-function openModal(modalId) { document.getElementById(modalId)?.classList.remove('hidden'); }
+async function openLinksModal() {
+    openModal('modal-partners');
+    const box = document.getElementById('links-list');
+    if (!box) return;
+    try {
+        const res = await fetch(`${API}/api/links`);
+        if (!res.ok) { box.innerHTML = ''; return; }
+        const data = await res.json();
+        const links = Array.isArray(data.links) ? data.links : [];
+
+        // Regroupe par section (dans l'ordre d'apparition dans useful_links.json)
+        const sections = [];
+        const byName = {};
+        links.forEach(l => {
+            const name = l.group || '';
+            if (!byName[name]) { byName[name] = { name, links: [] }; sections.push(byName[name]); }
+            byName[name].links.push(l);
+        });
+
+        const row = (l) => {
+            const icon = /^[a-z0-9 -]+$/i.test(l.icon || '') ? l.icon : 'fa-solid fa-link';
+            return `<a href="${escapeHtml(l.url).replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer" class="useful-link-row"><i class="${icon}"></i> <span>${escapeHtml(l.name)}</span> <i class="fa-solid fa-arrow-up-right-from-square useful-link-ext"></i></a>`;
+        };
+
+        // Chaque section est un menu dépliant ; en ouvrir une referme les autres (toggleAccord)
+        box.innerHTML = sections.map(sec => {
+            const rows = sec.links.map(row).join('');
+            if (!sec.name) return rows;   // liens sans section : affichés directement
+            return `<div class="accord-section">
+                <div class="accord-header" onclick="toggleAccord(this)">
+                    <span>${escapeHtml(sec.name)} <span class="useful-links-count">${sec.links.length}</span></span>
+                    <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                </div>
+                <div class="accord-body"><div class="useful-links-body">${rows}</div></div>
+            </div>`;
+        }).join('');
+    } catch (e) { box.innerHTML = ''; }
+}
+
+function openModal(modalId) {
+    document.getElementById(modalId)?.classList.remove('hidden');
+    if (modalId === 'modal-select-type') loadSourceSuggestions();
+}
+
+// ── Dossiers 3D détectés sur l'ordinateur, ajoutables en un clic ──
+let _sourceSuggestionsToken = 0;
+async function loadSourceSuggestions() {
+    const box = document.getElementById('source-suggestions');
+    if (!box) return;
+    const token = ++_sourceSuggestionsToken;
+    box.classList.add('hidden');
+    box.innerHTML = '';
+    if (typeof stellioAppConfig !== 'undefined' && stellioAppConfig && stellioAppConfig.headless) return;
+
+    let list = [];
+    try {
+        const res = await fetch(`${API}/api/sources/suggestions`);
+        if (res.ok) list = (await res.json()).suggestions || [];
+    } catch (e) { }
+    if (token !== _sourceSuggestionsToken || !list.length) return;
+
+    const attr = (v) => escapeHtml(String(v || '')).replace(/"/g, '&quot;');
+    box.innerHTML = `
+        <div class="source-suggestions-title"><i class="fa-solid fa-wand-magic-sparkles"></i> ${escapeHtml(I18N.t('source.suggest_title'))}</div>
+        <div class="source-suggestions-hint">${escapeHtml(I18N.t('source.suggest_hint'))}</div>
+        ${list.map((item, idx) => `
+            <div class="source-suggestion-row">
+                <i class="fa-solid fa-folder-open"></i>
+                <div class="source-suggestion-info">
+                    <div class="source-suggestion-name">${escapeHtml(item.name)}</div>
+                    <div class="source-suggestion-path" title="${attr(item.path)}">${escapeHtml(item.path)}</div>
+                </div>
+                <span class="source-suggestion-count">${escapeHtml(I18N.t('source.suggest_count', { count: item.capped ? `${item.count}+` : item.count }))}</span>
+                <button type="button" class="btn btn-primary btn-sm" data-suggest-idx="${idx}">${escapeHtml(I18N.t('source.suggest_add'))}</button>
+            </div>`).join('')}`;
+    box.querySelectorAll('button[data-suggest-idx]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const item = list[Number(btn.dataset.suggestIdx)];
+            if (!item) return;
+            btn.disabled = true;
+            const ok = await addSource('folder', item.name, item.path, {});
+            if (ok) {
+                showToast(I18N.t('toast.source_added'), 'success');
+                closeModal('modal-select-type');
+                loadSources();
+                loadFiles();
+            } else {
+                btn.disabled = false;
+            }
+        });
+    });
+    box.classList.remove('hidden');
+}
 function closeModal(modalId) {
     document.getElementById(modalId)?.classList.add('hidden');
 
 
     if (modalId === 'modal-slicer') _slicerLaunchedFromViewer = false;
 }
+
+// ── Choix de la source d'une photo : appareil photo ou galerie ──
+let _photoPickCallback = null;
+function pickPhoto(onFile) {
+    _photoPickCallback = onFile;
+    // Sur ordinateur, "capture" n'a aucun effet : on ouvre directement le sélecteur de fichiers.
+    const isTouchDevice = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    if (!isTouchDevice) {
+        document.getElementById('photo-source-gallery-input')?.click();
+        return;
+    }
+    openModal('modal-photo-source');
+}
+window.pickPhoto = pickPhoto;
+
+(function initPhotoSourcePicker() {
+    const cameraInput = document.getElementById('photo-source-camera-input');
+    const galleryInput = document.getElementById('photo-source-gallery-input');
+
+    // Le clic sur l'input doit partir directement du geste de l'utilisateur, sinon le navigateur le bloque.
+    document.getElementById('photo-source-camera-btn')?.addEventListener('click', () => {
+        cameraInput?.click();
+        closeModal('modal-photo-source');
+    });
+    document.getElementById('photo-source-gallery-btn')?.addEventListener('click', () => {
+        galleryInput?.click();
+        closeModal('modal-photo-source');
+    });
+
+    [cameraInput, galleryInput].forEach((input) => {
+        input?.addEventListener('change', () => {
+            const file = input.files?.[0];
+            input.value = '';
+            closeModal('modal-photo-source');
+            const cb = _photoPickCallback;
+            _photoPickCallback = null;
+            if (file && cb) cb(file);
+        });
+    });
+})();
 
 
 async function loadFileMetadata(filePath, callback) {
@@ -1737,11 +3724,54 @@ async function loadRemoteInstances() {
         const keyInput = document.getElementById('local-peer-key-display');
         if (keyInput) keyInput.value = data.local_peer_key || '';
         _renderRemoteInstances(data.instances || []);
+        discoverRemoteInstances();
     } catch (e) {
         console.error('[RemoteInstances]', e);
     }
 }
 window.loadRemoteInstances = loadRemoteInstances;
+
+let _discoveringInstances = false;
+let _discoveredInstances = [];
+async function discoverRemoteInstances() {
+    const box = document.getElementById('remote-instances-discovered');
+    if (!box || _discoveringInstances) return;
+    _discoveringInstances = true;
+    box.innerHTML = `<p class="settings-hint"><i class="fa-solid fa-spinner fa-spin"></i> ${escapeHtml(_t2('settings.remote_instances_scanning', 'Recherche en cours...'))}</p>`;
+    try {
+        const res = await fetch(`${API}/api/remote-instances/discover`);
+        const data = res.ok ? await res.json() : { instances: [] };
+        _discoveredInstances = data.instances || [];
+        if (!_discoveredInstances.length) {
+            box.innerHTML = `<p class="settings-hint">${escapeHtml(_t2('settings.remote_instances_none_found', 'Aucune autre instance Stellio détectée sur le réseau.'))}</p>`;
+        } else {
+            box.innerHTML = _discoveredInstances.map((d, i) => `
+                <div class="source-item">
+                    <div class="source-info">
+                        <div class="source-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+                        <div class="source-details"><h4>${escapeHtml(d.name)}</h4><p>${escapeHtml(d.url)}${d.version ? ' · v' + escapeHtml(d.version) : ''}</p></div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" data-discovered="${i}"><i class="fa-solid fa-plus"></i> ${escapeHtml(_t2('actions.add', 'Ajouter'))}</button>
+                </div>`).join('');
+            box.querySelectorAll('[data-discovered]').forEach(btn => {
+                btn.onclick = () => addDiscoveredRemoteInstance(_discoveredInstances[parseInt(btn.dataset.discovered, 10)]);
+            });
+        }
+    } catch (e) {
+        box.innerHTML = '';
+    } finally {
+        _discoveringInstances = false;
+    }
+}
+window.discoverRemoteInstances = discoverRemoteInstances;
+
+async function addDiscoveredRemoteInstance(inst) {
+    if (!inst) return;
+    await openAddRemoteInstanceModal();
+    document.getElementById('remote-instance-name').value = inst.name || '';
+    document.getElementById('remote-instance-url').value = inst.url || '';
+    document.getElementById('remote-instance-peer-key').focus();
+}
 
 function _renderRemoteInstances(instances) {
     const container = document.getElementById('remote-instances-list');
@@ -1899,11 +3929,16 @@ function _openSendToInstancePicker(filePath, instances) {
     openModal('modal-send-to-instance');
 }
 
-async function _doSendToRemoteInstance(filePath, target) {
+function _doSendToRemoteInstance(filePath, target) {
+    _openRemoteFolderPicker(target, (destFolder) => _sendToRemoteInstanceNow(filePath, target, destFolder));
+}
+
+async function _sendToRemoteInstanceNow(filePath, target, destFolder) {
     showToast(_t2('settings.remote_instances_sending', `Envoi vers ${target.name}...`, { name: target.name }), 'info');
     try {
         const res = await fetch(`${API}/api/remote-instances/${target.id}/send`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file_path: filePath })
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file_path: filePath, dest_folder: destFolder || '' })
         });
         const data = await res.json();
         showToast(res.ok
@@ -1912,6 +3947,97 @@ async function _doSendToRemoteInstance(filePath, target) {
     } catch (e) {
         showToast(_t2('settings.remote_instances_send_error', "Échec de l'envoi"), 'error');
     }
+}
+
+function _openRemoteFolderPicker(target, onPick) {
+    let modal = document.getElementById('modal-remote-folder');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-remote-folder';
+        modal.className = 'modal hidden';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width:460px;">
+                <div class="modal-header">
+                    <h3><i class="fa-solid fa-folder-tree"></i> <span id="remote-folder-title"></span></h3>
+                    <button class="modal-close" onclick="closeModal('modal-remote-folder')">×</button>
+                </div>
+                <div class="modal-body">
+                    <div id="remote-folder-current" style="font-size:12px; opacity:.7; margin-bottom:8px; word-break:break-all;"></div>
+                    <div id="remote-folder-list" style="max-height:320px; overflow-y:auto; display:flex; flex-direction:column; gap:4px;"></div>
+                    <button id="remote-folder-confirm" class="btn btn-primary" style="width:100%; margin-top:12px;">
+                        <i class="fa-solid fa-paper-plane"></i> <span id="remote-folder-confirm-label"></span>
+                    </button>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+    }
+    const titleEl = modal.querySelector('#remote-folder-title');
+    const currentEl = modal.querySelector('#remote-folder-current');
+    const listEl = modal.querySelector('#remote-folder-list');
+    const confirmBtn = modal.querySelector('#remote-folder-confirm');
+    modal.querySelector('#remote-folder-confirm-label').textContent = _t2('settings.remote_instances_send_here', 'Envoyer ici');
+    titleEl.textContent = _t2('settings.remote_instances_pick_folder', `Dossier de destination sur ${target.name}`, { name: target.name });
+
+    let currentPath = '';
+    let entries = [];
+    let parentPath = null;
+
+    const rowStyle = 'text-align:left; justify-content:flex-start; width:100%;';
+    const render = () => {
+        currentEl.textContent = currentPath || _t2('settings.remote_instances_folder_roots', 'Sources de l\'instance cible');
+        confirmBtn.disabled = !currentPath;
+        let html = '';
+        if (currentPath) {
+            html += `<button class="btn btn-ghost" style="${rowStyle}" data-nav="up"><i class="fa-solid fa-arrow-up"></i> ..</button>`;
+        }
+        html += entries.map((f, i) => `<button class="btn btn-ghost" style="${rowStyle}" data-nav="${i}"><i class="fa-solid fa-folder"></i> ${escapeHtml(f.name)}</button>`).join('');
+        if (!entries.length) {
+            html += `<p style="opacity:.6; padding:8px;">${escapeHtml(currentPath
+                ? _t2('settings.remote_instances_no_subfolder', 'Aucun sous-dossier')
+                : _t2('settings.remote_instances_no_source_folder', "Cette instance n'a aucun dossier source accessible en écriture : ajoutes-en un dans ses Paramètres > Sources."))}</p>`;
+        }
+        listEl.innerHTML = html;
+    };
+
+    const load = async (path) => {
+        listEl.innerHTML = '<p style="opacity:.6; padding:8px;"><i class="fa-solid fa-spinner fa-spin"></i></p>';
+        try {
+            const res = await fetch(`${API}/api/remote-instances/${target.id}/folders?path=${encodeURIComponent(path || '')}`);
+            let data = null;
+            try { data = await res.json(); } catch (_) { data = null; }
+            if (!data || data.code === 'peer_outdated') {
+                // Instance locale ou distante pas à jour : on envoie sans choix de dossier
+                closeModal('modal-remote-folder');
+                showToast(_t2('settings.remote_instances_outdated', "Choix du dossier indisponible (une des deux instances n'est pas à jour) : envoi dans le dossier par défaut."), 'info');
+                onPick('');
+                return;
+            }
+            if (!res.ok) throw new Error(data.error || 'Erreur');
+            currentPath = data.path || '';
+            parentPath = data.parent || '';
+            entries = data.folders || [];
+            render();
+        } catch (e) {
+            closeModal('modal-remote-folder');
+            showToast(e.message || _t2('settings.remote_instances_send_error', "Échec de l'envoi"), 'error');
+        }
+    };
+
+    listEl.onclick = (ev) => {
+        const btn = ev.target.closest('[data-nav]');
+        if (!btn) return;
+        if (btn.dataset.nav === 'up') load(parentPath || '');
+        else load(entries[parseInt(btn.dataset.nav, 10)].path);
+    };
+    confirmBtn.onclick = () => {
+        if (!currentPath) return;
+        const chosen = currentPath;
+        closeModal('modal-remote-folder');
+        onPick(chosen);
+    };
+
+    openModal('modal-remote-folder');
+    load('');
 }
 
 async function loadSources() {
@@ -1959,22 +4085,30 @@ confirmCallback = null;
 };
 }
 async function deleteSource(id) {
-showConfirmModal(I18N.t('toast.delete_source'), async () => {
 try {
 const res = await fetch(`${API}/api/sources/${id}`, { method: 'DELETE' });
+const data = await res.json().catch(() => ({}));
 if (res.ok) {
-showToast(I18N.t('toast.source_deleted'), 'success');
+const undoData = data.undo;
+showGenericUndoToast(I18N.t('toast.source_deleted'), undoData ? (async () => {
+const r = await fetch(`${API}/api/sources`, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify(undoData),
+});
+const d = await r.json().catch(() => ({}));
+if (r.ok) { await loadSources(); setTimeout(() => loadFiles(), 1500); }
+return { success: r.ok, message: r.ok ? _t2('toast.source_restored', 'Source restaurée') : d.error };
+}) : null);
 loadSources();
 setTimeout(() => loadFiles(), 1500);
 } else {
-const data = await res.json();
 showToast(data.error || I18N.t('toast.error'), 'error');
 }
 } catch (err) {
 showToast(I18N.t('toast.network_error'), 'error');
 console.error(err);
 }
-});
 }
 
 
@@ -2055,7 +4189,8 @@ scanPollingInterval = setInterval(async () => {
             updateScanBadge(I18N.t('scan.in_progress', { count: data.found }));
 
             if (data.new_files && data.new_files.length > 0) {
-                allFiles = allFiles.concat(data.new_files);
+                const _knownPaths = new Set(allFiles.map(f => f.path));
+                allFiles = allFiles.concat(data.new_files.filter(f => !_knownPaths.has(f.path)));
                 filteredFiles = showFavoritesOnly ? allFiles.filter(f => favoriteFiles.has(f.path)) : [...allFiles];
                 applySorting();
                 renderFiles();
@@ -2270,10 +4405,14 @@ const multiPlateLabel = I18N.t('card.multi_plate') || 'Plateau multiple';
 const multiPlateBadgeHtml = f.multi_plate
     ? `<span class="file-multiplate-badge" title="${multiPlateLabel}"><i class="fa-solid fa-table-cells"></i></span>`
     : '';
-const tooltipHtml = `<div class="file-metadata-tooltip" id="tooltip-${f.path.replace(/[^\w]/g, '-')}"><div class="meta-row"><i class="fa-solid fa-ruler-combined"></i><span id="dims-${f.path.replace(/[^\w]/g, '-')}">${I18N.t('library.loading')}</span></div><div class="meta-row"><i class="fa-solid fa-weight-scale"></i><span id="weight-${f.path.replace(/[^\w]/g, '-')}">PLA: -g • PETG: -g</span></div><div class="meta-row"><i class="fa-solid fa-clock"></i><span id="time-${f.path.replace(/[^\w]/g, '-')}">~--</span></div></div>`;
+const viewedByOtherBadgeHtml = isFileViewedByOther(f.path)
+    ? `<span class="file-viewed-by-other-badge" title="${_t2('presence.file_viewed_by_other', 'Consulté en ce moment sur un autre appareil')}"><i class="fa-solid fa-eye"></i></span>`
+    : '';
+const _tipId = f.path.replace(/[^\w]/g, '-');
+const tooltipHtml = `<div class="file-metadata-tooltip" id="tooltip-${_tipId}"><div class="meta-row"><i class="fa-solid fa-paper-plane"></i><span class="meta-label">${I18N.t('card.sent_to_slicer') || 'Envoyé au slicer'}</span><strong class="meta-val" id="sent-${_tipId}">…</strong></div><div class="meta-row"><i class="fa-solid fa-circle-check"></i><span class="meta-label">${I18N.t('card.print_success') || 'Impression réussie'}</span><strong class="meta-val" id="ok-${_tipId}">…</strong></div></div>`;
 const thumbContent = f.has_thumb
     ? `<img src="${thumbUrl}" data-loaded="pending" onload="this.dataset.loaded='true'; this.style.display='block'; this.nextElementSibling?.style.setProperty('display','none','important');" onerror="window.handleThumbnailError(this)" style="width:100%; height:100%; object-fit:cover; display:block;"><div class="file-loading" style="display:none; align-items:center; justify-content:center;"><i class="fa-solid ${icon} thumb-icon" style="font-size:48px; color:var(--text-muted);"></i></div>`
-    : `<img src="" data-loaded="false" style="display:none; width:100%; height:100%; object-fit:cover;"><div class="file-loading thumb-pending" data-path="${escapeHtml(f.path)}" style="display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px;"><i class="fa-solid fa-spinner fa-spin" style="font-size:32px; color:var(--text-muted); opacity:0.6;"></i></div>`;
+    : `<img src="" data-loaded="false" style="display:none; width:100%; height:100%; object-fit:cover;"><div class="file-loading thumb-pending" data-path="${escapeHtml(f.path)}"><div class="skeleton-thumb"><i class="fa-solid ${icon} skeleton-thumb-icon"></i></div></div>`;
 const checkboxHtml = isSelectionMode ? `<div class="file-checkbox" onclick="event.stopPropagation(); toggleFileSelection('${escapeJs(f.path)}', event)" title="${isSelected ? I18N.t('actions.cancel') : I18N.t('actions.select')}"><i class="fa-solid ${isSelected ? 'fa-check-square' : 'fa-square'}"></i></div>` : '';
 const fileMenuBtnHtml = isSelectionMode ? '' : `<button type="button" class="file-menu-btn" onclick="event.stopPropagation(); openFileCtxMenu(event, '${escapeJs(f.path)}', '${escapeJs(f.name)}')" title="${I18N.t('actions.more') || 'Actions'}"><i class="fa-solid fa-bars"></i></button>`;
 const viewerClick = `onclick="open3DViewer('${escapeJs(f.name)}', '${escapeJs(f.path)}', ${f.plate_count || 1})" style="cursor:pointer;"`;
@@ -2283,7 +4422,7 @@ if (currentView === 'details') {
     const sizeStr = formatSize(f.size || 0);
     const safeId = f.path.replace(/[^\w]/g, '-');
     return `<div class="file-card file-card--details${selectedClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}>
-  <div class="dv-thumb">${checkboxHtml}${thumbContent}${isNew ? `<span class="file-new-badge file-new-badge--small"><i class="fa-solid fa-sparkles"></i></span>` : ''}${inArchiveBadgeHtml}${multiPlateBadgeHtml}</div>
+  <div class="dv-thumb">${checkboxHtml}${thumbContent}${isNew ? `<span class="file-new-badge file-new-badge--small"><i class="fa-solid fa-sparkles"></i></span>` : ''}${inArchiveBadgeHtml}${multiPlateBadgeHtml}${viewedByOtherBadgeHtml}</div>
   <div class="dv-name">
     <span class="dv-filename" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
     <span class="dv-path" title="${dirPath}"><i class="fa-solid fa-folder"></i> ${dirPath}</span>
@@ -2307,13 +4446,14 @@ const isVirtualEntry = f.path.includes('::');
 const deleteBtnHtml = (!isVirtualEntry && !isSelectionMode)
     ? `<button type="button" class="file-delete-btn" onclick="event.stopPropagation(); openDeleteFileModal('${escapeJs(f.path)}', '${escapeJs(f.name)}')" title="${I18N.t('actions.delete') || 'Supprimer'}"><i class="fa-solid fa-xmark"></i></button>`
     : '';
-return `<div class="file-card${selectedClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}><div class="file-thumb" style="position:relative;">${checkboxHtml}${fileMenuBtnHtml}${thumbContent}${tooltipHtml}<span class="file-ext-badge">${ext.replace('.', '')}</span>${deleteBtnHtml}${isArchive ? archiveEntryHtml : ''}${inArchiveBadgeHtml}${multiPlateBadgeHtml}${isNew ? newBadgeHtml : ''}${isArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); decompressFile('${escapeJs(f.path)}', event)" title="${I18N.t('toast.extract_success')}"><i class="fa-solid fa-file-zipper"></i> ${I18N.t('actions.add')}</button>` : ''}${inArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); extractArchiveEntry('${escapeJs(f.archive_path)}', '${escapeJs(f.internal_path)}', event)" title="${I18N.t('actions.extract_single_file') || 'Extraire uniquement ce fichier'}"><i class="fa-solid fa-download"></i></button>` : ''}<button type="button" class="file-favorite-btn ${isFav ? 'favorited' : ''}" onclick="toggleFavorite('${escapeJs(f.path)}', event); return false;" title="${isFav ? I18N.t('toast.favorites_removed') : I18N.t('toast.favorites_added')}"><i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-star"></i></button><button type="button" class="file-tag-btn" onclick="event.stopPropagation(); openTagModal('${escapeJs(f.path)}')" title="${I18N.t('modal.manage_tags')}"><i class="fa-solid fa-tag"></i></button></div><div class="file-info"><div class="file-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>${f.tags?.length ? `<div class="file-tags">${f.tags.map(t => `<span class="file-tag" style="background:${t.color}20;color:${t.color};border-color:${t.color}">${escapeHtml(t.name)}</span>`).join('')}</div>` : ''}</div></div>`;
+return `<div class="file-card${selectedClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}><div class="file-thumb" style="position:relative;">${checkboxHtml}${fileMenuBtnHtml}${thumbContent}${tooltipHtml}<span class="file-ext-badge">${ext.replace('.', '')}</span>${deleteBtnHtml}${isArchive ? archiveEntryHtml : ''}${inArchiveBadgeHtml}${multiPlateBadgeHtml}${viewedByOtherBadgeHtml}${isNew ? newBadgeHtml : ''}${isArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); decompressFile('${escapeJs(f.path)}', event)" title="${I18N.t('toast.extract_success')}"><i class="fa-solid fa-file-zipper"></i> ${I18N.t('actions.add')}</button>` : ''}${inArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); extractArchiveEntry('${escapeJs(f.archive_path)}', '${escapeJs(f.internal_path)}', event)" title="${I18N.t('actions.extract_single_file') || 'Extraire uniquement ce fichier'}"><i class="fa-solid fa-download"></i></button>` : ''}<button type="button" class="file-favorite-btn ${isFav ? 'favorited' : ''}" onclick="toggleFavorite('${escapeJs(f.path)}', event); return false;" title="${isFav ? I18N.t('toast.favorites_removed') : I18N.t('toast.favorites_added')}"><i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-star"></i></button><button type="button" class="file-tag-btn" onclick="event.stopPropagation(); openTagModal('${escapeJs(f.path)}')" title="${I18N.t('modal.manage_tags')}"><i class="fa-solid fa-tag"></i></button></div><div class="file-info"><div class="file-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>${f.tags?.length ? `<div class="file-tags">${f.tags.map(t => `<span class="file-tag" style="background:${t.color}20;color:${t.color};border-color:${t.color}">${escapeHtml(t.name)}</span>`).join('')}</div>` : ''}</div></div>`;
 }
 
 
 window.toggleSelectionMode = function () {
 isSelectionMode = !isSelectionMode;
 selectedFiles.clear();
+_lastSelectionAnchorPath = null;
 const btn = document.getElementById('select-all-btn');
 if (btn) {
 btn.classList.toggle('active', isSelectionMode);
@@ -2324,13 +4464,26 @@ if (actionBar) actionBar.style.display = isSelectionMode ? 'flex' : 'none';
 renderFiles();
 updateSelectionCount();
 };
+let _lastSelectionAnchorPath = null;
 window.toggleFileSelection = function (filePath, event) {
 if (event) {
 event.preventDefault();
 event.stopPropagation();
 }
+if (event && event.shiftKey && _lastSelectionAnchorPath) {
+const anchorIdx = filteredFiles.findIndex(f => f.path === _lastSelectionAnchorPath);
+const targetIdx = filteredFiles.findIndex(f => f.path === filePath);
+if (anchorIdx !== -1 && targetIdx !== -1) {
+const [start, end] = anchorIdx < targetIdx ? [anchorIdx, targetIdx] : [targetIdx, anchorIdx];
+for (let i = start; i <= end; i++) selectedFiles.add(filteredFiles[i].path);
+renderFiles();
+updateSelectionCount();
+return;
+}
+}
 if (selectedFiles.has(filePath)) selectedFiles.delete(filePath);
 else selectedFiles.add(filePath);
+_lastSelectionAnchorPath = filePath;
 renderFiles();
 updateSelectionCount();
 };
@@ -2397,7 +4550,8 @@ body: JSON.stringify({ file_paths: [...selectedFiles] })
 const data = await res.json();
 if (res.ok) {
 if (data.deleted_count > 0) {
-showToast(I18N.tp('toast.files_deleted', data.deleted_count, { count: data.deleted_count }) || `${data.deleted_count} fichier(s) supprimé(s)`, 'success');
+const msg = I18N.tp('toast.files_deleted', data.deleted_count, { count: data.deleted_count }) || `${data.deleted_count} fichier(s) supprimé(s)`;
+showUndoToast(msg, data.batch_id, data.undo_seconds);
 }
 if (data.errors && data.errors.length > 0) {
 showToast(`${data.errors.length} ${I18N.t('toast.delete_partial_error') || "fichier(s) n'ont pas pu être supprimés"}`, 'warning');
@@ -2489,10 +4643,38 @@ console.error('[Batch Thumb Regen]', err);
 };
 
 
+function buildLibraryEmptyStateHTML() {
+    if (!allFiles?.length) {
+        return `<div class="empty-state illustrated">
+            <div class="empty-state-icon"><i class="fa-solid fa-folder-open"></i></div>
+            <h3>${_t2('library.empty_title', 'Votre bibliothèque est vide')}</h3>
+            <p>${_t2('library.empty_subtitle', "Ajoutez un dossier, un fichier ou un partage réseau pour commencer.")}</p>
+            <button class="btn btn-primary" onclick="openModal('modal-select-type')"><i class="fa-solid fa-plus"></i> ${_t2('library.empty_cta', 'Ajouter une source')}</button>
+        </div>`;
+    }
+    if (currentSearchQuery) {
+        return `<div class="empty-state illustrated">
+            <div class="empty-state-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+            <h3>${_t2('library.no_results_title', 'Aucun résultat')} ${currentSearchQuery ? `“${escapeHtml(currentSearchQuery)}”` : ''}</h3>
+            <p>${_t2('library.no_results_subtitle', "Essayez un autre terme ou vérifiez l'orthographe.")}</p>
+            <button class="btn btn-ghost" onclick="clearSearchAndFilters()"><i class="fa-solid fa-xmark"></i> ${_t2('library.clear_search', 'Effacer la recherche')}</button>
+        </div>`;
+    }
+    if (hasActiveFilters()) {
+        return `<div class="empty-state illustrated">
+            <div class="empty-state-icon"><i class="fa-solid fa-filter-circle-xmark"></i></div>
+            <h3>${_t2('library.no_filter_results_title', 'Aucun fichier ne correspond à ces filtres')}</h3>
+            <p>${_t2('library.no_filter_results_subtitle', 'Essayez de relâcher un ou plusieurs critères.')}</p>
+            <button class="btn btn-ghost" onclick="resetFilters()"><i class="fa-solid fa-rotate-left"></i> ${_t2('library.reset_filters_cta', 'Réinitialiser les filtres')}</button>
+        </div>`;
+    }
+    return `<div class="empty-state"><i class="fa-solid fa-inbox"></i><p>${I18N.t('library.no_files')}</p></div>`;
+}
+
 function renderFiles(chunkSize = 50) {
 const grid = document.getElementById('files-grid');
 if (!filteredFiles?.length) {
-grid.innerHTML = `<div class="empty-state"><i class="fa-solid fa-inbox"></i><p>${I18N.t('library.no_files')}</p></div>`;
+grid.innerHTML = buildLibraryEmptyStateHTML();
 I18N.apply();
 return;
 }
@@ -3019,25 +5201,204 @@ showToast(I18N.t('toast.fetch_error'), 'error');
 console.error('[Tags] Erreur:', err);
 }
 }
-window.deleteTag = (tagId, tagName) => {
+
+function openBulkTagModal() {
+    if (!selectedFiles.size) return;
+    const countEl = document.getElementById('bulk-tag-count');
+    if (countEl) countEl.textContent = I18N.tp('common.file_count', selectedFiles.size, { count: selectedFiles.size });
+    const listEl = document.getElementById('bulk-tag-list');
+    if (listEl) {
+        listEl.innerHTML = allTags.length
+            ? allTags.map(t => `<label class="checkbox-label" style="margin:6px 0;"><input type="checkbox" value="${escapeHtml(t.name)}" class="bulk-tag-select"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${t.color};margin-right:8px;"></span>${escapeHtml(t.name)}</label>`).join('')
+            : `<p style="color:var(--text-muted);font-size:12px;">${I18N.t('toast.tag_empty')}</p>`;
+    }
+    const newTagInput = document.getElementById('bulk-tag-new-tag');
+    if (newTagInput) newTagInput.value = '';
+    I18N.apply();
+    openModal('modal-bulk-tag');
+}
+window.openBulkTagModal = openBulkTagModal;
+
+// --- Renommage en masse ---
+function openBulkRenameModal() {
+    if (!selectedFiles.size) return;
+    const countEl = document.getElementById('bulk-rename-count');
+    if (countEl) countEl.textContent = I18N.tp('common.file_count', selectedFiles.size, { count: selectedFiles.size });
+    document.getElementById('bulk-rename-mode').value = 'find_replace';
+    document.getElementById('bulk-rename-search').value = '';
+    document.getElementById('bulk-rename-replace').value = '';
+    document.getElementById('bulk-rename-prefix-text').value = '';
+    document.getElementById('bulk-rename-suffix-text').value = '';
+    document.getElementById('bulk-rename-base-name').value = '';
+    document.getElementById('bulk-rename-start-at').value = '1';
+    _toggleBulkRenameFields();
+    updateBulkRenamePreview();
+    I18N.apply();
+    openModal('modal-bulk-rename');
+}
+window.openBulkRenameModal = openBulkRenameModal;
+
+document.getElementById('bulk-rename-mode')?.addEventListener('change', _toggleBulkRenameFields);
+function _toggleBulkRenameFields() {
+    const mode = document.getElementById('bulk-rename-mode')?.value;
+    document.querySelectorAll('.bulk-rename-fields').forEach(el => el.classList.add('hidden'));
+    document.getElementById(`bulk-rename-fields-${(mode || '').replace('_', '-')}`)?.classList.remove('hidden');
+}
+
+/** Calcule le nouveau nom (sans extension) d'un fichier selon le mode de renommage choisi. */
+function _computeBulkRenameName(baseName, mode, index) {
+    switch (mode) {
+        case 'find_replace': {
+            const search = document.getElementById('bulk-rename-search')?.value || '';
+            const replace = document.getElementById('bulk-rename-replace')?.value || '';
+            if (!search) return baseName;
+            return baseName.split(search).join(replace);
+        }
+        case 'prefix': {
+            const prefix = document.getElementById('bulk-rename-prefix-text')?.value || '';
+            return prefix + baseName;
+        }
+        case 'suffix': {
+            const suffix = document.getElementById('bulk-rename-suffix-text')?.value || '';
+            return baseName + suffix;
+        }
+        case 'numbering': {
+            const base = document.getElementById('bulk-rename-base-name')?.value || baseName;
+            const startAt = parseInt(document.getElementById('bulk-rename-start-at')?.value || '1', 10) || 0;
+            const num = startAt + index;
+            const padded = String(num).padStart(3, '0');
+            return `${base}_${padded}`;
+        }
+        default:
+            return baseName;
+    }
+}
+
+window.updateBulkRenamePreview = function () {
+    const mode = document.getElementById('bulk-rename-mode')?.value || 'find_replace';
+    const previewEl = document.getElementById('bulk-rename-preview');
+    if (!previewEl) return;
+    const files = [...selectedFiles].map(p => allFiles.find(f => f.path === p)).filter(Boolean);
+    const rows = files.slice(0, 8).map((f, idx) => {
+        const dotIdx = f.name.lastIndexOf('.');
+        const base = dotIdx > 0 ? f.name.slice(0, dotIdx) : f.name;
+        const ext = dotIdx > 0 ? f.name.slice(dotIdx) : '';
+        const newBase = _computeBulkRenameName(base, mode, idx);
+        return `<div style="display:flex; align-items:center; gap:6px; white-space:nowrap; overflow:hidden;">
+            <span style="color:var(--text-muted); text-overflow:ellipsis; overflow:hidden;">${escapeHtml(f.name)}</span>
+            <i class="fa-solid fa-arrow-right" style="flex-shrink:0; font-size:10px;"></i>
+            <span style="color:var(--accent); font-weight:600;">${escapeHtml(newBase + ext)}</span>
+        </div>`;
+    });
+    if (files.length > 8) {
+        rows.push(`<div style="color:var(--text-muted); font-style:italic;">${_t2('modal.bulk_rename_more', '... et {count} de plus').replace('{count}', files.length - 8)}</div>`);
+    }
+    previewEl.innerHTML = rows.join('') || `<span style="color:var(--text-muted);">${_t2('modal.bulk_rename_no_files', 'Aucun fichier sélectionné')}</span>`;
+};
+
+window.applyBulkRename = async function () {
+    const mode = document.getElementById('bulk-rename-mode')?.value || 'find_replace';
+    const files = [...selectedFiles].map(p => allFiles.find(f => f.path === p)).filter(Boolean);
+    if (!files.length) { closeModal('modal-bulk-rename'); return; }
+
+    const btn = document.getElementById('apply-bulk-rename-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
+
+    let successCount = 0;
+    const errors = [];
+    for (let idx = 0; idx < files.length; idx++) {
+        const f = files[idx];
+        const dotIdx = f.name.lastIndexOf('.');
+        const base = dotIdx > 0 ? f.name.slice(0, dotIdx) : f.name;
+        const ext = dotIdx > 0 ? f.name.slice(dotIdx) : '';
+        const newName = _computeBulkRenameName(base, mode, idx) + ext;
+        if (newName === f.name) continue;
+        try {
+            const res = await fetch(`${API}/api/files/rename`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_path: f.path, new_name: newName }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) successCount++;
+            else errors.push(`${f.name}: ${data.error || '?'}`);
+        } catch (err) {
+            errors.push(`${f.name}: ${err.message}`);
+        }
+    }
+
+    if (btn) { btn.disabled = false; btn.innerHTML = `<i class="fa-solid fa-check"></i> <span>${_t2('filters.apply', 'Appliquer')}</span>`; }
+    closeModal('modal-bulk-rename');
+
+    if (successCount > 0) {
+        showToast(I18N.tp('toast.bulk_rename_success', successCount, { count: successCount }) || `${successCount} fichier(s) renommé(s)`, 'success');
+    }
+    if (errors.length) {
+        console.warn('[BulkRename] Erreurs:', errors);
+        showToast(`${errors.length} ${_t2('toast.bulk_rename_partial_error', "renommage(s) ont échoué")}`, 'warning');
+    }
+    selectedFiles.clear();
+    toggleSelectionMode();
+    if (typeof loadFiles === 'function') loadFiles();
+};
+
+async function applyTagsToSelection() {
+    const selected = [...document.querySelectorAll('.bulk-tag-select:checked')].map(c => c.value);
+    const newTagInput = document.getElementById('bulk-tag-new-tag');
+    const newTag = newTagInput?.value.trim();
+    const tagsToAdd = [...new Set([...selected, ...(newTag ? [newTag] : [])])];
+    if (!tagsToAdd.length) {
+        showToast(I18N.t('toast.tag_empty'), 'error');
+        return;
+    }
+    try {
+        const res = await fetch(`${API}/api/files/tags/bulk-add`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paths: [...selectedFiles], tags: tagsToAdd })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showToast(I18N.t('toast.tags_updated'), 'success');
+            closeModal('modal-bulk-tag');
+            await Promise.all([loadFiles(), loadTags()]);
+        } else {
+            showToast(data.error || I18N.t('toast.tag_assign_error'), 'error');
+        }
+    } catch (err) {
+        showToast(I18N.t('toast.fetch_error'), 'error');
+        console.error('[BulkTags] Erreur:', err);
+    }
+}
+document.getElementById('apply-bulk-tag-btn')?.addEventListener('click', () => applyTagsToSelection());
+
+window.deleteTag = async (tagId, tagName) => {
 closeModal('modal-tag-manager');
-showConfirmModal(`${I18N.t('toast.delete_tag')} "${tagName}" ?`, async () => {
 try {
 const res = await fetch(`${API}/api/tags/${tagId}`, { method: 'DELETE' });
+const data = await res.json().catch(() => ({}));
 if (res.ok) {
-showToast(I18N.t('toast.tags_deleted'), 'success');
+const undoData = data.undo;
+showGenericUndoToast(`${I18N.t('toast.tags_deleted')} : "${tagName}"`, undoData ? (async () => {
+const r = await fetch(`${API}/api/tags/restore`, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify(undoData),
+});
+const d = await r.json().catch(() => ({}));
+if (r.ok) { await loadTags(); await loadFiles(); }
+return { success: r.ok, message: r.ok ? _t2('toast.tag_restored', 'Tag restauré') : d.error };
+}) : null);
 await loadTags();
 await loadFiles();
 setTimeout(() => openTagManagerModal('global'), 200);
 } else {
-const data = await res.json();
 showToast(data.error || I18N.t('toast.error'), 'error');
 }
 } catch (err) {
 showToast(I18N.t('toast.fetch_error'), 'error');
 console.error('[Tags] Erreur:', err);
 }
-});
 };
 window.editTag = async (tagId, currentName, currentColor) => {
 const newName = prompt(`${I18N.t('modal.rename_source')} :`, currentName);
@@ -3084,6 +5445,12 @@ const folderSources = sources.filter(s => s.type === 'folder' || s.type === 'smb
         return;
     }
 
+    let subfolders = [];
+    try {
+        const tr = await fetch(`${API}/api/download/targets`);
+        if (tr.ok) subfolders = (await tr.json()).subfolders || [];
+    } catch (e) { /* sous-dossiers facultatifs */ }
+
     folderSources.forEach(source => {
         const option = document.createElement('option');
         option.value = source.id;
@@ -3091,6 +5458,13 @@ const folderSources = sources.filter(s => s.type === 'folder' || s.type === 'smb
         option.textContent = `${icon} ${source.name} (${source.path})`;
         option.dataset.sourceType = source.type;
         select.appendChild(option);
+        subfolders.filter(sf => String(sf.source_id) === String(source.id)).forEach(sf => {
+            const sub = document.createElement('option');
+            sub.value = `${source.id}::${sf.rel_path}`;
+            sub.textContent = `\u00A0\u00A0\u00A0↳ 📁 ${sf.rel_path} (${sf.path})`;
+            sub.dataset.sourceType = source.type;
+            select.appendChild(sub);
+        });
     });
 } catch  (err) {
     console.error('[Download Sources]', err);
@@ -3114,13 +5488,16 @@ async function handleDownload(e) {
 e.preventDefault();
 if (isFormLocked) { showToast(I18N.t('toast.please_wait'), 'warning'); return; }
 const url = document.getElementById('download-url').value.trim();
-const sourceId = document.getElementById('download-source').value;
+const rawTarget = document.getElementById('download-source').value;
+const _sepIdx = rawTarget.indexOf('::');
+const sourceId = _sepIdx >= 0 ? rawTarget.slice(0, _sepIdx) : rawTarget;
+const subPath = _sepIdx >= 0 ? rawTarget.slice(_sepIdx + 2) : '';
 const preferredFormat = document.getElementById('makerworld-format')?.value || '';
 if (!url) { showToast(I18N.t('toast.url_required'), 'warning'); return; }
 isFormLocked = true;
 try {
 const downloadId = ++downloadIdCounter;
-const downloadInfo = { id: downloadId, url, sourceId, preferredFormat, status: 'starting', filename: '', progress: 0, current: 0, total: 0, toastElement: null };
+const downloadInfo = { id: downloadId, url, sourceId, subPath, preferredFormat, status: 'starting', filename: '', progress: 0, current: 0, total: 0, toastElement: null };
 activeDownloads.push(downloadInfo);
 createDownloadToast(downloadInfo);
 startDownload(downloadInfo);
@@ -3154,7 +5531,7 @@ updateDownloadToast(downloadInfo, currentMB, totalMB);
     const res = await fetch(`${API}/api/download`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: downloadInfo.url, target_source_id: downloadInfo.sourceId || null, download_id: downloadInfo.id, preferred_format: downloadInfo.preferredFormat || '' })
+        body: JSON.stringify({ url: downloadInfo.url, target_source_id: downloadInfo.sourceId || null, target_subpath: downloadInfo.subPath || '', download_id: downloadInfo.id, preferred_format: downloadInfo.preferredFormat || '' })
     });
     clearInterval(progressPollingInterval);
     const data = await res.json();
@@ -3249,7 +5626,8 @@ showToast(I18N.t('download.cancelled_toast'), 'info');
 }
 window.openCreateFolderModal = async function() {
 const sourceSelect = document.getElementById('download-source');
-const selectedSourceId = sourceSelect ? sourceSelect.value : null;
+const selectedRaw = sourceSelect ? sourceSelect.value : null;
+const selectedSourceId = selectedRaw ? selectedRaw.split('::')[0] : selectedRaw;
 let parentPath = null;
 let sourceConfig = null;
 if (selectedSourceId && selectedSourceId !== "") {
@@ -3346,8 +5724,9 @@ const createFolder = async () => {
             await loadDownloadSources();
             setTimeout(() => {
                 const opts = sourceSelect.options;
+                const wanted = result.as_subfolder ? `${result.as_subfolder.source_id}::${result.as_subfolder.rel_path}` : null;
                 for (let i = 0; i < opts.length; i++) {
-                    if (opts[i].text.includes(cleanFolderName)) {
+                    if (wanted ? opts[i].value === wanted : opts[i].text.includes(cleanFolderName)) {
                         sourceSelect.selectedIndex = i;
                         break;
                     }
@@ -3389,6 +5768,7 @@ if (activeTypeFilters?.length > 0 && activeTypeFilters.length < 3) files = files
 if (currentSizeFilter) files = files.filter(f => { const mb = (f.size || 0) / (1024 * 1024); return mb >= (currentSizeFilter.min || 0) && mb <= (currentSizeFilter.max !== undefined ? currentSizeFilter.max : Infinity); });
 if (currentWeightFilter) files = files.filter(f => { if (f.weight_g === null || f.weight_g === undefined) return false; return f.weight_g >= (currentWeightFilter.min || 0) && f.weight_g <= (currentWeightFilter.max !== undefined ? currentWeightFilter.max : Infinity); });
 if (printStatusFilter) files = files.filter(f => (f.print_status || 'never') === printStatusFilter);
+if (stockFilter && stockPrintableMap) files = files.filter(f => !!stockPrintableMap[(f.path || '').replace(/\\/g, '/')]);
 if (activeTagFilters.size > 0) files = files.filter(f => { const fileTags = new Set((f.tags || []).map(t => t.name.toLowerCase())); for (const tag of activeTagFilters) { if (!fileTags.has(tag.toLowerCase())) return false; } return true; });
 if (noThumbFilterOnly) files = files.filter(f => !f.has_thumb);
 if (failedThumbFilterOnly) files = files.filter(f => !!f.thumb_fallback);
@@ -3432,14 +5812,17 @@ document.getElementById('weight-min').value = currentWeightFilter?.min || '';
 document.getElementById('weight-max').value = currentWeightFilter?.max || '';
 const printStatusSelect = document.getElementById('filter-print-status');
 if (printStatusSelect) printStatusSelect.value = printStatusFilter || '';
+const stockSelect = document.getElementById('filter-stock');
+if (stockSelect) stockSelect.value = stockFilter || '';
 const noThumbCb = document.getElementById('filter-no-thumb');
 if (noThumbCb) noThumbCb.checked = noThumbFilterOnly;
 const failedThumbCb = document.getElementById('filter-thumb-failed');
 if (failedThumbCb) failedThumbCb.checked = failedThumbFilterOnly;
 renderFilterTagsModal();
+renderSavedFiltersList();
 openModal('modal-filters');
 }
-function applyFiltersFromModal() {
+async function applyFiltersFromModal() {
 const selectedTypes = [...document.querySelectorAll('.filter-type:checked')].map(cb => cb.value);
 activeTypeFilters = selectedTypes.length === 3 ? [] : selectedTypes;
 noThumbFilterOnly = document.getElementById('filter-no-thumb')?.checked || false;
@@ -3451,9 +5834,29 @@ const weightMinVal = parseFloat(document.getElementById('weight-min').value);
 const weightMaxVal = parseFloat(document.getElementById('weight-max').value);
 currentWeightFilter = (isNaN(weightMinVal) && isNaN(weightMaxVal)) ? null : { min: isNaN(weightMinVal) ? 0 : weightMinVal, max: isNaN(weightMaxVal) ? Infinity : weightMaxVal };
 printStatusFilter = document.getElementById('filter-print-status')?.value || '';
+stockFilter = document.getElementById('filter-stock')?.value || '';
+stockPrintableMap = null;
+let stockInfo = null;
+if (stockFilter) {
+try {
+const res = await fetch(`${API}/api/filament/printable-files?material=${encodeURIComponent(stockFilter === 'any' ? '' : stockFilter)}`);
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+stockInfo = await res.json();
+stockPrintableMap = stockInfo.printable || {};
+} catch (err) {
+stockFilter = '';
+showToast(I18N.t('filters.stock_error'), 'error');
+}
+}
 closeModal('modal-filters');
 applyFilters();
+if (stockInfo && stockInfo.slots_count === 0) {
+showToast(I18N.t('filters.stock_no_spools'), 'warning');
+} else if (stockInfo) {
+showToast(I18N.t('filters.stock_result', { count: stockInfo.printable_count, checked: stockInfo.files_checked }), 'success');
+} else if (!stockFilter) {
 showToast(I18N.t('toast.filters_applied'), 'success');
+}
 }
 function resetFilters() {
 document.querySelectorAll('.filter-type').forEach(cb => cb.checked = true);
@@ -3470,6 +5873,10 @@ document.getElementById('weight-max').value = '';
 const printStatusSelect = document.getElementById('filter-print-status');
 if (printStatusSelect) printStatusSelect.value = '';
 printStatusFilter = '';
+const stockSelectReset = document.getElementById('filter-stock');
+if (stockSelectReset) stockSelectReset.value = '';
+stockFilter = '';
+stockPrintableMap = null;
 activeTypeFilters = [];
 currentSizeFilter = null;
 currentWeightFilter = null;
@@ -3478,6 +5885,90 @@ closeModal('modal-filters');
 applyFilters();
 showToast(I18N.t('toast.filters_reset'), 'info');
 }
+
+// --- Filtres sauvegardés ---
+const SAVED_FILTERS_KEY = 'stellio-saved-filters';
+
+function _loadSavedFilters() {
+    try {
+        const raw = localStorage.getItem(SAVED_FILTERS_KEY);
+        const list = raw ? JSON.parse(raw) : [];
+        return Array.isArray(list) ? list : [];
+    } catch { return []; }
+}
+
+function _persistSavedFilters(list) {
+    try { localStorage.setItem(SAVED_FILTERS_KEY, JSON.stringify(list)); } catch {}
+}
+
+function renderSavedFiltersList() {
+    const container = document.getElementById('saved-filters-list');
+    if (!container) return;
+    const list = _loadSavedFilters();
+    if (!list.length) {
+        container.innerHTML = `<p style="color:var(--text-muted); font-size:12px; margin:0;">${_t2('filters.no_saved', "Aucun filtre sauvegardé pour l'instant.")}</p>`;
+        return;
+    }
+    container.innerHTML = list.map(f => `
+        <div class="saved-filter-chip" onclick="applySavedFilterSet('${f.id}')">
+            <i class="fa-solid fa-bookmark"></i>
+            <span>${escapeHtml(f.name)}</span>
+            <button type="button" onclick="event.stopPropagation(); deleteSavedFilterSet('${f.id}')"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+    `).join('');
+}
+
+window.saveCurrentFilterSet = function () {
+    const name = prompt(_t2('filters.save_prompt', 'Nom de ce filtre :'));
+    if (!name || !name.trim()) return;
+    const state = {
+        types: [...document.querySelectorAll('.filter-type:checked')].map(cb => cb.value),
+        noThumb: document.getElementById('filter-no-thumb')?.checked || false,
+        failedThumb: document.getElementById('filter-thumb-failed')?.checked || false,
+        sizeMin: document.getElementById('size-min')?.value || '',
+        sizeMax: document.getElementById('size-max')?.value || '',
+        weightMin: document.getElementById('weight-min')?.value || '',
+        weightMax: document.getElementById('weight-max')?.value || '',
+        printStatus: document.getElementById('filter-print-status')?.value || '',
+        stock: document.getElementById('filter-stock')?.value || '',
+        tags: [...activeTagFilters],
+    };
+    const list = _loadSavedFilters();
+    list.push({ id: `f${Date.now()}`, name: name.trim(), state });
+    _persistSavedFilters(list);
+    renderSavedFiltersList();
+    showToast(_t2('filters.saved', 'Filtre sauvegardé'), 'success');
+};
+
+window.applySavedFilterSet = function (id) {
+    const list = _loadSavedFilters();
+    const entry = list.find(f => f.id === id);
+    if (!entry) return;
+    const s = entry.state;
+    document.querySelectorAll('.filter-type').forEach(cb => { cb.checked = s.types.includes(cb.value); });
+    const noThumbCb = document.getElementById('filter-no-thumb');
+    if (noThumbCb) noThumbCb.checked = !!s.noThumb;
+    const failedThumbCb = document.getElementById('filter-thumb-failed');
+    if (failedThumbCb) failedThumbCb.checked = !!s.failedThumb;
+    document.getElementById('size-min').value = s.sizeMin || '';
+    document.getElementById('size-max').value = s.sizeMax || '';
+    document.getElementById('weight-min').value = s.weightMin || '';
+    document.getElementById('weight-max').value = s.weightMax || '';
+    const printStatusSelect = document.getElementById('filter-print-status');
+    if (printStatusSelect) printStatusSelect.value = s.printStatus || '';
+    const stockSelectSaved = document.getElementById('filter-stock');
+    if (stockSelectSaved) stockSelectSaved.value = s.stock || '';
+    activeTagFilters = new Set(s.tags || []);
+    renderFilterTagsModal();
+    applyFiltersFromModal();
+};
+
+window.deleteSavedFilterSet = function (id) {
+    const list = _loadSavedFilters().filter(f => f.id !== id);
+    _persistSavedFilters(list);
+    renderSavedFiltersList();
+};
+
 function renderFilterTagsModal() {
 const container = document.getElementById('filter-tags-modal');
 if (!container) return;
@@ -3527,6 +6018,8 @@ try {
 
 function sendToSlicer(path, name, aiProfile, orientation) {
 currentSlicerFile = path;
+const _rb = document.getElementById('slicer-reprint-box');
+if (_rb) { _rb.style.display = 'none'; _rb.innerHTML = ''; }
 currentSlicerOrientation = orientation || 'default';
 document.getElementById('slicer-file-name').textContent = `${I18N.t('modal.selected_file')}: ${name}`;
 _lastAiRecommendedProfile = aiProfile || null;
@@ -3534,7 +6027,50 @@ const aiBox = document.getElementById('slicer-ai-recommend-result');
 if (aiBox) { aiBox.style.display = 'none'; aiBox.innerHTML = ''; }
 openModal('modal-slicer');
 _loadSlicerSpoolBox(path);
+_loadSlicerCalibBox(path);
 _runPrePrintCheck(path);
+_loadSlicerQuickEstimate(path, name);
+}
+
+async function _loadSlicerQuickEstimate(filePath, fileName) {
+    const box = document.getElementById('slicer-quick-estimate');
+    if (!box) return;
+    box.classList.remove('hidden');
+    box.innerHTML = `<div class="slicer-quick-estimate-loading"><i class="fa-solid fa-spinner fa-spin"></i> ${_t2('slicer.estimating', 'Estimation en cours...')}</div>`;
+    try {
+        const res = await fetch(`${API}/api/files/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: filePath }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.metadata || currentSlicerFile !== filePath) {
+            box.classList.add('hidden');
+            return;
+        }
+        const meta = data.metadata;
+        const weight = meta.weights?.pla ?? Object.values(meta.weights || {})[0];
+        const time = meta.estimated_time?.formatted;
+
+        const parts = [];
+        if (weight != null) parts.push(`<span><i class="fa-solid fa-weight-hanging"></i> ${Math.round(weight)} g</span>`);
+        if (time) parts.push(`<span><i class="fa-solid fa-clock"></i> ${escapeHtml(time)}</span>`);
+
+        if (!parts.length) { box.classList.add('hidden'); return; }
+
+        box.innerHTML = `
+            <div class="slicer-quick-estimate-row">
+                ${parts.join('')}
+                <a href="#" onclick="event.preventDefault(); closeModal('modal-slicer'); openPrintCostModal('${escapeJs(filePath)}', '${escapeJs(fileName)}');">
+                    <i class="fa-solid fa-calculator"></i> ${_t2('slicer.see_cost_detail', 'Voir le coût détaillé')}
+                </a>
+            </div>
+            <p class="slicer-quick-estimate-hint">${_t2('slicer.estimate_geometric_hint', 'Estimation géométrique — le slicer donnera un résultat plus précis.')}</p>
+        `;
+    } catch (err) {
+        console.debug('[QuickEstimate] Erreur:', err);
+        box.classList.add('hidden');
+    }
 }
 
 async function _runPrePrintCheck(path) {
@@ -3552,13 +6088,7 @@ try {
     const data = await res.json();
     const warnings = data.warnings || [];
     if (!warnings.length) return;
-    box.innerHTML = warnings.map(w => {
-        const isError = w.level === 'error';
-        return `<div style="display:flex; gap:8px; align-items:flex-start; padding:8px 10px; border-radius:var(--radius); font-size:12px; background:${isError ? 'rgba(220,53,69,0.12)' : 'rgba(245,166,35,0.12)'}; border:1px solid ${isError ? 'rgba(220,53,69,0.35)' : 'rgba(245,166,35,0.35)'}; color:${isError ? '#fc8181' : '#f6ad55'};">
-            <i class="fa-solid ${isError ? 'fa-circle-exclamation' : 'fa-triangle-exclamation'}" style="margin-top:1px;"></i>
-            <span>${escapeHtml(w.message)}</span>
-        </div>`;
-    }).join('');
+    box.innerHTML = warnings.map(_prePrintWarningHtml).join('');
     box.style.display = 'flex';
 } catch (e) {  }
 }
@@ -3668,6 +6198,7 @@ viewerCurrentPath = filePath;
 viewerCurrentFileName = fileName;
 viewerPlateCount = (plateCount && plateCount > 1) ? plateCount : 1;
 viewerCurrentPlate = 1;
+window._presenceViewingFile = { path: filePath, name: fileName };
 load3DModel(filePath, viewerCurrentPlate);
 updatePlateNavUI();
 }
@@ -3710,6 +6241,7 @@ function close3DViewer() {
 disposeViewer3D();
 closeModal('modal-3d-viewer');
 viewerCurrentPath = null;
+window._presenceViewingFile = null;
 viewerPlateCount = 1;
 viewerCurrentPlate = 1;
 viewerOverhangMode = false;
@@ -4909,6 +7441,12 @@ function applyFabricant(fabricant) {
 document.documentElement.setAttribute('data-fabricant', fabricant);
 }
 async function initSettings() {
+updateBrowserNotifStatus();
+_checkSettingsUndoAvailable();
+const highContrastToggle = document.getElementById('high-contrast-toggle');
+if (highContrastToggle) highContrastToggle.checked = localStorage.getItem('stellio-high-contrast') === '1';
+const reduceMotionToggle = document.getElementById('reduce-motion-toggle');
+if (reduceMotionToggle) reduceMotionToggle.checked = localStorage.getItem('stellio-reduce-motion') === '1';
 const themeSelector = document.getElementById('theme-selector');
 const fabricantSelector = document.getElementById('fabricant-selector');
 if (!themeSelector || !fabricantSelector) {
@@ -4964,6 +7502,7 @@ loadSlicerSettings();
 loadSpoolmanSettings();
 loadOllamaSettings();
 loadAutoScanSettings();
+loadManualInventorySettings();
 loadStartupSettings();
 loadPrintCostSettings();
 loadAccountBadges();
@@ -5244,6 +7783,45 @@ async function loadAutoScanSettings() {
     } catch (e) { console.warn('[AutoScan] Réglages indisponibles'); }
 }
 
+window.manualInventoryEnabled = true;
+
+async function loadManualInventorySettings() {
+    try {
+        const res = await fetch(`${API}/api/settings`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const enabled = data.manual_inventory_enabled !== false;
+        window.manualInventoryEnabled = enabled;
+        const toggle = document.getElementById('manual-inventory-enabled-toggle');
+        if (toggle) toggle.checked = enabled;
+    } catch (e) { console.warn('[ManualInventory] Réglages indisponibles'); }
+}
+
+async function toggleManualInventoryEnabled(enabled) {
+    window.manualInventoryEnabled = enabled;
+    try {
+        const res = await fetch(`${API}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ manual_inventory_enabled: enabled })
+        });
+        if (res.ok) {
+            showToast(enabled
+                ? _t3('toast.manual_inventory_enabled', 'Inventaire manuel activé')
+                : _t3('toast.manual_inventory_disabled', 'Inventaire manuel désactivé — vos bobines sont conservées mais ignorées partout dans Stellio'),
+                'success');
+        } else {
+            showToast(I18N.t('toast.save_error'), 'error');
+        }
+    } catch (_) {
+        showToast(I18N.t('toast.network_error'), 'error');
+    }
+    if (document.getElementById('page-spoolman')?.classList.contains('active')) {
+        loadSpoolmanPage();
+    }
+}
+window.toggleManualInventoryEnabled = toggleManualInventoryEnabled;
+
 function applyLaunchAtStartupUI(enabled, supported) {
     const block = document.getElementById('launch-minimized-block');
     if (block) {
@@ -5442,6 +8020,7 @@ async function loadPrintCostSettings() {
         const res = await fetch(`${API}/api/settings`);
         if (!res.ok) return;
         const data = await res.json();
+        _fillQuoteSettingsForm(data);
 
         printCostDefaultSpoolId = data.print_cost_default_spool_id || null;
         printCostPriceOverrides = (data.print_cost_price_overrides && typeof data.print_cost_price_overrides === 'object') ? data.print_cost_price_overrides : {};
@@ -5526,6 +8105,105 @@ async function savePrintCostSettings() {
     }
 }
 window.savePrintCostSettings = savePrintCostSettings;
+
+// ── Réglages du devis : en-tête (nom, logo, adresse, contact), SIRET/TVA, mentions légales ──
+let _quoteLogoData = '';
+
+function _renderQuoteLogoPreview() {
+    const box = document.getElementById('settings-quote-logo-preview');
+    const removeBtn = document.getElementById('settings-quote-logo-remove');
+    if (!box) return;
+    box.textContent = '';
+    if (_quoteLogoData && _quoteLogoData.startsWith('data:image/')) {
+        const img = document.createElement('img');
+        img.src = _quoteLogoData;
+        img.alt = '';
+        img.style.cssText = 'max-width:100%; max-height:100%; object-fit:contain;';
+        box.appendChild(img);
+        if (removeBtn) removeBtn.style.display = '';
+    } else {
+        const icon = document.createElement('i');
+        icon.className = 'fa-solid fa-image';
+        box.appendChild(icon);
+        if (removeBtn) removeBtn.style.display = 'none';
+    }
+}
+
+function _fillQuoteSettingsForm(data) {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
+    set('settings-quote-company', data.quote_company ?? data.print_cost_quote_company ?? '');
+    set('settings-quote-address', data.quote_address);
+    set('settings-quote-phone', data.quote_phone);
+    set('settings-quote-email', data.quote_email);
+    set('settings-quote-website', data.quote_website);
+    set('settings-quote-tax-id', data.quote_tax_id);
+    set('settings-quote-legal', data.quote_legal);
+    _quoteLogoData = typeof data.quote_logo === 'string' ? data.quote_logo : '';
+    _renderQuoteLogoPreview();
+}
+
+function onQuoteLogoSelected(input) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    const fail = () => showToast(I18N.t('settings.quote_logo_error') || 'Image invalide ou trop lourde', 'error');
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) { fail(); return; }
+    const reader = new FileReader();
+    reader.onerror = fail;
+    reader.onload = () => {
+        const img = new Image();
+        img.onerror = fail;
+        img.onload = () => {
+            const ratio = Math.min(1, 600 / img.width, 300 / img.height);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(img.width * ratio));
+            canvas.height = Math.max(1, Math.round(img.height * ratio));
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/png');
+            if (dataUrl.length > 1500000) { fail(); return; }
+            _quoteLogoData = dataUrl;
+            _renderQuoteLogoPreview();
+        };
+        img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+}
+window.onQuoteLogoSelected = onQuoteLogoSelected;
+
+function removeQuoteLogo() {
+    _quoteLogoData = '';
+    _renderQuoteLogoPreview();
+}
+window.removeQuoteLogo = removeQuoteLogo;
+
+async function saveQuoteSettings() {
+    const val = (id, max) => (document.getElementById(id)?.value || '').trim().slice(0, max);
+    const payload = {
+        quote_company: val('settings-quote-company', 120),
+        quote_logo: _quoteLogoData || '',
+        quote_address: val('settings-quote-address', 300),
+        quote_phone: val('settings-quote-phone', 40),
+        quote_email: val('settings-quote-email', 120),
+        quote_website: val('settings-quote-website', 120),
+        quote_tax_id: val('settings-quote-tax-id', 80),
+        quote_legal: val('settings-quote-legal', 1500),
+    };
+    try {
+        const res = await fetch(`${API}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+            showToast(I18N.t('toast.settings_saved') || 'Réglages enregistrés', 'success');
+        } else {
+            showToast(I18N.t('toast.save_error') || 'Erreur', 'error');
+        }
+    } catch (_) {
+        showToast(I18N.t('toast.network_error') || 'Erreur de connexion', 'error');
+    }
+}
+window.saveQuoteSettings = saveQuoteSettings;
 
 function toggleOllamaGuide(forceOpen) {
     const guide = document.getElementById('ollama-guide');
@@ -5825,11 +8503,9 @@ function setSosprintPhoto(file) {
 
 function clearSosprintPhoto() {
     sosprintPhotoFile = null;
-    const photoInput = document.getElementById('sosprint-photo-input');
     const placeholderEl = document.getElementById('sosprint-photo-placeholder');
     const previewEl = document.getElementById('sosprint-photo-preview');
     const previewImgEl = document.getElementById('sosprint-photo-preview-img');
-    if (photoInput) photoInput.value = '';
     if (previewImgEl) previewImgEl.src = '';
     if (previewEl) previewEl.style.display = 'none';
     if (placeholderEl) placeholderEl.style.display = 'flex';
@@ -5837,17 +8513,11 @@ function clearSosprintPhoto() {
 
 (() => {
     const zone = document.getElementById('sosprint-photo-zone');
-    const input = document.getElementById('sosprint-photo-input');
     const removeBtn = document.getElementById('sosprint-photo-remove');
 
     zone?.addEventListener('click', (e) => {
         if (e.target.closest('.sosprint-photo-remove')) return;
-        input?.click();
-    });
-
-    input?.addEventListener('change', (e) => {
-        const file = e.target.files?.[0];
-        if (file) setSosprintPhoto(file);
+        pickPhoto(setSosprintPhoto);
     });
 
     removeBtn?.addEventListener('click', (e) => {
@@ -5870,13 +8540,11 @@ function clearSosprintPhoto() {
 
 (() => {
     const addBtn = document.getElementById('sosprint-add-photo-btn');
-    const input = document.getElementById('sosprint-extra-photo-input');
     const statusEl = document.getElementById('sosprint-extra-photo-status');
 
-    addBtn?.addEventListener('click', () => input?.click());
+    addBtn?.addEventListener('click', () => pickPhoto(uploadExtraPhoto));
 
-    input?.addEventListener('change', async (e) => {
-        const file = e.target.files?.[0];
+    async function uploadExtraPhoto(file) {
         if (!file) return;
         if (!sosprintConversationId) {
             showToast(_t2('sosprint.no_conversation_yet', "Démarrez d'abord une enquête avant d'ajouter une photo"), 'warning');
@@ -5901,9 +8569,8 @@ function clearSosprintPhoto() {
             showToast(`${_t2('sosprint.photo_add_error', "Échec de l'ajout de la photo")} : ${err.message}`, 'error');
         } finally {
             addBtn.disabled = false;
-            input.value = '';
         }
-    });
+    }
 })();
 
 async function runSosprintDiagnosis(material, description, answers) {
@@ -6549,7 +9216,9 @@ async function getSpoolmanUrl() {
 }
 
 async function loadSpoolmanPage() {
-    const grid = document.getElementById('spoolman-grid');
+    const spoolmanSection = document.getElementById('spoolman-section');
+    const manualSection = document.getElementById('manual-section');
+    const manualGrid = document.getElementById('manual-grid');
     const label = document.getElementById('spoolman-server-label');
     const addBtn = document.getElementById('add-manual-spool-btn');
     const filtersBar = document.getElementById('spoolman-filters');
@@ -6559,36 +9228,55 @@ async function loadSpoolmanPage() {
         document.getElementById('spool-header-location'),
         document.getElementById('spool-header-sort')
     ];
-    if (!grid) return;
+    if (!spoolmanSection || !manualSection || !manualGrid) return;
 
     const url = await getSpoolmanUrl();
+    const manualEnabled = !!window.manualInventoryEnabled;
     const isSpoolmanPageActive = document.getElementById('page-spoolman')?.classList.contains('active');
+
+    // Les filtres de l'en-tête ne s'appliquent qu'à l'inventaire manuel
     headerFilterEls.forEach(el => {
         if (!el) return;
-        el.classList.toggle('header-hide', !!url || !isSpoolmanPageActive);
+        el.classList.toggle('header-hide', !manualEnabled || !isSpoolmanPageActive);
     });
 
-    if (label) {
-        label.innerHTML = url
-            ? `<i class="fa-solid fa-circle-nodes"></i> ${escapeHtml(url)}`
-            : `<i class="fa-solid fa-box-open"></i> ${_t2('spoolman.local_inventory_label', 'Inventaire local (sans serveur Spoolman)')}`;
-    }
+    // Une bannière + une grille par source : Spoolman, inventaire manuel, TigerTag
+    spoolmanSection.style.display = url ? 'block' : 'none';
+    if (label) label.textContent = url || '';
+    manualSection.style.display = (manualEnabled || !url) ? 'block' : 'none';
 
-    if (!url) {
+    const tasks = [];
+    if (url) tasks.push(loadSpoolmanServer(url));
+    if (manualEnabled) {
         if (addBtn) addBtn.style.display = '';
         if (filtersBar) filtersBar.style.display = 'flex';
-        await loadManualSpoolInventory();
-        return;
+        tasks.push(loadManualSpoolInventory());
+    } else {
+        if (addBtn) addBtn.style.display = 'none';
+        if (filtersBar) filtersBar.style.display = 'none';
+        if (!url) {
+            manualGrid.innerHTML = `
+                <div class="empty-state">
+                    <i class="fa-solid fa-pen-slash"></i>
+                    <p>${_t3('spoolman.manual_disabled', "Inventaire manuel désactivé (Paramètres → Inventaire filament).")}</p>
+                </div>`;
+        }
     }
+    tasks.push(loadTigerTagSpools());
+    await Promise.all(tasks);
+}
+window.loadSpoolmanPage = loadSpoolmanPage;
 
-    if (addBtn) addBtn.style.display = 'none';
-    if (filtersBar) filtersBar.style.display = 'none';
+async function loadSpoolmanServer(url) {
+    const grid = document.getElementById('spoolman-grid');
+    if (!grid) return;
+    url = url || await getSpoolmanUrl();
+    if (!url) return;
     grid.innerHTML = `
         <div class="empty-state">
             <i class="fa-solid fa-spinner fa-spin"></i>
             <p>${I18N.t('spoolman.loading')}</p>
         </div>`;
-
     try {
         const res = await fetch(`${API}/api/spoolman/spools?url=${encodeURIComponent(url)}`);
         const data = await res.json();
@@ -6597,7 +9285,7 @@ async function loadSpoolmanPage() {
                 <div class="empty-state">
                     <i class="fa-solid fa-triangle-exclamation"></i>
                     <p>${escapeHtml(data.error || I18N.t('spoolman.connection_error'))}</p>
-                    <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="loadSpoolmanPage()">${I18N.t('actions.retry')}</button>
+                    <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="loadSpoolmanServer()">${I18N.t('actions.retry')}</button>
                 </div>`;
             return;
         }
@@ -6608,15 +9296,15 @@ async function loadSpoolmanPage() {
             <div class="empty-state">
                 <i class="fa-solid fa-triangle-exclamation"></i>
                 <p>${_t2('spoolman.server_unreachable', 'Serveur injoignable')}</p>
-                <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="loadSpoolmanPage()">${I18N.t('actions.retry')}</button>
+                <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="loadSpoolmanServer()">${I18N.t('actions.retry')}</button>
             </div>`;
     }
 }
-window.loadSpoolmanPage = loadSpoolmanPage;
+window.loadSpoolmanServer = loadSpoolmanServer;
 
 
 async function loadManualSpoolInventory() {
-    const grid = document.getElementById('spoolman-grid');
+    const grid = document.getElementById('manual-grid');
     if (!grid) return;
     grid.innerHTML = `
         <div class="empty-state">
@@ -6745,7 +9433,7 @@ function renderManualSpoolGrid(spools) {
 window.renderManualSpoolGrid = renderManualSpoolGrid;
 
 function _renderManualSpoolCards(spools) {
-    const grid = document.getElementById('spoolman-grid');
+    const grid = document.getElementById('manual-grid');
     if (!grid) return;
     if (!_manualSpoolCache.length) {
         grid.innerHTML = `
@@ -6769,8 +9457,10 @@ function _renderManualSpoolCards(spools) {
         const capacity = s.capacity_g || null;
         const pct = (remaining !== null && capacity) ? Math.max(0, Math.min(100, (remaining / capacity) * 100)) : null;
         const archived = !!s.archived;
+        const detail = _detailFromManual(s);
+        _spoolDetailRegistry[detail.key] = detail;
         return `
-            <div class="spool-card ${archived ? 'archived' : ''}">
+            <div class="spool-card ${archived ? 'archived' : ''}" data-detail-key="${detail.key}">
                 <div class="spool-card-header">
                     <span class="spool-color-dot" style="background:${escapeHtml(color)};"></span>
                     <div class="spool-title">
@@ -6948,6 +9638,1173 @@ async function deleteManualSpoolFromInventory(spoolId) {
 }
 window.deleteManualSpoolFromInventory = deleteManualSpoolFromInventory;
 
+// ---------- Fiche détaillée d'une bobine (clic sur une carte de l'inventaire) ----------
+// ============================================================================
+// Rôles (mode invité), séchage des bobines, calibrations, pièces d'usure
+// ============================================================================
+function _tf(key, fallback, params) {
+    let out = _t3(key, fallback, params);
+    if (params) Object.keys(params).forEach(k => { out = String(out).split(`{{${k}}}`).join(String(params[k])); });
+    return out;
+}
+
+function applyRoleUI(user) {
+    IS_VIEWER = !!user && user.role === 'viewer';
+    window.IS_VIEWER = IS_VIEWER;
+    document.body.classList.toggle('role-viewer', IS_VIEWER);
+    let banner = document.getElementById('viewer-banner');
+    if (IS_VIEWER) {
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'viewer-banner';
+            banner.className = 'viewer-banner';
+            document.body.appendChild(banner);
+        }
+        banner.innerHTML = `<i class="fa-solid fa-eye"></i> <span>${escapeHtml(_t3('viewer.banner', 'Mode invité — lecture seule'))}</span>`;
+    } else if (banner) {
+        banner.remove();
+    }
+}
+
+async function _extrasGetPrinters() {
+    if (typeof printersList !== 'undefined' && Array.isArray(printersList) && printersList.length) return printersList;
+    try {
+        const res = await fetch(`${API}/api/printers`);
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+    } catch (e) { return []; }
+}
+
+function _extrasPrinterOptions(printers, selected, emptyLabel) {
+    return `<option value="">${escapeHtml(emptyLabel)}</option>` + printers.map(p =>
+        `<option value="${p.id}" ${String(selected ?? '') === String(p.id) ? 'selected' : ''}>${escapeHtml(p.name || ('#' + p.id))}</option>`).join('');
+}
+
+function _extrasNumInput(name, label, value, step, extra = '') {
+    return `<label class="spool-extra-field"><span>${escapeHtml(label)}</span><input type="number" name="${name}" step="${step}" value="${value ?? ''}" ${extra}></label>`;
+}
+
+// ----------------------------------------------------------------------------
+// Fiche bobine : blocs « Séchage » et « Calibrations »
+// ----------------------------------------------------------------------------
+function _initSpoolDetailExtras(d) {
+    if (!d || !d.source_type || d.source_id === undefined || d.source_id === null || d.source_id === '') return;
+    const host = document.getElementById('spool-detail-extras');
+    if (!host) return;
+    host.innerHTML = `<div class="spool-extra" id="spool-report-box"></div><div class="spool-extra" id="spool-drying-box"></div><div class="spool-extra" id="spool-calib-box"></div>`;
+    _loadSpoolReport(d);
+    _loadSpoolDrying(d);
+    _loadSpoolCalib(d);
+}
+
+const _DRY_KIND_LABELS = {
+    dried: ['drying.kind_dried', 'Séchée'],
+    opened: ['drying.kind_opened', "Sortie à l'air"],
+    sealed: ['drying.kind_sealed', 'Rangée au sec']
+};
+
+function _extrasFmtDate(iso) {
+    try { return new Date(iso).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }); } catch (e) { return String(iso || ''); }
+}
+
+async function _loadSpoolDrying(d) {
+    const box = document.getElementById('spool-drying-box');
+    if (!box) return;
+    try {
+        const qs = new URLSearchParams({ source_type: d.source_type, source_id: String(d.source_id), material: d.material || '' });
+        const res = await fetch(`${API}/api/filament/drying?${qs}`);
+        if (!res.ok) { box.innerHTML = ''; return; }
+        _renderSpoolDrying(box, d, await res.json());
+    } catch (e) { box.innerHTML = ''; }
+}
+
+async function _dryPost(d, body) {
+    const label = [d.vendor, d.name].filter(Boolean).filter((v, i, a) => a.findIndex(x => String(x).toLowerCase() === String(v).toLowerCase()) === i).join(' ');
+    const payload = Object.assign({ source_type: d.source_type, source_id: String(d.source_id), source_label: label, material: d.material || '' }, body);
+    try {
+        const res = await fetch(`${API}/api/filament/drying`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { if (data.code !== 'viewer_readonly') showToast(data.error || _t3('toast.error', 'Erreur'), 'error'); return false; }
+        return true;
+    } catch (e) {
+        showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error');
+        return false;
+    }
+}
+
+function _renderSpoolDrying(box, d, data) {
+    const st = data.status || { state: 'none' };
+    const adv = data.advice;
+    const pills = {
+        none: ['dry-pill-none', _t3('drying.state_none', 'Aucun suivi')],
+        ok: ['dry-pill-ok', _t3('drying.state_ok', 'Sèche')],
+        due: ['dry-pill-due', _t3('drying.state_due', 'À sécher')],
+        sealed: ['dry-pill-ok', _t3('drying.state_sealed', 'Rangée au sec')]
+    };
+    const [pillCls, pillText] = pills[st.state] || pills.none;
+    const since = ((st.state === 'ok' || st.state === 'due') && st.days_since != null)
+        ? `<div class="spool-extra-hint">${escapeHtml(_tf('drying.since', 'Depuis {{days}} j · rappel conseillé tous les {{interval}} j', { days: Math.floor(st.days_since), interval: st.interval_days }))}</div>` : '';
+    const advice = adv
+        ? _tf('drying.advice', 'Séchage conseillé ({{material}}) : {{temp}} °C pendant ~{{hours}} h. Valeurs indicatives — vérifie la fiche du fabricant.', { material: adv.material_class, temp: adv.temp_c, hours: adv.hours })
+        : _t3('drying.advice_unknown', 'Matière non reconnue : rappel après 60 jours. Vérifie la fiche du fabricant pour le séchage.');
+    const events = data.events || [];
+    const rows = events.map(ev => {
+        const [k, fb] = _DRY_KIND_LABELS[ev.kind] || _DRY_KIND_LABELS.dried;
+        const bits = [];
+        if (ev.temp_c != null) bits.push(`${ev.temp_c} °C`);
+        if (ev.duration_h != null) bits.push(`${ev.duration_h} h`);
+        if (ev.humidity_pct != null) bits.push(`${ev.humidity_pct} %`);
+        return `<div class="spool-extra-row">
+            <div style="min-width:0;"><strong>${escapeHtml(_t3(k, fb))}</strong> · ${escapeHtml(_extrasFmtDate(ev.event_at))}${bits.length ? ` · ${escapeHtml(bits.join(' · '))}` : ''}</div>
+            <button type="button" class="btn btn-ghost btn-sm viewer-hide" data-dry-del="${ev.id}" title="${escapeHtml(_t3('actions.delete', 'Supprimer'))}"><i class="fa-solid fa-trash-can"></i></button>
+        </div>`;
+    }).join('');
+    box.innerHTML = `
+        <div class="spool-extra-head"><i class="fa-solid fa-droplet"></i><span>${escapeHtml(_t3('drying.title', 'Séchage & humidité'))}</span><span class="dry-pill ${pillCls}">${escapeHtml(pillText)}</span></div>
+        ${since}
+        <div class="spool-extra-hint">${escapeHtml(advice)}</div>
+        <div class="spool-extra-actions viewer-hide">
+            <button type="button" class="btn btn-ghost btn-sm" data-dry="form"><i class="fa-solid fa-temperature-arrow-up"></i> ${escapeHtml(_t3('drying.btn_dried', 'Séchée'))}</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-dry="opened"><i class="fa-solid fa-wind"></i> ${escapeHtml(_t3('drying.btn_opened', "Sortie à l'air"))}</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-dry="sealed"><i class="fa-solid fa-box-archive"></i> ${escapeHtml(_t3('drying.btn_sealed', 'Rangée au sec'))}</button>
+        </div>
+        <div class="spool-extra-form hidden" data-dry-form>
+            ${_extrasNumInput('temp', _t3('drying.field_temp', 'Température (°C)'), adv ? adv.temp_c : '', '1', 'min="20" max="120"')}
+            ${_extrasNumInput('hours', _t3('drying.field_hours', 'Durée (h)'), adv ? adv.hours : '', '0.5', 'min="0.5" max="72"')}
+            ${_extrasNumInput('hum', _t3('drying.field_humidity', 'Humidité mesurée (%) — optionnel'), '', '1', 'min="0" max="100"')}
+            <div class="spool-extra-form-actions">
+                <button type="button" class="btn btn-primary btn-sm" data-dry-save><i class="fa-solid fa-check"></i> ${escapeHtml(_t3('actions.save', 'Enregistrer'))}</button>
+            </div>
+        </div>
+        ${events.length ? `<details class="spool-extra-details"><summary>${escapeHtml(_tf('drying.history', 'Historique ({{n}})', { n: events.length }))}</summary>${rows}</details>` : ''}`;
+
+    box.querySelector('[data-dry="form"]')?.addEventListener('click', () => box.querySelector('[data-dry-form]').classList.toggle('hidden'));
+    box.querySelectorAll('[data-dry="opened"],[data-dry="sealed"]').forEach(b => b.addEventListener('click', async () => {
+        if (await _dryPost(d, { kind: b.dataset.dry })) _loadSpoolDrying(d);
+    }));
+    box.querySelector('[data-dry-save]')?.addEventListener('click', async () => {
+        const f = box.querySelector('[data-dry-form]');
+        const body = { kind: 'dried', temp_c: f.querySelector('[name=temp]').value, duration_h: f.querySelector('[name=hours]').value, humidity_pct: f.querySelector('[name=hum]').value };
+        if (await _dryPost(d, body)) { showToast(_t3('drying.saved', 'Séchage enregistré'), 'success'); _loadSpoolDrying(d); }
+    });
+    box.querySelectorAll('[data-dry-del]').forEach(b => b.addEventListener('click', async () => {
+        try {
+            const res = await fetch(`${API}/api/filament/drying/${b.dataset.dryDel}`, { method: 'DELETE' });
+            if (res.ok) _loadSpoolDrying(d);
+        } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+    }));
+}
+
+// ----------------------------------------------------------------------------
+// Calibrations (par marque + matière + imprimante)
+// ----------------------------------------------------------------------------
+const _CALIB_FIELDS = [
+    ['nozzle_diameter', 'calib.nozzle_diameter', 'Ø buse (mm)', '0.05'],
+    ['nozzle_temp', 'calib.nozzle_temp', 'Buse (°C)', '1'],
+    ['bed_temp', 'calib.bed_temp', 'Plateau (°C)', '1'],
+    ['flow_ratio', 'calib.flow_ratio', 'Flow ratio', '0.001'],
+    ['pressure_advance', 'calib.pressure_advance', 'Pressure advance / K', '0.001'],
+    ['max_flow', 'calib.max_flow', 'Débit max (mm³/s)', '0.1'],
+    ['retraction_mm', 'calib.retraction', 'Rétraction (mm)', '0.1']
+];
+
+function _calibSummary(c) {
+    const bits = [];
+    if (c.nozzle_diameter != null) bits.push(`Ø${c.nozzle_diameter}`);
+    if (c.nozzle_temp != null) bits.push(`${c.nozzle_temp} °C`);
+    if (c.bed_temp != null) bits.push(`${_t3('calib.bed_short', 'plateau')} ${c.bed_temp} °C`);
+    if (c.flow_ratio != null) bits.push(`flow ${c.flow_ratio}`);
+    if (c.pressure_advance != null) bits.push(`PA ${c.pressure_advance}`);
+    if (c.max_flow != null) bits.push(`${c.max_flow} mm³/s`);
+    if (c.retraction_mm != null) bits.push(`${_t3('calib.retraction_short', 'rétr.')} ${c.retraction_mm} mm`);
+    return bits.join(' · ');
+}
+
+async function _loadSpoolCalib(d) {
+    const box = document.getElementById('spool-calib-box');
+    if (!box) return;
+    if (!d.material) { box.innerHTML = ''; return; }
+    try {
+        const qs = new URLSearchParams({ material: d.material, brand: d.vendor || '' });
+        const [res, printers] = await Promise.all([fetch(`${API}/api/calibrations?${qs}`), _extrasGetPrinters()]);
+        if (!res.ok) { box.innerHTML = ''; return; }
+        const data = await res.json();
+        _renderSpoolCalib(box, d, data.calibrations || [], printers);
+    } catch (e) { box.innerHTML = ''; }
+}
+
+function _renderSpoolCalib(box, d, items, printers) {
+    window._calibItemsCache = items;
+    const list = items.map(c => `
+        <div class="spool-extra-row" style="align-items:flex-start;">
+            <div style="min-width:0;">
+                <div><strong>${escapeHtml(c.printer_name || _t3('calib.any_printer', 'Toutes imprimantes'))}</strong>${c.brand ? ` · ${escapeHtml(c.brand)}` : ''}</div>
+                <div class="spool-extra-hint" style="margin:2px 0 0;">${escapeHtml(_calibSummary(c))}</div>
+                ${c.notes ? `<div class="spool-extra-hint" style="margin:2px 0 0;">${escapeHtml(c.notes)}</div>` : ''}
+            </div>
+            <div style="display:flex; gap:2px; flex-shrink:0;" class="viewer-hide">
+                <button type="button" class="btn btn-ghost btn-sm" data-calib-edit="${c.id}" title="${escapeHtml(_t3('actions.edit', 'Modifier'))}"><i class="fa-solid fa-pen"></i></button>
+                <button type="button" class="btn btn-ghost btn-sm" data-calib-del="${c.id}" title="${escapeHtml(_t3('actions.delete', 'Supprimer'))}"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+        </div>`).join('');
+    box.innerHTML = `
+        <div class="spool-extra-head"><i class="fa-solid fa-sliders"></i><span>${escapeHtml(_t3('calib.title', 'Calibrations'))}</span><span class="dry-pill dry-pill-none">${items.length}</span></div>
+        ${items.length ? list : `<div class="spool-extra-hint">${escapeHtml(_t3('calib.empty', 'Aucune calibration enregistrée pour cette matière.'))}</div>`}
+        <div class="spool-extra-actions viewer-hide">
+            <button type="button" class="btn btn-ghost btn-sm" data-calib-new><i class="fa-solid fa-plus"></i> ${escapeHtml(_t3('calib.add', 'Enregistrer une calibration'))}</button>
+        </div>
+        <div class="spool-extra-form hidden" data-calib-form>
+            <label class="spool-extra-field"><span>${escapeHtml(_t3('calib.printer', 'Imprimante'))}</span>
+                <select name="printer_id" class="settings-select">${_extrasPrinterOptions(printers, '', _t3('calib.any_printer', 'Toutes imprimantes'))}</select></label>
+            ${_CALIB_FIELDS.map(([name, key, fb, step]) => _extrasNumInput(name, _t3(key, fb), name === 'nozzle_diameter' ? 0.4 : '', step)).join('')}
+            <label class="spool-extra-field" style="grid-column:1/-1;"><span>${escapeHtml(_t3('calib.notes', 'Notes'))}</span><input type="text" name="notes" maxlength="400"></label>
+            <div class="spool-extra-form-actions">
+                <button type="button" class="btn btn-primary btn-sm" data-calib-save><i class="fa-solid fa-check"></i> ${escapeHtml(_t3('actions.save', 'Enregistrer'))}</button>
+            </div>
+        </div>`;
+    const form = box.querySelector('[data-calib-form]');
+    box.querySelector('[data-calib-new]')?.addEventListener('click', () => form.classList.toggle('hidden'));
+    box.querySelectorAll('[data-calib-edit]').forEach(b => b.addEventListener('click', () => {
+        const c = items.find(x => String(x.id) === b.dataset.calibEdit);
+        if (!c) return;
+        form.classList.remove('hidden');
+        form.querySelector('[name=printer_id]').value = c.printer_id ?? '';
+        _CALIB_FIELDS.forEach(([name]) => { form.querySelector(`[name=${name}]`).value = c[name] ?? ''; });
+        form.querySelector('[name=notes]').value = c.notes || '';
+    }));
+    box.querySelectorAll('[data-calib-del]').forEach(b => b.addEventListener('click', async () => {
+        const ok = await showConfirmDialog(_t3('calib.delete_confirm', 'Supprimer cette calibration ?'), { danger: true });
+        if (!ok) return;
+        try {
+            const res = await fetch(`${API}/api/calibrations/${b.dataset.calibDel}`, { method: 'DELETE' });
+            if (res.ok) _loadSpoolCalib(d);
+        } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+    }));
+    box.querySelector('[data-calib-save]')?.addEventListener('click', async () => {
+        const body = { brand: d.vendor || '', material: d.material || '', printer_id: form.querySelector('[name=printer_id]').value || null, notes: form.querySelector('[name=notes]').value };
+        _CALIB_FIELDS.forEach(([name]) => { body[name] = form.querySelector(`[name=${name}]`).value; });
+        try {
+            const res = await fetch(`${API}/api/calibrations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) { if (data.code !== 'viewer_readonly') showToast(data.error || _t3('toast.error', 'Erreur'), 'error'); return; }
+            showToast(data.updated ? _t3('calib.updated', 'Calibration mise à jour') : _t3('calib.saved', 'Calibration enregistrée'), 'success');
+            _loadSpoolCalib(d);
+        } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+    });
+}
+
+// Fenêtre « Envoyer au slicer » : rappelle la calibration connue du filament assigné au fichier
+async function _loadSlicerCalibBox(path) {
+    const box = document.getElementById('slicer-calib-box');
+    if (!box) return;
+    box.style.display = 'none';
+    box.innerHTML = '';
+    try {
+        const ar = await fetch(`${API}/api/files/filament-assignment?path=${encodeURIComponent(path)}`);
+        const a = (await ar.json()).assignment;
+        if (!a || !a.material) return;
+        const qs = new URLSearchParams({ material: a.material, printer_id: a.printer_id || '' });
+        const sr = await fetch(`${API}/api/calibrations/suggest?${qs}`);
+        if (!sr.ok) return;
+        const s = await sr.json();
+        if (!s.calibration || currentSlicerFile !== path) return;
+        const c = s.calibration;
+        const where = c.printer_name || _t3('calib.any_printer', 'Toutes imprimantes');
+        box.innerHTML = `<i class="fa-solid fa-sliders"></i> <span><strong>${escapeHtml(_tf('calib.slicer_hint', 'Calibration connue ({{material}} · {{printer}})', { material: a.material, printer: where }))}</strong> — ${escapeHtml(_calibSummary(c))}</span>`;
+        box.style.display = 'flex';
+    } catch (e) { /* indice facultatif */ }
+}
+
+// ----------------------------------------------------------------------------
+// Pièces d'usure et consommables
+// ----------------------------------------------------------------------------
+const _PART_CATEGORIES = [
+    ['nozzle', 'parts.cat_nozzle', 'Buse / hotend'], ['plate', 'parts.cat_plate', 'Plateau / PEI'],
+    ['belt', 'parts.cat_belt', 'Courroie'], ['fan', 'parts.cat_fan', 'Ventilateur'],
+    ['ptfe', 'parts.cat_ptfe', 'Tube PTFE'], ['lubricant', 'parts.cat_lubricant', 'Lubrifiant'],
+    ['other', 'parts.cat_other', 'Autre']
+];
+let _partsCache = [];
+
+function _partCatLabel(cat) {
+    const f = _PART_CATEGORIES.find(c => c[0] === cat) || _PART_CATEGORIES[_PART_CATEGORIES.length - 1];
+    return _t3(f[1], f[2]);
+}
+
+function openPartsModal() {
+    let modal = document.getElementById('modal-parts');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-parts';
+        modal.className = 'modal hidden';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fa-solid fa-toolbox"></i> <span>${escapeHtml(_t3('parts.title', "Pièces d'usure & consommables"))}</span></h3>
+                    <button class="modal-close" onclick="closeModal('modal-parts')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="settings-hint" style="margin-bottom:12px;">${escapeHtml(_t3('parts.hint', "Suis ton stock de buses, plateaux, courroies… Lie une pièce à une tâche de maintenance : chaque entretien effectué décompte une unité."))}</p>
+                    <div id="parts-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;"></div>
+                    <div class="viewer-hide">
+                        <button type="button" class="btn btn-ghost btn-sm" id="parts-new-btn"><i class="fa-solid fa-plus"></i> ${escapeHtml(_t3('parts.add', 'Ajouter une pièce'))}</button>
+                        <div id="parts-form" class="spool-extra-form hidden" style="margin-top:10px;"></div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-parts'); });
+        modal.querySelector('#parts-new-btn').addEventListener('click', () => _partsShowForm(null));
+    }
+    openModal('modal-parts');
+    loadParts();
+}
+window.openPartsModal = openPartsModal;
+
+async function loadParts() {
+    const list = document.getElementById('parts-list');
+    if (!list) return;
+    try {
+        const res = await fetch(`${API}/api/parts`);
+        const data = await res.json();
+        _partsCache = data.parts || [];
+    } catch (e) {
+        list.innerHTML = `<div style="color:var(--danger); font-size:12.5px;">${escapeHtml(_t3('toast.connection_error', 'Erreur de connexion'))}</div>`;
+        return;
+    }
+    if (!_partsCache.length) {
+        list.innerHTML = `<p class="settings-hint">${escapeHtml(_t3('parts.empty', 'Aucune pièce suivie pour le moment.'))}</p>`;
+        return;
+    }
+    list.innerHTML = _partsCache.map(p => `
+        <div class="spool-extra-row part-row ${p.low ? 'part-low' : ''}">
+            <div style="min-width:0; flex:1;">
+                <div style="font-weight:600; font-size:13px;">${p.low ? '<i class="fa-solid fa-triangle-exclamation" style="color:var(--danger);"></i> ' : ''}${escapeHtml(p.name)}</div>
+                <div class="spool-extra-hint" style="margin:2px 0 0;">${escapeHtml(_partCatLabel(p.category))}${p.printer_name ? ` · ${escapeHtml(p.printer_name)}` : ''} · ${escapeHtml(_tf('parts.alert_at', 'alerte à {{n}}', { n: p.alert_qty }))}</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                <button type="button" class="btn btn-ghost btn-sm viewer-hide" data-part-adj="-1:${p.id}"><i class="fa-solid fa-minus"></i></button>
+                <strong style="min-width:26px; text-align:center;">${p.stock_qty}</strong>
+                <button type="button" class="btn btn-ghost btn-sm viewer-hide" data-part-adj="1:${p.id}"><i class="fa-solid fa-plus"></i></button>
+                ${p.buy_url ? `<a class="btn btn-ghost btn-sm" href="${escapeHtml(p.buy_url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(_t3('spoolman.detail_buy', 'Acheter'))}"><i class="fa-solid fa-cart-shopping"></i></a>` : ''}
+                <button type="button" class="btn btn-ghost btn-sm viewer-hide" data-part-edit="${p.id}"><i class="fa-solid fa-pen"></i></button>
+                <button type="button" class="btn btn-ghost btn-sm viewer-hide" data-part-del="${p.id}"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+        </div>`).join('');
+    list.querySelectorAll('[data-part-adj]').forEach(b => b.addEventListener('click', async () => {
+        const [delta, id] = b.dataset.partAdj.split(':');
+        try {
+            await fetch(`${API}/api/parts/${id}/adjust`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delta: Number(delta) }) });
+            loadParts();
+        } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+    }));
+    list.querySelectorAll('[data-part-edit]').forEach(b => b.addEventListener('click', () => _partsShowForm(_partsCache.find(p => String(p.id) === b.dataset.partEdit))));
+    list.querySelectorAll('[data-part-del]').forEach(b => b.addEventListener('click', async () => {
+        const ok = await showConfirmDialog(_t3('parts.delete_confirm', 'Supprimer cette pièce ? Les tâches de maintenance liées seront conservées.'), { danger: true });
+        if (!ok) return;
+        try {
+            await fetch(`${API}/api/parts/${b.dataset.partDel}`, { method: 'DELETE' });
+            loadParts();
+        } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+    }));
+}
+
+async function _partsShowForm(part) {
+    const form = document.getElementById('parts-form');
+    if (!form) return;
+    const printers = await _extrasGetPrinters();
+    const p = part || { name: '', category: 'nozzle', stock_qty: 1, alert_qty: 1, printer_id: '', buy_url: '', notes: '' };
+    form.dataset.editId = part ? part.id : '';
+    form.classList.remove('hidden');
+    form.innerHTML = `
+        <label class="spool-extra-field" style="grid-column:1/-1;"><span>${escapeHtml(_t3('parts.field_name', 'Nom (ex : Buse 0.4 acier)'))}</span><input type="text" name="name" maxlength="100" value="${escapeHtml(p.name)}"></label>
+        <label class="spool-extra-field"><span>${escapeHtml(_t3('parts.field_category', 'Catégorie'))}</span>
+            <select name="category" class="settings-select">${_PART_CATEGORIES.map(c => `<option value="${c[0]}" ${p.category === c[0] ? 'selected' : ''}>${escapeHtml(_t3(c[1], c[2]))}</option>`).join('')}</select></label>
+        <label class="spool-extra-field"><span>${escapeHtml(_t3('calib.printer', 'Imprimante'))}</span>
+            <select name="printer_id" class="settings-select">${_extrasPrinterOptions(printers, p.printer_id, _t3('parts.any_printer', 'Toutes / aucune'))}</select></label>
+        ${_extrasNumInput('stock_qty', _t3('parts.field_stock', 'En stock'), p.stock_qty, '1', 'min="0"')}
+        ${_extrasNumInput('alert_qty', _t3('parts.field_alert', 'Alerte quand il en reste ≤'), p.alert_qty, '1', 'min="0"')}
+        <label class="spool-extra-field" style="grid-column:1/-1;"><span>${escapeHtml(_t3('parts.field_url', "Lien d'achat (optionnel)"))}</span><input type="url" name="buy_url" maxlength="500" value="${escapeHtml(p.buy_url || '')}" placeholder="https://"></label>
+        <div class="spool-extra-form-actions">
+            <button type="button" class="btn btn-primary btn-sm" data-part-save><i class="fa-solid fa-check"></i> ${escapeHtml(_t3('actions.save', 'Enregistrer'))}</button>
+        </div>`;
+    form.querySelector('[data-part-save]').addEventListener('click', async () => {
+        const body = {};
+        form.querySelectorAll('[name]').forEach(el => { body[el.name] = el.value; });
+        const editId = form.dataset.editId;
+        try {
+            const res = await fetch(editId ? `${API}/api/parts/${editId}` : `${API}/api/parts`, { method: editId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) { if (data.code !== 'viewer_readonly') showToast(data.error || _t3('toast.error', 'Erreur'), 'error'); return; }
+            form.classList.add('hidden');
+            form.innerHTML = '';
+            loadParts();
+            checkPartsLowAlerts();
+        } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+    });
+}
+
+// Maintenance : liste des pièces proposables pour une tâche
+async function _maintenancePartOptions(selectedId) {
+    try {
+        const res = await fetch(`${API}/api/parts`);
+        const data = await res.json();
+        window._maintenancePartsCache = data.parts || [];
+    } catch (e) { window._maintenancePartsCache = []; }
+    return _maintenancePartOptionsHtml(selectedId);
+}
+
+function _maintenancePartOptionsHtml(selectedId) {
+    const parts = window._maintenancePartsCache || [];
+    return `<option value="">${escapeHtml(_t3('parts.no_part', '— Aucune pièce —'))}</option>` + parts.map(p =>
+        `<option value="${p.id}" ${String(selectedId ?? '') === String(p.id) ? 'selected' : ''}>${escapeHtml(p.name)} (${p.stock_qty})</option>`).join('');
+}
+
+async function _refreshMaintenancePartSelect() {
+    const sel = document.getElementById('maintenance-new-part');
+    if (!sel) return;
+    sel.innerHTML = await _maintenancePartOptions('');
+}
+
+function _handleMaintenanceResetPart(part) {
+    if (!part) return;
+    if (part.out_of_stock) {
+        showToast(_tf('parts.out_of_stock', 'Plus de stock : {{name}} — pense à en racheter', { name: part.name }), 'warning');
+    } else {
+        showToast(_tf('parts.consumed', '1 × {{name}} décompté ({{stock}} restant)', { name: part.name, stock: part.stock_qty }), part.low ? 'warning' : 'success');
+        if (part.low) checkPartsLowAlerts();
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Alertes au démarrage : bobines à sécher, pièces à recommander
+// ----------------------------------------------------------------------------
+async function checkPartsLowAlerts() {
+    if (IS_VIEWER) return;
+    try {
+        const res = await fetch(`${API}/api/parts/low`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const today = new Date().toISOString().slice(0, 10);
+        (data.parts || []).forEach(p => {
+            createNotification('low_stock', _t3('parts.notif_title', 'Pièce à recommander'),
+                `${p.name} — ${_tf('parts.notif_msg', '{{n}} en stock', { n: p.stock_qty })}`, 'printers', `part_low_${p.id}_${today}`);
+        });
+    } catch (e) { /* silencieux */ }
+}
+
+async function checkDryingDueAlerts() {
+    if (IS_VIEWER) return;
+    try {
+        const res = await fetch(`${API}/api/filament/drying/due`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const today = new Date().toISOString().slice(0, 10);
+        (data.due || []).forEach(s => {
+            createNotification('maintenance', _t3('drying.notif_title', 'Bobine à sécher'),
+                `${s.name}${s.material ? ' (' + s.material + ')' : ''} — ${_tf('drying.notif_msg', '{{days}} j depuis le dernier séchage', { days: Math.floor(s.days_since) })}`,
+                'spoolman', `drying_due_${s.source_type}_${s.source_id}_${today}`);
+        });
+    } catch (e) { /* silencieux */ }
+}
+
+function checkStellioExtrasAlerts() {
+    if (IS_VIEWER) return;
+    checkDryingDueAlerts();
+    checkPartsLowAlerts();
+    autoCheckModelUpdates();
+}
+
+// ----------------------------------------------------------------------------
+// Paramètres : comptes invités (lecture seule)
+// ----------------------------------------------------------------------------
+async function loadGuests() {
+    const list = document.getElementById('guests-list');
+    if (!list || IS_VIEWER) return;
+    try {
+        const res = await fetch(`${API}/api/auth/guests`);
+        if (!res.ok) return;
+        const guests = (await res.json()).guests || [];
+        if (!guests.length) {
+            list.innerHTML = `<div class="empty-state small"><p>${escapeHtml(_t3('guests.none', 'Aucun compte invité'))}</p></div>`;
+            return;
+        }
+        list.innerHTML = guests.map(g => `
+            <div class="spool-extra-row" data-guest-row="${g.id}">
+                <div style="min-width:0;"><i class="fa-solid fa-eye" style="color:var(--text-muted);"></i> <strong>${escapeHtml(g.username)}</strong></div>
+                <div style="display:flex; gap:4px; align-items:center;">
+                    <input type="password" class="settings-select hidden" data-guest-pw="${g.id}" placeholder="${escapeHtml(_t3('guests.new_password', 'Nouveau mot de passe'))}" style="width:150px;">
+                    <button type="button" class="btn btn-ghost btn-sm" data-guest-key="${g.id}" title="${escapeHtml(_t3('guests.change_password', 'Changer le mot de passe'))}"><i class="fa-solid fa-key"></i></button>
+                    <button type="button" class="btn btn-ghost btn-sm" data-guest-del="${g.id}" title="${escapeHtml(_t3('actions.delete', 'Supprimer'))}"><i class="fa-solid fa-trash-can"></i></button>
+                </div>
+            </div>`).join('');
+        list.querySelectorAll('[data-guest-key]').forEach(b => b.addEventListener('click', async () => {
+            const input = list.querySelector(`[data-guest-pw="${b.dataset.guestKey}"]`);
+            if (input.classList.contains('hidden')) { input.classList.remove('hidden'); input.focus(); return; }
+            if (input.value.length < 4) { showToast(_t3('guests.password_short', 'Mot de passe trop court (4 caractères minimum)'), 'error'); return; }
+            const r = await fetch(`${API}/api/auth/guests/${b.dataset.guestKey}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: input.value }) });
+            const data = await r.json().catch(() => ({}));
+            if (r.ok) { showToast(_t3('guests.password_changed', 'Mot de passe modifié'), 'success'); input.value = ''; input.classList.add('hidden'); }
+            else showToast(data.error || _t3('toast.error', 'Erreur'), 'error');
+        }));
+        list.querySelectorAll('[data-guest-del]').forEach(b => b.addEventListener('click', async () => {
+            const ok = await showConfirmDialog(_t3('guests.delete_confirm', 'Supprimer ce compte invité ? Il sera déconnecté immédiatement.'), { danger: true });
+            if (!ok) return;
+            const r = await fetch(`${API}/api/auth/guests/${b.dataset.guestDel}`, { method: 'DELETE' });
+            if (r.ok) loadGuests();
+        }));
+    } catch (e) { /* silencieux */ }
+}
+
+async function createGuest() {
+    const u = document.getElementById('guest-new-username');
+    const p = document.getElementById('guest-new-password');
+    if (!u || !p) return;
+    const username = u.value.trim();
+    if (!username || !p.value) { showToast(_t3('guests.fields_required', 'Nom et mot de passe requis'), 'error'); return; }
+    try {
+        const res = await fetch(`${API}/api/auth/guests`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password: p.value }) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { showToast(data.error || _t3('toast.error', 'Erreur'), 'error'); return; }
+        u.value = ''; p.value = '';
+        showToast(_t3('guests.created', 'Compte invité créé'), 'success');
+        loadGuests();
+    } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+}
+window.createGuest = createGuest;
+
+
+// ============================================================================
+// Avertissements avant impression, fiabilité croisée, notifications push
+// ============================================================================
+function _prePrintWarningHtml(w) {
+    const level = w.level === 'error' ? 'error' : (w.level === 'info' ? 'info' : 'warning');
+    const styles = {
+        error: ['rgba(220,53,69,0.12)', 'rgba(220,53,69,0.35)', '#fc8181', 'fa-circle-exclamation'],
+        warning: ['rgba(245,166,35,0.12)', 'rgba(245,166,35,0.35)', '#f6ad55', 'fa-triangle-exclamation'],
+        info: ['rgba(78,161,211,0.12)', 'rgba(78,161,211,0.35)', '#63b3ed', 'fa-circle-info']
+    };
+    const [bg, border, color, icon] = styles[level];
+    const text = (w.code && w.params) ? _tf('preprint.' + w.code, w.message, w.params) : w.message;
+    return `<div style="display:flex; gap:8px; align-items:flex-start; padding:8px 10px; border-radius:var(--radius); font-size:12px; background:${bg}; border:1px solid ${border}; color:${color};">
+            <i class="fa-solid ${icon}" style="margin-top:1px;"></i>
+            <span>${escapeHtml(text)}</span>
+        </div>`;
+}
+
+function _statsReliabilityRows(data) {
+    const group = document.getElementById('stat-reliability-group')?.value || 'profile';
+    if (group === 'profile') return data.profile_reliability || [];
+    return (data.reliability_breakdown || {})[group] || [];
+}
+
+function _renderStatsReliability(data) {
+    const relEl = document.getElementById('stat-profile-reliability');
+    if (!relEl) return;
+    const group = document.getElementById('stat-reliability-group')?.value || 'profile';
+    document.getElementById('stat-reliability-filament-hint')?.classList.toggle('hidden', !(group === 'material' || group === 'filament'));
+    const rel = _statsReliabilityRows(data);
+    if (!rel.length) {
+        const emptyText = group === 'profile'
+            ? (I18N.t('stats.profile_reliability_empty') || "Note tes impressions dans l'Historique pour voir apparaître ce classement.")
+            : _t3('stats.reliability_empty_group', "Pas encore de données pour ce regroupement. Note tes impressions dans l'Historique et assigne un filament avant l'envoi.");
+        relEl.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(emptyText)}</p>`;
+        return;
+    }
+    relEl.innerHTML = rel.map(p => {
+        const hasRate = p.success_rate !== null && p.success_rate !== undefined;
+        const rate = hasRate ? p.success_rate : null;
+        const col = !hasRate ? '#a0aec0' : rate >= 80 ? '#68d391' : rate >= 50 ? '#f6ad55' : '#fc8181';
+        const rateLabel = hasRate ? `${rate}%` : (I18N.t('stats.profile_reliability_unrated') || 'non noté');
+        const detail = `${p.success}✓ / ${p.failed}✗${p.unrated ? ` / ${p.unrated} ${I18N.t('stats.profile_reliability_unrated_short') || 'non notées'}` : ''}`;
+        const lost = p.failed_cost > 0 ? ` · ${_tf('stats.reliability_failed_cost', '{{cost}} perdus', { cost: formatCost(p.failed_cost) })}` : '';
+        return `<div class="stat-top-row" title="${escapeHtml(detail + lost)}">
+            <span class="stat-top-name" style="flex:1;" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>
+            <span style="color:var(--text-muted);font-size:11px;margin-right:8px;white-space:nowrap;">${escapeHtml(detail)}${escapeHtml(lost)}</span>
+            <span class="stat-top-count" style="color:${col};font-weight:600;">${rateLabel}</span>
+        </div>`;
+    }).join('');
+}
+
+document.addEventListener('change', (e) => {
+    if (e.target && e.target.id === 'stat-reliability-group' && window._lastStatsData) _renderStatsReliability(window._lastStatsData);
+});
+
+// ----------------------------------------------------------------------------
+// Paramètres : notifications push
+// ----------------------------------------------------------------------------
+const _PUSH_FIELDS = [
+    ['push-ntfy-server', 'push_ntfy_server', 'https://ntfy.sh'], ['push-ntfy-topic', 'push_ntfy_topic', ''],
+    ['push-ntfy-token', 'push_ntfy_token', ''], ['push-telegram-token', 'push_telegram_token', ''],
+    ['push-telegram-chat', 'push_telegram_chat_id', ''], ['push-discord-url', 'push_discord_url', ''],
+    ['push-webhook-url', 'push_webhook_url', '']
+];
+const _PUSH_DEFAULT_TYPES_UI = ['print_finished', 'print_failed', 'maintenance', 'low_stock'];
+
+function _pushShowProviderFields() {
+    const prov = document.getElementById('push-provider')?.value || 'ntfy';
+    document.querySelectorAll('[data-push-provider]').forEach(el => el.classList.toggle('hidden', el.dataset.pushProvider !== prov));
+}
+
+async function loadPushSettings() {
+    if (IS_VIEWER || !document.getElementById('push-provider')) return;
+    try {
+        const res = await fetch(`${API}/api/settings`);
+        if (!res.ok) return;
+        const s = await res.json();
+        document.getElementById('push-enabled').checked = !!s.push_enabled;
+        document.getElementById('push-provider').value = s.push_provider || 'ntfy';
+        _PUSH_FIELDS.forEach(([id, key, def]) => { document.getElementById(id).value = s[key] || def; });
+        const types = Array.isArray(s.push_types) ? s.push_types : _PUSH_DEFAULT_TYPES_UI;
+        document.querySelectorAll('[data-push-type]').forEach(cb => { cb.checked = types.includes(cb.dataset.pushType); });
+        _pushShowProviderFields();
+    } catch (e) { /* silencieux */ }
+}
+
+function _collectPushSettings() {
+    const out = {
+        push_enabled: document.getElementById('push-enabled').checked,
+        push_provider: document.getElementById('push-provider').value,
+        push_types: [...document.querySelectorAll('[data-push-type]')].filter(cb => cb.checked).map(cb => cb.dataset.pushType)
+    };
+    _PUSH_FIELDS.forEach(([id, key]) => { out[key] = document.getElementById(id).value.trim(); });
+    return out;
+}
+
+async function savePushSettings() {
+    try {
+        const res = await fetch(`${API}/api/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_collectPushSettings()) });
+        if (res.ok) showToast(_t3('push.saved', 'Paramètres push enregistrés'), 'success');
+        else showToast(_t3('toast.error', 'Erreur'), 'error');
+    } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+}
+
+async function testPush() {
+    try {
+        const res = await fetch(`${API}/api/push/test`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_collectPushSettings()) });
+        const data = await res.json().catch(() => ({}));
+        if (data.success) showToast(_t3('push.test_ok', 'Notification de test envoyée'), 'success');
+        else showToast(_tf('push.test_fail', "Échec de l'envoi : {{error}}", { error: data.error || _t3('toast.error', 'Erreur') }), 'error');
+    } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+}
+
+
+// ============================================================================
+// Réimprimer comme la dernière fois, bilan mensuel, bilan de bobine,
+// détection de nouvelles versions des modèles
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// Réimprimer comme la dernière fois
+// ----------------------------------------------------------------------------
+window.reprintHistoryFile = async function (filePath, fileName, entryId) {
+    if (!(await _checkHistoryFileExists(filePath))) {
+        showToast(I18N.t('history.file_missing') || "Ce fichier n'est plus disponible — il a peut-être été déplacé ou supprimé.", 'error');
+        return;
+    }
+    const entry = (typeof _historyEntries !== 'undefined' ? _historyEntries : []).find(e => e.id === entryId);
+    const profile = (entry && entry.slicer_profile_id)
+        ? { id: entry.slicer_profile_id, name: entry.slicer_profile_name || entry.slicer_profile_id } : null;
+
+    // 1) Remet en place le filament assigné lors de cette impression
+    if (entry && entry.assignment_json) {
+        try {
+            const snap = JSON.parse(entry.assignment_json);
+            if (snap && snap.source_type && snap.source_id) {
+                await fetch(`${API}/api/files/assign-filament`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        path: filePath, source_type: snap.source_type, source_id: snap.source_id, name: snap.name || '',
+                        material: snap.material || '', color_hex: snap.color_hex || '', spoolman_url: snap.spoolman_url || '',
+                        printer_id: entry.printer_id ?? snap.printer_id ?? null
+                    })
+                });
+            }
+        } catch (e) { /* le filament reste celui actuellement assigné */ }
+    }
+
+    // 2) Ouvre la fenêtre d'envoi avec le profil, puis 3) reprend imprimante / matière
+    sendToSlicer(filePath, fileName, profile);
+    if (entry) _applyReprintContext(entry);
+};
+
+function _applyReprintContext(entry) {
+    const details = [];
+    const printerSel = document.getElementById('slicer-ai-printer-select');
+    if (printerSel && entry.printer_id !== null && entry.printer_id !== undefined) {
+        const val = String(entry.printer_id);
+        if ([...printerSel.options].some(o => o.value === val)) {
+            printerSel.value = val;
+            printerSel.dispatchEvent(new Event('change'));
+            details.push(printerSel.options[printerSel.selectedIndex].textContent);
+        }
+    }
+    if (entry.slicer_profile_name) details.push(entry.slicer_profile_name);
+    const matSel = document.getElementById('slicer-ai-material-select');
+    const matToken = String(entry.filament_material || '').split(/[^A-Za-z0-9]+/)[0].toUpperCase();
+    if (matSel && matToken) {
+        const opt = [...matSel.options].find(o => String(o.value).toUpperCase() === matToken);
+        if (opt) matSel.value = opt.value;
+    }
+    if (entry.filament_label) details.push(entry.filament_label);
+    const box = document.getElementById('slicer-reprint-box');
+    if (!box) return;
+    if (!details.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    const date = new Date(String(entry.sent_at).replace(' ', 'T') + 'Z').toLocaleDateString(I18N.lang, { day: 'numeric', month: 'long', year: 'numeric' });
+    box.innerHTML = `<i class="fa-solid fa-rotate-left"></i> <span>${escapeHtml(_tf('reprint.hint', "Réglages repris de l'impression du {{date}} : {{details}}", { date, details: details.join(' · ') }))}</span>`;
+    box.style.display = 'flex';
+}
+
+// ----------------------------------------------------------------------------
+// Bilan mensuel
+// ----------------------------------------------------------------------------
+function _reportFmtGrams(g) { return g >= 1000 ? `${(g / 1000).toFixed(2)} kg` : `${Math.round(g * 10) / 10} g`; }
+function _reportFmtHours(secs) { return `${(secs / 3600).toFixed(1)} h`; }
+function _reportDelta(cur, prev, fmt) {
+    if (prev === null || prev === undefined || prev === 0 && cur === 0) return '';
+    const d = cur - prev;
+    if (Math.abs(d) < 0.005) return '=';
+    return `${d > 0 ? '+' : '−'}${fmt ? fmt(Math.abs(d)) : Math.abs(Math.round(d * 10) / 10)}`;
+}
+
+function _monthlyReportModel(data) {
+    const t = data.totals, p = data.previous || {};
+    const vs = (txt) => txt ? _tf('report.vs_prev', '{{delta}} vs mois précédent', { delta: txt }) : '';
+    const kpis = [
+        [_t3('report.kpi_prints', 'Impressions'), String(t.prints), vs(_reportDelta(t.prints, p.prints))],
+        [_t3('report.kpi_success', 'Taux de réussite'), t.success_rate === null || t.success_rate === undefined ? '—' : `${t.success_rate}%`, `${t.success}✓ / ${t.failed}✗${t.unrated ? ` / ${t.unrated}?` : ''}`],
+        [_t3('report.kpi_time', "Temps d'impression estimé"), _reportFmtHours(t.seconds), vs(_reportDelta(t.seconds / 3600, (p.seconds || 0) / 3600, v => `${v.toFixed(1)} h`))],
+        [_t3('report.kpi_filament', 'Filament utilisé'), _reportFmtGrams(t.grams), vs(_reportDelta(t.grams, p.grams, _reportFmtGrams))],
+        [_t3('report.kpi_cost', 'Coût total'), formatCost(t.total_cost), vs(_reportDelta(t.total_cost, p.total_cost, formatCost))],
+        [_t3('report.kpi_failed_cost', 'Coût des échecs'), formatCost(t.failed_cost), t.failed_grams ? _reportFmtGrams(t.failed_grams) : ''],
+        [_t3('report.kpi_co2', 'CO₂ estimé'), `${(t.co2_g / 1000).toFixed(2)} kg`, '']
+    ];
+    const colName = _t3('report.col_name', 'Nom'), colPrints = _t3('report.col_prints', 'Impr.');
+    const tables = [
+        { title: _t3('report.by_printer', 'Par imprimante'), headers: [colName, colPrints, _t3('report.col_filament', 'Filament'), _t3('report.col_time', 'Durée'), _t3('report.col_cost', 'Coût')],
+          rows: (data.by_printer || []).map(x => [x.name, String(x.prints), _reportFmtGrams(x.grams), _reportFmtHours(x.seconds), formatCost(x.cost)]) },
+        { title: _t3('report.by_material', 'Par matière'), headers: [colName, colPrints, _t3('report.col_filament', 'Filament'), _t3('report.col_failed', 'Échecs'), _t3('report.col_cost', 'Coût')],
+          rows: (data.by_material || []).map(x => [x.name, String(x.prints), _reportFmtGrams(x.grams), String(x.failed), formatCost(x.cost)]) },
+        { title: _t3('report.top_models', 'Modèles les plus imprimés'), headers: [colName, colPrints, _t3('report.col_filament', 'Filament')],
+          rows: (data.top_models || []).map(x => [x.name, String(x.prints), _reportFmtGrams(x.grams)]) }
+    ].filter(tb => tb.rows.length);
+    return { kpis, tables };
+}
+
+function _monthLabel(month) {
+    const [y, m] = month.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString(I18N.lang, { month: 'long', year: 'numeric' });
+}
+
+function openMonthlyReport() {
+    let modal = document.getElementById('modal-monthly-report');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-monthly-report';
+        modal.className = 'modal hidden';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width:640px;">
+                <div class="modal-header">
+                    <h3><i class="fa-solid fa-file-lines"></i> <span>${escapeHtml(_t3('report.title', 'Bilan mensuel'))}</span></h3>
+                    <button class="modal-close" onclick="closeModal('modal-monthly-report')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+                        <label for="monthly-report-month" style="font-size:12.5px; color:var(--text-muted);">${escapeHtml(_t3('report.month', 'Mois'))}</label>
+                        <input type="month" id="monthly-report-month" class="settings-select" style="max-width:180px;">
+                        <button type="button" class="btn btn-primary btn-sm" id="monthly-report-export" style="margin-left:auto;"><i class="fa-solid fa-file-pdf"></i> ${escapeHtml(_t3('report.export_pdf', 'Exporter en PDF'))}</button>
+                    </div>
+                    <div id="monthly-report-body"></div>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-monthly-report'); });
+        modal.querySelector('#monthly-report-month').addEventListener('change', (e) => loadMonthlyReport(e.target.value));
+        modal.querySelector('#monthly-report-export').addEventListener('click', exportMonthlyReport);
+    }
+    const input = modal.querySelector('#monthly-report-month');
+    if (!input.value) { const n = new Date(); input.value = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; }
+    openModal('modal-monthly-report');
+    loadMonthlyReport(input.value);
+}
+window.openMonthlyReport = openMonthlyReport;
+
+let _lastMonthlyReport = null;
+async function loadMonthlyReport(month) {
+    const body = document.getElementById('monthly-report-body');
+    if (!body) return;
+    body.innerHTML = `<div style="text-align:center; padding:24px; color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
+    try {
+        const res = await fetch(`${API}/api/reports/monthly?month=${encodeURIComponent(month)}`);
+        if (!res.ok) throw new Error('http');
+        const data = await res.json();
+        _lastMonthlyReport = data;
+        if (!data.totals.prints) {
+            body.innerHTML = `<p class="settings-hint">${escapeHtml(_t3('report.empty', 'Aucune impression enregistrée ce mois-là.'))}</p>`;
+            return;
+        }
+        const model = _monthlyReportModel(data);
+        body.innerHTML = `
+            <div class="report-kpis">${model.kpis.map(k => `<div class="report-kpi"><div class="report-kpi-label">${escapeHtml(k[0])}</div><div class="report-kpi-value">${escapeHtml(k[1])}</div>${k[2] ? `<div class="report-kpi-note">${escapeHtml(k[2])}</div>` : ''}</div>`).join('')}</div>
+            ${model.tables.map(tb => `<div class="report-table-title">${escapeHtml(tb.title)}</div>
+                <div class="report-table-wrap"><table class="report-table"><thead><tr>${tb.headers.map((h, i) => `<th${i ? ' class="num"' : ''}>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+                <tbody>${tb.rows.map(r => `<tr>${r.map((c, i) => `<td${i ? ' class="num"' : ''}>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`).join('')}
+            <p class="settings-hint" style="margin-top:12px;">${escapeHtml(_t3('report.hint_estimated', "Durées et CO₂ : estimations d'après les données enregistrées à l'envoi."))}</p>`;
+    } catch (e) {
+        body.innerHTML = `<p style="color:var(--danger); font-size:13px;">${escapeHtml(_t3('toast.connection_error', 'Erreur de connexion'))}</p>`;
+    }
+}
+
+async function exportMonthlyReport() {
+    const data = _lastMonthlyReport;
+    if (!data) return;
+    const model = _monthlyReportModel(data);
+    const month = data.month;
+    const payload = {
+        filename: `${_t3('report.file_prefix', 'bilan')}-${month}.pdf`, lang: I18N.lang,
+        title: `${_t3('report.title', 'Bilan mensuel')} — ${_monthLabel(month)}`, subtitle: 'Stellio',
+        kpis: model.kpis, tables: model.tables,
+        footer: _tf('report.footer', 'Généré par Stellio le {{date}}', { date: new Date().toLocaleDateString(I18N.lang, { day: 'numeric', month: 'long', year: 'numeric' }) })
+    };
+    const init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(payload) };
+    const btn = document.getElementById('monthly-report-export');
+    if (btn) btn.disabled = true;
+    try {
+        try {
+            const res = await fetch(`${API}/api/reports/export-native`, init);
+            const result = await res.json().catch(() => ({}));
+            if (res.ok && result.success) { showToast(_tf('report.exported', 'Bilan enregistré : {{path}}', { path: result.path }), 'success'); return; }
+            if (result.cancelled) return;
+        } catch (e) { /* repli navigateur */ }
+        const res = await fetch(`${API}/api/reports/export`, init);
+        if (!res.ok) throw new Error('export');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = payload.filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+        showToast(_t3('report.export_error', "Échec de l'export du PDF"), 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Bilan de bobine (fiche bobine)
+// ----------------------------------------------------------------------------
+async function _loadSpoolReport(d) {
+    const box = document.getElementById('spool-report-box');
+    if (!box) return;
+    try {
+        const qs = new URLSearchParams({ source_type: d.source_type, source_id: String(d.source_id) });
+        const res = await fetch(`${API}/api/filament/spool-report?${qs}`);
+        if (!res.ok) { box.innerHTML = ''; return; }
+        const r = await res.json();
+        if (!r.prints) { box.innerHTML = ''; return; }
+        const cap = Number(d.capacity_g) || 0, rem = d.remaining_g;
+        const finished = rem !== null && rem !== undefined && cap > 0 && rem <= Math.max(5, cap * 0.02);
+        const consumed = (cap > 0 && rem !== null && rem !== undefined) ? Math.max(0, cap - rem) : null;
+        const row = (label, value) => `<div class="spool-extra-row"><span>${escapeHtml(label)}</span><strong style="text-align:right;">${value}</strong></div>`;
+        const rows = [
+            row(_t3('spoolreport.prints', 'Impressions'), escapeHtml(_tf('spoolreport.prints_value', '{{n}} ({{ok}} réussies, {{ko}} échouées)', { n: r.prints, ok: r.success, ko: r.failed }))),
+            row(_t3('spoolreport.tracked', 'Filament enregistré'), escapeHtml(_reportFmtGrams(r.grams)))
+        ];
+        if (consumed !== null) rows.push(row(_t3('spoolreport.consumed', 'Consommé sur la bobine'), escapeHtml(_reportFmtGrams(consumed))));
+        if (r.avg_g) rows.push(row(_t3('spoolreport.avg', 'Moyenne par impression'), escapeHtml(_reportFmtGrams(r.avg_g))));
+        rows.push(row(_t3('spoolreport.cost', 'Coût des impressions'), `${escapeHtml(formatCost(r.total_cost))}${r.failed_cost > 0 ? ` <span class="spool-extra-hint" style="margin:0;">(${escapeHtml(_tf('spoolreport.failed_cost', 'dont échecs : {{cost}}', { cost: formatCost(r.failed_cost) }))})</span>` : ''}`));
+        if (d.price && cap > 0) rows.push(row(_t3('spoolreport.price', "Prix d'achat"), escapeHtml(`${formatCost(d.price)} (${formatCost(d.price / (cap / 1000))}/kg)`)));
+        const fmtDay = (iso) => new Date(String(iso).replace(' ', 'T') + 'Z').toLocaleDateString(I18N.lang, { day: 'numeric', month: 'short', year: 'numeric' });
+        if (r.first_at) rows.push(row(_t3('spoolreport.period', 'Période'), escapeHtml(`${fmtDay(r.first_at)} → ${fmtDay(r.last_at)}`)));
+        const gap = consumed !== null ? Math.round((consumed - r.grams) * 10) / 10 : null;
+        const gapHint = (gap !== null && gap > 5) ? `<div class="spool-extra-hint">${escapeHtml(_tf('spoolreport.gap', 'Écart non suivi : {{g}} g (purges, essais, impressions lancées hors de Stellio)', { g: gap }))}</div>` : '';
+        const tops = (r.top_models || []).length ? `<div class="spool-extra-hint" style="margin-top:6px;">${escapeHtml(_t3('spoolreport.top', 'Modèles les plus imprimés'))} : ${escapeHtml(r.top_models.map(m => `${m.name} ×${m.prints}`).join(', '))}</div>` : '';
+        box.innerHTML = `
+            <details class="spool-extra-details" ${finished ? 'open' : ''}>
+                <summary style="font-size:13.5px; font-weight:600; color:var(--text);"><i class="fa-solid fa-flag-checkered" style="color:var(--accent);"></i> ${escapeHtml(_t3('spoolreport.title', 'Bilan de la bobine'))}${finished ? ` <span class="dry-pill dry-pill-ok" style="margin-left:6px;">${escapeHtml(_t3('spoolreport.finished', 'Terminée'))}</span>` : ''}</summary>
+                ${rows.join('')}${gapHint}${tops}
+            </details>`;
+    } catch (e) { box.innerHTML = ''; }
+}
+
+// ----------------------------------------------------------------------------
+// Mises à jour des modèles téléchargés
+// ----------------------------------------------------------------------------
+let _modelUpdatesTimer = null;
+
+async function loadModelUpdates() {
+    const card = document.getElementById('model-updates-card');
+    if (!card) return;
+    let data;
+    try {
+        const res = await fetch(`${API}/api/model-updates`);
+        if (!res.ok) return;
+        data = await res.json();
+    } catch (e) { return; }
+    _renderModelUpdates(card, data);
+    if (data.running && !_modelUpdatesTimer) {
+        _modelUpdatesTimer = setInterval(async () => {
+            await loadModelUpdates();
+        }, 1500);
+    } else if (!data.running && _modelUpdatesTimer) {
+        clearInterval(_modelUpdatesTimer);
+        _modelUpdatesTimer = null;
+    }
+}
+
+function _renderModelUpdates(card, data) {
+    const items = data.items || [];
+    const updates = items.filter(i => i.status === 'update');
+    const noToken = items.filter(i => i.status === 'unsupported' && i.reason === 'no_token').length;
+    const gone = items.filter(i => i.status === 'unsupported' && i.reason === 'gone').length;
+    const lastChecked = data.last_checked_at ? new Date(String(data.last_checked_at).replace(' ', 'T') + 'Z').toLocaleString(I18N.lang, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+    const fmtDate = (iso) => iso ? new Date(String(iso).replace(' ', 'T') + 'Z').toLocaleDateString(I18N.lang, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    const list = updates.map(u => `
+        <div class="spool-extra-row model-update-row" style="align-items:flex-start;">
+            <div style="min-width:0; flex:1;">
+                <div style="font-weight:600; font-size:13px;">${escapeHtml(u.title || u.model_id)} <span class="dry-pill dry-pill-due">${escapeHtml(u.platform)}</span></div>
+                <div class="spool-extra-hint" style="margin:2px 0 0;">${escapeHtml(u.reason === 'date' ? _tf('modelupdate.reason_date', 'Mis à jour le {{date}}', { date: fmtDate(u.remote_modified_at) }) : _t3('modelupdate.reason_files', 'Les fichiers ont changé'))}</div>
+            </div>
+            <div style="display:flex; gap:4px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end;">
+                <a class="btn btn-ghost btn-sm" href="${escapeHtml(u.source_url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(_t3('modelupdate.open_page', 'Ouvrir la page'))}"><i class="fa-solid fa-up-right-from-square"></i></a>
+                <button type="button" class="btn btn-primary btn-sm viewer-hide" data-mu-download="${escapeHtml(u.source_url)}"><i class="fa-solid fa-download"></i> ${escapeHtml(_t3('modelupdate.download', 'Télécharger la nouvelle version'))}</button>
+                <button type="button" class="btn btn-ghost btn-sm viewer-hide" data-mu-dismiss="${u.id}" title="${escapeHtml(_t3('modelupdate.dismiss', 'Ignorer'))}"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </div>`).join('');
+    const progress = data.running ? _tf('modelupdate.checking', 'Vérification… {{done}}/{{total}}', { done: data.done, total: data.total }) : '';
+    const notes = [];
+    if (noToken) notes.push(_tf('modelupdate.no_token', '{{n}} modèle(s) Thingiverse non vérifiable(s) : renseigne ton jeton Thingiverse dans les Paramètres.', { n: noToken }));
+    if (gone) notes.push(_tf('modelupdate.gone', '{{n}} modèle(s) introuvable(s) en ligne (supprimés ?)', { n: gone }));
+    card.innerHTML = `
+        <div class="download-history-header">
+            <h3><i class="fa-solid fa-cloud-arrow-down"></i> <span>${escapeHtml(_t3('modelupdate.title', 'Mises à jour des modèles'))}</span>${updates.length ? ` <span class="dry-pill dry-pill-due">${updates.length}</span>` : ''}</h3>
+            <button type="button" class="btn btn-ghost btn-sm viewer-hide" id="mu-check-btn" ${data.running ? 'disabled' : ''}><i class="fa-solid fa-arrows-rotate ${data.running ? 'fa-spin' : ''}"></i> <span>${escapeHtml(progress || _t3('modelupdate.check', 'Vérifier maintenant'))}</span></button>
+        </div>
+        ${items.length ? '' : `<p class="settings-hint">${escapeHtml(_t3('modelupdate.empty', 'Aucun modèle téléchargé depuis Printables, MakerWorld ou Thingiverse à suivre pour l\'instant.'))}</p>`}
+        ${items.length && !updates.length && !data.running ? `<p class="settings-hint">${escapeHtml(_t3('modelupdate.none', 'Aucune nouvelle version détectée.'))}</p>` : ''}
+        ${list}
+        ${items.length ? `<p class="spool-extra-hint" style="margin-top:8px;">${escapeHtml(_tf('modelupdate.summary', '{{n}} modèle(s) suivi(s) · dernière vérification : {{date}}', { n: items.length, date: lastChecked }))}</p>` : ''}
+        ${notes.map(n => `<p class="spool-extra-hint">${escapeHtml(n)}</p>`).join('')}
+        <label class="checkbox-label viewer-hide" style="margin-top:6px;"><input type="checkbox" id="mu-auto" ${data.auto ? 'checked' : ''}> <span>${escapeHtml(_t3('modelupdate.auto', 'Vérifier automatiquement (1 fois par jour)'))}</span></label>`;
+    card.querySelector('#mu-check-btn')?.addEventListener('click', async () => {
+        try { await fetch(`${API}/api/model-updates/check`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: true }) }); } catch (e) { /* ignore */ }
+        loadModelUpdates();
+    });
+    card.querySelector('#mu-auto')?.addEventListener('change', async (e) => {
+        try { await fetch(`${API}/api/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_updates_auto: e.target.checked }) }); } catch (err) { /* ignore */ }
+    });
+    card.querySelectorAll('[data-mu-dismiss]').forEach(b => b.addEventListener('click', async () => {
+        try { await fetch(`${API}/api/model-updates/${b.dataset.muDismiss}/dismiss`, { method: 'POST' }); } catch (e) { /* ignore */ }
+        loadModelUpdates();
+    }));
+    card.querySelectorAll('[data-mu-download]').forEach(b => b.addEventListener('click', () => {
+        openDownloadModal();
+        const input = document.getElementById('download-url');
+        if (input) { input.value = b.dataset.muDownload; input.dispatchEvent(new Event('input', { bubbles: true })); }
+    }));
+}
+
+async function autoCheckModelUpdates() {
+    if (IS_VIEWER) return;
+    try {
+        const res = await fetch(`${API}/api/model-updates`);
+        if (!res.ok) return;
+        const d = await res.json();
+        if (!d.auto || d.running) return;
+        const last = d.last_checked_at ? Date.parse(String(d.last_checked_at).replace(' ', 'T') + 'Z') : 0;
+        if (Date.now() - last < 24 * 3600 * 1000) return;
+        await fetch(`${API}/api/model-updates/check`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    } catch (e) { /* silencieux */ }
+}
+
+
+const _spoolDetailRegistry = {};
+
+function _detailFromSpoolman(s) {
+    const f = s.filament || {};
+    const v = f.vendor || {};
+    return {
+        key: `spoolman:${s.id}`,
+        source_type: 'spoolman',
+        source_id: s.id,
+        name: f.name || v.name || I18N.t('spoolman.spool'),
+        vendor: v.name || '',
+        material: f.material || '',
+        color_hex: f.color_hex ? `#${String(f.color_hex).replace('#', '')}` : '#888888',
+        remaining_g: typeof s.remaining_weight === 'number' ? s.remaining_weight : null,
+        capacity_g: f.weight || s.initial_weight || null,
+        diameter: f.diameter || null,
+        nozzle_temp: f.settings_extruder_temp || null,
+        bed_temp: f.settings_bed_temp || null,
+        price: (s.price ?? f.price) ?? null,
+        location: s.location || '',
+        lot: s.lot_nr || '',
+        empty_spool_g: (s.spool_weight ?? f.spool_weight) ?? null,
+        notes: s.comment || '',
+        buy: { vendor: v.name || '', material: f.material || '', color: f.name || '' }
+    };
+}
+
+function _detailFromManual(s) {
+    return {
+        key: `manual:${s.id}`,
+        source_type: 'manual',
+        source_id: s.id,
+        name: s.name || '',
+        vendor: s.vendor || '',
+        material: s.material || '',
+        color_hex: s.color_hex || '#888888',
+        remaining_g: typeof s.remaining_g === 'number' ? s.remaining_g : null,
+        capacity_g: s.capacity_g || null,
+        diameter: s.diameter_mm || null,
+        price: s.price || null,
+        location: s.storage_location || '',
+        notes: s.notes || '',
+        buy: { vendor: s.vendor || '', material: s.material || '', color: s.name || '' }
+    };
+}
+
+function _detailFromTigerTag(s, idx) {
+    return {
+        key: `tigertag:${idx}`,
+        source_type: 'tigertag',
+        source_id: s.source_id ?? '',
+        name: s.name || 'TigerTag',
+        vendor: s.vendor || '',
+        material: s.material || '',
+        color_name: s.color_name || '',
+        color_hex: s.color_hex || '#888888',
+        remaining_g: typeof s.remaining_g === 'number' ? s.remaining_g : null,
+        capacity_g: s.capacity_g || null,
+        buy: { vendor: s.vendor || '', material: s.material || '', color: s.color_name || s.name || '' }
+    };
+}
+
+// Températures typiques par matière (mêmes valeurs que MATERIAL_RANGES côté serveur) : [buse, plateau]
+const _TYPICAL_TEMPS = {
+    PLA: ['190–220', '50–60'], PETG: ['230–250', '70–80'], ABS: ['230–250', '95–110'], ASA: ['240–260', '90–110'],
+    TPU: ['210–230', '30–50'], PA: ['250–270', '70–90'], PC: ['260–290', '100–120']
+};
+const _TEMP_ALIASES = { NYLON: 'PA', PA6: 'PA', PA12: 'PA', PA66: 'PA', PAHT: 'PA' };
+
+function _typicalTempsFor(material) {
+    const token = String(material || '').toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean)[0] || '';
+    return _TYPICAL_TEMPS[_TEMP_ALIASES[token] || token] || null;
+}
+
+function showSpoolDetailPopup(d) {
+    const color = d.color_hex || '#888888';
+    const g = (v) => `${Math.round(Number(v))} g`;
+    const hasRemaining = typeof d.remaining_g === 'number';
+    const pct = (hasRemaining && d.capacity_g)
+        ? Math.max(0, Math.min(100, (d.remaining_g / d.capacity_g) * 100)) : null;
+
+    // Cases de la grille (une case n'apparaît que si la donnée existe)
+    const cells = [];
+    const add = (labelKey, fallback, valueHtml) => {
+        if (valueHtml === null || valueHtml === undefined || valueHtml === '') return;
+        cells.push(`<div class="spool-detail-cell"><div class="spool-detail-cell-label">${_t3(labelKey, fallback)}</div><div class="spool-detail-cell-value">${valueHtml}</div></div>`);
+    };
+    add('spoolman.detail_brand', 'Marque', d.vendor ? escapeHtml(d.vendor) : '');
+    add('spoolman.detail_material', 'Matière', d.material ? escapeHtml(d.material) : '');
+    add('spoolman.detail_color', 'Couleur',
+        `<span style="display:inline-block; width:11px; height:11px; border-radius:3px; background:${escapeHtml(color)}; margin-right:6px; vertical-align:-1px;"></span>${escapeHtml(d.color_name || String(color).toUpperCase())}`);
+    add('spoolman.detail_diameter', 'Diamètre', d.diameter ? `${escapeHtml(String(d.diameter))} mm` : '');
+    add('spoolman.detail_new_weight', 'Poids bobine neuve', d.capacity_g ? g(d.capacity_g) : '');
+    add('spoolman.detail_remaining', 'Poids restant', hasRemaining ? g(d.remaining_g) : '');
+    add('spoolman.detail_used', 'Consommé', (hasRemaining && d.capacity_g && d.capacity_g >= d.remaining_g) ? g(d.capacity_g - d.remaining_g) : '');
+    add('spoolman.detail_location', 'Emplacement de rangement', d.location ? escapeHtml(d.location) : '');
+    add('spoolman.detail_price', 'Prix', Number(d.price) > 0 ? `${Number(d.price).toFixed(2)} €` : '');
+    add('spoolman.detail_empty_spool', 'Poids bobine vide', d.empty_spool_g ? g(d.empty_spool_g) : '');
+    add('spoolman.detail_lot', 'N° de lot', d.lot ? escapeHtml(d.lot) : '');
+    if (cells.length % 2 === 1) cells.push('<div class="spool-detail-cell filler"></div>');
+    if (d.notes) {
+        cells.push(`<div class="spool-detail-cell full"><div class="spool-detail-cell-label">${_t3('spoolman.detail_notes', 'Notes')}</div><div class="spool-detail-cell-value" style="font-weight:500;">${escapeHtml(d.notes)}</div></div>`);
+    }
+
+    // Températures : valeurs de l'inventaire si elles existent, sinon valeurs typiques de la matière
+    let tempsHtml = '';
+    const own = !!(d.nozzle_temp || d.bed_temp);
+    const typical = _typicalTempsFor(d.material);
+    if (own || typical) {
+        const nozzle = d.nozzle_temp ? String(d.nozzle_temp) : (!own && typical ? typical[0] : '');
+        const bed = d.bed_temp ? String(d.bed_temp) : (!own && typical ? typical[1] : '');
+        const cell = (labelKey, fallback, v) => `<div class="spool-detail-cell"><div class="spool-detail-cell-label">${_t3(labelKey, fallback)}</div><div class="spool-detail-cell-value">${v ? `${escapeHtml(v)} °C` : '—'}</div></div>`;
+        tempsHtml = `
+        <div style="display:flex; align-items:center; gap:8px; margin:18px 0 8px; font-size:13.5px; font-weight:600;">
+            <i class="fa-solid fa-temperature-half" style="color:var(--accent);"></i>
+            <span>${_t3('spoolman.detail_temps_title', "Températures d'impression recommandées")}</span>
+        </div>
+        <div class="spool-detail-grid">${cell('spoolman.detail_nozzle_temp', 'Buse', nozzle)}${cell('spoolman.detail_bed_temp', 'Plateau', bed)}</div>
+        <div style="font-size:11.5px; color:var(--text-muted); margin-top:8px;">${own
+            ? _t3('spoolman.detail_temps_hint_set', "Valeurs définies dans l'inventaire pour cette bobine.")
+            : _t3('spoolman.detail_temps_hint', "Valeurs typiques pour cette matière — vérifie l'étiquette de la bobine.")}</div>`;
+    }
+
+    const subtitle = [d.vendor, d.material].filter(Boolean).map(escapeHtml).join(' · ');
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100000; backdrop-filter: blur(3px);`;
+    const popup = document.createElement('div');
+    popup.style.cssText = `background: var(--bg-secondary); color: var(--text-primary); padding: 22px; border-radius: 14px; max-width: 440px; width: 92%; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 0 12px 35px rgba(0,0,0,0.6); border: 1px solid var(--border);`;
+    popup.innerHTML = `
+        <div style="display:flex; align-items:center; gap:14px; margin-bottom:16px;">
+            <div style="width:52px; height:52px; border-radius:50%; background:${escapeHtml(color)}; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <span style="width:16px; height:16px; border-radius:50%; background:var(--bg-secondary);"></span>
+            </div>
+            <div style="min-width:0; flex:1;">
+                <div style="font-size:17px; font-weight:700; word-break:break-word;">${escapeHtml(d.name || '')}</div>
+                ${subtitle ? `<div style="font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.3px;">${subtitle}</div>` : ''}
+            </div>
+            <button id="spool-detail-x" type="button" aria-label="${_t3('actions.close', 'Fermer')}" style="background:none; border:none; color:var(--text-muted); font-size:24px; line-height:1; cursor:pointer; align-self:flex-start;">&times;</button>
+        </div>
+        ${hasRemaining ? `
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:8px;">
+            <span style="font-size:20px; font-weight:700;">${g(d.remaining_g)}</span>
+            ${pct !== null ? `<span style="font-size:12px; color:var(--text-muted);">${Math.round(pct)}% · ${_t3('spoolman.detail_new_weight', 'Poids bobine neuve')} ${g(d.capacity_g)}</span>` : ''}
+        </div>
+        ${pct !== null ? `<div class="spool-progress-track" style="margin-bottom:16px;"><div class="spool-progress-bar" style="width:${pct}%; background:${escapeHtml(color)};"></div></div>` : '<div style="margin-bottom:16px;"></div>'}` : ''}
+        <div class="spool-detail-grid">${cells.join('')}</div>
+        ${tempsHtml}
+        <div id="spool-detail-extras"></div>
+        <div style="display:flex; gap:8px; margin-top:20px;">
+            <button id="spool-detail-buy" class="btn btn-primary" style="flex:1;"><i class="fa-solid fa-cart-shopping"></i> ${_t3('spoolman.detail_buy', 'Acheter')}</button>
+            <button id="spool-detail-close" class="btn btn-ghost" style="border:none;">${_t3('actions.close', 'Fermer')}</button>
+        </div>
+    `;
+    overlay.appendChild(popup);
+    document.body.appendChild(overlay);
+    _initSpoolDetailExtras(d);
+    const close = () => overlay.remove();
+    document.getElementById('spool-detail-close').addEventListener('click', close);
+    document.getElementById('spool-detail-x').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    const buyBtn = document.getElementById('spool-detail-buy');
+    buyBtn.addEventListener('click', async () => {
+        buyBtn.disabled = true;
+        try {
+            const buy = d.buy || {};
+            const qs = new URLSearchParams({ vendor: buy.vendor || '', material: buy.material || '', color: buy.color || '' });
+            const res = await fetch(`${API}/api/filament/buy-links?${qs}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const info = await res.json();
+            showLowStockShopPopup({ name: d.name, color_hex: d.color_hex, search_query: info.search_query || '', shops: info.shops || [] });
+        } catch (e) {
+            showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error');
+        } finally {
+            buyBtn.disabled = false;
+        }
+    });
+}
+
+document.addEventListener('click', (e) => {
+    const card = e.target.closest('.spool-card[data-detail-key]');
+    if (!card) return;
+    if (e.target.closest('button, a, input, select, label')) return;
+    const d = _spoolDetailRegistry[card.dataset.detailKey];
+    if (d) showSpoolDetailPopup(d);
+});
+
 function renderSpoolmanGrid(spools) {
     const grid = document.getElementById('spoolman-grid');
     if (!grid) return;
@@ -6970,8 +10827,10 @@ function renderSpoolmanGrid(spools) {
         const initial = filament.weight || s.initial_weight || null;
         const pct = (remaining !== null && initial) ? Math.max(0, Math.min(100, (remaining / initial) * 100)) : null;
         const archived = !!s.archived;
+        const detail = _detailFromSpoolman(s);
+        _spoolDetailRegistry[detail.key] = detail;
         return `
-            <div class="spool-card ${archived ? 'archived' : ''}">
+            <div class="spool-card ${archived ? 'archived' : ''}" data-detail-key="${detail.key}">
                 <div class="spool-card-header">
                     <span class="spool-color-dot" style="background:${color};"></span>
                     <div class="spool-title">
@@ -7174,6 +11033,142 @@ async function makerWorldDisconnect() {
     }
 }
 window.makerWorldDisconnect = makerWorldDisconnect;
+async function tigerTagAutoDetectStudio() {
+    const btn = document.getElementById('tigertag-autodetect-btn');
+    const originalHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>' + _t3('settings.tigertag_searching', 'Recherche en cours…') + '</span>';
+    }
+    try {
+        const res = await fetch(`${API}/api/accounts/tigertag/auto-detect-studio`, { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.connected) {
+            showToast(data.error || I18N.t('toast.login_failed'), 'error');
+            return;
+        }
+        tigerTagOnConnected(data.email || '');
+    } catch (e) {
+        showToast(I18N.t('toast.network_error'), 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
+}
+window.tigerTagAutoDetectStudio = tigerTagAutoDetectStudio;
+
+function tigerTagOnConnected(email) {
+    updateAccountBadge('tigertag', true);
+    const emailDisplay = document.getElementById('tigertag-email-display');
+    if (emailDisplay) emailDisplay.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${I18N.t('status.connected_email', { email })}`;
+    const loginRow = document.getElementById('tigertag-login-row');
+    const cr = document.getElementById('tigertag-connected-row');
+    if (loginRow) loginRow.style.display = 'none';
+    if (cr) cr.style.display = 'block';
+    showToast(I18N.t('toast.tigertag_connected'), 'success');
+    if (document.getElementById('page-spoolman')?.classList.contains('active')) loadTigerTagSpools();
+}
+
+function tigerTagShowLogin() {
+    const cr = document.getElementById('tigertag-connected-row');
+    const loginRow = document.getElementById('tigertag-login-row');
+    if (cr) cr.style.display = 'none';
+    if (loginRow) loginRow.style.display = 'block';
+}
+window.tigerTagShowLogin = tigerTagShowLogin;
+
+async function tigerTagDisconnect() {
+    try {
+        await fetch(`${API}/api/accounts/tigertag`, { method: 'DELETE' });
+        updateAccountBadge('tigertag', false);
+        const cr = document.getElementById('tigertag-connected-row');
+        const loginRow = document.getElementById('tigertag-login-row');
+        if (cr) cr.style.display = 'none';
+        if (loginRow) loginRow.style.display = 'block';
+        const section = document.getElementById('tigertag-section');
+        if (section) section.style.display = 'none';
+        showToast(I18N.t('toast.tigertag_removed'), 'info');
+    } catch (e) {
+        showToast(I18N.t('toast.disconnect_error'), 'error');
+    }
+}
+window.tigerTagDisconnect = tigerTagDisconnect;
+
+async function loadTigerTagSpools() {
+    const section = document.getElementById('tigertag-section');
+    const grid = document.getElementById('tigertag-grid');
+    if (!section || !grid) return;
+    try {
+        const res = await fetch(`${API}/api/filament/tigertag`);
+        if (!res.ok) { section.style.display = 'none'; return; }
+        const data = await res.json();
+        const spools = Array.isArray(data) ? data : [];
+        if (!spools.length) { section.style.display = 'none'; return; }
+        section.style.display = 'block';
+        renderTigerTagGrid(spools);
+    } catch (e) {
+        console.debug('[TigerTag] Inventaire non chargé:', e);
+        section.style.display = 'none';
+    }
+}
+window.loadTigerTagSpools = loadTigerTagSpools;
+
+// Tiger Studio Manager est une appli externe : Stellio n'a aucun moyen d'être
+// notifié quand une bobine y est ajoutée/modifiée. On rafraîchit donc tout
+// seul l'inventaire TigerTag pendant que la page Inventaire filament est
+// affichée (poll léger), plus immédiatement quand l'utilisateur revient sur
+// la fenêtre Stellio (ex: après avoir ajouté une bobine dans TigerTag Studio
+// puis basculé sur Stellio).
+function startTigerTagAutoRefresh() {
+    setInterval(() => {
+        if (document.getElementById('page-spoolman')?.classList.contains('active')) {
+            loadTigerTagSpools();
+        }
+    }, 15000);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && document.getElementById('page-spoolman')?.classList.contains('active')) {
+            loadTigerTagSpools();
+        }
+    });
+}
+
+function renderTigerTagGrid(spools) {
+    const grid = document.getElementById('tigertag-grid');
+    if (!grid) return;
+    grid.innerHTML = spools.map((s, idx) => {
+        const detail = _detailFromTigerTag(s, idx);
+        _spoolDetailRegistry[detail.key] = detail;
+        const color = s.color_hex || '#888888';
+        const remaining = typeof s.remaining_g === 'number' ? s.remaining_g : null;
+        const capacity = s.capacity_g || null;
+        const pct = (remaining !== null && capacity) ? Math.max(0, Math.min(100, (remaining / capacity) * 100)) : null;
+        return `
+            <div class="spool-card" data-detail-key="${detail.key}">
+                <div class="spool-card-header">
+                    <span class="spool-color-dot" style="background:${escapeHtml(color)};"></span>
+                    <div class="spool-title">
+                        <span class="spool-name">${escapeHtml(s.name || 'TigerTag')}</span>
+                    </div>
+                </div>
+                <div class="spool-card-body">
+                    ${s.material ? `<span class="spool-material-tag">${escapeHtml(s.material)}</span>` : ''}
+                    ${pct !== null ? `
+                        <div class="spool-weight-row">
+                            <span>${Math.round(remaining)} ${I18N.t('units.g_remaining')}</span>
+                            <span>${Math.round(pct)}%</span>
+                        </div>
+                        <div class="spool-progress-track">
+                            <div class="spool-progress-bar" style="width:${pct}%; background:${escapeHtml(color)};"></div>
+                        </div>
+                    ` : remaining !== null ? `<p class="spool-weight-row"><span>${Math.round(remaining)} ${I18N.t('units.g_remaining')}</span></p>` : ''}
+                </div>
+            </div>`;
+    }).join('');
+}
+window.renderTigerTagGrid = renderTigerTagGrid;
+
 async function loadAccountBadges() {
 for (const platform of ['thingiverse']) {
 try {
@@ -7202,6 +11197,16 @@ try {
             if (step1) step1.style.display = 'none';
             if (step2) step2.style.display = 'none';
             if (cr) cr.style.display = 'block';
+        }
+        if (status.tigertag) {
+            updateAccountBadge('tigertag', true);
+            const ttEmailDisplay = document.getElementById('tigertag-email-display');
+            if (ttEmailDisplay && status.tigertag_email) {
+                ttEmailDisplay.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${I18N.t('status.connected_email', { email: status.tigertag_email })}`;
+            }
+            document.getElementById('tigertag-login-row') && (document.getElementById('tigertag-login-row').style.display = 'none');
+            const ttCr = document.getElementById('tigertag-connected-row');
+            if (ttCr) ttCr.style.display = 'block';
         }
     }
 } catch (e) {  }
@@ -7501,6 +11506,8 @@ function updateHeaderVisibilityForPage(page) {
 
     const libraryOnlyEls = [
         document.getElementById('library-search-wrap'),
+        document.getElementById('search-ai-disabled-hint'),
+        document.getElementById('semantic-search-hint'),
         document.getElementById('mobile-search-toggle'),
         document.getElementById('sort-select'),
         document.querySelector('.view-modes'),
@@ -7563,13 +11570,15 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         updateHeaderVisibilityForPage(page);
         if (page === 'library') loadFiles();
         if (page === 'printers') loadPrinters(); else stopAllPrinterCardCameras();
-        if (page === 'settings') { loadSources(); loadRemoteInstances(); }
+        if (page === 'settings') { loadSources(); loadRemoteInstances(); loadGuests(); loadPushSettings(); }
         else stopDiagnosticConsolePoll();
         if (page === 'spoolman') loadSpoolmanPage();
         if (page === 'stats') loadStats();
         if (page === 'history') { loadHistory(); loadDownloadHistory(); }
         if (page === 'gallery') loadGalleryPage();
         if (page === 'projects') loadProjects();
+        if (page === 'print-queue') loadPrintQueue();
+        if (page === 'dashboard') loadDashboard();
         closeMobileSidebar();
     });
 });
@@ -7619,6 +11628,8 @@ document.getElementById('select-toggle-all')?.addEventListener('click', () => se
 document.getElementById('send-selected-to-slicer-btn')?.addEventListener('click', () => sendSelectedToSlicer());
 document.getElementById('nesting-btn')?.addEventListener('click', () => openNestingModal());
 document.getElementById('add-selected-to-project-btn')?.addEventListener('click', () => openSelectionProjectModal());
+document.getElementById('tag-selected-btn')?.addEventListener('click', () => openBulkTagModal());
+document.getElementById('rename-selected-btn')?.addEventListener('click', () => openBulkRenameModal());
 document.getElementById('slicer-profile-file-input')?.addEventListener('change', (e) => {
     openSlicerImportAssignModal(e.target.files);
     e.target.value = '';
@@ -7651,8 +11662,45 @@ document.getElementById('delete-selected-btn')?.addEventListener('click', () => 
         e.preventDefault();
         dragCounter = 0;
         dropZone.classList.remove('drop-zone-active');
+        // Sur desktop (app pywebview), le glisser-déposer natif fournit déjà les chemins réels via
+        // __stellioHandleDroppedPaths (voir _bind_drag_drop côté Python) — on ne fait rien ici dans
+        // ce cas pour éviter un double traitement. Dans un navigateur classique (accès Pi/mobile/
+        // distant), il n'y a pas de chemin réel disponible : on upload directement le contenu.
+        if (window.pywebview) return;
+        const files = e.dataTransfer?.files;
+        if (files && files.length) _uploadDroppedFiles(files);
     });
 })();
+
+async function _uploadDroppedFiles(fileList) {
+    const files = [...fileList];
+    showToast(I18N.tp('toast.drop_uploading', files.length, { count: files.length }) || `Envoi de ${files.length} fichier(s)...`, 'info');
+    const formData = new FormData();
+    files.forEach(f => formData.append('files', f));
+    try {
+        const res = await fetch(`${API}/api/files/upload-drop`, { method: 'POST', body: formData });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            showToast(data.error || I18N.t('toast.connection_error'), 'error');
+            return;
+        }
+        if (data.saved?.length) {
+            showToast(
+                I18N.tp('toast.drop_upload_success', data.saved.length, { count: data.saved.length, destination: data.destination }) ||
+                `${data.saved.length} fichier(s) ajouté(s) dans "${data.destination}"`,
+                'success'
+            );
+            await loadSources?.();
+            await loadFiles?.();
+        }
+        if (data.skipped?.length) {
+            showToast(`${data.skipped.length} ${_t2('toast.drop_upload_skipped', "fichier(s) ignoré(s) (format non supporté)")}`, 'warning');
+        }
+    } catch (err) {
+        console.error('[DropUpload] Erreur:', err);
+        showToast(I18N.t('toast.connection_error'), 'error');
+    }
+}
 
 window.__stellioHandleDroppedPaths = async function (paths) {
     if (!paths || !paths.length) return;
@@ -7956,6 +12004,7 @@ async function runSemanticSearch(query) {
 
 function handleSearchInput(query, sourceInput) {
     const trimmed = query.trim();
+    currentSearchQuery = trimmed;
     clearTimeout(semanticSearchTimeout);
 
     [globalSearchInput, mobileSearchInput].forEach(input => {
@@ -8010,6 +12059,99 @@ function clearSearchInput(input) {
 document.getElementById('global-search-clear')?.addEventListener('click', () => clearSearchInput(globalSearchInput));
 document.getElementById('mobile-search-clear')?.addEventListener('click', () => clearSearchInput(mobileSearchInput));
 
+// --- Recherches récentes ---
+const RECENT_SEARCHES_KEY = 'stellio_recent_searches';
+const RECENT_SEARCHES_MAX = 8;
+
+function getRecentSearches() {
+    try {
+        const raw = localStorage.getItem(RECENT_SEARCHES_KEY);
+        const list = raw ? JSON.parse(raw) : [];
+        return Array.isArray(list) ? list : [];
+    } catch { return []; }
+}
+
+function saveRecentSearch(term) {
+    const trimmed = (term || '').trim();
+    if (!trimmed || trimmed.length < 2) return;
+    let list = getRecentSearches().filter(t => t.toLowerCase() !== trimmed.toLowerCase());
+    list.unshift(trimmed);
+    list = list.slice(0, RECENT_SEARCHES_MAX);
+    try { localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(list)); } catch {}
+}
+
+function removeRecentSearch(term) {
+    const list = getRecentSearches().filter(t => t !== term);
+    try { localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(list)); } catch {}
+}
+
+function clearRecentSearches() {
+    try { localStorage.removeItem(RECENT_SEARCHES_KEY); } catch {}
+}
+
+function renderRecentSearchesDropdown(dropdownEl, input) {
+    if (!dropdownEl) return;
+    const list = getRecentSearches();
+    if (!list.length) { dropdownEl.classList.add('hidden'); dropdownEl.innerHTML = ''; return; }
+    dropdownEl.innerHTML = `
+        <div class="search-recent-dropdown-header">
+            <span>${_t2('search.recent_title', 'Recherches récentes')}</span>
+            <button type="button" data-action="clear-all">${_t2('search.recent_clear', 'Effacer')}</button>
+        </div>
+        ${list.map(term => `
+            <div class="search-recent-item" data-term="${escapeHtml(term)}">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>${escapeHtml(term)}</span>
+                <span class="search-recent-remove" data-action="remove" data-term="${escapeHtml(term)}"><i class="fa-solid fa-xmark"></i></span>
+            </div>
+        `).join('')}
+    `;
+    dropdownEl.classList.remove('hidden');
+    dropdownEl.querySelectorAll('.search-recent-item').forEach(item => {
+        item.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            if (e.target.closest('[data-action="remove"]')) {
+                removeRecentSearch(item.dataset.term);
+                renderRecentSearchesDropdown(dropdownEl, input);
+                return;
+            }
+            input.value = item.dataset.term;
+            handleSearchInput(item.dataset.term, input);
+            dropdownEl.classList.add('hidden');
+        });
+    });
+    dropdownEl.querySelector('[data-action="clear-all"]')?.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        clearRecentSearches();
+        dropdownEl.classList.add('hidden');
+    });
+}
+
+function setupRecentSearches(input, dropdownEl) {
+    if (!input || !dropdownEl) return;
+    input.addEventListener('focus', () => {
+        if (!input.value.trim()) renderRecentSearchesDropdown(dropdownEl, input);
+    });
+    input.addEventListener('blur', () => {
+        if (input.value.trim()) saveRecentSearch(input.value);
+        setTimeout(() => dropdownEl.classList.add('hidden'), 120);
+    });
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && input.value.trim()) {
+            saveRecentSearch(input.value);
+            dropdownEl.classList.add('hidden');
+        } else if (e.key === 'Escape') {
+            dropdownEl.classList.add('hidden');
+        }
+    });
+    input.addEventListener('input', () => {
+        if (!input.value.trim()) renderRecentSearchesDropdown(dropdownEl, input);
+        else dropdownEl.classList.add('hidden');
+    });
+}
+setupRecentSearches(globalSearchInput, document.getElementById('search-recent-dropdown'));
+setupRecentSearches(mobileSearchInput, document.getElementById('search-recent-dropdown-mobile'));
+
 window.runSemanticSearch = runSemanticSearch;
 window.setSearchMode     = setSearchMode;
 
@@ -8055,11 +12197,59 @@ document.addEventListener('DOMContentLoaded', function restoreNavPrefs() {
     } catch (_) {}
 });
 
+// ── Flèches de défilement de la barre de navigation mobile ──
+// Tout à gauche : flèche droite seule. Au milieu : deux flèches. Tout à droite : flèche gauche seule.
+// Aucune flèche si tous les onglets tiennent à l'écran.
+(function initBottomNavScrollHints() {
+    const nav = document.getElementById('mobile-bottom-nav');
+    const hintLeft = document.getElementById('bottom-nav-hint-left');
+    const hintRight = document.getElementById('bottom-nav-hint-right');
+    if (!nav || !hintLeft || !hintRight) return;
+
+    const EDGE = 2; // tolérance en px (les scrollLeft sont parfois fractionnaires sur mobile)
+    let pending = false;
+
+    function updateHints() {
+        pending = false;
+        const maxScroll = nav.scrollWidth - nav.clientWidth;
+        const scrollable = maxScroll > EDGE;
+        const x = nav.scrollLeft;
+        hintLeft.classList.toggle('visible', scrollable && x > EDGE);
+        hintRight.classList.toggle('visible', scrollable && x < maxScroll - EDGE);
+    }
+
+    function scheduleUpdate() {
+        if (pending) return;
+        pending = true;
+        requestAnimationFrame(updateHints);
+    }
+
+    nav.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleUpdate);
+    window.addEventListener('orientationchange', scheduleUpdate);
+    window.addEventListener('load', scheduleUpdate);
+
+    // Onglets masqués/affichés depuis les réglages (style.display) : la largeur totale change.
+    if ('MutationObserver' in window) {
+        new MutationObserver(scheduleUpdate).observe(nav, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style']
+        });
+    }
+    if ('ResizeObserver' in window) new ResizeObserver(scheduleUpdate).observe(nav);
+
+    scheduleUpdate();
+})();
+
 
 document.getElementById('sort-select')?.addEventListener('change', (e) => { currentSort = e.target.value; applySorting(); renderFiles(); });
 document.getElementById('apply-filters')?.addEventListener('click', applyFilters);
 
-document.getElementById('confirm-slicer')?.addEventListener('click', async () => {
+document.getElementById('confirm-slicer')?.addEventListener('click', () => _confirmSendToSlicer(false));
+
+async function _confirmSendToSlicer(force) {
     if (!currentSlicerFile) return;
     const consumeSpool = document.getElementById('slicer-spool-box')?.style.display !== 'none'
         && document.getElementById('slicer-consume-spool-checkbox')?.checked;
@@ -8069,7 +12259,8 @@ document.getElementById('confirm-slicer')?.addEventListener('click', async () =>
             consume_spool: !!consumeSpool,
             orientation: currentSlicerOrientation || 'default',
             printer_id: document.getElementById('slicer-ai-printer-select')?.value || null,
-            material_type: document.getElementById('slicer-ai-material-select')?.value || null
+            material_type: document.getElementById('slicer-ai-material-select')?.value || null,
+            force: !!force,
         };
         if (_lastAiRecommendedProfile && _lastAiRecommendedProfile.id) {
             body.slicer_profile_id = _lastAiRecommendedProfile.id;
@@ -8077,6 +12268,17 @@ document.getElementById('confirm-slicer')?.addEventListener('click', async () =>
         }
         const res = await fetch(`${API}/api/slicer/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const data = await res.json();
+
+        if (res.status === 409 && data.duplicate_send) {
+            const secondsAgo = data.seconds_ago;
+            const timeLabel = secondsAgo != null ? `${secondsAgo}s` : '';
+            showConfirmModal(
+                `${_t2('slicer.duplicate_send_confirm', 'Ce fichier a déjà été envoyé au slicer il y a')} ${timeLabel} ${_t2('slicer.duplicate_send_confirm_suffix', "— probablement depuis un autre appareil. L'envoyer quand même ?")}`,
+                () => _confirmSendToSlicer(true)
+            );
+            return;
+        }
+
         showToast(res.ok ? I18N.t('toast.files_sent') : data.error, res.ok ? 'success' : 'error');
         if (res.ok && data.stock_warning) _showStockWarningToast(data.stock_warning);
     } catch (err) { showToast(I18N.t('toast.send_error'), 'error'); }
@@ -8086,7 +12288,7 @@ document.getElementById('confirm-slicer')?.addEventListener('click', async () =>
         _slicerLaunchedFromViewer = false;
         close3DViewer();
     }
-});
+}
 
 document.querySelectorAll('.modal').forEach(modal => {
     modal.addEventListener('click', (e) => {
@@ -8324,6 +12526,51 @@ badge.textContent = count > 0 ? count : '';
 badge.style.display = count > 0 ? 'inline-block' : 'none';
 }
 }
+function showRepairDiff(fileName, before, after) {
+    if (!before || !after) return;
+    document.getElementById('repair-diff-filename').textContent = fileName;
+
+    const formatBool = (v) => v
+        ? `<i class="fa-solid fa-circle-check" style="color:var(--success,#22c55e);"></i> ${_t2('repair.watertight_yes', 'Oui')}`
+        : `<i class="fa-solid fa-circle-xmark" style="color:var(--danger);"></i> ${_t2('repair.watertight_no', 'Non')}`;
+
+    const rows = [
+        {
+            label: _t2('repair.diff_watertight', 'Étanche (watertight)'),
+            before: formatBool(before.watertight), after: formatBool(after.watertight),
+            improved: !before.watertight && after.watertight,
+        },
+        {
+            label: _t2('repair.diff_triangles', 'Triangles'),
+            before: before.triangle_count?.toLocaleString(), after: after.triangle_count?.toLocaleString(),
+            unchanged: before.triangle_count === after.triangle_count,
+        },
+        {
+            label: _t2('repair.diff_vertices', 'Sommets'),
+            before: before.vertex_count?.toLocaleString(), after: after.vertex_count?.toLocaleString(),
+            unchanged: before.vertex_count === after.vertex_count,
+        },
+    ];
+    if (before.file_size != null && after.file_size != null) {
+        rows.push({
+            label: _t2('repair.diff_size', 'Taille du fichier'),
+            before: formatSize(before.file_size), after: formatSize(after.file_size),
+            unchanged: before.file_size === after.file_size,
+        });
+    }
+
+    document.getElementById('repair-diff-rows').innerHTML = rows.map(r => `
+        <div class="repair-diff-row ${r.improved ? 'improved' : (r.unchanged ? 'unchanged' : '')}">
+            <span>${escapeHtml(r.label)}</span>
+            <span>${r.before ?? '—'}</span>
+            <span>${r.after ?? '—'}</span>
+        </div>
+    `).join('');
+
+    openModal('modal-repair-diff');
+}
+window.showRepairDiff = showRepairDiff;
+
 window.repairFile = async function(filePath, btn) {
 const originalHtml = btn.innerHTML;
 btn.disabled = true;
@@ -8339,6 +12586,8 @@ if (res.ok && data.success && data.watertight !== false) {
 btn.innerHTML = `<i class="fa-solid fa-check"></i> ${I18N.t('actions.repaired') || 'Réparé'}`;
 btn.classList.replace('btn-primary', 'btn-success');
 showToast(I18N.t('toast.repair_success'), 'success');
+const fName = repairFilesList.find(f => f.path === filePath)?.name || filePath.split(/[\\/]/).pop();
+if (data.before && data.after) showRepairDiff(fName, data.before, data.after);
 setTimeout(() => {
 repairFilesList = repairFilesList.filter(f => f.path !== filePath);
 renderRepairFiles();
@@ -8348,6 +12597,8 @@ loadFiles();
 btn.innerHTML = `<i class="fa-solid fa-check"></i> ${I18N.t('actions.repaired') || 'Traité'}`;
 btn.classList.replace('btn-primary', 'btn-success');
 showToast(data.message || I18N.t('toast.repair_partial') || 'Réparation partielle : problèmes non résolus automatiquement (sauvegarde .bak conservée)', 'warning');
+const fName2 = repairFilesList.find(f => f.path === filePath)?.name || filePath.split(/[\\/]/).pop();
+if (data.before && data.after) showRepairDiff(fName2, data.before, data.after);
 setTimeout(() => {
 repairFilesList = repairFilesList.filter(f => f.path !== filePath);
 renderRepairFiles();
@@ -9155,25 +13406,8 @@ window.loadStats = async function () {
             }
         }
 
-        const relEl = document.getElementById('stat-profile-reliability');
-        if (relEl) {
-            const rel = data.profile_reliability || [];
-            if (rel.length) {
-                relEl.innerHTML = rel.map(p => {
-                    const hasRate = p.success_rate !== null && p.success_rate !== undefined;
-                    const rate = hasRate ? p.success_rate : null;
-                    const col = !hasRate ? '#a0aec0' : rate >= 80 ? '#68d391' : rate >= 50 ? '#f6ad55' : '#fc8181';
-                    const rateLabel = hasRate ? `${rate}%` : I18N.t('stats.profile_reliability_unrated') || 'non noté';
-                    const detail = `${p.success}✓ / ${p.failed}✗${p.unrated ? ` / ${p.unrated} ${I18N.t('stats.profile_reliability_unrated_short') || 'non notées'}` : ''}`;
-                    return `<div class="stat-top-row" title="${escapeHtml(detail)}">
-                        <span class="stat-top-name" style="flex:1;" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>
-                        <span class="stat-top-count" style="color:${col};font-weight:600;">${rateLabel}</span>
-                    </div>`;
-                }).join('');
-            } else {
-                relEl.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${I18N.t('stats.profile_reliability_empty') || "Note tes impressions dans l'Historique pour voir apparaître ce classement."}</p>`;
-            }
-        }
+        window._lastStatsData = data;
+        _renderStatsReliability(data);
 
         loading?.classList.add('hidden');
         content?.classList.remove('hidden');
@@ -9366,6 +13600,36 @@ async function rateHistoryEntry(id, result, failureReason) {
     }
 }
 
+let _historyFilterPlatformsPopulated = false;
+function _populateHistoryPlatformFilter(platforms) {
+    if (_historyFilterPlatformsPopulated) return;
+    const select = document.getElementById('history-filter-platform');
+    if (!select || !platforms.length) return;
+    platforms.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        select.appendChild(opt);
+    });
+    _historyFilterPlatformsPopulated = true;
+}
+
+window.applyHistoryFilters = function () {
+    loadHistory(true);
+};
+
+window.resetHistoryFilters = function () {
+    const platformSel = document.getElementById('history-filter-platform');
+    const resultSel = document.getElementById('history-filter-result');
+    const dateFrom = document.getElementById('history-filter-date-from');
+    const dateTo = document.getElementById('history-filter-date-to');
+    if (platformSel) platformSel.value = '';
+    if (resultSel) resultSel.value = '';
+    if (dateFrom) dateFrom.value = '';
+    if (dateTo) dateTo.value = '';
+    loadHistory(true);
+};
+
 window.loadHistory = async function (reset = true) {
     if (reset) {
         _historyOffset = 0;
@@ -9377,10 +13641,25 @@ window.loadHistory = async function (reset = true) {
     }
     document.getElementById('history-loading')?.classList.remove('hidden');
     try {
-        const res  = await fetch(`${API}/api/print-history?limit=${HISTORY_LIMIT}&offset=${_historyOffset}`);
+        const params = new URLSearchParams({ limit: HISTORY_LIMIT, offset: _historyOffset });
+        const platform = document.getElementById('history-filter-platform')?.value;
+        const result = document.getElementById('history-filter-result')?.value;
+        const dateFrom = document.getElementById('history-filter-date-from')?.value;
+        const dateTo = document.getElementById('history-filter-date-to')?.value;
+        if (platform) params.set('platform', platform);
+        if (result) params.set('result', result);
+        if (dateFrom) params.set('date_from', dateFrom);
+        if (dateTo) params.set('date_to', dateTo);
+        const resetBtn = document.getElementById('history-filter-reset');
+        if (resetBtn) resetBtn.style.display = (platform || result || dateFrom || dateTo) ? '' : 'none';
+
+        const res  = await fetch(`${API}/api/print-history?${params.toString()}`);
         const data = await res.json();
         document.getElementById('history-loading')?.classList.add('hidden');
         if (!res.ok) { showToast(data.error || I18N.t('toast.history_error'), 'error'); return; }
+
+        _populateHistoryPlatformFilter(data.available_platforms || []);
+
         if (data.total === 0) {
             document.getElementById('history-empty').classList.remove('hidden');
             return;
@@ -9426,6 +13705,12 @@ window.loadHistory = async function (reset = true) {
                     </div>
                     <div class="history-entry-time">${timeStr}</div>
                     <div class="history-entry-rating">${_renderHistoryRatingBlock(entry)}</div>
+                    <button class="history-entry-view" onclick="viewHistoryFile('${escapeJs(entry.file_path)}', '${escapeJs(entry.file_name)}')" title="${I18N.t('history.view_file') || 'Voir le fichier'}">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                    <button class="history-entry-reprint" onclick="reprintHistoryFile('${escapeJs(entry.file_path)}', '${escapeJs(entry.file_name)}', ${entry.id})" title="${I18N.t('history.reprint_file_same') || 'Réimprimer comme la dernière fois'}">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
                     <button class="history-entry-del" onclick="deleteHistoryEntry(${entry.id})" title="${I18N.t('actions.delete')}">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
@@ -9446,7 +13731,28 @@ window.loadHistory = async function (reset = true) {
 
 window.loadMoreHistory = function () { loadHistory(false); };
 
+async function _checkHistoryFileExists(filePath) {
+    try {
+        const res = await fetch(`${API}/api/files/exists?path=${encodeURIComponent(filePath)}`);
+        const data = await res.json();
+        return !!data.exists;
+    } catch {
+        return true; // en cas de doute (ex: pas de réseau), on laisse l'action continuer plutôt que de bloquer
+    }
+}
+
+window.viewHistoryFile = async function (filePath, fileName) {
+    if (!(await _checkHistoryFileExists(filePath))) {
+        showToast(I18N.t('history.file_missing') || "Ce fichier n'est plus disponible — il a peut-être été déplacé ou supprimé.", 'error');
+        return;
+    }
+    open3DViewer(fileName, filePath);
+};
+
+
+
 async function loadDownloadHistory() {
+    loadModelUpdates();
     const sel = document.getElementById('download-history-select');
     const empty = document.getElementById('download-history-empty');
     if (!sel || !empty) return;
@@ -9508,6 +13814,7 @@ window.goToFileInLibrary = function (filePath, fileName) {
     if (typeof currentSizeFilter !== 'undefined') currentSizeFilter = null;
     if (typeof currentWeightFilter !== 'undefined') currentWeightFilter = null;
     if (typeof printStatusFilter !== 'undefined') printStatusFilter = '';
+    if (typeof stockFilter !== 'undefined') { stockFilter = ''; stockPrintableMap = null; }
     if (typeof noThumbFilterOnly !== 'undefined') noThumbFilterOnly = false;
 if (typeof failedThumbFilterOnly !== 'undefined') failedThumbFilterOnly = false;
     activeTagFilters?.clear?.();
@@ -9744,14 +14051,84 @@ function _renderSpoolChips(ams) {
 
 let _refreshAllPrintersRunning = false;
 
+let _lastPrinterStatus = {};
+let _miniWidgetDismissedFor = new Set();
+let _miniWidgetCurrentPid = null;
+
+function _updateMiniPrinterWidget(activeList) {
+    const widget = document.getElementById('mini-printer-widget');
+    if (!widget) return;
+    const visible = activeList.filter(({ printer }) => !_miniWidgetDismissedFor.has(printer.id));
+    if (!visible.length) {
+        widget.classList.add('hidden');
+        _miniWidgetCurrentPid = null;
+        return;
+    }
+    // Garde le même imprimante affichée tant qu'elle est active, pour éviter que le widget "saute" d'une carte à l'autre.
+    let chosen = visible.find(v => v.printer.id === _miniWidgetCurrentPid) || visible[0];
+    _miniWidgetCurrentPid = chosen.printer.id;
+
+    document.getElementById('mini-printer-widget-name').textContent = chosen.printer.name;
+    document.getElementById('mini-printer-widget-bar').style.width = `${chosen.status.progress || 0}%`;
+    document.getElementById('mini-printer-widget-pct').textContent = `${Math.round(chosen.status.progress || 0)}%`;
+    const extraEl = document.getElementById('mini-printer-widget-extra');
+    const extraCount = visible.length - 1;
+    if (extraCount > 0) {
+        extraEl.textContent = `+${extraCount}`;
+        extraEl.classList.remove('hidden');
+    } else {
+        extraEl.classList.add('hidden');
+    }
+    widget.classList.remove('hidden');
+}
+
+window.dismissMiniPrinterWidget = function () {
+    if (_miniWidgetCurrentPid != null) _miniWidgetDismissedFor.add(_miniWidgetCurrentPid);
+    document.getElementById('mini-printer-widget')?.classList.add('hidden');
+};
+
+window._openMiniWidgetTarget = function () {
+    if (_miniWidgetCurrentPid == null) return;
+    document.querySelector('.nav-btn[data-page="printers"]')?.click();
+    setTimeout(() => { if (typeof openPrinterMonitor === 'function') openPrinterMonitor(_miniWidgetCurrentPid); }, 150);
+};
+
+
 async function refreshAllPrinters() {
     if (_refreshAllPrintersRunning) return;
     _refreshAllPrintersRunning = true;
+    const _activeForWidget = [];
     try {
         for (const p of printersList) {
             try {
                 const res = await fetch(`${API}/api/printers/${p.id}/status`);
                 const data = await res.json();
+
+                const prevStatus = _lastPrinterStatus[p.id];
+                if (prevStatus === 'printing' && data.status === 'idle') {
+                    createNotification(
+                        'print_finished',
+                        _t2('notif.print_finished_title', 'Impression terminée'),
+                        p.name,
+                        'printers',
+                        `print_finished_${p.id}_${Date.now()}`
+                    );
+                } else if (prevStatus === 'printing' && data.status === 'error') {
+                    createNotification(
+                        'print_failed',
+                        _t2('notif.print_failed_title', "Échec d'impression"),
+                        p.name,
+                        'sosprint',
+                        `print_failed_${p.id}_${Date.now()}`
+                    );
+                }
+                if (data.status === 'printing' && prevStatus !== 'printing') {
+                    _miniWidgetDismissedFor.delete(p.id);
+                }
+                _lastPrinterStatus[p.id] = data.status;
+                if (['printing', 'paused'].includes(data.status)) {
+                    _activeForWidget.push({ printer: p, status: data });
+                }
 
                 const progressBar = document.getElementById(`progress-${p.id}`);
                 const cardStatus = document.getElementById(`card-status-${p.id}`);
@@ -9793,6 +14170,7 @@ async function refreshAllPrinters() {
                 if (currentMonitorPid === p.id) updateMonitorUI(data);
             } catch (_) {  }
         }
+        _updateMiniPrinterWidget(_activeForWidget);
     } finally {
         _refreshAllPrintersRunning = false;
     }
@@ -9808,8 +14186,19 @@ async function _checkMaintenanceBadge(pid) {
         const data = await res.json();
         const badge = document.getElementById(`maintenance-badge-${pid}`);
         if (!badge) return;
-        const hasDue = (data.tasks || []).some(t => t.due);
-        badge.style.display = hasDue ? 'block' : 'none';
+        const dueTasks = (data.tasks || []).filter(t => t.due);
+        badge.style.display = dueTasks.length > 0 ? 'block' : 'none';
+        if (dueTasks.length > 0) {
+            const printerName = printersList.find(p => p.id === pid)?.name || `#${pid}`;
+            const today = new Date().toISOString().slice(0, 10);
+            createNotification(
+                'maintenance',
+                _t2('notif.maintenance_title', 'Maintenance à prévoir'),
+                `${printerName} — ${dueTasks.map(t => t.name).join(', ')}`,
+                'printers',
+                `maintenance_${pid}_${today}`
+            );
+        }
     } catch (err) {  }
 }
 
@@ -9874,6 +14263,10 @@ function openMaintenanceModal(pid, printerName, brand) {
                             <label style="display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--text-muted);">
                                 <span data-i18n="printers.maintenance_every_days">Tous les (jours)</span>
                                 <input type="number" id="maintenance-new-days" min="1" step="1" style="width:80px;">
+                            </label>
+                            <label style="display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--text-muted); min-width:150px;">
+                                <span>${_t3('parts.linked_part', 'Pièce consommée (optionnel)')}</span>
+                                <select id="maintenance-new-part" class="settings-select"></select>
                             </label>
                             <button class="btn btn-primary btn-sm" onclick="addMaintenanceTask()">
                                 <i class="fa-solid fa-plus"></i> <span data-i18n="actions.add">Ajouter</span>
@@ -10023,6 +14416,7 @@ async function loadMaintenanceTasks(pid) {
             }
         }
         renderMaintenanceTasks(data.tasks || []);
+        _refreshMaintenancePartSelect();
     } catch (err) {
         list.innerHTML = `<div style="color:var(--danger); font-size:12.5px;">${_t3('toast.connection_error', 'Erreur de connexion')}</div>`;
     }
@@ -10061,6 +14455,7 @@ function renderMaintenanceTasks(tasks) {
                     </div>
                 </div>
                 <div id="maintenance-task-info-${t.id}" style="font-size:11px; color:var(--text-muted); margin-top:4px;">${parts.join(' · ')}</div>
+                ${t.part_name ? `<div style="font-size:11px; margin-top:3px; color:${t.part_low ? 'var(--danger)' : 'var(--text-muted)'};"><i class="fa-solid fa-toolbox"></i> ${escapeHtml(t.part_name)} · ${escapeHtml(_tf('parts.stock_n', 'stock : {{n}}', { n: t.part_stock }))}${t.part_low ? ' ⚠' : ''}</div>` : ''}
                 <div class="progress-track" style="margin-top:6px;">
                     <div class="progress-bar" style="width:${Math.round(ratio*100)}%; background:${barColor};"></div>
                 </div>
@@ -10083,6 +14478,10 @@ function toggleEditMaintenanceTask(taskId) {
                 <span data-i18n="printers.maintenance_every_days">Tous les (jours)</span>
                 <input type="number" id="edit-days-${taskId}" value="${task.interval_days ?? ''}" min="1" step="1" style="width:60px;">
             </label>
+            <label style="display:flex; align-items:center; gap:4px;">
+                <i class="fa-solid fa-toolbox" title="${escapeHtml(_t3('parts.linked_part', 'Pièce consommée (optionnel)'))}"></i>
+                <select id="edit-part-${taskId}" class="settings-select" style="max-width:150px;">${_maintenancePartOptionsHtml(task.part_id)}</select>
+            </label>
             <button class="btn btn-primary btn-sm" onclick="saveMaintenanceTaskEdit(${taskId})"><i class="fa-solid fa-check"></i></button>
             <button class="btn btn-ghost btn-sm" onclick="loadMaintenanceTasks(_currentMaintenancePid)"><i class="fa-solid fa-xmark"></i></button>
         </div>
@@ -10096,7 +14495,12 @@ async function saveMaintenanceTaskEdit(taskId) {
     try {
         const res = await fetch(`${API}/api/printers/maintenance/${taskId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ interval_hours: hours, interval_days: days })
+            body: JSON.stringify((() => {
+                const payload = { interval_hours: hours, interval_days: days };
+                const partSel = document.getElementById(`edit-part-${taskId}`);
+                if (partSel) payload.part_id = partSel.value || null;
+                return payload;
+            })())
         });
         const data = await res.json();
         if (!res.ok) { showToast(data.error || _t3('toast.error', 'Erreur'), 'error'); return; }
@@ -10118,7 +14522,7 @@ async function addMaintenanceTask() {
     try {
         const res = await fetch(`${API}/api/printers/${_currentMaintenancePid}/maintenance`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, interval_hours: hours || null, interval_days: days || null })
+            body: JSON.stringify({ name, interval_hours: hours || null, interval_days: days || null, part_id: document.getElementById('maintenance-new-part')?.value || null })
         });
         const data = await res.json();
         if (!res.ok) { showToast(data.error || _t3('toast.error', 'Erreur'), 'error'); return; }
@@ -10138,6 +14542,7 @@ async function resetMaintenanceTask(taskId) {
         const data = await res.json();
         if (!res.ok) { showToast(data.error || _t3('toast.error', 'Erreur'), 'error'); return; }
         showToast(_t3('printers.maintenance_done_saved', 'Entretien enregistré !'), 'success');
+        _handleMaintenanceResetPart(data.part);
         loadMaintenanceTasks(_currentMaintenancePid);
         _checkMaintenanceBadge(_currentMaintenancePid);
     } catch (err) {
@@ -10223,6 +14628,129 @@ function showMaintenanceAlertPopup(printerName, taskName) {
     document.body.appendChild(overlay);
     const close = () => overlay.remove();
     document.getElementById('maintenance-alert-ok').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+}
+
+let _lowStockList = [];
+
+async function checkLowStockOnStartup() {
+    try {
+        const res = await fetch(`${API}/api/filament/low-stock`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data) && data.length) {
+            _lowStockList = data;
+            showLowStockToast(_lowStockList);
+        }
+    } catch (e) {  }
+}
+
+function showLowStockToast(spools) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const count = spools.length;
+    const DURATION_MS = 10000;
+    const message = count > 1
+        ? _t3('spoolman.low_stock_summary_message_plural', 'Vous avez {{count}} bobines qui se trouvent sous les 100g, pensez à en racheter.', { count }).replace('{{count}}', count)
+        : _t3('spoolman.low_stock_summary_message_single', 'Vous avez 1 bobine qui se trouve sous les 100g, pensez à en racheter.', {});
+    const toast = document.createElement('div');
+    toast.className = 'toast warning lowstock-toast';
+    toast.innerHTML = `
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span class="toast-message">${escapeHtml(message)}</span>
+        <i class="fa-solid fa-chevron-right lowstock-toast-arrow"></i>
+        <button type="button" class="lowstock-toast-close" aria-label="${_t3('actions.close', 'Fermer')}">&times;</button>
+        <div class="lowstock-toast-progress" style="animation-duration:${DURATION_MS}ms;"></div>
+    `;
+    let dismissTimer = setTimeout(dismiss, DURATION_MS);
+    function dismiss() {
+        clearTimeout(dismissTimer);
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        toast.style.transition = 'all 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }
+    toast.addEventListener('click', () => {
+        dismiss();
+        showLowStockListPopup(spools);
+    });
+    toast.querySelector('.lowstock-toast-close').addEventListener('click', (e) => {
+        e.stopPropagation();
+        dismiss();
+    });
+    container.appendChild(toast);
+}
+
+function showLowStockListPopup(spools) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 100000; backdrop-filter: blur(5px);`;
+    const popup = document.createElement('div');
+    popup.style.cssText = `background: var(--bg-secondary); color: var(--text-primary); padding: 24px; border-radius: 14px; max-width: 440px; width: 90%; max-height: 70vh; display: flex; flex-direction: column; box-shadow: 0 12px 35px rgba(0,0,0,0.6); border: 1px solid var(--border);`;
+    const rows = spools.map((spool, i) => {
+        const color = spool.color_hex || '#888888';
+        const remaining = typeof spool.remaining_g === 'number' ? Math.round(spool.remaining_g) : null;
+        return `
+        <button class="low-stock-row" data-idx="${i}" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary); cursor:pointer; margin-bottom:8px;">
+            <span style="width:14px; height:14px; border-radius:4px; background:${escapeHtml(color)}; flex-shrink:0;"></span>
+            <span style="flex:1; font-size:14px; font-weight:500;">${escapeHtml(spool.name || spool.material || '—')}</span>
+            <span style="font-size:12.5px; color:var(--text-muted);">${remaining !== null ? _t3('spoolman.low_stock_remaining', '{{g}} g restants', { g: remaining }).replace('{{g}}', remaining) : ''}</span>
+            <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
+        </button>`;
+    }).join('');
+    popup.innerHTML = `
+        <h3 style="margin:0 0 14px 0; font-size:18px; font-weight:600; flex-shrink:0;"><i class="fa-solid fa-cart-shopping" style="color:var(--accent);"></i> ${_t3('spoolman.low_stock_list_title', 'Bobines à racheter')}</h3>
+        <div style="overflow-y:auto; margin-bottom:16px;">${rows}</div>
+        <button id="low-stock-list-close" class="btn btn-ghost" style="flex-shrink:0;">${_t3('actions.close', 'Fermer')}</button>
+    `;
+    overlay.appendChild(popup);
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    popup.querySelectorAll('.low-stock-row').forEach(row => {
+        row.addEventListener('click', () => {
+            const spool = spools[Number(row.dataset.idx)];
+            if (spool) showLowStockShopPopup(spool);
+        });
+    });
+    document.getElementById('low-stock-list-close').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+}
+
+function showLowStockShopPopup(spool) {
+    const shops = Array.isArray(spool.shops) ? spool.shops : [];
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100001; backdrop-filter: blur(3px);`;
+    const popup = document.createElement('div');
+    popup.style.cssText = `background: var(--bg-secondary); color: var(--text-primary); padding: 24px; border-radius: 14px; max-width: 380px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 12px 35px rgba(0,0,0,0.6); border: 1px solid var(--border);`;
+    const color = spool.color_hex || '#888888';
+    const query = spool.search_query || spool.name || spool.material || '';
+    const shopButtons = shops.map((shop, i) => `
+        <button class="low-stock-shop-btn" data-idx="${i}" style="display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary); cursor:pointer; margin-bottom:8px; font-size:14.5px; font-weight:500;">
+            <i class="fa-solid fa-store" style="color:var(--accent); width:18px; text-align:center;"></i>
+            <span style="flex:1;">${escapeHtml(shop.name)}</span>
+            <i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--text-muted); font-size:12px;"></i>
+        </button>`).join('');
+    const body = shops.length
+        ? `<div style="overflow-y:auto;">${shopButtons}</div>`
+        : `<div style="font-size:13px; color:var(--text-muted); margin-bottom:8px;">${_t3('spoolman.low_stock_no_shop', 'Aucune boutique avec recherche configurée (champ search_url dans useful_links.json).')}</div>`;
+    popup.innerHTML = `
+        <h3 style="margin:0 0 8px 0; font-size:18px; font-weight:600;"><i class="fa-solid fa-store" style="color:var(--accent);"></i> ${_t3('spoolman.low_stock_shop_title', 'Où racheter cette bobine ?')}</h3>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; color:var(--text-muted); font-size:13px;">
+            <span style="width:12px; height:12px; border-radius:4px; background:${escapeHtml(color)}; flex-shrink:0;"></span>
+            <span><i class="fa-solid fa-magnifying-glass" style="font-size:11px;"></i> ${escapeHtml(query)}</span>
+        </div>
+        ${body}
+        <button id="low-stock-shop-close" class="btn btn-ghost" style="margin-top:6px; flex-shrink:0;">${_t3('actions.close', 'Fermer')}</button>
+    `;
+    overlay.appendChild(popup);
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    popup.querySelectorAll('.low-stock-shop-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const shop = shops[Number(btn.dataset.idx)];
+            if (shop && shop.url) window.open(shop.url, '_blank', 'noopener');
+        });
+    });
+    document.getElementById('low-stock-shop-close').addEventListener('click', close);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 }
 
@@ -10936,7 +15464,7 @@ async function enableDebugSessionAndRestart(btn) {
         return;
     }
 
-    fetch(`${API}/api/app/quit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}), keepalive: true }).catch(() => {});
+    fetch(`${API}/api/app/quit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ restart: true }), keepalive: true }).catch(() => {});
     setTimeout(() => { window.close(); }, 1200);
 }
 window.enableDebugSessionAndRestart = enableDebugSessionAndRestart;
@@ -11067,6 +15595,14 @@ startThumbAutoRefresh();
 
         const nameEl = document.getElementById('file-actions-name');
         if (nameEl) nameEl.textContent = fileName;
+
+        const queueLabel = document.getElementById('ctx-queue-label');
+        if (queueLabel) {
+            const queued = printQueuePaths.has(filePath);
+            queueLabel.textContent = queued
+                ? (I18N.t('queue.remove_action') || 'Retirer de la file d\'attente')
+                : (I18N.t('queue.add_action') || 'Ajouter à imprimer bientôt');
+        }
 
         const isVirtualEntry = filePath.includes('::');
         ['ctx-rename-btn', 'ctx-move-btn', 'ctx-share-btn', 'ctx-regen-btn', 'ctx-openwith-btn', 'ctx-send-instance-btn'].forEach(id => {
@@ -11419,8 +15955,8 @@ startThumbAutoRefresh();
             });
             const data = await res.json();
             if (res.ok) {
-                showToast(data.message || I18N.t('toast.file_deleted'), 'success');
                 closeModal('modal-delete-file');
+                showUndoToast(data.message || I18N.t('toast.file_deleted'), data.batch_id, data.undo_seconds);
                 if (typeof loadFiles === 'function') loadFiles();
             } else {
                 showToast(data.error || I18N.t('toast.delete_error'), 'error');
@@ -11485,6 +16021,8 @@ startThumbAutoRefresh();
 
 
     let _costMetadata = null;
+    let _costCurrentFileName = '';
+    let _lastQuote = null;
     let _costSaveTimer = null;
     let _preciseEstimate = null;
     let _preciseEstimateStatus = 'idle';
@@ -11502,6 +16040,9 @@ startThumbAutoRefresh();
             const elecPrice = document.getElementById('cost-elec-price')?.value;
             const printerPower = document.getElementById('cost-printer-power')?.value;
             const printerId = document.getElementById('cost-printer-select')?.value || null;
+            const wearRate = document.getElementById('cost-wear-rate')?.value ?? '';
+            const fixedFee = document.getElementById('cost-fixed-fee')?.value ?? '';
+            const marginPct = document.getElementById('cost-margin-pct')?.value ?? '';
 
             try {
                 const res = await fetch(`${API}/api/settings`);
@@ -11527,12 +16068,37 @@ startThumbAutoRefresh();
                         print_cost_spools: spools,
                         print_cost_elec_price: elecPrice,
                         print_cost_printer_power: printerPower,
-                        print_cost_printer_id: printerId
+                        print_cost_printer_id: printerId,
+                        print_cost_wear_per_hour: wearRate === '' ? '' : parseFloat(wearRate),
+                        print_cost_fixed_fee: fixedFee === '' ? '' : parseFloat(fixedFee),
+                        print_cost_margin_pct: marginPct === '' ? '' : parseFloat(marginPct)
                     })
                 });
             } catch (_) {  }
         }, 600);
     }
+
+    const _costNum = (v, max) => {
+        const n = parseFloat(v);
+        return Number.isFinite(n) && n > 0 ? Math.min(n, max) : 0;
+    };
+    const _round2 = (v) => Math.round((v + Number.EPSILON) * 100) / 100;
+
+    // Chaque ligne est arrondie au centime : le devis additionne exactement ce qu'il affiche.
+    function _computeQuote(p) {
+        const material = _round2(_costNum(p.weightG, 1e6) * _costNum(p.pricePerGram, 1e6));
+        const elec = p.hasElec ? _round2(_costNum(p.timeHours, 1e6) * (_costNum(p.printerPower, 1e6) / 1000) * _costNum(p.elecPrice, 1e6)) : 0;
+        const wear = _round2(_costNum(p.timeHours, 1e6) * _costNum(p.wearPerHour, 1e6));
+        const fixed = _round2(_costNum(p.fixedFee, 1e6));
+        const cost = _round2(material + elec + wear + fixed);
+        const marginPct = _costNum(p.marginPct, 1000);
+        const margin = _round2(cost * marginPct / 100);
+        const unit = _round2(cost + margin);
+        const qty = Math.min(10000, Math.max(1, Math.floor(_costNum(p.qty, 10000)) || 1));
+        const total = _round2(unit * qty);
+        return { material, elec, wear, fixed, cost, marginPct, margin, unit, qty, total };
+    }
+    window._computeQuote = _computeQuote;
 
     function _recomputeCost() {
         const resultsEl = document.getElementById('cost-results');
@@ -11551,12 +16117,19 @@ startThumbAutoRefresh();
         const timeHours = timeSeconds / 3600;
 
         const pricePerGram = spoolWeight > 0 ? (spoolPrice / spoolWeight) : 0;
-        const materialCost = weightG * pricePerGram;
-
         const hasElec = elecPriceRaw !== '' && !isNaN(elecPrice) && elecPrice > 0;
-        const elecCost = hasElec ? timeHours * (printerPower / 1000) * elecPrice : 0;
 
-        const total = materialCost + elecCost;
+        const q = _computeQuote({
+            weightG, timeHours, pricePerGram, hasElec, elecPrice, printerPower,
+            wearPerHour: document.getElementById('cost-wear-rate')?.value,
+            fixedFee: document.getElementById('cost-fixed-fee')?.value,
+            marginPct: document.getElementById('cost-margin-pct')?.value,
+            qty: document.getElementById('cost-quantity')?.value
+        });
+        const materialCost = q.material;
+        const elecCost = q.elec;
+        const total = q.cost;
+        _lastQuote = { ...q, material_key: material, weightG, timeFormatted };
 
         const preciseBadgeHtml = {
             done: `<div style="display:flex; align-items:center; gap:6px; font-size:11px; color:#68d391; margin-bottom:10px;"><i class="fa-solid fa-circle-check"></i> ${I18N.t('cost.precise_via_slicer', { slicer: escapeHtml(_preciseEstimate?.slicer_name || '') })}</div>`,
@@ -11594,11 +16167,35 @@ startThumbAutoRefresh();
                     <span><i class="fa-solid fa-bolt" style="width:16px;"></i> ${I18N.t('cost.electricity_cost_label')}</span>
                     <strong style="color:${hasElec ? 'var(--text-primary)' : 'var(--text-muted)'};">${hasElec ? formatCost(elecCost) : I18N.t('printers.no_value_set')}</strong>
                 </div>
+                ${q.wear > 0 ? `
+                <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+                    <span><i class="fa-solid fa-screwdriver-wrench" style="width:16px;"></i> ${I18N.t('cost.wear_cost_label')}</span>
+                    <strong style="color:var(--text-primary);">${formatCost(q.wear)}</strong>
+                </div>` : ''}
+                ${q.fixed > 0 ? `
+                <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+                    <span><i class="fa-solid fa-hand" style="width:16px;"></i> ${I18N.t('cost.fixed_fee_cost_label')}</span>
+                    <strong style="color:var(--text-primary);">${formatCost(q.fixed)}</strong>
+                </div>` : ''}
                 <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:15px;">
                     <span style="color:var(--text-primary); font-weight:600;">${I18N.t('cost.total_estimated_label')}</span>
                     <strong style="color:var(--accent); font-size:18px;">${formatCost(total)}</strong>
                 </div>
+                ${q.marginPct > 0 ? `
+                <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+                    <span><i class="fa-solid fa-percent" style="width:16px;"></i> ${I18N.t('cost.margin_line_label', { pct: q.marginPct })}</span>
+                    <strong style="color:var(--text-primary);">+ ${formatCost(q.margin)}</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:15px;">
+                    <span style="color:var(--text-primary); font-weight:600;">${I18N.t('cost.unit_price_label')}</span>
+                    <strong style="color:var(--accent); font-size:18px;">${formatCost(q.unit)}</strong>
+                </div>` : ''}
+                ${q.qty > 1 ? `
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:15px;">
+                    <span style="color:var(--text-primary); font-weight:600;">${I18N.t('cost.total_for_qty_label', { n: q.qty })}</span>
+                    <strong style="color:var(--accent); font-size:18px;">${formatCost(q.total)}</strong>
+                </div>` : ''}
 				<div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
 					<span>${I18N.t('cost.slicer_estimate_note')}</span>
 				</div>
@@ -11706,13 +16303,15 @@ startThumbAutoRefresh();
         spoolman: '🔵',
         bambu_ams: '🟠',
         creality_cfs: '🟢',
-        manual: '⚪'
+        manual: '⚪',
+        tigertag: '🟡'
     };
     const FILAMENT_SOURCE_LABELS = {
         spoolman: 'Spoolman',
         bambu_ams: 'AMS',
         creality_cfs: 'CFS',
-        manual: _t2('spoolman.manual_source', 'Manuel')
+        manual: _t2('spoolman.manual_source', 'Manuel'),
+        tigertag: 'TigerTag'
     };
 
     let _compatSlotsCache = {};
@@ -12160,11 +16759,7 @@ startThumbAutoRefresh();
         }
     }
 
-    document.getElementById('print-photo-file-input')?.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        e.target.value = '';
-        await _uploadPrintPhoto(file);
-    });
+    document.getElementById('print-photo-add-btn')?.addEventListener('click', () => pickPhoto(_uploadPrintPhoto));
 
     (function initPrintPhotoDropZone() {
         const modalBody = document.querySelector('#modal-print-photos .modal-body');
@@ -12236,6 +16831,8 @@ startThumbAutoRefresh();
             ${row(I18N.t('modal.metadata_added') || 'Ajouté le', f.date_added)}
             ${f.tags?.length ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">${f.tags.map(t => `<span class="file-tag" style="background:${t.color}20;color:${t.color};border-color:${t.color}">${escapeHtml(t.name)}</span>`).join('')}</div>` : ''}
 
+            <div id="file-origin-box"></div>
+
             <h4 style="font-size:12px; text-transform:uppercase; color:var(--text-muted); margin:16px 0 4px;" data-i18n="modal.metadata_geometry_section">Géométrie</h4>
             ${metadata ? `
                 ${row(I18N.t('modal.metadata_dimensions') || 'Dimensions', dims)}
@@ -12256,6 +16853,8 @@ startThumbAutoRefresh();
             <p id="ai-description-text" style="font-size:13px; color:var(--text-secondary); line-height:1.5; font-style:italic;">${I18N.t('common.loading_ellipsis') || 'Chargement...'}</p>
         `;
 
+        _loadFileOrigin(filePath);
+
         try {
             const descRes = await fetch(`${API}/api/file-description?path=${encodeURIComponent(filePath)}`);
             const descData = await descRes.json();
@@ -12266,6 +16865,84 @@ startThumbAutoRefresh();
         } catch (e) {
             const descEl = document.getElementById('ai-description-text');
             if (descEl) descEl.textContent = '';
+        }
+    };
+
+    // ── Origine du modèle : lien d'origine, auteur, licence, notes ──
+    const _originAttr = (v) => escapeHtml(String(v || '')).replace(/"/g, '&quot;');
+
+    window._loadFileOrigin = async function (filePath) {
+        const box = document.getElementById('file-origin-box');
+        if (!box) return;
+        let o = null;
+        try {
+            const res = await fetch(`${API}/api/files/origin?path=${encodeURIComponent(filePath)}`);
+            if (res.ok) o = await res.json();
+        } catch (e) { }
+        if (!o) { box.innerHTML = ''; return; }
+
+        const safeUrl = /^https?:\/\//i.test(o.source_url || '') ? o.source_url : '';
+        let dateTxt = '';
+        if (o.from_download && o.downloaded_at) {
+            const dt = new Date(String(o.downloaded_at).replace(' ', 'T') + 'Z');
+            if (!isNaN(dt)) dateTxt = dt.toLocaleDateString(I18N.lang, { day: 'numeric', month: 'long', year: 'numeric' });
+        }
+        const linkRow = safeUrl
+            ? `<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:6px 0 12px;">
+                    <a class="btn btn-ghost btn-sm" href="${_originAttr(safeUrl)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i> ${escapeHtml(o.platform || I18N.t('modal.origin_open'))}</a>
+                    ${dateTxt ? `<span style="font-size:12px; color:var(--text-muted);">${escapeHtml(I18N.t('modal.origin_downloaded_on', { date: dateTxt }))}</span>` : ''}
+               </div>`
+            : `<p style="font-size:12px; color:var(--text-muted); margin:6px 0 12px;">${escapeHtml(I18N.t('modal.origin_none'))}</p>`;
+
+        box.innerHTML = `
+            <h4 style="font-size:12px; text-transform:uppercase; color:var(--text-muted); margin:16px 0 4px;">${escapeHtml(I18N.t('modal.origin_title'))}</h4>
+            ${linkRow}
+            <div class="input-group" style="margin-bottom:10px;"><i class="fa-solid fa-link"></i>
+                <input type="text" id="origin-url" maxlength="500" value="${_originAttr(o.source_url)}" placeholder="${_originAttr(I18N.t('modal.origin_url_placeholder'))}" autocomplete="off">
+            </div>
+            <div class="input-group" style="margin-bottom:10px;"><i class="fa-solid fa-user-pen"></i>
+                <input type="text" id="origin-author" maxlength="120" value="${_originAttr(o.author)}" placeholder="${_originAttr(I18N.t('modal.origin_author'))}" autocomplete="off">
+            </div>
+            <div class="input-group" style="margin-bottom:10px;"><i class="fa-solid fa-scale-balanced"></i>
+                <input type="text" id="origin-license" maxlength="120" value="${_originAttr(o.license)}" placeholder="${_originAttr(I18N.t('modal.origin_license'))}" autocomplete="off">
+            </div>
+            <div class="input-group" style="margin-bottom:10px;">
+                <textarea id="origin-notes" rows="2" maxlength="1000" placeholder="${_originAttr(I18N.t('modal.origin_notes'))}">${escapeHtml(o.notes || '')}</textarea>
+            </div>
+            <button class="btn btn-primary btn-sm" id="origin-save-btn"><i class="fa-solid fa-floppy-disk"></i> ${escapeHtml(I18N.t('modal.origin_save'))}</button>`;
+
+        document.getElementById('origin-save-btn')?.addEventListener('click', () => _saveFileOrigin(filePath));
+    };
+
+    window._saveFileOrigin = async function (filePath) {
+        const btn = document.getElementById('origin-save-btn');
+        if (btn) btn.disabled = true;
+        try {
+            const res = await fetch(`${API}/api/files/origin`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    path: filePath,
+                    source_url: document.getElementById('origin-url')?.value || '',
+                    author: document.getElementById('origin-author')?.value || '',
+                    license: document.getElementById('origin-license')?.value || '',
+                    notes: document.getElementById('origin-notes')?.value || ''
+                })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                const known = { url_invalid: 'modal.origin_err_url', url_too_long: 'modal.origin_err_url' };
+                const key = known[data.error] || (/_too_long$/.test(data.error || '') ? 'modal.origin_err_length' : null);
+                showToast(key ? I18N.t(key) : (data.error || I18N.t('toast.error')), 'error');
+                return;
+            }
+            showToast(I18N.t('modal.origin_saved'), 'success');
+            await _loadFileOrigin(filePath);
+        } catch (e) {
+            showToast(I18N.t('toast.connection_error'), 'error');
+        } finally {
+            const b = document.getElementById('origin-save-btn');
+            if (b) b.disabled = false;
         }
     };
 
@@ -12319,6 +16996,148 @@ function _applyCostPrinterSelection(printerId) {
 }
 window._applyCostPrinterSelection = _applyCostPrinterSelection;
 
+    // ── Devis : document HTML autonome (imprimable / enregistrable en PDF depuis le navigateur) ──
+    function _buildQuoteHtml(q, ctx) {
+        const e = escapeHtml;
+        const t = (k, p) => I18N.t(k, p);
+        const nl = (v) => e(v).replace(/\n/g, '<br>');
+        const details = t('cost.quote_item_details', { material: String(q.material_key || '').toUpperCase(), weight: q.weightG.toFixed(1) });
+        return `<!DOCTYPE html>
+<html lang="${e(ctx.lang || 'fr')}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${e(t('cost.quote_title'))} ${e(ctx.number)}</title>
+<style>
+  body { font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; color: #1a1d2e; max-width: 780px; margin: 32px auto; padding: 0 24px; line-height: 1.5; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  .meta { color: #555; font-size: 14px; margin-bottom: 28px; }
+  .parties { display: flex; gap: 32px; margin-bottom: 28px; }
+  .parties > div { flex: 1; }
+  .label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #777; margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #555; border-bottom: 2px solid #1a1d2e; padding: 8px 6px; }
+  td { padding: 12px 6px; border-bottom: 1px solid #ddd; vertical-align: top; }
+  th.num, td.num { text-align: right; white-space: nowrap; }
+  .sub { color: #666; font-size: 12.5px; }
+  .total { text-align: right; font-size: 20px; font-weight: 700; margin-top: 8px; }
+  .notes { margin-top: 28px; font-size: 13px; color: #444; border-top: 1px solid #ddd; padding-top: 12px; }
+  .actions { margin-bottom: 24px; }
+  .actions button { font: inherit; padding: 8px 16px; border-radius: 8px; border: 1px solid #1a1d2e; background: #1a1d2e; color: #fff; cursor: pointer; }
+  @media print { .actions { display: none; } body { margin: 0; } }
+</style>
+</head>
+<body>
+<div class="actions"><button type="button" onclick="window.print()">${e(t('cost.quote_print'))}</button></div>
+<h1>${e(t('cost.quote_title'))}</h1>
+<div class="meta">${e(t('cost.quote_number'))} ${e(ctx.number)} · ${e(ctx.date)}</div>
+<div class="parties">
+  <div><div class="label">${e(t('cost.quote_from'))}</div>${ctx.company ? e(ctx.company) : '&mdash;'}</div>
+  <div><div class="label">${e(t('cost.quote_to'))}</div>${ctx.client ? e(ctx.client) : '&mdash;'}</div>
+</div>
+<table>
+  <thead><tr><th>${e(t('cost.quote_description'))}</th><th class="num">${e(t('cost.quote_qty'))}</th><th class="num">${e(t('cost.quote_unit_price'))}</th><th class="num">${e(t('cost.quote_line_total'))}</th></tr></thead>
+  <tbody><tr>
+    <td>${e(t('cost.quote_item_desc', { name: ctx.fileName }))}<div class="sub">${e(details)}</div></td>
+    <td class="num">${q.qty}</td>
+    <td class="num">${e(formatCost(q.unit))}</td>
+    <td class="num">${e(formatCost(q.total))}</td>
+  </tr></tbody>
+</table>
+<div class="total">${e(t('cost.quote_total'))} : ${e(formatCost(q.total))}</div>
+${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
+</body>
+</html>`;
+    }
+    window._buildQuoteHtml = _buildQuoteHtml;
+
+    async function _downloadQuote() {
+        if (!_lastQuote) return;
+        const t = (k, p) => I18N.t(k, p);
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+        const ctx = {
+            lang: I18N.lang,
+            number: `DEV-${stamp}-${pad(now.getHours())}${pad(now.getMinutes())}`,
+            date: now.toLocaleDateString(I18N.lang, { day: 'numeric', month: 'long', year: 'numeric' }),
+            client: (document.getElementById('cost-quote-client')?.value || '').trim().slice(0, 120),
+            notes: (document.getElementById('cost-quote-notes')?.value || '').trim().slice(0, 500),
+            fileName: String(_costCurrentFileName || '').replace(/\.[^.]+$/, '') || '—'
+        };
+        ctx.itemName = (document.getElementById('cost-quote-item-name')?.value || '').trim().slice(0, 120) || ctx.fileName;
+        const clientSlug = ctx.client.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+        const filename = [t('cost.quote_file_prefix'), clientSlug, ctx.number].filter(Boolean).join('-') + '.pdf';
+        const q = _lastQuote;
+        const payload = {
+            filename,
+            lang: ctx.lang,
+            title: t('cost.quote_title'),
+            number_label: t('cost.quote_number'),
+            number: ctx.number,
+            date: ctx.date,
+            to_label: t('cost.quote_to'),
+            tax_id_label: t('settings.quote_tax_id_label'),
+            client: ctx.client,
+            description_label: t('cost.quote_description'),
+            qty_label: t('cost.quote_qty'),
+            unit_label: t('cost.quote_unit_price'),
+            line_total_label: t('cost.quote_line_total'),
+            total_label: t('cost.quote_total'),
+            item_desc: t('cost.quote_item_desc', { name: ctx.itemName }),
+            item_details: t('cost.quote_item_details', { material: String(q.material_key || '').toUpperCase(), weight: q.weightG.toFixed(1) }),
+            qty: String(q.qty),
+            unit_price: formatCost(q.unit),
+            line_total: formatCost(q.total),
+            notes: ctx.notes
+        };
+        const init = {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify(payload)
+        };
+
+        const btn = document.getElementById('cost-quote-btn');
+        if (btn) btn.disabled = true;
+        try {
+            // 1) App desktop : fenêtre « Enregistrer sous » native, au format PDF
+            try {
+                const res = await fetch(`${API}/api/quote/export-native`, init);
+                const result = await res.json().catch(() => ({}));
+                if (res.ok && result.success) {
+                    showToast(t('cost.quote_saved', { path: result.path }), 'success');
+                    return;
+                }
+                if (result.cancelled) return;
+            } catch (err) {
+                // Route native indisponible — repli sur le téléchargement navigateur ci-dessous.
+            }
+
+            // 2) Navigateur / mobile : téléchargement du PDF
+            const res = await fetch(`${API}/api/quote/export`, init);
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || t('cost.quote_error'));
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = payload.filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            showToast(t('cost.quote_done'), 'success');
+        } catch (err) {
+            console.error('[Quote] Export PDF échoué:', err);
+            showToast(t('cost.quote_error'), 'error');
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
     window.openPrintCostModal = async function (filePath, fileName) {
         let modal = document.getElementById('modal-print-cost');
         if (!modal) {
@@ -12341,6 +17160,8 @@ window._applyCostPrinterSelection = _applyCostPrinterSelection;
         openModal('modal-print-cost');
         _costMetadata = null;
         _costCurrentFilePath = filePath;
+        _costCurrentFileName = fileName || '';
+        _lastQuote = null;
         _preciseEstimate = null;
         _preciseEstimateStatus = 'idle';
         _aiTimePrediction = null;
@@ -12375,6 +17196,9 @@ window._applyCostPrinterSelection = _applyCostPrinterSelection;
             const spoolPrice = defaultSpool ? (defaultSpool.price ?? 20) : (settings.print_cost_spool_price ?? 20);
             const spoolWeight = defaultSpool ? (defaultSpool.weight ?? 1000) : (settings.print_cost_spool_weight ?? 1000);
             const elecPrice = settings.print_cost_elec_price ?? '';
+            const wearRate = settings.print_cost_wear_per_hour ?? '';
+            const fixedFee = settings.print_cost_fixed_fee ?? '';
+            const marginPct = settings.print_cost_margin_pct ?? '';
             const defaultPrinterId = settings.print_cost_printer_id != null ? String(settings.print_cost_printer_id) : '';
             const matchedPrinter = (typeof printersList !== 'undefined' ? printersList : []).find(p => String(p.id) === defaultPrinterId);
             const printerPower = matchedPrinter ? (matchedPrinter.power_w ?? 120) : (settings.print_cost_printer_power ?? 120);
@@ -12428,8 +17252,44 @@ window._applyCostPrinterSelection = _applyCostPrinterSelection;
                             <input type="number" id="cost-printer-power" min="1" step="1" value="${printerPower}" style="${fieldStyle}">
                         </div>
                     </div>
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;">
+                            <label style="${labelStyle}">${I18N.t('cost.wear_label')} (<span class="currency-symbol">${printCostCurrency === 'USD' ? '$' : '€'}</span>/h) <span style="color:var(--text-muted);">${I18N.t('cost.optional_suffix')}</span></label>
+                            <input type="number" id="cost-wear-rate" min="0" step="0.01" value="${wearRate}" placeholder="ex: 0.15" style="${fieldStyle}">
+                        </div>
+                        <div style="flex:1;">
+                            <label style="${labelStyle}">${I18N.t('cost.fixed_fee_label')} (<span class="currency-symbol">${printCostCurrency === 'USD' ? '$' : '€'}</span>) <span style="color:var(--text-muted);">${I18N.t('cost.optional_suffix')}</span></label>
+                            <input type="number" id="cost-fixed-fee" min="0" step="0.01" value="${fixedFee}" placeholder="ex: 2" style="${fieldStyle}">
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;">
+                            <label style="${labelStyle}">${I18N.t('cost.margin_label')} <span style="color:var(--text-muted);">${I18N.t('cost.optional_suffix')}</span></label>
+                            <input type="number" id="cost-margin-pct" min="0" max="1000" step="1" value="${marginPct}" placeholder="ex: 30" style="${fieldStyle}">
+                        </div>
+                        <div style="flex:1;">
+                            <label style="${labelStyle}">${I18N.t('cost.quantity_label')}</label>
+                            <input type="number" id="cost-quantity" min="1" max="10000" step="1" value="1" style="${fieldStyle}">
+                        </div>
+                    </div>
                 </div>
                 <div id="cost-results"></div>
+                <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:10px;">
+                    <div>
+                        <label style="${labelStyle}">${I18N.t('cost.quote_client')}</label>
+                        <input type="text" id="cost-quote-client" maxlength="120" style="${fieldStyle}" autocomplete="off">
+                    </div>
+                    <div>
+                        <label style="${labelStyle}">${I18N.t('cost.quote_item_name')}</label>
+                        <input type="text" id="cost-quote-item-name" maxlength="120" value="${escapeHtml(String(_costCurrentFileName || '').replace(/\.[^.]+$/, '')).replace(/\"/g, '&quot;')}" style="${fieldStyle}" autocomplete="off">
+                    </div>
+                    <div>
+                        <label style="${labelStyle}">${I18N.t('cost.quote_notes')}</label>
+                        <textarea id="cost-quote-notes" rows="2" maxlength="500" style="${fieldStyle} resize:vertical;"></textarea>
+                    </div>
+                    <p style="margin:0; font-size:12px; color:var(--text-muted);"><i class="fa-solid fa-circle-info"></i> ${I18N.t('cost.quote_header_hint')}</p>
+                    <button type="button" class="btn btn-primary btn-sm" id="cost-quote-btn"><i class="fa-solid fa-file-invoice"></i> ${I18N.t('cost.quote_generate')}</button>
+                </div>
                 <div id="cost-filament-compat"></div>
                 <p style="display:flex; align-items:flex-start; gap:8px; font-size:12px; color:var(--text-muted); margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
                     <i class="fa-solid fa-triangle-exclamation" style="margin-top:1px; color:var(--warning);"></i>
@@ -12437,11 +17297,13 @@ window._applyCostPrinterSelection = _applyCostPrinterSelection;
                 </p>
             `;
 
-            ['cost-material-select', 'cost-spool-price', 'cost-spool-weight', 'cost-elec-price', 'cost-printer-power'].forEach(id => {
+            ['cost-material-select', 'cost-spool-price', 'cost-spool-weight', 'cost-elec-price', 'cost-printer-power', 'cost-wear-rate', 'cost-fixed-fee', 'cost-margin-pct', 'cost-quantity'].forEach(id => {
                 const el = document.getElementById(id);
                 el?.addEventListener('input', () => { _recomputeCost(); _costSaveSettings(); });
                 el?.addEventListener('change', () => { _recomputeCost(); _costSaveSettings(); });
             });
+
+            document.getElementById('cost-quote-btn')?.addEventListener('click', _downloadQuote);
 
             _recomputeCost();
             _startPreciseEstimate(filePath);
@@ -12605,17 +17467,22 @@ window.saveProjectForm = async function () {
 };
 
 window.deleteProjectConfirm = async function (projectId, name) {
-    const ok = await showConfirmDialog(
-        `${I18N.t('projects.delete_confirm')} "${name}" ?`,
-        { title: I18N.t('actions.delete') || 'Supprimer', confirmLabel: I18N.t('actions.delete') || 'Supprimer', danger: true }
-    );
-    if (!ok) return;
     try {
         const res = await fetch(`${API}/api/projects/${projectId}`, { method: 'DELETE' });
         const data = await res.json();
         if (!res.ok) { showToast(data.error || I18N.t('toast.error'), 'error'); return; }
-        showToast(I18N.t('projects.deleted'), 'success');
         closeModal('modal-project-detail');
+        const undoData = data.undo;
+        showGenericUndoToast(`${I18N.t('projects.deleted')} : "${name}"`, undoData ? (async () => {
+            const r = await fetch(`${API}/api/projects/restore`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(undoData),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (r.ok) await loadProjects();
+            return { success: r.ok, message: r.ok ? _t2('toast.project_restored', 'Projet restauré') : d.error };
+        }) : null);
         await loadProjects();
     } catch (err) {
         showToast(I18N.t('toast.connection_error'), 'error');
@@ -13059,7 +17926,9 @@ async function _loadQrCode(which, format) {
 window.toggleRemoteAccessEnabled = async function (enabled) {
     const container = document.getElementById('remote-access-content');
     const fixedUrlSection = document.getElementById('fixed-url-section');
+    const customUrlSection = document.getElementById('custom-url-section');
     if (fixedUrlSection) fixedUrlSection.style.display = enabled ? '' : 'none';
+    if (customUrlSection) customUrlSection.style.display = enabled ? '' : 'none';
     if (container) {
         container.innerHTML = `<p class="settings-hint"><i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="settings.remote_starting">Initialisation de l'accès distant…</span></p>`;
     }
@@ -13085,6 +17954,8 @@ window.loadRemoteAccess = async function () {
     const container = document.getElementById('remote-access-content');
     const toggle = document.getElementById('remote-access-enabled-toggle');
     const fixedUrlSection = document.getElementById('fixed-url-section');
+    const customUrlSection = document.getElementById('custom-url-section');
+    const customUrlInput = document.getElementById('custom-remote-url');
     if (!container) return;
     try {
         const res = await fetch(`${API}/api/remote-access`);
@@ -13092,6 +17963,8 @@ window.loadRemoteAccess = async function () {
 
         if (toggle) toggle.checked = !!data.enabled;
         if (fixedUrlSection) fixedUrlSection.style.display = data.enabled ? '' : 'none';
+        if (customUrlSection) customUrlSection.style.display = data.enabled ? '' : 'none';
+        if (customUrlInput && document.activeElement !== customUrlInput) customUrlInput.value = data.custom_url || '';
 
         if (!data.enabled) {
             container.innerHTML = `<p class="settings-hint" data-i18n="settings.remote_access_disabled_hint">Activez l'accès à distance ci-dessus pour générer une adresse publique.</p>`;
@@ -13100,11 +17973,18 @@ window.loadRemoteAccess = async function () {
 
         if (data.status === 'ready' && data.url) {
             const isFixed = data.mode === 'fixed';
-            const badge = isFixed
+            const isCustom = data.mode === 'custom';
+            const badge = isCustom
+                ? `<span style="background:var(--success)20;color:var(--success);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;"><i class="fa-solid fa-link"></i> <span data-i18n="settings.remote_mode_custom">Adresse personnalisée</span></span>`
+                : isFixed
                 ? `<span style="background:var(--success)20;color:var(--success);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;"><i class="fa-solid fa-lock"></i> <span data-i18n="settings.remote_mode_fixed">URL fixe</span></span>`
                 : `<span style="background:var(--accent)20;color:var(--accent);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;"><i class="fa-solid fa-shuffle"></i> <span data-i18n="settings.remote_mode_quick">URL aléatoire</span></span>`;
 
-            const warning = isFixed
+            const warning = isCustom
+                ? `<p class="settings-hint" style="margin-top:12px;font-size:12px;text-align:left;color:var(--text-muted);">
+                       <i class="fa-solid fa-circle-info"></i> <span data-i18n="settings.remote_custom_notice">Adresse saisie manuellement : Stellio ne la vérifie pas et n'utilise pas Cloudflare. Assurez-vous qu'elle redirige bien vers ce PC.</span>
+                   </p>`
+                : isFixed
                 ? `<p class="settings-hint" style="margin-top:12px;font-size:12px;text-align:left;color:var(--text-muted);">
                        <i class="fa-solid fa-circle-info"></i> <span data-i18n="settings.remote_fixed_notice">Cette adresse reste la même à chaque redémarrage (configurée via votre compte Cloudflare).</span>
                    </p>`
@@ -13120,7 +18000,7 @@ window.loadRemoteAccess = async function () {
                     <i class="fa-solid fa-circle-check"></i> <span data-i18n="settings.remote_active">Accès distant actif</span> ${badge}
                 </p>
                 <div style="display:flex;gap:8px;margin-bottom:10px;">
-                    <input type="text" readonly value="${data.url}" class="settings-select" id="remote-url-input" style="flex:1;">
+                    <input type="text" readonly value="${escapeHtml(data.url).replace(/"/g, '&quot;')}" class="settings-select" id="remote-url-input" style="flex:1;">
                     <button class="btn btn-ghost remote-copy-btn" onclick="copyRemoteUrl()" data-i18n-title="actions.copy" title="${I18N.t('actions.copy') || 'Copier'}">
                         <i class="fa-solid fa-copy"></i>
                     </button>
@@ -13193,6 +18073,60 @@ window.disableFixedRemoteAccess = async function () {
 
         document.getElementById('cf-tunnel-token').value = '';
         document.getElementById('cf-fixed-url').value = '';
+        statusEl.textContent = data.message;
+        statusEl.style.color = 'var(--success)';
+        setTimeout(loadRemoteAccess, 3000);
+    } catch (e) {
+        statusEl.textContent = e.message;
+        statusEl.style.color = 'var(--danger)';
+    }
+};
+
+window.saveCustomRemoteAccess = async function () {
+    const input = document.getElementById('custom-remote-url');
+    const statusEl = document.getElementById('custom-remote-url-status');
+    const url = input ? input.value.trim() : '';
+
+    if (!url) {
+        statusEl.textContent = _t3('settings.custom_url_missing', 'Indiquez une adresse.');
+        statusEl.style.color = 'var(--danger)';
+        return;
+    }
+
+    statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    statusEl.style.color = 'var(--text-muted)';
+
+    try {
+        const res = await fetch(`${API}/api/remote-access/custom`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erreur serveur');
+
+        if (input && data.url) input.value = data.url;
+        statusEl.textContent = data.message;
+        statusEl.style.color = 'var(--success)';
+        setTimeout(loadRemoteAccess, 1500);
+    } catch (e) {
+        statusEl.textContent = e.message;
+        statusEl.style.color = 'var(--danger)';
+    }
+};
+
+window.disableCustomRemoteAccess = async function () {
+    const input = document.getElementById('custom-remote-url');
+    const statusEl = document.getElementById('custom-remote-url-status');
+    statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    statusEl.style.color = 'var(--text-muted)';
+
+    try {
+        const res = await fetch(`${API}/api/remote-access/disable-custom`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erreur serveur');
+
+        if (input) input.value = '';
         statusEl.textContent = data.message;
         statusEl.style.color = 'var(--success)';
         setTimeout(loadRemoteAccess, 3000);

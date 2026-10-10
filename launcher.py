@@ -83,7 +83,7 @@ _PRELOAD_MODULES = [
     "cryptography", "cryptography.hazmat.primitives.ciphers", "rarfile",
     "py7zr", "defusedxml", "defusedxml.ElementTree", "nest_asyncio",
     "psutil", "packaging", "packaging.version", "qrcode", "websocket",
-    "flashforge",
+    "flashforge", "reportlab", "reportlab.platypus",
 ]
 
 

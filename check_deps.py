@@ -51,8 +51,10 @@ REQUIRED_MODULES = [
     ("matplotlib",                              "matplotlib",             "use",                None),
     ("psutil",                                  "psutil",                 "virtual_memory",     None),
     ("qrcode",                                  "qrcode",                 "QRCode",             None),
+    ("plyer",                                   "plyer",                  "notification",       None),
     ("websocket",                               "websocket-client",       "WebSocketApp",       ["websocket", "websocket-client"]),
     ("flashforge",                              "flashforge-python-api",  "FlashForgeClient",   None),
+    ("reportlab.platypus",                      "reportlab",              "SimpleDocTemplate",  None),
 ]
 
 TELEGRAM_MODULES = [

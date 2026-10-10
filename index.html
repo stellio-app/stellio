@@ -218,13 +218,14 @@
                 <span><img src="assets/nom-stellio.png" alt="Stellio Logo" class="stellio-nom-img"></span>
             </div>
             <nav class="sidebar-nav">
-                <button class="nav-btn active" data-page="library" data-icon="fa-layer-group" data-title-key="nav.library">
+                <button class="nav-btn active" data-page="dashboard" data-icon="fa-gauge-high" data-title-key="nav.dashboard">
+                    <i class="fa-solid fa-gauge-high"></i>
+                    <span data-i18n="nav.dashboard">Tableau de bord</span>
+                </button>
+                <div class="sidebar-nav-scroll">
+                <button class="nav-btn" data-page="library" data-icon="fa-layer-group" data-title-key="nav.library">
                     <i class="fa-solid fa-layer-group"></i>
                     <span data-i18n="nav.library">Bibliothèque</span>
-                </button>
-                <button class="nav-btn mobile-hidden-nav" data-page="settings" data-icon="fa-gear" data-title-key="nav.settings">
-                    <i class="fa-solid fa-gear"></i>
-                    <span data-i18n="nav.settings">Paramètres</span>
                 </button>
                 <div id="reorderable-nav-items">
 				<button class="nav-btn" data-page="stats" data-nav-id="stats" data-icon="fa-chart-pie" data-title-key="nav.stats">
@@ -234,6 +235,11 @@
 				<button class="nav-btn" data-page="projects" data-nav-id="projects" data-icon="fa-diagram-project" data-title-key="nav.projects">
 					<i class="fa-solid fa-diagram-project"></i>
 					<span data-i18n="nav.projects">Projets</span>
+				</button>
+				<button class="nav-btn" data-page="print-queue" data-nav-id="print-queue" data-icon="fa-list-ol" data-title-key="nav.print_queue">
+					<i class="fa-solid fa-list-ol"></i>
+					<span data-i18n="nav.print_queue">À imprimer bientôt</span>
+					<span class="badge" id="print-queue-count" style="display:none;">0</span>
 				</button>
 				<button class="nav-btn" data-page="history" data-nav-id="history" data-icon="fa-clock-rotate-left" data-title-key="nav.history">
 				    <i class="fa-solid fa-clock-rotate-left"></i>
@@ -285,6 +291,7 @@
 					<span data-i18n="nav.spoolman">Inventaire filament</span>
 				</button>
                 </div>
+                </div>
                 <div class="nav-about-spacer">
 					<button class="nav-btn hidden" id="pwa-install-btn" onclick="installStellioApp()" data-i18n-title="pwa.install_hint" title="Installer Stellio comme application sur cet appareil">
 						<i class="fa-solid fa-download"></i>
@@ -295,6 +302,10 @@
 						<span data-i18n="nav.check_update">Mises à jour</span>
 						<span id="update-available-dot" class="badge hidden" style="background:var(--success);">!</span>
 					</button>
+                    <button class="nav-btn" onclick="openLinksModal()" style="cursor: pointer;">
+                        <i class="fa-solid fa-link"></i>
+                        <span data-i18n="nav.partners">Liens utiles</span>
+                    </button>
                     <a class="nav-btn" data-nav-id="github" href="https://github.com/stellio-app/stellio" target="_blank" rel="noopener noreferrer">
                         <i class="fa-brands fa-github"></i>
                         <span data-i18n="nav.github">GitHub</span>
@@ -302,6 +313,10 @@
                     <button class="nav-btn" onclick="openModal('modal-about')" style="cursor: pointer;">
                         <i class="fa-solid fa-circle-info"></i>
                         <span data-i18n="nav.about">À propos de</span>
+                    </button>
+                    <button class="nav-btn mobile-hidden-nav" data-page="settings" data-icon="fa-gear" data-title-key="nav.settings">
+                        <i class="fa-solid fa-gear"></i>
+                        <span data-i18n="nav.settings">Paramètres</span>
                     </button>
                 </div>
             </nav>
@@ -329,10 +344,11 @@
                 <div class="header-center">
                     <div class="search-box" id="library-search-wrap">
                         <i class="fa-solid fa-search"></i>
-                        <input type="text" id="global-search" data-i18n-placeholder="search.placeholder">
+                        <input type="text" id="global-search" data-i18n-placeholder="search.placeholder" autocomplete="off">
                         <button type="button" id="global-search-clear" class="search-clear-btn" data-i18n-aria="actions.clear_search" aria-label="Effacer la recherche" title="Effacer">
                             <i class="fa-solid fa-xmark"></i>
                         </button>
+                        <div id="search-recent-dropdown" class="search-recent-dropdown hidden"></div>
                     </div>
                     <div class="search-box header-hide" id="spool-header-search-wrap">
                         <i class="fa-solid fa-search"></i>
@@ -410,6 +426,34 @@
 					   onmouseout="this.style.color='var(--text-muted)'; this.style.background='transparent'">
 						<i class="fa-solid fa-power-off"></i>
 					</button>
+					<span id="presence-indicator" class="presence-indicator hidden" aria-live="polite">
+						<i class="fa-solid fa-users" aria-hidden="true"></i>
+						<span id="presence-count">0</span>
+					</span>
+					<button id="notif-bell-btn" onclick="toggleNotificationPanel()" data-i18n-title="notif.title" title="Notifications" aria-label="Notifications" data-i18n-aria="notif.title" style="
+						background: transparent;
+						border: none;
+						color: var(--text-muted);
+						cursor: pointer;
+						padding: 6px 8px;
+						border-radius: 6px;
+						transition: all 0.2s;
+						font-size: 14px;
+						position: relative;
+					" onmouseover="this.style.color='var(--accent)'; this.style.background='var(--bg-hover)'"
+					   onmouseout="this.style.color='var(--text-muted)'; this.style.background='transparent'">
+						<i class="fa-solid fa-bell"></i>
+						<span id="notif-bell-badge" class="badge" style="display:none; position:absolute; top:2px; right:2px; background:var(--danger); color:#fff; font-size:9px; min-width:14px; height:14px; line-height:14px; border-radius:7px; padding:0 3px;">0</span>
+					</button>
+					<div id="notif-panel" class="notif-panel hidden">
+						<div class="notif-panel-header">
+							<span data-i18n="notif.title">Notifications</span>
+							<button type="button" onclick="markAllNotificationsRead()" data-i18n="notif.mark_all_read">Tout marquer comme lu</button>
+						</div>
+						<div id="notif-panel-list" class="notif-panel-list">
+							<div class="dashboard-widget-empty"><i class="fa-solid fa-bell-slash"></i><p data-i18n="notif.empty">Aucune notification</p></div>
+						</div>
+					</div>
 					<button id="global-logout-btn" data-i18n-title="nav.logout" title="Déconnexion" style="
 						background: transparent;
 						border: none;
@@ -434,10 +478,11 @@
                 <div class="mobile-search-bar">
                     <div class="search-box">
                         <i class="fa-solid fa-search"></i>
-                        <input type="text" id="mobile-search-input" data-i18n-placeholder="search.placeholder">
+                        <input type="text" id="mobile-search-input" data-i18n-placeholder="search.placeholder" autocomplete="off">
                         <button type="button" id="mobile-search-clear" class="search-clear-btn" data-i18n-aria="actions.clear_search" aria-label="Effacer la recherche" title="Effacer">
                             <i class="fa-solid fa-xmark"></i>
                         </button>
+                        <div id="search-recent-dropdown-mobile" class="search-recent-dropdown hidden"></div>
                     </div>
                     <button id="mobile-search-close" type="button" data-i18n-aria="actions.close" aria-label="Fermer">
                         <i class="fa-solid fa-xmark"></i>
@@ -454,7 +499,198 @@
             </div>
 
             <main class="main-content">
-                <div id="page-library" class="page active">
+                <div id="page-dashboard" class="page active">
+                    <div class="dashboard-page">
+                        <div class="dashboard-header">
+                            <h2><i class="fa-solid fa-gauge-high"></i> <span id="dashboard-greeting" data-i18n="dashboard.title">Tableau de bord</span></h2>
+                            <button type="button" class="btn btn-ghost btn-sm" id="dashboard-customize-btn" onclick="toggleDashboardEditMode()">
+                                <i class="fa-solid fa-sliders"></i> <span data-i18n="dashboard.customize">Personnaliser</span>
+                            </button>
+                        </div>
+                        <div id="onboarding-checklist" class="onboarding-checklist hidden">
+                            <div class="onboarding-checklist-header">
+                                <span><i class="fa-solid fa-rocket"></i> <span data-i18n="onboarding.title">Premiers pas avec Stellio</span></span>
+                                <button type="button" onclick="dismissOnboardingChecklist()" data-i18n-title="actions.close" title="Fermer"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+                            <div class="onboarding-checklist-items" id="onboarding-checklist-items"></div>
+                        </div>
+                        <div class="dashboard-grid" id="dashboard-grid">
+                            <div class="dashboard-widget" id="dashboard-widget-printers" data-widget-id="printers" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-print"></i> <span data-i18n="dashboard.printers_title">Impressions en cours</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;printers&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('printers')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-printers-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-stock" data-widget-id="stock" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-triangle-exclamation"></i> <span data-i18n="dashboard.stock_title">Stock filament faible</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;spoolman&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('stock')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-stock-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-history" data-widget-id="history" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-clock-rotate-left"></i> <span data-i18n="dashboard.history_title">Dernières impressions</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;history&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('history')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-history-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-recent" data-widget-id="recent" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-layer-group"></i> <span data-i18n="dashboard.recent_title">Fichiers récents</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;library&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('recent')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-recent-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-sos" data-widget-id="sos" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-stethoscope"></i> <span data-i18n="dashboard.sos_title">Dernier S.O.S Print</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;printers&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('sos')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-sos-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-favorites" data-widget-id="favorites" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-star"></i> <span data-i18n="dashboard.favorites_title">Favoris</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;library&quot;]')?.click(); toggleFavoritesFilter(true); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('favorites')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-favorites-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-projects" data-widget-id="projects" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-diagram-project"></i> <span data-i18n="dashboard.projects_title">Projets en cours</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;projects&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('projects')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-projects-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-stats" data-widget-id="stats" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-chart-pie"></i> <span data-i18n="dashboard.stats_title">Statistiques rapides</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;stats&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('stats')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-stats-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-maintenance" data-widget-id="maintenance" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-screwdriver-wrench"></i> <span data-i18n="dashboard.maintenance_title">Maintenance à prévoir</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;printers&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('maintenance')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-maintenance-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-queue" data-widget-id="queue" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-list-ol"></i> <span data-i18n="dashboard.queue_title">À imprimer bientôt</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;print-queue&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('queue')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-queue-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-downloads" data-widget-id="downloads" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-download"></i> <span data-i18n="dashboard.downloads_title">Téléchargements récents</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;history&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('downloads')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-downloads-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-update" data-widget-id="update" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-arrow-up-right-dots"></i> <span data-i18n="dashboard.update_title">Mise à jour</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;settings&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('update')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-update-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-instances" data-widget-id="instances" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-network-wired"></i> <span data-i18n="dashboard.instances_title">Instances Stellio</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;settings&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('instances')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-instances-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-suggestions" data-widget-id="suggestions" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-lightbulb"></i> <span data-i18n="dashboard.suggestions_title">Suggestions</span></h3>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('suggestions')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-suggestions-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="dashboard-hidden-widgets" class="dashboard-hidden-widgets hidden">
+                            <span data-i18n="dashboard.hidden_widgets_label">Widgets masqués :</span>
+                            <div id="dashboard-hidden-widgets-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="page-library" class="page">
                     <div id="files-grid" class="files-grid gallery">
                         <div class="empty-state">
                             <i class="fa-solid fa-inbox"></i>
@@ -467,6 +703,7 @@
                     <div class="stats-page">
                         <div class="stats-header">
                             <h2><i class="fa-solid fa-chart-pie"></i> <span data-i18n="stats.title">Statistiques de la bibliothèque</span></h2>
+                            <button class="btn btn-ghost btn-sm" onclick="openMonthlyReport()"><i class="fa-solid fa-file-lines"></i> <span data-i18n="report.open_btn">Bilan mensuel</span></button>
                             <button class="btn btn-ghost btn-sm" onclick="loadStats()" data-i18n-title="actions.refresh" title="Actualiser">
                                 <i class="fa-solid fa-arrows-rotate"></i>
                             </button>
@@ -554,8 +791,18 @@
 
                             <div class="stats-panels" style="margin-top:16px;">
                                 <div class="stats-panel" style="flex:1;">
-                                    <h3><i class="fa-solid fa-shield-halved"></i> <span data-i18n="stats.profile_reliability">Fiabilité par profil slicer</span></h3>
+                                    <h3><i class="fa-solid fa-shield-halved"></i> <span data-i18n="stats.reliability_title">Fiabilité des impressions</span></h3>
+                                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                                        <label for="stat-reliability-group" style="font-size:12px; color:var(--text-muted);" data-i18n="stats.reliability_group_label">Regrouper par</label>
+                                        <select id="stat-reliability-group" class="settings-select" style="max-width:200px;">
+                                            <option value="profile" data-i18n="stats.reliability_by_profile">Profil slicer</option>
+                                            <option value="material" data-i18n="stats.reliability_by_material">Matière</option>
+                                            <option value="printer" data-i18n="stats.reliability_by_printer">Imprimante</option>
+                                            <option value="filament" data-i18n="stats.reliability_by_filament">Bobine</option>
+                                        </select>
+                                    </div>
                                     <p class="settings-hint" style="margin-top:-4px; margin-bottom:8px;" data-i18n="stats.profile_reliability_hint">Basé sur les impressions notées dans l'Historique (réussi/échoué).</p>
+                                    <p id="stat-reliability-filament-hint" class="settings-hint hidden" style="margin-top:-4px; margin-bottom:8px;" data-i18n="stats.reliability_filament_hint">Matière et bobine : d'après le filament assigné au fichier au moment de l'envoi (ancien historique : le filament assigné actuellement).</p>
                                     <div id="stat-profile-reliability" class="stats-top-list"></div>
                                 </div>
                             </div>
@@ -574,11 +821,32 @@
                         <div id="projects-loading" class="stats-loading">
                             <i class="fa-solid fa-spinner fa-spin fa-2x" style="color:var(--accent);"></i>
                         </div>
-                        <div id="projects-empty" class="empty-state hidden">
-                            <i class="fa-solid fa-diagram-project"></i>
-                            <p data-i18n="projects.empty">Aucun projet pour l'instant. Regroupez plusieurs fichiers qui forment un même objet (ex : boîtier + couvercle + vis).</p>
+                        <div id="projects-empty" class="empty-state illustrated hidden">
+                            <div class="empty-state-icon"><i class="fa-solid fa-diagram-project"></i></div>
+                            <h3 data-i18n="projects.empty_title">Aucun projet pour l'instant</h3>
+                            <p data-i18n="projects.empty">Regroupez plusieurs fichiers qui forment un même objet (ex : boîtier + couvercle + vis).</p>
                         </div>
                         <div id="projects-grid" class="projects-grid hidden"></div>
+                    </div>
+                </div>
+
+                <div id="page-print-queue" class="page">
+                    <div class="history-page">
+                        <div class="history-header">
+                            <h2><i class="fa-solid fa-list-ol"></i> <span data-i18n="queue.title">À imprimer bientôt</span></h2>
+                        </div>
+                        <p style="font-size:12px; color:var(--text-muted); margin:-8px 0 14px;" data-i18n="queue.subtitle">
+                            Une liste d'attente distincte des favoris — glissez pour réordonner, envoyez directement au slicer.
+                        </p>
+                        <div id="print-queue-loading" class="stats-loading">
+                            <i class="fa-solid fa-spinner fa-spin fa-2x" style="color:var(--accent);"></i>
+                        </div>
+                        <div id="print-queue-empty" class="empty-state illustrated hidden">
+                            <div class="empty-state-icon"><i class="fa-solid fa-list-ol"></i></div>
+                            <h3 data-i18n="queue.empty_title">File d'attente vide</h3>
+                            <p data-i18n="queue.empty">Ajoutez un fichier depuis son menu (⋯) → "Ajouter à imprimer bientôt".</p>
+                        </div>
+                        <div id="print-queue-list" class="print-queue-list hidden"></div>
                     </div>
                 </div>
 
@@ -595,9 +863,10 @@
                         <div id="gallery-loading" class="stats-loading">
                             <i class="fa-solid fa-spinner fa-spin fa-2x" style="color:var(--accent);"></i>
                         </div>
-                        <div id="gallery-empty" class="empty-state hidden">
-                            <i class="fa-solid fa-camera"></i>
-                            <p data-i18n="gallery.empty">Aucune photo pour l'instant. Ajoute-en depuis le menu (⋯) d'un fichier.</p>
+                        <div id="gallery-empty" class="empty-state illustrated hidden">
+                            <div class="empty-state-icon"><i class="fa-solid fa-camera"></i></div>
+                            <h3 data-i18n="gallery.empty_title">Aucune photo pour l'instant</h3>
+                            <p data-i18n="gallery.empty">Ajoute-en depuis le menu (⋯) d'un fichier.</p>
                         </div>
                         <div id="gallery-grid" class="hidden" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px;"></div>
                     </div>
@@ -611,11 +880,29 @@
                                 <i class="fa-solid fa-trash"></i> <span data-i18n="history.clear">Vider</span>
                             </button>
                         </div>
+                        <div class="history-filters">
+                            <select id="history-filter-platform" onchange="applyHistoryFilters()">
+                                <option value="" data-i18n="history.filter_all_platforms">Toutes les plateformes</option>
+                            </select>
+                            <select id="history-filter-result" onchange="applyHistoryFilters()">
+                                <option value="" data-i18n="history.filter_all_results">Tous les résultats</option>
+                                <option value="success" data-i18n="history.filter_success">Réussi</option>
+                                <option value="failed" data-i18n="history.filter_failed">Raté</option>
+                                <option value="partial" data-i18n="history.filter_partial">Partiel</option>
+                                <option value="unrated" data-i18n="history.filter_unrated">Non noté</option>
+                            </select>
+                            <input type="date" id="history-filter-date-from" onchange="applyHistoryFilters()" data-i18n-title="history.filter_from" title="À partir du">
+                            <input type="date" id="history-filter-date-to" onchange="applyHistoryFilters()" data-i18n-title="history.filter_to" title="Jusqu'au">
+                            <button type="button" class="btn btn-ghost btn-sm" id="history-filter-reset" onclick="resetHistoryFilters()" style="display:none;">
+                                <i class="fa-solid fa-xmark"></i> <span data-i18n="history.filter_reset">Réinitialiser</span>
+                            </button>
+                        </div>
                         <div id="history-loading" class="stats-loading">
                             <i class="fa-solid fa-spinner fa-spin fa-2x" style="color:var(--accent);"></i>
                         </div>
-                        <div id="history-empty" class="empty-state hidden">
-                            <i class="fa-solid fa-clock"></i>
+                        <div id="history-empty" class="empty-state illustrated hidden">
+                            <div class="empty-state-icon"><i class="fa-solid fa-clock"></i></div>
+                            <h3 data-i18n="history.empty_title">Aucun historique pour l'instant</h3>
                             <p data-i18n="history.empty">Aucun fichier envoyé au slicer pour l'instant.</p>
                         </div>
                         <div id="history-list" class="history-list hidden"></div>
@@ -631,6 +918,7 @@
                                     <i class="fa-solid fa-trash"></i> <span data-i18n="history.clear">Vider</span>
                                 </button>
                             </div>
+                            <div id="model-updates-card" class="model-updates-card"></div>
                             <div id="download-history-empty" class="empty-state hidden" style="padding:20px 0;">
                                 <i class="fa-solid fa-download"></i>
                                 <p data-i18n="history.no_downloads">Aucun fichier téléchargé depuis le web pour l'instant.</p>
@@ -677,6 +965,13 @@
                     <div class="settings-grid">
                         <div class="settings-col">
 
+                        <div id="settings-undo-banner" class="settings-undo-banner hidden">
+                            <span><i class="fa-solid fa-clock-rotate-left"></i> <span data-i18n="settings.undo_available">Un changement de paramètres a été effectué récemment.</span></span>
+                            <button type="button" class="btn btn-ghost btn-sm" onclick="undoLastSettingsChange()">
+                                <i class="fa-solid fa-rotate-left"></i> <span data-i18n="settings.undo_last_change">Annuler ce changement</span>
+                            </button>
+                        </div>
+
                         <div class="accord-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-palette"></i> <span data-i18n="settings.appearance">Apparence</span></span>
@@ -720,6 +1015,35 @@
                                         <option value="ja" data-i18n="language.ja">日本語</option>
                                         <option value="zh" data-i18n="language.zh">中文</option>
                                     </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accord-section" id="accessibility-settings-section">
+                            <div class="accord-header" onclick="toggleAccord(this)">
+                                <span><i class="fa-solid fa-universal-access"></i> <span data-i18n="settings.accessibility">Accessibilité</span></span>
+                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                            </div>
+                            <div class="accord-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <div class="settings-row" style="align-items:flex-start;">
+                                    <div>
+                                        <label style="font-size:13px; font-weight:500;" data-i18n="settings.high_contrast">Contraste élevé</label>
+                                        <p class="settings-hint" style="margin-top:2px;" data-i18n="settings.high_contrast_hint">Renforce les contrastes de couleur et les bordures pour une meilleure lisibilité.</p>
+                                    </div>
+                                    <label class="nav-toggle-switch" style="margin-top:2px;">
+                                        <input type="checkbox" id="high-contrast-toggle" onchange="toggleHighContrast(this.checked)">
+                                        <span class="nav-toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="settings-row" style="align-items:flex-start;">
+                                    <div>
+                                        <label style="font-size:13px; font-weight:500;" data-i18n="settings.reduce_motion">Réduire les animations</label>
+                                        <p class="settings-hint" style="margin-top:2px;" data-i18n="settings.reduce_motion_hint">Désactive les transitions et animations non essentielles.</p>
+                                    </div>
+                                    <label class="nav-toggle-switch" style="margin-top:2px;">
+                                        <input type="checkbox" id="reduce-motion-toggle" onchange="toggleReduceMotion(this.checked)">
+                                        <span class="nav-toggle-slider"></span>
+                                    </label>
                                 </div>
                             </div>
                         </div>
@@ -825,6 +1149,74 @@
                                 </div>
 
                                 <button type="button" class="btn btn-primary btn-sm" style="align-self:flex-start;" onclick="savePrintCostSettings()">
+                                    <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="actions.save">Enregistrer</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="accord-section">
+                            <div class="accord-header" onclick="toggleAccord(this)">
+                                <span><i class="fa-solid fa-file-invoice"></i> <span data-i18n="settings.quote_title">Devis : en-tête et mentions légales</span></span>
+                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                            </div>
+                            <div class="accord-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <p class="settings-hint" data-i18n="settings.quote_hint">Ces informations apparaissent en en-tête et en pied de page de chaque devis PDF.</p>
+
+                                <div>
+                                    <label style="font-size:13px; color:var(--text-primary); display:block; margin-bottom:4px;" data-i18n="settings.quote_company_label">Nom / société</label>
+                                    <input type="text" id="settings-quote-company" maxlength="120" autocomplete="off" style="width:100%; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px; box-sizing:border-box;">
+                                </div>
+
+                                <div>
+                                    <label style="font-size:13px; color:var(--text-primary); display:block; margin-bottom:4px;" data-i18n="settings.quote_logo_label">Logo</label>
+                                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                                        <div id="settings-quote-logo-preview" style="width:140px; height:70px; display:flex; align-items:center; justify-content:center; background:#fff; border:1px dashed var(--border); border-radius:var(--radius); overflow:hidden; color:#aaa;"><i class="fa-solid fa-image"></i></div>
+                                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                            <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('settings-quote-logo-input').click()">
+                                                <i class="fa-solid fa-upload"></i> <span data-i18n="settings.quote_logo_choose">Choisir un logo</span>
+                                            </button>
+                                            <button type="button" class="btn btn-ghost btn-sm" id="settings-quote-logo-remove" style="display:none;" onclick="removeQuoteLogo()">
+                                                <i class="fa-solid fa-trash"></i> <span data-i18n="settings.quote_logo_remove">Retirer le logo</span>
+                                            </button>
+                                        </div>
+                                        <input type="file" id="settings-quote-logo-input" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="onQuoteLogoSelected(this)">
+                                    </div>
+                                    <p class="settings-hint" style="margin:6px 0 0;" data-i18n="settings.quote_logo_hint">PNG, JPG ou WebP. L'image est redimensionnée automatiquement.</p>
+                                </div>
+
+                                <div>
+                                    <label style="font-size:13px; color:var(--text-primary); display:block; margin-bottom:4px;" data-i18n="settings.quote_address_label">Adresse</label>
+                                    <textarea id="settings-quote-address" rows="3" maxlength="300" style="width:100%; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px; box-sizing:border-box; resize:vertical;"></textarea>
+                                </div>
+
+                                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                                    <div style="flex:1; min-width:160px;">
+                                        <label style="font-size:13px; color:var(--text-primary); display:block; margin-bottom:4px;" data-i18n="settings.quote_phone_label">Téléphone</label>
+                                        <input type="text" id="settings-quote-phone" maxlength="40" autocomplete="off" style="width:100%; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px; box-sizing:border-box;">
+                                    </div>
+                                    <div style="flex:1; min-width:160px;">
+                                        <label style="font-size:13px; color:var(--text-primary); display:block; margin-bottom:4px;" data-i18n="settings.quote_email_label">E-mail</label>
+                                        <input type="text" id="settings-quote-email" maxlength="120" autocomplete="off" style="width:100%; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px; box-sizing:border-box;">
+                                    </div>
+                                </div>
+
+                                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                                    <div style="flex:1; min-width:160px;">
+                                        <label style="font-size:13px; color:var(--text-primary); display:block; margin-bottom:4px;" data-i18n="settings.quote_website_label">Site web</label>
+                                        <input type="text" id="settings-quote-website" maxlength="120" autocomplete="off" style="width:100%; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px; box-sizing:border-box;">
+                                    </div>
+                                    <div style="flex:1; min-width:160px;">
+                                        <label style="font-size:13px; color:var(--text-primary); display:block; margin-bottom:4px;" data-i18n="settings.quote_tax_id_label">SIRET / N° TVA</label>
+                                        <input type="text" id="settings-quote-tax-id" maxlength="80" autocomplete="off" style="width:100%; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px; box-sizing:border-box;">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label style="font-size:13px; color:var(--text-primary); display:block; margin-bottom:4px;" data-i18n="settings.quote_legal_label">Mentions légales</label>
+                                    <textarea id="settings-quote-legal" rows="4" maxlength="1500" data-i18n-placeholder="settings.quote_legal_placeholder" placeholder="Ex. : TVA non applicable, art. 293 B du CGI — Paiement à 30 jours — Devis valable 15 jours…" style="width:100%; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px; box-sizing:border-box; resize:vertical;"></textarea>
+                                </div>
+
+                                <button type="button" class="btn btn-primary btn-sm" style="align-self:flex-start;" onclick="saveQuoteSettings()">
                                     <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="actions.save">Enregistrer</span>
                                 </button>
                             </div>
@@ -1036,11 +1428,20 @@
 
                         <div class="accord-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
-                                <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="22"/><line x1="2" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="22" y2="12"/></svg> Spoolman</span>
+                                <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="22"/><line x1="2" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="22" y2="12"/></svg> <span data-i18n="settings.filament_inventory">Inventaire filament</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
                             </div>
                             <div class="accord-body">
-                                <div id="spoolman-configured-view" style="display:none;flex-direction:column;gap:8px;">
+                                <p class="settings-hint" style="margin-bottom:14px;" data-i18n="settings.filament_inventory_hint">Connectez vos sources d'inventaire filament (Spoolman, TigerTag...), ou gérez votre inventaire manuel.</p>
+
+                                <div class="account-card">
+                                    <div class="account-card-header">
+                                        <div style="display:flex;align-items:center;gap:10px;">
+                                            <div class="account-icon-badge" style="background:rgba(0,130,200,0.15);color:#0082c8;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="22"/><line x1="2" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="22" y2="12"/></svg></div>
+                                            <div><div style="font-weight:600;font-size:13px;">Spoolman</div><div style="font-size:11px;color:var(--text-muted);" data-i18n="settings.self_hosted_server">Serveur auto-hébergé</div></div>
+                                        </div>
+                                    </div>
+                                <div id="spoolman-configured-view" style="margin-top:10px;display:none;flex-direction:column;gap:8px;">
                                     <label style="font-size:13px;color:var(--text-secondary);" data-i18n="settings.server_url">URL du serveur</label>
                                     <div style="display:flex;gap:8px;align-items:center;">
                                         <span id="spoolman-configured-address" style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
@@ -1049,7 +1450,7 @@
                                         </button>
                                     </div>
                                 </div>
-                                <div id="spoolman-manual-view" style="display:flex;flex-direction:column;gap:8px;">
+                                <div id="spoolman-manual-view" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
                                     <label style="font-size:13px;color:var(--text-secondary);" data-i18n="settings.server_url">URL du serveur</label>
                                     <div style="display:flex;gap:8px;">
                                         <input id="spoolman-url-input" type="text" placeholder="192.168.1.x ou http://192.168.1.x:7912"
@@ -1059,6 +1460,51 @@
                                         </button>
                                     </div>
                                     <p class="settings-hint" data-i18n="settings.spoolman_hint">Entrez l'IP seule — le port 7912 sera ajouté automatiquement. Stellio recherche aussi automatiquement un serveur sur le réseau à la connexion.</p>
+                                </div>
+                                </div>
+
+                                <div class="account-card" style="margin-top:12px;">
+                                    <div class="account-card-header">
+                                        <div style="display:flex;align-items:center;gap:10px;">
+                                            <div class="account-icon-badge" style="background:rgba(255,159,0,0.15);color:#ff9f00;"><img src="assets/tigertag-logo.svg" alt="TigerTag" class="tigertag-banner-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"></div>
+                                            <div><div style="font-weight:600;font-size:13px;">TigerTag</div><div style="font-size:11px;color:var(--text-muted);">tigersystem.io</div></div>
+                                        </div>
+                                        <span id="tigertag-status-badge" class="account-badge disconnected" data-i18n="settings.account_not_configured">Non configuré</span>
+                                    </div>
+
+                                    <div id="tigertag-login-row" style="margin-top:10px;">
+                                        <p class="settings-hint" style="margin-bottom:8px;" data-i18n="settings.tigertag_connect_hint">Connectez-vous avec votre compte TigerTag pour afficher vos bobines dans l'inventaire filament (lecture seule).</p>
+
+                                        <button type="button" id="tigertag-autodetect-btn" class="btn btn-primary btn-sm" onclick="tigerTagAutoDetectStudio()"
+                                            style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;">
+                                            <i class="fa-solid fa-magnifying-glass"></i>
+                                            <span data-i18n="settings.tigertag_autodetect_btn">Détecter TigerTag Studio sur ce PC</span>
+                                        </button>
+                                        <p class="settings-hint" style="margin-top:8px;" data-i18n="settings.tigertag_autodetect_hint">Si TigerTag Studio est installé sur ce PC et déjà connecté avec Google, Stellio récupère la session automatiquement — sans repasser par Google ici.</p>
+                                        <p class="settings-hint" style="margin-top:6px;" data-i18n="settings.tigertag_unofficial_hint">Intégration non officielle (API TigerTag non documentée) — lecture seule, ne modifie jamais ton inventaire TigerTag.</p>
+                                    </div>
+
+                                    <div id="tigertag-connected-row" style="display:none;margin-top:10px;">
+                                        <p id="tigertag-email-display" class="settings-hint" style="margin-bottom:6px;color:var(--success);"><i class="fa-solid fa-circle-check"></i> <span data-i18n="status.connected">Connecté</span></p>
+                                        <div style="display:flex;gap:8px;">
+                                            <button class="btn btn-ghost btn-sm" onclick="tigerTagShowLogin()"><i class="fa-solid fa-pen"></i> <span data-i18n="actions.reconnect">Reconnecter</span></button>
+                                            <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="tigerTagDisconnect()"><i class="fa-solid fa-trash"></i> <span data-i18n="actions.disconnect">Déconnecter</span></button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="account-card" style="margin-top:12px;">
+                                    <div class="account-card-header">
+                                        <div style="display:flex;align-items:center;gap:10px;">
+                                            <div class="account-icon-badge" style="background:rgba(148,163,184,0.15);color:var(--text-secondary);"><i class="fa-solid fa-pen"></i></div>
+                                            <div><div style="font-weight:600;font-size:13px;" data-i18n="settings.manual_inventory">Inventaire manuel</div><div style="font-size:11px;color:var(--text-muted);" data-i18n="settings.manual_inventory_sub">Bobines saisies à la main dans Stellio</div></div>
+                                        </div>
+                                        <label class="nav-toggle-switch">
+                                            <input type="checkbox" id="manual-inventory-enabled-toggle" checked onchange="toggleManualInventoryEnabled(this.checked)">
+                                            <span class="nav-toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                    <p class="settings-hint" style="margin-top:8px;" data-i18n="settings.manual_inventory_hint">Si désactivé, vos bobines saisies manuellement sont ignorées partout dans Stellio (inventaire, compatibilité, alertes de stock) sans être supprimées.</p>
                                 </div>
                             </div>
                         </div>
@@ -1074,19 +1520,20 @@
                             <div class="accord-body">
                                 <p class="settings-hint" style="margin-bottom:12px;" data-i18n="settings.latbarre-hint">Activez ou désactivez les éléments de la barre latérale, et faites-les glisser pour les réorganiser.</p>
                                 <div class="nav-toggle-list" id="nav-toggle-list">
-								<div class="nav-toggle-row" draggable="true" data-nav-id="stats"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.stats">Statistiques</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="stats" onchange="toggleNavItem('stats',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
-								<div class="nav-toggle-row" draggable="true" data-nav-id="projects"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.projects">Projets</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="projects" onchange="toggleNavItem('projects',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
-				<div class="nav-toggle-row" draggable="true" data-nav-id="history"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.history">Historique</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="history" onchange="toggleNavItem('history',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
-				<div class="nav-toggle-row" draggable="true" data-nav-id="gallery"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.gallery">Galerie</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="gallery" onchange="toggleNavItem('gallery',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
-								<div class="nav-toggle-row" draggable="true" data-nav-id="favorites"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.favorites">Favoris</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="favorites" onchange="toggleNavItem('favorites',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
-								<div class="nav-toggle-row" draggable="true" data-nav-id="duplicates"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.duplicates">Doublons</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="duplicates" onchange="toggleNavItem('duplicates',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
-								<div class="nav-toggle-row" draggable="true" data-nav-id="filters"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.filters">Filtres</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="filters" onchange="toggleNavItem('filters',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
-								<div class="nav-toggle-row" draggable="true" data-nav-id="download"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.download">Télécharger</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="download" onchange="toggleNavItem('download',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
-								<div class="nav-toggle-row" draggable="true" data-nav-id="repair"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.repair">Réparation</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="repair" onchange="toggleNavItem('repair',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
-							<div class="nav-toggle-row" draggable="true" data-nav-id="converter"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.converter">Convertisseur</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="converter" onchange="toggleNavItem('converter',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
-								<div class="nav-toggle-row" draggable="true" data-nav-id="printers"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.printers">Imprimantes</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="printers" onchange="toggleNavItem('printers',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
-								<div class="nav-toggle-row" draggable="true" data-nav-id="spoolman"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.spoolman">Inventaire filament</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="spoolman" onchange="toggleNavItem('spoolman',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
-								<div class="nav-toggle-row" draggable="true" data-nav-id="sosprint"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle"></i><span data-i18n="nav.sosprint">S.O.S print</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="sosprint" onchange="toggleNavItem('sosprint',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="stats"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.stats">Statistiques</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="stats" onchange="toggleNavItem('stats',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="projects"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.projects">Projets</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="projects" onchange="toggleNavItem('projects',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="print-queue"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.print_queue">À imprimer bientôt</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="print-queue" onchange="toggleNavItem('print-queue',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+				<div class="nav-toggle-row" draggable="true" data-nav-id="history"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.history">Historique</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="history" onchange="toggleNavItem('history',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+				<div class="nav-toggle-row" draggable="true" data-nav-id="gallery"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.gallery">Galerie</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="gallery" onchange="toggleNavItem('gallery',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="favorites"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.favorites">Favoris</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="favorites" onchange="toggleNavItem('favorites',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="duplicates"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.duplicates">Doublons</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="duplicates" onchange="toggleNavItem('duplicates',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="filters"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.filters">Filtres</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="filters" onchange="toggleNavItem('filters',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="download"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.download">Télécharger</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="download" onchange="toggleNavItem('download',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="repair"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.repair">Réparation</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="repair" onchange="toggleNavItem('repair',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+							<div class="nav-toggle-row" draggable="true" data-nav-id="converter"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.converter">Convertisseur</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="converter" onchange="toggleNavItem('converter',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="printers"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.printers">Imprimantes</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="printers" onchange="toggleNavItem('printers',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="spoolman"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.spoolman">Inventaire filament</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="spoolman" onchange="toggleNavItem('spoolman',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="sosprint"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.sosprint">S.O.S print</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="sosprint" onchange="toggleNavItem('sosprint',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 								</div>
                             </div>
                         </div>
@@ -1096,20 +1543,6 @@
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
                             </div>
                             <div class="accord-body" style="text-align:center;">
-                                <div class="accord-section" style="margin-bottom:14px;box-shadow:none;">
-                                    <div class="accord-header" onclick="toggleAccord(this)" style="background:var(--bg-input);">
-                                        <span><i class="fa-brands fa-android"></i> <span data-i18n="settings.companion_apk_title">App compagnon Android (APK)</span></span>
-                                        <i class="fa-solid fa-chevron-down accord-arrow"></i>
-                                    </div>
-                                    <div class="accord-body" style="text-align:left;">
-                                        <p class="settings-hint" style="margin-bottom:14px;" data-i18n="settings.companion_apk_hint">
-                                            Scannez ce QR code depuis votre téléphone Android pour télécharger et installer l'app compagnon Stellio (fichier APK).
-                                        </p>
-                                        <button class="btn btn-primary" onclick="openApkQRModal()" style="width:100%;">
-                                            <i class="fa-solid fa-qrcode"></i> <span data-i18n="settings.companion_apk_qr">Afficher le QR code de téléchargement</span>
-                                        </button>
-                                    </div>
-                                </div>
                                 <p class="settings-hint" style="margin-bottom:14px;">Activez l'accès à distance ci-dessous pour générer un QR code et accéder à Stellio depuis votre téléphone ou votre tablette.</p>
 
                                 <div>
@@ -1161,6 +1594,61 @@
                                             <p id="cf-fixed-url-status" class="settings-hint" style="margin-top:10px;"></p>
                                         </div>
                                     </div>
+
+                                    <div class="accord-section" id="custom-url-section" style="margin-top:14px;box-shadow:none;display:none;">
+                                        <div class="accord-header" onclick="toggleAccord(this)" style="background:var(--bg-input);">
+                                            <span><i class="fa-solid fa-link"></i> <span data-i18n="settings.custom_url_title">Avancé : adresse personnalisée (sans Cloudflare)</span></span>
+                                            <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                                        </div>
+                                        <div class="accord-body" style="text-align:left;">
+                                            <p class="settings-hint" style="margin-bottom:12px;" data-i18n="settings.custom_url_hint">
+                                                Si vous ne souhaitez pas utiliser Cloudflare, indiquez ici l'adresse par laquelle votre Stellio est joignable depuis l'extérieur (nom de domaine avec reverse proxy, DynDNS avec redirection de port, VPN, Tailscale…). Stellio ne lance alors aucun tunnel : il se contente de partager cette adresse (QR code, liens de partage, application compagnon). La redirection vers ce PC (port 5000) et la sécurité (HTTPS recommandé) restent à votre charge.
+                                            </p>
+                                            <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+                                                <label data-i18n="settings.custom_url_label">Adresse externe (ex : https://stellio.mondomaine.com)</label>
+                                                <input type="text" id="custom-remote-url" class="settings-select" placeholder="https://stellio.mondomaine.com" autocomplete="off" spellcheck="false">
+                                            </div>
+                                            <div style="display:flex;gap:8px;margin-top:14px;">
+                                                <button class="btn btn-primary" onclick="saveCustomRemoteAccess()" style="flex:1;">
+                                                    <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="actions.save">Enregistrer</span>
+                                                </button>
+                                                <button class="btn btn-ghost" onclick="disableCustomRemoteAccess()">
+                                                    <i class="fa-solid fa-rotate-left"></i> <span data-i18n="settings.custom_url_revert">Revenir à Cloudflare</span>
+                                                </button>
+                                            </div>
+                                            <p id="custom-remote-url-status" class="settings-hint" style="margin-top:10px;"></p>
+                                        </div>
+                                    </div>
+
+                                    <div class="accord-section" style="margin-top:14px;box-shadow:none;">
+                                        <div class="accord-header" onclick="toggleAccord(this)" style="background:var(--bg-input);">
+                                            <span><i class="fa-brands fa-android"></i> <span data-i18n="settings.companion_apk_title">App compagnon Android (APK)</span></span>
+                                            <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                                        </div>
+                                        <div class="accord-body" style="text-align:left;">
+                                            <p class="settings-hint" style="margin-bottom:14px;" data-i18n="settings.companion_apk_hint">
+                                                Scannez ce QR code depuis votre téléphone Android pour télécharger et installer l'app compagnon Stellio (fichier APK).
+                                            </p>
+                                            <button class="btn btn-primary" onclick="openApkQRModal()" style="width:100%;">
+                                                <i class="fa-solid fa-qrcode"></i> <span data-i18n="settings.companion_apk_qr">Afficher le QR code de téléchargement</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="accord-section" style="margin-top:14px;box-shadow:none;">
+                                        <div class="accord-header" onclick="toggleAccord(this)" style="background:var(--bg-input);">
+                                            <span><i class="fa-solid fa-bell"></i> <span data-i18n="settings.browser_notif_title">Notifications navigateur</span></span>
+                                            <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                                        </div>
+                                        <div class="accord-body" style="text-align:left;">
+                                            <p class="settings-hint" style="margin-bottom:14px;" data-i18n="settings.browser_notif_hint">
+                                                Recevez une notification de votre navigateur (fin d'impression, échec, maintenance, stock faible) même si Stellio est en arrière-plan.
+                                            </p>
+                                            <button class="btn btn-primary" id="enable-browser-notif-btn" onclick="requestBrowserNotifPermission()" style="width:100%;">
+                                                <i class="fa-solid fa-bell"></i> <span data-i18n="settings.browser_notif_enable">Activer les notifications</span>
+                                            </button>
+                                            <p id="browser-notif-status" class="settings-hint" style="margin-top:10px;"></p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1179,8 +1667,85 @@
                                         <button class="btn btn-ghost btn-sm" onclick="copyLocalPeerKey()" data-i18n-title="actions.copy" title="Copier"><i class="fa-solid fa-copy"></i></button>
                                     </div>
                                 </div>
+                                <div style="margin-top:14px;">
+                                    <div style="display:flex; align-items:center; justify-content:space-between;">
+                                        <label data-i18n="settings.remote_instances_discovered">Détectées sur le réseau</label>
+                                        <button class="btn btn-ghost btn-sm" onclick="discoverRemoteInstances()" data-i18n-title="settings.remote_instances_rescan" title="Relancer la détection"><i class="fa-solid fa-rotate"></i></button>
+                                    </div>
+                                    <div id="remote-instances-discovered" style="display:flex; flex-direction:column; gap:8px; margin-top:6px;"></div>
+                                </div>
                                 <div id="remote-instances-list" style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
                                     <div class="empty-state small"><p data-i18n="settings.remote_instances_none">Aucune instance configurée</p></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accord-section viewer-hide">
+                            <div class="accord-header" onclick="toggleAccord(this)">
+                                <span><i class="fa-solid fa-bell"></i> <span data-i18n="push.title">Notifications push</span></span>
+                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                            </div>
+                            <div class="accord-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <p class="settings-hint" data-i18n="push.hint">Reçois les alertes sur ton téléphone quand tu n'es pas devant l'écran.</p>
+                                <div class="settings-row" style="align-items:center;">
+                                    <label style="font-size:13px; font-weight:500;" data-i18n="push.enable">Activer les notifications push</label>
+                                    <label class="nav-toggle-switch">
+                                        <input type="checkbox" id="push-enabled">
+                                        <span class="nav-toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="settings-row">
+                                    <label data-i18n="push.provider">Service</label>
+                                    <select id="push-provider" class="settings-select" onchange="_pushShowProviderFields()">
+                                        <option value="ntfy" data-i18n="push.provider_ntfy">ntfy (auto-hébergeable)</option>
+                                        <option value="telegram" data-i18n="push.provider_telegram">Telegram</option>
+                                        <option value="discord" data-i18n="push.provider_discord">Discord (webhook)</option>
+                                        <option value="webhook" data-i18n="push.provider_webhook">Webhook générique</option>
+                                    </select>
+                                </div>
+                                <div data-push-provider="ntfy" style="display:flex; flex-direction:column; gap:8px;">
+                                    <label class="spool-extra-field"><span data-i18n="push.ntfy_server">Serveur ntfy</span><input type="url" id="push-ntfy-server" class="settings-select" placeholder="https://ntfy.sh" autocomplete="off"></label>
+                                    <label class="spool-extra-field"><span data-i18n="push.ntfy_topic">Sujet (topic)</span><input type="text" id="push-ntfy-topic" class="settings-select" autocomplete="off"></label>
+                                    <label class="spool-extra-field"><span data-i18n="push.ntfy_token">Jeton d'accès (optionnel)</span><input type="password" id="push-ntfy-token" class="settings-select" autocomplete="new-password"></label>
+                                </div>
+                                <div data-push-provider="telegram" class="hidden" style="display:flex; flex-direction:column; gap:8px;">
+                                    <label class="spool-extra-field"><span data-i18n="push.telegram_token">Jeton du bot</span><input type="password" id="push-telegram-token" class="settings-select" autocomplete="new-password"></label>
+                                    <label class="spool-extra-field"><span data-i18n="push.telegram_chat">Identifiant de conversation (chat_id)</span><input type="text" id="push-telegram-chat" class="settings-select" autocomplete="off"></label>
+                                </div>
+                                <div data-push-provider="discord" class="hidden" style="display:flex; flex-direction:column; gap:8px;">
+                                    <label class="spool-extra-field"><span data-i18n="push.discord_url">URL du webhook Discord</span><input type="password" id="push-discord-url" class="settings-select" autocomplete="new-password"></label>
+                                </div>
+                                <div data-push-provider="webhook" class="hidden" style="display:flex; flex-direction:column; gap:8px;">
+                                    <label class="spool-extra-field"><span data-i18n="push.webhook_url">URL du webhook</span><input type="url" id="push-webhook-url" class="settings-select" autocomplete="off"></label>
+                                </div>
+                                <div>
+                                    <div style="font-size:12.5px; font-weight:600; margin-bottom:6px;" data-i18n="push.types_title">Événements à envoyer</div>
+                                    <div style="display:flex; flex-direction:column; gap:6px;">
+                                        <label class="checkbox-label"><input type="checkbox" data-push-type="print_finished" checked> <span data-i18n="push.type_print_finished">Impression terminée</span></label>
+                                        <label class="checkbox-label"><input type="checkbox" data-push-type="print_failed" checked> <span data-i18n="push.type_print_failed">Échec d'impression</span></label>
+                                        <label class="checkbox-label"><input type="checkbox" data-push-type="maintenance" checked> <span data-i18n="push.type_maintenance">Maintenance et séchage</span></label>
+                                        <label class="checkbox-label"><input type="checkbox" data-push-type="low_stock" checked> <span data-i18n="push.type_low_stock">Stock bas et pièces</span></label>
+                                    </div>
+                                </div>
+                                <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
+                                    <button type="button" class="btn btn-ghost btn-sm" onclick="testPush()"><i class="fa-solid fa-paper-plane"></i> <span data-i18n="push.test">Envoyer un test</span></button>
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="savePushSettings()"><i class="fa-solid fa-check"></i> <span data-i18n="push.save">Enregistrer</span></button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accord-section viewer-hide">
+                            <div class="accord-header" onclick="toggleAccord(this)">
+                                <span><i class="fa-solid fa-user-lock"></i> <span data-i18n="guests.title">Comptes invités</span></span>
+                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                            </div>
+                            <div class="accord-body">
+                                <p class="settings-hint" data-i18n="guests.hint">Un compte invité consulte ta bibliothèque, tes imprimantes et ton stock en lecture seule : il ne peut rien modifier ni lancer. Pratique pour la famille ou un atelier.</p>
+                                <div id="guests-list" style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
+                                    <div class="empty-state small"><p data-i18n="guests.none">Aucun compte invité</p></div>
+                                </div>
+                                <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+                                    <input type="text" id="guest-new-username" class="settings-select" style="flex:1; min-width:120px;" maxlength="60" autocomplete="off" data-i18n-placeholder="guests.username_ph" placeholder="Nom de l'invité">
+                                    <input type="password" id="guest-new-password" class="settings-select" style="flex:1; min-width:120px;" autocomplete="new-password" data-i18n-placeholder="guests.password_ph" placeholder="Mot de passe (4 car. min.)">
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="createGuest()"><i class="fa-solid fa-plus"></i> <span data-i18n="guests.create">Créer</span></button>
                                 </div>
                             </div>
                         </div>
@@ -1301,12 +1866,28 @@
 
                         <div class="accord-section" id="shortcuts-settings-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
+                                <span><i class="fa-solid fa-compass"></i> <span data-i18n="tour.settings_title">Visite guidée</span></span>
+                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                            </div>
+                            <div class="accord-body">
+                                <p class="settings-hint" style="margin-bottom:14px;" data-i18n="tour.settings_hint">
+                                    Redécouvrez les fonctionnalités principales de Stellio avec une visite guidée pas à pas.
+                                </p>
+                                <button class="btn btn-primary" onclick="startTour()" style="width:100%;">
+                                    <i class="fa-solid fa-map-signs"></i> <span data-i18n="tour.settings_restart">Relancer la visite guidée</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="accord-section" id="shortcuts-settings-section-real">
+                            <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-keyboard"></i> <span data-i18n="shortcuts.title">Raccourcis clavier</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
                             </div>
                             <div class="accord-body" style="display:flex; flex-direction:column; gap:14px;">
                                 <div class="shortcuts-section">
                                     <h4><i class="fa-solid fa-compass"></i> <span data-i18n="shortcuts.navigation">Navigation</span></h4>
+                                    <div class="shortcut-row"><span data-i18n="cmdpalette.title">Palette de commandes</span><span class="shortcut-keys"><kbd>Ctrl</kbd>+<kbd>K</kbd></span></div>
                                     <div class="shortcut-row"><span data-i18n="shortcuts.go_library">Aller à la Bibliothèque</span><span class="shortcut-keys"><kbd>Alt</kbd>+<kbd>1</kbd></span></div>
                                     <div class="shortcut-row"><span data-i18n="shortcuts.go_stats">Aller aux Statistiques</span><span class="shortcut-keys"><kbd>Alt</kbd>+<kbd>2</kbd></span></div>
                                     <div class="shortcut-row"><span data-i18n="shortcuts.go_projects">Aller aux Projets</span><span class="shortcut-keys"><kbd>Alt</kbd>+<kbd>3</kbd></span></div>
@@ -1543,9 +2124,8 @@
 							</div>
 
 							<div class="input-group">
-								<label for="sosprint-photo-input"><span data-i18n="sosprint.photo_label">Photo de la pièce ratée</span> <span class="sosprint-optional-tag" data-i18n="sosprint.optional">(facultatif)</span></label>
+								<label><span data-i18n="sosprint.photo_label">Photo de la pièce ratée</span> <span class="sosprint-optional-tag" data-i18n="sosprint.optional">(facultatif)</span></label>
 								<div class="sosprint-photo-zone" id="sosprint-photo-zone">
-									<input type="file" id="sosprint-photo-input" accept="image/jpeg,image/png,image/webp" capture="environment" hidden>
 									<div class="sosprint-photo-placeholder" id="sosprint-photo-placeholder">
 										<i class="fa-solid fa-camera"></i>
 										<span data-i18n="sosprint.add_photo">Ajouter une photo pour un diagnostic plus précis</span>
@@ -1580,7 +2160,6 @@
 							</div>
 
 							<div class="sosprint-investigation-photo-row">
-								<input type="file" id="sosprint-extra-photo-input" accept="image/jpeg,image/png,image/webp" capture="environment" hidden>
 								<button type="button" class="btn btn-ghost btn-sm" id="sosprint-add-photo-btn">
 									<i class="fa-solid fa-camera"></i> <span data-i18n="sosprint.add_photo_now">Ajouter une photo</span>
 								</button>
@@ -1636,20 +2215,41 @@
 				</div>
 				<div id="page-printers" class="page">
 					<div id="printers-grid" class="grid-printers"></div>
-					<button onclick="openAddPrinterModal()" class="btn btn-primary">
+					<button onclick="openAddPrinterModal()" class="btn btn-primary viewer-hide">
 						<i class="fa-solid fa-plus"></i> <span data-i18n="printers.add">Ajouter une imprimante</span>
+					</button>
+					<button onclick="openPartsModal()" class="btn btn-ghost" style="margin-left:8px;">
+						<i class="fa-solid fa-toolbox"></i> <span data-i18n="parts.open_btn">Pièces &amp; consommables</span>
 					</button>
 				</div>
 				<div id="page-spoolman" class="page">
-					<div class="spoolman-toolbar">
-						<div id="spoolman-server-label" class="spoolman-server-label"></div>
-						<button id="add-manual-spool-btn" class="btn btn-primary btn-sm" style="display:none;" onclick="openSpoolInventoryModal()">
-							<i class="fa-solid fa-plus"></i> <span data-i18n="spoolman.add_spool_btn">Ajouter bobine</span>
-						</button>
-						<button class="btn btn-ghost btn-sm" onclick="loadSpoolmanPage()" data-i18n-title="actions.refresh" title="Rafraîchir">
-							<i class="fa-solid fa-rotate"></i> <span data-i18n="actions.refresh">Rafraîchir</span>
-						</button>
+					<div id="spoolman-section" style="display:none; margin-top:24px;">
+						<div class="source-banner source-banner-spoolman">
+							<div class="source-banner-icon"><i class="fa-solid fa-circle-nodes"></i></div>
+							<div style="flex:1; min-width:0;">
+								<div style="font-weight:600; font-size:14px;">Spoolman</div>
+								<div id="spoolman-server-label" class="source-banner-sub"></div>
+							</div>
+							<button class="btn btn-ghost btn-sm" onclick="loadSpoolmanServer()" data-i18n-title="actions.refresh" title="Rafraîchir">
+								<i class="fa-solid fa-rotate"></i> <span data-i18n="actions.refresh">Rafraîchir</span>
+							</button>
+						</div>
+						<div id="spoolman-grid" class="grid-spoolman" style="margin-top:12px;"></div>
 					</div>
+					<div id="manual-section" style="display:none; margin-top:24px;">
+						<div class="source-banner source-banner-manual">
+							<div class="source-banner-icon"><i class="fa-solid fa-box-open"></i></div>
+							<div style="flex:1; min-width:0;">
+								<div style="font-weight:600; font-size:14px;" data-i18n="settings.manual_inventory">Inventaire manuel</div>
+								<div class="source-banner-sub" data-i18n="spoolman.manual_banner_desc">Bobines saisies à la main dans Stellio</div>
+							</div>
+							<button id="add-manual-spool-btn" class="btn btn-primary btn-sm" style="display:none;" onclick="openSpoolInventoryModal()">
+								<i class="fa-solid fa-plus"></i> <span data-i18n="spoolman.add_spool_btn">Ajouter bobine</span>
+							</button>
+							<button class="btn btn-ghost btn-sm" onclick="loadManualSpoolInventory()" data-i18n-title="actions.refresh" title="Rafraîchir">
+								<i class="fa-solid fa-rotate"></i> <span data-i18n="actions.refresh">Rafraîchir</span>
+							</button>
+						</div>
 					<div id="spoolman-filters" class="spoolman-toolbar spoolman-filters-mobile-only" style="display:none; gap:8px; flex-wrap:wrap;">
 						<div class="spoolman-search-box">
 							<i class="fa-solid fa-search"></i>
@@ -1671,7 +2271,22 @@
 							<option value="remaining_desc" data-i18n="spoolman.sort_remaining_desc">Poids restant ↓</option>
 						</select>
 					</div>
-					<div id="spoolman-grid" class="grid-spoolman"></div>
+						<div id="manual-grid" class="grid-spoolman" style="margin-top:12px;"></div>
+					</div>
+					<div id="tigertag-section" style="display:none; margin-top:24px;">
+						<div class="tigertag-banner">
+							<img src="assets/tigertag-logo.svg" alt="TigerTag" class="tigertag-banner-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+							<div class="tigertag-banner-fallback-icon"><i class="fa-solid fa-tag"></i></div>
+							<div style="flex:1;">
+								<div style="font-weight:600; font-size:14px;">TigerTag</div>
+								<div style="font-size:11.5px; color:var(--text-muted);" data-i18n="spoolman.tigertag_banner_desc">Bobines identifiées par puce NFC/RFID TigerTag</div>
+							</div>
+							<button class="btn btn-ghost btn-sm" onclick="loadTigerTagSpools()" data-i18n-title="actions.refresh" title="Rafraîchir">
+								<i class="fa-solid fa-rotate"></i> <span data-i18n="actions.refresh">Rafraîchir</span>
+							</button>
+						</div>
+						<div id="tigertag-grid" class="grid-spoolman" style="margin-top:12px;"></div>
+					</div>
 				</div>
             </main>
         </div>
@@ -1693,6 +2308,12 @@
             <button id="add-selected-to-project-btn" class="btn btn-sm">
                 <i class="fa-solid fa-diagram-project"></i> <span data-i18n="actions.add_to_project">Projet</span>
             </button>
+            <button id="tag-selected-btn" class="btn btn-sm">
+                <i class="fa-solid fa-tag"></i> <span data-i18n="actions.tag_selection">Tag</span>
+            </button>
+            <button id="rename-selected-btn" class="btn btn-sm">
+                <i class="fa-solid fa-i-cursor"></i> <span data-i18n="actions.rename_selection">Renommer</span>
+            </button>
             <button id="regen-selected-thumbs-btn" class="btn btn-sm">
                 <i class="fa-solid fa-arrows-rotate"></i> <span data-i18n="actions.regen_thumbnails">Régénérer miniatures</span>
             </button>
@@ -1711,7 +2332,11 @@
             <div class="bottom-nav-scroll-hint bottom-nav-scroll-hint--right" id="bottom-nav-hint-right" aria-hidden="true">
                 <i class="fa-solid fa-chevron-right"></i>
             </div>
-            <button class="nav-btn bottom-nav-btn active" data-page="library" data-icon="fa-layer-group" data-title-key="nav.library">
+            <button class="nav-btn bottom-nav-btn active" data-page="dashboard" data-icon="fa-gauge-high" data-title-key="nav.dashboard">
+                <i class="fa-solid fa-gauge-high"></i>
+                <span data-i18n="nav.dashboard">Tableau de bord</span>
+            </button>
+            <button class="nav-btn bottom-nav-btn" data-page="library" data-icon="fa-layer-group" data-title-key="nav.library">
                 <i class="fa-solid fa-layer-group"></i>
                 <span data-i18n="nav.library">Bibliothèque</span>
             </button>
@@ -1734,6 +2359,11 @@
             <button class="nav-btn bottom-nav-btn" data-page="projects" data-nav-id="projects" data-icon="fa-diagram-project" data-title-key="nav.projects">
                 <i class="fa-solid fa-diagram-project"></i>
                 <span data-i18n="nav.projects">Projets</span>
+            </button>
+            <button class="nav-btn bottom-nav-btn" data-page="print-queue" data-nav-id="print-queue" data-icon="fa-list-ol" data-title-key="nav.print_queue">
+                <i class="fa-solid fa-list-ol"></i>
+                <span data-i18n="nav.print_queue">À imprimer</span>
+                <span class="badge" id="print-queue-count-mobile" style="display:none;">0</span>
             </button>
             <button class="nav-btn bottom-nav-btn" data-page="history" data-nav-id="history" data-icon="fa-clock-rotate-left" data-title-key="nav.history">
                 <i class="fa-solid fa-clock-rotate-left"></i>
@@ -1770,7 +2400,7 @@
         <div class="modal-content small">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-database"></i> <span data-i18n="modal.add_source">Ajouter une source</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-select-type')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-select-type')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body">
                 <p class="modal-subtitle" data-i18n="modal.select_type">Sélectionnez le type de source à ajouter</p>
@@ -1792,7 +2422,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-box-archive"></i> <span data-i18n="backup.options_title">Que sauvegarder ?</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-backup-options')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-backup-options')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body">
                 <p class="settings-hint" style="margin-bottom:14px;" data-i18n="backup.options_hint">Choisissez les données à inclure dans l'archive. Votre compte utilisateur est toujours conservé (nécessaire pour restaurer).</p>
@@ -1843,7 +2473,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="local-manual-title"><i class="fa-solid fa-folder"></i> <span data-i18n="source.local_folder">Dossier local</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-local-manual')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-local-manual')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body">
                 <p class="settings-hint" style="margin-bottom:14px;" data-i18n="source.manual_path_hint">Le sélecteur de dossier natif n'est pas disponible dans ce déploiement (serveur sans écran). Indiquez le chemin tel qu'il existe dans le conteneur, par exemple <code>/library</code> ou <code>/library/mes-modeles</code>.</p>
@@ -1869,7 +2499,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-network-wired"></i> <span data-i18n="source.smb_share">Partage SMB</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-smb')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-smb')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body">
                 <form id="smb-form">
@@ -1914,7 +2544,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-server"></i> <span data-i18n="source.nfs_share">Partage NFS</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-nfs')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-nfs')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body">
                 <form id="nfs-form">
@@ -1951,7 +2581,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-file-import"></i> <span data-i18n="modal.import_assign_title">Assigner les profils importés</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-slicer-import-assign')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-slicer-import-assign')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body">
                 <p class="settings-hint" style="margin-bottom:12px;" data-i18n="modal.import_assign_hint">Choisis, pour chaque fichier, l'imprimante concernée (laisse "Non assigné" si ce réglage vaut pour plusieurs machines ou si tu préfères l'assigner plus tard).</p>
@@ -1970,11 +2600,14 @@
         <div class="modal-content small">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-scissors"></i> <span data-i18n="modal.send_to_slicer">Envoyer au Slicer</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-slicer')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-slicer')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body">
                 <p id="slicer-file-name" style="margin-bottom: 15px; font-weight: bold;"></p>
+                <div id="slicer-quick-estimate" class="slicer-quick-estimate hidden"></div>
                 <div id="slicer-preprint-warnings" style="display:none; margin-bottom:15px; flex-direction:column; gap:6px;"></div>
+                <div id="slicer-calib-box" class="slicer-calib-box" style="display:none;"></div>
+                <div id="slicer-reprint-box" class="slicer-calib-box" style="display:none;"></div>
                 <div id="slicer-spool-box" style="display:none; margin-bottom:15px; padding:10px 12px; border-radius:var(--radius); background:var(--bg-input); border:1px solid var(--border); font-size:12px;">
                     <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
                         <input type="checkbox" id="slicer-consume-spool-checkbox" checked>
@@ -2013,7 +2646,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-border-all"></i> <span data-i18n="modal.nesting_title">Nester le plateau</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-nesting')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-nesting')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body">
                 <div style="display:flex; gap:12px; margin-bottom:14px; flex-wrap:wrap;">
@@ -2072,7 +2705,7 @@
         <div class="modal-content small">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-triangle-exclamation"></i> <span data-i18n="modal.confirm_title">Confirmation</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-confirm')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-confirm')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body">
                 <p id="confirm-message" style="margin-bottom: 20px; color: var(--text-secondary);"></p>
@@ -2113,7 +2746,7 @@
                     <button type="button" class="btn btn-primary" style="font-size:12px; padding:6px 12px; white-space:nowrap;" onclick="sendViewerFileToSlicer()" data-i18n-title="viewer.send_to_slicer_title" title="Ouvrir dans le slicer avec l'orientation choisie ci-dessus">
                         <i class="fa-solid fa-paper-plane"></i> <span data-i18n="viewer.send_to_slicer">Envoyer au slicer</span>
                     </button>
-                    <button class="modal-close" onclick="close3DViewer()">&times;</button>
+                    <button class="modal-close" onclick="close3DViewer()" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
                 </div>
             </div>
             <div class="viewer-canvas-wrapper">
@@ -2133,10 +2766,10 @@
                 <button type="button" id="viewer-recenter-btn" class="viewer-recenter-btn" onclick="event.stopPropagation(); recenterViewerCamera();" onmousedown="event.stopPropagation();" data-i18n-title="viewer.recenter_title" title="Recentrer la vue">
                     <i class="fa-solid fa-arrows-to-dot"></i>
                 </button>
-                <button type="button" id="viewer-plate-prev" class="viewer-plate-nav-btn viewer-plate-nav-btn--left" onclick="goToPlate(-1)" title="Plateau précédent" style="display:none;">
+                <button type="button" id="viewer-plate-prev" class="viewer-plate-nav-btn viewer-plate-nav-btn--left" onclick="goToPlate(-1)" data-i18n-title="viewer.plate_prev" title="Plateau précédent" style="display:none;">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
-                <button type="button" id="viewer-plate-next" class="viewer-plate-nav-btn viewer-plate-nav-btn--right" onclick="goToPlate(1)" title="Plateau suivant" style="display:none;">
+                <button type="button" id="viewer-plate-next" class="viewer-plate-nav-btn viewer-plate-nav-btn--right" onclick="goToPlate(1)" data-i18n-title="viewer.plate_next" title="Plateau suivant" style="display:none;">
                     <i class="fa-solid fa-chevron-right"></i>
                 </button>
                 <div id="viewer-plate-label" class="viewer-plate-label" style="display:none;"></div>
@@ -2149,11 +2782,23 @@
         </div>
     </div>
 
+    <div id="modal-partners" class="modal hidden">
+        <div class="modal-content" style="max-width:420px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-link"></i> <span data-i18n="nav.partners">Liens utiles</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-partners')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
+            </div>
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:10px;">
+                <div id="links-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-about" class="modal hidden">
         <div class="modal-content modal-about-content">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-circle-info"></i> <span data-i18n="about.title">À propos de Stellio</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-about')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-about')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body about-body">
                 <div class="about-logo-section">
@@ -2182,11 +2827,12 @@
         <div class="modal-content shortcuts-modal-content">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-keyboard"></i> <span data-i18n="shortcuts.title">Raccourcis clavier</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-shortcuts')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-shortcuts')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body shortcuts-body">
                 <div class="shortcuts-section">
                     <h4><i class="fa-solid fa-compass"></i> <span data-i18n="shortcuts.navigation">Navigation</span></h4>
+                    <div class="shortcut-row"><span data-i18n="cmdpalette.title">Palette de commandes</span><span class="shortcut-keys"><kbd>Ctrl</kbd>+<kbd>K</kbd></span></div>
                     <div class="shortcut-row"><span data-i18n="shortcuts.go_library">Aller à la Bibliothèque</span><span class="shortcut-keys"><kbd>Alt</kbd>+<kbd>1</kbd></span></div>
                     <div class="shortcut-row"><span data-i18n="shortcuts.go_stats">Aller aux Statistiques</span><span class="shortcut-keys"><kbd>Alt</kbd>+<kbd>2</kbd></span></div>
                     <div class="shortcut-row"><span data-i18n="shortcuts.go_projects">Aller aux Projets</span><span class="shortcut-keys"><kbd>Alt</kbd>+<kbd>3</kbd></span></div>
@@ -2218,7 +2864,7 @@
         <div class="modal-content small">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-pen"></i> <span data-i18n="modal.rename_source">Renommer la source</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-rename-source')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-rename-source')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body">
                 <form id="rename-source-form">
@@ -2242,9 +2888,17 @@
         <div class="modal-content small">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-filter"></i> <span data-i18n="nav.filters">Filtres</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-filters')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-filters')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body">
+                <div class="filter-group" id="saved-filters-group" style="margin-bottom: 20px;">
+                    <h3><i class="fa-solid fa-bookmark"></i> <span data-i18n="filters.saved_filters">Filtres sauvegardés</span></h3>
+                    <div id="saved-filters-list" class="saved-filters-list"></div>
+                    <button id="save-current-filters-btn" class="btn btn-ghost btn-sm btn-block" style="margin-top: 8px; border: 1px dashed var(--border);" onclick="saveCurrentFilterSet()">
+                        <i class="fa-solid fa-plus"></i> <span data-i18n="filters.save_current">Sauvegarder les filtres actuels</span>
+                    </button>
+                </div>
+
                 <div class="filter-group" style="margin-bottom: 20px;">
                     <h3><i class="fa-solid fa-shapes"></i> <span data-i18n="filters.file_type">Type de fichier</span></h3>
                     <label class="checkbox-label">
@@ -2304,6 +2958,20 @@
                 </div>
 
                 <div class="filter-group" style="margin-bottom: 20px;">
+                    <h3><i class="fa-solid fa-boxes-stacked"></i> <span data-i18n="filters.stock">Stock de filament</span></h3>
+                    <select id="filter-stock" class="settings-select" style="width:100%;">
+                        <option value="" data-i18n="filters.stock_all">Tous les fichiers</option>
+                        <option value="any" data-i18n="filters.stock_any">Imprimable avec mon stock</option>
+                        <option value="pla">PLA</option>
+                        <option value="petg">PETG</option>
+                        <option value="abs">ABS / ASA</option>
+                        <option value="tpu">TPU</option>
+                        <option value="nylon">Nylon (PA)</option>
+                    </select>
+                    <p class="settings-hint" style="margin-top:4px;" data-i18n="filters.stock_hint">Garde les fichiers dont le poids estimé tient dans une bobine en stock (Spoolman, inventaire manuel, TigerTag). Uniquement pour les fichiers déjà analysés.</p>
+                </div>
+
+                <div class="filter-group" style="margin-bottom: 20px;">
                     <h3><i class="fa-solid fa-image"></i> <span data-i18n="filters.thumbnails">Miniatures</span></h3>
                     <label class="checkbox-label">
                         <input type="checkbox" id="filter-no-thumb">
@@ -2341,7 +3009,7 @@
         <div class="modal-content small">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-tags"></i> <span data-i18n="modal.manage_tags">Gérer les tags</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-tag-manager')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-tag-manager')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body">
                 <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;" data-i18n="modal.tags_desc">
@@ -2387,12 +3055,41 @@
         </div>
     </div>
 
+    <div id="modal-bulk-tag" class="modal hidden">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-tag"></i> <span data-i18n="modal.bulk_tag_title">Taguer la sélection</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-bulk-tag')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="bulk-tag-count" style="font-size:12px; color:var(--text-muted); margin-bottom:12px;"></p>
+                <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;" data-i18n="modal.bulk_tag_desc">
+                    Les tags choisis seront ajoutés à tous les fichiers sélectionnés, sans toucher à leurs tags existants.
+                </p>
+                <div style="max-height:180px; overflow-y:auto; border:1px solid var(--border); border-radius:var(--radius); padding:10px; margin-bottom:15px;">
+                    <label style="font-size:12px; color:var(--text-secondary); font-weight:600;" data-i18n="modal.available_tags">Tags disponibles :</label>
+                    <div id="bulk-tag-list" style="display:flex; flex-direction:column; gap:6px; margin-top:8px;"></div>
+                </div>
+                <div class="input-group" style="display:flex; gap:8px;">
+                    <div style="flex:1;">
+                        <label data-i18n="modal.new_tag">Nouveau tag</label>
+                        <input type="text" id="bulk-tag-new-tag" data-i18n-placeholder="modal.new_tag_placeholder" placeholder="ex: Vis, Écrou, Print-Ready...">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" onclick="closeModal('modal-bulk-tag')" data-i18n="actions.cancel">Annuler</button>
+                <button class="btn btn-primary" id="apply-bulk-tag-btn"><i class="fa-solid fa-check"></i> <span data-i18n="filters.apply">Appliquer</span></button>
+            </div>
+        </div>
+    </div>
+
 
 	<div id="modal-download" class="modal hidden">
 		<div class="modal-content small">
 			<div class="modal-header">
 				<h3><i class="fa-solid fa-cloud-arrow-down"></i> <span data-i18n="modal.download_title">Télécharger depuis un lien</span></h3>
-				<button class="modal-close" onclick="closeModal('modal-download')">&times;</button>
+				<button class="modal-close" onclick="closeModal('modal-download')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
 			</div>
 			<div class="modal-body">
 				<p style="margin-bottom: 15px; color: var(--text-secondary);" data-i18n="modal.download_desc">
@@ -2535,7 +3232,7 @@
 		<div class="modal-content">
 			<div class="modal-header">
 				<h3><i class="fa-solid fa-network-wired"></i> <span data-i18n="settings.remote_instances_add_title">Ajouter une instance Stellio</span></h3>
-				<button class="modal-close" onclick="closeModal('modal-add-remote-instance')">×</button>
+				<button class="modal-close" onclick="closeModal('modal-add-remote-instance')" aria-label="Fermer" data-i18n-aria="actions.close">×</button>
 			</div>
 			<div class="modal-body">
 				<form id="add-remote-instance-form">
@@ -2549,7 +3246,7 @@
 					</div>
 					<div class="input-group">
 						<label data-i18n="settings.remote_instances_peer_key_label">Clé locale de l'autre instance</label>
-						<input type="text" id="remote-instance-peer-key" style="font-family:monospace;" placeholder="Copiée depuis les Paramètres de l'autre instance" required>
+						<input type="text" id="remote-instance-peer-key" style="font-family:monospace;" data-i18n-placeholder="settings.remote_instances_peer_key_ph" placeholder="Copiée depuis les Paramètres de l'autre instance" required>
 					</div>
 					<div class="input-group">
 						<label data-i18n="settings.remote_instances_inbox_label">Dossier de réception (optionnel)</label>
@@ -2570,7 +3267,7 @@
 		<div class="modal-content">
 			<div class="modal-header">
 				<h3><i class="fa-solid fa-print"></i> <span id="add-printer-modal-title" data-i18n="printers.add">Ajouter une imprimante</span></h3>
-				<button class="modal-close" onclick="closeModal('modal-add-printer')">×</button>
+				<button class="modal-close" onclick="closeModal('modal-add-printer')" aria-label="Fermer" data-i18n-aria="actions.close">×</button>
 			</div>
 			<div class="modal-body">
 				<div id="printer-discover-section" style="margin-bottom:14px;">
@@ -2722,7 +3419,7 @@
         <div class="modal-content small">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-ellipsis"></i> <span id="file-actions-title" data-i18n="modal.actions_title">Actions</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-file-actions')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-file-actions')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body" style="padding: 8px 0;">
                 <p id="file-actions-name" style="font-size:12px; color:var(--text-muted); padding:0 20px 12px; border-bottom:1px solid var(--border); margin-bottom:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></p>
@@ -2766,6 +3463,11 @@
                     <span class="file-action-label" data-i18n="projects.add_to_project">Ajouter à un projet</span>
                     <i class="fa-solid fa-chevron-right file-action-arrow"></i>
                 </button>
+                <button class="file-action-row" id="ctx-queue-btn">
+                    <span class="file-action-icon"><i class="fa-solid fa-list-ol"></i></span>
+                    <span class="file-action-label" id="ctx-queue-label" data-i18n="queue.add_action">Ajouter à imprimer bientôt</span>
+                    <i class="fa-solid fa-chevron-right file-action-arrow"></i>
+                </button>
                 <button class="file-action-row" id="ctx-rename-btn">
                     <span class="file-action-icon"><i class="fa-solid fa-pencil"></i></span>
                     <span class="file-action-label" data-i18n="modal.rename_file">Renommer le fichier</span>
@@ -2789,7 +3491,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-circle-info"></i> <span data-i18n="modal.full_metadata">Métadonnées complètes</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-file-metadata')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-file-metadata')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body" id="file-metadata-body"></div>
         </div>
@@ -2799,13 +3501,12 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-camera"></i> <span data-i18n="modal.print_photos">Photos d'impression</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-print-photos')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-print-photos')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body">
                 <p id="print-photos-file-name" style="font-size:12px; color:var(--text-muted); margin-bottom:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></p>
                 <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
-                    <input type="file" id="print-photo-file-input" accept="image/png,image/jpeg,image/webp" capture="environment" style="display:none;">
-                    <button class="btn btn-primary btn-sm" onclick="document.getElementById('print-photo-file-input').click()">
+                    <button class="btn btn-primary btn-sm" id="print-photo-add-btn" type="button">
                         <i class="fa-solid fa-plus"></i> <span data-i18n="modal.print_photos_add">Ajouter une photo</span>
                     </button>
                     <div class="btn-group" style="display:flex; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;">
@@ -2828,11 +3529,34 @@
         </div>
     </div>
 
+    <div id="modal-photo-source" class="modal hidden">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-camera"></i> <span data-i18n="modal.photo_source_title">Ajouter une photo</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-photo-source')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 8px 0;">
+                <input type="file" id="photo-source-camera-input" accept="image/*" capture="environment" hidden>
+                <input type="file" id="photo-source-gallery-input" accept="image/*" hidden>
+                <button type="button" class="file-action-row" id="photo-source-camera-btn">
+                    <span class="file-action-icon"><i class="fa-solid fa-camera"></i></span>
+                    <span class="file-action-label" data-i18n="modal.photo_source_camera">Prendre une photo</span>
+                    <i class="fa-solid fa-chevron-right file-action-arrow"></i>
+                </button>
+                <button type="button" class="file-action-row" id="photo-source-gallery-btn">
+                    <span class="file-action-icon"><i class="fa-solid fa-image"></i></span>
+                    <span class="file-action-label" data-i18n="modal.photo_source_gallery">Choisir dans la galerie</span>
+                    <i class="fa-solid fa-chevron-right file-action-arrow"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-share-file" class="modal hidden">
         <div class="modal-content small" style="max-width:400px;">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-share-nodes"></i> <span data-i18n="share.title">Partager le fichier</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-share-file')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-share-file')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body" style="padding:20px;">
                 <p id="share-file-name" style="font-size:12px; color:var(--text-muted); margin-bottom:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></p>
@@ -2869,7 +3593,7 @@
         <div class="modal-content small">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-folder-arrow-down"></i> <span data-i18n="modal.move_file">Déplacer le fichier</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-move-file')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-move-file')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
 			<div class="modal-body">
 				<p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;" data-i18n="modal.move_dest_label">Choisissez le dossier de destination :</p>
@@ -2898,7 +3622,7 @@
         <div class="modal-content small">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-trash" style="color:var(--danger)!important;"></i> <span data-i18n="modal.delete_file">Supprimer le fichier</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-delete-file')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-delete-file')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body">
                 <p id="delete-file-msg" style="color:var(--text-secondary); font-size:13px; line-height:1.6;"></p>
@@ -2916,7 +3640,7 @@
         <div class="modal-content small">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-pencil"></i> <span data-i18n="modal.rename_file">Renommer le fichier</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-rename-file')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-rename-file')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body">
                 <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;" data-i18n="modal.rename_file_hint">Nouveau nom du fichier (l'extension est conservée automatiquement) :</p>
@@ -2938,7 +3662,7 @@
         <div class="modal-content" style="max-width:700px;">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-copy"></i> <span data-i18n="duplicates.title">Fichiers en double</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-duplicates')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-duplicates')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body" style="max-height:500px; overflow-y:auto;">
                 <div class="duplicates-tabs" style="display:flex; gap:8px; margin-bottom:14px;">
@@ -2973,7 +3697,7 @@
         <div class="modal-content small" style="max-width:360px;">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-globe"></i> <span data-i18n="settings.remote_access">Accès à distance</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-qrcode-remote')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-qrcode-remote')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body" style="text-align:center; padding:24px 20px;">
                 <div id="qr-remote-loading" style="padding:30px;">
@@ -3026,7 +3750,7 @@
         <div class="modal-content small" style="max-width:360px;">
             <div class="modal-header">
                 <h3><i class="fa-brands fa-android"></i> <span data-i18n="settings.companion_apk_title">App compagnon Android (APK)</span></h3>
-                <button class="modal-close" onclick="closeModal('modal-qrcode-apk')">&times;</button>
+                <button class="modal-close" onclick="closeModal('modal-qrcode-apk')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
             </div>
             <div class="modal-body" style="text-align:center; padding:24px 20px;">
                 <div id="qr-apk-loading" style="padding:30px;">
@@ -3064,6 +3788,158 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-ghost" onclick="closeModal('modal-qrcode-apk')" data-i18n="actions.close">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-whats-new" class="modal hidden">
+        <div class="modal-content" style="max-width:440px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-sparkles" style="color:var(--accent);"></i> <span data-i18n="whatsnew.title">Quoi de neuf dans Stellio</span></h3>
+                <button class="modal-close" onclick="dismissWhatsNew()" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
+            </div>
+            <div class="modal-body" style="padding:20px 24px;">
+                <p id="whatsnew-version" style="font-size:12px; color:var(--text-muted); margin:0 0 14px;"></p>
+                <ul id="whatsnew-list" style="margin:0; padding-left:20px; display:flex; flex-direction:column; gap:10px; font-size:14px; color:var(--text-secondary); line-height:1.5;"></ul>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="dismissWhatsNew()" style="width:100%;" data-i18n="whatsnew.close">Super, merci !</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="command-palette" class="command-palette-overlay hidden" onclick="if(event.target===this) closeCommandPalette()">
+        <div class="command-palette">
+            <div class="command-palette-input-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="cmd-palette-input" data-i18n-placeholder="cmdpalette.placeholder" placeholder="Rechercher une action, une page, un fichier..." autocomplete="off">
+                <kbd>Esc</kbd>
+            </div>
+            <div id="cmd-palette-results" class="command-palette-results"></div>
+        </div>
+    </div>
+
+    <div id="thumb-hover-preview" class="thumb-hover-preview hidden">
+        <img id="thumb-hover-preview-img" src="" alt="">
+    </div>
+
+    <div id="modal-bulk-rename" class="modal hidden">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-i-cursor"></i> <span data-i18n="modal.bulk_rename_title">Renommer la sélection</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-bulk-rename')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="bulk-rename-count" style="font-size:12px; color:var(--text-muted); margin-bottom:14px;"></p>
+
+                <div class="input-group" style="margin-bottom:12px;">
+                    <label data-i18n="modal.bulk_rename_mode">Méthode</label>
+                    <select id="bulk-rename-mode" onchange="updateBulkRenamePreview()">
+                        <option value="find_replace" data-i18n="modal.bulk_rename_find_replace">Rechercher / remplacer</option>
+                        <option value="prefix" data-i18n="modal.bulk_rename_prefix">Ajouter un préfixe</option>
+                        <option value="suffix" data-i18n="modal.bulk_rename_suffix">Ajouter un suffixe</option>
+                        <option value="numbering" data-i18n="modal.bulk_rename_numbering">Numérotation</option>
+                    </select>
+                </div>
+
+                <div id="bulk-rename-fields-find-replace" class="bulk-rename-fields">
+                    <div class="input-group" style="display:flex; gap:8px;">
+                        <div style="flex:1;">
+                            <label data-i18n="modal.bulk_rename_search">Rechercher</label>
+                            <input type="text" id="bulk-rename-search" oninput="updateBulkRenamePreview()">
+                        </div>
+                        <div style="flex:1;">
+                            <label data-i18n="modal.bulk_rename_replace">Remplacer par</label>
+                            <input type="text" id="bulk-rename-replace" oninput="updateBulkRenamePreview()">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="bulk-rename-fields-prefix" class="bulk-rename-fields hidden">
+                    <div class="input-group">
+                        <label data-i18n="modal.bulk_rename_prefix_label">Texte à ajouter avant le nom</label>
+                        <input type="text" id="bulk-rename-prefix-text" oninput="updateBulkRenamePreview()" placeholder="ex: V2_">
+                    </div>
+                </div>
+
+                <div id="bulk-rename-fields-suffix" class="bulk-rename-fields hidden">
+                    <div class="input-group">
+                        <label data-i18n="modal.bulk_rename_suffix_label">Texte à ajouter après le nom</label>
+                        <input type="text" id="bulk-rename-suffix-text" oninput="updateBulkRenamePreview()" placeholder="ex: _final">
+                    </div>
+                </div>
+
+                <div id="bulk-rename-fields-numbering" class="bulk-rename-fields hidden">
+                    <div class="input-group" style="display:flex; gap:8px;">
+                        <div style="flex:2;">
+                            <label data-i18n="modal.bulk_rename_base_name">Nom de base</label>
+                            <input type="text" id="bulk-rename-base-name" oninput="updateBulkRenamePreview()" placeholder="ex: Piece">
+                        </div>
+                        <div style="flex:1;">
+                            <label data-i18n="modal.bulk_rename_start_at">Commence à</label>
+                            <input type="number" id="bulk-rename-start-at" value="1" min="0" oninput="updateBulkRenamePreview()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-group" style="margin-top:14px;">
+                    <label data-i18n="modal.bulk_rename_preview">Aperçu</label>
+                    <div id="bulk-rename-preview" style="max-height:160px; overflow-y:auto; border:1px solid var(--border); border-radius:var(--radius); padding:10px; font-size:12px; color:var(--text-secondary); display:flex; flex-direction:column; gap:4px;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" onclick="closeModal('modal-bulk-rename')" data-i18n="actions.cancel">Annuler</button>
+                <button class="btn btn-primary" id="apply-bulk-rename-btn" onclick="applyBulkRename()"><i class="fa-solid fa-check"></i> <span data-i18n="filters.apply">Appliquer</span></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-repair-diff" class="modal hidden">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-wrench"></i> <span data-i18n="repair.diff_title">Résultat de la réparation</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-repair-diff')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="repair-diff-filename" style="font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:14px;"></p>
+                <div class="repair-diff-table">
+                    <div class="repair-diff-row repair-diff-header">
+                        <span></span>
+                        <span data-i18n="repair.diff_before">Avant</span>
+                        <span data-i18n="repair.diff_after">Après</span>
+                    </div>
+                    <div id="repair-diff-rows"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeModal('modal-repair-diff')" data-i18n="actions.close">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="mini-printer-widget" class="mini-printer-widget hidden" onclick="_openMiniWidgetTarget(event)">
+        <div class="mini-printer-widget-icon"><i class="fa-solid fa-print"></i></div>
+        <div class="mini-printer-widget-body">
+            <div class="mini-printer-widget-name" id="mini-printer-widget-name"></div>
+            <div class="progress-track" style="height:5px; margin-top:4px;"><div class="progress-bar" id="mini-printer-widget-bar" style="width:0%;"></div></div>
+        </div>
+        <div class="mini-printer-widget-pct" id="mini-printer-widget-pct">0%</div>
+        <span class="mini-printer-widget-extra hidden" id="mini-printer-widget-extra">+0</span>
+        <button type="button" class="mini-printer-widget-close" onclick="event.stopPropagation(); dismissMiniPrinterWidget()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div id="tour-overlay" class="tour-overlay hidden">
+        <div id="tour-spotlight" class="tour-spotlight"></div>
+        <div id="tour-tooltip" class="tour-tooltip">
+            <div class="tour-tooltip-header">
+                <span id="tour-step-counter">1 / 8</span>
+                <button type="button" onclick="skipTour()" data-i18n-title="tour.skip" title="Passer"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <h4 id="tour-title"></h4>
+            <p id="tour-desc"></p>
+            <div class="tour-tooltip-footer">
+                <button type="button" class="btn btn-ghost btn-sm" id="tour-prev-btn" onclick="prevTourStep()"><span data-i18n="tour.prev">Précédent</span></button>
+                <button type="button" class="btn btn-primary btn-sm" id="tour-next-btn" onclick="nextTourStep()"><span data-i18n="tour.next">Suivant</span></button>
             </div>
         </div>
     </div>
