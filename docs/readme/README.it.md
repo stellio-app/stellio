@@ -46,62 +46,110 @@ Che tu sia un maker alle prime armi o un utente esperto con più macchine, Stell
 
 ## ✨ Funzionalità
 
+### 🏠 Dashboard e produttività
+- 📊 **Dashboard all'avvio**: stampe in corso, scorte di filamento basse, ultime stampe e file recenti a colpo d'occhio
+- 🧱 **Completamente personalizzabile**: riordino e nascondimento dei widget con drag & drop (12 disponibili: stampe in corso, scorte basse, ultimo S.O.S Print, suggerimenti, istanze Stellio…)
+- ✅ **Checklist «Primi passi»** per i nuovi utenti
+- 💡 **Widget «Suggerimenti»**: individua i file che ristampi spesso ma che non rivedi da tempo e i profili slicer con un alto tasso di fallimento
+- ⌨️ **Palette comandi (`Ctrl+K`)**: naviga, avvia un'azione o trova all'istante un file, un tag, una bobina o un profilo slicer
+- 🔔 **Centro notifiche (campanella)**: fine stampa, fallimenti, manutenzione in arrivo, scorte di filamento basse e promemoria di essiccazione in un unico posto
+- 📺 **Widget mobile** che mostra l'avanzamento della stampa in corso, visibile in tutte le pagine
+- 🧭 **Tour guidato interattivo** per scoprire le funzionalità principali, riavviabile dalle Impostazioni
+- ♿ **Accessibilità**: modalità ad alto contrasto, riduzione delle animazioni, indicatori di focus da tastiera visibili ovunque
+
 ### 📚 Gestione della libreria
-- 🗂️ **Sorgenti multiple**: cartelle locali, singoli file, condivisioni SMB/NFS
-- 🖼️ **Miniature 3D automatiche** tramite PyRender (rendering di alta qualità) o un rasterizzatore CPU numpy (soluzione di riserva)
-- 🏷️ **Tag personalizzati** con colori + tagging automatico via IA
-- 🔍 **Ricerca semantica assistita dall'IA** ("cerco un supporto per...")
-- ⭐ **Preferiti** e filtri avanzati (tipo, dimensione, peso, stato di stampa)
+- 🗂️ **Sorgenti multiple**: cartelle locali, singoli file, condivisioni SMB/NFS — le cartelle 3D rilevate sul computer vengono proposte e aggiungibili con un clic
+- 🖼️ **Miniature 3D automatiche** tramite PyRender (rendering di alta qualità) o un rasterizzatore CPU numpy (soluzione di riserva), con effetto di caricamento e **anteprima ingrandita al passaggio del mouse**
+- 🏷️ **Tag personalizzati** con colori + tagging automatico via IA, e **tagging con un clic di più file selezionati**
+- 🔍 **Ricerca semantica assistita dall'IA** ("cerco un supporto per...") con **ricerche recenti memorizzate**
+- ⭐ **Preferiti** e filtri avanzati (tipo, dimensione, peso, stato di stampa), con un **avviso di rifornimento** quando le scorte di filamento non bastano per i tuoi preferiti
+- 🧵 **Filtro «Scorte di filamento»**: mantiene solo i file stampabili con le bobine che hai davvero (Spoolman, inventario manuale, TigerTag), per materiale
+- 💾 **Filtri salvati**: salva qualsiasi combinazione di filtri e riutilizzala con un clic
+- 📋 **Coda «Da stampare presto»**, separata dai preferiti, riordinabile con drag & drop e inviabile direttamente allo slicer
+- 🖱️ **Selezione rapida**: selezione a intervallo (`Maiusc+clic`) e navigazione da tastiera (frecce + `Invio`)
+- ✏️ **Rinomina in blocco** (cerca/sostituisci, prefisso, suffisso, numerazione) con anteprima prima di applicare
+- ↩️ **Annulla le eliminazioni** (`Ctrl+Z`) grazie a un cestino temporaneo di 5 minuti — anche l'eliminazione di un tag, di un progetto o di una sorgente è annullabile, senza conferma bloccante
+- 🔗 **Origine del modello**: link di origine, autore, licenza e note nella scheda del file, con la data di download se applicabile
 - 🧩 **Progetti/Assemblaggi**: raggruppa più file in un unico oggetto, con supporto multi-piatto 3MF (navigazione tra i piatti nel visualizzatore)
 - 🔁 **Rilevamento duplicati** (esatti e simili per geometria)
+- 🗜️ **Supporto agli archivi**: sfoglia ed estrai i modelli direttamente dagli archivi
+- 🖱️ **Drag & drop di file 3D** da esplora risorse — funziona nell'app desktop e anche tramite browser (Raspberry Pi, mobile, accesso remoto)
 - 📊 **Statistiche dettagliate** (formati, piattaforme, affidabilità dei profili)
 
 ### 🤖 Intelligenza artificiale (Ollama locale)
 - 🏷️ **Tagging automatico** intelligente dei file
 - 📝 **Descrizione automatica** dei modelli
 - 🔎 **Ricerca semantica** in linguaggio naturale
-- 📐 **Analisi di stampabilità** (rilevamento degli sbalzi)
+- 📐 **Analisi di stampabilità** (rilevamento degli sbalzi) e **orientamenti suggeriti** (meno sbalzi, contatto con il piatto mostrato)
 - 🎯 **Raccomandazione del profilo slicer** basata su geometria + storico dei successi
-- 🩺 **S.O.S Print**: diagnosi adattiva dei fallimenti di stampa, passo dopo passo — Stellio pone una domanda alla volta, restringe una lista di ipotesi in base alle tue risposte (massimo 4 domande) e infine fornisce una diagnosi finale; l'analisi delle foto è disponibile in qualsiasi momento
+- ⏱️ **Stima del tempo di stampa** prima dello slicing
+- 🩺 **S.O.S Print**: diagnosi adattiva dei fallimenti di stampa, passo dopo passo — Stellio pone una domanda alla volta, restringe una lista di ipotesi in base alle tue risposte (massimo 4 domande) e infine fornisce una diagnosi finale; l'analisi delle foto è disponibile in qualsiasi momento e le conversazioni vengono salvate (riapertura, segno «risolto»)
 
 ### 🖨️ Gestione delle stampanti
-- 🔌 Supporto per **OctoPrint**, **Klipper/Moonraker**, **Bambu Lab** (MQTT), **Creality** (WebSocket), **FlashForge**
+- 🔌 Supporto per **OctoPrint**, **Klipper/Moonraker**, **Bambu Lab** (MQTT), **Creality** (WebSocket), **FlashForge**, **Elegoo** (SDCP) e **PrusaLink**
 - 📡 **Rilevamento automatico in rete**: Stellio scansiona la tua rete locale (SSDP per Bambu Lab, broadcast UDP per Elegoo/Centauri/FlashForge, probing mirato per Klipper/OctoPrint/PrusaLink/Creality) e ti permette di aggiungere le stampanti rilevate con un clic
 - 📡 Monitoraggio in tempo reale (temperature, avanzamento, telecamera)
 - 🔧 **Manutenzione predittiva** con tracciamento delle attività e raccomandazioni specifiche per marca (Bambu, Prusa, Creality, ecc.)
+- 🔩 **Parti soggette a usura e materiali di consumo**: scorte di ugelli, piatti, cinghie… con avvisi, collegate alle attività di manutenzione (ogni intervento scala un pezzo)
 - ⏱️ Contatore automatico delle ore di stampa
 - 📤 Invio diretto allo slicer, con un selettore di bobina per assegnare il filamento giusto direttamente dalla finestra di invio, oppure upload alla stampante
+- 👀 **Anteprima rapida** (peso, tempo di stampa stimato) direttamente nella finestra di invio allo slicer, prima di confermare
+- 🛡️ **Controllo pre-stampa potenziato**: avvisa se la bobina assegnata deve essere essiccata, se il filamento è abrasivo (consigliato ugello in acciaio temprato) o se non esiste una calibrazione per questa stampante
+- 🔁 **Ristampa come l'ultima volta**: dalla cronologia, un clic riapre la finestra di invio con la stessa stampante, lo stesso profilo e la stessa bobina
+- 🎛️ **Calibrazioni**: salva flow, pressure advance, temperature… per filamento e per stampante, richiamate nella finestra di invio allo slicer
+- 👥 **Modalità collaborativa leggera**: vedi se un altro dispositivo connesso sta già consultando un file, e un avviso evita di inviare due volte lo stesso file allo slicer per errore
 
 ### 🧵 Gestione del filamento
-- 🔗 Integrazione **Spoolman** (server di gestione bobine)
-- 🏷️ Integrazione dell'inventario **TigerTag** (sola lettura)
+- 🔗 Integrazione **Spoolman** (server di gestione bobine), con rilevamento automatico sulla tua rete
 - 🟠 Supporto **AMS Bambu Lab** (lettura degli slot)
 - 🟢 Supporto **CFS Creality**
+- 🐯 Integrazione **TigerTag** (identificazione NFC/RFID delle bobine): accedi per vedere le tue bobine TigerTag nell'inventario, oppure lascia che Stellio recuperi automaticamente una sessione TigerTag Studio esistente — sola lettura, non modifica mai il tuo inventario TigerTag
 - ⚪ Bobine manuali
 - 📉 Tracciamento automatico del consumo all'invio allo slicer, con verifica di compatibilità prima della stampa (materiale sufficiente?)
 - 🔔 **Avvisi di scorte basse** all'avvio, con un link rapido per riacquistare
+- 💨 **Essiccazione delle bobine**: registro di essiccazione, stato (asciutta / da essiccare) in base al materiale, temperatura e durata suggerite e promemoria nelle notifiche
+- 📈 **Riepilogo per bobina**: stampe, grammi, costo e differenza non tracciata nella scheda di ogni bobina
 
 ### 📥 Download dalle piattaforme
 - 🟠 **Printables** (API GraphQL)
 - 🟢 **MakerWorld** (login Bambu Lab in 2 passaggi)
 - 🔵 **Thingiverse** (tramite chiave API)
-- 🟣 **Cults3D**
 - 📁 Download diretto nelle sorgenti configurate
+- 🆕 **Rilevamento di nuove versioni**: Stellio controlla ogni giorno se i modelli scaricati (Printables, MakerWorld, Thingiverse) sono stati aggiornati
+- 🛒 **Link utili**: negozi, produttori, siti di modelli 3D e risorse raggruppati in sezioni comprimibili
 
 ### 🧩 Strumenti avanzati
 - 🎨 **Nesting automatico** sul piatto (rectpack o sagoma reale tramite shapely)
-- 🔧 **Riparazione mesh** (trimesh + pymeshfix)
+- 🔧 **Riparazione mesh** (trimesh + pymeshfix) con **confronto prima/dopo** (tenuta stagna, triangoli, vertici, dimensione)
 - 🔄 **Convertitore di formato** (STL ↔ 3MF ↔ OBJ)
 - 🛡️ **Verifica dell'integrità** (file corrotti/mancanti)
-- 💰 **Calcolo del costo di stampa** (materiale + elettricità)
+- 💰 **Calcolo del costo di stampa**: materiale, elettricità, usura della macchina (all'ora), costi fissi, margine in % e quantità — prezzo unitario e totale calcolati al centesimo
+- 🧾 **Preventivi PDF**: generati dal calcolo dei costi, con cliente, descrizione e note personalizzabili; intestazione del preventivo configurabile (nome/azienda, logo, indirizzo, telefono, e-mail, sito web, partita IVA) e note legali a piè di pagina
+- 🌱 **Stima ambientale**: impronta di CO₂ delle tue stampe (materiale + elettricità)
 - 📸 **Galleria fotografica delle stampe** (riuscite/fallite)
-- 🕒 **Cronologia** con valutazione successo/fallimento (alimenta l'IA)
+- 🕒 **Cronologia** con valutazione successo/fallimento (alimenta l'IA), pulsanti **«Vedi file»** e **«Ristampa»** su ogni riga (con rilevamento dei file spostati/eliminati) e filtri per piattaforma, risultato (riuscita/fallita/parziale/non valutata) e intervallo di date
+
+### 📈 Report e affidabilità
+- 🧮 **Affidabilità di stampa**: tasso di successo e costo dei fallimenti classificati per profilo slicer, materiale, stampante o bobina
+- 🗓️ **Report mensile**: stampe, tasso di successo, filamento, costo, fallimenti e CO₂ del mese, confrontati con il mese precedente, esportabile in PDF
+
+### 🔔 Notifiche
+- 🪟 **Notifiche native di Windows**
+- 🌐 **Notifiche del browser**, attivabili per l'accesso da Raspberry Pi o da mobile
+- 📣 **Notifiche push** (ntfy, Telegram, Discord o webhook): fine e fallimento della stampa rilevati anche a finestra chiusa, oltre agli avvisi di manutenzione e di scorte
 
 ### 🌐 Accesso mobile e remoto
 - 📱 **QR code** per accedere alla libreria da mobile (PWA installabile)
-- 📲 **App companion Android**: un QR code dedicato consente di scaricare e installare l'APK dell'app companion Stellio direttamente dalle impostazioni di accesso mobile
-- 🌍 **Accesso remoto** tramite Cloudflare Tunnel (gratuito, URL casuale o fisso)
+- 📲 **App companion Android**: un QR code dedicato consente di scaricare e installare l'APK dell'app companion Stellio direttamente dalle impostazioni di accesso mobile, con la possibilità di scattare foto direttamente da una stampa
+- 🌍 **Accesso remoto** tramite Cloudflare Tunnel (gratuito, URL casuale o fisso), oppure **indirizzo personalizzato** (nome di dominio, DynDNS, VPN, Tailscale…) per fare a meno di Cloudflare, con ritorno a Cloudflare in un clic
 - 🔗 **Link di condivisione** temporanei (24 ore, uso singolo)
+
+### 👥 Account e multi-istanza
+- 🔐 **Account locali** con codice di recupero e domanda segreta: reimpostazione della password al 100 % in locale, senza e-mail né internet
+- 👤 **Account ospite in sola lettura**: condividi libreria, stampanti e scorte senza alcun rischio
+- 🔄 **Istanze Stellio**: rilevamento automatico delle altre installazioni sulla rete locale e aggiunta con un clic (devi solo inserire la loro chiave locale)
+- 📨 **Invio di un file a un'altra istanza**: scelta della cartella di destinazione sull'istanza di destinazione, il file ricevuto compare subito nella sua libreria
+- ✅ **Widget di stato delle istanze** nella dashboard (spunta verde o croce rossa per ogni istanza salvata)
 
 ### 🎨 Personalizzazione
 - 🌓 Temi: Scuro / Chiaro / Sistema
@@ -109,10 +157,12 @@ Che tu sia un maker alle prime armi o un utente esperto con più macchine, Stell
 - 🎯 Colore d'accento personalizzato
 - 🌍 **8 lingue**: FR, EN, DE, ES, IT, PT, JA, ZH
 - 🧲 Riordino della navigazione tramite drag & drop
+- ↩️ **Annulla impostazioni**: ripristina l'ultima modifica di configurazione effettuata
 
 ### 💾 Backup e aggiornamenti
 - 📦 Esportazione/importazione di backup completo (.zip)
 - 🔄 Aggiornamenti automatici da GitHub (patch `.zip` — stesso meccanismo su Windows e Raspberry Pi/Linux)
+- 🔁 Riavvio affidabile dopo un aggiornamento o dopo l'attivazione della modalità debug, su Windows e Raspberry Pi/Linux
 - 📋 Esportazione dei log diagnostici (segreti oscurati)
 
 ---
@@ -208,10 +258,14 @@ Stellio rileva automaticamente:
 
 | Scorciatoia | Azione |
 |---|---|
+| `Ctrl+K` | Palette comandi |
 | `Ctrl+F` | Ricerca |
 | `Ctrl+N` | Nuovo download |
 | `Ctrl+,` | Impostazioni |
+| `Ctrl+Z` | Annulla l'ultima eliminazione (cestino da 5 min) |
 | `Alt+1-8` | Navigazione rapida |
+| `Maiusc+Clic` | Seleziona un intervallo di file |
+| `↑ ↓ ← →` + `Enter` | Naviga e apri i file nella libreria |
 | `F` | Attiva/disattiva preferiti |
 | `T` | Gestore dei tag |
 | `?` | Guida scorciatoie |
@@ -221,19 +275,19 @@ Stellio rileva automaticamente:
 
 ```
 stellio/
-├── main.py                 # Backend Flask + Desktop
-├── script.js                # JavaScript frontend
-├── index.html                # Interfaccia principale
-├── style.css                  # Stili
-├── launcher.py                  # Launcher leggero / bootstrap del runtime
-├── check_deps.py                 # Verifica dipendenze auto-riparante
-├── worker.py                       # Worker in background (miniature, scansioni)
-├── assets/                          # Loghi, icone
-├── languages/                        # File di traduzione (JSON)
-├── apk/                                # Pacchetto dell'app companion Android
-├── docs/                                # Documentazione, informativa sulla privacy, README tradotti
-├── requirements.txt                      # Dipendenze Python
-├── install-pi.sh                          # Script di installazione per Raspberry Pi / Linux (servizio systemd)
+├── main.py             # Backend Flask + Desktop
+├── script.js           # JavaScript frontend
+├── index.html          # Interfaccia principale
+├── style.css           # Stili
+├── launcher.py         # Launcher leggero / bootstrap del runtime
+├── check_deps.py       # Verifica dipendenze auto-riparante
+├── worker.py           # Worker in background (miniature, scansioni)
+├── assets/             # Loghi, icone
+├── languages/          # File di traduzione (JSON)
+├── apk/                # Pacchetto dell'app companion Android
+├── docs/               # Documentazione, informativa sulla privacy, README tradotti
+├── requirements.txt    # Dipendenze Python
+└── install-pi.sh       # Script di installazione per Raspberry Pi / Linux (servizio systemd)
 ```
 
 Hai un'idea? [Apri una issue](https://github.com/stellio-app/stellio/issues)!
@@ -292,6 +346,8 @@ Gli eseguibili Windows pubblicati nelle [Releases](https://github.com/stellio-ap
 - [Flask](https://flask.palletsprojects.com/) per il backend
 - [Three.js](https://threejs.org/) per il rendering 3D sul web
 - [trimesh](https://github.com/mikedh/trimesh) per l'elaborazione delle mesh
+- [Spoolman](https://github.com/Donkie/Spoolman) per la gestione delle bobine di filamento
+- [TigerTag](https://tigersystem.io) per l'identificazione NFC/RFID dei filamenti
 - Alla community dei maker per feedback e suggerimenti
 - A tutti i contributori ❤️
 
