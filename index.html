@@ -43,12 +43,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/vendor/fontawesome/css/all.min.css">
 	<link rel="stylesheet" href="assets/vendor/mdi/css/materialdesignicons.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TrackballControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/3MFLoader.js"></script>
+    <script src="assets/vendor/threejs/three.min.js"></script>
+    <script src="assets/vendor/threejs/controls/OrbitControls.js"></script>
+    <script src="assets/vendor/threejs/controls/TrackballControls.js"></script>
+    <script src="assets/vendor/threejs/loaders/STLLoader.js"></script>
+    <script src="assets/vendor/threejs/loaders/OBJLoader.js"></script>
+    <script src="assets/vendor/threejs/loaders/3MFLoader.js"></script>
 </head>
 <body>
     <div id="auth-screen" class="auth-screen">
@@ -1784,6 +1784,25 @@
                                         </div>
                                         <button id="thingiverse-edit-btn" class="btn btn-ghost btn-sm" style="display:none;margin-top:10px;" onclick="showAccountKeyInput('thingiverse')"><i class="fa-solid fa-pen"></i> <span data-i18n="actions.edit">Modifier</span></button>
                                         <p class="settings-hint" style="margin-top:6px;"><span data-i18n="settings.hint">Obtenir sur</span> <a href="https://www.thingiverse.com/apps/create" style="color:var(--accent)" target="_blank" rel="noopener noreferrer">thingiverse.com/apps/create</a></p>
+                                    </div>
+
+                                    <div class="account-card" style="margin-top:12px;">
+                                        <div class="account-card-header">
+                                            <div style="display:flex;align-items:center;gap:10px;">
+                                                <div class="account-icon-badge" style="background:rgba(37,99,235,0.15);color:#2563eb;"><i class="fa-solid fa-cube"></i></div>
+                                                <div><div style="font-weight:600;font-size:13px;">Nexprint</div><div style="font-size:11px;color:var(--text-muted);">nexprint.com (Elegoo)</div></div>
+                                            </div>
+                                            <span id="nexprint-status-badge" class="account-badge disconnected">Non configuré</span>
+                                        </div>
+                                        <button id="nexprint-login-btn" class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="nexprintBrowserLogin()"><i class="fa-solid fa-right-to-bracket"></i> Se connecter avec Nexprint</button>
+                                        <p class="settings-hint" style="margin-top:6px;">Une fenêtre s'ouvre sur le site officiel : connecte-toi normalement, Stellio récupère la session automatiquement. Tes identifiants ne passent jamais par Stellio.</p>
+                                        <div id="nexprint-key-row" style="display:flex;gap:8px;margin-top:10px;">
+                                            <input type="password" id="nexprint-api-key" placeholder="Ou colle le cookie auth_token..."
+                                                style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;font-family:monospace;">
+                                            <button class="btn btn-primary btn-sm" onclick="saveAccountKey('nexprint')"><i class="fa-solid fa-floppy-disk"></i></button>
+                                        </div>
+                                        <button id="nexprint-edit-btn" class="btn btn-ghost btn-sm" style="display:none;margin-top:10px;" onclick="showAccountKeyInput('nexprint')"><i class="fa-solid fa-pen"></i> <span data-i18n="actions.edit">Modifier</span></button>
+                                        <p class="settings-hint" style="margin-top:6px;">Méthode manuelle (si la fenêtre ne fonctionne pas) : copie la valeur du cookie <code>auth_token</code> depuis les outils du navigateur (F12 → Application → Cookies).</p>
                                     </div>
 
                                     <div class="account-card" style="margin-top:12px;">

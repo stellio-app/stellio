@@ -5968,6 +5968,9 @@ def api_save_account():
         if platform == 'thingiverse':
             if not api_key:
                 return jsonify({"error": "Token API requis pour Thingiverse"}), 400
+        elif platform == 'nexprint':
+            if not api_key:
+                return jsonify({"error": "Cookie auth_token requis pour Nexprint"}), 400
         elif platform and platform != 'thingiverse':
             if not email and not password:
                 return jsonify({"error": "Email et/ou mot de passe requis"}), 400
@@ -6010,6 +6013,108 @@ def api_save_account():
     except Exception as e:
         app_logger.info(f"[ERROR] Erreur serveur: {e}")
         return jsonify({"error": f"Erreur serveur: {str(e)}"}), 500
+
+nexprint_login_state = {}
+
+
+def _nexprint_save_token(user_id, token):
+    conn = get_db()
+    try:
+        conn.execute("""
+            INSERT INTO account_credentials (user_id, platform, email, api_key, last_login)
+            VALUES (?, 'nexprint', NULL, ?, ?)
+            ON CONFLICT(user_id, platform) DO UPDATE SET
+                api_key = excluded.api_key,
+                last_login = CURRENT_TIMESTAMP
+        """, (user_id, encrypt_password(token), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _nexprint_cookie_from_window(win):
+    """Lit le cookie auth_token dans la fenêtre de connexion (None si absent)."""
+    try:
+        cookies = win.get_cookies() or []
+    except Exception:
+        return None
+    for c in cookies:
+        try:
+            morsel = c.get('auth_token') if hasattr(c, 'get') else None
+            if morsel is not None and getattr(morsel, 'value', ''):
+                return morsel.value
+        except Exception:
+            continue
+    return None
+
+
+@app.route('/api/accounts/nexprint/browser-login', methods=['POST'])
+@login_required
+def api_nexprint_browser_login():
+    """Ouvre la page de connexion officielle Nexprint dans une fenêtre Stellio
+    et récupère automatiquement le cookie de session une fois connecté."""
+    import threading
+    user_id = session['user_id']
+    try:
+        import webview as _wv
+        if not _wv.windows:
+            raise RuntimeError("no window")
+    except Exception:
+        return jsonify({"error": "La connexion automatique n'est disponible que dans l'application Stellio. Utilise la saisie manuelle du cookie."}), 501
+
+    if nexprint_login_state.get(user_id) == 'waiting':
+        return jsonify({"state": "waiting"})
+
+    try:
+        win = _wv.create_window('Connexion Nexprint', NEXPRINT_BASE + '/en/account/login', width=520, height=760)
+    except Exception as e:
+        app_logger.warning(f"[Nexprint] Ouverture fenêtre de connexion impossible: {e}")
+        return jsonify({"error": "Impossible d'ouvrir la fenêtre de connexion."}), 500
+
+    nexprint_login_state[user_id] = 'waiting'
+
+    def _watch():
+        deadline = time.time() + 600
+        try:
+            while time.time() < deadline:
+                time.sleep(1.5)
+                if win not in _wv.windows:
+                    nexprint_login_state[user_id] = 'closed'
+                    return
+                try:
+                    current = win.get_current_url() or ''
+                except Exception:
+                    current = ''
+                if '/account/login' in current:
+                    continue
+                token = _nexprint_cookie_from_window(win)
+                if token:
+                    _nexprint_save_token(user_id, token)
+                    nexprint_login_state[user_id] = 'ok'
+                    app_logger.info("[Nexprint] Connexion enregistrée via la fenêtre de connexion")
+                    try:
+                        win.destroy()
+                    except Exception:
+                        pass
+                    return
+            nexprint_login_state[user_id] = 'timeout'
+            try:
+                win.destroy()
+            except Exception:
+                pass
+        except Exception as e:
+            app_logger.warning(f"[Nexprint] Surveillance connexion: {e}")
+            nexprint_login_state[user_id] = 'error'
+
+    threading.Thread(target=_watch, daemon=True).start()
+    return jsonify({"state": "waiting"})
+
+
+@app.route('/api/accounts/nexprint/browser-login/status', methods=['GET'])
+@login_required
+def api_nexprint_browser_login_status():
+    return jsonify({"state": nexprint_login_state.get(session['user_id'], 'idle')})
+
 
 @app.route('/api/accounts/<platform>', methods=['DELETE'])
 @login_required
@@ -7025,6 +7130,7 @@ AUTO_TAG_COLORS = {
     'makerworld': '#00a884',
     'printables': '#f5a623',
     'thingiverse': '#1a8fe3',
+    'nexprint': '#2563eb',
     'local': '#8899aa',
     'réseau (smb)': '#8899aa',
     'fichier unique': '#8899aa',
@@ -8783,6 +8889,7 @@ def api_get_stats():
             'thingiverse': 'Thingiverse',
             'printables': 'Printables',
             'makerworld': 'MakerWorld',
+            'nexprint': 'Nexprint',
         }
         for f in cached:
             path_lower = (f.get('path') or '').lower().replace('\\', '/')
@@ -10068,6 +10175,8 @@ def detect_platform_from_path(file_path):
         return 'Printables'
     if 'makerworld' in path_lower:
         return 'MakerWorld'
+    if 'nexprint' in path_lower:
+        return 'Nexprint'
     return ''
 
 def find_slicer_by_name(slicer_name):
@@ -10879,6 +10988,220 @@ def printables_get_download_link(file_id, model_id, file_type):
     return None
 
 
+NEXPRINT_BASE = "https://www.nexprint.com"
+NEXPRINT_API = NEXPRINT_BASE + "/gateway/api/v1/model-library-server"
+NEXPRINT_DETAIL_URL = NEXPRINT_API + "/model-base-info/get"
+NEXPRINT_PRESIGN_URL = NEXPRINT_API + "/common/presigned-download-url"
+NEXPRINT_MODEL_CONFIG_FILE = "5"
+NEXPRINT_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0 Safari/537.36"
+    ),
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": NEXPRINT_BASE + "/",
+    "Origin": NEXPRINT_BASE,
+}
+
+
+class NexprintError(Exception):
+    def __init__(self, message, status=502):
+        super().__init__(message)
+        self.status = status
+
+
+def _nexprint_clean_token(raw):
+    """Accepte la valeur brute du cookie auth_token ou un en-tête Cookie complet."""
+    raw = (raw or '').strip()
+    if raw.lower().startswith('cookie:'):
+        raw = raw.split(':', 1)[1].strip()
+    m = re.search(r'(?:^|[;\s])auth_token=([^;\s]+)', raw)
+    token = m.group(1) if m else raw
+    return token.strip().strip('"\'')
+
+
+def _nexprint_json(resp, what):
+    if resp.status_code in (401, 403):
+        app_logger.warning(f"[Nexprint] {what}: HTTP {resp.status_code}")
+        raise NexprintError(f"Session Nexprint refusée (HTTP {resp.status_code}) : reconnecte-toi sur nexprint.com puis recopie le cookie auth_token dans Paramètres → Comptes externes → Nexprint.", 401)
+    resp.raise_for_status()
+    payload = resp.json()
+    if not isinstance(payload, dict):
+        raise NexprintError(f"Réponse Nexprint invalide ({what}).")
+    code = payload.get('code')
+    msg = str(payload.get('msg') or payload.get('message') or '')
+    try:
+        code = int(code) if code is not None else None
+    except (TypeError, ValueError):
+        code = None
+    if code not in (None, 0, 200):
+        app_logger.warning(f"[Nexprint] {what}: code={code} msg={msg!r}")
+    if code in (401, 403):
+        raise NexprintError(f"Session Nexprint refusée par l'API (code {code}{' : ' + msg if msg else ''}). Recopie le cookie auth_token en entier, juste après t'être connecté sur nexprint.com.", 401)
+    if code not in (None, 0, 200):
+        raise NexprintError(f"Nexprint : {what} a échoué (code {code}{' : ' + msg if msg else ''}).")
+    data = payload.get('data')
+    return data if isinstance(data, dict) else {}
+
+
+def _nexprint_auth_strategies(token):
+    """Variantes d'authentification, la première reproduit celle du site officiel."""
+    site = {
+        "Authorization": "Bearer " + token,
+        "client-id": "Nexprint",
+        "user-lang": "en",
+    }
+    return [("site (Bearer + client-id)", site), ("cookie", {})]
+
+
+def nexprint_get_model_files(model_id, auth_token, profile_hint=None):
+    """Liste les fichiers 3D d'un modèle Nexprint avec une URL signée par fichier.
+
+    Utilise l'API de Nexprint avec la session de l'utilisateur (cookie auth_token,
+    puis variantes d'en-têtes si l'API répond « non connecté »).
+    profile_hint : valeur de ?printConfigId= de l'URL pour ne télécharger qu'un profil.
+    Retourne une liste de {'name', 'url', 'size'}. Lève NexprintError.
+    """
+    token = _nexprint_clean_token(auth_token)
+    if not token:
+        raise NexprintError("Compte Nexprint non configuré.", 400)
+
+    app_logger.info(
+        f"[Nexprint] jeton: longueur={len(token)}, points={token.count('.')}, "
+        f"pourcent={'%' in token}, espaces={any(ch.isspace() for ch in token)}"
+    )
+    sess = requests.Session()
+    sess.headers.update(NEXPRINT_HEADERS)
+    sess.cookies.set('auth_token', token, domain='.nexprint.com', path='/')
+    try:
+        detail, last_auth_err = None, None
+        for label, extra in _nexprint_auth_strategies(token):
+            for k in list(sess.headers):
+                if k not in NEXPRINT_HEADERS:
+                    del sess.headers[k]
+            sess.headers.update(extra)
+            try:
+                r = sess.get(NEXPRINT_DETAIL_URL, params={"id": model_id}, timeout=30)
+                app_logger.info(f"[Nexprint] detail {model_id} [{label}] status={r.status_code}")
+                detail = _nexprint_json(r, "lecture du modèle")
+                app_logger.info(f"[Nexprint] authentification acceptée via: {label}")
+                break
+            except NexprintError as e:
+                if e.status == 401:
+                    last_auth_err = e
+                    continue
+                raise
+            except Exception as e:
+                raise NexprintError(f"Impossible de lire le modèle Nexprint : {e}")
+        if detail is None:
+            raise last_auth_err or NexprintError("Session Nexprint refusée.", 401)
+
+        # Entrées à télécharger : (nom, fileId, bizId, taille, url_directe)
+        profiles = [p for p in (detail.get('settingInfoList') or []) if isinstance(p, dict)]
+        if profiles:
+            app_logger.info(
+                f"[Nexprint] {len(profiles)} profil(s); champs: {sorted(profiles[0].keys())}; "
+                f"ids: {[p.get('id') for p in profiles]}"
+            )
+        if profile_hint:
+            hint = str(profile_hint)
+            want = re.sub(r'\D', '', hint)
+
+            def _matches(p):
+                for v in p.values():
+                    if isinstance(v, (str, int)) and not isinstance(v, bool) and str(v) == hint:
+                        return True
+                return bool(want) and re.sub(r'\D', '', str(p.get('id') or '')) == want
+
+            picked = [p for p in profiles if _matches(p)]
+            if picked:
+                profiles = picked
+            else:
+                app_logger.info(f"[Nexprint] profil {profile_hint} introuvable, tous les profils seront téléchargés")
+
+        entries, seen = [], set()
+        for prof in profiles:
+            finfo = prof.get('settingFile')
+            if not isinstance(finfo, dict) or not finfo.get('fileId'):
+                continue
+            fid = str(finfo['fileId'])
+            if fid in seen:
+                continue
+            seen.add(fid)
+            name = finfo.get('fileName') or ''
+            stem = os.path.splitext(name)[0]
+            if not name or stem.isdigit():
+                name = f"{prof.get('settingName') or model_id}"
+            if os.path.splitext(name)[1].lower() != '.3mf':
+                name += '.3mf'
+            entries.append((name, fid, str(prof.get('id') or ''), finfo.get('fileSize'), None))
+
+        if not entries:
+            for key in ('modelFileInfoList', 'files', 'modelFileList'):
+                for f in detail.get(key) or []:
+                    if not isinstance(f, dict):
+                        continue
+                    direct = f.get('fileUrl') or f.get('url') or f.get('downloadUrl')
+                    fname = f.get('fileName') or f.get('name') or ''
+                    if direct and fname:
+                        entries.append((fname, '', '', f.get('fileSize'), direct))
+                if entries:
+                    break
+
+        strategies = _nexprint_auth_strategies(token)
+        working = [0]
+
+        def _apply(idx):
+            for k in list(sess.headers):
+                if k not in NEXPRINT_HEADERS:
+                    del sess.headers[k]
+            sess.headers.update(strategies[idx][1])
+
+        def _presign(fid, biz):
+            """Crée le lien signé ; essaie les variantes d'authentification si « non connecté »."""
+            last = None
+            order = [working[0]] + [i for i in range(len(strategies)) if i != working[0]]
+            for idx in order:
+                _apply(idx)
+                try:
+                    pr = sess.post(NEXPRINT_PRESIGN_URL, json={"fileInfoList": [
+                        {"fileId": fid, "type": NEXPRINT_MODEL_CONFIG_FILE, "bizId": biz}
+                    ]}, timeout=30)
+                    pdata = _nexprint_json(pr, "création du lien signé")
+                    working[0] = idx
+                    app_logger.info(f"[Nexprint] lien signé obtenu via: {strategies[idx][0]}")
+                    return pdata
+                except NexprintError as e:
+                    if e.status == 401:
+                        last = e
+                        continue
+                    raise
+            raise last or NexprintError("Session Nexprint refusée.", 401)
+
+        files = []
+        for name, fid, biz, size, direct in entries:
+            url = direct
+            if not url:
+                try:
+                    pdata = _presign(fid, biz)
+                    lst = pdata.get('fileInfoList')
+                    if isinstance(lst, list) and lst and isinstance(lst[0], dict):
+                        url = (lst[0].get('resultUrl') or lst[0].get('downloadUrl')
+                               or lst[0].get('fileUrl') or lst[0].get('url'))
+                except NexprintError:
+                    raise
+                except Exception as e:
+                    app_logger.warning(f"[Nexprint] Lien signé impossible pour {name}: {e}")
+            if url and url.lower().startswith('http'):
+                files.append({"name": name, "url": url, "size": size})
+        app_logger.info(f"[Nexprint] {len(files)} fichier(s) prêt(s) pour {model_id}")
+        return files
+    finally:
+        sess.close()
+
+
 MAKERWORLD_API = "https://api.bambulab.com"
 MAKERWORLD_DL_HEADERS = {
     "User-Agent": (
@@ -11404,6 +11727,113 @@ def api_download_file():
                     "count": len(results),
                 })
 
+        elif 'nexprint.com' in parsed.netloc:
+            m_id = re.search(r'/models/([A-Za-z]\d+)', parsed.path)
+            if not m_id:
+                active_downloads.pop(download_id, None)
+                return jsonify({
+                    "error": "URL Nexprint invalide. Format attendu : https://www.nexprint.com/models/G1234567"
+                }), 400
+
+            model_id = m_id.group(1)
+
+            nx_token = None
+            try:
+                conn = get_db()
+                acc_row = conn.execute(
+                    "SELECT api_key FROM account_credentials WHERE user_id = ? AND platform = 'nexprint'",
+                    (session['user_id'],)
+                ).fetchone()
+                conn.close()
+                if acc_row and acc_row['api_key']:
+                    nx_token = decrypt_account_secret(acc_row['api_key'])
+            except Exception:
+                pass
+
+            if not nx_token:
+                active_downloads.pop(download_id, None)
+                return jsonify({
+                    "error": "Compte Nexprint non configuré. Colle ton cookie auth_token dans Paramètres → Comptes externes → Nexprint."
+                }), 400
+
+            try:
+                from urllib.parse import parse_qs as _pqs
+                _hint = (_pqs(parsed.query).get('printConfigId') or [None])[0]
+                nx_files = nexprint_get_model_files(model_id, nx_token, profile_hint=_hint)
+            except NexprintError as nx_err:
+                active_downloads.pop(download_id, None)
+                return jsonify({"error": str(nx_err)}), nx_err.status
+            if not nx_files:
+                active_downloads.pop(download_id, None)
+                return jsonify({
+                    "error": "Aucun fichier 3D téléchargeable trouvé pour ce modèle Nexprint."
+                }), 404
+
+            nx_dl_headers = dict(DL_HEADERS)
+            total_files = len(nx_files)
+            results = []
+            for idx, nf in enumerate(nx_files):
+                fname_item = re.sub(r'[<>:"/\\|?*]', '_', nf['name']) or f"nexprint_{model_id}_{idx}.3mf"
+                dest_path = os.path.join(save_dir, fname_item)
+                active_downloads[download_id]['filename'] = fname_item
+                currently_downloading_paths.add(dest_path.replace('\\', '/'))
+
+                file_ok = False
+                try:
+                    with requests.get(nf['url'], headers=nx_dl_headers, stream=True, timeout=120) as r_dl:
+                        r_dl.raise_for_status()
+                        total_bytes = int(r_dl.headers.get('Content-Length', 0))
+                        downloaded_bytes = 0
+                        with open(dest_path, 'wb') as f_out:
+                            for chunk in r_dl.iter_content(chunk_size=65536):
+                                if download_id in cancelled_downloads:
+                                    break
+                                if chunk:
+                                    f_out.write(chunk)
+                                    downloaded_bytes += len(chunk)
+                                    base_pct = int(idx * 100 / total_files)
+                                    file_pct = int(downloaded_bytes * 100 / total_bytes / total_files) if total_bytes else 0
+                                    active_downloads[download_id]['percentage'] = base_pct + file_pct
+                    file_ok = download_id not in cancelled_downloads and os.path.getsize(dest_path) > 0
+                except Exception as file_err:
+                    app_logger.warning(f"[Download][Nexprint] Échec sur {fname_item}: {file_err}")
+                finally:
+                    if file_ok:
+                        mark_download_complete_and_refresh_thumbnail(dest_path)
+                        results.append(fname_item)
+                        app_logger.info(f"[Download][Nexprint] {fname_item} → {dest_path}")
+                    else:
+                        currently_downloading_paths.discard(dest_path.replace('\\', '/'))
+                        try:
+                            if os.path.exists(dest_path):
+                                os.remove(dest_path)
+                        except OSError as cleanup_err:
+                            app_logger.warning(f"[Download][Nexprint] Échec suppression fichier partiel {dest_path}: {cleanup_err}")
+
+                if download_id in cancelled_downloads:
+                    break
+
+            active_downloads.pop(download_id, None)
+            if download_id in cancelled_downloads:
+                cancelled_downloads.discard(download_id)
+                return jsonify({"cancelled": True, "download_id": download_id}), 200
+            if not results:
+                return jsonify({"error": "Impossible de télécharger les fichiers Nexprint pour ce modèle."}), 502
+
+            fname = results[0]
+            file_size = os.path.getsize(os.path.join(save_dir, fname))
+            for rf in results:
+                rp = os.path.join(save_dir, rf)
+                save_download_history(session['user_id'], rf, rp, os.path.getsize(rp) if os.path.exists(rp) else 0, os.path.splitext(rf)[1], url, 'Nexprint')
+            invalidate_cache()
+            return jsonify({
+                "success": True,
+                "filename": fname,
+                "path": os.path.join(save_dir, fname),
+                "size": file_size,
+                "count": len(results),
+            })
+
         elif 'makerworld.com' in parsed.netloc:
             m_id = re.search(r'/models/(\d+)', parsed.path)
             if not m_id:
@@ -11639,7 +12069,7 @@ def api_download_file():
 
             active_downloads.pop(download_id, None)
 
-            platform_name = 'Thingiverse' if 'thingiverse' in url else ('MakerWorld' if 'makerworld' in url else '')
+            platform_name = 'Thingiverse' if 'thingiverse' in url else ('MakerWorld' if 'makerworld' in url else ('Nexprint' if 'nexprint' in url else ''))
             save_download_history(session['user_id'], fname, dest_path, file_size, os.path.splitext(fname)[1], url, platform_name)
             invalidate_cache()
 
@@ -12607,6 +13037,7 @@ def api_accounts_status():
         'thingiverse': False,
         'makerworld': False,
         'tigertag': False,
+        'nexprint': False,
     }
 
     conn = get_db()
@@ -12622,6 +13053,8 @@ def api_accounts_status():
         platform = acc['platform']
         if platform == 'thingiverse' and acc['api_key']:
             status['thingiverse'] = True
+        elif platform == 'nexprint' and acc['api_key']:
+            status['nexprint'] = True
         elif platform == 'makerworld' and acc['api_key']:
             status['makerworld'] = True
             status['makerworld_email'] = acc['email'] or ''
@@ -13948,7 +14381,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.6.8"
+CURRENT_VERSION = "0.6.9"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -19055,6 +19488,7 @@ _DEFAULT_USEFUL_LINKS = [
     {"id": "printables", "name": "Printables", "group": "Modèles 3D", "url": "https://www.printables.com", "icon": "fa-solid fa-cube"},
     {"id": "makerworld", "name": "MakerWorld", "group": "Modèles 3D", "url": "https://makerworld.com", "icon": "fa-solid fa-cube"},
     {"id": "thingiverse", "name": "Thingiverse", "group": "Modèles 3D", "url": "https://www.thingiverse.com", "icon": "fa-solid fa-cube"},
+    {"id": "nexprint", "name": "Nexprint", "group": "Modèles 3D", "url": "https://www.nexprint.com", "icon": "fa-solid fa-cube"},
     {"id": "cults", "name": "Cults", "group": "Modèles 3D", "url": "https://cults3d.com", "icon": "fa-solid fa-cube"},
     {"id": "spoolman", "name": "Spoolman", "group": "Ressources", "url": "https://github.com/Donkie/Spoolman", "icon": "fa-brands fa-github"},
     {"id": "orcaslicer", "name": "OrcaSlicer", "group": "Ressources", "url": "https://github.com/SoftFever/OrcaSlicer", "icon": "fa-brands fa-github"},

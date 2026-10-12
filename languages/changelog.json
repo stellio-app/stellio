@@ -1,5 +1,66 @@
 [
   {
+    "version": "0.6.9",
+    "items": {
+      "fr": [
+        "Nouveau : téléchargement de modèles depuis Nexprint (nexprint.com, la bibliothèque de modèles d'Elegoo) — collez l'adresse d'un modèle (https://www.nexprint.com/models/G…) dans la fenêtre de téléchargement et Stellio récupère ses fichiers directement dans votre bibliothèque",
+        "Nexprint : si l'adresse contient un profil d'impression précis, seul ce profil est téléchargé ; sinon tous les profils du modèle sont récupérés",
+        "Paramètres → Comptes externes : nouveau compte Nexprint avec le bouton « Se connecter avec Nexprint » — une fenêtre s'ouvre sur le site officiel et Stellio récupère la session automatiquement, vos identifiants ne passent jamais par Stellio (app de bureau)",
+        "Nexprint : méthode manuelle en repli en collant le cookie auth_token (utile sur Raspberry Pi ou via un navigateur) ; la session est stockée chiffrée sur votre machine",
+        "Les téléchargements Nexprint sont identifiés « Nexprint » (couleur dédiée) dans l'historique des téléchargements, et le site rejoint les liens utiles « Modèles 3D »"
+      ],
+      "en": [
+        "New: download models from Nexprint (nexprint.com, Elegoo's model library) — paste a model address (https://www.nexprint.com/models/G…) in the download window and Stellio fetches its files straight into your library",
+        "Nexprint: if the address contains a specific print profile, only that profile is downloaded; otherwise all of the model's profiles are fetched",
+        "Settings → External accounts: new Nexprint account with a \"Sign in with Nexprint\" button — a window opens on the official site and Stellio picks up the session automatically, your credentials never go through Stellio (desktop app)",
+        "Nexprint: manual fallback by pasting the auth_token cookie (handy on Raspberry Pi or through a browser); the session is stored encrypted on your machine",
+        "Nexprint downloads are labeled \"Nexprint\" (dedicated color) in the download history, and the site joins the \"3D models\" useful links"
+      ],
+      "de": [
+        "Neu: Modelle von Nexprint herunterladen (nexprint.com, die Modellbibliothek von Elegoo) — fügen Sie die Adresse eines Modells (https://www.nexprint.com/models/G…) im Download-Fenster ein, und Stellio holt die Dateien direkt in Ihre Bibliothek",
+        "Nexprint: Enthält die Adresse ein bestimmtes Druckprofil, wird nur dieses Profil heruntergeladen; andernfalls werden alle Profile des Modells geladen",
+        "Einstellungen → Externe Konten: neues Nexprint-Konto mit der Schaltfläche „Mit Nexprint anmelden“ — ein Fenster öffnet die offizielle Website, und Stellio übernimmt die Sitzung automatisch; Ihre Zugangsdaten laufen nie über Stellio (Desktop-App)",
+        "Nexprint: manuelle Alternative durch Einfügen des auth_token-Cookies (praktisch auf dem Raspberry Pi oder über einen Browser); die Sitzung wird verschlüsselt auf Ihrem Gerät gespeichert",
+        "Nexprint-Downloads erscheinen im Download-Verlauf als „Nexprint“ (eigene Farbe), und die Website wird zu den nützlichen Links „3D-Modelle“ hinzugefügt"
+      ],
+      "es": [
+        "Novedad: descarga de modelos desde Nexprint (nexprint.com, la biblioteca de modelos de Elegoo) — pega la dirección de un modelo (https://www.nexprint.com/models/G…) en la ventana de descarga y Stellio guarda sus archivos directamente en tu biblioteca",
+        "Nexprint: si la dirección incluye un perfil de impresión concreto, solo se descarga ese perfil; si no, se obtienen todos los perfiles del modelo",
+        "Ajustes → Cuentas externas: nueva cuenta de Nexprint con el botón «Iniciar sesión con Nexprint» — se abre una ventana en el sitio oficial y Stellio recupera la sesión automáticamente; tus credenciales nunca pasan por Stellio (app de escritorio)",
+        "Nexprint: método manual alternativo pegando la cookie auth_token (útil en Raspberry Pi o desde un navegador); la sesión se guarda cifrada en tu equipo",
+        "Las descargas de Nexprint se identifican como «Nexprint» (color propio) en el historial de descargas, y el sitio se añade a los enlaces útiles de «Modelos 3D»"
+      ],
+      "it": [
+        "Novità: download di modelli da Nexprint (nexprint.com, la libreria di modelli di Elegoo) — incolla l'indirizzo di un modello (https://www.nexprint.com/models/G…) nella finestra di download e Stellio salva i file direttamente nella tua libreria",
+        "Nexprint: se l'indirizzo contiene un profilo di stampa specifico, viene scaricato solo quel profilo; altrimenti vengono recuperati tutti i profili del modello",
+        "Impostazioni → Account esterni: nuovo account Nexprint con il pulsante «Accedi con Nexprint» — si apre una finestra sul sito ufficiale e Stellio recupera automaticamente la sessione; le tue credenziali non passano mai da Stellio (app desktop)",
+        "Nexprint: metodo manuale alternativo incollando il cookie auth_token (utile su Raspberry Pi o da browser); la sessione è salvata cifrata sul tuo computer",
+        "I download da Nexprint sono indicati come «Nexprint» (colore dedicato) nella cronologia dei download, e il sito entra nei link utili «Modelli 3D»"
+      ],
+      "pt": [
+        "Novo: download de modelos do Nexprint (nexprint.com, a biblioteca de modelos da Elegoo) — cole o endereço de um modelo (https://www.nexprint.com/models/G…) na janela de download e o Stellio coloca os arquivos direto na sua biblioteca",
+        "Nexprint: se o endereço contiver um perfil de impressão específico, apenas esse perfil é baixado; caso contrário, todos os perfis do modelo são obtidos",
+        "Configurações → Contas externas: nova conta Nexprint com o botão «Entrar com o Nexprint» — uma janela abre o site oficial e o Stellio recupera a sessão automaticamente; suas credenciais nunca passam pelo Stellio (app de desktop)",
+        "Nexprint: método manual alternativo colando o cookie auth_token (útil no Raspberry Pi ou pelo navegador); a sessão fica armazenada criptografada no seu computador",
+        "Os downloads do Nexprint são identificados como «Nexprint» (cor própria) no histórico de downloads, e o site entra nos links úteis de «Modelos 3D»"
+      ],
+      "ja": [
+        "新機能：Nexprint（nexprint.com、Elegooのモデルライブラリ）からモデルをダウンロード。ダウンロード画面にモデルのアドレス（https://www.nexprint.com/models/G…）を貼り付けるだけで、Stellioがファイルをライブラリに直接保存します",
+        "Nexprint：アドレスに特定の印刷プロファイルが含まれている場合はそのプロファイルのみ、含まれていない場合はモデルのすべてのプロファイルを取得します",
+        "設定 → 外部アカウント：新しいNexprintアカウントと「Nexprintでログイン」ボタンを追加。公式サイトのウィンドウが開き、Stellioがセッションを自動取得します。認証情報がStellioを経由することはありません（デスクトップアプリ）",
+        "Nexprint：auth_tokenクッキーを貼り付ける手動方式も利用可能（Raspberry Piやブラウザ経由で便利）。セッションは暗号化してお使いのPCに保存されます",
+        "Nexprintからのダウンロードはダウンロード履歴で専用カラーの「Nexprint」として表示され、サイトは「3Dモデル」の便利なリンクにも追加されました"
+      ],
+      "zh": [
+        "新功能：支持从 Nexprint（nexprint.com，Elegoo 的模型库）下载模型 —— 在下载窗口中粘贴模型地址（https://www.nexprint.com/models/G…），Stellio 会将文件直接保存到你的库中",
+        "Nexprint：如果地址中包含指定的打印配置，则只下载该配置；否则获取该模型的所有配置",
+        "设置 → 外部账户：新增 Nexprint 账户和“使用 Nexprint 登录”按钮 —— 会打开官方网站窗口，Stellio 自动获取登录会话，你的账号密码不会经过 Stellio（桌面应用）",
+        "Nexprint：可作为备用方案手动粘贴 auth_token Cookie（适用于树莓派或通过浏览器访问）；会话以加密方式保存在你的设备上",
+        "Nexprint 下载在下载历史中以“Nexprint”标识（专用颜色），该网站也已加入“3D 模型”实用链接"
+      ]
+    }
+  },
+  {
     "version": "0.6.8",
     "items": {
       "fr": [

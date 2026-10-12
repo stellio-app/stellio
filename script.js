@@ -3457,6 +3457,7 @@ const res = await fetch(`${API}/api/accounts/status`);
 if (res.ok) {
 const status = await res.json();
 updateThingiverseFooterStatus(status.thingiverse, status.thingiverse ? null : I18N.t('settings.no_accounts'));
+if (status.nexprint) { updateAccountBadge('nexprint', true); showAccountKeyConfigured('nexprint'); }
 if (status.makerworld) {
     updateAccountBadge('makerworld', true);
     const emailDisplay = document.getElementById('makerworld-email-display');
@@ -10886,7 +10887,7 @@ const editBtn = document.getElementById(`${platform}-edit-btn`);
 if (row) row.style.display = 'flex';
 if (editBtn) editBtn.style.display = 'none';
 
-const inputId = 'thingiverse-api-key';
+const inputId = `${platform}-api-key`;
 const input = document.getElementById(inputId);
 if (input) {
     input.value = '';
@@ -10902,7 +10903,7 @@ if (input) {
 }
 window.showAccountKeyInput = showAccountKeyInput;
 async function saveAccountKey(platform) {
-const inputId = 'thingiverse-api-key';
+const inputId = `${platform}-api-key`;
 const input = document.getElementById(inputId);
 const apiKey = input ? input.value.trim() : '';
 if (!apiKey) { showToast(I18N.t('toast.api_key_required'), 'error'); return; }
@@ -10926,6 +10927,44 @@ showToast(I18N.t('toast.network_error_backend'), 'error');
 }
 }
 window.saveAccountKey = saveAccountKey;
+async function nexprintBrowserLogin() {
+const btn = document.getElementById('nexprint-login-btn');
+if (btn) btn.disabled = true;
+try {
+const res = await fetch(`${API}/api/accounts/nexprint/browser-login`, { method: 'POST' });
+const data = await res.json().catch(() => ({}));
+if (!res.ok) {
+showToast(data.error || 'Connexion impossible', 'error');
+if (btn) btn.disabled = false;
+return;
+}
+showToast('Connecte-toi dans la fenêtre Nexprint qui vient de s\'ouvrir.', 'info');
+const timer = setInterval(async () => {
+try {
+const r = await fetch(`${API}/api/accounts/nexprint/browser-login/status`);
+const st = (await r.json()).state;
+if (st === 'waiting') return;
+clearInterval(timer);
+if (btn) btn.disabled = false;
+if (st === 'ok') {
+showToast('Compte Nexprint connecté', 'success');
+updateAccountBadge('nexprint', true);
+showAccountKeyConfigured('nexprint');
+} else if (st === 'closed') {
+showToast('Fenêtre fermée avant la connexion', 'warning');
+} else {
+showToast('Connexion Nexprint non terminée', 'error');
+}
+} catch (e) { clearInterval(timer); if (btn) btn.disabled = false; }
+}, 1500);
+} catch (err) {
+console.error('[nexprintBrowserLogin]', err);
+if (btn) btn.disabled = false;
+showToast(I18N.t('toast.network_error_backend'), 'error');
+}
+}
+window.nexprintBrowserLogin = nexprintBrowserLogin;
+
 
 
 let _makerWorldEmail = '';
