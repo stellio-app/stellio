@@ -202,9 +202,8 @@ import trimesh.transformations as tra
 import io
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms
 try:
-    # CFB a été déplacé dans le module « decrepit » (cryptography >= 47) ; l'ancien chemin est déprécié.
     from cryptography.hazmat.decrepit.ciphers.modes import CFB
-except ImportError:  # cryptography < 47 : ancien emplacement
+except ImportError: 
     from cryptography.hazmat.primitives.ciphers.modes import CFB
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
