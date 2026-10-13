@@ -229,6 +229,7 @@ jobs:
   build-macos:
     needs: check-version
     strategy:
+      fail-fast: false
       matrix:
         include:
           - runner: macos-latest
@@ -348,10 +349,24 @@ jobs:
         run: |
           APP_DIR="dist/Stellio.app/Contents/Resources/app"
           mkdir -p "$APP_DIR/bin"
-          curl -L -o ffmpeg.zip "https://evermeet.cx/ffmpeg/getrelease/zip"
-          unzip -o ffmpeg.zip -d ffmpeg_extracted
-          cp ffmpeg_extracted/ffmpeg "$APP_DIR/bin/ffmpeg"
+          # Binaires statiques eugeneware/ffmpeg-static : un build natif par architecture,
+          # heberge sur GitHub (pas de blocage d'IP contrairement a evermeet.cx, qui est Intel uniquement).
+          case "${{ matrix.arch }}" in
+            arm64)  FF_ASSET="ffmpeg-darwin-arm64" ;;
+            x86_64) FF_ASSET="ffmpeg-darwin-x64" ;;
+          esac
+          URL="https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/${FF_ASSET}"
+          echo "Telechargement depuis $URL"
+          curl -fL --retry 3 -o ffmpeg_bin "$URL"
+          # Garde-fou : un vrai binaire ffmpeg fait plusieurs Mo, pas quelques octets
+          SIZE=$(wc -c < ffmpeg_bin)
+          if [ "$SIZE" -lt 1000000 ]; then
+            echo "ffmpeg telecharge trop petit ($SIZE octets) - telechargement invalide"
+            exit 1
+          fi
+          cp ffmpeg_bin "$APP_DIR/bin/ffmpeg"
           chmod +x "$APP_DIR/bin/ffmpeg"
+          file "$APP_DIR/bin/ffmpeg"
 
       - name: Download unrar (not committed to the repo, fetched fresh each build)
         run: |

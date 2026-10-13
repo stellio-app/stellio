@@ -480,10 +480,6 @@ TRASH_RETENTION_SECONDS = 300
 _trash_registry = {}  
 _trash_registry_lock = threading.Lock()
 
-# --- Présence légère (mode collaboratif) ---
-# Suivi en mémoire (pas de persistance nécessaire) des appareils/onglets connectés à cette même
-# instance Stellio, pour afficher qui regarde quoi en temps réel. Une entrée expire au bout de 30s
-# sans battement de cœur (l'appareil est considéré déconnecté).
 _active_sessions = {}
 _active_sessions_lock = threading.Lock()
 PRESENCE_TIMEOUT_SECONDS = 30
