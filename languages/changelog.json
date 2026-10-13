@@ -1,5 +1,50 @@
 [
   {
+    "version": "0.7.0",
+    "items": {
+      "fr": [
+        "Coût d'impression : le sélecteur de bobine liste désormais tout l'inventaire filament en direct (manuel, Spoolman et TigerTag), chaque entrée indiquant le matériau et la source — la liste n'est plus figée sur la dernière sauvegarde des réglages",
+        "Les bobines TigerTag apparaissent maintenant aussi dans Paramètres → Tarifs d'impression (bouton « Actualiser depuis l'inventaire ») et peuvent être choisies comme bobine par défaut",
+        "Compatibilité filament (fenêtre Coût d'impression) : toutes les bobines sont affichées au lieu de 12 au maximum, dans une liste défilante de 10 lignes visibles"
+      ],
+      "en": [
+        "Print cost: the spool selector now lists the whole filament inventory live (manual, Spoolman and TigerTag), each entry showing its material and source — the list is no longer frozen on the last saved settings",
+        "TigerTag spools now also appear in Settings → Print rates (\"Refresh from inventory\" button) and can be chosen as the default spool",
+        "Filament compatibility (Print cost window): all spools are shown instead of a maximum of 12, in a scrollable list with 10 visible rows"
+      ],
+      "de": [
+        "Druckkosten: Die Spulenauswahl listet jetzt das gesamte Filament-Inventar live auf (manuell, Spoolman und TigerTag), jeder Eintrag mit Material und Quelle — die Liste ist nicht mehr auf den zuletzt gespeicherten Einstellungen eingefroren",
+        "TigerTag-Spulen erscheinen jetzt auch unter Einstellungen → Druckpreise (Schaltfläche „Aus Inventar aktualisieren“) und können als Standardspule gewählt werden",
+        "Filament-Kompatibilität (Fenster Druckkosten): Es werden alle Spulen statt maximal 12 angezeigt, in einer scrollbaren Liste mit 10 sichtbaren Zeilen"
+      ],
+      "es": [
+        "Coste de impresión: el selector de bobina ahora muestra en directo todo el inventario de filamento (manual, Spoolman y TigerTag), cada entrada con su material y su origen — la lista ya no se queda congelada en el último guardado de los ajustes",
+        "Las bobinas TigerTag también aparecen ahora en Ajustes → Tarifas de impresión (botón «Actualizar desde el inventario») y se pueden elegir como bobina predeterminada",
+        "Compatibilidad de filamento (ventana Coste de impresión): se muestran todas las bobinas en lugar de un máximo de 12, en una lista desplazable con 10 filas visibles"
+      ],
+      "it": [
+        "Costo di stampa: il selettore della bobina ora elenca in tempo reale tutto l'inventario filamento (manuale, Spoolman e TigerTag), ogni voce con materiale e origine — l'elenco non resta più fermo all'ultimo salvataggio delle impostazioni",
+        "Le bobine TigerTag compaiono ora anche in Impostazioni → Tariffe di stampa (pulsante «Aggiorna dall'inventario») e possono essere scelte come bobina predefinita",
+        "Compatibilità filamento (finestra Costo di stampa): vengono mostrate tutte le bobine invece di un massimo di 12, in un elenco scorrevole con 10 righe visibili"
+      ],
+      "pt": [
+        "Custo de impressão: o seletor de bobina agora lista todo o inventário de filamento em tempo real (manual, Spoolman e TigerTag), cada entrada com material e origem — a lista deixa de ficar presa ao último salvamento das configurações",
+        "As bobinas TigerTag também aparecem agora em Configurações → Tarifas de impressão (botão «Atualizar a partir do inventário») e podem ser escolhidas como bobina padrão",
+        "Compatibilidade de filamento (janela Custo de impressão): todas as bobinas são exibidas em vez de no máximo 12, em uma lista rolável com 10 linhas visíveis"
+      ],
+      "ja": [
+        "印刷コスト：スプールの選択欄に、フィラメント在庫全体（手動・Spoolman・TigerTag）がリアルタイムで表示されるようになり、各項目に素材と取得元も表示されます。設定の最後の保存内容で固定されることはなくなりました",
+        "TigerTagのスプールが「設定 → 印刷料金」にも表示されるようになり（「在庫から更新」ボタン）、デフォルトのスプールとして選択できます",
+        "フィラメント互換性（印刷コストのウィンドウ）：最大12個の制限をなくしてすべてのスプールを表示し、10行分が見えるスクロール可能なリストにしました"
+      ],
+      "zh": [
+        "打印成本：耗材盘选择器现在会实时列出全部耗材库存（手动、Spoolman 和 TigerTag），每一项都显示材料和来源 —— 列表不再停留在上一次保存的设置",
+        "TigerTag 耗材盘现在也会出现在“设置 → 打印费率”中（“从库存刷新”按钮），并可设为默认耗材盘",
+        "耗材兼容性（打印成本窗口）：显示全部耗材盘，不再限制最多 12 个，并采用可滚动列表，可见 10 行"
+      ]
+    }
+  },
+  {
     "version": "0.6.9",
     "items": {
       "fr": [

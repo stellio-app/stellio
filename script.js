@@ -216,8 +216,6 @@ function _getCsrfCookie() {
     const match = document.cookie.match(/(?:^|;\s*)stellio_csrf=([^;]*)/);
     return match ? decodeURIComponent(match[1]) : null;
 }
-let IS_VIEWER = false;
-let _viewerToastAt = 0;
 const _nativeFetch = window.fetch.bind(window);
 window.fetch = function (input, init = {}) {
     const url = typeof input === 'string' ? input : (input?.url || '');
@@ -231,19 +229,7 @@ window.fetch = function (input, init = {}) {
             init.headers.set('X-CSRF-Token', token);
         }
     }
-    const _p = _nativeFetch(input, init);
-    if (!isSameOrigin || method === 'GET') return _p;
-    const _reqUrl = typeof input === 'string' ? input : ((input && input.url) || '');
-    return _p.then((res) => {
-        if (res.ok && /\/api\/(slicer|print-history)/.test(_reqUrl)) {
-            try { _printStatusCache.clear(); } catch (e) { /* cache pas encore initialisé */ }
-        }
-        if (res.status === 403 && IS_VIEWER && Date.now() - _viewerToastAt > 3000) {
-            _viewerToastAt = Date.now();
-            try { showToast(_t3('viewer.readonly_toast', 'Compte invité : lecture seule'), 'warning'); } catch (e) { /* ignore */ }
-        }
-        return res;
-    });
+    return _nativeFetch(input, init);
 };
 
 let allFiles = [];
@@ -906,32 +892,6 @@ function setupKeyboardShortcuts() {
         }
     });
 }
-const _printStatusCache = new Map();
-async function loadFilePrintStatus(path) {
-    const safeId = path.replace(/[^\w]/g, '-');
-    const sentEl = document.getElementById(`sent-${safeId}`);
-    const okEl = document.getElementById(`ok-${safeId}`);
-    if (!sentEl || !okEl) return;
-    const yes = I18N.t('card.yes') || 'Oui', no = I18N.t('card.no') || 'Non';
-    const paint = (st) => {
-        sentEl.textContent = st.sent ? yes : no;
-        sentEl.className = `meta-val ${st.sent ? 'meta-yes' : 'meta-no'}`;
-        okEl.textContent = st.success ? yes : no;
-        okEl.className = `meta-val ${st.success ? 'meta-yes' : 'meta-no'}`;
-        okEl.title = (!st.success && st.sent) ? (I18N.t('card.print_success_hint') || "Aucune impression notée comme réussie — note-les dans l'Historique") : '';
-    };
-    const cached = _printStatusCache.get(path);
-    if (cached && Date.now() - cached.t < 15000) { paint(cached.st); return; }
-    try {
-        const res = await fetch(`${API}/api/print-history/file-status?path=${encodeURIComponent(path)}`);
-        if (!res.ok) return;
-        const st = await res.json();
-        _printStatusCache.set(path, { t: Date.now(), st });
-        if (_printStatusCache.size > 500) _printStatusCache.delete(_printStatusCache.keys().next().value);
-        paint(st);
-    } catch (e) { /* l'infobulle reste sur « … » */ }
-}
-
 function setupHoverDelegation() {
 const grid = document.getElementById('files-grid');
 if (!grid) return;
@@ -972,10 +932,6 @@ if (!path) return;
         card.dataset.thumbChecked = 'true';
     }
 
-    if (!card.classList.contains('file-card--details')) {
-        loadFilePrintStatus(path);
-        return;
-    }
     loadFileMetadata(path, (meta) => {
         if (!meta) return;
         const safeId = path.replace(/[^\w]/g, '-');
@@ -1759,30 +1715,28 @@ function showApp(user, filesPromise = null) {
 document.getElementById('auth-screen').classList.add('hidden');
 document.getElementById('app-screen').classList.remove('hidden');
 document.getElementById('current-username').textContent = user.username;
-applyRoleUI(user);
 loadAppVersion();
 loadAppConfig();
 loadSources();
-if (!IS_VIEWER) loadAccountBadges();
+loadAccountBadges();
 loadTags();
 loadFavorites();
 loadSeenFiles();
 loadPrinters();
 loadSlicerProfiles();
-if (!IS_VIEWER) checkAccountsStatusOnStartup();
+checkAccountsStatusOnStartup();
 startThumbProgressMonitor();
-if (!IS_VIEWER) startMaintenanceDueChecker();
+startMaintenanceDueChecker();
 checkLowStockOnStartup();
 startTigerTagAutoRefresh();
-if (!IS_VIEWER) checkSpoolmanAutoDiscovery();
-if (!IS_VIEWER) checkSlicerDefaultDiscovery();
-if (!IS_VIEWER) checkWhatsNew();
+checkSpoolmanAutoDiscovery();
+checkSlicerDefaultDiscovery();
+checkWhatsNew();
 loadPrintQueueSet();
 loadDashboard();
 startNotificationPolling();
-if (!IS_VIEWER) maybeAutoStartTour();
+maybeAutoStartTour();
 startPresence();
-checkStellioExtrasAlerts();
 if (filesPromise) {
     filesPromise.then(async (cachedFiles) => {
         if (cachedFiles && Array.isArray(cachedFiles)) {
@@ -2519,7 +2473,6 @@ window.deleteNotificationItem = async function (id) {
 };
 
 async function createNotification(type, title, message, linkPage, dedupKey) {
-    if (IS_VIEWER) return;
     try {
         await fetch(`${API}/api/notifications`, {
             method: 'POST',
@@ -3457,7 +3410,6 @@ const res = await fetch(`${API}/api/accounts/status`);
 if (res.ok) {
 const status = await res.json();
 updateThingiverseFooterStatus(status.thingiverse, status.thingiverse ? null : I18N.t('settings.no_accounts'));
-if (status.nexprint) { updateAccountBadge('nexprint', true); showAccountKeyConfigured('nexprint'); }
 if (status.makerworld) {
     updateAccountBadge('makerworld', true);
     const emailDisplay = document.getElementById('makerworld-email-display');
@@ -3734,13 +3686,13 @@ window.loadRemoteInstances = loadRemoteInstances;
 
 let _discoveringInstances = false;
 let _discoveredInstances = [];
-async function discoverRemoteInstances() {
+async function discoverRemoteInstances(force) {
     const box = document.getElementById('remote-instances-discovered');
     if (!box || _discoveringInstances) return;
     _discoveringInstances = true;
     box.innerHTML = `<p class="settings-hint"><i class="fa-solid fa-spinner fa-spin"></i> ${escapeHtml(_t2('settings.remote_instances_scanning', 'Recherche en cours...'))}</p>`;
     try {
-        const res = await fetch(`${API}/api/remote-instances/discover`);
+        const res = await fetch(`${API}/api/remote-instances/discover${force === true ? '?refresh=1' : ''}`);
         const data = res.ok ? await res.json() : { instances: [] };
         _discoveredInstances = data.instances || [];
         if (!_discoveredInstances.length) {
@@ -4190,8 +4142,7 @@ scanPollingInterval = setInterval(async () => {
             updateScanBadge(I18N.t('scan.in_progress', { count: data.found }));
 
             if (data.new_files && data.new_files.length > 0) {
-                const _knownPaths = new Set(allFiles.map(f => f.path));
-                allFiles = allFiles.concat(data.new_files.filter(f => !_knownPaths.has(f.path)));
+                allFiles = allFiles.concat(data.new_files);
                 filteredFiles = showFavoritesOnly ? allFiles.filter(f => favoriteFiles.has(f.path)) : [...allFiles];
                 applySorting();
                 renderFiles();
@@ -4409,8 +4360,7 @@ const multiPlateBadgeHtml = f.multi_plate
 const viewedByOtherBadgeHtml = isFileViewedByOther(f.path)
     ? `<span class="file-viewed-by-other-badge" title="${_t2('presence.file_viewed_by_other', 'Consulté en ce moment sur un autre appareil')}"><i class="fa-solid fa-eye"></i></span>`
     : '';
-const _tipId = f.path.replace(/[^\w]/g, '-');
-const tooltipHtml = `<div class="file-metadata-tooltip" id="tooltip-${_tipId}"><div class="meta-row"><i class="fa-solid fa-paper-plane"></i><span class="meta-label">${I18N.t('card.sent_to_slicer') || 'Envoyé au slicer'}</span><strong class="meta-val" id="sent-${_tipId}">…</strong></div><div class="meta-row"><i class="fa-solid fa-circle-check"></i><span class="meta-label">${I18N.t('card.print_success') || 'Impression réussie'}</span><strong class="meta-val" id="ok-${_tipId}">…</strong></div></div>`;
+const tooltipHtml = `<div class="file-metadata-tooltip" id="tooltip-${f.path.replace(/[^\w]/g, '-')}"><div class="meta-row"><i class="fa-solid fa-ruler-combined"></i><span id="dims-${f.path.replace(/[^\w]/g, '-')}">${I18N.t('library.loading')}</span></div><div class="meta-row"><i class="fa-solid fa-weight-scale"></i><span id="weight-${f.path.replace(/[^\w]/g, '-')}">PLA: -g • PETG: -g</span></div><div class="meta-row"><i class="fa-solid fa-clock"></i><span id="time-${f.path.replace(/[^\w]/g, '-')}">~--</span></div></div>`;
 const thumbContent = f.has_thumb
     ? `<img src="${thumbUrl}" data-loaded="pending" onload="this.dataset.loaded='true'; this.style.display='block'; this.nextElementSibling?.style.setProperty('display','none','important');" onerror="window.handleThumbnailError(this)" style="width:100%; height:100%; object-fit:cover; display:block;"><div class="file-loading" style="display:none; align-items:center; justify-content:center;"><i class="fa-solid ${icon} thumb-icon" style="font-size:48px; color:var(--text-muted);"></i></div>`
     : `<img src="" data-loaded="false" style="display:none; width:100%; height:100%; object-fit:cover;"><div class="file-loading thumb-pending" data-path="${escapeHtml(f.path)}"><div class="skeleton-thumb"><i class="fa-solid ${icon} skeleton-thumb-icon"></i></div></div>`;
@@ -5446,12 +5396,6 @@ const folderSources = sources.filter(s => s.type === 'folder' || s.type === 'smb
         return;
     }
 
-    let subfolders = [];
-    try {
-        const tr = await fetch(`${API}/api/download/targets`);
-        if (tr.ok) subfolders = (await tr.json()).subfolders || [];
-    } catch (e) { /* sous-dossiers facultatifs */ }
-
     folderSources.forEach(source => {
         const option = document.createElement('option');
         option.value = source.id;
@@ -5459,13 +5403,6 @@ const folderSources = sources.filter(s => s.type === 'folder' || s.type === 'smb
         option.textContent = `${icon} ${source.name} (${source.path})`;
         option.dataset.sourceType = source.type;
         select.appendChild(option);
-        subfolders.filter(sf => String(sf.source_id) === String(source.id)).forEach(sf => {
-            const sub = document.createElement('option');
-            sub.value = `${source.id}::${sf.rel_path}`;
-            sub.textContent = `\u00A0\u00A0\u00A0↳ 📁 ${sf.rel_path} (${sf.path})`;
-            sub.dataset.sourceType = source.type;
-            select.appendChild(sub);
-        });
     });
 } catch  (err) {
     console.error('[Download Sources]', err);
@@ -5489,16 +5426,13 @@ async function handleDownload(e) {
 e.preventDefault();
 if (isFormLocked) { showToast(I18N.t('toast.please_wait'), 'warning'); return; }
 const url = document.getElementById('download-url').value.trim();
-const rawTarget = document.getElementById('download-source').value;
-const _sepIdx = rawTarget.indexOf('::');
-const sourceId = _sepIdx >= 0 ? rawTarget.slice(0, _sepIdx) : rawTarget;
-const subPath = _sepIdx >= 0 ? rawTarget.slice(_sepIdx + 2) : '';
+const sourceId = document.getElementById('download-source').value;
 const preferredFormat = document.getElementById('makerworld-format')?.value || '';
 if (!url) { showToast(I18N.t('toast.url_required'), 'warning'); return; }
 isFormLocked = true;
 try {
 const downloadId = ++downloadIdCounter;
-const downloadInfo = { id: downloadId, url, sourceId, subPath, preferredFormat, status: 'starting', filename: '', progress: 0, current: 0, total: 0, toastElement: null };
+const downloadInfo = { id: downloadId, url, sourceId, preferredFormat, status: 'starting', filename: '', progress: 0, current: 0, total: 0, toastElement: null };
 activeDownloads.push(downloadInfo);
 createDownloadToast(downloadInfo);
 startDownload(downloadInfo);
@@ -5532,7 +5466,7 @@ updateDownloadToast(downloadInfo, currentMB, totalMB);
     const res = await fetch(`${API}/api/download`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: downloadInfo.url, target_source_id: downloadInfo.sourceId || null, target_subpath: downloadInfo.subPath || '', download_id: downloadInfo.id, preferred_format: downloadInfo.preferredFormat || '' })
+        body: JSON.stringify({ url: downloadInfo.url, target_source_id: downloadInfo.sourceId || null, download_id: downloadInfo.id, preferred_format: downloadInfo.preferredFormat || '' })
     });
     clearInterval(progressPollingInterval);
     const data = await res.json();
@@ -5627,8 +5561,7 @@ showToast(I18N.t('download.cancelled_toast'), 'info');
 }
 window.openCreateFolderModal = async function() {
 const sourceSelect = document.getElementById('download-source');
-const selectedRaw = sourceSelect ? sourceSelect.value : null;
-const selectedSourceId = selectedRaw ? selectedRaw.split('::')[0] : selectedRaw;
+const selectedSourceId = sourceSelect ? sourceSelect.value : null;
 let parentPath = null;
 let sourceConfig = null;
 if (selectedSourceId && selectedSourceId !== "") {
@@ -5725,9 +5658,8 @@ const createFolder = async () => {
             await loadDownloadSources();
             setTimeout(() => {
                 const opts = sourceSelect.options;
-                const wanted = result.as_subfolder ? `${result.as_subfolder.source_id}::${result.as_subfolder.rel_path}` : null;
                 for (let i = 0; i < opts.length; i++) {
-                    if (wanted ? opts[i].value === wanted : opts[i].text.includes(cleanFolderName)) {
+                    if (opts[i].text.includes(cleanFolderName)) {
                         sourceSelect.selectedIndex = i;
                         break;
                     }
@@ -6019,8 +5951,6 @@ try {
 
 function sendToSlicer(path, name, aiProfile, orientation) {
 currentSlicerFile = path;
-const _rb = document.getElementById('slicer-reprint-box');
-if (_rb) { _rb.style.display = 'none'; _rb.innerHTML = ''; }
 currentSlicerOrientation = orientation || 'default';
 document.getElementById('slicer-file-name').textContent = `${I18N.t('modal.selected_file')}: ${name}`;
 _lastAiRecommendedProfile = aiProfile || null;
@@ -6028,7 +5958,6 @@ const aiBox = document.getElementById('slicer-ai-recommend-result');
 if (aiBox) { aiBox.style.display = 'none'; aiBox.innerHTML = ''; }
 openModal('modal-slicer');
 _loadSlicerSpoolBox(path);
-_loadSlicerCalibBox(path);
 _runPrePrintCheck(path);
 _loadSlicerQuickEstimate(path, name);
 }
@@ -6089,7 +6018,13 @@ try {
     const data = await res.json();
     const warnings = data.warnings || [];
     if (!warnings.length) return;
-    box.innerHTML = warnings.map(_prePrintWarningHtml).join('');
+    box.innerHTML = warnings.map(w => {
+        const isError = w.level === 'error';
+        return `<div style="display:flex; gap:8px; align-items:flex-start; padding:8px 10px; border-radius:var(--radius); font-size:12px; background:${isError ? 'rgba(220,53,69,0.12)' : 'rgba(245,166,35,0.12)'}; border:1px solid ${isError ? 'rgba(220,53,69,0.35)' : 'rgba(245,166,35,0.35)'}; color:${isError ? '#fc8181' : '#f6ad55'};">
+            <i class="fa-solid ${isError ? 'fa-circle-exclamation' : 'fa-triangle-exclamation'}" style="margin-top:1px;"></i>
+            <span>${escapeHtml(w.message)}</span>
+        </div>`;
+    }).join('');
     box.style.display = 'flex';
 } catch (e) {  }
 }
@@ -7924,6 +7859,7 @@ window.applyCurrencySymbols = applyCurrencySymbols;
 function _sourceLabelFor(sourceType) {
     if (sourceType === 'manual') return I18N.t('spoolman.source_manual') || 'Manuel';
     if (sourceType === 'spoolman') return 'Spoolman';
+    if (sourceType === 'tigertag') return 'TigerTag';
     return sourceType;
 }
 
@@ -8108,16 +8044,21 @@ async function savePrintCostSettings() {
 window.savePrintCostSettings = savePrintCostSettings;
 
 // ── Réglages du devis : en-tête (nom, logo, adresse, contact), SIRET/TVA, mentions légales ──
-let _quoteLogoData = '';
+let _quoteLogoData = '';        // nouveau logo choisi, pas encore envoyé (data URL)
+let _quoteLogoOnServer = false; // un logo est déjà enregistré côté serveur
+let _quoteLogoRemoved = false;  // le logo enregistré doit être supprimé à l'enregistrement
 
 function _renderQuoteLogoPreview() {
     const box = document.getElementById('settings-quote-logo-preview');
     const removeBtn = document.getElementById('settings-quote-logo-remove');
     if (!box) return;
     box.textContent = '';
-    if (_quoteLogoData && _quoteLogoData.startsWith('data:image/')) {
+    let src = '';
+    if (_quoteLogoData && _quoteLogoData.startsWith('data:image/')) src = _quoteLogoData;
+    else if (_quoteLogoOnServer && !_quoteLogoRemoved) src = `${API}/api/quote/logo?t=${Date.now()}`;
+    if (src) {
         const img = document.createElement('img');
-        img.src = _quoteLogoData;
+        img.src = src;
         img.alt = '';
         img.style.cssText = 'max-width:100%; max-height:100%; object-fit:contain;';
         box.appendChild(img);
@@ -8139,7 +8080,9 @@ function _fillQuoteSettingsForm(data) {
     set('settings-quote-website', data.quote_website);
     set('settings-quote-tax-id', data.quote_tax_id);
     set('settings-quote-legal', data.quote_legal);
-    _quoteLogoData = typeof data.quote_logo === 'string' ? data.quote_logo : '';
+    _quoteLogoData = '';
+    _quoteLogoRemoved = false;
+    _quoteLogoOnServer = !!data.quote_has_logo;
     _renderQuoteLogoPreview();
 }
 
@@ -8163,6 +8106,7 @@ function onQuoteLogoSelected(input) {
             const dataUrl = canvas.toDataURL('image/png');
             if (dataUrl.length > 1500000) { fail(); return; }
             _quoteLogoData = dataUrl;
+            _quoteLogoRemoved = false;
             _renderQuoteLogoPreview();
         };
         img.src = reader.result;
@@ -8173,6 +8117,7 @@ window.onQuoteLogoSelected = onQuoteLogoSelected;
 
 function removeQuoteLogo() {
     _quoteLogoData = '';
+    _quoteLogoRemoved = true;
     _renderQuoteLogoPreview();
 }
 window.removeQuoteLogo = removeQuoteLogo;
@@ -8181,7 +8126,6 @@ async function saveQuoteSettings() {
     const val = (id, max) => (document.getElementById(id)?.value || '').trim().slice(0, max);
     const payload = {
         quote_company: val('settings-quote-company', 120),
-        quote_logo: _quoteLogoData || '',
         quote_address: val('settings-quote-address', 300),
         quote_phone: val('settings-quote-phone', 40),
         quote_email: val('settings-quote-email', 120),
@@ -8190,6 +8134,19 @@ async function saveQuoteSettings() {
         quote_legal: val('settings-quote-legal', 1500),
     };
     try {
+        // Le logo est envoyé à part (fichier côté serveur), pas dans les réglages
+        if (_quoteLogoData) {
+            const lr = await fetch(`${API}/api/quote/logo`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ data_url: _quoteLogoData })
+            });
+            if (!lr.ok) { showToast(I18N.t('settings.quote_logo_error') || 'Image invalide ou trop lourde', 'error'); return; }
+            _quoteLogoOnServer = true; _quoteLogoData = ''; _quoteLogoRemoved = false;
+        } else if (_quoteLogoRemoved && _quoteLogoOnServer) {
+            await fetch(`${API}/api/quote/logo`, { method: 'DELETE' });
+            _quoteLogoOnServer = false; _quoteLogoRemoved = false;
+        }
         const res = await fetch(`${API}/api/settings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -9640,986 +9597,6 @@ async function deleteManualSpoolFromInventory(spoolId) {
 window.deleteManualSpoolFromInventory = deleteManualSpoolFromInventory;
 
 // ---------- Fiche détaillée d'une bobine (clic sur une carte de l'inventaire) ----------
-// ============================================================================
-// Rôles (mode invité), séchage des bobines, calibrations, pièces d'usure
-// ============================================================================
-function _tf(key, fallback, params) {
-    let out = _t3(key, fallback, params);
-    if (params) Object.keys(params).forEach(k => { out = String(out).split(`{{${k}}}`).join(String(params[k])); });
-    return out;
-}
-
-function applyRoleUI(user) {
-    IS_VIEWER = !!user && user.role === 'viewer';
-    window.IS_VIEWER = IS_VIEWER;
-    document.body.classList.toggle('role-viewer', IS_VIEWER);
-    let banner = document.getElementById('viewer-banner');
-    if (IS_VIEWER) {
-        if (!banner) {
-            banner = document.createElement('div');
-            banner.id = 'viewer-banner';
-            banner.className = 'viewer-banner';
-            document.body.appendChild(banner);
-        }
-        banner.innerHTML = `<i class="fa-solid fa-eye"></i> <span>${escapeHtml(_t3('viewer.banner', 'Mode invité — lecture seule'))}</span>`;
-    } else if (banner) {
-        banner.remove();
-    }
-}
-
-async function _extrasGetPrinters() {
-    if (typeof printersList !== 'undefined' && Array.isArray(printersList) && printersList.length) return printersList;
-    try {
-        const res = await fetch(`${API}/api/printers`);
-        const data = await res.json();
-        return Array.isArray(data) ? data : [];
-    } catch (e) { return []; }
-}
-
-function _extrasPrinterOptions(printers, selected, emptyLabel) {
-    return `<option value="">${escapeHtml(emptyLabel)}</option>` + printers.map(p =>
-        `<option value="${p.id}" ${String(selected ?? '') === String(p.id) ? 'selected' : ''}>${escapeHtml(p.name || ('#' + p.id))}</option>`).join('');
-}
-
-function _extrasNumInput(name, label, value, step, extra = '') {
-    return `<label class="spool-extra-field"><span>${escapeHtml(label)}</span><input type="number" name="${name}" step="${step}" value="${value ?? ''}" ${extra}></label>`;
-}
-
-// ----------------------------------------------------------------------------
-// Fiche bobine : blocs « Séchage » et « Calibrations »
-// ----------------------------------------------------------------------------
-function _initSpoolDetailExtras(d) {
-    if (!d || !d.source_type || d.source_id === undefined || d.source_id === null || d.source_id === '') return;
-    const host = document.getElementById('spool-detail-extras');
-    if (!host) return;
-    host.innerHTML = `<div class="spool-extra" id="spool-report-box"></div><div class="spool-extra" id="spool-drying-box"></div><div class="spool-extra" id="spool-calib-box"></div>`;
-    _loadSpoolReport(d);
-    _loadSpoolDrying(d);
-    _loadSpoolCalib(d);
-}
-
-const _DRY_KIND_LABELS = {
-    dried: ['drying.kind_dried', 'Séchée'],
-    opened: ['drying.kind_opened', "Sortie à l'air"],
-    sealed: ['drying.kind_sealed', 'Rangée au sec']
-};
-
-function _extrasFmtDate(iso) {
-    try { return new Date(iso).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }); } catch (e) { return String(iso || ''); }
-}
-
-async function _loadSpoolDrying(d) {
-    const box = document.getElementById('spool-drying-box');
-    if (!box) return;
-    try {
-        const qs = new URLSearchParams({ source_type: d.source_type, source_id: String(d.source_id), material: d.material || '' });
-        const res = await fetch(`${API}/api/filament/drying?${qs}`);
-        if (!res.ok) { box.innerHTML = ''; return; }
-        _renderSpoolDrying(box, d, await res.json());
-    } catch (e) { box.innerHTML = ''; }
-}
-
-async function _dryPost(d, body) {
-    const label = [d.vendor, d.name].filter(Boolean).filter((v, i, a) => a.findIndex(x => String(x).toLowerCase() === String(v).toLowerCase()) === i).join(' ');
-    const payload = Object.assign({ source_type: d.source_type, source_id: String(d.source_id), source_label: label, material: d.material || '' }, body);
-    try {
-        const res = await fetch(`${API}/api/filament/drying`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) { if (data.code !== 'viewer_readonly') showToast(data.error || _t3('toast.error', 'Erreur'), 'error'); return false; }
-        return true;
-    } catch (e) {
-        showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error');
-        return false;
-    }
-}
-
-function _renderSpoolDrying(box, d, data) {
-    const st = data.status || { state: 'none' };
-    const adv = data.advice;
-    const pills = {
-        none: ['dry-pill-none', _t3('drying.state_none', 'Aucun suivi')],
-        ok: ['dry-pill-ok', _t3('drying.state_ok', 'Sèche')],
-        due: ['dry-pill-due', _t3('drying.state_due', 'À sécher')],
-        sealed: ['dry-pill-ok', _t3('drying.state_sealed', 'Rangée au sec')]
-    };
-    const [pillCls, pillText] = pills[st.state] || pills.none;
-    const since = ((st.state === 'ok' || st.state === 'due') && st.days_since != null)
-        ? `<div class="spool-extra-hint">${escapeHtml(_tf('drying.since', 'Depuis {{days}} j · rappel conseillé tous les {{interval}} j', { days: Math.floor(st.days_since), interval: st.interval_days }))}</div>` : '';
-    const advice = adv
-        ? _tf('drying.advice', 'Séchage conseillé ({{material}}) : {{temp}} °C pendant ~{{hours}} h. Valeurs indicatives — vérifie la fiche du fabricant.', { material: adv.material_class, temp: adv.temp_c, hours: adv.hours })
-        : _t3('drying.advice_unknown', 'Matière non reconnue : rappel après 60 jours. Vérifie la fiche du fabricant pour le séchage.');
-    const events = data.events || [];
-    const rows = events.map(ev => {
-        const [k, fb] = _DRY_KIND_LABELS[ev.kind] || _DRY_KIND_LABELS.dried;
-        const bits = [];
-        if (ev.temp_c != null) bits.push(`${ev.temp_c} °C`);
-        if (ev.duration_h != null) bits.push(`${ev.duration_h} h`);
-        if (ev.humidity_pct != null) bits.push(`${ev.humidity_pct} %`);
-        return `<div class="spool-extra-row">
-            <div style="min-width:0;"><strong>${escapeHtml(_t3(k, fb))}</strong> · ${escapeHtml(_extrasFmtDate(ev.event_at))}${bits.length ? ` · ${escapeHtml(bits.join(' · '))}` : ''}</div>
-            <button type="button" class="btn btn-ghost btn-sm viewer-hide" data-dry-del="${ev.id}" title="${escapeHtml(_t3('actions.delete', 'Supprimer'))}"><i class="fa-solid fa-trash-can"></i></button>
-        </div>`;
-    }).join('');
-    box.innerHTML = `
-        <div class="spool-extra-head"><i class="fa-solid fa-droplet"></i><span>${escapeHtml(_t3('drying.title', 'Séchage & humidité'))}</span><span class="dry-pill ${pillCls}">${escapeHtml(pillText)}</span></div>
-        ${since}
-        <div class="spool-extra-hint">${escapeHtml(advice)}</div>
-        <div class="spool-extra-actions viewer-hide">
-            <button type="button" class="btn btn-ghost btn-sm" data-dry="form"><i class="fa-solid fa-temperature-arrow-up"></i> ${escapeHtml(_t3('drying.btn_dried', 'Séchée'))}</button>
-            <button type="button" class="btn btn-ghost btn-sm" data-dry="opened"><i class="fa-solid fa-wind"></i> ${escapeHtml(_t3('drying.btn_opened', "Sortie à l'air"))}</button>
-            <button type="button" class="btn btn-ghost btn-sm" data-dry="sealed"><i class="fa-solid fa-box-archive"></i> ${escapeHtml(_t3('drying.btn_sealed', 'Rangée au sec'))}</button>
-        </div>
-        <div class="spool-extra-form hidden" data-dry-form>
-            ${_extrasNumInput('temp', _t3('drying.field_temp', 'Température (°C)'), adv ? adv.temp_c : '', '1', 'min="20" max="120"')}
-            ${_extrasNumInput('hours', _t3('drying.field_hours', 'Durée (h)'), adv ? adv.hours : '', '0.5', 'min="0.5" max="72"')}
-            ${_extrasNumInput('hum', _t3('drying.field_humidity', 'Humidité mesurée (%) — optionnel'), '', '1', 'min="0" max="100"')}
-            <div class="spool-extra-form-actions">
-                <button type="button" class="btn btn-primary btn-sm" data-dry-save><i class="fa-solid fa-check"></i> ${escapeHtml(_t3('actions.save', 'Enregistrer'))}</button>
-            </div>
-        </div>
-        ${events.length ? `<details class="spool-extra-details"><summary>${escapeHtml(_tf('drying.history', 'Historique ({{n}})', { n: events.length }))}</summary>${rows}</details>` : ''}`;
-
-    box.querySelector('[data-dry="form"]')?.addEventListener('click', () => box.querySelector('[data-dry-form]').classList.toggle('hidden'));
-    box.querySelectorAll('[data-dry="opened"],[data-dry="sealed"]').forEach(b => b.addEventListener('click', async () => {
-        if (await _dryPost(d, { kind: b.dataset.dry })) _loadSpoolDrying(d);
-    }));
-    box.querySelector('[data-dry-save]')?.addEventListener('click', async () => {
-        const f = box.querySelector('[data-dry-form]');
-        const body = { kind: 'dried', temp_c: f.querySelector('[name=temp]').value, duration_h: f.querySelector('[name=hours]').value, humidity_pct: f.querySelector('[name=hum]').value };
-        if (await _dryPost(d, body)) { showToast(_t3('drying.saved', 'Séchage enregistré'), 'success'); _loadSpoolDrying(d); }
-    });
-    box.querySelectorAll('[data-dry-del]').forEach(b => b.addEventListener('click', async () => {
-        try {
-            const res = await fetch(`${API}/api/filament/drying/${b.dataset.dryDel}`, { method: 'DELETE' });
-            if (res.ok) _loadSpoolDrying(d);
-        } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
-    }));
-}
-
-// ----------------------------------------------------------------------------
-// Calibrations (par marque + matière + imprimante)
-// ----------------------------------------------------------------------------
-const _CALIB_FIELDS = [
-    ['nozzle_diameter', 'calib.nozzle_diameter', 'Ø buse (mm)', '0.05'],
-    ['nozzle_temp', 'calib.nozzle_temp', 'Buse (°C)', '1'],
-    ['bed_temp', 'calib.bed_temp', 'Plateau (°C)', '1'],
-    ['flow_ratio', 'calib.flow_ratio', 'Flow ratio', '0.001'],
-    ['pressure_advance', 'calib.pressure_advance', 'Pressure advance / K', '0.001'],
-    ['max_flow', 'calib.max_flow', 'Débit max (mm³/s)', '0.1'],
-    ['retraction_mm', 'calib.retraction', 'Rétraction (mm)', '0.1']
-];
-
-function _calibSummary(c) {
-    const bits = [];
-    if (c.nozzle_diameter != null) bits.push(`Ø${c.nozzle_diameter}`);
-    if (c.nozzle_temp != null) bits.push(`${c.nozzle_temp} °C`);
-    if (c.bed_temp != null) bits.push(`${_t3('calib.bed_short', 'plateau')} ${c.bed_temp} °C`);
-    if (c.flow_ratio != null) bits.push(`flow ${c.flow_ratio}`);
-    if (c.pressure_advance != null) bits.push(`PA ${c.pressure_advance}`);
-    if (c.max_flow != null) bits.push(`${c.max_flow} mm³/s`);
-    if (c.retraction_mm != null) bits.push(`${_t3('calib.retraction_short', 'rétr.')} ${c.retraction_mm} mm`);
-    return bits.join(' · ');
-}
-
-async function _loadSpoolCalib(d) {
-    const box = document.getElementById('spool-calib-box');
-    if (!box) return;
-    if (!d.material) { box.innerHTML = ''; return; }
-    try {
-        const qs = new URLSearchParams({ material: d.material, brand: d.vendor || '' });
-        const [res, printers] = await Promise.all([fetch(`${API}/api/calibrations?${qs}`), _extrasGetPrinters()]);
-        if (!res.ok) { box.innerHTML = ''; return; }
-        const data = await res.json();
-        _renderSpoolCalib(box, d, data.calibrations || [], printers);
-    } catch (e) { box.innerHTML = ''; }
-}
-
-function _renderSpoolCalib(box, d, items, printers) {
-    window._calibItemsCache = items;
-    const list = items.map(c => `
-        <div class="spool-extra-row" style="align-items:flex-start;">
-            <div style="min-width:0;">
-                <div><strong>${escapeHtml(c.printer_name || _t3('calib.any_printer', 'Toutes imprimantes'))}</strong>${c.brand ? ` · ${escapeHtml(c.brand)}` : ''}</div>
-                <div class="spool-extra-hint" style="margin:2px 0 0;">${escapeHtml(_calibSummary(c))}</div>
-                ${c.notes ? `<div class="spool-extra-hint" style="margin:2px 0 0;">${escapeHtml(c.notes)}</div>` : ''}
-            </div>
-            <div style="display:flex; gap:2px; flex-shrink:0;" class="viewer-hide">
-                <button type="button" class="btn btn-ghost btn-sm" data-calib-edit="${c.id}" title="${escapeHtml(_t3('actions.edit', 'Modifier'))}"><i class="fa-solid fa-pen"></i></button>
-                <button type="button" class="btn btn-ghost btn-sm" data-calib-del="${c.id}" title="${escapeHtml(_t3('actions.delete', 'Supprimer'))}"><i class="fa-solid fa-trash-can"></i></button>
-            </div>
-        </div>`).join('');
-    box.innerHTML = `
-        <div class="spool-extra-head"><i class="fa-solid fa-sliders"></i><span>${escapeHtml(_t3('calib.title', 'Calibrations'))}</span><span class="dry-pill dry-pill-none">${items.length}</span></div>
-        ${items.length ? list : `<div class="spool-extra-hint">${escapeHtml(_t3('calib.empty', 'Aucune calibration enregistrée pour cette matière.'))}</div>`}
-        <div class="spool-extra-actions viewer-hide">
-            <button type="button" class="btn btn-ghost btn-sm" data-calib-new><i class="fa-solid fa-plus"></i> ${escapeHtml(_t3('calib.add', 'Enregistrer une calibration'))}</button>
-        </div>
-        <div class="spool-extra-form hidden" data-calib-form>
-            <label class="spool-extra-field"><span>${escapeHtml(_t3('calib.printer', 'Imprimante'))}</span>
-                <select name="printer_id" class="settings-select">${_extrasPrinterOptions(printers, '', _t3('calib.any_printer', 'Toutes imprimantes'))}</select></label>
-            ${_CALIB_FIELDS.map(([name, key, fb, step]) => _extrasNumInput(name, _t3(key, fb), name === 'nozzle_diameter' ? 0.4 : '', step)).join('')}
-            <label class="spool-extra-field" style="grid-column:1/-1;"><span>${escapeHtml(_t3('calib.notes', 'Notes'))}</span><input type="text" name="notes" maxlength="400"></label>
-            <div class="spool-extra-form-actions">
-                <button type="button" class="btn btn-primary btn-sm" data-calib-save><i class="fa-solid fa-check"></i> ${escapeHtml(_t3('actions.save', 'Enregistrer'))}</button>
-            </div>
-        </div>`;
-    const form = box.querySelector('[data-calib-form]');
-    box.querySelector('[data-calib-new]')?.addEventListener('click', () => form.classList.toggle('hidden'));
-    box.querySelectorAll('[data-calib-edit]').forEach(b => b.addEventListener('click', () => {
-        const c = items.find(x => String(x.id) === b.dataset.calibEdit);
-        if (!c) return;
-        form.classList.remove('hidden');
-        form.querySelector('[name=printer_id]').value = c.printer_id ?? '';
-        _CALIB_FIELDS.forEach(([name]) => { form.querySelector(`[name=${name}]`).value = c[name] ?? ''; });
-        form.querySelector('[name=notes]').value = c.notes || '';
-    }));
-    box.querySelectorAll('[data-calib-del]').forEach(b => b.addEventListener('click', async () => {
-        const ok = await showConfirmDialog(_t3('calib.delete_confirm', 'Supprimer cette calibration ?'), { danger: true });
-        if (!ok) return;
-        try {
-            const res = await fetch(`${API}/api/calibrations/${b.dataset.calibDel}`, { method: 'DELETE' });
-            if (res.ok) _loadSpoolCalib(d);
-        } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
-    }));
-    box.querySelector('[data-calib-save]')?.addEventListener('click', async () => {
-        const body = { brand: d.vendor || '', material: d.material || '', printer_id: form.querySelector('[name=printer_id]').value || null, notes: form.querySelector('[name=notes]').value };
-        _CALIB_FIELDS.forEach(([name]) => { body[name] = form.querySelector(`[name=${name}]`).value; });
-        try {
-            const res = await fetch(`${API}/api/calibrations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) { if (data.code !== 'viewer_readonly') showToast(data.error || _t3('toast.error', 'Erreur'), 'error'); return; }
-            showToast(data.updated ? _t3('calib.updated', 'Calibration mise à jour') : _t3('calib.saved', 'Calibration enregistrée'), 'success');
-            _loadSpoolCalib(d);
-        } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
-    });
-}
-
-// Fenêtre « Envoyer au slicer » : rappelle la calibration connue du filament assigné au fichier
-async function _loadSlicerCalibBox(path) {
-    const box = document.getElementById('slicer-calib-box');
-    if (!box) return;
-    box.style.display = 'none';
-    box.innerHTML = '';
-    try {
-        const ar = await fetch(`${API}/api/files/filament-assignment?path=${encodeURIComponent(path)}`);
-        const a = (await ar.json()).assignment;
-        if (!a || !a.material) return;
-        const qs = new URLSearchParams({ material: a.material, printer_id: a.printer_id || '' });
-        const sr = await fetch(`${API}/api/calibrations/suggest?${qs}`);
-        if (!sr.ok) return;
-        const s = await sr.json();
-        if (!s.calibration || currentSlicerFile !== path) return;
-        const c = s.calibration;
-        const where = c.printer_name || _t3('calib.any_printer', 'Toutes imprimantes');
-        box.innerHTML = `<i class="fa-solid fa-sliders"></i> <span><strong>${escapeHtml(_tf('calib.slicer_hint', 'Calibration connue ({{material}} · {{printer}})', { material: a.material, printer: where }))}</strong> — ${escapeHtml(_calibSummary(c))}</span>`;
-        box.style.display = 'flex';
-    } catch (e) { /* indice facultatif */ }
-}
-
-// ----------------------------------------------------------------------------
-// Pièces d'usure et consommables
-// ----------------------------------------------------------------------------
-const _PART_CATEGORIES = [
-    ['nozzle', 'parts.cat_nozzle', 'Buse / hotend'], ['plate', 'parts.cat_plate', 'Plateau / PEI'],
-    ['belt', 'parts.cat_belt', 'Courroie'], ['fan', 'parts.cat_fan', 'Ventilateur'],
-    ['ptfe', 'parts.cat_ptfe', 'Tube PTFE'], ['lubricant', 'parts.cat_lubricant', 'Lubrifiant'],
-    ['other', 'parts.cat_other', 'Autre']
-];
-let _partsCache = [];
-
-function _partCatLabel(cat) {
-    const f = _PART_CATEGORIES.find(c => c[0] === cat) || _PART_CATEGORIES[_PART_CATEGORIES.length - 1];
-    return _t3(f[1], f[2]);
-}
-
-function openPartsModal() {
-    let modal = document.getElementById('modal-parts');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'modal-parts';
-        modal.className = 'modal hidden';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3><i class="fa-solid fa-toolbox"></i> <span>${escapeHtml(_t3('parts.title', "Pièces d'usure & consommables"))}</span></h3>
-                    <button class="modal-close" onclick="closeModal('modal-parts')">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <p class="settings-hint" style="margin-bottom:12px;">${escapeHtml(_t3('parts.hint', "Suis ton stock de buses, plateaux, courroies… Lie une pièce à une tâche de maintenance : chaque entretien effectué décompte une unité."))}</p>
-                    <div id="parts-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;"></div>
-                    <div class="viewer-hide">
-                        <button type="button" class="btn btn-ghost btn-sm" id="parts-new-btn"><i class="fa-solid fa-plus"></i> ${escapeHtml(_t3('parts.add', 'Ajouter une pièce'))}</button>
-                        <div id="parts-form" class="spool-extra-form hidden" style="margin-top:10px;"></div>
-                    </div>
-                </div>
-            </div>`;
-        document.body.appendChild(modal);
-        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-parts'); });
-        modal.querySelector('#parts-new-btn').addEventListener('click', () => _partsShowForm(null));
-    }
-    openModal('modal-parts');
-    loadParts();
-}
-window.openPartsModal = openPartsModal;
-
-async function loadParts() {
-    const list = document.getElementById('parts-list');
-    if (!list) return;
-    try {
-        const res = await fetch(`${API}/api/parts`);
-        const data = await res.json();
-        _partsCache = data.parts || [];
-    } catch (e) {
-        list.innerHTML = `<div style="color:var(--danger); font-size:12.5px;">${escapeHtml(_t3('toast.connection_error', 'Erreur de connexion'))}</div>`;
-        return;
-    }
-    if (!_partsCache.length) {
-        list.innerHTML = `<p class="settings-hint">${escapeHtml(_t3('parts.empty', 'Aucune pièce suivie pour le moment.'))}</p>`;
-        return;
-    }
-    list.innerHTML = _partsCache.map(p => `
-        <div class="spool-extra-row part-row ${p.low ? 'part-low' : ''}">
-            <div style="min-width:0; flex:1;">
-                <div style="font-weight:600; font-size:13px;">${p.low ? '<i class="fa-solid fa-triangle-exclamation" style="color:var(--danger);"></i> ' : ''}${escapeHtml(p.name)}</div>
-                <div class="spool-extra-hint" style="margin:2px 0 0;">${escapeHtml(_partCatLabel(p.category))}${p.printer_name ? ` · ${escapeHtml(p.printer_name)}` : ''} · ${escapeHtml(_tf('parts.alert_at', 'alerte à {{n}}', { n: p.alert_qty }))}</div>
-            </div>
-            <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
-                <button type="button" class="btn btn-ghost btn-sm viewer-hide" data-part-adj="-1:${p.id}"><i class="fa-solid fa-minus"></i></button>
-                <strong style="min-width:26px; text-align:center;">${p.stock_qty}</strong>
-                <button type="button" class="btn btn-ghost btn-sm viewer-hide" data-part-adj="1:${p.id}"><i class="fa-solid fa-plus"></i></button>
-                ${p.buy_url ? `<a class="btn btn-ghost btn-sm" href="${escapeHtml(p.buy_url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(_t3('spoolman.detail_buy', 'Acheter'))}"><i class="fa-solid fa-cart-shopping"></i></a>` : ''}
-                <button type="button" class="btn btn-ghost btn-sm viewer-hide" data-part-edit="${p.id}"><i class="fa-solid fa-pen"></i></button>
-                <button type="button" class="btn btn-ghost btn-sm viewer-hide" data-part-del="${p.id}"><i class="fa-solid fa-trash-can"></i></button>
-            </div>
-        </div>`).join('');
-    list.querySelectorAll('[data-part-adj]').forEach(b => b.addEventListener('click', async () => {
-        const [delta, id] = b.dataset.partAdj.split(':');
-        try {
-            await fetch(`${API}/api/parts/${id}/adjust`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delta: Number(delta) }) });
-            loadParts();
-        } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
-    }));
-    list.querySelectorAll('[data-part-edit]').forEach(b => b.addEventListener('click', () => _partsShowForm(_partsCache.find(p => String(p.id) === b.dataset.partEdit))));
-    list.querySelectorAll('[data-part-del]').forEach(b => b.addEventListener('click', async () => {
-        const ok = await showConfirmDialog(_t3('parts.delete_confirm', 'Supprimer cette pièce ? Les tâches de maintenance liées seront conservées.'), { danger: true });
-        if (!ok) return;
-        try {
-            await fetch(`${API}/api/parts/${b.dataset.partDel}`, { method: 'DELETE' });
-            loadParts();
-        } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
-    }));
-}
-
-async function _partsShowForm(part) {
-    const form = document.getElementById('parts-form');
-    if (!form) return;
-    const printers = await _extrasGetPrinters();
-    const p = part || { name: '', category: 'nozzle', stock_qty: 1, alert_qty: 1, printer_id: '', buy_url: '', notes: '' };
-    form.dataset.editId = part ? part.id : '';
-    form.classList.remove('hidden');
-    form.innerHTML = `
-        <label class="spool-extra-field" style="grid-column:1/-1;"><span>${escapeHtml(_t3('parts.field_name', 'Nom (ex : Buse 0.4 acier)'))}</span><input type="text" name="name" maxlength="100" value="${escapeHtml(p.name)}"></label>
-        <label class="spool-extra-field"><span>${escapeHtml(_t3('parts.field_category', 'Catégorie'))}</span>
-            <select name="category" class="settings-select">${_PART_CATEGORIES.map(c => `<option value="${c[0]}" ${p.category === c[0] ? 'selected' : ''}>${escapeHtml(_t3(c[1], c[2]))}</option>`).join('')}</select></label>
-        <label class="spool-extra-field"><span>${escapeHtml(_t3('calib.printer', 'Imprimante'))}</span>
-            <select name="printer_id" class="settings-select">${_extrasPrinterOptions(printers, p.printer_id, _t3('parts.any_printer', 'Toutes / aucune'))}</select></label>
-        ${_extrasNumInput('stock_qty', _t3('parts.field_stock', 'En stock'), p.stock_qty, '1', 'min="0"')}
-        ${_extrasNumInput('alert_qty', _t3('parts.field_alert', 'Alerte quand il en reste ≤'), p.alert_qty, '1', 'min="0"')}
-        <label class="spool-extra-field" style="grid-column:1/-1;"><span>${escapeHtml(_t3('parts.field_url', "Lien d'achat (optionnel)"))}</span><input type="url" name="buy_url" maxlength="500" value="${escapeHtml(p.buy_url || '')}" placeholder="https://"></label>
-        <div class="spool-extra-form-actions">
-            <button type="button" class="btn btn-primary btn-sm" data-part-save><i class="fa-solid fa-check"></i> ${escapeHtml(_t3('actions.save', 'Enregistrer'))}</button>
-        </div>`;
-    form.querySelector('[data-part-save]').addEventListener('click', async () => {
-        const body = {};
-        form.querySelectorAll('[name]').forEach(el => { body[el.name] = el.value; });
-        const editId = form.dataset.editId;
-        try {
-            const res = await fetch(editId ? `${API}/api/parts/${editId}` : `${API}/api/parts`, { method: editId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) { if (data.code !== 'viewer_readonly') showToast(data.error || _t3('toast.error', 'Erreur'), 'error'); return; }
-            form.classList.add('hidden');
-            form.innerHTML = '';
-            loadParts();
-            checkPartsLowAlerts();
-        } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
-    });
-}
-
-// Maintenance : liste des pièces proposables pour une tâche
-async function _maintenancePartOptions(selectedId) {
-    try {
-        const res = await fetch(`${API}/api/parts`);
-        const data = await res.json();
-        window._maintenancePartsCache = data.parts || [];
-    } catch (e) { window._maintenancePartsCache = []; }
-    return _maintenancePartOptionsHtml(selectedId);
-}
-
-function _maintenancePartOptionsHtml(selectedId) {
-    const parts = window._maintenancePartsCache || [];
-    return `<option value="">${escapeHtml(_t3('parts.no_part', '— Aucune pièce —'))}</option>` + parts.map(p =>
-        `<option value="${p.id}" ${String(selectedId ?? '') === String(p.id) ? 'selected' : ''}>${escapeHtml(p.name)} (${p.stock_qty})</option>`).join('');
-}
-
-async function _refreshMaintenancePartSelect() {
-    const sel = document.getElementById('maintenance-new-part');
-    if (!sel) return;
-    sel.innerHTML = await _maintenancePartOptions('');
-}
-
-function _handleMaintenanceResetPart(part) {
-    if (!part) return;
-    if (part.out_of_stock) {
-        showToast(_tf('parts.out_of_stock', 'Plus de stock : {{name}} — pense à en racheter', { name: part.name }), 'warning');
-    } else {
-        showToast(_tf('parts.consumed', '1 × {{name}} décompté ({{stock}} restant)', { name: part.name, stock: part.stock_qty }), part.low ? 'warning' : 'success');
-        if (part.low) checkPartsLowAlerts();
-    }
-}
-
-// ----------------------------------------------------------------------------
-// Alertes au démarrage : bobines à sécher, pièces à recommander
-// ----------------------------------------------------------------------------
-async function checkPartsLowAlerts() {
-    if (IS_VIEWER) return;
-    try {
-        const res = await fetch(`${API}/api/parts/low`);
-        if (!res.ok) return;
-        const data = await res.json();
-        const today = new Date().toISOString().slice(0, 10);
-        (data.parts || []).forEach(p => {
-            createNotification('low_stock', _t3('parts.notif_title', 'Pièce à recommander'),
-                `${p.name} — ${_tf('parts.notif_msg', '{{n}} en stock', { n: p.stock_qty })}`, 'printers', `part_low_${p.id}_${today}`);
-        });
-    } catch (e) { /* silencieux */ }
-}
-
-async function checkDryingDueAlerts() {
-    if (IS_VIEWER) return;
-    try {
-        const res = await fetch(`${API}/api/filament/drying/due`);
-        if (!res.ok) return;
-        const data = await res.json();
-        const today = new Date().toISOString().slice(0, 10);
-        (data.due || []).forEach(s => {
-            createNotification('maintenance', _t3('drying.notif_title', 'Bobine à sécher'),
-                `${s.name}${s.material ? ' (' + s.material + ')' : ''} — ${_tf('drying.notif_msg', '{{days}} j depuis le dernier séchage', { days: Math.floor(s.days_since) })}`,
-                'spoolman', `drying_due_${s.source_type}_${s.source_id}_${today}`);
-        });
-    } catch (e) { /* silencieux */ }
-}
-
-function checkStellioExtrasAlerts() {
-    if (IS_VIEWER) return;
-    checkDryingDueAlerts();
-    checkPartsLowAlerts();
-    autoCheckModelUpdates();
-}
-
-// ----------------------------------------------------------------------------
-// Paramètres : comptes invités (lecture seule)
-// ----------------------------------------------------------------------------
-async function loadGuests() {
-    const list = document.getElementById('guests-list');
-    if (!list || IS_VIEWER) return;
-    try {
-        const res = await fetch(`${API}/api/auth/guests`);
-        if (!res.ok) return;
-        const guests = (await res.json()).guests || [];
-        if (!guests.length) {
-            list.innerHTML = `<div class="empty-state small"><p>${escapeHtml(_t3('guests.none', 'Aucun compte invité'))}</p></div>`;
-            return;
-        }
-        list.innerHTML = guests.map(g => `
-            <div class="spool-extra-row" data-guest-row="${g.id}">
-                <div style="min-width:0;"><i class="fa-solid fa-eye" style="color:var(--text-muted);"></i> <strong>${escapeHtml(g.username)}</strong></div>
-                <div style="display:flex; gap:4px; align-items:center;">
-                    <input type="password" class="settings-select hidden" data-guest-pw="${g.id}" placeholder="${escapeHtml(_t3('guests.new_password', 'Nouveau mot de passe'))}" style="width:150px;">
-                    <button type="button" class="btn btn-ghost btn-sm" data-guest-key="${g.id}" title="${escapeHtml(_t3('guests.change_password', 'Changer le mot de passe'))}"><i class="fa-solid fa-key"></i></button>
-                    <button type="button" class="btn btn-ghost btn-sm" data-guest-del="${g.id}" title="${escapeHtml(_t3('actions.delete', 'Supprimer'))}"><i class="fa-solid fa-trash-can"></i></button>
-                </div>
-            </div>`).join('');
-        list.querySelectorAll('[data-guest-key]').forEach(b => b.addEventListener('click', async () => {
-            const input = list.querySelector(`[data-guest-pw="${b.dataset.guestKey}"]`);
-            if (input.classList.contains('hidden')) { input.classList.remove('hidden'); input.focus(); return; }
-            if (input.value.length < 4) { showToast(_t3('guests.password_short', 'Mot de passe trop court (4 caractères minimum)'), 'error'); return; }
-            const r = await fetch(`${API}/api/auth/guests/${b.dataset.guestKey}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: input.value }) });
-            const data = await r.json().catch(() => ({}));
-            if (r.ok) { showToast(_t3('guests.password_changed', 'Mot de passe modifié'), 'success'); input.value = ''; input.classList.add('hidden'); }
-            else showToast(data.error || _t3('toast.error', 'Erreur'), 'error');
-        }));
-        list.querySelectorAll('[data-guest-del]').forEach(b => b.addEventListener('click', async () => {
-            const ok = await showConfirmDialog(_t3('guests.delete_confirm', 'Supprimer ce compte invité ? Il sera déconnecté immédiatement.'), { danger: true });
-            if (!ok) return;
-            const r = await fetch(`${API}/api/auth/guests/${b.dataset.guestDel}`, { method: 'DELETE' });
-            if (r.ok) loadGuests();
-        }));
-    } catch (e) { /* silencieux */ }
-}
-
-async function createGuest() {
-    const u = document.getElementById('guest-new-username');
-    const p = document.getElementById('guest-new-password');
-    if (!u || !p) return;
-    const username = u.value.trim();
-    if (!username || !p.value) { showToast(_t3('guests.fields_required', 'Nom et mot de passe requis'), 'error'); return; }
-    try {
-        const res = await fetch(`${API}/api/auth/guests`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password: p.value }) });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) { showToast(data.error || _t3('toast.error', 'Erreur'), 'error'); return; }
-        u.value = ''; p.value = '';
-        showToast(_t3('guests.created', 'Compte invité créé'), 'success');
-        loadGuests();
-    } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
-}
-window.createGuest = createGuest;
-
-
-// ============================================================================
-// Avertissements avant impression, fiabilité croisée, notifications push
-// ============================================================================
-function _prePrintWarningHtml(w) {
-    const level = w.level === 'error' ? 'error' : (w.level === 'info' ? 'info' : 'warning');
-    const styles = {
-        error: ['rgba(220,53,69,0.12)', 'rgba(220,53,69,0.35)', '#fc8181', 'fa-circle-exclamation'],
-        warning: ['rgba(245,166,35,0.12)', 'rgba(245,166,35,0.35)', '#f6ad55', 'fa-triangle-exclamation'],
-        info: ['rgba(78,161,211,0.12)', 'rgba(78,161,211,0.35)', '#63b3ed', 'fa-circle-info']
-    };
-    const [bg, border, color, icon] = styles[level];
-    const text = (w.code && w.params) ? _tf('preprint.' + w.code, w.message, w.params) : w.message;
-    return `<div style="display:flex; gap:8px; align-items:flex-start; padding:8px 10px; border-radius:var(--radius); font-size:12px; background:${bg}; border:1px solid ${border}; color:${color};">
-            <i class="fa-solid ${icon}" style="margin-top:1px;"></i>
-            <span>${escapeHtml(text)}</span>
-        </div>`;
-}
-
-function _statsReliabilityRows(data) {
-    const group = document.getElementById('stat-reliability-group')?.value || 'profile';
-    if (group === 'profile') return data.profile_reliability || [];
-    return (data.reliability_breakdown || {})[group] || [];
-}
-
-function _renderStatsReliability(data) {
-    const relEl = document.getElementById('stat-profile-reliability');
-    if (!relEl) return;
-    const group = document.getElementById('stat-reliability-group')?.value || 'profile';
-    document.getElementById('stat-reliability-filament-hint')?.classList.toggle('hidden', !(group === 'material' || group === 'filament'));
-    const rel = _statsReliabilityRows(data);
-    if (!rel.length) {
-        const emptyText = group === 'profile'
-            ? (I18N.t('stats.profile_reliability_empty') || "Note tes impressions dans l'Historique pour voir apparaître ce classement.")
-            : _t3('stats.reliability_empty_group', "Pas encore de données pour ce regroupement. Note tes impressions dans l'Historique et assigne un filament avant l'envoi.");
-        relEl.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(emptyText)}</p>`;
-        return;
-    }
-    relEl.innerHTML = rel.map(p => {
-        const hasRate = p.success_rate !== null && p.success_rate !== undefined;
-        const rate = hasRate ? p.success_rate : null;
-        const col = !hasRate ? '#a0aec0' : rate >= 80 ? '#68d391' : rate >= 50 ? '#f6ad55' : '#fc8181';
-        const rateLabel = hasRate ? `${rate}%` : (I18N.t('stats.profile_reliability_unrated') || 'non noté');
-        const detail = `${p.success}✓ / ${p.failed}✗${p.unrated ? ` / ${p.unrated} ${I18N.t('stats.profile_reliability_unrated_short') || 'non notées'}` : ''}`;
-        const lost = p.failed_cost > 0 ? ` · ${_tf('stats.reliability_failed_cost', '{{cost}} perdus', { cost: formatCost(p.failed_cost) })}` : '';
-        return `<div class="stat-top-row" title="${escapeHtml(detail + lost)}">
-            <span class="stat-top-name" style="flex:1;" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>
-            <span style="color:var(--text-muted);font-size:11px;margin-right:8px;white-space:nowrap;">${escapeHtml(detail)}${escapeHtml(lost)}</span>
-            <span class="stat-top-count" style="color:${col};font-weight:600;">${rateLabel}</span>
-        </div>`;
-    }).join('');
-}
-
-document.addEventListener('change', (e) => {
-    if (e.target && e.target.id === 'stat-reliability-group' && window._lastStatsData) _renderStatsReliability(window._lastStatsData);
-});
-
-// ----------------------------------------------------------------------------
-// Paramètres : notifications push
-// ----------------------------------------------------------------------------
-const _PUSH_FIELDS = [
-    ['push-ntfy-server', 'push_ntfy_server', 'https://ntfy.sh'], ['push-ntfy-topic', 'push_ntfy_topic', ''],
-    ['push-ntfy-token', 'push_ntfy_token', ''], ['push-telegram-token', 'push_telegram_token', ''],
-    ['push-telegram-chat', 'push_telegram_chat_id', ''], ['push-discord-url', 'push_discord_url', ''],
-    ['push-webhook-url', 'push_webhook_url', '']
-];
-const _PUSH_DEFAULT_TYPES_UI = ['print_finished', 'print_failed', 'maintenance', 'low_stock'];
-
-function _pushShowProviderFields() {
-    const prov = document.getElementById('push-provider')?.value || 'ntfy';
-    document.querySelectorAll('[data-push-provider]').forEach(el => el.classList.toggle('hidden', el.dataset.pushProvider !== prov));
-}
-
-async function loadPushSettings() {
-    if (IS_VIEWER || !document.getElementById('push-provider')) return;
-    try {
-        const res = await fetch(`${API}/api/settings`);
-        if (!res.ok) return;
-        const s = await res.json();
-        document.getElementById('push-enabled').checked = !!s.push_enabled;
-        document.getElementById('push-provider').value = s.push_provider || 'ntfy';
-        _PUSH_FIELDS.forEach(([id, key, def]) => { document.getElementById(id).value = s[key] || def; });
-        const types = Array.isArray(s.push_types) ? s.push_types : _PUSH_DEFAULT_TYPES_UI;
-        document.querySelectorAll('[data-push-type]').forEach(cb => { cb.checked = types.includes(cb.dataset.pushType); });
-        _pushShowProviderFields();
-    } catch (e) { /* silencieux */ }
-}
-
-function _collectPushSettings() {
-    const out = {
-        push_enabled: document.getElementById('push-enabled').checked,
-        push_provider: document.getElementById('push-provider').value,
-        push_types: [...document.querySelectorAll('[data-push-type]')].filter(cb => cb.checked).map(cb => cb.dataset.pushType)
-    };
-    _PUSH_FIELDS.forEach(([id, key]) => { out[key] = document.getElementById(id).value.trim(); });
-    return out;
-}
-
-async function savePushSettings() {
-    try {
-        const res = await fetch(`${API}/api/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_collectPushSettings()) });
-        if (res.ok) showToast(_t3('push.saved', 'Paramètres push enregistrés'), 'success');
-        else showToast(_t3('toast.error', 'Erreur'), 'error');
-    } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
-}
-
-async function testPush() {
-    try {
-        const res = await fetch(`${API}/api/push/test`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_collectPushSettings()) });
-        const data = await res.json().catch(() => ({}));
-        if (data.success) showToast(_t3('push.test_ok', 'Notification de test envoyée'), 'success');
-        else showToast(_tf('push.test_fail', "Échec de l'envoi : {{error}}", { error: data.error || _t3('toast.error', 'Erreur') }), 'error');
-    } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
-}
-
-
-// ============================================================================
-// Réimprimer comme la dernière fois, bilan mensuel, bilan de bobine,
-// détection de nouvelles versions des modèles
-// ============================================================================
-
-// ----------------------------------------------------------------------------
-// Réimprimer comme la dernière fois
-// ----------------------------------------------------------------------------
-window.reprintHistoryFile = async function (filePath, fileName, entryId) {
-    if (!(await _checkHistoryFileExists(filePath))) {
-        showToast(I18N.t('history.file_missing') || "Ce fichier n'est plus disponible — il a peut-être été déplacé ou supprimé.", 'error');
-        return;
-    }
-    const entry = (typeof _historyEntries !== 'undefined' ? _historyEntries : []).find(e => e.id === entryId);
-    const profile = (entry && entry.slicer_profile_id)
-        ? { id: entry.slicer_profile_id, name: entry.slicer_profile_name || entry.slicer_profile_id } : null;
-
-    // 1) Remet en place le filament assigné lors de cette impression
-    if (entry && entry.assignment_json) {
-        try {
-            const snap = JSON.parse(entry.assignment_json);
-            if (snap && snap.source_type && snap.source_id) {
-                await fetch(`${API}/api/files/assign-filament`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        path: filePath, source_type: snap.source_type, source_id: snap.source_id, name: snap.name || '',
-                        material: snap.material || '', color_hex: snap.color_hex || '', spoolman_url: snap.spoolman_url || '',
-                        printer_id: entry.printer_id ?? snap.printer_id ?? null
-                    })
-                });
-            }
-        } catch (e) { /* le filament reste celui actuellement assigné */ }
-    }
-
-    // 2) Ouvre la fenêtre d'envoi avec le profil, puis 3) reprend imprimante / matière
-    sendToSlicer(filePath, fileName, profile);
-    if (entry) _applyReprintContext(entry);
-};
-
-function _applyReprintContext(entry) {
-    const details = [];
-    const printerSel = document.getElementById('slicer-ai-printer-select');
-    if (printerSel && entry.printer_id !== null && entry.printer_id !== undefined) {
-        const val = String(entry.printer_id);
-        if ([...printerSel.options].some(o => o.value === val)) {
-            printerSel.value = val;
-            printerSel.dispatchEvent(new Event('change'));
-            details.push(printerSel.options[printerSel.selectedIndex].textContent);
-        }
-    }
-    if (entry.slicer_profile_name) details.push(entry.slicer_profile_name);
-    const matSel = document.getElementById('slicer-ai-material-select');
-    const matToken = String(entry.filament_material || '').split(/[^A-Za-z0-9]+/)[0].toUpperCase();
-    if (matSel && matToken) {
-        const opt = [...matSel.options].find(o => String(o.value).toUpperCase() === matToken);
-        if (opt) matSel.value = opt.value;
-    }
-    if (entry.filament_label) details.push(entry.filament_label);
-    const box = document.getElementById('slicer-reprint-box');
-    if (!box) return;
-    if (!details.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
-    const date = new Date(String(entry.sent_at).replace(' ', 'T') + 'Z').toLocaleDateString(I18N.lang, { day: 'numeric', month: 'long', year: 'numeric' });
-    box.innerHTML = `<i class="fa-solid fa-rotate-left"></i> <span>${escapeHtml(_tf('reprint.hint', "Réglages repris de l'impression du {{date}} : {{details}}", { date, details: details.join(' · ') }))}</span>`;
-    box.style.display = 'flex';
-}
-
-// ----------------------------------------------------------------------------
-// Bilan mensuel
-// ----------------------------------------------------------------------------
-function _reportFmtGrams(g) { return g >= 1000 ? `${(g / 1000).toFixed(2)} kg` : `${Math.round(g * 10) / 10} g`; }
-function _reportFmtHours(secs) { return `${(secs / 3600).toFixed(1)} h`; }
-function _reportDelta(cur, prev, fmt) {
-    if (prev === null || prev === undefined || prev === 0 && cur === 0) return '';
-    const d = cur - prev;
-    if (Math.abs(d) < 0.005) return '=';
-    return `${d > 0 ? '+' : '−'}${fmt ? fmt(Math.abs(d)) : Math.abs(Math.round(d * 10) / 10)}`;
-}
-
-function _monthlyReportModel(data) {
-    const t = data.totals, p = data.previous || {};
-    const vs = (txt) => txt ? _tf('report.vs_prev', '{{delta}} vs mois précédent', { delta: txt }) : '';
-    const kpis = [
-        [_t3('report.kpi_prints', 'Impressions'), String(t.prints), vs(_reportDelta(t.prints, p.prints))],
-        [_t3('report.kpi_success', 'Taux de réussite'), t.success_rate === null || t.success_rate === undefined ? '—' : `${t.success_rate}%`, `${t.success}✓ / ${t.failed}✗${t.unrated ? ` / ${t.unrated}?` : ''}`],
-        [_t3('report.kpi_time', "Temps d'impression estimé"), _reportFmtHours(t.seconds), vs(_reportDelta(t.seconds / 3600, (p.seconds || 0) / 3600, v => `${v.toFixed(1)} h`))],
-        [_t3('report.kpi_filament', 'Filament utilisé'), _reportFmtGrams(t.grams), vs(_reportDelta(t.grams, p.grams, _reportFmtGrams))],
-        [_t3('report.kpi_cost', 'Coût total'), formatCost(t.total_cost), vs(_reportDelta(t.total_cost, p.total_cost, formatCost))],
-        [_t3('report.kpi_failed_cost', 'Coût des échecs'), formatCost(t.failed_cost), t.failed_grams ? _reportFmtGrams(t.failed_grams) : ''],
-        [_t3('report.kpi_co2', 'CO₂ estimé'), `${(t.co2_g / 1000).toFixed(2)} kg`, '']
-    ];
-    const colName = _t3('report.col_name', 'Nom'), colPrints = _t3('report.col_prints', 'Impr.');
-    const tables = [
-        { title: _t3('report.by_printer', 'Par imprimante'), headers: [colName, colPrints, _t3('report.col_filament', 'Filament'), _t3('report.col_time', 'Durée'), _t3('report.col_cost', 'Coût')],
-          rows: (data.by_printer || []).map(x => [x.name, String(x.prints), _reportFmtGrams(x.grams), _reportFmtHours(x.seconds), formatCost(x.cost)]) },
-        { title: _t3('report.by_material', 'Par matière'), headers: [colName, colPrints, _t3('report.col_filament', 'Filament'), _t3('report.col_failed', 'Échecs'), _t3('report.col_cost', 'Coût')],
-          rows: (data.by_material || []).map(x => [x.name, String(x.prints), _reportFmtGrams(x.grams), String(x.failed), formatCost(x.cost)]) },
-        { title: _t3('report.top_models', 'Modèles les plus imprimés'), headers: [colName, colPrints, _t3('report.col_filament', 'Filament')],
-          rows: (data.top_models || []).map(x => [x.name, String(x.prints), _reportFmtGrams(x.grams)]) }
-    ].filter(tb => tb.rows.length);
-    return { kpis, tables };
-}
-
-function _monthLabel(month) {
-    const [y, m] = month.split('-').map(Number);
-    return new Date(y, m - 1, 1).toLocaleDateString(I18N.lang, { month: 'long', year: 'numeric' });
-}
-
-function openMonthlyReport() {
-    let modal = document.getElementById('modal-monthly-report');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'modal-monthly-report';
-        modal.className = 'modal hidden';
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width:640px;">
-                <div class="modal-header">
-                    <h3><i class="fa-solid fa-file-lines"></i> <span>${escapeHtml(_t3('report.title', 'Bilan mensuel'))}</span></h3>
-                    <button class="modal-close" onclick="closeModal('modal-monthly-report')">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
-                        <label for="monthly-report-month" style="font-size:12.5px; color:var(--text-muted);">${escapeHtml(_t3('report.month', 'Mois'))}</label>
-                        <input type="month" id="monthly-report-month" class="settings-select" style="max-width:180px;">
-                        <button type="button" class="btn btn-primary btn-sm" id="monthly-report-export" style="margin-left:auto;"><i class="fa-solid fa-file-pdf"></i> ${escapeHtml(_t3('report.export_pdf', 'Exporter en PDF'))}</button>
-                    </div>
-                    <div id="monthly-report-body"></div>
-                </div>
-            </div>`;
-        document.body.appendChild(modal);
-        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-monthly-report'); });
-        modal.querySelector('#monthly-report-month').addEventListener('change', (e) => loadMonthlyReport(e.target.value));
-        modal.querySelector('#monthly-report-export').addEventListener('click', exportMonthlyReport);
-    }
-    const input = modal.querySelector('#monthly-report-month');
-    if (!input.value) { const n = new Date(); input.value = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; }
-    openModal('modal-monthly-report');
-    loadMonthlyReport(input.value);
-}
-window.openMonthlyReport = openMonthlyReport;
-
-let _lastMonthlyReport = null;
-async function loadMonthlyReport(month) {
-    const body = document.getElementById('monthly-report-body');
-    if (!body) return;
-    body.innerHTML = `<div style="text-align:center; padding:24px; color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
-    try {
-        const res = await fetch(`${API}/api/reports/monthly?month=${encodeURIComponent(month)}`);
-        if (!res.ok) throw new Error('http');
-        const data = await res.json();
-        _lastMonthlyReport = data;
-        if (!data.totals.prints) {
-            body.innerHTML = `<p class="settings-hint">${escapeHtml(_t3('report.empty', 'Aucune impression enregistrée ce mois-là.'))}</p>`;
-            return;
-        }
-        const model = _monthlyReportModel(data);
-        body.innerHTML = `
-            <div class="report-kpis">${model.kpis.map(k => `<div class="report-kpi"><div class="report-kpi-label">${escapeHtml(k[0])}</div><div class="report-kpi-value">${escapeHtml(k[1])}</div>${k[2] ? `<div class="report-kpi-note">${escapeHtml(k[2])}</div>` : ''}</div>`).join('')}</div>
-            ${model.tables.map(tb => `<div class="report-table-title">${escapeHtml(tb.title)}</div>
-                <div class="report-table-wrap"><table class="report-table"><thead><tr>${tb.headers.map((h, i) => `<th${i ? ' class="num"' : ''}>${escapeHtml(h)}</th>`).join('')}</tr></thead>
-                <tbody>${tb.rows.map(r => `<tr>${r.map((c, i) => `<td${i ? ' class="num"' : ''}>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`).join('')}
-            <p class="settings-hint" style="margin-top:12px;">${escapeHtml(_t3('report.hint_estimated', "Durées et CO₂ : estimations d'après les données enregistrées à l'envoi."))}</p>`;
-    } catch (e) {
-        body.innerHTML = `<p style="color:var(--danger); font-size:13px;">${escapeHtml(_t3('toast.connection_error', 'Erreur de connexion'))}</p>`;
-    }
-}
-
-async function exportMonthlyReport() {
-    const data = _lastMonthlyReport;
-    if (!data) return;
-    const model = _monthlyReportModel(data);
-    const month = data.month;
-    const payload = {
-        filename: `${_t3('report.file_prefix', 'bilan')}-${month}.pdf`, lang: I18N.lang,
-        title: `${_t3('report.title', 'Bilan mensuel')} — ${_monthLabel(month)}`, subtitle: 'Stellio',
-        kpis: model.kpis, tables: model.tables,
-        footer: _tf('report.footer', 'Généré par Stellio le {{date}}', { date: new Date().toLocaleDateString(I18N.lang, { day: 'numeric', month: 'long', year: 'numeric' }) })
-    };
-    const init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(payload) };
-    const btn = document.getElementById('monthly-report-export');
-    if (btn) btn.disabled = true;
-    try {
-        try {
-            const res = await fetch(`${API}/api/reports/export-native`, init);
-            const result = await res.json().catch(() => ({}));
-            if (res.ok && result.success) { showToast(_tf('report.exported', 'Bilan enregistré : {{path}}', { path: result.path }), 'success'); return; }
-            if (result.cancelled) return;
-        } catch (e) { /* repli navigateur */ }
-        const res = await fetch(`${API}/api/reports/export`, init);
-        if (!res.ok) throw new Error('export');
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = payload.filename;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (e) {
-        showToast(_t3('report.export_error', "Échec de l'export du PDF"), 'error');
-    } finally {
-        if (btn) btn.disabled = false;
-    }
-}
-
-// ----------------------------------------------------------------------------
-// Bilan de bobine (fiche bobine)
-// ----------------------------------------------------------------------------
-async function _loadSpoolReport(d) {
-    const box = document.getElementById('spool-report-box');
-    if (!box) return;
-    try {
-        const qs = new URLSearchParams({ source_type: d.source_type, source_id: String(d.source_id) });
-        const res = await fetch(`${API}/api/filament/spool-report?${qs}`);
-        if (!res.ok) { box.innerHTML = ''; return; }
-        const r = await res.json();
-        if (!r.prints) { box.innerHTML = ''; return; }
-        const cap = Number(d.capacity_g) || 0, rem = d.remaining_g;
-        const finished = rem !== null && rem !== undefined && cap > 0 && rem <= Math.max(5, cap * 0.02);
-        const consumed = (cap > 0 && rem !== null && rem !== undefined) ? Math.max(0, cap - rem) : null;
-        const row = (label, value) => `<div class="spool-extra-row"><span>${escapeHtml(label)}</span><strong style="text-align:right;">${value}</strong></div>`;
-        const rows = [
-            row(_t3('spoolreport.prints', 'Impressions'), escapeHtml(_tf('spoolreport.prints_value', '{{n}} ({{ok}} réussies, {{ko}} échouées)', { n: r.prints, ok: r.success, ko: r.failed }))),
-            row(_t3('spoolreport.tracked', 'Filament enregistré'), escapeHtml(_reportFmtGrams(r.grams)))
-        ];
-        if (consumed !== null) rows.push(row(_t3('spoolreport.consumed', 'Consommé sur la bobine'), escapeHtml(_reportFmtGrams(consumed))));
-        if (r.avg_g) rows.push(row(_t3('spoolreport.avg', 'Moyenne par impression'), escapeHtml(_reportFmtGrams(r.avg_g))));
-        rows.push(row(_t3('spoolreport.cost', 'Coût des impressions'), `${escapeHtml(formatCost(r.total_cost))}${r.failed_cost > 0 ? ` <span class="spool-extra-hint" style="margin:0;">(${escapeHtml(_tf('spoolreport.failed_cost', 'dont échecs : {{cost}}', { cost: formatCost(r.failed_cost) }))})</span>` : ''}`));
-        if (d.price && cap > 0) rows.push(row(_t3('spoolreport.price', "Prix d'achat"), escapeHtml(`${formatCost(d.price)} (${formatCost(d.price / (cap / 1000))}/kg)`)));
-        const fmtDay = (iso) => new Date(String(iso).replace(' ', 'T') + 'Z').toLocaleDateString(I18N.lang, { day: 'numeric', month: 'short', year: 'numeric' });
-        if (r.first_at) rows.push(row(_t3('spoolreport.period', 'Période'), escapeHtml(`${fmtDay(r.first_at)} → ${fmtDay(r.last_at)}`)));
-        const gap = consumed !== null ? Math.round((consumed - r.grams) * 10) / 10 : null;
-        const gapHint = (gap !== null && gap > 5) ? `<div class="spool-extra-hint">${escapeHtml(_tf('spoolreport.gap', 'Écart non suivi : {{g}} g (purges, essais, impressions lancées hors de Stellio)', { g: gap }))}</div>` : '';
-        const tops = (r.top_models || []).length ? `<div class="spool-extra-hint" style="margin-top:6px;">${escapeHtml(_t3('spoolreport.top', 'Modèles les plus imprimés'))} : ${escapeHtml(r.top_models.map(m => `${m.name} ×${m.prints}`).join(', '))}</div>` : '';
-        box.innerHTML = `
-            <details class="spool-extra-details" ${finished ? 'open' : ''}>
-                <summary style="font-size:13.5px; font-weight:600; color:var(--text);"><i class="fa-solid fa-flag-checkered" style="color:var(--accent);"></i> ${escapeHtml(_t3('spoolreport.title', 'Bilan de la bobine'))}${finished ? ` <span class="dry-pill dry-pill-ok" style="margin-left:6px;">${escapeHtml(_t3('spoolreport.finished', 'Terminée'))}</span>` : ''}</summary>
-                ${rows.join('')}${gapHint}${tops}
-            </details>`;
-    } catch (e) { box.innerHTML = ''; }
-}
-
-// ----------------------------------------------------------------------------
-// Mises à jour des modèles téléchargés
-// ----------------------------------------------------------------------------
-let _modelUpdatesTimer = null;
-
-async function loadModelUpdates() {
-    const card = document.getElementById('model-updates-card');
-    if (!card) return;
-    let data;
-    try {
-        const res = await fetch(`${API}/api/model-updates`);
-        if (!res.ok) return;
-        data = await res.json();
-    } catch (e) { return; }
-    _renderModelUpdates(card, data);
-    if (data.running && !_modelUpdatesTimer) {
-        _modelUpdatesTimer = setInterval(async () => {
-            await loadModelUpdates();
-        }, 1500);
-    } else if (!data.running && _modelUpdatesTimer) {
-        clearInterval(_modelUpdatesTimer);
-        _modelUpdatesTimer = null;
-    }
-}
-
-function _renderModelUpdates(card, data) {
-    const items = data.items || [];
-    const updates = items.filter(i => i.status === 'update');
-    const noToken = items.filter(i => i.status === 'unsupported' && i.reason === 'no_token').length;
-    const gone = items.filter(i => i.status === 'unsupported' && i.reason === 'gone').length;
-    const lastChecked = data.last_checked_at ? new Date(String(data.last_checked_at).replace(' ', 'T') + 'Z').toLocaleString(I18N.lang, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
-    const fmtDate = (iso) => iso ? new Date(String(iso).replace(' ', 'T') + 'Z').toLocaleDateString(I18N.lang, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
-    const list = updates.map(u => `
-        <div class="spool-extra-row model-update-row" style="align-items:flex-start;">
-            <div style="min-width:0; flex:1;">
-                <div style="font-weight:600; font-size:13px;">${escapeHtml(u.title || u.model_id)} <span class="dry-pill dry-pill-due">${escapeHtml(u.platform)}</span></div>
-                <div class="spool-extra-hint" style="margin:2px 0 0;">${escapeHtml(u.reason === 'date' ? _tf('modelupdate.reason_date', 'Mis à jour le {{date}}', { date: fmtDate(u.remote_modified_at) }) : _t3('modelupdate.reason_files', 'Les fichiers ont changé'))}</div>
-            </div>
-            <div style="display:flex; gap:4px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end;">
-                <a class="btn btn-ghost btn-sm" href="${escapeHtml(u.source_url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(_t3('modelupdate.open_page', 'Ouvrir la page'))}"><i class="fa-solid fa-up-right-from-square"></i></a>
-                <button type="button" class="btn btn-primary btn-sm viewer-hide" data-mu-download="${escapeHtml(u.source_url)}"><i class="fa-solid fa-download"></i> ${escapeHtml(_t3('modelupdate.download', 'Télécharger la nouvelle version'))}</button>
-                <button type="button" class="btn btn-ghost btn-sm viewer-hide" data-mu-dismiss="${u.id}" title="${escapeHtml(_t3('modelupdate.dismiss', 'Ignorer'))}"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-        </div>`).join('');
-    const progress = data.running ? _tf('modelupdate.checking', 'Vérification… {{done}}/{{total}}', { done: data.done, total: data.total }) : '';
-    const notes = [];
-    if (noToken) notes.push(_tf('modelupdate.no_token', '{{n}} modèle(s) Thingiverse non vérifiable(s) : renseigne ton jeton Thingiverse dans les Paramètres.', { n: noToken }));
-    if (gone) notes.push(_tf('modelupdate.gone', '{{n}} modèle(s) introuvable(s) en ligne (supprimés ?)', { n: gone }));
-    card.innerHTML = `
-        <div class="download-history-header">
-            <h3><i class="fa-solid fa-cloud-arrow-down"></i> <span>${escapeHtml(_t3('modelupdate.title', 'Mises à jour des modèles'))}</span>${updates.length ? ` <span class="dry-pill dry-pill-due">${updates.length}</span>` : ''}</h3>
-            <button type="button" class="btn btn-ghost btn-sm viewer-hide" id="mu-check-btn" ${data.running ? 'disabled' : ''}><i class="fa-solid fa-arrows-rotate ${data.running ? 'fa-spin' : ''}"></i> <span>${escapeHtml(progress || _t3('modelupdate.check', 'Vérifier maintenant'))}</span></button>
-        </div>
-        ${items.length ? '' : `<p class="settings-hint">${escapeHtml(_t3('modelupdate.empty', 'Aucun modèle téléchargé depuis Printables, MakerWorld ou Thingiverse à suivre pour l\'instant.'))}</p>`}
-        ${items.length && !updates.length && !data.running ? `<p class="settings-hint">${escapeHtml(_t3('modelupdate.none', 'Aucune nouvelle version détectée.'))}</p>` : ''}
-        ${list}
-        ${items.length ? `<p class="spool-extra-hint" style="margin-top:8px;">${escapeHtml(_tf('modelupdate.summary', '{{n}} modèle(s) suivi(s) · dernière vérification : {{date}}', { n: items.length, date: lastChecked }))}</p>` : ''}
-        ${notes.map(n => `<p class="spool-extra-hint">${escapeHtml(n)}</p>`).join('')}
-        <label class="checkbox-label viewer-hide" style="margin-top:6px;"><input type="checkbox" id="mu-auto" ${data.auto ? 'checked' : ''}> <span>${escapeHtml(_t3('modelupdate.auto', 'Vérifier automatiquement (1 fois par jour)'))}</span></label>`;
-    card.querySelector('#mu-check-btn')?.addEventListener('click', async () => {
-        try { await fetch(`${API}/api/model-updates/check`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: true }) }); } catch (e) { /* ignore */ }
-        loadModelUpdates();
-    });
-    card.querySelector('#mu-auto')?.addEventListener('change', async (e) => {
-        try { await fetch(`${API}/api/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_updates_auto: e.target.checked }) }); } catch (err) { /* ignore */ }
-    });
-    card.querySelectorAll('[data-mu-dismiss]').forEach(b => b.addEventListener('click', async () => {
-        try { await fetch(`${API}/api/model-updates/${b.dataset.muDismiss}/dismiss`, { method: 'POST' }); } catch (e) { /* ignore */ }
-        loadModelUpdates();
-    }));
-    card.querySelectorAll('[data-mu-download]').forEach(b => b.addEventListener('click', () => {
-        openDownloadModal();
-        const input = document.getElementById('download-url');
-        if (input) { input.value = b.dataset.muDownload; input.dispatchEvent(new Event('input', { bubbles: true })); }
-    }));
-}
-
-async function autoCheckModelUpdates() {
-    if (IS_VIEWER) return;
-    try {
-        const res = await fetch(`${API}/api/model-updates`);
-        if (!res.ok) return;
-        const d = await res.json();
-        if (!d.auto || d.running) return;
-        const last = d.last_checked_at ? Date.parse(String(d.last_checked_at).replace(' ', 'T') + 'Z') : 0;
-        if (Date.now() - last < 24 * 3600 * 1000) return;
-        await fetch(`${API}/api/model-updates/check`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-    } catch (e) { /* silencieux */ }
-}
-
-
 const _spoolDetailRegistry = {};
 
 function _detailFromSpoolman(s) {
@@ -10627,8 +9604,6 @@ function _detailFromSpoolman(s) {
     const v = f.vendor || {};
     return {
         key: `spoolman:${s.id}`,
-        source_type: 'spoolman',
-        source_id: s.id,
         name: f.name || v.name || I18N.t('spoolman.spool'),
         vendor: v.name || '',
         material: f.material || '',
@@ -10650,8 +9625,6 @@ function _detailFromSpoolman(s) {
 function _detailFromManual(s) {
     return {
         key: `manual:${s.id}`,
-        source_type: 'manual',
-        source_id: s.id,
         name: s.name || '',
         vendor: s.vendor || '',
         material: s.material || '',
@@ -10669,8 +9642,6 @@ function _detailFromManual(s) {
 function _detailFromTigerTag(s, idx) {
     return {
         key: `tigertag:${idx}`,
-        source_type: 'tigertag',
-        source_id: s.source_id ?? '',
         name: s.name || 'TigerTag',
         vendor: s.vendor || '',
         material: s.material || '',
@@ -10767,7 +9738,6 @@ function showSpoolDetailPopup(d) {
         ${pct !== null ? `<div class="spool-progress-track" style="margin-bottom:16px;"><div class="spool-progress-bar" style="width:${pct}%; background:${escapeHtml(color)};"></div></div>` : '<div style="margin-bottom:16px;"></div>'}` : ''}
         <div class="spool-detail-grid">${cells.join('')}</div>
         ${tempsHtml}
-        <div id="spool-detail-extras"></div>
         <div style="display:flex; gap:8px; margin-top:20px;">
             <button id="spool-detail-buy" class="btn btn-primary" style="flex:1;"><i class="fa-solid fa-cart-shopping"></i> ${_t3('spoolman.detail_buy', 'Acheter')}</button>
             <button id="spool-detail-close" class="btn btn-ghost" style="border:none;">${_t3('actions.close', 'Fermer')}</button>
@@ -10775,7 +9745,6 @@ function showSpoolDetailPopup(d) {
     `;
     overlay.appendChild(popup);
     document.body.appendChild(overlay);
-    _initSpoolDetailExtras(d);
     const close = () => overlay.remove();
     document.getElementById('spool-detail-close').addEventListener('click', close);
     document.getElementById('spool-detail-x').addEventListener('click', close);
@@ -10887,7 +9856,7 @@ const editBtn = document.getElementById(`${platform}-edit-btn`);
 if (row) row.style.display = 'flex';
 if (editBtn) editBtn.style.display = 'none';
 
-const inputId = `${platform}-api-key`;
+const inputId = 'thingiverse-api-key';
 const input = document.getElementById(inputId);
 if (input) {
     input.value = '';
@@ -10903,7 +9872,7 @@ if (input) {
 }
 window.showAccountKeyInput = showAccountKeyInput;
 async function saveAccountKey(platform) {
-const inputId = `${platform}-api-key`;
+const inputId = 'thingiverse-api-key';
 const input = document.getElementById(inputId);
 const apiKey = input ? input.value.trim() : '';
 if (!apiKey) { showToast(I18N.t('toast.api_key_required'), 'error'); return; }
@@ -10927,44 +9896,6 @@ showToast(I18N.t('toast.network_error_backend'), 'error');
 }
 }
 window.saveAccountKey = saveAccountKey;
-async function nexprintBrowserLogin() {
-const btn = document.getElementById('nexprint-login-btn');
-if (btn) btn.disabled = true;
-try {
-const res = await fetch(`${API}/api/accounts/nexprint/browser-login`, { method: 'POST' });
-const data = await res.json().catch(() => ({}));
-if (!res.ok) {
-showToast(data.error || 'Connexion impossible', 'error');
-if (btn) btn.disabled = false;
-return;
-}
-showToast('Connecte-toi dans la fenêtre Nexprint qui vient de s\'ouvrir.', 'info');
-const timer = setInterval(async () => {
-try {
-const r = await fetch(`${API}/api/accounts/nexprint/browser-login/status`);
-const st = (await r.json()).state;
-if (st === 'waiting') return;
-clearInterval(timer);
-if (btn) btn.disabled = false;
-if (st === 'ok') {
-showToast('Compte Nexprint connecté', 'success');
-updateAccountBadge('nexprint', true);
-showAccountKeyConfigured('nexprint');
-} else if (st === 'closed') {
-showToast('Fenêtre fermée avant la connexion', 'warning');
-} else {
-showToast('Connexion Nexprint non terminée', 'error');
-}
-} catch (e) { clearInterval(timer); if (btn) btn.disabled = false; }
-}, 1500);
-} catch (err) {
-console.error('[nexprintBrowserLogin]', err);
-if (btn) btn.disabled = false;
-showToast(I18N.t('toast.network_error_backend'), 'error');
-}
-}
-window.nexprintBrowserLogin = nexprintBrowserLogin;
-
 
 
 let _makerWorldEmail = '';
@@ -11609,7 +10540,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         updateHeaderVisibilityForPage(page);
         if (page === 'library') loadFiles();
         if (page === 'printers') loadPrinters(); else stopAllPrinterCardCameras();
-        if (page === 'settings') { loadSources(); loadRemoteInstances(); loadGuests(); loadPushSettings(); }
+        if (page === 'settings') { loadSources(); loadRemoteInstances(); }
         else stopDiagnosticConsolePoll();
         if (page === 'spoolman') loadSpoolmanPage();
         if (page === 'stats') loadStats();
@@ -13445,8 +12376,25 @@ window.loadStats = async function () {
             }
         }
 
-        window._lastStatsData = data;
-        _renderStatsReliability(data);
+        const relEl = document.getElementById('stat-profile-reliability');
+        if (relEl) {
+            const rel = data.profile_reliability || [];
+            if (rel.length) {
+                relEl.innerHTML = rel.map(p => {
+                    const hasRate = p.success_rate !== null && p.success_rate !== undefined;
+                    const rate = hasRate ? p.success_rate : null;
+                    const col = !hasRate ? '#a0aec0' : rate >= 80 ? '#68d391' : rate >= 50 ? '#f6ad55' : '#fc8181';
+                    const rateLabel = hasRate ? `${rate}%` : I18N.t('stats.profile_reliability_unrated') || 'non noté';
+                    const detail = `${p.success}✓ / ${p.failed}✗${p.unrated ? ` / ${p.unrated} ${I18N.t('stats.profile_reliability_unrated_short') || 'non notées'}` : ''}`;
+                    return `<div class="stat-top-row" title="${escapeHtml(detail)}">
+                        <span class="stat-top-name" style="flex:1;" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>
+                        <span class="stat-top-count" style="color:${col};font-weight:600;">${rateLabel}</span>
+                    </div>`;
+                }).join('');
+            } else {
+                relEl.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${I18N.t('stats.profile_reliability_empty') || "Note tes impressions dans l'Historique pour voir apparaître ce classement."}</p>`;
+            }
+        }
 
         loading?.classList.add('hidden');
         content?.classList.remove('hidden');
@@ -13747,7 +12695,7 @@ window.loadHistory = async function (reset = true) {
                     <button class="history-entry-view" onclick="viewHistoryFile('${escapeJs(entry.file_path)}', '${escapeJs(entry.file_name)}')" title="${I18N.t('history.view_file') || 'Voir le fichier'}">
                         <i class="fa-solid fa-eye"></i>
                     </button>
-                    <button class="history-entry-reprint" onclick="reprintHistoryFile('${escapeJs(entry.file_path)}', '${escapeJs(entry.file_name)}', ${entry.id})" title="${I18N.t('history.reprint_file_same') || 'Réimprimer comme la dernière fois'}">
+                    <button class="history-entry-reprint" onclick="reprintHistoryFile('${escapeJs(entry.file_path)}', '${escapeJs(entry.file_name)}')" title="${I18N.t('history.reprint_file') || 'Réimprimer ce fichier'}">
                         <i class="fa-solid fa-paper-plane"></i>
                     </button>
                     <button class="history-entry-del" onclick="deleteHistoryEntry(${entry.id})" title="${I18N.t('actions.delete')}">
@@ -13788,10 +12736,16 @@ window.viewHistoryFile = async function (filePath, fileName) {
     open3DViewer(fileName, filePath);
 };
 
+window.reprintHistoryFile = async function (filePath, fileName) {
+    if (!(await _checkHistoryFileExists(filePath))) {
+        showToast(I18N.t('history.file_missing') || "Ce fichier n'est plus disponible — il a peut-être été déplacé ou supprimé.", 'error');
+        return;
+    }
+    sendToSlicer(filePath, fileName);
+};
 
 
 async function loadDownloadHistory() {
-    loadModelUpdates();
     const sel = document.getElementById('download-history-select');
     const empty = document.getElementById('download-history-empty');
     if (!sel || !empty) return;
@@ -14303,10 +13257,6 @@ function openMaintenanceModal(pid, printerName, brand) {
                                 <span data-i18n="printers.maintenance_every_days">Tous les (jours)</span>
                                 <input type="number" id="maintenance-new-days" min="1" step="1" style="width:80px;">
                             </label>
-                            <label style="display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--text-muted); min-width:150px;">
-                                <span>${_t3('parts.linked_part', 'Pièce consommée (optionnel)')}</span>
-                                <select id="maintenance-new-part" class="settings-select"></select>
-                            </label>
                             <button class="btn btn-primary btn-sm" onclick="addMaintenanceTask()">
                                 <i class="fa-solid fa-plus"></i> <span data-i18n="actions.add">Ajouter</span>
                             </button>
@@ -14455,7 +13405,6 @@ async function loadMaintenanceTasks(pid) {
             }
         }
         renderMaintenanceTasks(data.tasks || []);
-        _refreshMaintenancePartSelect();
     } catch (err) {
         list.innerHTML = `<div style="color:var(--danger); font-size:12.5px;">${_t3('toast.connection_error', 'Erreur de connexion')}</div>`;
     }
@@ -14494,7 +13443,6 @@ function renderMaintenanceTasks(tasks) {
                     </div>
                 </div>
                 <div id="maintenance-task-info-${t.id}" style="font-size:11px; color:var(--text-muted); margin-top:4px;">${parts.join(' · ')}</div>
-                ${t.part_name ? `<div style="font-size:11px; margin-top:3px; color:${t.part_low ? 'var(--danger)' : 'var(--text-muted)'};"><i class="fa-solid fa-toolbox"></i> ${escapeHtml(t.part_name)} · ${escapeHtml(_tf('parts.stock_n', 'stock : {{n}}', { n: t.part_stock }))}${t.part_low ? ' ⚠' : ''}</div>` : ''}
                 <div class="progress-track" style="margin-top:6px;">
                     <div class="progress-bar" style="width:${Math.round(ratio*100)}%; background:${barColor};"></div>
                 </div>
@@ -14517,10 +13465,6 @@ function toggleEditMaintenanceTask(taskId) {
                 <span data-i18n="printers.maintenance_every_days">Tous les (jours)</span>
                 <input type="number" id="edit-days-${taskId}" value="${task.interval_days ?? ''}" min="1" step="1" style="width:60px;">
             </label>
-            <label style="display:flex; align-items:center; gap:4px;">
-                <i class="fa-solid fa-toolbox" title="${escapeHtml(_t3('parts.linked_part', 'Pièce consommée (optionnel)'))}"></i>
-                <select id="edit-part-${taskId}" class="settings-select" style="max-width:150px;">${_maintenancePartOptionsHtml(task.part_id)}</select>
-            </label>
             <button class="btn btn-primary btn-sm" onclick="saveMaintenanceTaskEdit(${taskId})"><i class="fa-solid fa-check"></i></button>
             <button class="btn btn-ghost btn-sm" onclick="loadMaintenanceTasks(_currentMaintenancePid)"><i class="fa-solid fa-xmark"></i></button>
         </div>
@@ -14534,12 +13478,7 @@ async function saveMaintenanceTaskEdit(taskId) {
     try {
         const res = await fetch(`${API}/api/printers/maintenance/${taskId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify((() => {
-                const payload = { interval_hours: hours, interval_days: days };
-                const partSel = document.getElementById(`edit-part-${taskId}`);
-                if (partSel) payload.part_id = partSel.value || null;
-                return payload;
-            })())
+            body: JSON.stringify({ interval_hours: hours, interval_days: days })
         });
         const data = await res.json();
         if (!res.ok) { showToast(data.error || _t3('toast.error', 'Erreur'), 'error'); return; }
@@ -14561,7 +13500,7 @@ async function addMaintenanceTask() {
     try {
         const res = await fetch(`${API}/api/printers/${_currentMaintenancePid}/maintenance`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, interval_hours: hours || null, interval_days: days || null, part_id: document.getElementById('maintenance-new-part')?.value || null })
+            body: JSON.stringify({ name, interval_hours: hours || null, interval_days: days || null })
         });
         const data = await res.json();
         if (!res.ok) { showToast(data.error || _t3('toast.error', 'Erreur'), 'error'); return; }
@@ -14581,7 +13520,6 @@ async function resetMaintenanceTask(taskId) {
         const data = await res.json();
         if (!res.ok) { showToast(data.error || _t3('toast.error', 'Erreur'), 'error'); return; }
         showToast(_t3('printers.maintenance_done_saved', 'Entretien enregistré !'), 'success');
-        _handleMaintenanceResetPart(data.part);
         loadMaintenanceTasks(_currentMaintenancePid);
         _checkMaintenanceBadge(_currentMaintenancePid);
     } catch (err) {
@@ -16389,7 +15327,7 @@ startThumbAutoRefresh();
                 return;
             }
             const assignedKey = data.assigned ? `${data.assigned.source_type}:${data.assigned.source_id}` : null;
-            const rows = slots.slice(0, 12).map(s => _renderCompatSlotRow(s, filePath, assignedKey)).join('');
+            const rows = `<div style="display:flex; flex-direction:column; gap:6px; max-height:404px; overflow-y:auto; padding-right:4px;">${slots.map(s => _renderCompatSlotRow(s, filePath, assignedKey)).join('')}</div>`;
             const noWeightNote = data.required_weight_g == null
                 ? `<p style="font-size:11px; color:var(--text-muted); margin-bottom:6px;">${_t2('spoolman.compat_no_weight', 'Poids non estimé pour ce fichier — la compatibilité ne peut pas être calculée précisément.')}</p>` : '';
             const errorsNote = (data.errors || []).length
@@ -17230,7 +16168,35 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             _costMetadata = data.metadata;
 
             const material = settings.print_cost_material || 'pla';
-            const settingsSpools = Array.isArray(settings.print_cost_spools) ? settings.print_cost_spools : [];
+            let settingsSpools = Array.isArray(settings.print_cost_spools) ? settings.print_cost_spools : [];
+            // Inventaire en direct (manuel + Spoolman + TigerTag) ; les prix saisis dans les réglages priment si la source n'en fournit pas
+            try {
+                const spoolsRes = await fetch(`${API}/api/filament/spools`);
+                if (spoolsRes.ok) {
+                    const spoolsData = await spoolsRes.json();
+                    const liveSlots = Array.isArray(spoolsData.slots) ? spoolsData.slots : [];
+                    if (liveSlots.length > 0) {
+                        const savedById = {};
+                        settingsSpools.forEach(sp => { savedById[sp.id] = sp; });
+                        const overrides = (settings.print_cost_price_overrides && typeof settings.print_cost_price_overrides === 'object') ? settings.print_cost_price_overrides : {};
+                        settingsSpools = liveSlots.map(sl => {
+                            const id = `${sl.source_type}:${sl.source_id}`;
+                            const saved = savedById[id];
+                            const srcPrice = (typeof sl.price === 'number' && sl.price > 0) ? sl.price : null;
+                            const price = srcPrice != null ? srcPrice : Number((saved && saved.price) ?? overrides[id] ?? 0) || 0;
+                            return {
+                                id,
+                                name: sl.name || (I18N.t('cost.spool_default_name') || 'Bobine'),
+                                price,
+                                weight: Number(sl.capacity_g) || Number(saved && saved.weight) || 1000,
+                                material: sl.material || '',
+                                source_type: sl.source_type,
+                                source_id: sl.source_id,
+                            };
+                        });
+                    }
+                }
+            } catch (e) { console.warn('[PrintCost] Inventaire indisponible, bobines enregistrées utilisées', e); }
             const defaultSpool = settingsSpools.find(s => s.id === settings.print_cost_default_spool_id) || settingsSpools[0] || null;
             const spoolPrice = defaultSpool ? (defaultSpool.price ?? 20) : (settings.print_cost_spool_price ?? 20);
             const spoolWeight = defaultSpool ? (defaultSpool.weight ?? 1000) : (settings.print_cost_spool_weight ?? 1000);
@@ -17268,7 +16234,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                     <div>
                         <label style="${labelStyle}">${I18N.t('cost.spool_select_label') || 'Bobine'}</label>
                         <select id="cost-spool-select" style="${fieldStyle}" onchange="_applyCostSpoolSelection(this.value)">
-                            ${spoolOptions.map(s => `<option value="${escapeHtml(String(s.id))}" data-price="${s.price}" data-weight="${s.weight}" ${s.id === (defaultSpool?.id) ? 'selected' : ''}>${escapeHtml(s.name || (I18N.t('cost.spool_default_name') || 'Bobine'))}</option>`).join('')}
+                            ${spoolOptions.map(s => `<option value="${escapeHtml(String(s.id))}" data-price="${s.price}" data-weight="${s.weight}" ${s.id === (defaultSpool?.id) ? 'selected' : ''}>${escapeHtml((s.name || (I18N.t('cost.spool_default_name') || 'Bobine')) + (s.source_type ? ` — ${[(s.material || '').toUpperCase(), _sourceLabelFor(s.source_type)].filter(Boolean).join(' · ')}` : ''))}</option>`).join('')}
                         </select>
                     </div>
                     <div style="display:flex; gap:10px;">

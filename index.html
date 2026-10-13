@@ -43,12 +43,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/vendor/fontawesome/css/all.min.css">
 	<link rel="stylesheet" href="assets/vendor/mdi/css/materialdesignicons.min.css">
-    <script src="assets/vendor/threejs/three.min.js"></script>
-    <script src="assets/vendor/threejs/controls/OrbitControls.js"></script>
-    <script src="assets/vendor/threejs/controls/TrackballControls.js"></script>
-    <script src="assets/vendor/threejs/loaders/STLLoader.js"></script>
-    <script src="assets/vendor/threejs/loaders/OBJLoader.js"></script>
-    <script src="assets/vendor/threejs/loaders/3MFLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TrackballControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/3MFLoader.js"></script>
 </head>
 <body>
     <div id="auth-screen" class="auth-screen">
@@ -703,7 +703,6 @@
                     <div class="stats-page">
                         <div class="stats-header">
                             <h2><i class="fa-solid fa-chart-pie"></i> <span data-i18n="stats.title">Statistiques de la bibliothèque</span></h2>
-                            <button class="btn btn-ghost btn-sm" onclick="openMonthlyReport()"><i class="fa-solid fa-file-lines"></i> <span data-i18n="report.open_btn">Bilan mensuel</span></button>
                             <button class="btn btn-ghost btn-sm" onclick="loadStats()" data-i18n-title="actions.refresh" title="Actualiser">
                                 <i class="fa-solid fa-arrows-rotate"></i>
                             </button>
@@ -791,18 +790,8 @@
 
                             <div class="stats-panels" style="margin-top:16px;">
                                 <div class="stats-panel" style="flex:1;">
-                                    <h3><i class="fa-solid fa-shield-halved"></i> <span data-i18n="stats.reliability_title">Fiabilité des impressions</span></h3>
-                                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-                                        <label for="stat-reliability-group" style="font-size:12px; color:var(--text-muted);" data-i18n="stats.reliability_group_label">Regrouper par</label>
-                                        <select id="stat-reliability-group" class="settings-select" style="max-width:200px;">
-                                            <option value="profile" data-i18n="stats.reliability_by_profile">Profil slicer</option>
-                                            <option value="material" data-i18n="stats.reliability_by_material">Matière</option>
-                                            <option value="printer" data-i18n="stats.reliability_by_printer">Imprimante</option>
-                                            <option value="filament" data-i18n="stats.reliability_by_filament">Bobine</option>
-                                        </select>
-                                    </div>
+                                    <h3><i class="fa-solid fa-shield-halved"></i> <span data-i18n="stats.profile_reliability">Fiabilité par profil slicer</span></h3>
                                     <p class="settings-hint" style="margin-top:-4px; margin-bottom:8px;" data-i18n="stats.profile_reliability_hint">Basé sur les impressions notées dans l'Historique (réussi/échoué).</p>
-                                    <p id="stat-reliability-filament-hint" class="settings-hint hidden" style="margin-top:-4px; margin-bottom:8px;" data-i18n="stats.reliability_filament_hint">Matière et bobine : d'après le filament assigné au fichier au moment de l'envoi (ancien historique : le filament assigné actuellement).</p>
                                     <div id="stat-profile-reliability" class="stats-top-list"></div>
                                 </div>
                             </div>
@@ -918,7 +907,6 @@
                                     <i class="fa-solid fa-trash"></i> <span data-i18n="history.clear">Vider</span>
                                 </button>
                             </div>
-                            <div id="model-updates-card" class="model-updates-card"></div>
                             <div id="download-history-empty" class="empty-state hidden" style="padding:20px 0;">
                                 <i class="fa-solid fa-download"></i>
                                 <p data-i18n="history.no_downloads">Aucun fichier téléchargé depuis le web pour l'instant.</p>
@@ -1466,7 +1454,7 @@
                                 <div class="account-card" style="margin-top:12px;">
                                     <div class="account-card-header">
                                         <div style="display:flex;align-items:center;gap:10px;">
-                                            <div class="account-icon-badge" style="background:rgba(255,159,0,0.15);color:#ff9f00;"><img src="assets/tigertag-logo.svg" alt="TigerTag" class="tigertag-banner-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"></div>
+                                            <div class="account-icon-badge" style="background:rgba(255,159,0,0.15);color:#ff9f00;"><i class="fa-solid fa-tag"></i></div>
                                             <div><div style="font-weight:600;font-size:13px;">TigerTag</div><div style="font-size:11px;color:var(--text-muted);">tigersystem.io</div></div>
                                         </div>
                                         <span id="tigertag-status-badge" class="account-badge disconnected" data-i18n="settings.account_not_configured">Non configuré</span>
@@ -1670,82 +1658,12 @@
                                 <div style="margin-top:14px;">
                                     <div style="display:flex; align-items:center; justify-content:space-between;">
                                         <label data-i18n="settings.remote_instances_discovered">Détectées sur le réseau</label>
-                                        <button class="btn btn-ghost btn-sm" onclick="discoverRemoteInstances()" data-i18n-title="settings.remote_instances_rescan" title="Relancer la détection"><i class="fa-solid fa-rotate"></i></button>
+                                        <button class="btn btn-ghost btn-sm" onclick="discoverRemoteInstances(true)" data-i18n-title="settings.remote_instances_rescan" title="Relancer la détection"><i class="fa-solid fa-rotate"></i></button>
                                     </div>
                                     <div id="remote-instances-discovered" style="display:flex; flex-direction:column; gap:8px; margin-top:6px;"></div>
                                 </div>
                                 <div id="remote-instances-list" style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
                                     <div class="empty-state small"><p data-i18n="settings.remote_instances_none">Aucune instance configurée</p></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="accord-section viewer-hide">
-                            <div class="accord-header" onclick="toggleAccord(this)">
-                                <span><i class="fa-solid fa-bell"></i> <span data-i18n="push.title">Notifications push</span></span>
-                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
-                            </div>
-                            <div class="accord-body" style="display:flex; flex-direction:column; gap:12px;">
-                                <p class="settings-hint" data-i18n="push.hint">Reçois les alertes sur ton téléphone quand tu n'es pas devant l'écran.</p>
-                                <div class="settings-row" style="align-items:center;">
-                                    <label style="font-size:13px; font-weight:500;" data-i18n="push.enable">Activer les notifications push</label>
-                                    <label class="nav-toggle-switch">
-                                        <input type="checkbox" id="push-enabled">
-                                        <span class="nav-toggle-slider"></span>
-                                    </label>
-                                </div>
-                                <div class="settings-row">
-                                    <label data-i18n="push.provider">Service</label>
-                                    <select id="push-provider" class="settings-select" onchange="_pushShowProviderFields()">
-                                        <option value="ntfy" data-i18n="push.provider_ntfy">ntfy (auto-hébergeable)</option>
-                                        <option value="telegram" data-i18n="push.provider_telegram">Telegram</option>
-                                        <option value="discord" data-i18n="push.provider_discord">Discord (webhook)</option>
-                                        <option value="webhook" data-i18n="push.provider_webhook">Webhook générique</option>
-                                    </select>
-                                </div>
-                                <div data-push-provider="ntfy" style="display:flex; flex-direction:column; gap:8px;">
-                                    <label class="spool-extra-field"><span data-i18n="push.ntfy_server">Serveur ntfy</span><input type="url" id="push-ntfy-server" class="settings-select" placeholder="https://ntfy.sh" autocomplete="off"></label>
-                                    <label class="spool-extra-field"><span data-i18n="push.ntfy_topic">Sujet (topic)</span><input type="text" id="push-ntfy-topic" class="settings-select" autocomplete="off"></label>
-                                    <label class="spool-extra-field"><span data-i18n="push.ntfy_token">Jeton d'accès (optionnel)</span><input type="password" id="push-ntfy-token" class="settings-select" autocomplete="new-password"></label>
-                                </div>
-                                <div data-push-provider="telegram" class="hidden" style="display:flex; flex-direction:column; gap:8px;">
-                                    <label class="spool-extra-field"><span data-i18n="push.telegram_token">Jeton du bot</span><input type="password" id="push-telegram-token" class="settings-select" autocomplete="new-password"></label>
-                                    <label class="spool-extra-field"><span data-i18n="push.telegram_chat">Identifiant de conversation (chat_id)</span><input type="text" id="push-telegram-chat" class="settings-select" autocomplete="off"></label>
-                                </div>
-                                <div data-push-provider="discord" class="hidden" style="display:flex; flex-direction:column; gap:8px;">
-                                    <label class="spool-extra-field"><span data-i18n="push.discord_url">URL du webhook Discord</span><input type="password" id="push-discord-url" class="settings-select" autocomplete="new-password"></label>
-                                </div>
-                                <div data-push-provider="webhook" class="hidden" style="display:flex; flex-direction:column; gap:8px;">
-                                    <label class="spool-extra-field"><span data-i18n="push.webhook_url">URL du webhook</span><input type="url" id="push-webhook-url" class="settings-select" autocomplete="off"></label>
-                                </div>
-                                <div>
-                                    <div style="font-size:12.5px; font-weight:600; margin-bottom:6px;" data-i18n="push.types_title">Événements à envoyer</div>
-                                    <div style="display:flex; flex-direction:column; gap:6px;">
-                                        <label class="checkbox-label"><input type="checkbox" data-push-type="print_finished" checked> <span data-i18n="push.type_print_finished">Impression terminée</span></label>
-                                        <label class="checkbox-label"><input type="checkbox" data-push-type="print_failed" checked> <span data-i18n="push.type_print_failed">Échec d'impression</span></label>
-                                        <label class="checkbox-label"><input type="checkbox" data-push-type="maintenance" checked> <span data-i18n="push.type_maintenance">Maintenance et séchage</span></label>
-                                        <label class="checkbox-label"><input type="checkbox" data-push-type="low_stock" checked> <span data-i18n="push.type_low_stock">Stock bas et pièces</span></label>
-                                    </div>
-                                </div>
-                                <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
-                                    <button type="button" class="btn btn-ghost btn-sm" onclick="testPush()"><i class="fa-solid fa-paper-plane"></i> <span data-i18n="push.test">Envoyer un test</span></button>
-                                    <button type="button" class="btn btn-primary btn-sm" onclick="savePushSettings()"><i class="fa-solid fa-check"></i> <span data-i18n="push.save">Enregistrer</span></button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="accord-section viewer-hide">
-                            <div class="accord-header" onclick="toggleAccord(this)">
-                                <span><i class="fa-solid fa-user-lock"></i> <span data-i18n="guests.title">Comptes invités</span></span>
-                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
-                            </div>
-                            <div class="accord-body">
-                                <p class="settings-hint" data-i18n="guests.hint">Un compte invité consulte ta bibliothèque, tes imprimantes et ton stock en lecture seule : il ne peut rien modifier ni lancer. Pratique pour la famille ou un atelier.</p>
-                                <div id="guests-list" style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
-                                    <div class="empty-state small"><p data-i18n="guests.none">Aucun compte invité</p></div>
-                                </div>
-                                <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
-                                    <input type="text" id="guest-new-username" class="settings-select" style="flex:1; min-width:120px;" maxlength="60" autocomplete="off" data-i18n-placeholder="guests.username_ph" placeholder="Nom de l'invité">
-                                    <input type="password" id="guest-new-password" class="settings-select" style="flex:1; min-width:120px;" autocomplete="new-password" data-i18n-placeholder="guests.password_ph" placeholder="Mot de passe (4 car. min.)">
-                                    <button type="button" class="btn btn-primary btn-sm" onclick="createGuest()"><i class="fa-solid fa-plus"></i> <span data-i18n="guests.create">Créer</span></button>
                                 </div>
                             </div>
                         </div>
@@ -1784,25 +1702,6 @@
                                         </div>
                                         <button id="thingiverse-edit-btn" class="btn btn-ghost btn-sm" style="display:none;margin-top:10px;" onclick="showAccountKeyInput('thingiverse')"><i class="fa-solid fa-pen"></i> <span data-i18n="actions.edit">Modifier</span></button>
                                         <p class="settings-hint" style="margin-top:6px;"><span data-i18n="settings.hint">Obtenir sur</span> <a href="https://www.thingiverse.com/apps/create" style="color:var(--accent)" target="_blank" rel="noopener noreferrer">thingiverse.com/apps/create</a></p>
-                                    </div>
-
-                                    <div class="account-card" style="margin-top:12px;">
-                                        <div class="account-card-header">
-                                            <div style="display:flex;align-items:center;gap:10px;">
-                                                <div class="account-icon-badge" style="background:rgba(37,99,235,0.15);color:#2563eb;"><i class="fa-solid fa-cube"></i></div>
-                                                <div><div style="font-weight:600;font-size:13px;">Nexprint</div><div style="font-size:11px;color:var(--text-muted);">nexprint.com (Elegoo)</div></div>
-                                            </div>
-                                            <span id="nexprint-status-badge" class="account-badge disconnected">Non configuré</span>
-                                        </div>
-                                        <button id="nexprint-login-btn" class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="nexprintBrowserLogin()"><i class="fa-solid fa-right-to-bracket"></i> Se connecter avec Nexprint</button>
-                                        <p class="settings-hint" style="margin-top:6px;">Une fenêtre s'ouvre sur le site officiel : connecte-toi normalement, Stellio récupère la session automatiquement. Tes identifiants ne passent jamais par Stellio.</p>
-                                        <div id="nexprint-key-row" style="display:flex;gap:8px;margin-top:10px;">
-                                            <input type="password" id="nexprint-api-key" placeholder="Ou colle le cookie auth_token..."
-                                                style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;font-family:monospace;">
-                                            <button class="btn btn-primary btn-sm" onclick="saveAccountKey('nexprint')"><i class="fa-solid fa-floppy-disk"></i></button>
-                                        </div>
-                                        <button id="nexprint-edit-btn" class="btn btn-ghost btn-sm" style="display:none;margin-top:10px;" onclick="showAccountKeyInput('nexprint')"><i class="fa-solid fa-pen"></i> <span data-i18n="actions.edit">Modifier</span></button>
-                                        <p class="settings-hint" style="margin-top:6px;">Méthode manuelle (si la fenêtre ne fonctionne pas) : copie la valeur du cookie <code>auth_token</code> depuis les outils du navigateur (F12 → Application → Cookies).</p>
                                     </div>
 
                                     <div class="account-card" style="margin-top:12px;">
@@ -2234,11 +2133,8 @@
 				</div>
 				<div id="page-printers" class="page">
 					<div id="printers-grid" class="grid-printers"></div>
-					<button onclick="openAddPrinterModal()" class="btn btn-primary viewer-hide">
+					<button onclick="openAddPrinterModal()" class="btn btn-primary">
 						<i class="fa-solid fa-plus"></i> <span data-i18n="printers.add">Ajouter une imprimante</span>
-					</button>
-					<button onclick="openPartsModal()" class="btn btn-ghost" style="margin-left:8px;">
-						<i class="fa-solid fa-toolbox"></i> <span data-i18n="parts.open_btn">Pièces &amp; consommables</span>
 					</button>
 				</div>
 				<div id="page-spoolman" class="page">
@@ -2625,8 +2521,6 @@
                 <p id="slicer-file-name" style="margin-bottom: 15px; font-weight: bold;"></p>
                 <div id="slicer-quick-estimate" class="slicer-quick-estimate hidden"></div>
                 <div id="slicer-preprint-warnings" style="display:none; margin-bottom:15px; flex-direction:column; gap:6px;"></div>
-                <div id="slicer-calib-box" class="slicer-calib-box" style="display:none;"></div>
-                <div id="slicer-reprint-box" class="slicer-calib-box" style="display:none;"></div>
                 <div id="slicer-spool-box" style="display:none; margin-bottom:15px; padding:10px 12px; border-radius:var(--radius); background:var(--bg-input); border:1px solid var(--border); font-size:12px;">
                     <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
                         <input type="checkbox" id="slicer-consume-spool-checkbox" checked>

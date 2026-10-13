@@ -38,3 +38,4 @@ telethon
 websocket-client
 flashforge-python-api
 reportlab
+pyaes
