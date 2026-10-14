@@ -372,7 +372,9 @@ Si Stellio vous est utile, pensez à :
 - Soutenir le développement avec un petit don sur Ko-fi ☕
 
 <p align="center">
-  [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/E6J828RYVD)
+  <a href="https://ko-fi.com/E6J828RYVD">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Soutenir Stellio sur Ko-fi">
+  </a>
 </p>
 
 ---
