@@ -369,6 +369,13 @@ Si Stellio te resulta útil, puedes:
 - Compartir el proyecto con tu comunidad
 - [Contribuir con código](#-contribuir) o traducciones
 - Informar de errores para ayudar a mejorar la app
+- Apoyar el desarrollo con una pequeña propina en Ko-fi ☕
+
+<p align="center">
+  <a href="https://ko-fi.com/E6J828RYVD">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Apoya Stellio en Ko-fi">
+  </a>
+</p>
 
 ---
 

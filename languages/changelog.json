@@ -1,5 +1,90 @@
 [
   {
+    "version": "0.7.1",
+    "items": {
+      "fr": [
+        "Stock de filament faible : en cliquant sur une bobine, Stellio cherche maintenant la référence exacte (marque, matière, couleur) dans toutes les boutiques et n'affiche que celles qui l'ont réellement en stock, avec le prix et le lien direct vers le produit",
+        "Si la bobine exacte est introuvable, un message l'indique et une sélection de remplacement en stock est proposée (même marque, même couleur ou même matière) ; les boutiques non vérifiables automatiquement restent accessibles en recherche manuelle",
+        "Un panneau « Détails de la recherche » indique, boutique par boutique, si la recherche a réussi, le nombre de produits vus et en stock, ou la raison d'un échec",
+        "Nouvelles boutiques interrogées pour retrouver une bobine : LV3D, Filo3D, 3DFils, Polyfab3D, Francofil, Filimprimante3D, Grossiste 3D, Arianeplast, Polymaker, eSUN, SUNLU, etc. (liste enrichie dans filament_shops.json)",
+        "Envoi au slicer : nouveau choix « Réglages du slicer » à côté de l'imprimante et de la matière, pour envoyer la pièce avec le profil de réglages de votre choix (ou « Automatique » comme avant)",
+        "Estimation du coût : le même choix de réglages est disponible ; l'estimation précise du slicer est recalculée avec le profil sélectionné, et le profil utilisé est indiqué à côté du slicer",
+        "Suggestions IA : l'assistant propose maintenant jusqu'à 3 profils de réglages slicer (et non plus des réglages de filament), avec leurs paramètres clés, la raison du choix et un bouton « Utiliser »",
+        "Suggestions IA : chaque profil affiche un temps d'impression estimé tout de suite, puis remplacé en arrière-plan par le temps réellement calculé par le slicer (OrcaSlicer, Bambu Studio, PrusaSlicer, SuperSlicer…)"
+      ],
+      "en": [
+        "Low filament stock: clicking a spool now makes Stellio look for the exact reference (brand, material, color) across all shops and show only those that really have it in stock, with the price and a direct link to the product",
+        "If the exact spool can't be found, a message says so and a selection of in-stock replacements is suggested (same brand, same color or same material); shops that can't be checked automatically remain available as a manual search",
+        "A \"Search details\" panel shows, shop by shop, whether the search worked, how many products were seen and in stock, or why it failed",
+        "More shops are now searched to find a spool: LV3D, Filo3D, 3DFils, Polyfab3D, Francofil, Filimprimante3D, Grossiste 3D, Arianeplast, Polymaker, eSUN, SUNLU, etc. (expanded list in filament_shops.json)",
+        "Send to slicer: new \"Slicer settings\" choice next to the printer and material, to send the model with the settings profile of your choice (or \"Automatic\" as before)",
+        "Cost estimate: the same settings choice is available; the precise slicer estimate is recalculated with the selected profile, and the profile used is shown next to the slicer",
+        "AI suggestions: the assistant now suggests up to 3 slicer settings profiles (instead of filament settings), with their key parameters, the reason for the choice and a \"Use\" button",
+        "AI suggestions: each profile shows an estimated print time right away, then replaced in the background by the time actually computed by the slicer (OrcaSlicer, Bambu Studio, PrusaSlicer, SuperSlicer…)"
+      ],
+      "de": [
+        "Niedriger Filamentbestand: Ein Klick auf eine Spule lässt Stellio jetzt die genaue Referenz (Marke, Material, Farbe) in allen Shops suchen und nur die Shops anzeigen, die sie wirklich vorrätig haben – mit Preis und direktem Link zum Produkt",
+        "Wird die genaue Spule nicht gefunden, weist eine Meldung darauf hin und es wird eine Auswahl lieferbarer Ersatzspulen vorgeschlagen (gleiche Marke, gleiche Farbe oder gleiches Material); nicht automatisch prüfbare Shops bleiben als manuelle Suche verfügbar",
+        "Ein Bereich „Suchdetails“ zeigt Shop für Shop, ob die Suche funktioniert hat, wie viele Produkte gesehen wurden und auf Lager sind oder warum sie fehlgeschlagen ist",
+        "Mehr Shops werden bei der Spulensuche abgefragt: LV3D, Filo3D, 3DFils, Polyfab3D, Francofil, Filimprimante3D, Grossiste 3D, Arianeplast, Polymaker, eSUN, SUNLU usw. (erweiterte Liste in filament_shops.json)",
+        "An den Slicer senden: neue Auswahl „Slicer-Einstellungen“ neben Drucker und Material, um das Modell mit dem gewünschten Einstellungsprofil zu senden (oder „Automatisch“ wie bisher)",
+        "Kostenschätzung: dieselbe Einstellungsauswahl ist verfügbar; die genaue Slicer-Schätzung wird mit dem gewählten Profil neu berechnet, und das verwendete Profil wird neben dem Slicer angezeigt",
+        "KI-Vorschläge: Der Assistent schlägt jetzt bis zu 3 Slicer-Einstellungsprofile vor (statt Filament-Einstellungen), mit den wichtigsten Parametern, der Begründung und einer Schaltfläche „Verwenden“",
+        "KI-Vorschläge: Jedes Profil zeigt sofort eine geschätzte Druckzeit, die im Hintergrund durch die vom Slicer tatsächlich berechnete Zeit ersetzt wird (OrcaSlicer, Bambu Studio, PrusaSlicer, SuperSlicer …)"
+      ],
+      "es": [
+        "Stock de filamento bajo: al hacer clic en una bobina, Stellio busca ahora la referencia exacta (marca, material, color) en todas las tiendas y muestra solo las que realmente la tienen en stock, con el precio y el enlace directo al producto",
+        "Si no se encuentra la bobina exacta, un mensaje lo indica y se propone una selección de reemplazos en stock (misma marca, mismo color o mismo material); las tiendas que no se pueden comprobar automáticamente siguen disponibles como búsqueda manual",
+        "Un panel «Detalles de la búsqueda» indica, tienda por tienda, si la búsqueda funcionó, cuántos productos se vieron y están en stock, o el motivo del fallo",
+        "Más tiendas consultadas para encontrar una bobina: LV3D, Filo3D, 3DFils, Polyfab3D, Francofil, Filimprimante3D, Grossiste 3D, Arianeplast, Polymaker, eSUN, SUNLU, etc. (lista ampliada en filament_shops.json)",
+        "Envío al slicer: nueva opción «Ajustes del slicer» junto a la impresora y el material, para enviar la pieza con el perfil de ajustes que prefieras (o «Automático» como antes)",
+        "Estimación de coste: la misma opción de ajustes está disponible; la estimación precisa del slicer se recalcula con el perfil seleccionado, y el perfil utilizado se muestra junto al slicer",
+        "Sugerencias de IA: el asistente propone ahora hasta 3 perfiles de ajustes de slicer (en lugar de ajustes de filamento), con sus parámetros clave, el motivo de la elección y un botón «Usar»",
+        "Sugerencias de IA: cada perfil muestra enseguida un tiempo de impresión estimado, que se sustituye en segundo plano por el tiempo realmente calculado por el slicer (OrcaSlicer, Bambu Studio, PrusaSlicer, SuperSlicer…)"
+      ],
+      "it": [
+        "Scorte di filamento basse: facendo clic su una bobina, Stellio cerca ora il riferimento esatto (marca, materiale, colore) in tutti i negozi e mostra solo quelli che lo hanno davvero disponibile, con prezzo e link diretto al prodotto",
+        "Se la bobina esatta non viene trovata, un messaggio lo segnala e viene proposta una selezione di sostituti disponibili (stessa marca, stesso colore o stesso materiale); i negozi non verificabili automaticamente restano disponibili come ricerca manuale",
+        "Un pannello «Dettagli della ricerca» indica, negozio per negozio, se la ricerca è riuscita, quanti prodotti sono stati visti e disponibili, o il motivo di un errore",
+        "Più negozi interrogati per trovare una bobina: LV3D, Filo3D, 3DFils, Polyfab3D, Francofil, Filimprimante3D, Grossiste 3D, Arianeplast, Polymaker, eSUN, SUNLU, ecc. (elenco ampliato in filament_shops.json)",
+        "Invio allo slicer: nuova scelta «Impostazioni dello slicer» accanto a stampante e materiale, per inviare il modello con il profilo di impostazioni che preferisci (o «Automatico» come prima)",
+        "Stima dei costi: la stessa scelta di impostazioni è disponibile; la stima precisa dello slicer viene ricalcolata con il profilo selezionato e il profilo usato è indicato accanto allo slicer",
+        "Suggerimenti IA: l'assistente propone ora fino a 3 profili di impostazioni slicer (invece delle impostazioni del filamento), con i parametri principali, il motivo della scelta e un pulsante «Usa»",
+        "Suggerimenti IA: ogni profilo mostra subito un tempo di stampa stimato, poi sostituito in background dal tempo effettivamente calcolato dallo slicer (OrcaSlicer, Bambu Studio, PrusaSlicer, SuperSlicer…)"
+      ],
+      "pt": [
+        "Estoque de filamento baixo: ao clicar em uma bobina, o Stellio agora procura a referência exata (marca, material, cor) em todas as lojas e mostra apenas as que realmente a têm em estoque, com o preço e o link direto para o produto",
+        "Se a bobina exata não for encontrada, uma mensagem avisa e uma seleção de substitutas em estoque é sugerida (mesma marca, mesma cor ou mesmo material); as lojas que não podem ser verificadas automaticamente continuam disponíveis como pesquisa manual",
+        "Um painel «Detalhes da pesquisa» mostra, loja por loja, se a pesquisa funcionou, quantos produtos foram vistos e estão em estoque, ou o motivo de uma falha",
+        "Mais lojas consultadas para encontrar uma bobina: LV3D, Filo3D, 3DFils, Polyfab3D, Francofil, Filimprimante3D, Grossiste 3D, Arianeplast, Polymaker, eSUN, SUNLU etc. (lista ampliada em filament_shops.json)",
+        "Envio ao slicer: nova opção «Definições do slicer» ao lado da impressora e do material, para enviar a peça com o perfil de definições que preferir (ou «Automático» como antes)",
+        "Estimativa de custo: a mesma opção de definições está disponível; a estimativa precisa do slicer é recalculada com o perfil selecionado, e o perfil usado é exibido ao lado do slicer",
+        "Sugestões de IA: o assistente agora sugere até 3 perfis de definições do slicer (em vez de definições de filamento), com seus parâmetros principais, o motivo da escolha e um botão «Usar»",
+        "Sugestões de IA: cada perfil mostra de imediato um tempo de impressão estimado, depois substituído em segundo plano pelo tempo realmente calculado pelo slicer (OrcaSlicer, Bambu Studio, PrusaSlicer, SuperSlicer…)"
+      ],
+      "ja": [
+        "フィラメント残量不足：スプールをクリックすると、Stellioがすべてのショップから正確な品番（ブランド・素材・色）を検索し、実際に在庫のあるショップだけを価格と商品への直接リンク付きで表示します",
+        "まったく同じスプールが見つからない場合はその旨を表示し、在庫のある代替品（同じブランド・同じ色・同じ素材）を提案します。自動確認できないショップは手動検索として引き続き利用できます",
+        "「検索の詳細」パネルで、ショップごとに検索の成否、確認した商品数と在庫数、または失敗の理由を確認できます",
+        "スプール検索の対象ショップを追加：LV3D、Filo3D、3DFils、Polyfab3D、Francofil、Filimprimante3D、Grossiste 3D、Arianeplast、Polymaker、eSUN、SUNLU など（filament_shops.json の一覧を拡充）",
+        "スライサーへ送信：プリンターと素材の隣に新しい「スライサー設定」の選択欄を追加。お好みの設定プロファイルで送信できます（従来どおりの「自動」も選択可能）",
+        "コスト見積もり：同じ設定の選択欄を追加。スライサーによる正確な見積もりは選択したプロファイルで再計算され、使用したプロファイルがスライサー名の横に表示されます",
+        "AI提案：アシスタントがフィラメント設定ではなく、最大3つのスライサー設定プロファイルを、主なパラメーター、選んだ理由、「使用」ボタンとともに提案するようになりました",
+        "AI提案：各プロファイルの推定印刷時間をすぐに表示し、その後バックグラウンドでスライサー（OrcaSlicer、Bambu Studio、PrusaSlicer、SuperSlicerなど）が実際に計算した時間に置き換えます"
+      ],
+      "zh": [
+        "耗材库存不足：点击某个耗材盘后，Stellio 现在会在所有商店中搜索完全相同的型号（品牌、材料、颜色），只显示真正有货的商店，并附上价格和商品直达链接",
+        "如果找不到完全相同的耗材盘，会给出提示并推荐有货的替代品（相同品牌、相同颜色或相同材料）；无法自动核实的商店仍可通过手动搜索访问",
+        "新增“搜索详情”面板，逐个商店显示搜索是否成功、查看的商品数和有货数量，或失败原因",
+        "查找耗材盘时查询更多商店：LV3D、Filo3D、3DFils、Polyfab3D、Francofil、Filimprimante3D、Grossiste 3D、Arianeplast、Polymaker、eSUN、SUNLU 等（filament_shops.json 中的列表已扩充）",
+        "发送到切片软件：在打印机和材料旁新增“切片设置”选项，可使用你选择的设置配置文件发送模型（也可像以前一样选择“自动”）",
+        "成本估算：同样提供设置选择；切片软件的精确估算会按所选配置文件重新计算，所用配置文件会显示在切片软件名称旁",
+        "AI 建议：助手现在最多推荐 3 个切片设置配置文件（不再是耗材设置），并附上关键参数、推荐理由和“使用”按钮",
+        "AI 建议：每个配置文件会先立即显示预计打印时间，随后在后台替换为切片软件（OrcaSlicer、Bambu Studio、PrusaSlicer、SuperSlicer 等）实际计算出的时间"
+      ]
+    }
+  },
+  {
     "version": "0.7.0",
     "items": {
       "fr": [

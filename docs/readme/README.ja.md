@@ -369,6 +369,13 @@ Stellioが役に立ったと感じたら、ぜひ：
 - 周りの人にプロジェクトを共有する
 - [コードで貢献する](#-コントリビュート)、または翻訳に協力する
 - バグを報告してアプリの改善に協力する
+- Ko-fi で開発を応援する ☕
+
+<p align="center">
+  <a href="https://ko-fi.com/E6J828RYVD">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Ko-fi で Stellio を応援する">
+  </a>
+</p>
 
 ---
 

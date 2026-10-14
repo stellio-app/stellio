@@ -369,6 +369,13 @@ Stellio 采用本地优先架构：您的数据保留在您的设备上，默认
 - 与身边的人分享这个项目
 - [贡献代码](#-贡献) 或参与翻译
 - 报告问题以帮助改进应用
+- 在 Ko-fi 上小额打赏，支持开发 ☕
+
+<p align="center">
+  <a href="https://ko-fi.com/E6J828RYVD">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="在 Ko-fi 上支持 Stellio">
+  </a>
+</p>
 
 ---
 

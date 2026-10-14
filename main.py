@@ -202,8 +202,9 @@ import trimesh.transformations as tra
 import io
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms
 try:
+    # CFB a été déplacé dans le module « decrepit » (cryptography >= 47) ; l'ancien chemin est déprécié.
     from cryptography.hazmat.decrepit.ciphers.modes import CFB
-except ImportError: 
+except ImportError:  # cryptography < 47 : ancien emplacement
     from cryptography.hazmat.primitives.ciphers.modes import CFB
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
@@ -480,6 +481,10 @@ TRASH_RETENTION_SECONDS = 300
 _trash_registry = {}  
 _trash_registry_lock = threading.Lock()
 
+# --- Présence légère (mode collaboratif) ---
+# Suivi en mémoire (pas de persistance nécessaire) des appareils/onglets connectés à cette même
+# instance Stellio, pour afficher qui regarde quoi en temps réel. Une entrée expire au bout de 30s
+# sans battement de cœur (l'appareil est considéré déconnecté).
 _active_sessions = {}
 _active_sessions_lock = threading.Lock()
 PRESENCE_TIMEOUT_SECONDS = 30
@@ -9591,7 +9596,8 @@ def parse_generic_output(output_path):
         return result
     return parse_slic3r_derived_gcode(output_path)
 
-def run_silent_slice(stl_path, slicer, timeout=150):
+def run_silent_slice(stl_path, slicer, timeout=150, override=None):
+    """override : {'settings': [chemins], 'filaments': [chemins]} impose des profils précis (sinon réglages globaux de l'app)."""
     slug = hashlib.md5(f"{stl_path}|{time.time()}".encode()).hexdigest()[:12]
     out_dir = os.path.join(get_slice_temp_dir(), slug)
     os.makedirs(out_dir, exist_ok=True)
@@ -9604,6 +9610,9 @@ def run_silent_slice(stl_path, slicer, timeout=150):
 
             load_settings_str = (settings.get('slicer_profile_settings') or '').strip()
             load_filament_str = (settings.get('slicer_profile_filament') or '').strip()
+            if override is not None:
+                load_settings_str = ';'.join(override.get('settings') or [])
+                load_filament_str = ';'.join(override.get('filaments') or [])
             if load_settings_str:
                 cmd += ['--load-settings', load_settings_str]
             if load_filament_str:
@@ -9622,6 +9631,8 @@ def run_silent_slice(stl_path, slicer, timeout=150):
 
             profile_key = 'slicer_profile_prusa_ini' if slicer['id'] == 'prusaslicer' else 'slicer_profile_super_ini'
             ini_str = (settings.get(profile_key) or '').strip()
+            if override is not None:
+                ini_str = ';'.join((override.get('settings') or []) + (override.get('filaments') or []))
             if ini_str:
                 for ini_path in ini_str.split(';'):
                     ini_path = ini_path.strip()
@@ -9712,6 +9723,8 @@ def process_slice_estimate_queue():
                 time.sleep(0.5)
                 continue
             file_path = task.get('path')
+            cache_key = task.get('key') or file_path
+            profile_id = task.get('profile_id')
             tmp_stl = None
             try:
                 if is_virtual_archive_path(file_path):
@@ -9727,21 +9740,39 @@ def process_slice_estimate_queue():
                 slicers = get_cached_installed_slicers()
                 if not slicers or not any(s.get('preslice_supported', True) for s in slicers):
                     with slice_estimate_lock:
-                        _slice_cache_set(file_path, {'status': 'unavailable', 'reason': 'no_slicer'})
+                        _slice_cache_set(cache_key, {'status': 'unavailable', 'reason': 'no_slicer'})
                     continue
 
-                slicer = next(s for s in slicers if s.get('preslice_supported', True))
-                data = run_silent_slice(stl_for_slicer, slicer)
+                override = None
+                if profile_id:
+                    # Estimation avec des réglages choisis : on tranche avec le slicer qui correspond au profil
+                    prof = next((p for p in load_slicer_profiles() if p.get('id') == profile_id), None)
+                    fam = ((prof or {}).get('slicer') or '').strip().lower()
+                    slicer = next((s for s in slicers if s.get('preslice_supported', True) and s.get('id') == fam), None)
+                    if not prof or slicer is None or fam not in (_SLICER_LOAD_SETTINGS_FAMILIES + _SLICER_LOAD_INI_FAMILIES):
+                        with slice_estimate_lock:
+                            _slice_cache_set(cache_key, {'status': 'unavailable', 'reason': 'profile_slicer_unavailable'})
+                        continue
+                    s_paths, f_paths, _ids = _resolve_slicer_profile_paths(
+                        fam, task.get('printer_id'), task.get('material_type'), profile_id)
+                    if not s_paths:
+                        with slice_estimate_lock:
+                            _slice_cache_set(cache_key, {'status': 'unavailable', 'reason': 'profile_unreadable'})
+                        continue
+                    override = {'settings': s_paths, 'filaments': f_paths}
+                else:
+                    slicer = next(s for s in slicers if s.get('preslice_supported', True))
+                data = run_silent_slice(stl_for_slicer, slicer, override=override)
 
                 with slice_estimate_lock:
                     if data:
-                        _slice_cache_set(file_path, {'status': 'done', 'data': data})
+                        _slice_cache_set(cache_key, {'status': 'done', 'data': data})
                     else:
-                        _slice_cache_set(file_path, {'status': 'error', 'reason': 'slice_failed'})
+                        _slice_cache_set(cache_key, {'status': 'error', 'reason': 'slice_failed'})
             except Exception as e:
                 app_logger.warning(f"[PreSlice] Erreur worker: {e}")
                 with slice_estimate_lock:
-                    _slice_cache_set(file_path, {'status': 'error', 'reason': str(e)})
+                    _slice_cache_set(cache_key, {'status': 'error', 'reason': str(e)})
             finally:
                 if tmp_stl and os.path.exists(tmp_stl):
                     try:
@@ -9776,6 +9807,14 @@ def find_slicer_by_name(slicer_name):
         return cura['path'] if cura else None
     return locate_slicer_by_id(slicer_id)
 
+def _slice_estimate_key(file_path, profile_id=None, printer_id=None, material_type=None):
+    """Clé de cache : le fichier seul (réglages globaux) ou fichier + réglages choisis (profil, imprimante, matière)."""
+    profile_id = (str(profile_id).strip() if profile_id else '')
+    if not profile_id:
+        return file_path
+    return f"{file_path}||{profile_id}|{printer_id or ''}|{(material_type or '').strip().lower()}"
+
+
 @app.route('/api/slicer/pre-slice-estimate', methods=['POST'])
 @login_required
 def api_request_slice_estimate():
@@ -9783,9 +9822,13 @@ def api_request_slice_estimate():
     file_path = (data.get('path') or '').strip()
     if not file_path:
         return jsonify({"error": "Chemin requis"}), 400
+    profile_id = (str(data.get('profile_id') or '')).strip() or None
+    printer_id = data.get('printer_id') or None
+    material_type = (data.get('material_type') or '').strip() or None
+    key = _slice_estimate_key(file_path, profile_id, printer_id, material_type)
 
     with slice_estimate_lock:
-        existing = slice_estimate_results.get(file_path)
+        existing = slice_estimate_results.get(key)
     if existing and existing.get('status') in ('done', 'error', 'unavailable'):
         return jsonify(existing), 200
 
@@ -9797,10 +9840,11 @@ def api_request_slice_estimate():
             return jsonify({"error": "Archive non trouvée"}), 404
 
     with slice_estimate_lock:
-        if file_path not in slice_estimate_results or slice_estimate_results[file_path].get('status') == 'error':
-            _slice_cache_set(file_path, {'status': 'pending'})
-            slice_estimate_queue.put({'path': file_path})
-        result = slice_estimate_results[file_path]
+        if key not in slice_estimate_results or slice_estimate_results[key].get('status') == 'error':
+            _slice_cache_set(key, {'status': 'pending'})
+            slice_estimate_queue.put({'path': file_path, 'key': key, 'profile_id': profile_id,
+                                      'printer_id': printer_id, 'material_type': material_type})
+        result = slice_estimate_results[key]
 
     return jsonify(result), 202
 
@@ -9817,8 +9861,10 @@ def api_get_slice_estimate():
     file_path = (request.args.get('path') or '').strip()
     if not file_path:
         return jsonify({"error": "Chemin requis"}), 400
+    key = _slice_estimate_key(file_path, request.args.get('profile_id'), request.args.get('printer_id'),
+                              request.args.get('material_type'))
     with slice_estimate_lock:
-        result = slice_estimate_results.get(file_path, {'status': 'unknown'})
+        result = slice_estimate_results.get(key, {'status': 'unknown'})
     return jsonify(result), 200
 
 _SLICER_FAMILY_BY_FILENAME = {
@@ -9849,47 +9895,103 @@ _SLICER_LOAD_SETTINGS_FAMILIES = ('orcaslicer', 'bambustudio', 'elegooslicer', '
 _SLICER_LOAD_INI_FAMILIES = ('prusaslicer', 'superslicer')
 
 
-def _resolve_slicer_profile_paths(slicer_family, printer_id, material_type=None):
-    if not printer_id or not slicer_family:
+def _resolve_slicer_profile_paths(slicer_family, printer_id, material_type=None, process_profile_id=None):
+    """Chemins des profils à charger dans le slicer.
+    process_profile_id : réglages (profil « process ») choisis explicitement par l'utilisateur ; ils remplacent
+    les profils de réglages rattachés à l'imprimante, qui restent chargés pour la machine et le filament."""
+    if not slicer_family:
         return [], [], []
 
-    try:
-        printer_id_int = int(printer_id)
-    except (TypeError, ValueError):
+    printer_id_int = None
+    if printer_id:
+        try:
+            printer_id_int = int(printer_id)
+        except (TypeError, ValueError):
+            printer_id_int = None
+    process_profile_id = (str(process_profile_id).strip() if process_profile_id else '') or None
+    if printer_id_int is None and not process_profile_id:
         return [], [], []
 
     profiles = load_slicer_profiles()
     settings_paths, filament_paths, matched_ids = [], [], []
 
-    for p in profiles:
-        if p.get('printer_id') != printer_id_int:
-            continue
-        if not p.get('source_path') or not os.path.exists(p['source_path']):
-            continue
-        p_slicer = (p.get('slicer') or '').strip().lower()
-        if p_slicer and p_slicer != slicer_family:
-            continue
-
-        ptype = p.get('profile_type')
-        if ptype == 'filament':
-            if material_type and (p.get('material_type') or '').strip().lower() != material_type.strip().lower():
+    if printer_id_int is not None:
+        for p in profiles:
+            if p.get('printer_id') != printer_id_int:
                 continue
-            filament_paths.append(p['source_path'])
-            matched_ids.append(p['id'])
-        elif ptype in ('process', 'printer'):
-            settings_paths.append(p['source_path'])
-            matched_ids.append(p['id'])
+            if not p.get('source_path') or not os.path.exists(p['source_path']):
+                continue
+            p_slicer = (p.get('slicer') or '').strip().lower()
+            if p_slicer and p_slicer != slicer_family:
+                continue
 
+            ptype = p.get('profile_type')
+            if ptype == 'filament':
+                if material_type and (p.get('material_type') or '').strip().lower() != material_type.strip().lower():
+                    continue
+                filament_paths.append(p['source_path'])
+                matched_ids.append(p['id'])
+            elif ptype in ('process', 'printer'):
+                settings_paths.append(p['source_path'])
+                matched_ids.append(p['id'])
 
-    confirmed_settings = [p['source_path'] for p in profiles
-                           if p.get('printer_id') == printer_id_int and p.get('printer_match_confirmed')
-                           and p.get('profile_type') in ('process', 'printer')
-                           and p.get('source_path') and os.path.exists(p['source_path'])
-                           and (not (p.get('slicer') or '').strip() or (p.get('slicer') or '').strip().lower() == slicer_family)]
-    if confirmed_settings:
-        settings_paths = confirmed_settings
+        confirmed_settings = [p['source_path'] for p in profiles
+                               if p.get('printer_id') == printer_id_int and p.get('printer_match_confirmed')
+                               and p.get('profile_type') in ('process', 'printer')
+                               and p.get('source_path') and os.path.exists(p['source_path'])
+                               and (not (p.get('slicer') or '').strip() or (p.get('slicer') or '').strip().lower() == slicer_family)]
+        if confirmed_settings:
+            settings_paths = confirmed_settings
+
+    if process_profile_id:
+        chosen = next((p for p in profiles
+                       if p.get('id') == process_profile_id and p.get('profile_type') == 'process'
+                       and p.get('source_path') and os.path.exists(p['source_path'])
+                       and (not (p.get('slicer') or '').strip() or (p.get('slicer') or '').strip().lower() == slicer_family)), None)
+        if chosen:
+            process_paths = {p['source_path'] for p in profiles if p.get('profile_type') == 'process' and p.get('source_path')}
+            process_ids = {p['id'] for p in profiles if p.get('profile_type') == 'process'}
+            settings_paths = [sp for sp in settings_paths if sp not in process_paths] + [chosen['source_path']]
+            matched_ids = [i for i in matched_ids if i not in process_ids] + [chosen['id']]
+        else:
+            app_logger.warning(f"[Slicer] Profil de réglages {process_profile_id} introuvable, illisible ou incompatible avec {slicer_family} : ignoré")
 
     return settings_paths, filament_paths, matched_ids
+
+
+@app.route('/api/slicer/process-profiles', methods=['GET'])
+@login_required
+def api_slicer_process_profiles():
+    """Profils de réglages (« process ») utilisables dans l'envoi au slicer / l'estimation.
+    ?printer_id= restreint aux profils de cette imprimante (+ ceux sans imprimante) ; ?all_slicers=1 : tous les slicers
+    (estimation), sinon seulement la famille du slicer par défaut (envoi)."""
+    settings = load_settings() or {}
+    slicer_name = settings.get('default_slicer', 'system_default')
+    slicer_path = find_slicer_by_name(slicer_name)
+    family = _resolve_slicer_family(slicer_path, slicer_name) if slicer_path else None
+    all_slicers = str(request.args.get('all_slicers') or '') in ('1', 'true')
+    printer_id = _safe_int(request.args.get('printer_id'))
+    out = []
+    for p in load_slicer_profiles():
+        if p.get('profile_type') != 'process':
+            continue
+        if not p.get('source_path') or not os.path.exists(p['source_path']):
+            continue   # sans fichier source, le profil ne peut pas être chargé dans le slicer
+        p_slicer = (p.get('slicer') or '').strip().lower()
+        if not all_slicers and family and p_slicer and p_slicer != family:
+            continue
+        pid = p.get('printer_id')
+        if printer_id is not None and pid not in (None, printer_id):
+            continue
+        out.append({
+            'id': p['id'], 'name': p.get('name') or p.get('source_filename') or 'Profil', 'slicer': p_slicer,
+            'layer_height': p.get('layer_height'), 'infill_density': p.get('infill_density'),
+            'print_speed': p.get('print_speed'), 'wall_count': p.get('wall_count'),
+            'supports_enabled': p.get('supports_enabled'),
+            'printer_matched': printer_id is not None and pid == printer_id,
+        })
+    out.sort(key=lambda x: (not x['printer_matched'], x['name'].lower()))
+    return jsonify({'profiles': out, 'slicer_family': family}), 200
 
 
 @app.route('/api/slicer/send', methods=['POST'])
@@ -9943,13 +10045,16 @@ def api_send_to_slicer():
             slicer_family = _resolve_slicer_family(slicer_path, slicer_name)
             printer_id = data.get('printer_id')
             material_type = data.get('material_type')
+            process_profile_id = (data.get('process_profile_id') or '').strip() or None
             cmd = [slicer_path]
 
-            if slicer_family and printer_id:
+            if slicer_family and (printer_id or process_profile_id):
                 settings_paths, filament_paths, matched_ids = _resolve_slicer_profile_paths(
-                    slicer_family, printer_id, material_type
+                    slicer_family, printer_id, material_type, process_profile_id
                 )
                 applied_profile_ids = matched_ids
+                if process_profile_id and process_profile_id in matched_ids and not data.get('slicer_profile_id'):
+                    data['slicer_profile_id'] = process_profile_id   # journalisé dans l'historique d'impression
                 if slicer_family in _SLICER_LOAD_SETTINGS_FAMILIES:
                     if settings_paths:
                         cmd += ['--load-settings', ';'.join(settings_paths)]
@@ -13457,7 +13562,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.7.0"
+CURRENT_VERSION = "0.7.1"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -17171,9 +17276,15 @@ def _analyze_mesh_for_recommendation(mesh):
     except Exception:
         overhang_ratio = None
 
+    try:
+        surface_mm2 = round(float(mesh.area), 1)
+    except Exception:
+        surface_mm2 = None
+
     return {
         "dimensions_mm": [round(d, 1) for d in dims],
         "volume_mm3": round(volume, 1),
+        "surface_mm2": surface_mm2,
         "fill_ratio": fill_ratio,
         "overhang_ratio": overhang_ratio,
         "is_watertight": bool(mesh.is_watertight),
@@ -17293,9 +17404,75 @@ def _build_filament_context_note(filament_profile):
     )
 
 
+def _format_duration_fr(seconds):
+    seconds = int(max(0, seconds))
+    h, m = seconds // 3600, (seconds % 3600) // 60
+    return f"{h}h {m:02d}min" if h > 0 else f"{max(m, 1)}min"
+
+
+def _estimate_print_seconds(piece, prof):
+    """Estimation rapide (≈ ±30 %) du temps d'impression d'une pièce avec un profil de réglages, sans lancer le slicer :
+    volume de matière à déposer (parois + dessus/dessous + remplissage + supports) divisé par le débit réalisable
+    (vitesse × hauteur de couche × largeur de ligne, plafonné), plus un temps fixe par couche et la mise en chauffe."""
+    try:
+        vol = float(piece.get('volume_mm3') or 0)
+        if vol <= 0:
+            return None
+        dims = piece.get('dimensions_mm') or [0, 0, 0]
+        height = max(float(dims[2] or 0), 0.2)
+        area = float(piece.get('surface_mm2') or 0) or (6.0 * vol ** (2.0 / 3.0))
+        lh = float(prof.get('layer_height') or 0.2)
+        nozzle = float(prof.get('nozzle_diameter') or 0.4)
+        lw = nozzle * 1.1
+        walls = int(prof.get('wall_count') or 2)
+        top = int(prof.get('top_layers') or 4)
+        bottom = int(prof.get('bottom_layers') or 4)
+        infill = prof.get('infill_density')
+        infill_frac = 0.15 if infill is None else (float(infill) / 100.0 if float(infill) > 1 else float(infill))
+        infill_frac = min(max(infill_frac, 0.0), 1.0)
+
+        shell = min(vol, area * walls * lw * 0.9)
+        tb = min(max(vol - shell, 0.0), (top + bottom) * lh * (vol / height))
+        inner = max(vol - shell - tb, 0.0) * infill_frac
+        extruded = shell + tb + inner
+        overhang = piece.get('overhang_ratio') or 0
+        if prof.get('supports_enabled') and overhang and overhang > 0.05:
+            extruded *= 1 + min(0.3, overhang * 2)
+
+        speed = float(prof.get('print_speed') or 60)
+        avg_speed = max(30.0, speed) * 1.15
+        flow = min(avg_speed * lh * lw, 15.0) * 0.55
+        if flow <= 0:
+            return None
+        layers = height / lh
+        return int(max(300, extruded / flow + layers * 2.5 + 240))
+    except Exception as e:
+        app_logger.debug(f"[RecommendProfile] Estimation rapide impossible: {e}")
+        return None
+
+
+def _build_process_filament_note(filament_profile):
+    if not filament_profile:
+        return ""
+    bits = [f"name={filament_profile.get('name')}"]
+    if filament_profile.get('material_type'):
+        bits.append(f"material={filament_profile['material_type']}")
+    if filament_profile.get('nozzle_temp'):
+        bits.append(f"nozzle_temp={filament_profile['nozzle_temp']}°C")
+    return (
+        f"\nThe user will print with this filament ({', '.join(bits)}). Prefer settings profiles whose layer height, "
+        f"speed and cooling-related choices suit this material.\n"
+    )
+
+
+MAX_PROFILE_SUGGESTIONS = 3
+
+
 @app.route('/api/ollama/recommend-profile', methods=['POST'])
 @login_required
 def api_ollama_recommend_profile():
+    """Suggère plusieurs profils de RÉGLAGES slicer (process) pour la pièce, avec un temps d'impression estimé chacun.
+    Le filament choisi ne sert que de contexte : on ne propose jamais de profil filament."""
     data = request.json or {}
     file_path = data.get('path')
     if not file_path or not os.path.exists(file_path):
@@ -17304,25 +17481,25 @@ def api_ollama_recommend_profile():
         app_logger.warning(f"[SECURITY] Tentative de recommandation IA hors sources: {file_path}")
         return jsonify({"error": "Ce fichier n'appartient à aucune source configurée"}), 403
 
-    profiles = load_slicer_profiles()
-    if not profiles:
-        return jsonify({
-            "error": "Aucun profil importé. Ajoutez vos profils dans Paramètres > Slicer.",
-            "no_profiles": True
-        }), 400
-
-    printer_id_raw = data.get('printer_id')
-    printer_id = _safe_int(printer_id_raw)
+    all_profiles = load_slicer_profiles()
+    printer_id = _safe_int(data.get('printer_id'))
     material_type = (data.get('material_type') or '').strip() or None
 
-    if printer_id is not None or material_type:
-        filtered_profiles = _filter_profiles_by_selection(profiles, printer_id, material_type)
-        if not filtered_profiles:
-            return jsonify({
-                "error": "Aucun profil ne correspond à l'imprimante et/ou au filament sélectionné.",
-                "no_profiles": True
-            }), 400
-        profiles = filtered_profiles
+    # Seuls les profils chargeables par le slicer par défaut sont proposés (mêmes critères que la liste « Réglages du slicer »)
+    _settings = load_settings() or {}
+    _slicer_name = _settings.get('default_slicer', 'system_default')
+    _slicer_path = find_slicer_by_name(_slicer_name)
+    _family = _resolve_slicer_family(_slicer_path, _slicer_name) if _slicer_path else None
+    candidates = [p for p in all_profiles
+                  if p.get('profile_type') == 'process'
+                  and p.get('source_path') and os.path.exists(p['source_path'])
+                  and (not _family or not (p.get('slicer') or '').strip() or (p.get('slicer') or '').strip().lower() == _family)
+                  and (printer_id is None or p.get('printer_id') in (None, printer_id))]
+    if not candidates:
+        return jsonify({
+            "error": "Aucun profil de réglages slicer (process) disponible pour cette imprimante. Ajoutez-les dans Paramètres > Slicer.",
+            "no_profiles": True
+        }), 400
 
     try:
         mesh = _load_mesh_for_conversion(file_path)
@@ -17335,47 +17512,39 @@ def api_ollama_recommend_profile():
     lang = get_user_lang()
     lang_name = LANG_NAMES.get(lang, lang)
 
-    slim_profiles = _build_slim_profiles_with_history(profiles, session['user_id'])
-    filament_note = _build_filament_context_note(_find_selected_filament_profile(profiles, material_type))
+    slim_profiles = _build_slim_profiles_with_history(candidates, session['user_id'])
+    filament_note = _build_process_filament_note(_find_selected_filament_profile(all_profiles, material_type))
+    n_max = min(MAX_PROFILE_SUGGESTIONS, len(candidates))
 
     prompt = (
-        f"3D piece to print:\n{json.dumps(piece, ensure_ascii=False)}\n\n"
-        f"Available user slicer profiles:\n{json.dumps(slim_profiles, ensure_ascii=False)}\n"
+        f"3D piece to print:\n{json.dumps({k: v for k, v in piece.items() if k != 'surface_mm2'}, ensure_ascii=False)}\n\n"
+        f"Available slicer SETTINGS profiles (process profiles: layer height, infill, walls, speed, supports):\n"
+        f"{json.dumps(slim_profiles, ensure_ascii=False)}\n"
         f"{filament_note}\n"
-        f"Some profiles include an 'historique_reussite' field summarizing REAL past print outcomes on "
-        f"this user's machine: sample_size (number of rated prints), confidence ('high' if sample_size >= 3, "
-        f"else 'low'), success_rate (0-1, only present when confidence is 'high'), and common_issue (a recurring "
-        f"failure cause, only set if it happened at least twice — never a single incident). Strongly prefer "
-        f"profiles with a good track record when confidence is 'high'. When confidence is 'low' (few or no "
-        f"ratings yet), do NOT treat the small sample as a reliable signal — do not say a profile is bad or "
-        f"risky based on 1-2 data points; rely on the piece's geometry instead and only mention the limited "
-        f"history as a minor aside if relevant.\n\n"
-        f"Pick the single best matching profile (by its 'name' field) for this piece, then list the specific "
-        f"parameter changes you would recommend on top of it (e.g. infill_density, supports_enabled, wall_count), "
-        f"each with a short reason tied to this piece's geometry (dimensions, fill_ratio, overhang_ratio) "
-        f"and/or to the profile's track record.\n"
-        f"Reply ONLY with strict JSON, no markdown formatting, no text outside the JSON object:\n"
-        f'{{"profil_recommande": "<profile name>", "modifications": '
-        f'[{{"parametre": "<field>", "valeur_actuelle": <value or null>, "valeur_suggeree": <value>, "raison": "<short reason>"}}]}}\n'
-        f"If the picked profile needs no changes, return an empty modifications array.\n"
+        f"Some profiles include an 'historique_reussite' field summarizing REAL past print outcomes on this user's "
+        f"machine (sample_size, confidence, success_rate only when confidence is 'high', common_issue). Prefer profiles "
+        f"with a good track record when confidence is 'high'; when confidence is 'low', do not treat the small sample "
+        f"as a reliable signal.\n\n"
+        f"Choose {n_max} DIFFERENT profiles from the list above (use their exact 'name'), best match first, ideally "
+        f"covering different trade-offs (e.g. quality / balanced / fast or strong) when the list allows it. For each, "
+        f"give a short reason tied to this piece's geometry (dimensions, fill_ratio, overhang_ratio) and/or the "
+        f"profile's track record. Never invent a profile that is not in the list.\n"
+        f"Reply ONLY with strict JSON, no markdown, no text outside the JSON object:\n"
+        f'{{"suggestions": [{{"profil": "<exact profile name>", "raison": "<short reason>"}}]}}\n'
         f"IMPORTANT: write every 'raison' text in {lang_name}."
     )
     system = (
-        f"You are an expert 3D printing assistant helping a maker pick the best slicer profile "
-        f"for a piece from their own saved profiles, informed by their real print history when available. "
+        f"You are an expert 3D printing assistant helping a maker pick the best slicer settings profiles for a piece "
+        f"from their own saved profiles, informed by their real print history when available. "
         f"Always reply with valid JSON only. Write all 'raison' text in {lang_name}."
     )
 
     try:
-        raw_text, source = _call_ai(prompt, system=system, num_predict=400, temperature=0.2)
+        raw_text, source = _call_ai(prompt, system=system, num_predict=500, temperature=0.2)
         match = re.search(r'\{.*\}', raw_text, re.DOTALL)
         if not match:
             return jsonify({"error": "Réponse IA illisible", "raw": raw_text}), 502
         result = json.loads(match.group())
-        result['source'] = source
-        result['piece'] = piece
-        result['profil_recommande_id'] = _resolve_recommended_profile_id(result, profiles)
-        return jsonify(result), 200
     except AIDisabledError as e:
         return jsonify({"error": str(e), "ai_disabled": True}), 403
     except RuntimeError as e:
@@ -17385,6 +17554,44 @@ def api_ollama_recommend_profile():
     except Exception as e:
         app_logger.error(f"[RecommendProfile] {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+    history = _get_profile_success_stats(session['user_id'])
+    by_name = {(p.get('name') or '').strip().lower(): p for p in candidates}
+    suggestions, seen_ids = [], set()
+    for item in (result.get('suggestions') or []):
+        if not isinstance(item, dict):
+            continue
+        prof = by_name.get(str(item.get('profil') or '').strip().lower())
+        if not prof or prof['id'] in seen_ids:
+            continue   # profil inventé ou en double : ignoré
+        seen_ids.add(prof['id'])
+        suggestions.append((prof, str(item.get('raison') or '').strip()))
+        if len(suggestions) >= n_max:
+            break
+    if not suggestions:   # réponse inexploitable : on propose les profils les mieux notés plutôt que rien
+        ranked = sorted(candidates, key=lambda p: -((history.get(p['id']) or {}).get('success_rate') or 0))
+        suggestions = [(p, '') for p in ranked[:n_max]]
+
+    out = []
+    for prof, reason in suggestions:
+        secs = _estimate_print_seconds(piece, prof)
+        out.append({
+            'id': prof['id'], 'name': prof.get('name'), 'slicer': (prof.get('slicer') or '').lower(),
+            'reason': reason,
+            'layer_height': prof.get('layer_height'), 'infill_density': prof.get('infill_density'),
+            'print_speed': prof.get('print_speed'), 'wall_count': prof.get('wall_count'),
+            'supports_enabled': prof.get('supports_enabled'),
+            'estimated_seconds': secs,
+            'estimated_formatted': _format_duration_fr(secs) if secs else None,
+            'estimate_source': 'approx',
+            'history': history.get(prof['id']),
+        })
+    piece_out = {k: v for k, v in piece.items() if k != 'surface_mm2'}
+    return jsonify({
+        'suggestions': out, 'source': source, 'piece': piece_out,
+        # compatibilité : première suggestion = « profil recommandé »
+        'profil_recommande': out[0]['name'], 'profil_recommande_id': out[0]['id'],
+    }), 200
 
 
 def _pack_footprints_shelf(items, bed_w, bed_h, spacing=0.0):
@@ -18703,7 +18910,8 @@ def _spool_buy_info(brand, material, color):
         if vendors and not any(str(v).lower() in low for v in vendors):
             continue
         shops.append({'id': s.get('id') or s['name'], 'name': s['name'], 'url': s['search_url'].replace('{q}', q)})
-    return {'vendor': brand or '', 'search_query': query, 'shops': shops}
+    return {'vendor': brand or '', 'material': material or '', 'color': color or '',
+            'search_query': query, 'shops': shops}
 
 
 @app.route('/api/filament/buy-links', methods=['GET'])
@@ -18715,6 +18923,528 @@ def api_filament_buy_links():
         # un ID numérique brut (catalogue TigerTag indisponible) est inutilisable en recherche
         return '' if name in ('vendor', 'material') and v.isdigit() else v
     return jsonify(_spool_buy_info(_arg('vendor'), _arg('material'), _arg('color'))), 200
+
+
+# ── Disponibilité d'une bobine dans les boutiques (stock faible → « où la racheter ? ») ──────────────
+# Pour chaque boutique de languages/useful_links.json (+ languages/filament_shops.json s'il existe) qui a un
+# search_url, on interroge sa recherche via l'API de sa plateforme (Shopify / PrestaShop / WooCommerce).
+# Une boutique dont la plateforme est inconnue ou qui ne répond pas n'est JAMAIS comptée comme « en stock » :
+# elle est simplement proposée en recherche manuelle.
+# Champ optionnel dans le JSON : "platform": "shopify" | "prestashop" | "woocommerce" | "none"
+import unicodedata as _unicodedata
+
+SHOP_HTTP_TIMEOUT = (4, 7)       # (connexion, lecture) en secondes, par requête
+SHOP_GLOBAL_TIMEOUT = 15         # durée max de toute la recherche, toutes boutiques confondues
+SHOP_CACHE_TTL = 900             # 15 min : évite de re-solliciter les boutiques à chaque ouverture du popup
+SHOP_MAX_ALTERNATIVES = 8
+SHOP_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+           "Chrome/124.0 Safari/537.36")
+_shop_avail_cache = {}
+_shop_avail_cache_lock = threading.Lock()
+
+_BRAND_STOPWORDS = {'lab', 'labs', '3d', 'filament', 'filaments', 'co', 'ltd', 'inc', 'the', 'by'}
+_BASE_MATERIALS = {'pla', 'petg', 'abs', 'asa', 'tpu', 'tpe', 'pc', 'pa', 'pa6', 'pa12', 'pva', 'hips', 'pp', 'pet',
+                   'nylon', 'pctg', 'pbt', 'peek', 'pei'}
+# Variantes qui changent réellement la nature de la bobine (un « PLA » n'est pas un « PLA Silk »)
+_MATERIAL_MODS = {
+    'silk': 'silk', 'soie': 'silk', 'matte': 'matte', 'mat': 'matte', 'cf': 'cf', 'carbon': 'cf', 'carbone': 'cf',
+    'wood': 'wood', 'bois': 'wood', 'marble': 'marble', 'marbre': 'marble', 'glow': 'glow', 'galaxy': 'sparkle',
+    'sparkle': 'sparkle', 'glitter': 'sparkle', 'metal': 'metal', 'gf': 'gf', 'flex': 'flex', 'flexible': 'flex',
+    'rainbow': 'rainbow', 'multicolor': 'rainbow', 'multicolore': 'rainbow', 'dual': 'rainbow', 'tricolor': 'rainbow',
+}
+_COLOR_GROUPS = {
+    'black': ['noir', 'noire', 'black', 'schwarz', 'negro', 'nero', 'nera', 'preto'],
+    'white': ['blanc', 'blanche', 'white', 'weiss', 'weis', 'blanco', 'bianco', 'branco'],
+    'grey': ['gris', 'grise', 'grey', 'gray', 'grau', 'grigio', 'cinza', 'anthracite'],
+    'silver': ['argent', 'argente', 'silver', 'silber', 'plata', 'argento', 'prata'],
+    'red': ['rouge', 'red', 'rot', 'rojo', 'rosso', 'vermelho'],
+    'blue': ['bleu', 'bleue', 'blue', 'blau', 'azul', 'blu', 'azzurro'],
+    'green': ['vert', 'verte', 'green', 'grun', 'gruen', 'verde'],
+    'yellow': ['jaune', 'yellow', 'gelb', 'amarillo', 'giallo', 'amarelo'],
+    'orange': ['orange', 'arancione', 'laranja'],
+    'purple': ['violet', 'violette', 'purple', 'lila', 'morado', 'viola', 'roxo', 'mauve'],
+    'pink': ['rose', 'pink', 'rosa', 'magenta'],
+    'brown': ['marron', 'brown', 'braun', 'brun', 'marrone', 'castanho'],
+    'gold': ['dore', 'doree', 'gold', 'oro', 'dourado'],
+    'beige': ['beige', 'sable', 'sand', 'creme', 'cream', 'ivoire', 'ivory'],
+    'turquoise': ['turquoise', 'cyan', 'teal', 'turkis', 'turquesa'],
+    'clear': ['transparent', 'transparente', 'clear', 'natural', 'naturel', 'natur'],
+}
+_COLOR_WORD_TO_GROUP = {w: g for g, ws in _COLOR_GROUPS.items() for w in ws}
+
+
+def _shop_norm(text):
+    """Minuscules, sans accents, ponctuation → espaces (le « + » est conservé : PLA+)."""
+    s = _unicodedata.normalize('NFKD', str(text or '')).encode('ascii', 'ignore').decode('ascii').lower()
+    return re.sub(r'[^a-z0-9+.]+', ' ', s).strip()
+
+
+def _shop_tokens(text):
+    return [t.strip('.') for t in _shop_norm(text).split() if t.strip('.')]
+
+
+def _hex_to_color_group(hex_color):
+    """Famille de couleur approchée d'un code hex (repli quand le nom de couleur est inconnu)."""
+    try:
+        import colorsys
+        h = str(hex_color or '').strip().lstrip('#')
+        if len(h) != 6:
+            return None
+        r, g, b = (int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+        hue, sat, val = colorsys.rgb_to_hsv(r, g, b)
+        hue *= 360
+        if val < 0.18:
+            return 'black'
+        if sat < 0.14:
+            return 'white' if val > 0.85 else ('silver' if val > 0.6 else 'grey')
+        if hue < 15 or hue >= 345:
+            return 'red'
+        if hue < 40:
+            return 'brown' if val < 0.6 else 'orange'
+        if hue < 70:
+            return 'yellow'
+        if hue < 165:
+            return 'green'
+        if hue < 200:
+            return 'turquoise'
+        if hue < 255:
+            return 'blue'
+        if hue < 300:
+            return 'purple'
+        return 'pink'
+    except Exception:
+        return None
+
+
+def _build_spool_spec(vendor, material, color, color_hex):
+    """Décompose une bobine en marque / matière de base / variantes / familles de couleur."""
+    brand_tokens = [t for t in _shop_tokens(vendor) if t not in _BRAND_STOPWORDS]
+    mat_tokens = _shop_tokens(material)
+    base = next((t for t in mat_tokens if t in _BASE_MATERIALS), None)
+    mods = {_MATERIAL_MODS[t] for t in mat_tokens if t in _MATERIAL_MODS}
+    # Les noms de bobine (« Geeetech PETG Noir ») contiennent marque + matière : on les retire pour isoler la couleur
+    known = set(brand_tokens) | set(mat_tokens) | _BRAND_STOPWORDS
+    color_tokens = _shop_tokens(color)
+    if base is None:   # matière absente du champ matière : on la cherche dans le nom
+        base = next((t for t in color_tokens if t in _BASE_MATERIALS), None)
+    mods |= {_MATERIAL_MODS[t] for t in color_tokens if t in _MATERIAL_MODS}
+    color_words = [t for t in color_tokens if t not in known and t not in _BASE_MATERIALS]
+    groups = {_COLOR_WORD_TO_GROUP[t] for t in color_words if t in _COLOR_WORD_TO_GROUP}
+    if not groups:
+        g = _hex_to_color_group(color_hex)
+        if g:
+            groups = {g}
+    q_words = []
+    for w in (list(brand_tokens) + ([base] if base else []) + sorted(mods) + [w for w in color_words if w in _COLOR_WORD_TO_GROUP]):
+        if w and w not in q_words:
+            q_words.append(w)
+    return {
+        'brand_tokens': brand_tokens, 'base': base, 'mods': mods, 'groups': groups,
+        'diameter_285': bool(re.search(r'(?<![0-9])(2\.85|3\.0{1,2})(?![0-9])', _shop_norm(f'{material} {color}'))),
+        'q_full': ' '.join(q_words),
+        'q_brand_mat': ' '.join([w for w in (list(brand_tokens) + ([base] if base else [])) if w]),
+        'q_mat': ' '.join([w for w in ([base] if base else []) + sorted(mods) if w]),
+    }
+
+
+def _eval_product(spec, title, vendor_field=''):
+    """Compare un produit de boutique à la bobine voulue. Retourne les critères satisfaits + un score."""
+    norm = _shop_norm(f'{title} {vendor_field}')
+    toks = set(norm.split())
+    brand_ok = (not spec['brand_tokens']) or all(t in toks or t in norm for t in spec['brand_tokens'])
+    brand_known = bool(spec['brand_tokens'])
+    prod_bases = {t for t in toks if t in _BASE_MATERIALS}
+    prod_bases |= {t.rstrip('+') for t in toks if t.rstrip('+') in _BASE_MATERIALS}
+    material_ok = (spec['base'] in prod_bases) if spec['base'] else True
+    prod_mods = {_MATERIAL_MODS[t] for t in toks if t in _MATERIAL_MODS}
+    mods_ok = prod_mods == spec['mods']
+    dia_285 = bool(re.search(r'(?<![0-9])(2\.85|3\.0{1,2})(?![0-9])', norm))
+    dia_ok = dia_285 == spec['diameter_285']
+    prod_groups = {_COLOR_WORD_TO_GROUP[t] for t in toks if t in _COLOR_WORD_TO_GROUP}
+    color_ok = (not spec['groups']) or bool(spec['groups'] & prod_groups)
+    exact = brand_ok and material_ok and mods_ok and dia_ok and color_ok
+    score = (3 if material_ok and spec['base'] else 0) + (2 if brand_ok and brand_known else 0) \
+        + (2 if color_ok and spec['groups'] else 0) + (1 if mods_ok else 0)
+    return {'exact': exact, 'brand_ok': brand_ok and brand_known, 'material_ok': material_ok, 'mods_ok': mods_ok,
+            'color_ok': color_ok and bool(spec['groups']), 'dia_ok': dia_ok, 'score': score}
+
+
+def _shop_http_get(url, as_json=True, ajax=False):
+    headers = {'User-Agent': SHOP_UA, 'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.7',
+               'Accept': 'application/json' if as_json else 'text/html'}
+    if ajax:
+        headers['X-Requested-With'] = 'XMLHttpRequest'
+    res = requests.get(url, headers=headers, timeout=SHOP_HTTP_TIMEOUT, allow_redirects=True)
+    if res.status_code != 200:
+        raise RuntimeError(f"HTTP {res.status_code}")
+    return res.json() if as_json else res.text
+
+
+def _shop_platform(shop):
+    p = str(shop.get('platform') or '').lower().strip()
+    if p:
+        return p
+    su = str(shop.get('search_url') or '').lower()
+    if 'controller=search' in su:
+        return 'prestashop'
+    if '/search?q=' in su:
+        return 'shopify'
+    if '/?s=' in su:
+        return 'woocommerce'
+    return 'none'
+
+
+def _shop_origin(shop):
+    from urllib.parse import urlsplit
+    p = urlsplit(str(shop.get('search_url') or shop.get('url') or ''))
+    return f"{p.scheme}://{p.netloc}" if p.scheme and p.netloc else ''
+
+
+def _shop_base(shop):
+    """Origine + préfixe de langue éventuel avant /search (ex. https://www.colorfabb.com/fr)."""
+    from urllib.parse import urlsplit
+    p = urlsplit(str(shop.get('search_url') or shop.get('url') or ''))
+    if not (p.scheme and p.netloc):
+        return ''
+    path = p.path or ''
+    i = path.lower().find('/search')
+    return f"{p.scheme}://{p.netloc}{path[:i] if i > 0 else ''}"
+
+
+def _price_str(v, cents=False):
+    try:
+        f = float(v)
+        return f"{(f / 100.0 if cents else f):.2f}"
+    except Exception:
+        return ''
+
+
+def _shop_search_shopify(shop, query, spec):
+    from urllib.parse import quote_plus
+    origin = _shop_origin(shop)
+    base = _shop_base(shop)
+    d = _shop_http_get(f"{base}/search/suggest.json?q={quote_plus(query)}&resources[type]=product&resources[limit]=10")
+    products = (((d or {}).get('resources') or {}).get('results') or {}).get('products')
+    if products is None:
+        raise RuntimeError("réponse Shopify inattendue")
+    out, detail_budget = [], 4
+    for p in products:
+        title = p.get('title') or ''
+        path = str(p.get('url') or '').split('?')[0]
+        base_url = origin + path if path.startswith('/') else path
+        ev = _eval_product(spec, title, p.get('vendor') or '')
+        # Les couleurs sont souvent des variantes d'un même produit (ex. Bambu Lab « PLA Basic ») : on lit les variantes
+        if detail_budget > 0 and ev['material_ok'] and (ev['brand_ok'] or not spec['brand_tokens']) and path.startswith('/products/'):
+            detail_budget -= 1
+            try:
+                pj = _shop_http_get(f"{origin}{path}.js")
+                img = (pj.get('featured_image') or '')
+                for v in pj.get('variants') or []:
+                    vt = f"{title} {v.get('public_title') or v.get('title') or ''}"
+                    out.append({'title': vt.replace(' Default Title', '').strip(), 'url': f"{base_url}?variant={v.get('id')}",
+                                'available': bool(v.get('available')), 'vendor': pj.get('vendor') or p.get('vendor') or '',
+                                'price': _price_str(v.get('price'), cents=True), 'image': img})
+                continue
+            except Exception:
+                pass
+        img = p.get('image') or (p.get('featured_image') or {}).get('url') or ''
+        out.append({'title': title, 'url': base_url, 'available': bool(p.get('available')),
+                    'vendor': p.get('vendor') or '', 'price': _price_str(p.get('price')), 'image': img})
+    return out
+
+
+def _html_text(fragment):
+    import html as _html
+    return _html.unescape(re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', fragment or ''))).strip()
+
+
+def _prestashop_parse_html(page, origin):
+    """Repli quand le thème ne renvoie pas de JSON : lit les vignettes produit de la page de recherche."""
+    from urllib.parse import urljoin
+    out = []
+    for m in re.finditer(r'<article\b[^>]*product-miniature[^>]*>(.*?)</article>', page, re.S | re.I):
+        blk = m.group(0)
+        t = re.search(r'class="[^"]*product-title[^"]*"[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', blk, re.S | re.I)
+        if not t:
+            t = re.search(r'<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', blk, re.S | re.I)
+        if not t:
+            continue
+        title = _html_text(t.group(2)) or _html_text((re.search(r'alt="([^"]+)"', blk) or [None, ''])[1])
+        if not title:
+            continue
+        price = re.search(r'([0-9]+[.,][0-9]{2})\s*(?:&nbsp;|\s)*(?:€|&euro;)', blk)
+        out_of_stock = bool(re.search(r'out[-_ ]of[-_ ]stock|rupture|[ée]puis|indisponible|unavailable', blk, re.I))
+        img = re.search(r'<img[^>]*(?:data-full-size-image-url|data-src|src)="([^"]+)"', blk, re.I)
+        out.append({'title': title, 'url': urljoin(origin + '/', t.group(1)), 'available': not out_of_stock,
+                    'vendor': '', 'price': (price.group(1).replace(',', '.') if price else ''),
+                    'image': img.group(1) if img else ''})
+    return out
+
+
+def _page_availability(url):
+    """True / False / None (indéterminé) d'après les données structurées de la fiche produit."""
+    try:
+        page = _shop_http_get(url, as_json=False)
+    except Exception:
+        return None
+    if re.search(r'schema\.org/(OutOfStock|SoldOut|Discontinued)|product:availability"\s+content="(out of stock|oos)', page, re.I):
+        return False
+    if re.search(r'schema\.org/(InStock|LimitedAvailability|PreOrder)|product:availability"\s+content="(in stock|instock)', page, re.I):
+        return True
+    return None
+
+
+def _shop_search_prestashop(shop, query, spec):
+    from urllib.parse import quote_plus
+    origin = _shop_origin(shop)
+    url = str(shop.get('search_url')).replace('{q}', quote_plus(query))
+    url += ('&' if '?' in url else '?') + 'resultsPerPage=24'
+    out = []
+    try:
+        d = _shop_http_get(url, ajax=True)
+        products = (d or {}).get('products')
+        if not isinstance(products, list):
+            raise ValueError("JSON sans « products »")
+        for p in products:
+            avail_flag = str(p.get('availability') or '').lower()
+            qty = p.get('quantity')
+            if avail_flag:
+                avail = avail_flag in ('available', 'last_remaining_items')
+            elif isinstance(qty, (int, float)):
+                avail = qty > 0 or bool(p.get('allow_oosp'))
+            else:
+                avail = not any('out_of_stock' in str(f) for f in (p.get('flags') or {}))
+            img = ''
+            try:
+                img = (p.get('cover') or {}).get('bySize', {}).get('home_default', {}).get('url') or ''
+            except Exception:
+                pass
+            out.append({'title': p.get('name') or '', 'url': p.get('canonical_url') or p.get('url') or '',
+                        'available': avail, 'vendor': p.get('manufacturer_name') or '',
+                        'price': _price_str(p.get('price_amount')), 'image': img})
+        return out
+    except Exception:
+        pass   # pas de JSON exploitable : on lit la page HTML de résultats
+    page = _shop_http_get(url, as_json=False)
+    out = _prestashop_parse_html(page, origin)
+    if not out and not re.search(r'product-miniature|product-title|js-product|data-id-product', page, re.I):
+        raise RuntimeError("page de résultats illisible (thème non reconnu ou accès bloqué)")
+    # Confirmation du stock sur la fiche des meilleurs candidats (la vignette seule n'est pas toujours fiable)
+    budget = 3
+    for p in out:
+        if budget <= 0:
+            break
+        ev = _eval_product(spec, p['title'], p['vendor'])
+        if ev['material_ok'] and (ev['brand_ok'] or not spec['brand_tokens']):
+            budget -= 1
+            st = _page_availability(p['url'])
+            if st is not None:
+                p['available'] = st
+    return out
+
+
+def _shop_search_woocommerce(shop, query, spec):
+    from urllib.parse import quote_plus
+    origin = _shop_origin(shop)
+    d = _shop_http_get(f"{origin}/wp-json/wc/store/v1/products?search={quote_plus(query)}&per_page=20")
+    if not isinstance(d, list):
+        raise RuntimeError("réponse WooCommerce inattendue")
+    out = []
+    for p in d:
+        prices = p.get('prices') or {}
+        minor = prices.get('currency_minor_unit', 2)
+        try:
+            price = f"{float(prices.get('price')) / (10 ** int(minor)):.2f}"
+        except Exception:
+            price = ''
+        imgs = p.get('images') or []
+        out.append({'title': re.sub(r'<[^>]+>', '', p.get('name') or ''), 'url': p.get('permalink') or '',
+                    'available': bool(p.get('is_in_stock')), 'vendor': '', 'price': price,
+                    'image': (imgs[0].get('src') if imgs else '') or ''})
+    return out
+
+
+_SHOP_ADAPTERS = {'shopify': _shop_search_shopify, 'prestashop': _shop_search_prestashop,
+                  'woocommerce': _shop_search_woocommerce}
+
+
+def _check_shop(shop, spec):
+    """Interroge une boutique. Retourne {'platform','items','error','seen'} (error=None si la boutique a répondu)."""
+    platform = _shop_platform(shop)
+    adapter = _SHOP_ADAPTERS.get(platform)
+    if not adapter:
+        return {'platform': platform, 'items': None, 'error': 'unsupported', 'seen': 0}
+    queries = []
+    for q in (spec['q_full'], spec['q_brand_mat'], spec['q_mat']):
+        if q and q not in queries:
+            queries.append(q)
+    if not queries:
+        return {'platform': platform, 'items': None, 'error': 'empty query', 'seen': 0}
+    seen, items = set(), []
+    try:
+        for q in queries:
+            for p in adapter(shop, q, spec):
+                key = p.get('url') or p.get('title')
+                if key in seen:
+                    continue
+                seen.add(key)
+                items.append(p)
+            # dès qu'on a une bobine exacte en stock, inutile d'élargir la recherche
+            if any(p['available'] and _eval_product(spec, p['title'], p['vendor'])['exact'] for p in items):
+                break
+    except Exception as e:
+        return {'platform': platform, 'items': None, 'error': str(e)[:160], 'seen': len(items)}
+    evaluated = []
+    for p in items:
+        if not p['available'] or not p.get('url'):
+            continue
+        evaluated.append({**p, 'ev': _eval_product(spec, p['title'], p['vendor'])})
+    return {'platform': platform, 'items': evaluated, 'error': None, 'seen': len(items)}
+
+
+def load_filament_shops():
+    """Boutiques interrogeables : useful_links.json (avec search_url) fusionné avec filament_shops.json s'il existe."""
+    shops, seen = [], set()
+
+    def _add(s):
+        if not isinstance(s, dict) or '{q}' not in str(s.get('search_url', '')):
+            return
+        sid = s.get('id') or s.get('name')
+        if not sid or sid in seen:
+            return
+        seen.add(sid)
+        shops.append(s)
+
+    for s in load_useful_links():
+        _add(s)
+    for path in (os.path.join(BASE_DIR, 'languages', 'filament_shops.json'), os.path.join(BASE_DIR, 'filament_shops.json')):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                for s in json.load(f):
+                    _add(s)
+            break
+        except FileNotFoundError:
+            continue
+        except Exception as e:
+            app_logger.warning(f"[ShopAvail] Lecture {path} impossible: {e}")
+    return shops
+
+
+def _search_spool_in_shops(vendor, material, color, color_hex):
+    from urllib.parse import quote_plus
+    spec = _build_spool_spec(vendor, material, color, color_hex)
+    cache_key = f"{spec['q_full']}|{sorted(spec['groups'])}|{sorted(spec['mods'])}"
+    now = time.time()
+    with _shop_avail_cache_lock:
+        hit = _shop_avail_cache.get(cache_key)
+        if hit and now - hit[0] < SHOP_CACHE_TTL:
+            return hit[1]
+
+    shops = load_filament_shops()
+    low_query = _spool_search_query(vendor, material, color)
+    low = (low_query or '').lower()
+    candidates = []
+    for s in shops:
+        vendors = s.get('vendors')   # boutique constructeur : seulement pour sa propre marque
+        if vendors and not any(str(v).lower() in low for v in vendors):
+            continue
+        candidates.append(s)
+
+    checked, failed, results, report = [], [], [], []
+    pool = ThreadPoolExecutor(max_workers=8)
+    try:
+        futs = {pool.submit(_check_shop, s, spec): s for s in candidates}
+        done, not_done = futures_wait(list(futs), timeout=SHOP_GLOBAL_TIMEOUT)
+        for f in done:
+            s = futs[f]
+            try:
+                r = f.result()
+            except Exception as e:
+                r = {'platform': _shop_platform(s), 'items': None, 'error': str(e)[:160], 'seen': 0}
+            row = {'shop': s['name'], 'platform': r['platform'], 'seen': r['seen']}
+            if r['error'] is not None:
+                failed.append(s)
+                row.update(status='unsupported' if r['error'] == 'unsupported' else 'error',
+                           detail='' if r['error'] == 'unsupported' else r['error'], in_stock=0)
+                app_logger.info(f"[ShopAvail] {s.get('name')} ({r['platform']}) non vérifiable : {r['error']}")
+            else:
+                checked.append(s)
+                row.update(status='ok', detail='', in_stock=len(r['items']))
+                app_logger.info(f"[ShopAvail] {s.get('name')} ({r['platform']}) : {r['seen']} produit(s) vus, {len(r['items'])} en stock")
+                for p in r['items']:
+                    results.append((s, p))
+            report.append(row)
+        for f in not_done:
+            s = futs[f]
+            failed.append(s)
+            report.append({'shop': s['name'], 'platform': _shop_platform(s), 'seen': 0, 'status': 'timeout',
+                           'detail': '', 'in_stock': 0})
+            app_logger.info(f"[ShopAvail] {s.get('name')} : délai dépassé")
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+    def _row(s, p, kind):
+        return {'shop_id': s.get('id') or s['name'], 'shop': s['name'], 'title': p['title'], 'url': p['url'],
+                'price': p.get('price') or '', 'image': p.get('image') or '', 'match': kind}
+
+    exact, per_shop = [], {}
+    for s, p in results:
+        if p['ev']['exact']:
+            exact.append((s, p))
+    exact.sort(key=lambda sp: (float(sp[1]['price']) if sp[1].get('price') else 1e9))
+    exact_rows, count = [], {}
+    for s, p in exact:
+        sid = s.get('id') or s['name']
+        if count.get(sid, 0) >= 2:
+            continue
+        count[sid] = count.get(sid, 0) + 1
+        exact_rows.append(_row(s, p, 'exact'))
+
+    alt_rows = []
+    if not exact_rows:
+        alts = [(s, p) for s, p in results if p['ev']['material_ok'] and p['ev']['dia_ok']
+                and (p['ev']['brand_ok'] or p['ev']['color_ok'] or p['ev']['mods_ok'])]
+        if not spec['base']:   # matière inconnue : on se rabat sur marque/couleur
+            alts = [(s, p) for s, p in results if p['ev']['brand_ok'] or p['ev']['color_ok']]
+        alts.sort(key=lambda sp: (-sp[1]['ev']['score'], float(sp[1]['price']) if sp[1].get('price') else 1e9))
+        count = {}
+        for s, p in alts:
+            sid = s.get('id') or s['name']
+            if count.get(sid, 0) >= 2:
+                continue
+            count[sid] = count.get(sid, 0) + 1
+            ev = p['ev']
+            kind = 'same_brand' if ev['brand_ok'] else ('same_color' if ev['color_ok'] else 'same_material')
+            alt_rows.append(_row(s, p, kind))
+            if len(alt_rows) >= SHOP_MAX_ALTERNATIVES:
+                break
+
+    q_manual = quote_plus(low_query)
+    manual = [{'id': s.get('id') or s['name'], 'name': s['name'], 'url': str(s['search_url']).replace('{q}', q_manual)}
+              for s in failed]
+    data = {'query': low_query, 'exact': exact_rows, 'alternatives': alt_rows,
+            'checked_count': len(checked), 'manual_shops': manual, 'report': report}
+    # Pas de cache si une boutique a échoué (panne passagère) : on réessaiera à la prochaine ouverture
+    if checked and not any(r['status'] in ('error', 'timeout') for r in report):
+        with _shop_avail_cache_lock:
+            _shop_avail_cache[cache_key] = (now, data)
+    return data
+
+
+@app.route('/api/filament/shop-availability', methods=['GET'])
+@login_required
+def api_filament_shop_availability():
+    """?vendor=&material=&color=&color_hex= -> {exact[], alternatives[], manual_shops[], checked_count}.
+    exact : boutiques qui ont réellement la bobine en stock ; alternatives : sélection de remplacement si aucune."""
+    def _arg(name, n=120):
+        v = (request.args.get(name) or '').strip()[:n]
+        return '' if name in ('vendor', 'material') and v.isdigit() else v
+    try:
+        data = _search_spool_in_shops(_arg('vendor'), _arg('material'), _arg('color'), _arg('color_hex', 9))
+    except Exception as e:
+        app_logger.error(f"[ShopAvail] Recherche échouée: {e}")
+        return jsonify({'error': str(e)}), 500
+    return jsonify(data), 200
 
 
 @app.route('/api/filament/low-stock', methods=['GET'])

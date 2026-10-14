@@ -2537,6 +2537,12 @@
                             <option value="" data-i18n="modal.ai_all_materials">Tous les filaments</option>
                         </select>
                     </div>
+                    <div style="margin-bottom:8px;">
+                        <label for="slicer-process-select" style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:3px;" data-i18n="modal.slicer_settings_label">Réglages du slicer</label>
+                        <select id="slicer-process-select" class="settings-select" style="width:100%; max-width:none;">
+                            <option value="" data-i18n="modal.slicer_settings_auto">Automatique (profils de l'imprimante)</option>
+                        </select>
+                    </div>
                     <div style="margin-bottom:8px; font-size:11px; color:var(--text-muted);" data-i18n="modal.printer_select_hint">Si des profils importés sont rattachés à cette imprimante, ils seront chargés automatiquement dans le slicer à l'envoi.</div>
                     <button id="slicer-ai-recommend-btn" class="btn btn-ghost btn-sm" style="width:100%; justify-content:center;" onclick="requestProfileRecommendation()">
                         <i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="modal.ai_recommend_btn">Analyser & recommander un profil</span>

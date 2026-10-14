@@ -5957,6 +5957,10 @@ _lastAiRecommendedProfile = aiProfile || null;
 const aiBox = document.getElementById('slicer-ai-recommend-result');
 if (aiBox) { aiBox.style.display = 'none'; aiBox.innerHTML = ''; }
 openModal('modal-slicer');
+const _procSel = document.getElementById('slicer-process-select');
+if (_procSel) _procSel.value = '';
+_loadProcessProfileSelect('slicer-process-select', document.getElementById('slicer-ai-printer-select')?.value || null,
+    { preselectId: (aiProfile && aiProfile.id) || null });
 _loadSlicerSpoolBox(path);
 _runPrePrintCheck(path);
 _loadSlicerQuickEstimate(path, name);
@@ -6028,9 +6032,41 @@ try {
     box.style.display = 'flex';
 } catch (e) {  }
 }
-document.getElementById('slicer-ai-printer-select')?.addEventListener('change', () => {
+document.getElementById('slicer-ai-printer-select')?.addEventListener('change', (e) => {
 if (currentSlicerFile) _runPrePrintCheck(currentSlicerFile);
+_loadProcessProfileSelect('slicer-process-select', e.target.value || null);
 });
+
+// Liste des profils de réglages (« process ») du slicer, filtrée sur l'imprimante choisie
+async function _loadProcessProfileSelect(selectId, printerId, opts = {}) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    const previous = sel.value;
+    try {
+        const qs = new URLSearchParams();
+        if (printerId) qs.set('printer_id', printerId);
+        if (opts.allSlicers) qs.set('all_slicers', '1');
+        const res = await fetch(`${API}/api/slicer/process-profiles?${qs}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const profiles = data.profiles || [];
+        sel.querySelectorAll('option[data-dynamic]').forEach(o => o.remove());
+        const multiSlicer = new Set(profiles.map(p => p.slicer).filter(Boolean)).size > 1;
+        profiles.forEach(p => {
+            const o = document.createElement('option');
+            o.value = p.id;
+            const bits = [];
+            if (p.layer_height) bits.push(`${p.layer_height} mm`);
+            if (p.infill_density != null) bits.push(`${p.infill_density}%`);
+            o.textContent = p.name + (bits.length ? ` — ${bits.join(' · ')}` : '') + (multiSlicer && p.slicer ? ` [${p.slicer}]` : '');
+            o.dataset.name = p.name;
+            o.setAttribute('data-dynamic', '1');
+            sel.appendChild(o);
+        });
+        const wanted = [previous, opts.preselectId].find(v => v && [...sel.options].some(o => o.value === v));
+        sel.value = wanted || '';
+    } catch (e) { /* liste vide : on reste sur « Automatique » */ }
+}
 
 async function _loadSlicerSpoolBox(path) {
 const box = document.getElementById('slicer-spool-box');
@@ -7175,12 +7211,115 @@ if (!res.ok) {
     }
     return;
 }
-renderProfileRecommendation(box, data);
+renderProfileSuggestions(box, data);
 } catch (err) {
 box.innerHTML = `<div style="color:var(--danger);">${I18N.t('toast.connection_error') || 'Erreur de connexion'}</div>`;
 } finally {
 if (btn) btn.disabled = false;
 }
+}
+
+function _fmtDurationSec(sec) {
+    const s = Math.max(0, Math.round(sec || 0));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+    return h > 0 ? `${h} h ${String(m).padStart(2, '0')} min` : `${Math.max(m, 1)} min`;
+}
+
+let _suggestPollToken = 0;
+
+// Plusieurs profils de réglages slicer suggérés, chacun avec son temps d'impression estimé
+function renderProfileSuggestions(box, data) {
+    const list = data.suggestions || [];
+    const token = ++_suggestPollToken;
+    _lastAiRecommendedProfile = null;
+    if (!list.length) {
+        box.innerHTML = `<div style="color:var(--text-muted);"><i class="fa-solid fa-circle-info"></i> ${_t3('modal.ai_suggest_none', "Aucun profil de réglages slicer disponible pour cette imprimante. Importe-les dans Paramètres → Slicer.")}</div>`;
+        return;
+    }
+    const cards = list.map((s, i) => {
+        const chips = [];
+        if (s.layer_height) chips.push(`${s.layer_height} mm`);
+        if (s.infill_density != null) chips.push(_t3('modal.ai_suggest_infill', '{{n}} % de remplissage', { n: s.infill_density }).replace('{{n}}', s.infill_density));
+        if (s.wall_count != null) chips.push(_t3('modal.ai_suggest_walls', '{{n}} parois', { n: s.wall_count }).replace('{{n}}', s.wall_count));
+        if (s.print_speed) chips.push(`${Math.round(s.print_speed)} mm/s`);
+        if (s.supports_enabled) chips.push(_t3('modal.ai_suggest_supports', 'supports'));
+        const chipsHtml = chips.map(c => `<span style="display:inline-block; font-size:11px; padding:1px 7px; margin:0 4px 4px 0; border-radius:20px; border:1px solid var(--border); color:var(--text-muted);">${escapeHtml(c)}</span>`).join('');
+        const timeHtml = s.estimated_seconds
+            ? `<i class="fa-solid fa-clock"></i> <strong>≈ ${escapeHtml(_fmtDurationSec(s.estimated_seconds))}</strong> <span style="color:var(--text-muted);">${_t3('modal.ai_suggest_time_approx', '(estimation approximative)')}</span> <i class="fa-solid fa-spinner fa-spin ai-suggest-spin" style="color:var(--text-muted);" title="${escapeHtml(_t3('modal.ai_suggest_computing', 'Calcul précis par le slicer…'))}"></i>`
+            : `<i class="fa-solid fa-spinner fa-spin ai-suggest-spin" style="color:var(--text-muted);"></i> <span style="color:var(--text-muted);">${_t3('modal.ai_suggest_computing', 'Calcul précis par le slicer…')}</span>`;
+        return `
+        <div class="ai-suggest-card" data-id="${escapeHtml(s.id)}" style="padding:8px 10px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-secondary); margin-bottom:6px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                <div style="flex:1; min-width:0; font-size:13.5px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${i === 0 ? '<i class="fa-solid fa-star" style="color:#f5a623;"></i> ' : ''}${escapeHtml(s.name || '—')}</div>
+                <button type="button" class="btn btn-ghost btn-sm ai-suggest-use" data-id="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name || '')}">${_t3('modal.ai_suggest_use', 'Utiliser')}</button>
+            </div>
+            <div>${chipsHtml}</div>
+            ${s.reason ? `<div style="color:var(--text-muted); margin:2px 0 4px;">${escapeHtml(s.reason)}</div>` : ''}
+            <div class="ai-suggest-time" data-id="${escapeHtml(s.id)}" style="font-size:12.5px;">${timeHtml}</div>
+        </div>`;
+    }).join('');
+    box.innerHTML = `
+        <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.03em; margin-bottom:6px;">${_t3('modal.ai_suggest_title', 'Réglages slicer suggérés')}</div>
+        ${cards}`;
+    box.querySelectorAll('.ai-suggest-use').forEach(btn => {
+        btn.addEventListener('click', () => _useSuggestedProfile(btn.dataset.id, btn.dataset.name, box));
+    });
+    list.forEach(s => _refineSuggestionTime(s, token, box));
+}
+
+function _useSuggestedProfile(id, name, box) {
+    const sel = document.getElementById('slicer-process-select');
+    if (sel) {
+        if (![...sel.options].some(o => o.value === id)) {
+            const o = document.createElement('option');
+            o.value = id; o.textContent = name; o.dataset.name = name; o.setAttribute('data-dynamic', '1');
+            sel.appendChild(o);
+        }
+        sel.value = id;
+    }
+    _lastAiRecommendedProfile = { id, name };
+    box.querySelectorAll('.ai-suggest-card').forEach(card => {
+        const active = card.dataset.id === id;
+        card.style.borderColor = active ? 'var(--accent, #4f8cff)' : 'var(--border)';
+        const b = card.querySelector('.ai-suggest-use');
+        if (b) b.innerHTML = active ? `<i class="fa-solid fa-check"></i> ${_t3('modal.ai_suggest_selected', 'Sélectionné')}` : _t3('modal.ai_suggest_use', 'Utiliser');
+    });
+}
+
+// Remplace l'estimation approximative par le temps réellement calculé par le slicer (en arrière-plan)
+async function _refineSuggestionTime(s, token, box) {
+    const path = currentSlicerFile;
+    if (!path) return;
+    const printerId = document.getElementById('slicer-ai-printer-select')?.value || '';
+    const material = document.getElementById('slicer-ai-material-select')?.value || '';
+    const el = () => box.querySelector(`.ai-suggest-time[data-id="${CSS.escape(s.id)}"]`);
+    const stopSpin = () => { el()?.querySelector('.ai-suggest-spin')?.remove(); };
+    try {
+        const res = await fetch(`${API}/api/slicer/pre-slice-estimate`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path, profile_id: s.id, printer_id: printerId || null, material_type: material || null })
+        });
+        let d = await res.json();
+        const qs = new URLSearchParams({ path, profile_id: s.id });
+        if (printerId) qs.set('printer_id', printerId);
+        if (material) qs.set('material_type', material);
+        for (let i = 0; i < 80 && d.status === 'pending'; i++) {
+            await new Promise(r => setTimeout(r, 3000));
+            if (token !== _suggestPollToken || !document.body.contains(box) || currentSlicerFile !== path) return;
+            const r2 = await fetch(`${API}/api/slicer/pre-slice-estimate?${qs}`);
+            d = await r2.json();
+        }
+        if (token !== _suggestPollToken || !document.body.contains(box)) return;
+        const target = el();
+        if (!target) return;
+        if (d.status === 'done' && d.data && d.data.time_seconds) {
+            target.innerHTML = `<i class="fa-solid fa-clock"></i> <strong>${escapeHtml(_fmtDurationSec(d.data.time_seconds))}</strong> <span style="color:#68d391;"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(_t3('modal.ai_suggest_time_slicer', 'calculé par le slicer'))}</span>`;
+        } else {
+            stopSpin();
+        }
+    } catch (e) {
+        stopSpin();
+    }
 }
 
 function renderProfileRecommendation(box, data) {
@@ -9758,7 +9897,7 @@ function showSpoolDetailPopup(d) {
             const res = await fetch(`${API}/api/filament/buy-links?${qs}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const info = await res.json();
-            showLowStockShopPopup({ name: d.name, color_hex: d.color_hex, search_query: info.search_query || '', shops: info.shops || [] });
+            showLowStockShopPopup({ name: d.name, color_hex: d.color_hex, vendor: buy.vendor || '', material: buy.material || '', color: buy.color || '', search_query: info.search_query || '', shops: info.shops || [] });
         } catch (e) {
             showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error');
         } finally {
@@ -11232,7 +11371,13 @@ async function _confirmSendToSlicer(force) {
             material_type: document.getElementById('slicer-ai-material-select')?.value || null,
             force: !!force,
         };
-        if (_lastAiRecommendedProfile && _lastAiRecommendedProfile.id) {
+        const _processSel = document.getElementById('slicer-process-select');
+        const _processId = _processSel?.value || '';
+        if (_processId) {
+            body.process_profile_id = _processId;
+            body.slicer_profile_id = _processId;
+            body.slicer_profile_name = _processSel.selectedOptions[0]?.dataset.name || '';
+        } else if (_lastAiRecommendedProfile && _lastAiRecommendedProfile.id) {
             body.slicer_profile_id = _lastAiRecommendedProfile.id;
             body.slicer_profile_name = _lastAiRecommendedProfile.name;
         }
@@ -13692,43 +13837,127 @@ function showLowStockListPopup(spools) {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 }
 
+function _openShopUrl(url) {
+    if (typeof url === 'string' && /^https?:\/\//i.test(url)) window.open(url, '_blank', 'noopener');
+}
+
 function showLowStockShopPopup(spool) {
-    const shops = Array.isArray(spool.shops) ? spool.shops : [];
+    const fallbackShops = Array.isArray(spool.shops) ? spool.shops : [];
     const overlay = document.createElement('div');
     overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100001; backdrop-filter: blur(3px);`;
     const popup = document.createElement('div');
-    popup.style.cssText = `background: var(--bg-secondary); color: var(--text-primary); padding: 24px; border-radius: 14px; max-width: 380px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 12px 35px rgba(0,0,0,0.6); border: 1px solid var(--border);`;
+    popup.style.cssText = `background: var(--bg-secondary); color: var(--text-primary); padding: 24px; border-radius: 14px; max-width: 440px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 12px 35px rgba(0,0,0,0.6); border: 1px solid var(--border);`;
     const color = spool.color_hex || '#888888';
     const query = spool.search_query || spool.name || spool.material || '';
-    const shopButtons = shops.map((shop, i) => `
-        <button class="low-stock-shop-btn" data-idx="${i}" style="display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary); cursor:pointer; margin-bottom:8px; font-size:14.5px; font-weight:500;">
+    const rowStyle = 'display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:10px 14px; border-radius:10px; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary); cursor:pointer; margin-bottom:8px;';
+
+    // Liste simple (boutiques sans vérification de stock : recherche manuelle)
+    const manualRows = (shops) => shops.map(shop => `
+        <button class="low-stock-shop-btn" data-url="${escapeHtml(shop.url || '')}" style="${rowStyle} font-size:14px; font-weight:500;">
             <i class="fa-solid fa-store" style="color:var(--accent); width:18px; text-align:center;"></i>
             <span style="flex:1;">${escapeHtml(shop.name)}</span>
             <i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--text-muted); font-size:12px;"></i>
         </button>`).join('');
-    const body = shops.length
-        ? `<div style="overflow-y:auto;">${shopButtons}</div>`
-        : `<div style="font-size:13px; color:var(--text-muted); margin-bottom:8px;">${_t3('spoolman.low_stock_no_shop', 'Aucune boutique avec recherche configurée (champ search_url dans useful_links.json).')}</div>`;
+
+    // Liste de produits réellement trouvés en stock
+    const productRows = (rows) => rows.map(r => {
+        const badge = r.match === 'same_brand' ? _t3('spoolman.low_stock_match_brand', 'Même marque')
+            : r.match === 'same_color' ? _t3('spoolman.low_stock_match_color', 'Même couleur')
+            : r.match === 'same_material' ? _t3('spoolman.low_stock_match_material', 'Même matière') : '';
+        return `
+        <button class="low-stock-shop-btn" data-url="${escapeHtml(r.url || '')}" style="${rowStyle}">
+            <i class="fa-solid fa-store" style="color:var(--accent); width:18px; text-align:center;"></i>
+            <span style="flex:1; min-width:0;">
+                <span style="display:block; font-size:14px; font-weight:600;">${escapeHtml(r.shop)}</span>
+                <span style="display:block; font-size:12.5px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(r.title)}</span>
+                ${badge ? `<span style="display:inline-block; margin-top:3px; font-size:11px; padding:1px 7px; border-radius:20px; border:1px solid var(--border); color:var(--text-muted);">${escapeHtml(badge)}</span>` : ''}
+            </span>
+            ${r.price ? `<span style="font-size:13px; font-weight:600; white-space:nowrap;">${escapeHtml(r.price)} €</span>` : ''}
+            <i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--text-muted); font-size:12px;"></i>
+        </button>`;
+    }).join('');
+
+    const manualSection = (shops) => shops.length ? `
+        <div style="font-size:12.5px; color:var(--text-muted); margin:12px 0 8px;">${_t3('spoolman.low_stock_manual_title', 'Autres boutiques (recherche manuelle, stock non vérifié)')}</div>
+        ${manualRows(shops)}` : '';
+
     popup.innerHTML = `
         <h3 style="margin:0 0 8px 0; font-size:18px; font-weight:600;"><i class="fa-solid fa-store" style="color:var(--accent);"></i> ${_t3('spoolman.low_stock_shop_title', 'Où racheter cette bobine ?')}</h3>
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; color:var(--text-muted); font-size:13px;">
             <span style="width:12px; height:12px; border-radius:4px; background:${escapeHtml(color)}; flex-shrink:0;"></span>
             <span><i class="fa-solid fa-magnifying-glass" style="font-size:11px;"></i> ${escapeHtml(query)}</span>
         </div>
-        ${body}
+        <div id="low-stock-shop-body" style="overflow-y:auto; min-height:60px;">
+            <div style="display:flex; align-items:center; gap:10px; color:var(--text-muted); font-size:13.5px; padding:8px 0;">
+                <i class="fa-solid fa-spinner fa-spin"></i> ${_t3('spoolman.low_stock_searching', 'Recherche de la bobine dans les boutiques…')}
+            </div>
+        </div>
         <button id="low-stock-shop-close" class="btn btn-ghost" style="margin-top:6px; flex-shrink:0;">${_t3('actions.close', 'Fermer')}</button>
     `;
     overlay.appendChild(popup);
     document.body.appendChild(overlay);
     const close = () => overlay.remove();
-    popup.querySelectorAll('.low-stock-shop-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const shop = shops[Number(btn.dataset.idx)];
-            if (shop && shop.url) window.open(shop.url, '_blank', 'noopener');
-        });
+    const body = popup.querySelector('#low-stock-shop-body');
+    body.addEventListener('click', (e) => {
+        const btn = e.target.closest('.low-stock-shop-btn');
+        if (btn) _openShopUrl(btn.dataset.url);
     });
     document.getElementById('low-stock-shop-close').addEventListener('click', close);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+    const detailsSection = (report) => {
+        if (!Array.isArray(report) || !report.length) return '';
+        const lines = report.map(r => {
+            let txt, icon;
+            if (r.status === 'ok') {
+                icon = 'fa-circle-check';
+                txt = _t3('spoolman.low_stock_details_ok', '{{n}} en stock ({{seen}} produits vus)', { n: r.in_stock, seen: r.seen })
+                    .replace('{{n}}', r.in_stock).replace('{{seen}}', r.seen);
+            } else if (r.status === 'unsupported') {
+                icon = 'fa-circle-minus';
+                txt = _t3('spoolman.low_stock_details_unsupported', 'non vérifiable automatiquement');
+            } else if (r.status === 'timeout') {
+                icon = 'fa-clock';
+                txt = _t3('spoolman.low_stock_details_timeout', 'délai dépassé');
+            } else {
+                icon = 'fa-circle-xmark';
+                txt = _t3('spoolman.low_stock_details_error', 'erreur') + (r.detail ? ` : ${r.detail}` : '');
+            }
+            return `<div style="padding:2px 0;"><i class="fa-solid ${icon}" style="width:16px;"></i> ${escapeHtml(r.shop)} <span style="opacity:.7;">(${escapeHtml(r.platform)})</span> — ${escapeHtml(txt)}</div>`;
+        }).join('');
+        return `<details style="margin-top:10px; font-size:12px; color:var(--text-muted);"><summary style="cursor:pointer;">${_t3('spoolman.low_stock_details_title', 'Détails de la recherche')}</summary>${lines}</details>`;
+    };
+
+    const noteStyle = 'font-size:13.5px; line-height:1.45; margin-bottom:12px; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--bg-primary);';
+    (async () => {
+        try {
+            const qs = new URLSearchParams({
+                vendor: spool.vendor || '', material: spool.material || '',
+                color: spool.color || spool.name || '', color_hex: spool.color_hex || ''
+            });
+            const res = await fetch(`${API}/api/filament/shop-availability?${qs}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (!overlay.isConnected) return;
+            const exact = data.exact || [];
+            const alts = data.alternatives || [];
+            const manual = data.manual_shops || [];
+            let html;
+            if (exact.length) {
+                html = `<div style="font-size:13px; color:var(--text-muted); margin-bottom:8px;"><i class="fa-solid fa-circle-check" style="color:var(--success, #4caf50);"></i> ${_t3('spoolman.low_stock_in_stock_title', 'Disponible dans ces boutiques')}</div>${productRows(exact)}`;
+            } else if (alts.length) {
+                html = `<div style="${noteStyle}"><i class="fa-solid fa-circle-info" style="color:var(--accent);"></i> ${_t3('spoolman.low_stock_not_found', "La bobine exacte n'a pas été trouvée, mais voici une sélection pour la remplacer :")}</div>${productRows(alts)}`;
+            } else {
+                html = `<div style="${noteStyle}">${_t3('spoolman.low_stock_nothing', "La bobine exacte n'a pas été trouvée et aucune bobine de remplacement en stock n'a été trouvée dans les boutiques vérifiées.")}</div>`;
+            }
+            body.innerHTML = html + manualSection(manual) + detailsSection(data.report);
+        } catch (e) {
+            if (!overlay.isConnected) return;
+            body.innerHTML = `<div style="${noteStyle}">${_t3('spoolman.low_stock_search_error', 'Recherche automatique indisponible : utilisez les liens de recherche ci-dessous.')}</div>`
+                + (fallbackShops.length ? manualRows(fallbackShops)
+                    : `<div style="font-size:13px; color:var(--text-muted);">${_t3('spoolman.low_stock_no_shop', 'Aucune boutique avec recherche configurée (champ search_url dans useful_links.json).')}</div>`);
+        }
+    })();
 }
 
 function openPrinterMonitor(pid) {
@@ -15109,7 +15338,7 @@ startThumbAutoRefresh();
         _lastQuote = { ...q, material_key: material, weightG, timeFormatted };
 
         const preciseBadgeHtml = {
-            done: `<div style="display:flex; align-items:center; gap:6px; font-size:11px; color:#68d391; margin-bottom:10px;"><i class="fa-solid fa-circle-check"></i> ${I18N.t('cost.precise_via_slicer', { slicer: escapeHtml(_preciseEstimate?.slicer_name || '') })}</div>`,
+            done: `<div style="display:flex; align-items:center; gap:6px; font-size:11px; color:#68d391; margin-bottom:10px;"><i class="fa-solid fa-circle-check"></i> ${I18N.t('cost.precise_via_slicer', { slicer: escapeHtml((_preciseEstimate?.slicer_name || '') + _costProfileSuffix()) })}</div>`,
             pending: `<div style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); margin-bottom:10px;"><i class="fa-solid fa-spinner fa-spin"></i> ${I18N.t('cost.precise_searching')}</div>`,
             unavailable: `<div style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); margin-bottom:10px;"><i class="fa-solid fa-circle-info"></i> ${I18N.t('cost.precise_no_slicer')}</div>`,
             error: `<div style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); margin-bottom:10px;"><i class="fa-solid fa-circle-info"></i> ${I18N.t('cost.precise_failed')}</div>`,
@@ -15189,8 +15418,37 @@ startThumbAutoRefresh();
         `;
     }
 
-    function _handlePreciseEstimateStatus(data, filePath) {
+    // Réglages de slicer choisis dans la modale (profil + imprimante + matière) ; vide = réglages par défaut de l'app
+    function _costEstimateParams() {
+        const profileId = document.getElementById('cost-process-select')?.value || '';
+        if (!profileId) return {};
+        const p = { profile_id: profileId };
+        const printerId = document.getElementById('cost-printer-select')?.value || '';
+        const material = document.getElementById('cost-material-select')?.value || '';
+        if (printerId) p.printer_id = printerId;
+        if (material) p.material_type = material;
+        return p;
+    }
+
+    function _costProfileSuffix() {
+        const sel = document.getElementById('cost-process-select');
+        const name = sel?.value ? (sel.selectedOptions[0]?.dataset.name || '') : '';
+        return name ? ` · ${name}` : '';
+    }
+
+    function _restartPreciseEstimate() {
+        if (!_costCurrentFilePath) return;
+        clearTimeout(_preciseEstimateTimer);
+        _preciseEstimate = null;
+        _preciseEstimateStatus = 'idle';
+        _aiTimePrediction = null;
+        _recomputeCost();
+        _startPreciseEstimate(_costCurrentFilePath);
+    }
+
+    function _handlePreciseEstimateStatus(data, filePath, paramsKey) {
         if (!data || filePath !== _costCurrentFilePath) return;
+        if (paramsKey !== undefined && paramsKey !== JSON.stringify(_costEstimateParams())) return;   // réglages changés entre-temps
         if (data.status === 'done' && data.data) {
             _preciseEstimate = data.data;
             _preciseEstimateStatus = 'done';
@@ -15210,22 +15468,24 @@ startThumbAutoRefresh();
         clearTimeout(_preciseEstimateTimer);
         _preciseEstimateTimer = setTimeout(async () => {
             try {
-                const res = await fetch(`${API}/api/slicer/pre-slice-estimate?path=${encodeURIComponent(filePath)}`);
+                const qs = new URLSearchParams({ path: filePath, ..._costEstimateParams() });
+                const res = await fetch(`${API}/api/slicer/pre-slice-estimate?${qs}`);
                 const d = await res.json();
-                _handlePreciseEstimateStatus(d, filePath);
+                _handlePreciseEstimateStatus(d, filePath, paramsKey);
             } catch (e) {  }
         }, 3000);
     }
 
     async function _startPreciseEstimate(filePath) {
         try {
+            const params = _costEstimateParams();
             const res = await fetch(`${API}/api/slicer/pre-slice-estimate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: filePath })
+                body: JSON.stringify({ path: filePath, ...params })
             });
             const data = await res.json();
-            _handlePreciseEstimateStatus(data, filePath);
+            _handlePreciseEstimateStatus(data, filePath, JSON.stringify(params));
         } catch (e) {
             console.debug('[PreSlice] Requête impossible:', e);
         }
@@ -16226,6 +16486,13 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                         </select>
                     </div>
                     <div>
+                        <label style="${labelStyle}">${_t2('modal.slicer_settings_label', 'Réglages du slicer')}</label>
+                        <select id="cost-process-select" style="${fieldStyle}">
+                            <option value="">${_t2('cost.slicer_settings_default', "Réglages par défaut de l'application")}</option>
+                        </select>
+                        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${_t2('cost.slicer_settings_hint', "L'estimation précise du slicer utilisera ce profil.")}</div>
+                    </div>
+                    <div>
                         <label style="${labelStyle}">${I18N.t('cost.material_label')}</label>
                         <select id="cost-material-select" style="${fieldStyle}">
                             ${materials.map(m => `<option value="${m}" ${m === material ? 'selected' : ''}>${m.toUpperCase()}</option>`).join('')}
@@ -16309,6 +16576,20 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             });
 
             document.getElementById('cost-quote-btn')?.addEventListener('click', _downloadQuote);
+
+            // Réglages du slicer : liste filtrée sur l'imprimante ; tout changement relance l'estimation précise
+            const _costProcessSel = document.getElementById('cost-process-select');
+            const _costPrinterSel = document.getElementById('cost-printer-select');
+            _loadProcessProfileSelect('cost-process-select', _costPrinterSel?.value || null, { allSlicers: true });
+            _costProcessSel?.addEventListener('change', _restartPreciseEstimate);
+            _costPrinterSel?.addEventListener('change', async () => {
+                const hadProfile = !!_costProcessSel?.value;
+                await _loadProcessProfileSelect('cost-process-select', _costPrinterSel.value || null, { allSlicers: true });
+                if (hadProfile) _restartPreciseEstimate();
+            });
+            document.getElementById('cost-material-select')?.addEventListener('change', () => {
+                if (_costProcessSel?.value) _restartPreciseEstimate();
+            });
 
             _recomputeCost();
             _startPreciseEstimate(filePath);

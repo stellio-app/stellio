@@ -369,6 +369,13 @@ Wenn Ihnen Stellio nützlich ist, können Sie:
 - das Projekt in Ihrem Umfeld teilen
 - [Code beitragen](#-mitwirken) oder Übersetzungen liefern
 - Fehler melden, um die App zu verbessern
+- Die Entwicklung mit einer kleinen Spende auf Ko-fi unterstützen ☕
+
+<p align="center">
+  <a href="https://ko-fi.com/E6J828RYVD">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Stellio auf Ko-fi unterstützen">
+  </a>
+</p>
 
 ---
 
