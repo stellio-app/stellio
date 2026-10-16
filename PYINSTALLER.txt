@@ -1,7 +1,2 @@
-Devis PDF (reportlab) : à ajouter dans ton .spec, sinon ça marche en dev mais pas dans l'exécutable.
-
 from PyInstaller.utils.hooks import collect_submodules
 hiddenimports += collect_submodules('reportlab') + ['pyaes']
-
-Et dans requirements.txt : reportlab, pyaes (pyaes = chiffrement AES-256 du PDF ; sans lui le code retombe sur 128 bits).
-Les polices japonaises/chinoises utilisent les CID fonts intégrées à reportlab (aucun fichier à embarquer).
