@@ -22220,8 +22220,6 @@ def _check_shop(shop, spec):
 
 
 def load_filament_shops():
-    # Les boutiques de recherche de stock sont les liens utiles qui ont une URL de recherche
-    # (champ search_url contenant {q}) dans languages/useful_links.json.
     shops, seen = [], set()
     for s in load_useful_links():
         if not isinstance(s, dict) or '{q}' not in str(s.get('search_url', '')):
@@ -22826,9 +22824,6 @@ def api_delete_manual_spool(spool_id):
         app_logger.error(f"[API] Erreur non gérée: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
-# ---------------------------------------------------------------------------
-# Import de bobines manuelles depuis un tableur (.xls / .xlsx / .csv)
-# ---------------------------------------------------------------------------
 _SPOOL_IMPORT_MAX_BYTES = 5 * 1024 * 1024
 _SPOOL_IMPORT_MAX_ROWS = 2000
 
