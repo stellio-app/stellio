@@ -51,6 +51,9 @@ except ImportError:
         ("websocket",                               "websocket-client",       "WebSocketApp",       ["websocket", "websocket-client"]),
         ("flashforge",                              "flashforge-python-api",  "FlashForgeClient",   None),
         ("reportlab.platypus",                      "reportlab",              "SimpleDocTemplate",  None),
+        ("plyer",                                   "plyer",                  "notification",       None),
+        ("openpyxl",                                "openpyxl",               "load_workbook",      None),
+        ("xlrd",                                    "xlrd",                   "open_workbook",      None),
     ]
 
 
@@ -202,9 +205,8 @@ import trimesh.transformations as tra
 import io
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms
 try:
-    # CFB a été déplacé dans le module « decrepit » (cryptography >= 47) ; l'ancien chemin est déprécié.
     from cryptography.hazmat.decrepit.ciphers.modes import CFB
-except ImportError:  # cryptography < 47 : ancien emplacement
+except ImportError: 
     from cryptography.hazmat.primitives.ciphers.modes import CFB
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
@@ -481,10 +483,6 @@ TRASH_RETENTION_SECONDS = 300
 _trash_registry = {}  
 _trash_registry_lock = threading.Lock()
 
-# --- Présence légère (mode collaboratif) ---
-# Suivi en mémoire (pas de persistance nécessaire) des appareils/onglets connectés à cette même
-# instance Stellio, pour afficher qui regarde quoi en temps réel. Une entrée expire au bout de 30s
-# sans battement de cœur (l'appareil est considéré déconnecté).
 _active_sessions = {}
 _active_sessions_lock = threading.Lock()
 PRESENCE_TIMEOUT_SECONDS = 30
@@ -1253,6 +1251,20 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(id),
         PRIMARY KEY (file_path, user_id)
     )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS file_origins (
+        file_path TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        source_url TEXT DEFAULT '',
+        author TEXT DEFAULT '',
+        license TEXT DEFAULT '',
+        notes TEXT DEFAULT '',
+        from_download INTEGER DEFAULT 0,
+        downloaded_at TEXT,
+        platform TEXT DEFAULT '',
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        PRIMARY KEY (file_path, user_id)
+    )""")
     c.execute("""CREATE TABLE IF NOT EXISTS print_photos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -1486,6 +1498,118 @@ def migrate_printer_maintenance():
     finally:
         conn.close()
 
+def migrate_stellio_extras():
+    conn = get_db()
+    c = conn.cursor()
+    try:
+        c.execute("PRAGMA table_info(users)")
+        ucols = [col[1] for col in c.fetchall()]
+        if 'owner_id' not in ucols:
+            c.execute("ALTER TABLE users ADD COLUMN owner_id INTEGER")
+        if 'role' not in ucols:
+            c.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'")
+
+        c.execute("PRAGMA table_info(printer_maintenance_tasks)")
+        tcols = [col[1] for col in c.fetchall()]
+        if tcols and 'part_id' not in tcols:
+            c.execute("ALTER TABLE printer_maintenance_tasks ADD COLUMN part_id INTEGER")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS spool_drying_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            source_type TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            source_label TEXT DEFAULT '',
+            material TEXT DEFAULT '',
+            kind TEXT NOT NULL DEFAULT 'dried',
+            event_at TEXT NOT NULL,
+            temp_c REAL,
+            duration_h REAL,
+            humidity_pct REAL,
+            notes TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_drying_spool ON spool_drying_log(user_id, source_type, source_id, event_at)")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS filament_calibrations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            printer_id INTEGER,
+            brand TEXT DEFAULT '',
+            material TEXT NOT NULL,
+            color_name TEXT DEFAULT '',
+            nozzle_diameter REAL DEFAULT 0.4,
+            nozzle_temp REAL,
+            bed_temp REAL,
+            flow_ratio REAL,
+            pressure_advance REAL,
+            max_flow REAL,
+            retraction_mm REAL,
+            notes TEXT DEFAULT '',
+            validated_at TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_calib_material ON filament_calibrations(user_id, material)")
+
+        c.execute("PRAGMA table_info(print_history)")
+        hcols = [col[1] for col in c.fetchall()]
+        if hcols and 'filament_material' not in hcols:
+            c.execute("ALTER TABLE print_history ADD COLUMN filament_material TEXT")
+        if hcols and 'filament_label' not in hcols:
+            c.execute("ALTER TABLE print_history ADD COLUMN filament_label TEXT")
+            c.execute("""UPDATE print_history SET
+                filament_material = (SELECT NULLIF(TRIM(fa.material), '') FROM filament_assignments fa
+                                     WHERE fa.file_path = print_history.file_path AND fa.user_id = print_history.user_id),
+                filament_label = (SELECT NULLIF(TRIM(fa.source_label), '') FROM filament_assignments fa
+                                  WHERE fa.file_path = print_history.file_path AND fa.user_id = print_history.user_id)""")
+
+        c.execute("PRAGMA table_info(print_history)")
+        hcols2 = [col[1] for col in c.fetchall()]
+        if hcols2:
+            for col in ('spool_source_type', 'spool_source_id', 'assignment_json'):
+                if col not in hcols2:
+                    c.execute(f"ALTER TABLE print_history ADD COLUMN {col} TEXT")
+            c.execute("""UPDATE print_history SET spool_source_type = 'spoolman', spool_source_id = CAST(spool_id AS TEXT)
+                         WHERE spool_source_type IS NULL AND spool_id IS NOT NULL AND TRIM(CAST(spool_id AS TEXT)) != ''""")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS model_updates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            platform TEXT NOT NULL,
+            model_id TEXT NOT NULL,
+            source_url TEXT DEFAULT '',
+            title TEXT DEFAULT '',
+            downloaded_at TEXT,
+            baseline_downloaded_at TEXT,
+            baseline_fingerprint TEXT,
+            fingerprint TEXT,
+            remote_modified_at TEXT,
+            dismissed_modified_at TEXT,
+            status TEXT DEFAULT 'new',
+            reason TEXT DEFAULT '',
+            last_checked_at TEXT,
+            notified_key TEXT DEFAULT '',
+            UNIQUE(user_id, platform, model_id)
+        )""")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS printer_parts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            printer_id INTEGER,
+            name TEXT NOT NULL,
+            category TEXT DEFAULT 'other',
+            stock_qty INTEGER DEFAULT 0,
+            alert_qty INTEGER DEFAULT 1,
+            buy_url TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""")
+        conn.commit()
+    except Exception as e:
+        app_logger.error(f"[MIGRATION] migrate_stellio_extras: {e}")
+    finally:
+        conn.close()
+
 init_db()
 migrate_account_passwords_to_random_iv()
 migrate_printer_api_keys()
@@ -1531,6 +1655,7 @@ def migrate_manual_filament_spools():
 
 migrate_print_history()
 migrate_printer_maintenance()
+migrate_stellio_extras()
 migrate_manual_filament_spools()
 migrate_print_photos()
 
@@ -3401,6 +3526,64 @@ def _csrf_protect():
         if not header_token or not secrets.compare_digest(session['csrf_token'], header_token):
             return jsonify({"error": "Jeton de sécurité manquant ou expiré. Rechargez la page et réessayez."}), 403
 
+_VIEWER_WRITE_WHITELIST = {
+    ('POST', '/api/auth/logout'),
+    ('POST', '/api/presence/heartbeat'),
+    ('POST', '/api/files/analyze'),
+    ('POST', '/api/files/analyze-now'),
+    ('POST', '/api/files/pre-print-check'),
+    ('POST', '/api/thumb/check'),
+    ('POST', '/api/thumb/generate-now'),
+    ('POST', '/api/ai/predict-print-time'),
+    ('POST', '/api/ollama/semantic-search'),
+    ('POST', '/api/ollama/explain-orientation'),
+    ('POST', '/api/nesting/arrange'),
+}
+_VIEWER_BLOCKED_GET_PREFIXES = (
+    '/api/accounts', '/api/remote-access', '/api/remote-instances', '/api/peer',
+    '/api/logs', '/api/backup', '/api/debug', '/api/update', '/api/auth/guests',
+    '/api/browse-folder', '/api/picker', '/api/sources/suggestions',
+    '/api/printers/discover', '/api/spoolman/discover', '/api/slicers/discover',
+)
+_SECRET_KEY_HINTS = ('token', 'secret', 'password', 'passwd', 'api_key', 'apikey',
+                     'access_code', 'cookie', 'credential', 'private', 'code',
+                     'webhook', 'topic', 'chat_id')
+
+def _is_viewer():
+    return session.get('role') == 'viewer'
+
+def _viewer_sanitize(obj):
+    if isinstance(obj, dict):
+        return {k: _viewer_sanitize(v) for k, v in obj.items()
+                if not any(h in str(k).lower() for h in _SECRET_KEY_HINTS)}
+    if isinstance(obj, list):
+        return [_viewer_sanitize(v) for v in obj]
+    return obj
+
+@app.before_request
+def _viewer_guard():
+    if session.get('role') != 'viewer' or 'user_id' not in session:
+        return
+    try:
+        _gconn = get_db()
+        try:
+            _alive = _gconn.execute("SELECT 1 FROM users WHERE id = ? AND role = 'viewer'", (session.get('viewer_id'),)).fetchone()
+        finally:
+            _gconn.close()
+    except Exception:
+        _alive = True
+    if not _alive:
+        session.clear()
+        return jsonify({"error": "non authentifié"}), 401
+    path = request.path
+    if request.method in ('GET', 'HEAD', 'OPTIONS'):
+        if path.startswith(_VIEWER_BLOCKED_GET_PREFIXES):
+            return jsonify({"error": "Accès réservé au propriétaire du compte", "code": "viewer_forbidden"}), 403
+        return
+    if (request.method, path) in _VIEWER_WRITE_WHITELIST:
+        return
+    return jsonify({"error": "Compte invité : lecture seule", "code": "viewer_readonly"}), 403
+
 @app.after_request
 def _set_security_headers(response):
     csrf_token = session.get('csrf_token')
@@ -5076,12 +5259,14 @@ def api_register():
         )
         conn.commit()
         user = conn.execute("SELECT id, username FROM users WHERE username = ?", (username,)).fetchone()
+        session.clear()
         session.permanent = True
         session['user_id'] = user['id']
         session['username'] = user['username']
+        session['role'] = 'user'
         return jsonify({
             "message": "Compte créé",
-            "user": {"id": user['id'], "username": user['username']},
+            "user": {"id": user['id'], "username": user['username'], "role": "user"},
             "recovery_code": recovery_code
         })
     except sqlite3.IntegrityError:
@@ -5101,18 +5286,30 @@ def api_login():
         return jsonify({"error": f"Trop de tentatives échouées. Réessayez dans {wait_seconds} secondes."}), 429
 
     conn = get_db()
-    user = conn.execute("SELECT id, username, password_hash FROM users WHERE username = ?", (username,)).fetchone()
+    user = conn.execute("SELECT id, username, password_hash, role, owner_id FROM users WHERE username = ?", (username,)).fetchone()
 
     if user and verify_pw_strong(password, user['password_hash']):
         if _is_legacy_hash(user['password_hash']):
             conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_pw_strong(password), user['id']))
             conn.commit()
+        role = 'viewer' if user['role'] == 'viewer' else 'user'
+        effective_id = user['id']
+        if role == 'viewer':
+            owner = conn.execute("SELECT id FROM users WHERE id = ? AND COALESCE(role,'user') != 'viewer'", (user['owner_id'],)).fetchone() if user['owner_id'] else None
+            if not owner:
+                conn.close()
+                return jsonify({"error": "Ce compte invité n'est plus rattaché à un propriétaire"}), 403
+            effective_id = owner['id']
         conn.close()
         _clear_attempts('login', username)
+        session.clear()
         session.permanent = remember
-        session['user_id'] = user['id']
+        session['user_id'] = effective_id
         session['username'] = user['username']
-        return jsonify({"message": "Connecté", "user": {"id": user['id'], "username": user['username']}})
+        session['role'] = role
+        if role == 'viewer':
+            session['viewer_id'] = user['id']
+        return jsonify({"message": "Connecté", "user": {"id": effective_id, "username": user['username'], "role": role}})
     conn.close()
     _record_failed_attempt('login', username)
     return jsonify({"error": "Identifiants invalides"}), 401
@@ -5125,8 +5322,85 @@ def api_logout():
 @app.route('/api/auth/me', methods=['GET'])
 def api_me():
     if 'user_id' in session:
-        return jsonify({"user": {"id": session['user_id'], "username": session['username']}})
+        return jsonify({"user": {"id": session['user_id'], "username": session['username'], "role": session.get('role', 'user')}})
     return jsonify({"error": "non authentifié"}), 401
+
+@app.route('/api/auth/guests', methods=['GET'])
+@login_required
+def api_guests_list():
+    if _is_viewer():
+        return jsonify({"error": "Accès réservé au propriétaire du compte", "code": "viewer_forbidden"}), 403
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, username, created_at FROM users WHERE role = 'viewer' AND owner_id = ? ORDER BY username COLLATE NOCASE",
+            (session['user_id'],)
+        ).fetchall()
+    finally:
+        conn.close()
+    return jsonify({"guests": [dict(r) for r in rows]}), 200
+
+@app.route('/api/auth/guests', methods=['POST'])
+@login_required
+def api_guests_create():
+    data = request.json or {}
+    username = (data.get('username') or '').strip()[:60]
+    password = data.get('password') or ''
+    if not username or not password:
+        return jsonify({"error": "Nom et mot de passe requis"}), 400
+    if len(password) < 4:
+        return jsonify({"error": "Mot de passe trop court (4 caractères minimum)"}), 400
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO users (username, password_hash, role, owner_id, recovery_code_hash) VALUES (?, ?, 'viewer', ?, ?)",
+            (username, hash_pw_strong(password), session['user_id'], hash_pw(secrets.token_hex(16)))
+        )
+        conn.commit()
+        gid = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()['id']
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "Nom d'utilisateur déjà utilisé"}), 409
+    finally:
+        conn.close()
+    return jsonify({"success": True, "id": gid}), 201
+
+@app.route('/api/auth/guests/<int:guest_id>', methods=['PUT'])
+@login_required
+def api_guests_update(guest_id):
+    data = request.json or {}
+    password = data.get('password') or ''
+    if len(password) < 4:
+        return jsonify({"error": "Mot de passe trop court (4 caractères minimum)"}), 400
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ? AND role = 'viewer' AND owner_id = ?",
+            (hash_pw_strong(password), guest_id, session['user_id'])
+        )
+        conn.commit()
+        found = cur.rowcount > 0
+    finally:
+        conn.close()
+    if not found:
+        return jsonify({"error": "Invité introuvable"}), 404
+    return jsonify({"success": True}), 200
+
+@app.route('/api/auth/guests/<int:guest_id>', methods=['DELETE'])
+@login_required
+def api_guests_delete(guest_id):
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "DELETE FROM users WHERE id = ? AND role = 'viewer' AND owner_id = ?",
+            (guest_id, session['user_id'])
+        )
+        conn.commit()
+        found = cur.rowcount > 0
+    finally:
+        conn.close()
+    if not found:
+        return jsonify({"error": "Invité introuvable"}), 404
+    return jsonify({"success": True}), 200
 
 @app.route('/api/auth/security-question', methods=['GET'])
 def api_get_security_question():
@@ -5229,14 +5503,12 @@ def api_get_sources():
         conn.close()
     return jsonify([dict(s) for s in sources])
 
-# ── Dossiers 3D détectés sur l'ordinateur (suggestions d'ajout de source) ──
-_SOURCE_SUGGEST_CAP = 200          # au-delà, on affiche « 200+ »
+_SOURCE_SUGGEST_CAP = 200          
 _SOURCE_SUGGEST_MAX_DEPTH = 4
-_SOURCE_SUGGEST_TIME_BUDGET = 4.0  # secondes, tous dossiers confondus
+_SOURCE_SUGGEST_TIME_BUDGET = 4.0  
 
 
 def _count_3d_files(folder, deadline, cap=_SOURCE_SUGGEST_CAP, max_depth=_SOURCE_SUGGEST_MAX_DEPTH):
-    """Compte les fichiers 3D d'un dossier (profondeur et durée bornées). Retourne (nombre, plafonné)."""
     count = 0
     base_depth = folder.rstrip('/\\').count(os.sep)
     for root, dirs, files in os.walk(folder):
@@ -5256,14 +5528,13 @@ def _count_3d_files(folder, deadline, cap=_SOURCE_SUGGEST_CAP, max_depth=_SOURCE
 @app.route('/api/sources/suggestions', methods=['GET'])
 @login_required
 def api_source_suggestions():
-    """Dossiers usuels contenant des fichiers 3D et pas encore ajoutés comme source."""
     try:
         if ALLOWED_SOURCE_TYPES and 'folder' not in ALLOWED_SOURCE_TYPES:
             return jsonify({"suggestions": []}), 200
         home = Path.home()
         names = ['Downloads', 'Téléchargements', 'Documents', 'Desktop', 'Bureau', '3D Objects', 'Objets 3D',
                  '3D Models', 'Modèles 3D', 'Models', 'Impression 3D', '3D Printing', 'Printables',
-                 'Thingiverse', 'MakerWorld', 'Cults', 'Bambu Studio', 'BambuStudio', 'OrcaSlicer',
+                 'Thingiverse', 'MakerWorld', 'Cults', 'Bambu Studio', 'BambuStudio', 'Qidi Studio', 'QIDIStudio', 'OrcaSlicer',
                  'PrusaSlicer', 'Cura']
         candidates, seen = [], set()
         for n in names:
@@ -5422,13 +5693,6 @@ def api_add_sources_from_drop():
 @app.route('/api/files/upload-drop', methods=['POST'])
 @login_required
 def api_upload_dropped_files():
-    """Reçoit un ou plusieurs fichiers glissés-déposés depuis l'explorateur de fichiers de l'OS
-    quand Stellio est utilisé dans un navigateur (accès Raspberry Pi/mobile/distant) — sur desktop,
-    le glisser-déposer natif (pywebviewFullPath, voir _bind_drag_drop) donne directement le chemin
-    réel du fichier et n'a pas besoin de passer par cette route.
-    Contrairement à /api/sources/drop (qui enregistre un chemin déjà existant sur le disque comme
-    nouvelle source), cette route reçoit le CONTENU du fichier et l'écrit sur disque, faute d'accès
-    au chemin réel depuis un navigateur standard."""
     try:
         user_id = session['user_id']
         uploaded_files = request.files.getlist('files')
@@ -5456,8 +5720,6 @@ def api_upload_dropped_files():
                 dest_dir = dest_row['path']
                 dest_source_name = dest_row['name']
             else:
-                # Aucune source dossier existante : on crée un dossier "Imports" dédié dans les
-                # données de l'application, et on l'enregistre comme nouvelle source.
                 dest_dir = os.path.join(DATA_DIR, 'imports')
                 os.makedirs(dest_dir, exist_ok=True)
                 existing_names = {r[0] for r in conn.execute("SELECT name FROM sources WHERE user_id=?", (user_id,)).fetchall()}
@@ -5755,6 +6017,9 @@ def api_save_account():
         if platform == 'thingiverse':
             if not api_key:
                 return jsonify({"error": "Token API requis pour Thingiverse"}), 400
+        elif platform == 'nexprint':
+            if not api_key:
+                return jsonify({"error": "Cookie auth_token requis pour Nexprint"}), 400
         elif platform and platform != 'thingiverse':
             if not email and not password:
                 return jsonify({"error": "Email et/ou mot de passe requis"}), 400
@@ -5797,6 +6062,108 @@ def api_save_account():
     except Exception as e:
         app_logger.info(f"[ERROR] Erreur serveur: {e}")
         return jsonify({"error": f"Erreur serveur: {str(e)}"}), 500
+
+nexprint_login_state = {}
+
+
+def _nexprint_save_token(user_id, token):
+    conn = get_db()
+    try:
+        conn.execute("""
+            INSERT INTO account_credentials (user_id, platform, email, api_key, last_login)
+            VALUES (?, 'nexprint', NULL, ?, ?)
+            ON CONFLICT(user_id, platform) DO UPDATE SET
+                api_key = excluded.api_key,
+                last_login = CURRENT_TIMESTAMP
+        """, (user_id, encrypt_password(token), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _nexprint_cookie_from_window(win):
+    """Lit le cookie auth_token dans la fenêtre de connexion (None si absent)."""
+    try:
+        cookies = win.get_cookies() or []
+    except Exception:
+        return None
+    for c in cookies:
+        try:
+            morsel = c.get('auth_token') if hasattr(c, 'get') else None
+            if morsel is not None and getattr(morsel, 'value', ''):
+                return morsel.value
+        except Exception:
+            continue
+    return None
+
+
+@app.route('/api/accounts/nexprint/browser-login', methods=['POST'])
+@login_required
+def api_nexprint_browser_login():
+    """Ouvre la page de connexion officielle Nexprint dans une fenêtre Stellio
+    et récupère automatiquement le cookie de session une fois connecté."""
+    import threading
+    user_id = session['user_id']
+    try:
+        import webview as _wv
+        if not _wv.windows:
+            raise RuntimeError("no window")
+    except Exception:
+        return jsonify({"error": "La connexion automatique n'est disponible que dans l'application Stellio. Utilise la saisie manuelle du cookie."}), 501
+
+    if nexprint_login_state.get(user_id) == 'waiting':
+        return jsonify({"state": "waiting"})
+
+    try:
+        win = _wv.create_window('Connexion Nexprint', NEXPRINT_BASE + '/en/account/login', width=520, height=760)
+    except Exception as e:
+        app_logger.warning(f"[Nexprint] Ouverture fenêtre de connexion impossible: {e}")
+        return jsonify({"error": "Impossible d'ouvrir la fenêtre de connexion."}), 500
+
+    nexprint_login_state[user_id] = 'waiting'
+
+    def _watch():
+        deadline = time.time() + 600
+        try:
+            while time.time() < deadline:
+                time.sleep(1.5)
+                if win not in _wv.windows:
+                    nexprint_login_state[user_id] = 'closed'
+                    return
+                try:
+                    current = win.get_current_url() or ''
+                except Exception:
+                    current = ''
+                if '/account/login' in current:
+                    continue
+                token = _nexprint_cookie_from_window(win)
+                if token:
+                    _nexprint_save_token(user_id, token)
+                    nexprint_login_state[user_id] = 'ok'
+                    app_logger.info("[Nexprint] Connexion enregistrée via la fenêtre de connexion")
+                    try:
+                        win.destroy()
+                    except Exception:
+                        pass
+                    return
+            nexprint_login_state[user_id] = 'timeout'
+            try:
+                win.destroy()
+            except Exception:
+                pass
+        except Exception as e:
+            app_logger.warning(f"[Nexprint] Surveillance connexion: {e}")
+            nexprint_login_state[user_id] = 'error'
+
+    threading.Thread(target=_watch, daemon=True).start()
+    return jsonify({"state": "waiting"})
+
+
+@app.route('/api/accounts/nexprint/browser-login/status', methods=['GET'])
+@login_required
+def api_nexprint_browser_login_status():
+    return jsonify({"state": nexprint_login_state.get(session['user_id'], 'idle')})
+
 
 @app.route('/api/accounts/<platform>', methods=['DELETE'])
 @login_required
@@ -6423,8 +6790,6 @@ def api_delete_tag(tag_id):
 @app.route('/api/tags/restore', methods=['POST'])
 @login_required
 def api_restore_tag():
-    """Recrée un tag supprimé et le réassigne aux mêmes fichiers — utilisé par le bouton
-    "Annuler" affiché juste après une suppression de tag."""
     try:
         data = request.json or {}
         name = (data.get('name') or '').strip()
@@ -6734,6 +7099,7 @@ AUTO_TAG_COLORS = {
     'makerworld': '#00a884',
     'printables': '#f5a623',
     'thingiverse': '#1a8fe3',
+    'nexprint': '#2563eb',
     'local': '#8899aa',
     'réseau (smb)': '#8899aa',
     'fichier unique': '#8899aa',
@@ -7541,7 +7907,6 @@ def api_peer_folders():
 
 
 def _is_lan_request():
-    """Vrai si la requête vient d'une adresse privée/locale et pas d'un tunnel d'accès distant."""
     import ipaddress
     if request.headers.get('Cf-Connecting-Ip') or request.headers.get('X-Forwarded-For'):
         return False
@@ -7554,7 +7919,6 @@ def _is_lan_request():
 
 @app.route('/api/peer/identify', methods=['GET'])
 def api_peer_identify():
-    # Sert uniquement à la détection automatique sur le réseau local : pas de réponse depuis Internet.
     if not _is_lan_request():
         return jsonify({"error": "Réseau local uniquement"}), 403
     settings = load_settings() or {}
@@ -7571,8 +7935,6 @@ _lan_scan_lock = threading.Lock()
 
 
 def _scan_lan_for_stellio(timeout=0.4, port=None, max_parallel=64, force=False):
-    """Sonde le sous-réseau local (/24 de l'adresse de cette machine) sur le port de CETTE instance.
-    Résultat mis en cache 60 s : ouvrir les Paramètres n'envoie pas 254 requêtes à chaque fois."""
     if port is None:
         port = globals().get('SERVER_PORT') or int(os.environ.get('STELLIO_PORT', '5000'))
     with _lan_scan_lock:
@@ -7947,9 +8309,6 @@ def api_open_file_with():
 @app.route('/api/files/exists', methods=['GET'])
 @login_required
 def api_file_exists():
-    """Vérifie qu'un chemin de fichier existe toujours et appartient à une source configurée
-    (utilisé notamment par l'historique d'impression pour proposer de revoir/réimprimer un fichier
-    qui pourrait avoir été déplacé ou supprimé depuis)."""
     try:
         file_path = (request.args.get('path') or '').strip()
         if not file_path:
@@ -7963,6 +8322,157 @@ def api_file_exists():
     except Exception as e:
         app_logger.error(f"[API] Erreur api_file_exists: {e}")
         return jsonify({"exists": False}), 200
+
+
+# ── Origine du modèle : lien d'origine, auteur, licence, notes ──
+# Longueurs max par champ -> code d'erreur « <code>_too_long » attendu par script.js
+_ORIGIN_LIMITS = (('source_url', 'url', 500), ('author', 'author', 120), ('license', 'license', 120), ('notes', 'notes', 1000))
+
+def _origin_norm_path(p):
+    return (p or '').strip().replace('\\', '/')
+
+def _origin_path_allowed(raw_path, user_id):
+    if is_virtual_archive_path(raw_path):
+        raw_path, _ = split_virtual_archive_path(raw_path)
+    native = raw_path.replace('/', '\\') if os.name == 'nt' else raw_path.replace('\\', '/')
+    return _is_path_within_sources(native, user_id)
+
+@app.route('/api/files/origin', methods=['GET'])
+@login_required
+def api_get_file_origin():
+    try:
+        raw = (request.args.get('path') or '').strip()
+        if not raw:
+            return jsonify({"error": "Chemin requis"}), 400
+        file_path = _origin_norm_path(raw)
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT source_url, author, license, notes, from_download, downloaded_at, platform "
+                "FROM file_origins WHERE file_path=? AND user_id=?",
+                (file_path, session['user_id'])
+            ).fetchone()
+            dl = conn.execute(
+                "SELECT source_url, platform, downloaded_at FROM download_history "
+                "WHERE user_id=? AND REPLACE(file_path, char(92), '/') = ? "
+                "ORDER BY downloaded_at DESC LIMIT 1",
+                (session['user_id'], file_path)
+            ).fetchone()
+        finally:
+            conn.close()
+
+        out = {
+            "source_url": "", "author": "", "license": "", "notes": "",
+            "from_download": False, "downloaded_at": None, "platform": ""
+        }
+        if row:
+            out.update({
+                "source_url": row["source_url"] or "", "author": row["author"] or "",
+                "license": row["license"] or "", "notes": row["notes"] or "",
+                "from_download": bool(row["from_download"]),
+                "downloaded_at": row["downloaded_at"], "platform": row["platform"] or ""
+            })
+        if dl:
+            out["from_download"] = True
+            out["source_url"] = out["source_url"] or (dl["source_url"] or "")
+            out["downloaded_at"] = out["downloaded_at"] or dl["downloaded_at"]
+            out["platform"] = out["platform"] or (dl["platform"] or "")
+        return jsonify(out), 200
+    except Exception as e:
+        app_logger.error(f"[ORIGIN] Erreur lecture: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+@app.route('/api/files/origin', methods=['POST'])
+@login_required
+def api_set_file_origin():
+    try:
+        data = request.get_json(silent=True) or {}
+        raw = (data.get('path') or '').strip()
+        if not raw:
+            return jsonify({"error": "Chemin requis"}), 400
+        if not _origin_path_allowed(raw, session['user_id']):
+            app_logger.warning(f"[SECURITY] Origine : chemin hors sources refusé: {raw}")
+            return jsonify({"error": "Ce fichier n'appartient à aucune source configurée"}), 403
+
+        values = {}
+        for key, code, limit in _ORIGIN_LIMITS:
+            val = re.sub(r'[\x00-\x1f\x7f]', ' ', str(data.get(key) or '')).strip() if key != 'notes' \
+                else re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', str(data.get(key) or '')).strip()
+            if len(val) > limit:
+                return jsonify({"error": f"{code}_too_long"}), 400
+            values[key] = val
+        if values['source_url'] and not re.match(r'^https?://\S+$', values['source_url'], re.IGNORECASE):
+            return jsonify({"error": "url_invalid"}), 400
+
+        file_path = _origin_norm_path(raw)
+        conn = get_db()
+        try:
+            existing = conn.execute(
+                "SELECT from_download FROM file_origins WHERE file_path=? AND user_id=?",
+                (file_path, session['user_id'])
+            ).fetchone()
+            if not any(values.values()) and not (existing and existing["from_download"]):
+                conn.execute("DELETE FROM file_origins WHERE file_path=? AND user_id=?", (file_path, session['user_id']))
+            else:
+                conn.execute(
+                    """INSERT INTO file_origins (file_path, user_id, source_url, author, license, notes, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                       ON CONFLICT(file_path, user_id) DO UPDATE SET
+                           source_url=excluded.source_url, author=excluded.author,
+                           license=excluded.license, notes=excluded.notes,
+                           updated_at=CURRENT_TIMESTAMP""",
+                    (file_path, session['user_id'], values['source_url'], values['author'],
+                     values['license'], values['notes'])
+                )
+            conn.commit()
+        finally:
+            conn.close()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        app_logger.error(f"[ORIGIN] Erreur enregistrement: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+def _follow_file_origin(old_path, new_path):
+    """Fait suivre l'origine d'un fichier renommé ou déplacé (table file_origins).
+    Si le fichier vient d'un téléchargement, le lien d'origine et la date sont
+    recopiés sur le nouveau chemin (download_history reste indexé sur l'ancien).
+    Ne doit jamais faire échouer l'opération de renommage / déplacement."""
+    try:
+        old_n = _origin_norm_path(old_path)
+        new_n = _origin_norm_path(new_path)
+        if not old_n or not new_n or old_n == new_n:
+            return
+        conn = get_db()
+        try:
+            conn.execute("DELETE FROM file_origins WHERE file_path=?", (new_n,))
+            conn.execute(
+                "UPDATE file_origins SET file_path=?, updated_at=CURRENT_TIMESTAMP WHERE file_path=?",
+                (new_n, old_n)
+            )
+            seen_users = set()
+            for dl in conn.execute(
+                "SELECT user_id, source_url, platform, downloaded_at FROM download_history "
+                "WHERE REPLACE(file_path, char(92), '/') = ? ORDER BY downloaded_at DESC",
+                (old_n,)
+            ).fetchall():
+                if dl["user_id"] in seen_users:
+                    continue
+                seen_users.add(dl["user_id"])
+                conn.execute(
+                    """INSERT INTO file_origins (file_path, user_id, source_url, from_download, downloaded_at, platform, updated_at)
+                       VALUES (?, ?, ?, 1, ?, ?, CURRENT_TIMESTAMP)
+                       ON CONFLICT(file_path, user_id) DO UPDATE SET
+                           from_download=1,
+                           source_url=CASE WHEN file_origins.source_url='' THEN excluded.source_url ELSE file_origins.source_url END,
+                           downloaded_at=COALESCE(file_origins.downloaded_at, excluded.downloaded_at),
+                           platform=CASE WHEN file_origins.platform='' THEN excluded.platform ELSE file_origins.platform END""",
+                    (new_n, dl["user_id"], dl["source_url"] or '', dl["downloaded_at"], dl["platform"] or '')
+                )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        app_logger.warning(f"[ORIGIN] Suivi de l'origine ignoré ({old_path} → {new_path}): {e}")
 
 
 @app.route('/api/files/delete', methods=['POST'])
@@ -8228,6 +8738,7 @@ def api_rename_file():
                 except: pass
 
         shutil.move(file_path, new_path)
+        _follow_file_origin(file_path, new_path)
         invalidate_cache()
 
         new_path_norm = new_path.replace('\\', '/')
@@ -8508,6 +9019,7 @@ def api_get_stats():
             'thingiverse': 'Thingiverse',
             'printables': 'Printables',
             'makerworld': 'MakerWorld',
+            'nexprint': 'Nexprint',
         }
         for f in cached:
             path_lower = (f.get('path') or '').lower().replace('\\', '/')
@@ -8930,6 +9442,7 @@ def api_move_file():
                     except Exception as e:
                         app_logger.warning(f"[MOVE] Erreur suppression miniature: {e}")
 
+            _follow_file_origin(source_path, dest_path)
             invalidate_cache()
 
             return jsonify({
@@ -9239,6 +9752,14 @@ _SLICER_CANDIDATES = {
                 ['bambu-studio.exe']),
         'mac': ['Bambu Studio.app', 'BambuStudio.app'],
         'linux': ['bambu-studio', 'bambustudio'],
+    },
+    'qidistudio': {
+        'name': 'Qidi Studio',
+        'win': (["QIDI Studio/qidi-studio.exe", "QIDI Studio*/qidi-studio.exe",
+                 "QIDIStudio/qidi-studio.exe", "Qidi Studio/qidi-studio.exe"],
+                ['qidi-studio.exe', 'QIDIStudio.exe']),
+        'mac': ['QIDIStudio.app', 'QIDI Studio.app', 'Qidi Studio.app'],
+        'linux': ['qidi-studio', 'qidistudio', 'QIDIStudio'],
     },
     'prusaslicer': {
         'name': 'PrusaSlicer',
@@ -9596,23 +10117,43 @@ def parse_generic_output(output_path):
         return result
     return parse_slic3r_derived_gcode(output_path)
 
-def run_silent_slice(stl_path, slicer, timeout=150, override=None):
-    """override : {'settings': [chemins], 'filaments': [chemins]} impose des profils précis (sinon réglages globaux de l'app)."""
+def _json_profile_type(path):
+    try:
+        with open(path, 'r', encoding='utf-8-sig') as f:
+            return str((json.load(f) or {}).get('type') or '').strip().lower()
+    except Exception:
+        return ''
+
+
+def run_silent_slice(stl_path, slicer, timeout=150, override=None, diag=None):
     slug = hashlib.md5(f"{stl_path}|{time.time()}".encode()).hexdigest()[:12]
     out_dir = os.path.join(get_slice_temp_dir(), slug)
     os.makedirs(out_dir, exist_ok=True)
 
     try:
         settings = load_settings()
-        if slicer['id'] in ('orcaslicer', 'bambustudio', 'elegooslicer', 'anycubicslicernext'):
+        if slicer['id'] in ('orcaslicer', 'bambustudio', 'qidistudio', 'elegooslicer', 'anycubicslicernext'):
             out_3mf = os.path.join(out_dir, 'preslice.gcode.3mf')
             cmd = [slicer['path'], '--slice', '1', '--allow-newer-file', '--mstpp', str(max(30, timeout - 20))]
 
             load_settings_str = (settings.get('slicer_profile_settings') or '').strip()
             load_filament_str = (settings.get('slicer_profile_filament') or '').strip()
             if override is not None:
-                load_settings_str = ';'.join(override.get('settings') or [])
-                load_filament_str = ';'.join(override.get('filaments') or [])
+                ov_settings = list(override.get('settings') or [])
+                ov_filaments = list(override.get('filaments') or [])
+                try:
+                    _printer_paths = {p.get('source_path') for p in load_slicer_profiles() if p.get('profile_type') == 'printer'}
+                except Exception:
+                    _printer_paths = set()
+                has_machine = any((x in _printer_paths) or _json_profile_type(x) == 'machine' for x in ov_settings)
+                if not has_machine:
+                    global_machine = [x.strip() for x in load_settings_str.split(';')
+                                      if x.strip() and x.strip() not in ov_settings and _json_profile_type(x.strip()) == 'machine']
+                    ov_settings = global_machine + ov_settings
+                if not ov_filaments:
+                    ov_filaments = [x.strip() for x in load_filament_str.split(';') if x.strip()]
+                load_settings_str = ';'.join(ov_settings)
+                load_filament_str = ';'.join(ov_filaments)
             if load_settings_str:
                 cmd += ['--load-settings', load_settings_str]
             if load_filament_str:
@@ -9620,11 +10161,18 @@ def run_silent_slice(stl_path, slicer, timeout=150, override=None):
 
             cmd += ['--export-3mf', out_3mf, stl_path]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, **_popen_kwargs_silent())
+            tail = ((result.stderr or '').strip() or (result.stdout or '').strip())[-700:]
+            if diag is not None:
+                diag['returncode'] = result.returncode
+                diag['output'] = tail
             if not os.path.exists(out_3mf):
-                app_logger.info(f"[PreSlice] Pas de sortie générée par {slicer['name']} - stderr: {(result.stderr or '')[:300]}")
+                app_logger.info(f"[PreSlice] Pas de sortie générée par {slicer['name']} (code {result.returncode}) - "
+                                f"settings={load_settings_str!r} filaments={load_filament_str!r} - sortie: {tail}")
                 parsed = None
             else:
                 parsed = parse_bambu_orca_gcode3mf(out_3mf)
+                if parsed is None and diag is not None and not diag.get('output'):
+                    diag['output'] = "Fichier généré mais temps/poids illisibles"
         elif slicer['id'] in ('prusaslicer', 'superslicer'):
             gcode_path = os.path.join(out_dir, 'preslice.gcode')
             cmd = [slicer['path'], '--export-gcode', '--output', gcode_path]
@@ -9641,6 +10189,9 @@ def run_silent_slice(stl_path, slicer, timeout=150, override=None):
 
             cmd += [stl_path]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, **_popen_kwargs_silent())
+            if diag is not None:
+                diag['returncode'] = result.returncode
+                diag['output'] = ((result.stderr or '').strip() or (result.stdout or '').strip())[-700:]
             if not os.path.exists(gcode_path):
                 if not ini_str:
                     app_logger.info(f"[PreSlice] {slicer['name']} n'a rien généré (aucun profil .ini configuré) - "
@@ -9745,9 +10296,13 @@ def process_slice_estimate_queue():
 
                 override = None
                 if profile_id:
-                    # Estimation avec des réglages choisis : on tranche avec le slicer qui correspond au profil
                     prof = next((p for p in load_slicer_profiles() if p.get('id') == profile_id), None)
                     fam = ((prof or {}).get('slicer') or '').strip().lower()
+                    if prof and not fam:
+                        wanted = (_SLICER_LOAD_INI_FAMILIES if str(prof.get('source_path') or '').lower().endswith('.ini')
+                                  else ('orcaslicer', 'bambustudio', 'qidistudio', 'elegooslicer', 'anycubicslicernext'))
+                        cand = next((s for s in slicers if s.get('preslice_supported', True) and s.get('id') in wanted), None)
+                        fam = cand['id'] if cand else ''
                     slicer = next((s for s in slicers if s.get('preslice_supported', True) and s.get('id') == fam), None)
                     if not prof or slicer is None or fam not in (_SLICER_LOAD_SETTINGS_FAMILIES + _SLICER_LOAD_INI_FAMILIES):
                         with slice_estimate_lock:
@@ -9762,13 +10317,16 @@ def process_slice_estimate_queue():
                     override = {'settings': s_paths, 'filaments': f_paths}
                 else:
                     slicer = next(s for s in slicers if s.get('preslice_supported', True))
-                data = run_silent_slice(stl_for_slicer, slicer, override=override)
+                diag = {}
+                data = run_silent_slice(stl_for_slicer, slicer, override=override, diag=diag)
 
                 with slice_estimate_lock:
                     if data:
                         _slice_cache_set(cache_key, {'status': 'done', 'data': data})
                     else:
-                        _slice_cache_set(cache_key, {'status': 'error', 'reason': 'slice_failed'})
+                        _slice_cache_set(cache_key, {'status': 'error', 'reason': 'slice_failed',
+                                                     'detail': (diag.get('output') or '')[-500:],
+                                                     'returncode': diag.get('returncode')})
             except Exception as e:
                 app_logger.warning(f"[PreSlice] Erreur worker: {e}")
                 with slice_estimate_lock:
@@ -9793,6 +10351,8 @@ def detect_platform_from_path(file_path):
         return 'Printables'
     if 'makerworld' in path_lower:
         return 'MakerWorld'
+    if 'nexprint' in path_lower:
+        return 'Nexprint'
     return ''
 
 def find_slicer_by_name(slicer_name):
@@ -9808,7 +10368,6 @@ def find_slicer_by_name(slicer_name):
     return locate_slicer_by_id(slicer_id)
 
 def _slice_estimate_key(file_path, profile_id=None, printer_id=None, material_type=None):
-    """Clé de cache : le fichier seul (réglages globaux) ou fichier + réglages choisis (profil, imprimante, matière)."""
     profile_id = (str(profile_id).strip() if profile_id else '')
     if not profile_id:
         return file_path
@@ -9826,6 +10385,7 @@ def api_request_slice_estimate():
     printer_id = data.get('printer_id') or None
     material_type = (data.get('material_type') or '').strip() or None
     key = _slice_estimate_key(file_path, profile_id, printer_id, material_type)
+    _sync_slicer_profiles(session['user_id'])   
 
     with slice_estimate_lock:
         existing = slice_estimate_results.get(key)
@@ -9872,6 +10432,9 @@ _SLICER_FAMILY_BY_FILENAME = {
     'orcaslicer.exe': 'orcaslicer',
     'bambu-studio.exe': 'bambustudio',
     'bambustudio.exe': 'bambustudio',
+    'qidi-studio.exe': 'qidistudio',
+    'qidistudio.exe': 'qidistudio',
+    'qidi-studio': 'qidistudio',
     'prusa-slicer.exe': 'prusaslicer',
     'prusa-slicer-console.exe': 'prusaslicer',
     'superslicer.exe': 'superslicer',
@@ -9891,14 +10454,11 @@ def _resolve_slicer_family(slicer_path, slicer_name):
             or _SLICER_FAMILY_BY_FILENAME.get((slicer_name or '').lower()))
 
 
-_SLICER_LOAD_SETTINGS_FAMILIES = ('orcaslicer', 'bambustudio', 'elegooslicer', 'anycubicslicernext', 'creality_print')
+_SLICER_LOAD_SETTINGS_FAMILIES = ('orcaslicer', 'bambustudio', 'qidistudio', 'elegooslicer', 'anycubicslicernext', 'creality_print')
 _SLICER_LOAD_INI_FAMILIES = ('prusaslicer', 'superslicer')
 
 
 def _resolve_slicer_profile_paths(slicer_family, printer_id, material_type=None, process_profile_id=None):
-    """Chemins des profils à charger dans le slicer.
-    process_profile_id : réglages (profil « process ») choisis explicitement par l'utilisateur ; ils remplacent
-    les profils de réglages rattachés à l'imprimante, qui restent chargés pour la machine et le filament."""
     if not slicer_family:
         return [], [], []
 
@@ -9962,9 +10522,7 @@ def _resolve_slicer_profile_paths(slicer_family, printer_id, material_type=None,
 @app.route('/api/slicer/process-profiles', methods=['GET'])
 @login_required
 def api_slicer_process_profiles():
-    """Profils de réglages (« process ») utilisables dans l'envoi au slicer / l'estimation.
-    ?printer_id= restreint aux profils de cette imprimante (+ ceux sans imprimante) ; ?all_slicers=1 : tous les slicers
-    (estimation), sinon seulement la famille du slicer par défaut (envoi)."""
+    synced = _sync_slicer_profiles(session['user_id'])
     settings = load_settings() or {}
     slicer_name = settings.get('default_slicer', 'system_default')
     slicer_path = find_slicer_by_name(slicer_name)
@@ -9976,7 +10534,7 @@ def api_slicer_process_profiles():
         if p.get('profile_type') != 'process':
             continue
         if not p.get('source_path') or not os.path.exists(p['source_path']):
-            continue   # sans fichier source, le profil ne peut pas être chargé dans le slicer
+            continue  
         p_slicer = (p.get('slicer') or '').strip().lower()
         if not all_slicers and family and p_slicer and p_slicer != family:
             continue
@@ -9991,7 +10549,7 @@ def api_slicer_process_profiles():
             'printer_matched': printer_id is not None and pid == printer_id,
         })
     out.sort(key=lambda x: (not x['printer_matched'], x['name'].lower()))
-    return jsonify({'profiles': out, 'slicer_family': family}), 200
+    return jsonify({'profiles': out, 'slicer_family': family, 'synced': synced}), 200
 
 
 @app.route('/api/slicer/send', methods=['POST'])
@@ -10111,14 +10669,16 @@ def api_send_to_slicer():
             material_cost, elec_cost, total_cost, _weight_for_cost = _compute_estimated_cost(norm, weight_g_hint=weight_used_logged)
             estimated_seconds_logged = _get_cached_slice_estimate_seconds(norm)
 
+            fil = _filament_info_for_file(conn, session['user_id'], norm)
             cur = conn.execute(
-                "INSERT INTO print_history (user_id, file_path, file_name, file_size, file_ext, slicer, source_platform, spool_id, spool_weight_used_g, slicer_profile_id, slicer_profile_name, material_cost, elec_cost, total_cost, printer_id, estimated_seconds) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO print_history (user_id, file_path, file_name, file_size, file_ext, slicer, source_platform, spool_id, spool_weight_used_g, slicer_profile_id, slicer_profile_name, material_cost, elec_cost, total_cost, printer_id, estimated_seconds, filament_material, filament_label, spool_source_type, spool_source_id, assignment_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (session['user_id'], norm, os.path.basename(file_path),
                  os.path.getsize(file_path) if os.path.exists(file_path) else 0,
                  os.path.splitext(file_path)[1].lower(), detected_slicer,
                  detect_platform_from_path(norm), spool_id_logged, weight_used_logged,
                  data.get('slicer_profile_id') or (applied_profile_ids[0] if applied_profile_ids else ''), data.get('slicer_profile_name') or '',
-                 material_cost, elec_cost, total_cost, printer_id, estimated_seconds_logged)
+                 material_cost, elec_cost, total_cost, printer_id, estimated_seconds_logged, fil['material'], fil['label'],
+                 fil['source_type'], fil['source_id'], fil['snapshot'])
             )
             history_id = cur.lastrowid
             conn.commit()
@@ -10201,13 +10761,15 @@ def api_slicer_send_batch():
                     norm = fp.replace('\\', '/')
                     material_cost, elec_cost, total_cost, _w = _compute_estimated_cost(norm)
                     estimated_seconds_logged = _get_cached_slice_estimate_seconds(norm)
+                    fil = _filament_info_for_file(conn, session['user_id'], norm)
                     conn.execute(
-                        "INSERT INTO print_history (user_id, file_path, file_name, file_size, file_ext, slicer, source_platform, slicer_profile_id, material_cost, elec_cost, total_cost, printer_id, estimated_seconds) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        "INSERT INTO print_history (user_id, file_path, file_name, file_size, file_ext, slicer, source_platform, slicer_profile_id, material_cost, elec_cost, total_cost, printer_id, estimated_seconds, filament_material, filament_label, spool_source_type, spool_source_id, assignment_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (session['user_id'], norm, os.path.basename(fp),
                          os.path.getsize(fp) if os.path.exists(fp) else 0,
                          os.path.splitext(fp)[1].lower(), slicer_label,
                          detect_platform_from_path(norm), profile_id_to_log, material_cost, elec_cost, total_cost,
-                         printer_id, estimated_seconds_logged)
+                         printer_id, estimated_seconds_logged, fil['material'], fil['label'],
+                         fil['source_type'], fil['source_id'], fil['snapshot'])
                     )
                 conn.commit()
             finally:
@@ -10588,6 +11150,220 @@ def printables_get_download_link(file_id, model_id, file_type):
         app_logger.warning(f"[Printables] Erreur récupération lien (file {file_id}): {e}")
 
     return None
+
+
+NEXPRINT_BASE = "https://www.nexprint.com"
+NEXPRINT_API = NEXPRINT_BASE + "/gateway/api/v1/model-library-server"
+NEXPRINT_DETAIL_URL = NEXPRINT_API + "/model-base-info/get"
+NEXPRINT_PRESIGN_URL = NEXPRINT_API + "/common/presigned-download-url"
+NEXPRINT_MODEL_CONFIG_FILE = "5"
+NEXPRINT_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0 Safari/537.36"
+    ),
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": NEXPRINT_BASE + "/",
+    "Origin": NEXPRINT_BASE,
+}
+
+
+class NexprintError(Exception):
+    def __init__(self, message, status=502):
+        super().__init__(message)
+        self.status = status
+
+
+def _nexprint_clean_token(raw):
+    """Accepte la valeur brute du cookie auth_token ou un en-tête Cookie complet."""
+    raw = (raw or '').strip()
+    if raw.lower().startswith('cookie:'):
+        raw = raw.split(':', 1)[1].strip()
+    m = re.search(r'(?:^|[;\s])auth_token=([^;\s]+)', raw)
+    token = m.group(1) if m else raw
+    return token.strip().strip('"\'')
+
+
+def _nexprint_json(resp, what):
+    if resp.status_code in (401, 403):
+        app_logger.warning(f"[Nexprint] {what}: HTTP {resp.status_code}")
+        raise NexprintError(f"Session Nexprint refusée (HTTP {resp.status_code}) : reconnecte-toi sur nexprint.com puis recopie le cookie auth_token dans Paramètres → Comptes externes → Nexprint.", 401)
+    resp.raise_for_status()
+    payload = resp.json()
+    if not isinstance(payload, dict):
+        raise NexprintError(f"Réponse Nexprint invalide ({what}).")
+    code = payload.get('code')
+    msg = str(payload.get('msg') or payload.get('message') or '')
+    try:
+        code = int(code) if code is not None else None
+    except (TypeError, ValueError):
+        code = None
+    if code not in (None, 0, 200):
+        app_logger.warning(f"[Nexprint] {what}: code={code} msg={msg!r}")
+    if code in (401, 403):
+        raise NexprintError(f"Session Nexprint refusée par l'API (code {code}{' : ' + msg if msg else ''}). Recopie le cookie auth_token en entier, juste après t'être connecté sur nexprint.com.", 401)
+    if code not in (None, 0, 200):
+        raise NexprintError(f"Nexprint : {what} a échoué (code {code}{' : ' + msg if msg else ''}).")
+    data = payload.get('data')
+    return data if isinstance(data, dict) else {}
+
+
+def _nexprint_auth_strategies(token):
+    """Variantes d'authentification, la première reproduit celle du site officiel."""
+    site = {
+        "Authorization": "Bearer " + token,
+        "client-id": "Nexprint",
+        "user-lang": "en",
+    }
+    return [("site (Bearer + client-id)", site), ("cookie", {})]
+
+
+def nexprint_get_model_files(model_id, auth_token, profile_hint=None):
+    """Liste les fichiers 3D d'un modèle Nexprint avec une URL signée par fichier.
+
+    Utilise l'API de Nexprint avec la session de l'utilisateur (cookie auth_token,
+    puis variantes d'en-têtes si l'API répond « non connecté »).
+    profile_hint : valeur de ?printConfigId= de l'URL pour ne télécharger qu'un profil.
+    Retourne une liste de {'name', 'url', 'size'}. Lève NexprintError.
+    """
+    token = _nexprint_clean_token(auth_token)
+    if not token:
+        raise NexprintError("Compte Nexprint non configuré.", 400)
+
+    app_logger.info(
+        f"[Nexprint] jeton: longueur={len(token)}, points={token.count('.')}, "
+        f"pourcent={'%' in token}, espaces={any(ch.isspace() for ch in token)}"
+    )
+    sess = requests.Session()
+    sess.headers.update(NEXPRINT_HEADERS)
+    sess.cookies.set('auth_token', token, domain='.nexprint.com', path='/')
+    try:
+        detail, last_auth_err = None, None
+        for label, extra in _nexprint_auth_strategies(token):
+            for k in list(sess.headers):
+                if k not in NEXPRINT_HEADERS:
+                    del sess.headers[k]
+            sess.headers.update(extra)
+            try:
+                r = sess.get(NEXPRINT_DETAIL_URL, params={"id": model_id}, timeout=30)
+                app_logger.info(f"[Nexprint] detail {model_id} [{label}] status={r.status_code}")
+                detail = _nexprint_json(r, "lecture du modèle")
+                app_logger.info(f"[Nexprint] authentification acceptée via: {label}")
+                break
+            except NexprintError as e:
+                if e.status == 401:
+                    last_auth_err = e
+                    continue
+                raise
+            except Exception as e:
+                raise NexprintError(f"Impossible de lire le modèle Nexprint : {e}")
+        if detail is None:
+            raise last_auth_err or NexprintError("Session Nexprint refusée.", 401)
+
+        # Entrées à télécharger : (nom, fileId, bizId, taille, url_directe)
+        profiles = [p for p in (detail.get('settingInfoList') or []) if isinstance(p, dict)]
+        if profiles:
+            app_logger.info(
+                f"[Nexprint] {len(profiles)} profil(s); champs: {sorted(profiles[0].keys())}; "
+                f"ids: {[p.get('id') for p in profiles]}"
+            )
+        if profile_hint:
+            hint = str(profile_hint)
+            want = re.sub(r'\D', '', hint)
+
+            def _matches(p):
+                for v in p.values():
+                    if isinstance(v, (str, int)) and not isinstance(v, bool) and str(v) == hint:
+                        return True
+                return bool(want) and re.sub(r'\D', '', str(p.get('id') or '')) == want
+
+            picked = [p for p in profiles if _matches(p)]
+            if picked:
+                profiles = picked
+            else:
+                app_logger.info(f"[Nexprint] profil {profile_hint} introuvable, tous les profils seront téléchargés")
+
+        entries, seen = [], set()
+        for prof in profiles:
+            finfo = prof.get('settingFile')
+            if not isinstance(finfo, dict) or not finfo.get('fileId'):
+                continue
+            fid = str(finfo['fileId'])
+            if fid in seen:
+                continue
+            seen.add(fid)
+            name = finfo.get('fileName') or ''
+            stem = os.path.splitext(name)[0]
+            if not name or stem.isdigit():
+                name = f"{prof.get('settingName') or model_id}"
+            if os.path.splitext(name)[1].lower() != '.3mf':
+                name += '.3mf'
+            entries.append((name, fid, str(prof.get('id') or ''), finfo.get('fileSize'), None))
+
+        if not entries:
+            for key in ('modelFileInfoList', 'files', 'modelFileList'):
+                for f in detail.get(key) or []:
+                    if not isinstance(f, dict):
+                        continue
+                    direct = f.get('fileUrl') or f.get('url') or f.get('downloadUrl')
+                    fname = f.get('fileName') or f.get('name') or ''
+                    if direct and fname:
+                        entries.append((fname, '', '', f.get('fileSize'), direct))
+                if entries:
+                    break
+
+        strategies = _nexprint_auth_strategies(token)
+        working = [0]
+
+        def _apply(idx):
+            for k in list(sess.headers):
+                if k not in NEXPRINT_HEADERS:
+                    del sess.headers[k]
+            sess.headers.update(strategies[idx][1])
+
+        def _presign(fid, biz):
+            """Crée le lien signé ; essaie les variantes d'authentification si « non connecté »."""
+            last = None
+            order = [working[0]] + [i for i in range(len(strategies)) if i != working[0]]
+            for idx in order:
+                _apply(idx)
+                try:
+                    pr = sess.post(NEXPRINT_PRESIGN_URL, json={"fileInfoList": [
+                        {"fileId": fid, "type": NEXPRINT_MODEL_CONFIG_FILE, "bizId": biz}
+                    ]}, timeout=30)
+                    pdata = _nexprint_json(pr, "création du lien signé")
+                    working[0] = idx
+                    app_logger.info(f"[Nexprint] lien signé obtenu via: {strategies[idx][0]}")
+                    return pdata
+                except NexprintError as e:
+                    if e.status == 401:
+                        last = e
+                        continue
+                    raise
+            raise last or NexprintError("Session Nexprint refusée.", 401)
+
+        files = []
+        for name, fid, biz, size, direct in entries:
+            url = direct
+            if not url:
+                try:
+                    pdata = _presign(fid, biz)
+                    lst = pdata.get('fileInfoList')
+                    if isinstance(lst, list) and lst and isinstance(lst[0], dict):
+                        url = (lst[0].get('resultUrl') or lst[0].get('downloadUrl')
+                               or lst[0].get('fileUrl') or lst[0].get('url'))
+                except NexprintError:
+                    raise
+                except Exception as e:
+                    app_logger.warning(f"[Nexprint] Lien signé impossible pour {name}: {e}")
+            if url and url.lower().startswith('http'):
+                files.append({"name": name, "url": url, "size": size})
+        app_logger.info(f"[Nexprint] {len(files)} fichier(s) prêt(s) pour {model_id}")
+        return files
+    finally:
+        sess.close()
 
 
 MAKERWORLD_API = "https://api.bambulab.com"
@@ -11108,6 +11884,113 @@ def api_download_file():
                     "count": len(results),
                 })
 
+        elif 'nexprint.com' in parsed.netloc:
+            m_id = re.search(r'/models/([A-Za-z]\d+)', parsed.path)
+            if not m_id:
+                active_downloads.pop(download_id, None)
+                return jsonify({
+                    "error": "URL Nexprint invalide. Format attendu : https://www.nexprint.com/models/G1234567"
+                }), 400
+
+            model_id = m_id.group(1)
+
+            nx_token = None
+            try:
+                conn = get_db()
+                acc_row = conn.execute(
+                    "SELECT api_key FROM account_credentials WHERE user_id = ? AND platform = 'nexprint'",
+                    (session['user_id'],)
+                ).fetchone()
+                conn.close()
+                if acc_row and acc_row['api_key']:
+                    nx_token = decrypt_account_secret(acc_row['api_key'])
+            except Exception:
+                pass
+
+            if not nx_token:
+                active_downloads.pop(download_id, None)
+                return jsonify({
+                    "error": "Compte Nexprint non configuré. Colle ton cookie auth_token dans Paramètres → Comptes externes → Nexprint."
+                }), 400
+
+            try:
+                from urllib.parse import parse_qs as _pqs
+                _hint = (_pqs(parsed.query).get('printConfigId') or [None])[0]
+                nx_files = nexprint_get_model_files(model_id, nx_token, profile_hint=_hint)
+            except NexprintError as nx_err:
+                active_downloads.pop(download_id, None)
+                return jsonify({"error": str(nx_err)}), nx_err.status
+            if not nx_files:
+                active_downloads.pop(download_id, None)
+                return jsonify({
+                    "error": "Aucun fichier 3D téléchargeable trouvé pour ce modèle Nexprint."
+                }), 404
+
+            nx_dl_headers = dict(DL_HEADERS)
+            total_files = len(nx_files)
+            results = []
+            for idx, nf in enumerate(nx_files):
+                fname_item = re.sub(r'[<>:"/\\|?*]', '_', nf['name']) or f"nexprint_{model_id}_{idx}.3mf"
+                dest_path = os.path.join(save_dir, fname_item)
+                active_downloads[download_id]['filename'] = fname_item
+                currently_downloading_paths.add(dest_path.replace('\\', '/'))
+
+                file_ok = False
+                try:
+                    with requests.get(nf['url'], headers=nx_dl_headers, stream=True, timeout=120) as r_dl:
+                        r_dl.raise_for_status()
+                        total_bytes = int(r_dl.headers.get('Content-Length', 0))
+                        downloaded_bytes = 0
+                        with open(dest_path, 'wb') as f_out:
+                            for chunk in r_dl.iter_content(chunk_size=65536):
+                                if download_id in cancelled_downloads:
+                                    break
+                                if chunk:
+                                    f_out.write(chunk)
+                                    downloaded_bytes += len(chunk)
+                                    base_pct = int(idx * 100 / total_files)
+                                    file_pct = int(downloaded_bytes * 100 / total_bytes / total_files) if total_bytes else 0
+                                    active_downloads[download_id]['percentage'] = base_pct + file_pct
+                    file_ok = download_id not in cancelled_downloads and os.path.getsize(dest_path) > 0
+                except Exception as file_err:
+                    app_logger.warning(f"[Download][Nexprint] Échec sur {fname_item}: {file_err}")
+                finally:
+                    if file_ok:
+                        mark_download_complete_and_refresh_thumbnail(dest_path)
+                        results.append(fname_item)
+                        app_logger.info(f"[Download][Nexprint] {fname_item} → {dest_path}")
+                    else:
+                        currently_downloading_paths.discard(dest_path.replace('\\', '/'))
+                        try:
+                            if os.path.exists(dest_path):
+                                os.remove(dest_path)
+                        except OSError as cleanup_err:
+                            app_logger.warning(f"[Download][Nexprint] Échec suppression fichier partiel {dest_path}: {cleanup_err}")
+
+                if download_id in cancelled_downloads:
+                    break
+
+            active_downloads.pop(download_id, None)
+            if download_id in cancelled_downloads:
+                cancelled_downloads.discard(download_id)
+                return jsonify({"cancelled": True, "download_id": download_id}), 200
+            if not results:
+                return jsonify({"error": "Impossible de télécharger les fichiers Nexprint pour ce modèle."}), 502
+
+            fname = results[0]
+            file_size = os.path.getsize(os.path.join(save_dir, fname))
+            for rf in results:
+                rp = os.path.join(save_dir, rf)
+                save_download_history(session['user_id'], rf, rp, os.path.getsize(rp) if os.path.exists(rp) else 0, os.path.splitext(rf)[1], url, 'Nexprint')
+            invalidate_cache()
+            return jsonify({
+                "success": True,
+                "filename": fname,
+                "path": os.path.join(save_dir, fname),
+                "size": file_size,
+                "count": len(results),
+            })
+
         elif 'makerworld.com' in parsed.netloc:
             m_id = re.search(r'/models/(\d+)', parsed.path)
             if not m_id:
@@ -11343,7 +12226,7 @@ def api_download_file():
 
             active_downloads.pop(download_id, None)
 
-            platform_name = 'Thingiverse' if 'thingiverse' in url else ('MakerWorld' if 'makerworld' in url else '')
+            platform_name = 'Thingiverse' if 'thingiverse' in url else ('MakerWorld' if 'makerworld' in url else ('Nexprint' if 'nexprint' in url else ''))
             save_download_history(session['user_id'], fname, dest_path, file_size, os.path.splitext(fname)[1], url, platform_name)
             invalidate_cache()
 
@@ -11734,6 +12617,188 @@ def _send_native_notification(title, message):
         app_logger.debug(f"[Notif] Notification native ignorée: {e}")
 
 
+_PUSH_DEFAULT_TYPES = ['print_finished', 'print_failed', 'maintenance', 'low_stock']
+_PUSH_TAGS = {'print_finished': ['white_check_mark'], 'print_failed': ['warning'],
+              'maintenance': ['wrench'], 'low_stock': ['package']}
+_server_lang_cache = {}
+
+
+def _server_t(key, default):
+    lang = str((load_settings() or {}).get('lang') or 'fr')
+    if not re.fullmatch(r'[a-z]{2}(-[A-Za-z]{2,4})?', lang):
+        lang = 'fr'
+    data = _server_lang_cache.get(lang)
+    if data is None:
+        try:
+            with open(os.path.join(BASE_DIR, 'languages', f'{lang}.json'), 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+        _server_lang_cache[lang] = data
+    return data.get(key) or default
+
+
+def _push_http_post(url, body, headers=None):
+    if not re.match(r'^https?://', url or '', re.I):
+        raise ValueError("URL invalide (http/https attendu)")
+    r = requests.post(url, json=body, headers=headers or {}, timeout=8)
+    if r.status_code >= 300:
+        raise RuntimeError(f"HTTP {r.status_code}")
+
+
+def _push_deliver(cfg, title, message, notif_type='info'):
+    provider = (cfg.get('push_provider') or 'ntfy').strip()
+    title = str(title or 'Stellio')[:120]
+    message = str(message or '')[:900]
+    if provider == 'ntfy':
+        server = (cfg.get('push_ntfy_server') or 'https://ntfy.sh').strip().rstrip('/')
+        topic = (cfg.get('push_ntfy_topic') or '').strip()
+        if not topic:
+            raise ValueError("Sujet ntfy manquant")
+        headers = {}
+        if (cfg.get('push_ntfy_token') or '').strip():
+            headers['Authorization'] = f"Bearer {cfg['push_ntfy_token'].strip()}"
+        body = {"topic": topic, "title": title, "message": message,
+                "tags": _PUSH_TAGS.get(notif_type, ['bell']), "priority": 4 if notif_type == 'print_failed' else 3}
+        _push_http_post(server, body, headers)
+    elif provider == 'telegram':
+        token = (cfg.get('push_telegram_token') or '').strip()
+        chat = str(cfg.get('push_telegram_chat_id') or '').strip()
+        if not token or not chat:
+            raise ValueError("Jeton ou identifiant de conversation Telegram manquant")
+        _push_http_post(f"https://api.telegram.org/bot{token}/sendMessage", {"chat_id": chat, "text": f"{title}\n{message}"})
+    elif provider == 'discord':
+        url = (cfg.get('push_discord_url') or '').strip()
+        if not url:
+            raise ValueError("URL du webhook Discord manquante")
+        _push_http_post(url, {"username": "Stellio", "content": f"**{title}**\n{message}"[:1900]})
+    elif provider == 'webhook':
+        url = (cfg.get('push_webhook_url') or '').strip()
+        if not url:
+            raise ValueError("URL du webhook manquante")
+        _push_http_post(url, {"source": "stellio", "type": notif_type, "title": title, "message": message,
+                              "timestamp": datetime.datetime.now().isoformat(timespec='seconds')})
+    else:
+        raise ValueError("Service inconnu")
+
+
+def _push_notify_async(notif_type, title, message):
+    cfg = load_settings() or {}
+    if not cfg.get('push_enabled'):
+        return
+    types = cfg.get('push_types') if isinstance(cfg.get('push_types'), list) else _PUSH_DEFAULT_TYPES
+    if notif_type not in types:
+        return
+
+    def _run():
+        try:
+            _push_deliver(cfg, title, message, notif_type)
+        except Exception as e:
+            app_logger.warning(f"[Push] Envoi échoué ({type(e).__name__}: {str(e)[:80]})")
+    threading.Thread(target=_run, daemon=True).start()
+
+
+@app.route('/api/push/test', methods=['POST'])
+@login_required
+def api_push_test():
+    cfg = dict(load_settings() or {})
+    for k, v in (request.json or {}).items():
+        if str(k).startswith('push_'):
+            cfg[k] = v
+    try:
+        _push_deliver(cfg, _server_t('push.test_title', 'Stellio — test'),
+                      _server_t('push.test_message', 'Les notifications push fonctionnent.'), 'info')
+        return jsonify({"success": True}), 200
+    except requests.exceptions.RequestException as e:
+        return jsonify({"success": False, "error": f"Connexion impossible ({type(e).__name__})"}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)[:120]}), 200
+
+
+_push_watch_state = {}
+
+
+def _push_watch_once(cfg):
+    types = cfg.get('push_types') if isinstance(cfg.get('push_types'), list) else _PUSH_DEFAULT_TYPES
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT * FROM printers").fetchall()
+    finally:
+        conn.close()
+    now = time.time()
+    for p in rows:
+        try:
+            status = printer_hub.get_status(parse_printer_config(p)) or {}
+        except Exception:
+            continue
+        st, pid = status.get('status'), p['id']
+        prev = _push_watch_state.get(pid)
+        if st == 'printing':
+            _push_watch_state[pid] = {'status': 'printing', 'ts': now}
+        elif st in ('idle', 'error'):
+            if prev and prev['status'] == 'printing' and now - prev['ts'] < 600:
+                if st == 'idle' and 'print_finished' in types:
+                    _push_notify_async('print_finished', _server_t('notif.print_finished_title', 'Impression terminée'), p['name'])
+                elif st == 'error' and 'print_failed' in types:
+                    _push_notify_async('print_failed', _server_t('notif.print_failed_title', "Échec d'impression"), p['name'])
+            _push_watch_state[pid] = {'status': st, 'ts': now}
+        elif st == 'paused':
+            if prev and prev['status'] == 'printing':
+                prev['ts'] = now
+        elif not prev:
+            _push_watch_state[pid] = {'status': st, 'ts': now}
+
+
+def _push_watcher_loop():
+    time.sleep(30)
+    while True:
+        try:
+            cfg = load_settings() or {}
+            if cfg.get('push_enabled'):
+                _push_watch_once(cfg)
+        except Exception as e:
+            app_logger.debug(f"[Push] Surveillance imprimantes: {e}")
+        time.sleep(20)
+
+
+_notif_create_lock = threading.Lock()
+_NOTIF_CONTENT_DEDUP_SECONDS = 300
+
+
+def _normalize_dedup_key(key):
+    # Retire un éventuel suffixe de date (_AAAA-MM-JJ) : le sujet seul identifie la notification.
+    key = (key or '').strip()
+    return re.sub(r'_\d{4}-\d{2}-\d{2}$', '', key) or None
+
+
+def _dedupe_notifications_once():
+    # Nettoyage unique : fusionne les doublons « même sujet, dates différentes » déjà en base.
+    try:
+        conn = get_db()
+        try:
+            rows = conn.execute(
+                "SELECT id, user_id, dedup_key FROM notifications "
+                "WHERE dedup_key GLOB '*_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' ORDER BY id"
+            ).fetchall()
+            latest = {}
+            for r in rows:
+                latest[(r['user_id'], _normalize_dedup_key(r['dedup_key']))] = r['id']
+            for r in rows:
+                k = (r['user_id'], _normalize_dedup_key(r['dedup_key']))
+                if latest[k] == r['id']:
+                    conn.execute("UPDATE notifications SET dedup_key = ? WHERE id = ?", (k[1], r['id']))
+                else:
+                    conn.execute("DELETE FROM notifications WHERE id = ?", (r['id'],))
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        app_logger.warning(f"[Notifications] Nettoyage des doublons impossible: {e}")
+
+
+_dedupe_notifications_once()
+
+
 @app.route('/api/notifications', methods=['POST'])
 @login_required
 def api_create_notification():
@@ -11743,20 +12808,25 @@ def api_create_notification():
         title = (data.get('title') or '').strip()
         message = (data.get('message') or '').strip() or None
         link_page = (data.get('link_page') or '').strip() or None
-        dedup_key = (data.get('dedup_key') or '').strip() or None
+        dedup_key = _normalize_dedup_key(data.get('dedup_key'))
         if not title:
             return jsonify({"error": "Titre requis"}), 400
 
         conn = get_db()
         try:
             if dedup_key:
+                # Même sujet = une seule notification, quelle que soit sa date (y compris
+                # les anciennes lignes dont la clé se terminait par la date du jour).
                 existing = conn.execute(
-                    "SELECT id FROM notifications WHERE user_id = ? AND dedup_key = ? "
-                    "AND created_at > datetime('now', '-1 day')",
-                    (session['user_id'], dedup_key)
+                    "SELECT id, message FROM notifications WHERE user_id = ? AND "
+                    "(dedup_key = ? OR dedup_key GLOB ?) ORDER BY id DESC LIMIT 1",
+                    (session['user_id'], dedup_key, dedup_key + '_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')
                 ).fetchone()
                 if existing:
-                    return jsonify({"message": "Déjà notifié récemment", "created": False}), 200
+                    if message and message != existing['message']:
+                        conn.execute("UPDATE notifications SET message = ? WHERE id = ?", (message, existing['id']))
+                        conn.commit()
+                    return jsonify({"message": "Déjà notifié", "created": False}), 200
             conn.execute(
                 "INSERT INTO notifications (user_id, type, title, message, link_page, dedup_key) VALUES (?, ?, ?, ?, ?, ?)",
                 (session['user_id'], notif_type, title, message, link_page, dedup_key)
@@ -11765,6 +12835,8 @@ def api_create_notification():
         finally:
             conn.close()
         _send_native_notification(title, message)
+        if notif_type not in ('print_finished', 'print_failed'):
+            _push_notify_async(notif_type, title, message)
         return jsonify({"message": "Créée", "created": True}), 201
     except Exception as e:
         app_logger.error(f"[API] Erreur api_create_notification: {e}")
@@ -12133,6 +13205,7 @@ def api_accounts_status():
         'thingiverse': False,
         'makerworld': False,
         'tigertag': False,
+        'nexprint': False,
     }
 
     conn = get_db()
@@ -12148,6 +13221,8 @@ def api_accounts_status():
         platform = acc['platform']
         if platform == 'thingiverse' and acc['api_key']:
             status['thingiverse'] = True
+        elif platform == 'nexprint' and acc['api_key']:
+            status['nexprint'] = True
         elif platform == 'makerworld' and acc['api_key']:
             status['makerworld'] = True
             status['makerworld_email'] = acc['email'] or ''
@@ -12809,42 +13884,13 @@ def api_backup_import():
 
     tmp_zip = os.path.join(tempfile.gettempdir(), f'stellio_import_{secrets.token_hex(6)}.zip')
     file.save(tmp_zip)
-    backup_dir = None
 
     try:
-        with zipfile.ZipFile(tmp_zip, 'r') as zf:
-            names = zf.namelist()
-            if 'manifest.json' not in names or 'stellio.db' not in names:
-                return jsonify({"error": "Archive invalide : ce n'est pas une sauvegarde Stellio."}), 400
-
-            manifest = json.loads(zf.read('manifest.json').decode('utf-8'))
-
-            backup_dir = os.path.join(DATA_DIR, 'backups', datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
-            os.makedirs(backup_dir, exist_ok=True)
-            for existing, dest_name in [(DB_PATH, 'stellio.db'), (SETTINGS_FILE, 'app_settings.json'),
-                                          (KEY_FILE, 'encryption.key'), (KEY_FILE.replace('.key', '.iv'), 'encryption.iv')]:
-                if os.path.exists(existing):
-                    shutil.copy2(existing, os.path.join(backup_dir, dest_name))
-
-            zf.extract('stellio.db', DATA_DIR)
-            os.replace(os.path.join(DATA_DIR, 'stellio.db'), DB_PATH)
-
-            if 'app_settings.json' in names:
-                zf.extract('app_settings.json', DATA_DIR)
-                os.replace(os.path.join(DATA_DIR, 'app_settings.json'), SETTINGS_FILE)
-
-            if 'encryption.key' in names and 'encryption.iv' in names:
-                zf.extract('encryption.key', DATA_DIR)
-                zf.extract('encryption.iv', DATA_DIR)
-                os.replace(os.path.join(DATA_DIR, 'encryption.key'), KEY_FILE)
-                os.replace(os.path.join(DATA_DIR, 'encryption.iv'), KEY_FILE.replace('.key', '.iv'))
-
-        global _settings_cache
-        _settings_cache = {}
-        invalidate_cache()
-
-        app_logger.info(f"[BACKUP] ✅ Sauvegarde importée (exportée le {manifest.get('exported_at', '?')}). Copie de sécurité: {backup_dir}")
-        return jsonify({"success": True, "restart_required": True, "backed_up_to": backup_dir})
+        with _auto_backup_lock:
+            info, err = _restore_backup_zip(tmp_zip)
+        if err:
+            return jsonify({"error": err[0]}), err[1]
+        return jsonify({"success": True, "restart_required": True, "backed_up_to": info['backed_up_to']})
     except zipfile.BadZipFile:
         return jsonify({"error": "Fichier .zip invalide ou corrompu"}), 400
     except Exception as e:
@@ -12855,6 +13901,720 @@ def api_backup_import():
             os.remove(tmp_zip)
         except Exception:
             pass
+
+
+AUTO_BACKUP_CONFIG_FILE = os.path.join(DATA_DIR, 'auto_backup.json')
+AUTO_BACKUP_DEFAULT_DIR = os.path.join(DATA_DIR, 'auto_backups')
+AUTO_BACKUP_NAME_RE = re.compile(r'^stellio_(auto|manual)_\d{8}_\d{6}\.zip$')
+AUTO_BACKUP_DEFAULTS = {
+    'enabled': False,
+    'frequency': 'daily',          
+    'time': '03:00',              
+    'weekday': 0,                  
+    'day_of_month': 1,             
+    'keep': 7,                     
+    'include': dict(BACKUP_DEFAULT_INCLUDE),
+    'folder': '',                  
+    'last_run': None,
+    'last_status': None,           
+    'last_error': '',
+}
+_auto_backup_lock = threading.RLock()
+
+
+def _load_auto_backup_config():
+    cfg = json.loads(json.dumps(AUTO_BACKUP_DEFAULTS))
+    try:
+        with open(AUTO_BACKUP_CONFIG_FILE, 'r', encoding='utf-8') as f:
+            saved = json.load(f)
+        if isinstance(saved, dict):
+            for k, v in saved.items():
+                if k == 'include' and isinstance(v, dict):
+                    cfg['include'].update({c: bool(v.get(c, True)) for c in BACKUP_DEFAULT_INCLUDE})
+                elif k in cfg:
+                    cfg[k] = v
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        app_logger.warning(f"[AUTO-BACKUP] Configuration illisible, valeurs par défaut utilisées : {e}")
+    return _sanitize_auto_backup_config(cfg)
+
+
+def _sanitize_auto_backup_config(cfg):
+    cfg['enabled'] = bool(cfg.get('enabled'))
+    if cfg.get('frequency') not in ('daily', 'weekly', 'monthly'):
+        cfg['frequency'] = 'daily'
+    m = re.match(r'^(\d{1,2}):(\d{2})$', str(cfg.get('time') or ''))
+    if not m or int(m.group(1)) > 23 or int(m.group(2)) > 59:
+        cfg['time'] = '03:00'
+    else:
+        cfg['time'] = f"{int(m.group(1)):02d}:{m.group(2)}"
+    try:
+        cfg['weekday'] = min(6, max(0, int(cfg.get('weekday', 0))))
+    except (TypeError, ValueError):
+        cfg['weekday'] = 0
+    try:
+        cfg['day_of_month'] = min(28, max(1, int(cfg.get('day_of_month', 1))))
+    except (TypeError, ValueError):
+        cfg['day_of_month'] = 1
+    try:
+        cfg['keep'] = min(100, max(1, int(cfg.get('keep', 7))))
+    except (TypeError, ValueError):
+        cfg['keep'] = 7
+    inc = cfg.get('include') if isinstance(cfg.get('include'), dict) else {}
+    cfg['include'] = {c: bool(inc.get(c, True)) for c in BACKUP_DEFAULT_INCLUDE}
+    cfg['folder'] = str(cfg.get('folder') or '').strip()
+    return cfg
+
+
+def _save_auto_backup_config(cfg):
+    tmp = AUTO_BACKUP_CONFIG_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, AUTO_BACKUP_CONFIG_FILE)
+
+
+def _auto_backup_folder(cfg, create=True):
+    folder = cfg.get('folder') or AUTO_BACKUP_DEFAULT_DIR
+    if create:
+        os.makedirs(folder, exist_ok=True)
+    return folder
+
+
+def _at_time(day, hhmm):
+    h, m = (int(x) for x in hhmm.split(':'))
+    return datetime.datetime.combine(day, datetime.time(h, m))
+
+
+def _month_occurrence(year, month, dom, hhmm):
+    return _at_time(datetime.date(year, month, min(dom, 28)), hhmm)
+
+
+def _last_scheduled_run(cfg, now):
+    freq, hhmm = cfg['frequency'], cfg['time']
+    if freq == 'daily':
+        cand = _at_time(now.date(), hhmm)
+        return cand if cand <= now else cand - datetime.timedelta(days=1)
+    if freq == 'weekly':
+        back = (now.weekday() - cfg['weekday']) % 7
+        cand = _at_time(now.date() - datetime.timedelta(days=back), hhmm)
+        return cand if cand <= now else cand - datetime.timedelta(days=7)
+    cand = _month_occurrence(now.year, now.month, cfg['day_of_month'], hhmm)
+    if cand <= now:
+        return cand
+    y, mth = (now.year - 1, 12) if now.month == 1 else (now.year, now.month - 1)
+    return _month_occurrence(y, mth, cfg['day_of_month'], hhmm)
+
+
+def _next_scheduled_run(cfg, now):
+    freq, hhmm = cfg['frequency'], cfg['time']
+    last = _last_scheduled_run(cfg, now)
+    if freq == 'daily':
+        return last + datetime.timedelta(days=1)
+    if freq == 'weekly':
+        return last + datetime.timedelta(days=7)
+    y, mth = (last.year + 1, 1) if last.month == 12 else (last.year, last.month + 1)
+    return _month_occurrence(y, mth, cfg['day_of_month'], hhmm)
+
+
+def _auto_backup_is_due(cfg, now):
+    if not cfg['enabled']:
+        return False
+    try:
+        last_run = datetime.datetime.fromisoformat(cfg['last_run']) if cfg.get('last_run') else None
+    except ValueError:
+        last_run = None
+    if last_run is None:
+        return False   
+    return last_run < _last_scheduled_run(cfg, now)
+
+
+def _create_backup_file(include, kind, folder):
+    zip_bytes, _ = build_backup_zip_bytes(include=include)
+    name = f"stellio_{kind}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    path = os.path.join(folder, name)
+    tmp = path + '.part'
+    with open(tmp, 'wb') as f:
+        f.write(zip_bytes)
+    os.replace(tmp, path)
+    return path
+
+
+def _prune_auto_backups(folder, keep):
+    try:
+        autos = sorted((n for n in os.listdir(folder) if AUTO_BACKUP_NAME_RE.match(n) and n.startswith('stellio_auto_')),
+                       reverse=True)
+        for old in autos[keep:]:
+            try:
+                os.remove(os.path.join(folder, old))
+                app_logger.info(f"[AUTO-BACKUP] Ancienne sauvegarde supprimée : {old}")
+            except Exception as e:
+                app_logger.warning(f"[AUTO-BACKUP] Suppression impossible de {old} : {e}")
+    except Exception as e:
+        app_logger.warning(f"[AUTO-BACKUP] Rotation impossible : {e}")
+
+
+def run_auto_backup(kind='auto', include_override=None):
+    with _auto_backup_lock:
+        cfg = _load_auto_backup_config()
+        include = include_override if include_override is not None else cfg['include']
+        try:
+            folder = _auto_backup_folder(cfg)
+            path = _create_backup_file(include, kind, folder)
+            if kind == 'auto':
+                _prune_auto_backups(folder, cfg['keep'])
+                cfg['last_run'] = datetime.datetime.now().isoformat(timespec='seconds')
+                cfg['last_status'], cfg['last_error'] = 'ok', ''
+                _save_auto_backup_config(cfg)
+            app_logger.info(f"[AUTO-BACKUP] ✅ Sauvegarde {kind} créée : {path}")
+            return path, None
+        except Exception as e:
+            app_logger.error(f"[AUTO-BACKUP] Échec de la sauvegarde {kind} : {e}")
+            if kind == 'auto':
+                cfg['last_run'] = datetime.datetime.now().isoformat(timespec='seconds')
+                cfg['last_status'], cfg['last_error'] = 'error', str(e)[:300]
+                try:
+                    _save_auto_backup_config(cfg)
+                except Exception:
+                    pass
+            return None, str(e)
+
+
+AUTO_BACKUP_GRACE_SECONDS = 600   
+
+
+def _auto_backup_missed_info(cfg, now):
+    if not _auto_backup_is_due(cfg, now):
+        return None
+    scheduled = _last_scheduled_run(cfg, now)
+    if (now - scheduled).total_seconds() > AUTO_BACKUP_GRACE_SECONDS:
+        return scheduled
+    return None
+
+
+def _auto_backup_scheduler():
+    _lower_thread_priority()
+    app_logger.info("[AUTO-BACKUP] Planificateur démarré")
+    time.sleep(20) 
+    while True:
+        try:
+            cfg = _load_auto_backup_config()
+            now = datetime.datetime.now()
+            if _auto_backup_is_due(cfg, now):
+                if _auto_backup_missed_info(cfg, now) is None:
+                    run_auto_backup('auto')  
+        except Exception as e:
+            app_logger.warning(f"[AUTO-BACKUP] Erreur du planificateur : {e}")
+        time.sleep(60)
+
+
+def _list_backups(folder):
+    items = []
+    try:
+        names = sorted((n for n in os.listdir(folder) if AUTO_BACKUP_NAME_RE.match(n)), reverse=True)
+    except FileNotFoundError:
+        return items
+    for name in names:
+        path = os.path.join(folder, name)
+        try:
+            st = os.stat(path)
+            item = {'name': name, 'kind': 'auto' if name.startswith('stellio_auto_') else 'manual',
+                    'size': st.st_size,
+                    'created': datetime.datetime.fromtimestamp(st.st_mtime).isoformat(timespec='seconds'),
+                    'include': None, 'app_version': None, 'valid': True}
+            try:
+                with zipfile.ZipFile(path, 'r') as zf:
+                    manifest = json.loads(zf.read('manifest.json').decode('utf-8'))
+                    item['include'] = manifest.get('included')
+                    item['app_version'] = manifest.get('app_version')
+                    if manifest.get('exported_at'):
+                        item['created'] = manifest['exported_at'][:19]
+            except Exception:
+                item['valid'] = False
+            items.append(item)
+        except Exception:
+            continue
+    return items
+
+
+def _merge_backup_categories(backup_db_path, categories):
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    try:
+        conn.execute("PRAGMA foreign_keys=OFF")
+        conn.execute("ATTACH DATABASE ? AS bk", (backup_db_path,))
+        for cat in categories:
+            for table in BACKUP_CATEGORY_TABLES.get(cat, []):
+                cols_main = [r[1] for r in conn.execute(f"PRAGMA main.table_info({table})")]
+                cols_bk = [r[1] for r in conn.execute(f"PRAGMA bk.table_info({table})")]
+                common = [c for c in cols_main if c in cols_bk]
+                if not common:
+                    continue
+                col_sql = ', '.join(f'"{c}"' for c in common)
+                conn.execute(f"DELETE FROM main.{table}")
+                conn.execute(f"INSERT INTO main.{table} ({col_sql}) SELECT {col_sql} FROM bk.{table}")
+        conn.commit()
+        conn.execute("DETACH DATABASE bk")
+    finally:
+        conn.close()
+
+
+def _restore_backup_zip(zip_path):
+    with zipfile.ZipFile(zip_path, 'r') as zf:
+        names = zf.namelist()
+        if 'manifest.json' not in names or 'stellio.db' not in names:
+            return None, ("Archive invalide : ce n'est pas une sauvegarde Stellio.", 400)
+
+        manifest = json.loads(zf.read('manifest.json').decode('utf-8'))
+        included = manifest.get('included')
+        partial = isinstance(included, dict) and not all(included.get(c, True) for c in BACKUP_DEFAULT_INCLUDE)
+
+        backup_dir = os.path.join(DATA_DIR, 'backups', datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
+        os.makedirs(backup_dir, exist_ok=True)
+        for existing, dest_name in [(DB_PATH, 'stellio.db'), (SETTINGS_FILE, 'app_settings.json'),
+                                      (KEY_FILE, 'encryption.key'), (KEY_FILE.replace('.key', '.iv'), 'encryption.iv')]:
+            if os.path.exists(existing):
+                shutil.copy2(existing, os.path.join(backup_dir, dest_name))
+
+        if partial:
+            tmp_db = os.path.join(tempfile.gettempdir(), f'stellio_restore_{secrets.token_hex(6)}.db')
+            try:
+                with zf.open('stellio.db') as src, open(tmp_db, 'wb') as dst:
+                    shutil.copyfileobj(src, dst)
+                cats = [c for c in BACKUP_CATEGORY_TABLES if included.get(c, True)]
+                _merge_backup_categories(tmp_db, cats)
+            finally:
+                try:
+                    os.remove(tmp_db)
+                except Exception:
+                    pass
+        else:
+            zf.extract('stellio.db', DATA_DIR)
+            os.replace(os.path.join(DATA_DIR, 'stellio.db'), DB_PATH)
+
+        if 'app_settings.json' in names and (not partial or included.get('settings', True)):
+            zf.extract('app_settings.json', DATA_DIR)
+            os.replace(os.path.join(DATA_DIR, 'app_settings.json'), SETTINGS_FILE)
+
+        if 'encryption.key' in names and 'encryption.iv' in names and (not partial or included.get('accounts', True)):
+            zf.extract('encryption.key', DATA_DIR)
+            zf.extract('encryption.iv', DATA_DIR)
+            os.replace(os.path.join(DATA_DIR, 'encryption.key'), KEY_FILE)
+            os.replace(os.path.join(DATA_DIR, 'encryption.iv'), KEY_FILE.replace('.key', '.iv'))
+
+    global _settings_cache
+    _settings_cache = {}
+    invalidate_cache()
+    app_logger.info(f"[BACKUP] ✅ Sauvegarde restaurée (créée le {manifest.get('exported_at', '?')}, "
+                    f"{'partielle' if partial else 'complète'}). Copie de sécurité: {backup_dir}")
+    return {'exported_at': manifest.get('exported_at'), 'backed_up_to': backup_dir, 'partial': partial}, None
+
+
+def _auto_backup_config_response(cfg):
+    now = datetime.datetime.now()
+    folder = _auto_backup_folder(cfg, create=False)
+    return {**cfg, 'folder_effective': folder, 'folder_is_default': not cfg.get('folder'),
+            'next_run': _next_scheduled_run(cfg, now).isoformat(timespec='minutes') if cfg['enabled'] else None}
+
+
+def _resolve_backup_file(name):
+    name = os.path.basename(str(name or ''))
+    if not AUTO_BACKUP_NAME_RE.match(name):
+        return None
+    path = os.path.join(_auto_backup_folder(_load_auto_backup_config(), create=False), name)
+    return path if os.path.isfile(path) else None
+
+
+@app.route('/api/backup/auto/config', methods=['GET'])
+@login_required
+def api_auto_backup_get_config():
+    with _auto_backup_lock:
+        return jsonify(_auto_backup_config_response(_load_auto_backup_config())), 200
+
+
+@app.route('/api/backup/auto/config', methods=['POST'])
+@login_required
+def api_auto_backup_set_config():
+    data = request.get_json(silent=True) or {}
+    with _auto_backup_lock:
+        cfg = _load_auto_backup_config()
+        was_enabled = cfg['enabled']
+        for key in ('enabled', 'frequency', 'time', 'weekday', 'day_of_month', 'keep', 'include', 'folder'):
+            if key in data:
+                cfg[key] = data[key]
+        cfg = _sanitize_auto_backup_config(cfg)
+        if cfg['folder']:
+            try:
+                if not os.path.isabs(cfg['folder']):
+                    return jsonify({"error": "Le dossier de sauvegarde doit être un chemin absolu."}), 400
+                os.makedirs(cfg['folder'], exist_ok=True)
+                probe = os.path.join(cfg['folder'], f'.stellio_write_test_{secrets.token_hex(4)}')
+                with open(probe, 'w') as f:
+                    f.write('ok')
+                os.remove(probe)
+            except Exception as e:
+                return jsonify({"error": f"Dossier inaccessible en écriture : {e}"}), 400
+        if cfg['enabled'] and not was_enabled:
+            cfg['last_run'] = datetime.datetime.now().isoformat(timespec='seconds')   
+        _save_auto_backup_config(cfg)
+        if cfg['enabled']:
+            _prune_auto_backups(_auto_backup_folder(cfg, create=False), cfg['keep'])
+        return jsonify(_auto_backup_config_response(cfg)), 200
+
+
+@app.route('/api/backup/auto/missed', methods=['GET'])
+@login_required
+def api_auto_backup_missed():
+    with _auto_backup_lock:
+        cfg = _load_auto_backup_config()
+        now = datetime.datetime.now()
+        scheduled = _auto_backup_missed_info(cfg, now)
+        return jsonify({
+            'missed': scheduled is not None,
+            'scheduled': scheduled.isoformat(timespec='minutes') if scheduled else None,
+            'next_run': _next_scheduled_run(cfg, now).isoformat(timespec='minutes') if cfg['enabled'] else None,
+        }), 200
+
+
+@app.route('/api/backup/auto/missed', methods=['POST'])
+@login_required
+def api_auto_backup_missed_answer():
+    data = request.get_json(silent=True) or {}
+    action = data.get('action')
+    with _auto_backup_lock:
+        if action == 'run':
+            path, err = run_auto_backup('auto')
+            if err:
+                return jsonify({"error": err}), 500
+            return jsonify({"success": True, "name": os.path.basename(path)}), 200
+        if action == 'skip':
+            cfg = _load_auto_backup_config()
+            cfg['last_run'] = datetime.datetime.now().isoformat(timespec='seconds')   
+            _save_auto_backup_config(cfg)
+            return jsonify({"success": True, "next_run": _next_scheduled_run(cfg, datetime.datetime.now()).isoformat(timespec='minutes')}), 200
+    return jsonify({"error": "Action inconnue"}), 400
+
+
+@app.route('/api/backup/auto/list', methods=['GET'])
+@login_required
+def api_auto_backup_list():
+    with _auto_backup_lock:
+        cfg = _load_auto_backup_config()
+        return jsonify({'backups': _list_backups(_auto_backup_folder(cfg, create=False)),
+                        'folder': _auto_backup_folder(cfg, create=False)}), 200
+
+
+@app.route('/api/backup/auto/run', methods=['POST'])
+@login_required
+def api_auto_backup_run_now():
+    data = request.get_json(silent=True) or {}
+    include = data.get('include')
+    if isinstance(include, dict):
+        include = {c: bool(include.get(c, True)) for c in BACKUP_DEFAULT_INCLUDE}
+    else:
+        include = None
+    path, err = run_auto_backup('manual', include_override=include)
+    if err:
+        return jsonify({"error": err}), 500
+    return jsonify({"success": True, "name": os.path.basename(path)}), 200
+
+
+@app.route('/api/backup/auto/restore', methods=['POST'])
+@login_required
+def api_auto_backup_restore():
+    data = request.get_json(silent=True) or {}
+    path = _resolve_backup_file(data.get('name'))
+    if not path:
+        return jsonify({"error": "Sauvegarde introuvable"}), 404
+    try:
+        with _auto_backup_lock:
+            info, err = _restore_backup_zip(path)
+        if err:
+            return jsonify({"error": err[0]}), err[1]
+        return jsonify({"success": True, "restart_required": True, **info}), 200
+    except zipfile.BadZipFile:
+        return jsonify({"error": "Fichier .zip invalide ou corrompu"}), 400
+    except Exception as e:
+        app_logger.error(f"[BACKUP] Échec restauration depuis la liste : {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+
+@app.route('/api/backup/auto/delete', methods=['POST'])
+@login_required
+def api_auto_backup_delete():
+    data = request.get_json(silent=True) or {}
+    path = _resolve_backup_file(data.get('name'))
+    if not path:
+        return jsonify({"error": "Sauvegarde introuvable"}), 404
+    try:
+        os.remove(path)
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        app_logger.error(f"[BACKUP] Suppression impossible : {e}")
+        return jsonify({"error": "Suppression impossible"}), 500
+
+
+FEEDBACK_RELAY_URL = "https://stellio-issue-relay.app-stellio.workers.dev" 
+FEEDBACK_FILE = os.path.join(DATA_DIR, 'feedback_requests.json')
+FEEDBACK_TYPES = ('bug', 'idea', 'improvement', 'question')
+FEEDBACK_LIMITS = {'title_min': 5, 'title_max': 120, 'desc_min': 10, 'desc_max': 6000}
+FEEDBACK_MAX_ENTRIES = 200
+FEEDBACK_MIN_SUBMIT_INTERVAL = 20  
+_feedback_lock = threading.RLock()
+_feedback_last_submit = 0.0
+
+
+def _feedback_repo():
+    return GITHUB_REPO
+
+
+def _feedback_relay():
+    url = (load_settings() or {}).get('feedback_relay_url') or FEEDBACK_RELAY_URL or os.environ.get('STELLIO_FEEDBACK_RELAY', '')
+    url = str(url or '').strip().rstrip('/')
+    return url if url.startswith('https://') else ''
+
+
+def _feedback_load():
+    try:
+        with open(FEEDBACK_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except FileNotFoundError:
+        return []
+    except Exception as e:
+        app_logger.warning(f"[FEEDBACK] Fichier des demandes illisible : {e}")
+        return []
+
+
+def _feedback_save(entries):
+    tmp = FEEDBACK_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(entries[:FEEDBACK_MAX_ENTRIES], f, ensure_ascii=False, indent=2)
+    os.replace(tmp, FEEDBACK_FILE)
+
+
+def _feedback_status(e):
+    if e.get('missing'):
+        return 'missing'
+    if e.get('state') == 'closed':
+        if e.get('closed_by_user'):
+            return 'closed_by_you'
+        return 'not_planned' if e.get('state_reason') == 'not_planned' else 'done'
+    labels = [str(l).lower() for l in (e.get('labels') or [])]
+    if any('progress' in l or 'en cours' in l for l in labels):
+        return 'in_progress'
+    return 'sent'
+
+
+def _feedback_public(e):
+    status = _feedback_status(e)
+    return {
+        'number': e['number'], 'title': e.get('title'), 'type': e.get('type'), 'url': e.get('url'),
+        'created_at': e.get('created_at'), 'updated_at': e.get('updated_at'),
+        'state': e.get('state'), 'status': status, 'comments': e.get('comments', 0),
+        'unread': status != e.get('seen_status') or e.get('comments', 0) > e.get('seen_comments', 0),
+        'can_close': bool(e.get('manage_token')) and e.get('state') != 'closed',
+    }
+
+
+def _gh_headers(etag=None):
+    h = {'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28',
+         'User-Agent': f'Stellio-App/{CURRENT_VERSION}'}
+    if etag:
+        h['If-None-Match'] = etag
+    return h
+
+
+def _feedback_refresh(entries):
+    changed, rate_limited = [], False
+    now = time.time()
+    for e in entries:
+        recently_checked = now - e.get('checked_at', 0) < 86400
+        if e.get('state') == 'closed' and recently_checked:
+            continue
+        before = (_feedback_status(e), e.get('comments', 0))
+        try:
+            res = requests.get(f"https://api.github.com/repos/{_feedback_repo()}/issues/{e['number']}",
+                               headers=_gh_headers(e.get('etag')), timeout=10)
+        except Exception as ex:
+            app_logger.debug(f"[FEEDBACK] Actualisation impossible (#{e['number']}) : {ex}")
+            break
+        if res.status_code in (403, 429):
+            rate_limited = True
+            break
+        e['checked_at'] = now
+        if res.status_code == 304:
+            continue
+        if res.status_code == 404:
+            e['missing'] = True
+        elif res.status_code == 200:
+            d = res.json()
+            e.update({'state': d.get('state'), 'state_reason': d.get('state_reason'),
+                      'labels': [l.get('name') for l in d.get('labels', []) if isinstance(l, dict)],
+                      'comments': d.get('comments', 0), 'updated_at': d.get('updated_at'),
+                      'title': d.get('title') or e.get('title'), 'url': d.get('html_url') or e.get('url'),
+                      'etag': res.headers.get('ETag'), 'missing': False})
+        if (_feedback_status(e), e.get('comments', 0)) != before:
+            changed.append(e['number'])
+    return changed, rate_limited
+
+
+def _feedback_find(entries, number):
+    return next((e for e in entries if e.get('number') == number), None)
+
+
+@app.route('/api/feedback/config', methods=['GET'])
+@login_required
+def api_feedback_config():
+    return jsonify({'relay_configured': bool(_feedback_relay()), 'repo': _feedback_repo(),
+                    'version': CURRENT_VERSION}), 200
+
+
+@app.route('/api/feedback/submit', methods=['POST'])
+@login_required
+def api_feedback_submit():
+    global _feedback_last_submit
+    d = request.get_json(silent=True) or {}
+    ftype = d.get('type')
+    title = re.sub(r'\s+', ' ', str(d.get('title') or '')).strip()
+    desc = str(d.get('description') or '').strip()
+    L = FEEDBACK_LIMITS
+    if ftype not in FEEDBACK_TYPES:
+        return jsonify({"error": "invalid_type"}), 400
+    if not (L['title_min'] <= len(title) <= L['title_max']):
+        return jsonify({"error": "invalid_title"}), 400
+    if not (L['desc_min'] <= len(desc) <= L['desc_max']):
+        return jsonify({"error": "invalid_description"}), 400
+    if d.get('consent') is not True:
+        return jsonify({"error": "consent_required"}), 400
+    relay = _feedback_relay()
+    if not relay:
+        return jsonify({"error": "relay_not_configured"}), 503
+
+    with _feedback_lock:
+        if time.time() - _feedback_last_submit < FEEDBACK_MIN_SUBMIT_INTERVAL:
+            return jsonify({"error": "too_fast"}), 429
+        _feedback_last_submit = time.time()
+
+    include_tech = bool(d.get('include_tech'))
+    payload = {'type': ftype, 'title': title, 'description': desc, 'consent': True,
+               'include_tech': include_tech, 'website': ''}
+    if include_tech:
+        payload.update({'version': CURRENT_VERSION, 'os': f"{platform.system()} {platform.release()}".strip(),
+                        'lang': get_user_lang()})
+    try:
+        res = requests.post(f"{relay}/issue", json=payload, timeout=25,
+                            headers={'User-Agent': f'Stellio-App/{CURRENT_VERSION}'})
+    except Exception as e:
+        app_logger.warning(f"[FEEDBACK] Relais injoignable : {e}")
+        return jsonify({"error": "relay_unreachable"}), 502
+    if res.status_code == 429:
+        return jsonify({"error": "too_fast"}), 429
+    if res.status_code != 201:
+        app_logger.warning(f"[FEEDBACK] Le relais a répondu {res.status_code} : {res.text[:200]}")
+        return jsonify({"error": "relay_error"}), 502
+    issue = res.json()
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
+    entry = {'number': int(issue['number']), 'title': title, 'type': ftype, 'url': issue.get('url'),
+             'manage_token': issue.get('manage_token'), 'created_at': now_iso, 'updated_at': now_iso,
+             'state': 'open', 'state_reason': None, 'labels': [], 'comments': 0,
+             'seen_status': 'sent', 'seen_comments': 0, 'checked_at': time.time()}
+    with _feedback_lock:
+        entries = _feedback_load()
+        entries.insert(0, entry)
+        _feedback_save(entries)
+    app_logger.info(f"[FEEDBACK] Demande #{entry['number']} créée ({ftype})")
+    return jsonify({"success": True, "request": _feedback_public(entry)}), 201
+
+
+@app.route('/api/feedback/requests', methods=['GET'])
+@login_required
+def api_feedback_requests():
+    with _feedback_lock:
+        entries = _feedback_load()
+        changed, limited = [], False
+        if request.args.get('refresh') == '1' and entries:
+            changed, limited = _feedback_refresh(entries)
+            _feedback_save(entries)
+        return jsonify({'requests': [_feedback_public(e) for e in entries], 'changed': changed,
+                        'rate_limited': limited}), 200
+
+
+@app.route('/api/feedback/request/<int:number>', methods=['GET'])
+@login_required
+def api_feedback_detail(number):
+    with _feedback_lock:
+        entries = _feedback_load()
+        e = _feedback_find(entries, number)
+        if not e:
+            return jsonify({"error": "not_found"}), 404
+    body, comments = '', []
+    try:
+        base = f"https://api.github.com/repos/{_feedback_repo()}/issues/{number}"
+        r1 = requests.get(base, headers=_gh_headers(), timeout=10)
+        if r1.status_code == 200:
+            body = (r1.json().get('body') or '')
+            body = body.split('\n---\n')[0].strip()   
+        r2 = requests.get(base + '/comments?per_page=50', headers=_gh_headers(), timeout=10)
+        if r2.status_code == 200:
+            for c in r2.json():
+                comments.append({'author': (c.get('user') or {}).get('login', ''),
+                                 'is_team': c.get('author_association') in ('OWNER', 'MEMBER', 'COLLABORATOR'),
+                                 'body': c.get('body') or '', 'created_at': c.get('created_at')})
+    except Exception as ex:
+        app_logger.debug(f"[FEEDBACK] Détail indisponible (#{number}) : {ex}")
+    with _feedback_lock:
+        entries = _feedback_load()
+        e = _feedback_find(entries, number)
+        if e:
+            if comments:
+                e['comments'] = max(e.get('comments', 0), len(comments))
+            e['seen_status'] = _feedback_status(e)
+            e['seen_comments'] = e.get('comments', 0)
+            _feedback_save(entries)
+            return jsonify({'request': _feedback_public(e), 'body': body, 'comments': comments}), 200
+    return jsonify({"error": "not_found"}), 404
+
+
+@app.route('/api/feedback/close', methods=['POST'])
+@login_required
+def api_feedback_close():
+    number = (request.get_json(silent=True) or {}).get('number')
+    with _feedback_lock:
+        entries = _feedback_load()
+        e = _feedback_find(entries, number)
+        if not e or not e.get('manage_token'):
+            return jsonify({"error": "not_found"}), 404
+    relay = _feedback_relay()
+    if not relay:
+        return jsonify({"error": "relay_not_configured"}), 503
+    try:
+        res = requests.post(f"{relay}/issue/close", json={'number': number, 'manage_token': e['manage_token']},
+                            timeout=20, headers={'User-Agent': f'Stellio-App/{CURRENT_VERSION}'})
+    except Exception as ex:
+        app_logger.warning(f"[FEEDBACK] Fermeture impossible : {ex}")
+        return jsonify({"error": "relay_unreachable"}), 502
+    if res.status_code != 200:
+        return jsonify({"error": "relay_error"}), 502
+    with _feedback_lock:
+        entries = _feedback_load()
+        e = _feedback_find(entries, number)
+        if e:
+            e.update({'state': 'closed', 'state_reason': 'not_planned', 'closed_by_user': True,
+                      'etag': None, 'checked_at': 0, 'seen_status': 'closed_by_you',
+                      'seen_comments': e.get('comments', 0) + 1, 'comments': e.get('comments', 0) + 1})
+            _feedback_save(entries)
+            return jsonify({'request': _feedback_public(e)}), 200
+    return jsonify({"error": "not_found"}), 404
+
+
+@app.route('/api/feedback/remove', methods=['POST'])
+@login_required
+def api_feedback_remove():
+    number = (request.get_json(silent=True) or {}).get('number')
+    with _feedback_lock:
+        entries = [e for e in _feedback_load() if e.get('number') != number]
+        _feedback_save(entries)
+    return jsonify({"success": True}), 200
 
 
 _SENSITIVE_SETTINGS_KEYS = (
@@ -13071,8 +14831,6 @@ def _save_quote_logo_png(png_buf):
 
 
 def _migrate_legacy_quote_logo():
-    """Anciennes versions : le logo était stocké en base64 dans app_settings.json (renvoyé à chaque
-    lecture des réglages et dupliqué dans l'instantané d'annulation). On le déplace dans un fichier."""
     try:
         settings = load_settings() or {}
         prev = settings.get('_previous_settings')
@@ -13094,7 +14852,6 @@ def _migrate_legacy_quote_logo():
 
 
 def _load_quote_logo():
-    """Logo du devis : (BytesIO PNG, largeur, hauteur) ou None."""
     _migrate_legacy_quote_logo()
     try:
         if os.path.isfile(QUOTE_LOGO_FILE):
@@ -13143,7 +14900,7 @@ def api_quote_logo_delete():
             os.remove(QUOTE_LOGO_FILE)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    _migrate_legacy_quote_logo()  # purge aussi un éventuel reliquat dans les réglages
+    _migrate_legacy_quote_logo()  
     return jsonify({"success": True}), 200
 
 
@@ -13470,8 +15227,6 @@ def api_debug_session_enable():
 def api_get_settings():
     try:
         _migrate_legacy_quote_logo()
-        # Copie : les clés calculées ci-dessous (et le retrait de _previous_settings) ne doivent pas
-        # modifier le cache des réglages, sinon l'annulation du dernier changement ne trouve plus rien.
         settings = dict(load_settings() or {})
         settings['quote_has_logo'] = os.path.isfile(QUOTE_LOGO_FILE)
         settings.setdefault('default_slicer', 'system_default')
@@ -13485,6 +15240,8 @@ def api_get_settings():
         settings['launch_minimized'] = is_startup_minimized() if settings['launch_at_startup'] else bool(settings.get('launch_minimized', False))
         settings['has_settings_undo'] = '_previous_settings' in settings
         settings.pop('_previous_settings', None)
+        if _is_viewer():
+            settings = _viewer_sanitize(settings)
         return jsonify(settings), 200
     except Exception as e:
         app_logger.error(f"[API] Erreur non gérée: {e}")
@@ -13513,7 +15270,6 @@ def api_save_settings():
         if not data:
             return jsonify({"error": "Données JSON requises"}), 400
 
-        # Le logo du devis a son propre endpoint (/api/quote/logo) : il ne transite plus par les réglages.
         data.pop('quote_logo', None)
         data.pop('quote_has_logo', None)
 
@@ -13562,7 +15318,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.7.1"
+CURRENT_VERSION = "0.7.2"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -14269,6 +16025,8 @@ def api_get_printers():
         if pc.get('api_key'):
             pc['api_key'] = '••••••••'
         result.append(pc)
+    if _is_viewer():
+        result = _viewer_sanitize(result)
     return jsonify(result)
 
 @app.route('/api/printers', methods=['POST'])
@@ -14811,6 +16569,7 @@ def _serialize_maintenance_task(task, printer_total_hours):
 
     return {
         "id": task['id'], "printer_id": task['printer_id'], "name": task['name'],
+        "part_id": task['part_id'] if 'part_id' in task.keys() else None,
         "interval_hours": task['interval_hours'], "interval_days": task['interval_days'],
         "hours_since_reset": hours_since, "days_since_reset": days_since,
         "progress_ratio": round(min(progress_ratio, 2.0), 2) if progress_ratio is not None else None,
@@ -14845,12 +16604,25 @@ def api_printer_maintenance_list(pid):
         "SELECT * FROM printer_maintenance_tasks WHERE printer_id=? AND user_id=? ORDER BY created_at ASC",
         (pid, session['user_id'])
     ).fetchall()
+    parts_by_id = {r['id']: r for r in conn.execute(
+        "SELECT id, name, stock_qty, alert_qty FROM printer_parts WHERE user_id=?", (session['user_id'],)
+    ).fetchall()}
     conn.close()
+
+    serialized = []
+    for task_row in tasks:
+        item = _serialize_maintenance_task(task_row, total_hours)
+        part = parts_by_id.get(item.get('part_id'))
+        if part:
+            item["part_name"] = part['name']
+            item["part_stock"] = part['stock_qty']
+            item["part_low"] = (part['stock_qty'] or 0) <= (part['alert_qty'] or 0)
+        serialized.append(item)
 
     return jsonify({
         "total_print_hours": round(total_hours, 1),
         "hours_source": hours_source,
-        "tasks": [_serialize_maintenance_task(t, total_hours) for t in tasks]
+        "tasks": serialized
     }), 200
 
 
@@ -14881,11 +16653,12 @@ def api_printer_maintenance_create(pid):
         conn.close()
         return jsonify({"error": "Imprimante introuvable"}), 404
 
+    part_id = _owned_part_id(conn, data.get('part_id'))
     conn.execute(
         """INSERT INTO printer_maintenance_tasks
-           (printer_id, user_id, name, interval_hours, interval_days, hours_at_last_reset, last_reset_at)
-           VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP)""",
-        (pid, session['user_id'], name, interval_hours, interval_days, printer['total_print_hours'] or 0)
+           (printer_id, user_id, name, interval_hours, interval_days, hours_at_last_reset, last_reset_at, part_id)
+           VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP,?)""",
+        (pid, session['user_id'], name, interval_hours, interval_days, printer['total_print_hours'] or 0, part_id)
     )
     conn.commit()
     conn.close()
@@ -14909,9 +16682,27 @@ def api_printer_maintenance_reset(task_id):
         "UPDATE printer_maintenance_tasks SET hours_at_last_reset=?, last_reset_at=CURRENT_TIMESTAMP WHERE id=?",
         ((printer['total_print_hours'] if printer else 0) or 0, task_id)
     )
+    part_info = None
+    part_id = task['part_id'] if 'part_id' in task.keys() else None
+    if part_id:
+        part = conn.execute(
+            "SELECT id, name, stock_qty, alert_qty FROM printer_parts WHERE id=? AND user_id=?",
+            (part_id, session['user_id'])
+        ).fetchone()
+        if part:
+            stock = part['stock_qty'] or 0
+            consumed = stock > 0
+            new_stock = stock - 1 if consumed else 0
+            if consumed:
+                conn.execute("UPDATE printer_parts SET stock_qty=? WHERE id=?", (new_stock, part['id']))
+            part_info = {
+                "id": part['id'], "name": part['name'], "stock_qty": new_stock,
+                "consumed": consumed, "out_of_stock": not consumed,
+                "low": new_stock <= (part['alert_qty'] or 0),
+            }
     conn.commit()
     conn.close()
-    return jsonify({"success": True}), 200
+    return jsonify({"success": True, "part": part_info}), 200
 
 
 @app.route('/api/printers/maintenance/<int:task_id>', methods=['PUT'])
@@ -14940,9 +16731,13 @@ def api_printer_maintenance_update(task_id):
         conn.close()
         return jsonify({"error": "Renseigne au moins un intervalle (heures ou jours)"}), 400
 
+    if 'part_id' in data:
+        part_id = _owned_part_id(conn, data.get('part_id'))
+    else:
+        part_id = task['part_id'] if 'part_id' in task.keys() else None
     conn.execute(
-        "UPDATE printer_maintenance_tasks SET name=?, interval_hours=?, interval_days=? WHERE id=?",
-        (name, interval_hours, interval_days, task_id)
+        "UPDATE printer_maintenance_tasks SET name=?, interval_hours=?, interval_days=?, part_id=? WHERE id=?",
+        (name, interval_hours, interval_days, part_id, task_id)
     )
     conn.commit()
     conn.close()
@@ -15078,10 +16873,6 @@ def api_quit_app():
         _cleanup_before_exit()
         if want_restart:
             app_logger.warning("[APP] 🔁 Redémarrage demandé (ex: activation du mode debug)")
-            # Code de sortie NON NULLE : redémarre correctement que le service systemd soit
-            # configuré en Restart=always OU en Restart=on-failure (ce dernier ignore les
-            # sorties propres avec le code 0, d'où le blocage rencontré sur Raspberry Pi si
-            # seul Restart=on-failure est présent dans stellio.service).
             os._exit(1)
         else:
             app_logger.info("[APP] 🛑 Fermeture demandée par l'utilisateur")
@@ -17131,6 +18922,7 @@ SLICER_AUTODETECT_DIRS = {
 SLICER_VERSIONED_USER_DIRS = {
     'orcaslicer':  ('OrcaSlicer\\user', ['process', 'filament', 'machine']),
     'bambustudio': ('BambuStudio\\user', ['process', 'filament', 'machine']),
+    'qidistudio': ('QIDIStudio\\user', ['process', 'filament', 'machine']),
 }
 
 SLICER_CURA_FAMILY_DIRS = {
@@ -17243,6 +19035,43 @@ def _autodetect_new_slicer_profiles(profiles, user_id):
         app_logger.info(f"[SlicerProfiles] {len(imported)} profil(s) importé(s) automatiquement (tous slicers)")
 
     return imported
+
+
+_profile_sync_lock = threading.Lock()
+_profile_sync_last = 0.0
+PROFILE_SYNC_MIN_INTERVAL = 15  
+
+
+def _sync_slicer_profiles(user_id, force=False):
+    global _profile_sync_last
+    result = {'updated': 0, 'imported': 0}
+    if user_id is None:
+        return result
+    now = time.time()
+    if not _profile_sync_lock.acquire(blocking=False):
+        return result   
+    try:
+        if not force and now - _profile_sync_last < PROFILE_SYNC_MIN_INTERVAL:
+            return result
+        _profile_sync_last = now
+        profiles = load_slicer_profiles()
+        updated, _errors = _refresh_stale_slicer_profiles(profiles)
+        imported = _autodetect_new_slicer_profiles(profiles, user_id)
+        result = {'updated': updated, 'imported': len(imported)}
+        if updated or imported:
+            app_logger.info(f"[SlicerProfiles] Synchronisation : {updated} actualisé(s), {len(imported)} importé(s)")
+    except Exception as e:
+        app_logger.warning(f"[SlicerProfiles] Synchronisation impossible : {e}")
+    finally:
+        _profile_sync_lock.release()
+    return result
+
+
+def _startup_sync_slicer_profiles():
+    try:
+        _sync_slicer_profiles(_get_primary_user_id(), force=True)
+    except Exception as e:
+        app_logger.debug(f"[SlicerProfiles] Synchronisation au démarrage ignorée : {e}")
 
 
 @app.route('/api/slicer-profiles/auto-detect', methods=['POST'])
@@ -17411,9 +19240,6 @@ def _format_duration_fr(seconds):
 
 
 def _estimate_print_seconds(piece, prof):
-    """Estimation rapide (≈ ±30 %) du temps d'impression d'une pièce avec un profil de réglages, sans lancer le slicer :
-    volume de matière à déposer (parois + dessus/dessous + remplissage + supports) divisé par le débit réalisable
-    (vitesse × hauteur de couche × largeur de ligne, plafonné), plus un temps fixe par couche et la mise en chauffe."""
     try:
         vol = float(piece.get('volume_mm3') or 0)
         if vol <= 0:
@@ -17471,8 +19297,6 @@ MAX_PROFILE_SUGGESTIONS = 3
 @app.route('/api/ollama/recommend-profile', methods=['POST'])
 @login_required
 def api_ollama_recommend_profile():
-    """Suggère plusieurs profils de RÉGLAGES slicer (process) pour la pièce, avec un temps d'impression estimé chacun.
-    Le filament choisi ne sert que de contexte : on ne propose jamais de profil filament."""
     data = request.json or {}
     file_path = data.get('path')
     if not file_path or not os.path.exists(file_path):
@@ -17481,11 +19305,11 @@ def api_ollama_recommend_profile():
         app_logger.warning(f"[SECURITY] Tentative de recommandation IA hors sources: {file_path}")
         return jsonify({"error": "Ce fichier n'appartient à aucune source configurée"}), 403
 
+    _sync_slicer_profiles(session['user_id'])
     all_profiles = load_slicer_profiles()
     printer_id = _safe_int(data.get('printer_id'))
     material_type = (data.get('material_type') or '').strip() or None
 
-    # Seuls les profils chargeables par le slicer par défaut sont proposés (mêmes critères que la liste « Réglages du slicer »)
     _settings = load_settings() or {}
     _slicer_name = _settings.get('default_slicer', 'system_default')
     _slicer_path = find_slicer_by_name(_slicer_name)
@@ -17563,12 +19387,12 @@ def api_ollama_recommend_profile():
             continue
         prof = by_name.get(str(item.get('profil') or '').strip().lower())
         if not prof or prof['id'] in seen_ids:
-            continue   # profil inventé ou en double : ignoré
+            continue   
         seen_ids.add(prof['id'])
         suggestions.append((prof, str(item.get('raison') or '').strip()))
         if len(suggestions) >= n_max:
             break
-    if not suggestions:   # réponse inexploitable : on propose les profils les mieux notés plutôt que rien
+    if not suggestions:   
         ranked = sorted(candidates, key=lambda p: -((history.get(p['id']) or {}).get('success_rate') or 0))
         suggestions = [(p, '') for p in ranked[:n_max]]
 
@@ -17589,7 +19413,6 @@ def api_ollama_recommend_profile():
     piece_out = {k: v for k, v in piece.items() if k != 'surface_mm2'}
     return jsonify({
         'suggestions': out, 'source': source, 'piece': piece_out,
-        # compatibilité : première suggestion = « profil recommandé »
         'profil_recommande': out[0]['name'], 'profil_recommande_id': out[0]['id'],
     }), 200
 
@@ -18284,33 +20107,23 @@ def _get_manual_filament_slots(user_id):
         app_logger.warning(f"[FilamentBridge] Lecture bobines manuelles impossible: {e}")
     return slots
 
-# ── TigerTag (compte cloud Firebase, lecture inventaire filament) ───────────
-# Port Python (requêtes synchrones) de la logique d'authentification et de
-# lecture Firestore de l'intégration Home Assistant tierce
-# https://github.com/Kenny3231/tigertag-home-assistant-third-party (MIT).
-# API non officielle et non documentée par TigerTag : peut évoluer sans préavis.
 
 TIGERTAG_FIREBASE_CONFIG_URL  = "https://tigertag-cdn.web.app/__/firebase/init.json"
 TIGERTAG_FIREBASE_REFRESH_URL = "https://securetoken.googleapis.com/v1/token"
 TIGERTAG_FIREBASE_LOOKUP_URL  = "https://identitytoolkit.googleapis.com/v1/accounts:lookup"
 TIGERTAG_FIRESTORE_BASE_URL   = "https://firestore.googleapis.com/v1"
 TIGERTAG_REFERENCES_BASE_URL  = "https://api.tigertag.io/api:tigertag"
-TIGERTAG_REFERENCES_TTL       = 86400  # 24h, comme l'app officielle
+TIGERTAG_REFERENCES_TTL       = 86400  
 
-# Cache mémoire des sessions Firebase par utilisateur Stellio (évite de
-# ré-authentifier à chaque appel ; idToken valide ~1h, refresh avant expiration).
 _tigertag_token_cache = {}
 _tigertag_token_cache_lock = threading.Lock()
 
-# Config Firebase publique (projectId/apiKey) : constante, récupérée une seule fois.
 _tigertag_firebase_config = {}
 
-# Tables de référence du catalogue TigerTag (marques, matériaux…) : mises en cache 24h.
 _tigertag_references_cache = {"data": None, "fetched_at": 0}
 
 
 def _tigertag_fs_value(field):
-    """Extrait la valeur typée d'un champ Firestore REST."""
     for ftype in ('stringValue', 'integerValue', 'doubleValue', 'booleanValue'):
         if ftype in field:
             val = field[ftype]
@@ -18332,12 +20145,10 @@ def _tigertag_fs_value(field):
 
 
 def _tigertag_parse_doc(doc):
-    """Convertit un document Firestore REST en dict Python natif."""
     return {k: _tigertag_fs_value(v) for k, v in doc.get('fields', {}).items()}
 
 
 def _tigertag_ensure_firebase_config():
-    """Récupère (une seule fois) la config Firebase publique (projectId, apiKey) de TigerTag."""
     if _tigertag_firebase_config.get('project_id') and _tigertag_firebase_config.get('api_key'):
         return
     resp = requests.get(TIGERTAG_FIREBASE_CONFIG_URL, timeout=10)
@@ -18348,7 +20159,6 @@ def _tigertag_ensure_firebase_config():
 
 
 def _tigertag_refresh_id_token(refresh_token):
-    """Renouvelle l'idToken TigerTag via le refreshToken."""
     _tigertag_ensure_firebase_config()
     url = f"{TIGERTAG_FIREBASE_REFRESH_URL}?key={_tigertag_firebase_config['api_key']}"
     resp = requests.post(url, json={
@@ -18359,19 +20169,10 @@ def _tigertag_refresh_id_token(refresh_token):
     if 'id_token' not in data:
         raise ValueError("Refresh token TigerTag invalide")
     expires_at = time.time() + 3600
-    # 'user_id' est renvoyé par l'API Secure Token quel que soit le provider
-    # d'origine (email/mot de passe ou Google) : utile pour reprendre une
-    # session Google sans jamais avoir stocké de mot de passe.
     return data['id_token'], data['refresh_token'], expires_at, data.get('user_id')
 
 
 def _tigertag_get_valid_session(user_id):
-    """
-    Garantit un idToken TigerTag valide pour cet utilisateur Stellio.
-    Réutilise le cache mémoire, renouvelle via refresh_token si besoin,
-    et ne ré-authentifie avec email/mot de passe qu'en dernier recours.
-    Retourne (id_token, firebase_uid). Lève ValueError si le compte n'est pas configuré.
-    """
     with _tigertag_token_cache_lock:
         cached = _tigertag_token_cache.get(user_id)
 
@@ -18404,8 +20205,6 @@ def _tigertag_get_valid_session(user_id):
     if not account or not account['api_key']:
         raise ValueError("Compte TigerTag non configuré — relance la détection TigerTag Studio")
 
-    # Seul mode de connexion désormais : refresh_token récupéré par détection
-    # automatique de TigerTag Studio (aucun mot de passe stocké).
     refresh_token = decrypt_account_secret(account['api_key'])
     id_token, new_refresh_token, expires_at, firebase_uid = _tigertag_refresh_id_token(refresh_token)
     if not firebase_uid:
@@ -18420,7 +20219,6 @@ def _tigertag_get_valid_session(user_id):
 
 
 def _tigertag_persist_refresh_token(user_id, refresh_token):
-    """Met à jour le refresh_token Google chiffré en base (compte déjà connecté via Google uniquement)."""
     try:
         conn = get_db()
         try:
@@ -18436,7 +20234,6 @@ def _tigertag_persist_refresh_token(user_id, refresh_token):
 
 
 def _tigertag_get_references():
-    """Récupère (et met en cache 24h) les tables de référence du catalogue TigerTag."""
     if _tigertag_references_cache['data'] and (time.time() - _tigertag_references_cache['fetched_at'] < TIGERTAG_REFERENCES_TTL):
         return _tigertag_references_cache['data']
 
@@ -18459,7 +20256,6 @@ def _tigertag_get_references():
 
 
 def _tigertag_resolve_reference(references, ref_type, item_id):
-    """Traduit un ID numérique du catalogue TigerTag (marque, matériau…) en libellé lisible."""
     if not item_id:
         return ''
     refs = references.get(ref_type)
@@ -18474,10 +20270,6 @@ def _tigertag_resolve_reference(references, ref_type, item_id):
 
 
 def _tigertag_fetch_inventory(user_id):
-    """
-    Récupère l'inventaire de bobines TigerTag de l'utilisateur depuis Firestore.
-    Retourne la liste des bobines actives (non supprimées), en dicts Python natifs.
-    """
     id_token, firebase_uid = _tigertag_get_valid_session(user_id)
     url = (
         f"{TIGERTAG_FIRESTORE_BASE_URL}/projects/{_tigertag_firebase_config['project_id']}"
@@ -18486,8 +20278,6 @@ def _tigertag_fetch_inventory(user_id):
     resp = requests.get(url, headers={"Authorization": f"Bearer {id_token}"}, timeout=15)
 
     if resp.status_code in (401, 403):
-        # Token invalidé côté serveur malgré une expiration locale non atteinte : on
-        # force une ré-authentification et on retente une seule fois.
         with _tigertag_token_cache_lock:
             _tigertag_token_cache.pop(user_id, None)
         id_token, firebase_uid = _tigertag_get_valid_session(user_id)
@@ -18509,12 +20299,6 @@ def _tigertag_fetch_inventory(user_id):
 
 
 def _get_tigertag_slots(user_id):
-    """
-    Retourne les bobines TigerTag de l'utilisateur au format normalisé partagé
-    par toutes les sources filament (mêmes clés que _get_spoolman_slots /
-    _get_manual_filament_slots). Liste vide si compte non configuré ou erreur
-    (ce n'est pas bloquant : TigerTag est une source optionnelle parmi d'autres).
-    """
     slots = []
     try:
         spools = _tigertag_fetch_inventory(user_id)
@@ -18541,7 +20325,7 @@ def _get_tigertag_slots(user_id):
             'source_type': 'tigertag',
             'source_id': d['uid'],
             'name': name,
-            'vendor': '' if str(brand).strip().isdigit() else (brand or ''),  # ID brut si le catalogue est indisponible : inutilisable en recherche
+            'vendor': '' if str(brand).strip().isdigit() else (brand or ''), 
             'color_name': d.get('color_name') or '',
             'material': material or '',
             'color_hex': color_hex,
@@ -18553,7 +20337,6 @@ def _get_tigertag_slots(user_id):
 
 
 def _tigertag_lookup_email(id_token):
-    """Récupère l'email associé à un idToken Firebase valide (best-effort)."""
     try:
         _tigertag_ensure_firebase_config()
         url = f"{TIGERTAG_FIREBASE_LOOKUP_URL}?key={_tigertag_firebase_config['api_key']}"
@@ -18567,30 +20350,11 @@ def _tigertag_lookup_email(id_token):
 
 
 _TIGERTAG_STUDIO_TOKEN_RE = re.compile(r'"refreshToken"\s*:\s*"([^"]{20,600})"')
-# Repli plus permissif : le SDK Firebase Auth (v9+) utilise IndexedDB par
-# défaut, où les valeurs sont des objets JS sérialisés en "structured clone"
-# binaire (pas du JSON texte) — le motif strict ci-dessus (littéral
-# `"refreshToken":"..."`) ne matche alors pas, même si le nom de propriété
-# "refreshToken" et la valeur du token apparaissent bien en clair dans le
-# fichier. On cherche donc aussi juste la chaîne "refreshToken" suivie, à
-# quelques octets près, d'une chaîne de type token (base64url).
 _TIGERTAG_STUDIO_TOKEN_LOOSE_RE = re.compile(r'refreshToken.{0,60}?([A-Za-z0-9_-]{20,600})', re.DOTALL)
-_TIGERTAG_STUDIO_MAX_FILE_SIZE = 80 * 1024 * 1024  # 80 Mo : au-delà, on saute le fichier
+_TIGERTAG_STUDIO_MAX_FILE_SIZE = 80 * 1024 * 1024  #
 
 
 def _tigertag_studio_candidate_roots():
-    """Dossiers plausibles de l'app TigerTag Studio (officiellement nommée
-    "Tiger Studio Manager") sur ce PC (Stellio et TigerTag Studio tournent
-    sur la même machine).
-
-    En plus de %APPDATA% et %LOCALAPPDATA% (où Electron stocke en général le
-    dossier userData, contenant la session), on regarde aussi dans
-    %LOCALAPPDATA%\\Programs : c'est là qu'electron-builder / Squirrel
-    installe par défaut les applications "par utilisateur" (comme VS Code ou
-    Discord) quand l'utilisateur clique juste sur "Suivant" à l'installation
-    — c'est le cas ici (Tiger Studio Manager.exe se trouve dans
-    %LOCALAPPDATA%\\Programs\\Tiger Studio Manager\\).
-    """
     localappdata = os.environ.get("LOCALAPPDATA")
 
     bases = []
@@ -18615,17 +20379,6 @@ def _tigertag_studio_candidate_roots():
 
 
 def _tigertag_studio_scan_tokens():
-    """
-    Cherche des refresh_token Firebase dans le stockage local (IndexedDB /
-    Local Storage) de TigerTag Studio, déjà connecté via Google sur un
-    domaine autorisé par TigerTag. Ne fait aucune requête réseau : lecture
-    de fichiers locaux uniquement. Retourne les tokens candidats, du plus
-    récemment modifié au plus ancien.
-
-    Journalise systématiquement (même en cas d'échec) les dossiers examinés
-    et le nombre de fichiers/jetons trouvés, pour pouvoir diagnostiquer une
-    détection infructueuse sans avoir à reproduire le problème.
-    """
     roots = _tigertag_studio_candidate_roots()
     if not roots:
         app_logger.info(
@@ -18637,7 +20390,7 @@ def _tigertag_studio_scan_tokens():
 
     app_logger.info(f"[TigerTag] Détection auto : {len(roots)} dossier(s) candidat(s) : {roots}")
 
-    candidates = []  # (mtime, token)
+    candidates = [] 
     seen = set()
     files_scanned = 0
     files_skipped = 0
@@ -18661,9 +20414,6 @@ def _tigertag_studio_scan_tokens():
                     continue
                 files_scanned += 1
                 root_files += 1
-                # IndexedDB (Chromium) stocke le texte en UTF-8 contigu ;
-                # Local Storage stocke parfois en UTF-16LE (octet nul entre
-                # chaque caractère) : on tente les deux décodages.
                 for text in (data.decode('utf-8', errors='ignore'),
                              data.decode('utf-16-le', errors='ignore')):
                     for m in _TIGERTAG_STUDIO_TOKEN_RE.finditer(text):
@@ -18695,13 +20445,6 @@ def _tigertag_studio_scan_tokens():
 @app.route('/api/accounts/tigertag/auto-detect-studio', methods=['POST'])
 @login_required
 def tigertag_auto_detect_studio():
-    """
-    Détecte et connecte automatiquement le compte TigerTag à partir d'une
-    session Google déjà active dans l'application officielle TigerTag
-    Studio installée sur ce PC (lue localement), sans jamais passer par un
-    flux Google Sign-In depuis Stellio (non autorisé côté Firebase pour
-    notre propre domaine).
-    """
     try:
         tokens = _tigertag_studio_scan_tokens()
     except Exception as e:
@@ -18717,7 +20460,7 @@ def tigertag_auto_detect_studio():
     app_logger.info(f"[TigerTag] Détection auto : {len(tokens)} jeton(s) candidat(s) à tester")
 
     last_error = "Aucun jeton valide trouvé"
-    for token in tokens[:8]:  # on limite le nombre de tentatives réseau
+    for token in tokens[:8]:  
         try:
             id_token, new_refresh_token, expires_at, firebase_uid = _tigertag_refresh_id_token(token)
         except Exception as e:
@@ -18804,35 +20547,59 @@ def api_filament_spools():
     slots = _get_manual_filament_slots(session['user_id'])
     spoolman_slots, spoolman_err = _get_spoolman_slots(url)
     slots.extend(spoolman_slots)
-    # TigerTag : source optionnelle (liste vide si compte non configuré ou erreur)
     slots.extend(_get_tigertag_slots(session['user_id']))
     return jsonify({"slots": slots, "spoolman_error": spoolman_err}), 200
 
-# Liens utiles : liste éditable dans languages/useful_links.json (menu « Liens utiles » + boutiques de recherche d'achat)
 USEFUL_LINKS_FILE = os.path.join(BASE_DIR, 'languages', 'useful_links.json')
+# Liste de secours : copie de languages/useful_links.json (utilisée seulement si ce fichier est absent ou invalide).
+# À garder synchronisée avec ce fichier.
 _DEFAULT_USEFUL_LINKS = [
-    {"id": "atome3d", "name": "Atome3D", "group": "Boutiques", "url": "https://www.atome3d.com", "icon": "fa-solid fa-store", "search_url": "https://www.atome3d.com/search?q={q}&type=product"},
-    {"id": "rainbow3d", "name": "Rainbow3D", "group": "Boutiques", "url": "https://rainbow3d.fr", "icon": "fa-solid fa-store", "search_url": "https://rainbow3d.fr/recherche?controller=search&s={q}"},
-    {"id": "amazon", "name": "Amazon", "group": "Boutiques", "url": "https://www.amazon.fr", "icon": "fa-brands fa-amazon", "search_url": "https://www.amazon.fr/s?k={q}"},
-    {"id": "bambulab", "name": "Bambu Lab Store", "group": "Boutiques", "url": "https://eu.store.bambulab.com", "icon": "fa-solid fa-store", "search_url": "https://eu.store.bambulab.com/search?q={q}", "vendors": ["bambu"]},
-    {"id": "creality", "name": "Creality Store", "group": "Boutiques", "url": "https://store.creality.com", "icon": "fa-solid fa-store"},
-    {"id": "prusa", "name": "Prusa", "group": "Boutiques", "url": "https://www.prusa3d.com", "icon": "fa-solid fa-store"},
+    {"id": "atome3d", "name": "Atome3D", "group": "Boutiques généralistes", "url": "https://www.atome3d.com", "icon": "fa-solid fa-store", "search_url": "https://www.atome3d.com/search?q={q}&type=product"},
+    {"id": "rainbow3d", "name": "Rainbow3D", "group": "Boutiques généralistes", "url": "https://rainbow3d.fr", "icon": "fa-solid fa-store", "search_url": "https://rainbow3d.fr/recherche?controller=search&s={q}"},
+    {"id": "amazon", "name": "Amazon", "group": "Boutiques généralistes", "url": "https://www.amazon.fr", "icon": "fa-brands fa-amazon", "search_url": "https://www.amazon.fr/s?k={q}"},
+    {"id": "3djake", "name": "3DJake", "group": "Boutiques généralistes", "url": "https://www.3djake.fr", "icon": "fa-solid fa-store", "search_url": "https://www.3djake.fr/recherche?keyword={q}"},
+    {"id": "aliexpress", "name": "AliExpress", "group": "Boutiques généralistes", "url": "https://fr.aliexpress.com", "icon": "fa-solid fa-store"},
+    {"id": "filimprimante3d", "name": "Filimprimante3D", "group": "Boutiques généralistes", "url": "https://www.filimprimante3d.fr", "icon": "fa-solid fa-store", "search_url": "https://www.filimprimante3d.fr/search?q={q}"},
+    {"id": "grossiste3d", "name": "Grossiste 3D", "group": "Boutiques généralistes", "url": "https://www.grossiste3d.com", "icon": "fa-solid fa-store", "search_url": "https://www.grossiste3d.com/recherche?controller=search&s={q}"},
+    {"id": "makershop", "name": "Makershop", "group": "Boutiques généralistes", "url": "https://www.makershop.fr", "icon": "fa-solid fa-store", "search_url": "https://www.makershop.fr/recherche?query={q}"},
+    {"id": "polyfab3d", "name": "Polyfab3D", "group": "Boutiques généralistes", "url": "https://www.polyfab3d.fr", "icon": "fa-solid fa-store", "search_url": "https://www.polyfab3d.fr/recherche?controller=search&s={q}"},
+    {"id": "lv3d", "name": "LV3D", "group": "Boutiques généralistes", "url": "https://www.lv3dofficiel.fr", "icon": "fa-solid fa-store", "search_url": "https://www.lv3dofficiel.fr/recherche?controller=search&s={q}"},
+    {"id": "matterhackers", "name": "MatterHackers", "group": "Boutiques généralistes", "url": "https://www.matterhackers.com", "icon": "fa-solid fa-store", "search_url": "https://www.matterhackers.com/s/store?q={q}"},
+    {"id": "bambulab", "name": "Bambu Lab", "group": "Boutiques constructeurs", "url": "https://eu.store.bambulab.com", "icon": "fa-solid fa-industry", "search_url": "https://eu.store.bambulab.com/search?q={q}", "vendors": ["bambu"]},
+    {"id": "creality", "name": "Creality", "group": "Boutiques constructeurs", "url": "https://store.creality.com", "icon": "fa-solid fa-industry"},
+    {"id": "elegoo", "name": "Elegoo", "group": "Boutiques constructeurs", "url": "https://www.elegoo.com", "icon": "fa-solid fa-industry"},
+    {"id": "prusa", "name": "Prusa", "group": "Boutiques constructeurs", "url": "https://www.prusa3d.com", "icon": "fa-solid fa-industry", "search_url": "https://www.prusa3d.com/search/?q={q}"},
+    {"id": "anycubic", "name": "Anycubic", "group": "Boutiques constructeurs", "url": "https://store.anycubic.com", "icon": "fa-solid fa-industry", "search_url": "https://store.anycubic.com/search?q={q}", "vendors": ["anycubic"]},
+    {"id": "geeetech", "name": "Geeetech", "group": "Boutiques constructeurs", "url": "https://www.geeetech.com", "icon": "fa-solid fa-industry"},
+    {"id": "polymaker", "name": "Polymaker", "group": "Boutiques constructeurs", "url": "https://polymaker.com", "icon": "fa-solid fa-industry", "search_url": "https://shop.polymaker.com/search?q={q}"},
+    {"id": "sunlu", "name": "Sunlu", "group": "Boutiques constructeurs", "url": "https://www.sunlu.com", "icon": "fa-solid fa-industry", "search_url": "https://www.sunlu.com/search?q={q}"},
+    {"id": "tigertag", "name": "TigerTag", "group": "Boutiques constructeurs", "url": "https://tigertag.io", "icon": "fa-solid fa-industry"},
+    {"id": "francofil", "name": "Francofil", "group": "Boutiques constructeurs", "url": "https://francofil.fr", "icon": "fa-solid fa-industry", "search_url": "https://francofil.fr/?s={q}"},
+    {"id": "dagoma", "name": "Dagoma", "group": "Boutiques constructeurs", "url": "https://www.dagoma3d.com", "icon": "fa-solid fa-industry", "search_url": "https://www.dagoma3d.com/shop?search={q}"},
+    {"id": "arianeplast", "name": "Arianeplast", "group": "Boutiques constructeurs", "url": "https://www.arianeplast.com", "icon": "fa-solid fa-industry", "search_url": "https://www.arianeplast.com/search?controller=search&s={q}"},
+    {"id": "filo3d", "name": "Filo3D", "group": "Boutiques constructeurs", "url": "https://www.filo3d.fr", "icon": "fa-solid fa-industry", "search_url": "https://www.filo3d.fr/recherche?controller=search&s={q}"},
+    {"id": "3dfils", "name": "3DFils", "group": "Boutiques constructeurs", "url": "https://3dfils.com", "icon": "fa-solid fa-industry", "search_url": "https://3dfils.com/recherche?controller=search&s={q}"},
+    {"id": "colorfabb", "name": "ColorFabb", "group": "Boutiques constructeurs", "url": "https://www.colorfabb.com", "icon": "fa-solid fa-industry", "search_url": "https://www.colorfabb.com/fr/search?q={q}"},
+    {"id": "lotactree", "name": "Lotactree", "group": "Boutiques constructeurs", "url": "https://www.lotactree.com", "icon": "fa-solid fa-industry", "search_url": "https://www.lotactree.com/en-us/search?q={q}"},
+    {"id": "esun", "name": "eSUN", "group": "Boutiques constructeurs", "url": "https://www.esun3d.com", "icon": "fa-solid fa-industry", "search_url": "https://www.esun3d.com/search?q={q}"},
     {"id": "printables", "name": "Printables", "group": "Modèles 3D", "url": "https://www.printables.com", "icon": "fa-solid fa-cube"},
     {"id": "makerworld", "name": "MakerWorld", "group": "Modèles 3D", "url": "https://makerworld.com", "icon": "fa-solid fa-cube"},
     {"id": "thingiverse", "name": "Thingiverse", "group": "Modèles 3D", "url": "https://www.thingiverse.com", "icon": "fa-solid fa-cube"},
     {"id": "cults", "name": "Cults", "group": "Modèles 3D", "url": "https://cults3d.com", "icon": "fa-solid fa-cube"},
+    {"id": "nexprint", "name": "Nexprint", "group": "Modèles 3D", "url": "https://www.nexprint.com", "icon": "fa-solid fa-cube"},
     {"id": "spoolman", "name": "Spoolman", "group": "Ressources", "url": "https://github.com/Donkie/Spoolman", "icon": "fa-brands fa-github"},
     {"id": "orcaslicer", "name": "OrcaSlicer", "group": "Ressources", "url": "https://github.com/SoftFever/OrcaSlicer", "icon": "fa-brands fa-github"},
     {"id": "bambuwiki", "name": "Bambu Lab Wiki", "group": "Ressources", "url": "https://wiki.bambulab.com", "icon": "fa-solid fa-book"},
+    {"id": "tigertag-doc", "name": "TigerTag — Documentation RFID", "group": "Ressources", "url": "https://github.com/TigerTag-Project/TigerTag-RFID-Guide", "icon": "fa-brands fa-github"},
+    {"id": "tigertag-studio", "name": "TigerTag Studio Manager", "group": "Ressources", "url": "https://github.com/TigerTag-Project/TigerTag-Studio-Manager", "icon": "fa-solid fa-desktop"},
+    {"id": "tigertag-ios", "name": "TigerTag RFID Connect — iOS", "group": "Ressources", "url": "https://apps.apple.com/fr/app/tigertag-rfid-connect/id6745437963", "icon": "fa-brands fa-apple"},
+    {"id": "tigertag-android", "name": "TigerTag RFID Connect — Android", "group": "Ressources", "url": "https://play.google.com/store/apps/details?id=com.tigertag.connect", "icon": "fa-brands fa-android"},
+    {"id": "tigersystem", "name": "TigerSystem — site officiel", "group": "Ressources", "url": "https://tigersystem.io", "icon": "fa-solid fa-globe"},
 ]
 _useful_links_missing_logged = False
 
 
 def load_useful_links():
-    """Charge les liens depuis languages/useful_links.json (relu à chaque appel, pas de redémarrage nécessaire).
-    Champs : name (obligatoire), url (lien affiché) et/ou search_url (avec {q}, boutiques proposées à l'achat),
-    group (titre de section), icon (classe Font Awesome), id, vendors.
-    Si le fichier est absent ou invalide, on retombe sur la liste par défaut."""
     global _useful_links_missing_logged
     try:
         with open(USEFUL_LINKS_FILE, 'r', encoding='utf-8') as f:
@@ -18854,7 +20621,6 @@ def load_useful_links():
 @app.route('/api/links', methods=['GET'])
 @login_required
 def api_links():
-    """Liens du menu « Liens utiles » : nom, URL (ou origine du search_url), section et icône."""
     from urllib.parse import urlsplit
     out = []
     for s in load_useful_links():
@@ -18869,12 +20635,11 @@ def api_links():
     return jsonify({'links': out}), 200
 
 
-LOW_STOCK_RATIO = 0.15   # sous 15% de la capacité, la bobine est considérée comme presque vide
-LOW_STOCK_FLOOR_G = 100  # ou sous ce seuil absolu si la capacité est inconnue
+LOW_STOCK_RATIO = 0.15   
+LOW_STOCK_FLOOR_G = 100  
 
 
 def _is_low_stock(remaining_g, capacity_g):
-    """Détermine si une bobine est presque vide (seuil relatif si la capacité est connue, sinon seuil absolu)."""
     if not isinstance(remaining_g, (int, float)):
         return False
     if isinstance(capacity_g, (int, float)) and capacity_g > 0:
@@ -18883,8 +20648,6 @@ def _is_low_stock(remaining_g, capacity_g):
 
 
 def _spool_search_query(brand, material, color):
-    """Termes de recherche d'une bobine : marque + matière + couleur (ex. « Geeetech PETG Noir »).
-    Les mots déjà présents (ex. nom de bobine « Geeetech PETG Noir ») ne sont pas répétés."""
     seen, words = set(), []
     for part in (brand, material, color):
         for w in str(part or '').split():
@@ -18896,8 +20659,6 @@ def _spool_search_query(brand, material, color):
 
 
 def _spool_buy_info(brand, material, color):
-    """Requête de recherche + liens de chaque boutique de useful_links.json qui a un search_url.
-    Une boutique avec "vendors": ["bambu"] n'est proposée que si l'un de ces mots figure dans la requête."""
     from urllib.parse import quote_plus
     query = _spool_search_query(brand, material, color)
     q = quote_plus(query)
@@ -18917,25 +20678,1194 @@ def _spool_buy_info(brand, material, color):
 @app.route('/api/filament/buy-links', methods=['GET'])
 @login_required
 def api_filament_buy_links():
-    """Recherche d'achat pour une bobine de l'inventaire : ?vendor=&material=&color= -> {search_query, shops}."""
     def _arg(name):
         v = (request.args.get(name) or '').strip()[:120]
-        # un ID numérique brut (catalogue TigerTag indisponible) est inutilisable en recherche
         return '' if name in ('vendor', 'material') and v.isdigit() else v
     return jsonify(_spool_buy_info(_arg('vendor'), _arg('material'), _arg('color'))), 200
 
 
-# ── Disponibilité d'une bobine dans les boutiques (stock faible → « où la racheter ? ») ──────────────
-# Pour chaque boutique de languages/useful_links.json (+ languages/filament_shops.json s'il existe) qui a un
-# search_url, on interroge sa recherche via l'API de sa plateforme (Shopify / PrestaShop / WooCommerce).
-# Une boutique dont la plateforme est inconnue ou qui ne répond pas n'est JAMAIS comptée comme « en stock » :
-# elle est simplement proposée en recherche manuelle.
-# Champ optionnel dans le JSON : "platform": "shopify" | "prestashop" | "woocommerce" | "none"
+_DRYING_ADVICE = {
+    'PLA':  {'temp_c': 45, 'hours': 6,  'interval_days': 90, 'sensitivity': 'low'},
+    'PETG': {'temp_c': 65, 'hours': 6,  'interval_days': 45, 'sensitivity': 'medium'},
+    'ABS':  {'temp_c': 80, 'hours': 4,  'interval_days': 90, 'sensitivity': 'low'},
+    'ASA':  {'temp_c': 80, 'hours': 4,  'interval_days': 90, 'sensitivity': 'low'},
+    'TPU':  {'temp_c': 50, 'hours': 8,  'interval_days': 30, 'sensitivity': 'high'},
+    'PC':   {'temp_c': 80, 'hours': 8,  'interval_days': 30, 'sensitivity': 'high'},
+    'PA':   {'temp_c': 75, 'hours': 10, 'interval_days': 14, 'sensitivity': 'high'},
+    'PVA':  {'temp_c': 50, 'hours': 8,  'interval_days': 10, 'sensitivity': 'high'},
+    'BVOH': {'temp_c': 50, 'hours': 8,  'interval_days': 10, 'sensitivity': 'high'},
+}
+_DRYING_ALIASES = {
+    'NYLON': 'PA', 'PA6': 'PA', 'PA12': 'PA', 'PA66': 'PA', 'PAHT': 'PA', 'PPA': 'PA',
+    'TPE': 'TPU', 'PCTG': 'PETG', 'PET': 'PETG', 'PETG': 'PETG',
+}
+_DRYING_SOURCES = ('spoolman', 'manual', 'tigertag')
+_DRYING_KINDS = ('dried', 'opened', 'sealed')
+_DRYING_DEFAULT_INTERVAL_DAYS = 60
+
+
+def _drying_advice_for(material):
+    token = ''
+    for part in re.split(r'[^A-Za-z0-9]+', str(material or '').upper()):
+        if part:
+            token = part
+            break
+    token = _DRYING_ALIASES.get(token, token)
+    advice = _DRYING_ADVICE.get(token)
+    return dict(advice, material_class=token) if advice else None
+
+
+def _drying_state(last_event, material):
+    advice = _drying_advice_for(material)
+    interval = advice['interval_days'] if advice else _DRYING_DEFAULT_INTERVAL_DAYS
+    if not last_event:
+        return {"state": "none", "interval_days": interval, "days_since": None}
+    if last_event['kind'] == 'sealed':
+        return {"state": "sealed", "interval_days": interval, "days_since": None}
+    try:
+        days = (datetime.datetime.now() - datetime.datetime.fromisoformat(last_event['event_at'])).total_seconds() / 86400
+    except Exception:
+        return {"state": "none", "interval_days": interval, "days_since": None}
+    days = max(days, 0)
+    return {"state": "due" if days >= interval else "ok", "interval_days": interval, "days_since": round(days, 1)}
+
+
+def _drying_opt_float(value, lo, hi):
+    if value in (None, ''):
+        return None
+    v = float(value)
+    if v < lo or v > hi:
+        raise ValueError("hors limites")
+    return v
+
+
+@app.route('/api/filament/drying', methods=['GET'])
+@login_required
+def api_drying_get():
+    source_type = (request.args.get('source_type') or '').strip()
+    source_id = str(request.args.get('source_id') or '').strip()
+    material = (request.args.get('material') or '').strip()
+    if source_type not in _DRYING_SOURCES or not source_id:
+        return jsonify({"error": "Bobine invalide"}), 400
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, kind, event_at, temp_c, duration_h, humidity_pct, notes, material FROM spool_drying_log "
+            "WHERE user_id=? AND source_type=? AND source_id=? ORDER BY event_at DESC, id DESC LIMIT 30",
+            (session['user_id'], source_type, source_id)
+        ).fetchall()
+    finally:
+        conn.close()
+    events = [dict(r) for r in rows]
+    material = material or (events[0]['material'] if events else '')
+    return jsonify({
+        "events": events,
+        "status": _drying_state(events[0] if events else None, material),
+        "advice": _drying_advice_for(material),
+    }), 200
+
+
+@app.route('/api/filament/drying', methods=['POST'])
+@login_required
+def api_drying_add():
+    data = request.json or {}
+    source_type = (data.get('source_type') or '').strip()
+    source_id = str(data.get('source_id') or '').strip()
+    kind = (data.get('kind') or 'dried').strip()
+    if source_type not in _DRYING_SOURCES or not source_id:
+        return jsonify({"error": "Bobine invalide"}), 400
+    if kind not in _DRYING_KINDS:
+        return jsonify({"error": "Type d'événement invalide"}), 400
+    try:
+        temp_c = _drying_opt_float(data.get('temp_c'), 20, 120)
+        duration_h = _drying_opt_float(data.get('duration_h'), 0.1, 72)
+        humidity = _drying_opt_float(data.get('humidity_pct'), 0, 100)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Valeur numérique invalide"}), 400
+    event_at = (data.get('event_at') or '').strip()
+    if event_at:
+        try:
+            parsed = datetime.datetime.fromisoformat(event_at)
+            if parsed > datetime.datetime.now() + datetime.timedelta(days=1):
+                return jsonify({"error": "Date dans le futur"}), 400
+            event_at = parsed.isoformat(timespec='seconds')
+        except ValueError:
+            return jsonify({"error": "Date invalide"}), 400
+    else:
+        event_at = datetime.datetime.now().isoformat(timespec='seconds')
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO spool_drying_log (user_id, source_type, source_id, source_label, material, kind, event_at, temp_c, duration_h, humidity_pct, notes) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (session['user_id'], source_type, source_id, (data.get('source_label') or '')[:120],
+             (data.get('material') or '')[:40], kind, event_at, temp_c, duration_h, humidity,
+             (data.get('notes') or '')[:300])
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"success": True}), 201
+
+
+@app.route('/api/filament/drying/<int:event_id>', methods=['DELETE'])
+@login_required
+def api_drying_delete(event_id):
+    conn = get_db()
+    try:
+        cur = conn.execute("DELETE FROM spool_drying_log WHERE id=? AND user_id=?", (event_id, session['user_id']))
+        conn.commit()
+        found = cur.rowcount > 0
+    finally:
+        conn.close()
+    if not found:
+        return jsonify({"error": "Événement introuvable"}), 404
+    return jsonify({"success": True}), 200
+
+
+@app.route('/api/filament/drying/due', methods=['GET'])
+@login_required
+def api_drying_due():
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT l.* FROM spool_drying_log l "
+            "JOIN (SELECT source_type, source_id, MAX(event_at) AS m FROM spool_drying_log WHERE user_id=? GROUP BY source_type, source_id) x "
+            "ON x.source_type=l.source_type AND x.source_id=l.source_id AND x.m=l.event_at "
+            "WHERE l.user_id=? ORDER BY l.id DESC",
+            (session['user_id'], session['user_id'])
+        ).fetchall()
+    finally:
+        conn.close()
+    due, seen = [], set()
+    for r in rows:
+        key = (r['source_type'], r['source_id'])
+        if key in seen:
+            continue
+        seen.add(key)
+        status = _drying_state(r, r['material'])
+        if status['state'] == 'due':
+            due.append({
+                "source_type": r['source_type'], "source_id": r['source_id'],
+                "name": r['source_label'] or r['source_id'], "material": r['material'],
+                "days_since": status['days_since'], "interval_days": status['interval_days'],
+            })
+    return jsonify({"due": due}), 200
+
+
+_CAL_LIMITS = {
+    'nozzle_diameter': (0.1, 2.0), 'nozzle_temp': (100, 500), 'bed_temp': (0, 150),
+    'flow_ratio': (0.5, 1.5), 'pressure_advance': (0, 2), 'max_flow': (1, 100), 'retraction_mm': (0, 15),
+}
+
+
+def _clean_calibration(data, conn, partial=False):
+    out = {}
+    for field, (lo, hi) in _CAL_LIMITS.items():
+        if field not in data and partial:
+            continue
+        raw = data.get(field)
+        if raw in (None, ''):
+            out[field] = 0.4 if field == 'nozzle_diameter' else None
+            continue
+        try:
+            v = float(raw)
+        except (TypeError, ValueError):
+            return None, f"Valeur invalide : {field}"
+        if v < lo or v > hi:
+            return None, f"Valeur hors limites : {field}"
+        out[field] = v
+    for field, maxlen in (('brand', 60), ('material', 40), ('color_name', 60), ('notes', 400)):
+        if field in data or not partial:
+            out[field] = str(data.get(field) or '').strip()[:maxlen]
+    if 'material' in out and not out['material']:
+        return None, "Matière requise"
+    if 'printer_id' in data or not partial:
+        pid = data.get('printer_id')
+        if pid in (None, ''):
+            out['printer_id'] = None
+        else:
+            try:
+                pid = int(pid)
+            except (TypeError, ValueError):
+                return None, "Imprimante invalide"
+            if not conn.execute("SELECT id FROM printers WHERE id=? AND user_id=?", (pid, session['user_id'])).fetchone():
+                return None, "Imprimante introuvable"
+            out['printer_id'] = pid
+    return out, None
+
+
+_CAL_SELECT = (
+    "SELECT c.*, p.name AS printer_name FROM filament_calibrations c "
+    "LEFT JOIN printers p ON p.id = c.printer_id "
+)
+
+
+@app.route('/api/calibrations', methods=['GET'])
+@login_required
+def api_calibrations_list():
+    brand = (request.args.get('brand') or '').strip().lower()
+    material = (request.args.get('material') or '').strip().lower()
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            _CAL_SELECT + "WHERE c.user_id=? ORDER BY c.validated_at DESC, c.id DESC", (session['user_id'],)
+        ).fetchall()
+    finally:
+        conn.close()
+    items = [dict(r) for r in rows]
+    if material:
+        items = [c for c in items if (c['material'] or '').lower() == material]
+    if brand:
+        items = [c for c in items if (c['brand'] or '').lower() in ('', brand)]
+    return jsonify({"calibrations": items}), 200
+
+
+@app.route('/api/calibrations', methods=['POST'])
+@login_required
+def api_calibrations_save():
+    data = request.json or {}
+    conn = get_db()
+    try:
+        vals, err = _clean_calibration(data, conn)
+        if err:
+            return jsonify({"error": err}), 400
+        vals['validated_at'] = datetime.datetime.now().isoformat(timespec='seconds')
+        existing = conn.execute(
+            "SELECT id FROM filament_calibrations WHERE user_id=? AND COALESCE(printer_id,0)=COALESCE(?,0) "
+            "AND lower(brand)=lower(?) AND lower(material)=lower(?) AND nozzle_diameter=?",
+            (session['user_id'], vals['printer_id'], vals['brand'], vals['material'], vals['nozzle_diameter'])
+        ).fetchone()
+        if existing:
+            cols = list(vals.keys())
+            conn.execute(
+                f"UPDATE filament_calibrations SET {', '.join(c + '=?' for c in cols)} WHERE id=?",
+                [vals[c] for c in cols] + [existing['id']]
+            )
+            cid = existing['id']
+        else:
+            cols = list(vals.keys()) + ['user_id']
+            cur = conn.execute(
+                f"INSERT INTO filament_calibrations ({', '.join(cols)}) VALUES ({', '.join('?' for _ in cols)})",
+                [vals[c] for c in vals] + [session['user_id']]
+            )
+            cid = cur.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"success": True, "id": cid, "updated": bool(existing)}), 200
+
+
+@app.route('/api/calibrations/<int:cal_id>', methods=['DELETE'])
+@login_required
+def api_calibrations_delete(cal_id):
+    conn = get_db()
+    try:
+        cur = conn.execute("DELETE FROM filament_calibrations WHERE id=? AND user_id=?", (cal_id, session['user_id']))
+        conn.commit()
+        found = cur.rowcount > 0
+    finally:
+        conn.close()
+    if not found:
+        return jsonify({"error": "Calibration introuvable"}), 404
+    return jsonify({"success": True}), 200
+
+
+@app.route('/api/calibrations/suggest', methods=['GET'])
+@login_required
+def api_calibrations_suggest():
+    brand = (request.args.get('brand') or '').strip().lower()
+    material = (request.args.get('material') or '').strip().lower()
+    try:
+        printer_id = int(request.args.get('printer_id')) if request.args.get('printer_id') not in (None, '') else None
+    except ValueError:
+        printer_id = None
+    if not material:
+        return jsonify({"calibration": None, "match": None}), 200
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            _CAL_SELECT + "WHERE c.user_id=? AND lower(c.material)=? ORDER BY c.validated_at DESC, c.id DESC",
+            (session['user_id'], material)
+        ).fetchall()
+    finally:
+        conn.close()
+    best, best_score, best_match = None, -1, None
+    for r in rows:
+        same_printer = printer_id is not None and r['printer_id'] == printer_id
+        same_brand = bool(brand) and (r['brand'] or '').lower() == brand
+        score = (2 if same_printer else 0) + (1 if same_brand else 0)
+        if score > best_score:
+            best, best_score = r, score
+            best_match = 'exact' if (same_printer and same_brand) else ('printer' if same_printer else ('brand' if same_brand else 'material'))
+    return jsonify({"calibration": dict(best) if best else None, "match": best_match}), 200
+
+
+def _owned_part_id(conn, raw):
+    try:
+        pid = int(raw)
+    except (TypeError, ValueError):
+        return None
+    row = conn.execute("SELECT id FROM printer_parts WHERE id=? AND user_id=?", (pid, session['user_id'])).fetchone()
+    return row['id'] if row else None
+
+
+def _serialize_part(r):
+    d = dict(r)
+    d['low'] = (d.get('stock_qty') or 0) <= (d.get('alert_qty') or 0)
+    return d
+
+
+def _clean_part(data, conn):
+    name = str(data.get('name') or '').strip()[:100]
+    if not name:
+        return None, "Nom requis"
+    try:
+        stock = int(data.get('stock_qty') or 0)
+        alert = int(data.get('alert_qty') if data.get('alert_qty') not in (None, '') else 1)
+    except (TypeError, ValueError):
+        return None, "Quantité invalide"
+    if stock < 0 or stock > 100000 or alert < 0 or alert > 100000:
+        return None, "Quantité hors limites"
+    printer_id = data.get('printer_id')
+    if printer_id in (None, '', 0, '0'):
+        printer_id = None
+    else:
+        try:
+            printer_id = int(printer_id)
+        except (TypeError, ValueError):
+            return None, "Imprimante invalide"
+        if not conn.execute("SELECT id FROM printers WHERE id=? AND user_id=?", (printer_id, session['user_id'])).fetchone():
+            return None, "Imprimante introuvable"
+    buy_url = str(data.get('buy_url') or '').strip()[:500]
+    if buy_url and not buy_url.lower().startswith(('http://', 'https://')):
+        return None, "Lien d'achat invalide (http/https)"
+    return {
+        'name': name, 'category': str(data.get('category') or 'other').strip()[:30] or 'other',
+        'stock_qty': stock, 'alert_qty': alert, 'printer_id': printer_id,
+        'buy_url': buy_url, 'notes': str(data.get('notes') or '').strip()[:300],
+    }, None
+
+
+_PARTS_SELECT = (
+    "SELECT pt.*, p.name AS printer_name FROM printer_parts pt "
+    "LEFT JOIN printers p ON p.id = pt.printer_id "
+)
+
+
+@app.route('/api/parts', methods=['GET'])
+@login_required
+def api_parts_list():
+    conn = get_db()
+    try:
+        rows = conn.execute(_PARTS_SELECT + "WHERE pt.user_id=? ORDER BY pt.name COLLATE NOCASE", (session['user_id'],)).fetchall()
+    finally:
+        conn.close()
+    return jsonify({"parts": [_serialize_part(r) for r in rows]}), 200
+
+
+@app.route('/api/parts', methods=['POST'])
+@login_required
+def api_parts_create():
+    conn = get_db()
+    try:
+        vals, err = _clean_part(request.json or {}, conn)
+        if err:
+            return jsonify({"error": err}), 400
+        cols = list(vals.keys()) + ['user_id']
+        cur = conn.execute(
+            f"INSERT INTO printer_parts ({', '.join(cols)}) VALUES ({', '.join('?' for _ in cols)})",
+            [vals[c] for c in vals] + [session['user_id']]
+        )
+        conn.commit()
+        pid = cur.lastrowid
+    finally:
+        conn.close()
+    return jsonify({"success": True, "id": pid}), 201
+
+
+@app.route('/api/parts/<int:part_id>', methods=['PUT'])
+@login_required
+def api_parts_update(part_id):
+    conn = get_db()
+    try:
+        if not conn.execute("SELECT id FROM printer_parts WHERE id=? AND user_id=?", (part_id, session['user_id'])).fetchone():
+            return jsonify({"error": "Pièce introuvable"}), 404
+        vals, err = _clean_part(request.json or {}, conn)
+        if err:
+            return jsonify({"error": err}), 400
+        cols = list(vals.keys())
+        conn.execute(
+            f"UPDATE printer_parts SET {', '.join(c + '=?' for c in cols)} WHERE id=? AND user_id=?",
+            [vals[c] for c in cols] + [part_id, session['user_id']]
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"success": True}), 200
+
+
+@app.route('/api/parts/<int:part_id>/adjust', methods=['POST'])
+@login_required
+def api_parts_adjust(part_id):
+    try:
+        delta = int((request.json or {}).get('delta'))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Variation invalide"}), 400
+    if delta == 0 or abs(delta) > 1000:
+        return jsonify({"error": "Variation invalide"}), 400
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT stock_qty, alert_qty FROM printer_parts WHERE id=? AND user_id=?", (part_id, session['user_id'])).fetchone()
+        if not row:
+            return jsonify({"error": "Pièce introuvable"}), 404
+        new_stock = max(0, (row['stock_qty'] or 0) + delta)
+        conn.execute("UPDATE printer_parts SET stock_qty=? WHERE id=?", (new_stock, part_id))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"success": True, "stock_qty": new_stock, "low": new_stock <= (row['alert_qty'] or 0)}), 200
+
+
+@app.route('/api/parts/<int:part_id>', methods=['DELETE'])
+@login_required
+def api_parts_delete(part_id):
+    conn = get_db()
+    try:
+        cur = conn.execute("DELETE FROM printer_parts WHERE id=? AND user_id=?", (part_id, session['user_id']))
+        conn.execute("UPDATE printer_maintenance_tasks SET part_id=NULL WHERE part_id=? AND user_id=?", (part_id, session['user_id']))
+        conn.commit()
+        found = cur.rowcount > 0
+    finally:
+        conn.close()
+    if not found:
+        return jsonify({"error": "Pièce introuvable"}), 404
+    return jsonify({"success": True}), 200
+
+
+@app.route('/api/parts/low', methods=['GET'])
+@login_required
+def api_parts_low():
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            _PARTS_SELECT + "WHERE pt.user_id=? AND pt.stock_qty <= pt.alert_qty ORDER BY pt.name COLLATE NOCASE",
+            (session['user_id'],)
+        ).fetchall()
+    finally:
+        conn.close()
+    return jsonify({"parts": [_serialize_part(r) for r in rows]}), 200
+
+
+def _month_bounds_ok(month):
+    return bool(re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', month or ''))
+
+
+def _prev_month(month):
+    y, mth = int(month[:4]), int(month[5:7])
+    return f"{y - 1}-12" if mth == 1 else f"{y}-{mth - 1:02d}"
+
+
+def _monthly_report_data(conn, user_id, month):
+    rows = conn.execute(
+        """SELECT h.file_name, h.result, h.spool_weight_used_g AS grams, h.estimated_seconds AS secs,
+                  h.material_cost, h.elec_cost, h.total_cost, h.filament_material AS material,
+                  COALESCE((SELECT p.name FROM printers p WHERE p.id = h.printer_id), '') AS printer
+           FROM print_history h
+           WHERE h.user_id = ? AND strftime('%Y-%m', h.sent_at, 'localtime') = ?""",
+        (user_id, month)
+    ).fetchall()
+    totals = {"prints": 0, "success": 0, "failed": 0, "unrated": 0, "grams": 0.0, "seconds": 0,
+              "material_cost": 0.0, "elec_cost": 0.0, "total_cost": 0.0, "failed_cost": 0.0, "failed_grams": 0.0, "co2_g": 0.0}
+    by_printer, by_material, by_model = {}, {}, {}
+
+    def bucket(d, key):
+        return d.setdefault(key, {"name": key, "prints": 0, "failed": 0, "grams": 0.0, "seconds": 0, "cost": 0.0})
+
+    for r in rows:
+        grams = float(r["grams"] or 0)
+        secs = int(r["secs"] or 0)
+        cost = float(r["total_cost"] or 0)
+        failed = r["result"] == "failed"
+        totals["prints"] += 1
+        totals["failed" if failed else ("success" if r["result"] == "success" else "unrated")] += 1
+        totals["grams"] += grams
+        totals["seconds"] += secs
+        totals["material_cost"] += float(r["material_cost"] or 0)
+        totals["elec_cost"] += float(r["elec_cost"] or 0)
+        totals["total_cost"] += cost
+        if failed:
+            totals["failed_cost"] += cost
+            totals["failed_grams"] += grams
+        mat = (r["material"] or "").strip()
+        token = re.split(r'[^A-Za-z0-9]+', mat.lower())[0] if mat else ''
+        totals["co2_g"] += grams * MATERIAL_CO2_FACTORS_KG_PER_KG.get(token, DEFAULT_MATERIAL_CO2_FACTOR_KG_PER_KG)
+        for d, key in ((by_printer, r["printer"] or ""), (by_material, mat.upper()), (by_model, r["file_name"] or "")):
+            if not key:
+                continue
+            b = bucket(d, key)
+            b["prints"] += 1
+            b["failed"] += 1 if failed else 0
+            b["grams"] += grams
+            b["seconds"] += secs
+            b["cost"] += cost
+
+    def finish(d, limit=None):
+        items = sorted(d.values(), key=lambda x: (-x["prints"], -x["grams"], x["name"]))
+        items = items[:limit] if limit else items
+        for it in items:
+            it["grams"] = round(it["grams"], 1)
+            it["cost"] = round(it["cost"], 2)
+        return items
+
+    for k in ("grams", "material_cost", "elec_cost", "total_cost", "failed_cost", "failed_grams", "co2_g"):
+        totals[k] = round(totals[k], 2 if k.endswith("cost") else 1)
+    rated = totals["success"] + totals["failed"]
+    totals["success_rate"] = round(totals["success"] / rated * 100, 1) if rated else None
+    return {"month": month, "totals": totals, "by_printer": finish(by_printer), "by_material": finish(by_material),
+            "top_models": finish(by_model, 5)}
+
+
+@app.route('/api/reports/monthly', methods=['GET'])
+@login_required
+def api_report_monthly():
+    month = (request.args.get('month') or '').strip()
+    if not _month_bounds_ok(month):
+        month = datetime.datetime.now().strftime('%Y-%m')
+    conn = get_db()
+    try:
+        report = _monthly_report_data(conn, session['user_id'], month)
+        report["previous"] = _monthly_report_data(conn, session['user_id'], _prev_month(month))["totals"]
+        first = conn.execute(
+            "SELECT MIN(strftime('%Y-%m', sent_at, 'localtime')) FROM print_history WHERE user_id = ?", (session['user_id'],)
+        ).fetchone()[0]
+        report["first_month"] = first
+    finally:
+        conn.close()
+    return jsonify(report), 200
+
+
+def build_report_pdf_bytes(data):
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
+    from xml.sax.saxutils import escape
+
+    def clip(v, n=120):
+        return escape(str(v if v is not None else '')[:n])
+
+    lang = str(data.get('lang') or '').lower()
+    if lang.startswith('ja'):
+        font = bold = 'HeiseiKakuGo-W5'
+    elif lang.startswith('zh'):
+        font = bold = 'STSong-Light'
+    else:
+        font, bold = 'Helvetica', 'Helvetica-Bold'
+    if font != 'Helvetica':
+        try:
+            pdfmetrics.registerFont(UnicodeCIDFont(font))
+        except Exception:
+            font, bold = 'Helvetica', 'Helvetica-Bold'
+
+    ink, grey, line = colors.HexColor('#1a1d2e'), colors.HexColor('#666666'), colors.HexColor('#dddddd')
+    st_title = ParagraphStyle('t', fontName=bold, fontSize=22, leading=26, textColor=ink)
+    st_sub = ParagraphStyle('s', fontName=font, fontSize=11, leading=15, textColor=grey, spaceAfter=10)
+    st_h = ParagraphStyle('h', fontName=bold, fontSize=12, leading=16, textColor=ink, spaceBefore=12, spaceAfter=4)
+    st_cell = ParagraphStyle('c', fontName=font, fontSize=9.5, leading=12, textColor=ink)
+    st_cell_b = ParagraphStyle('cb', fontName=bold, fontSize=9.5, leading=12, textColor=ink)
+    st_cell_r = ParagraphStyle('cr', parent=st_cell, alignment=2)
+    st_th = ParagraphStyle('th', fontName=bold, fontSize=8.5, leading=11, textColor=grey)
+    st_th_r = ParagraphStyle('thr', parent=st_th, alignment=2)
+    st_foot = ParagraphStyle('f', fontName=font, fontSize=8, leading=11, textColor=grey, spaceBefore=14)
+    width = A4[0] - 40 * mm
+
+    story = [Paragraph(clip(data.get('title'), 100), st_title), Paragraph(clip(data.get('subtitle'), 160), st_sub)]
+    raw_kpis = data.get('kpis') if isinstance(data.get('kpis'), list) else []
+    kpis = [k for k in raw_kpis[:12] if isinstance(k, (list, tuple)) and len(k) >= 2]
+    if kpis:
+        rows = []
+        for k in kpis:
+            note = f" <font color='#666666' size='8'>{clip(k[2], 40)}</font>" if len(k) > 2 and k[2] else ''
+            rows.append([Paragraph(clip(k[0], 60), st_cell), Paragraph(f"{clip(k[1], 40)}{note}", st_cell_b)])
+        tbl = Table(rows, colWidths=[width * 0.55, width * 0.45])
+        tbl.setStyle(TableStyle([('LINEBELOW', (0, 0), (-1, -1), 0.4, line), ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                                 ('TOPPADDING', (0, 0), (-1, -1), 5), ('BOTTOMPADDING', (0, 0), (-1, -1), 5)]))
+        story.append(tbl)
+    raw_tables = data.get('tables') if isinstance(data.get('tables'), list) else []
+    for sec in raw_tables[:6]:
+        if not isinstance(sec, dict):
+            continue
+        raw_headers = sec.get('headers') if isinstance(sec.get('headers'), list) else []
+        raw_rows = sec.get('rows') if isinstance(sec.get('rows'), list) else []
+        headers = [clip(h, 40) for h in raw_headers][:6]
+        body = [r for r in raw_rows[:40] if isinstance(r, (list, tuple))]
+        if not headers or not body:
+            continue
+        ncol = len(headers)
+        first_w = width * (0.4 if ncol > 3 else 0.5)
+        other_w = (width - first_w) / max(ncol - 1, 1)
+        data_rows = [[Paragraph(h, st_th if i == 0 else st_th_r) for i, h in enumerate(headers)]]
+        for r in body:
+            data_rows.append([Paragraph(clip(r[i] if i < len(r) else '', 80), st_cell if i == 0 else st_cell_r) for i in range(ncol)])
+        tbl = Table(data_rows, colWidths=[first_w] + [other_w] * (ncol - 1), repeatRows=1)
+        tbl.setStyle(TableStyle([('LINEBELOW', (0, 0), (-1, 0), 0.8, ink), ('LINEBELOW', (0, 1), (-1, -1), 0.4, line),
+                                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                                 ('TOPPADDING', (0, 0), (-1, -1), 4), ('BOTTOMPADDING', (0, 0), (-1, -1), 4)]))
+        story.append(KeepTogether([Paragraph(clip(sec.get('title'), 80), st_h), tbl]))
+    if data.get('footer'):
+        story.append(Paragraph(clip(data.get('footer'), 200), st_foot))
+
+    buf = io.BytesIO()
+    SimpleDocTemplate(buf, pagesize=A4, leftMargin=20 * mm, rightMargin=20 * mm, topMargin=18 * mm, bottomMargin=18 * mm,
+                      title=clip(data.get('title'), 100), author='Stellio').build(story)
+    return buf.getvalue()
+
+
+@app.route('/api/reports/export', methods=['POST'])
+@login_required
+def api_report_export():
+    data = request.get_json(silent=True) or {}
+    try:
+        pdf_bytes = build_report_pdf_bytes(data)
+    except Exception as e:
+        app_logger.error(f"[REPORT] Échec génération PDF : {e}")
+        return jsonify({"success": False, "error": "Échec de la génération du PDF"}), 500
+    return send_file(io.BytesIO(pdf_bytes), mimetype='application/pdf', as_attachment=True,
+                     download_name=_safe_quote_pdf_filename(data.get('filename')))
+
+
+@app.route('/api/reports/export-native', methods=['POST'])
+@login_required
+def api_report_export_native():
+    data = request.get_json(silent=True) or {}
+    filename = _safe_quote_pdf_filename(data.get('filename'))
+    try:
+        pdf_bytes = build_report_pdf_bytes(data)
+    except Exception as e:
+        app_logger.error(f"[REPORT] Échec génération PDF : {e}")
+        return jsonify({"success": False, "error": "Échec de la génération du PDF"}), 500
+    try:
+        import webview
+        result = webview.windows[0].create_file_dialog(
+            webview.SAVE_DIALOG, directory=str(Path.home() / 'Documents'),
+            save_filename=filename, file_types=('Document PDF (*.pdf)',)
+        )
+    except Exception as e:
+        app_logger.info(f"[REPORT] Boîte de dialogue native indisponible : {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    dest_path = result[0] if isinstance(result, (list, tuple)) and result else result
+    if not dest_path:
+        return jsonify({"success": False, "cancelled": True}), 200
+    dest_path = str(dest_path)
+    if not dest_path.lower().endswith('.pdf'):
+        dest_path += '.pdf'
+    try:
+        with open(dest_path, 'wb') as f:
+            f.write(pdf_bytes)
+        return jsonify({"success": True, "path": dest_path}), 200
+    except Exception as e:
+        app_logger.error(f"[REPORT] Échec écriture fichier : {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/filament/spool-report', methods=['GET'])
+@login_required
+def api_spool_report():
+    source_type = (request.args.get('source_type') or '').strip()
+    source_id = str(request.args.get('source_id') or '').strip()
+    if source_type not in _DRYING_SOURCES or not source_id:
+        return jsonify({"error": "Bobine invalide"}), 400
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """SELECT file_name, result, spool_weight_used_g AS grams, material_cost, elec_cost, total_cost, sent_at
+               FROM print_history WHERE user_id = ? AND spool_source_type = ? AND spool_source_id = ?
+               ORDER BY sent_at""",
+            (session['user_id'], source_type, source_id)
+        ).fetchall()
+    finally:
+        conn.close()
+    rep = {"prints": 0, "success": 0, "failed": 0, "unrated": 0, "grams": 0.0, "total_cost": 0.0,
+           "failed_cost": 0.0, "failed_grams": 0.0, "first_at": None, "last_at": None}
+    models = {}
+    for r in rows:
+        g = float(r["grams"] or 0)
+        c = float(r["total_cost"] or 0)
+        rep["prints"] += 1
+        rep["grams"] += g
+        rep["total_cost"] += c
+        if r["result"] == "failed":
+            rep["failed"] += 1
+            rep["failed_cost"] += c
+            rep["failed_grams"] += g
+        elif r["result"] == "success":
+            rep["success"] += 1
+        else:
+            rep["unrated"] += 1
+        rep["first_at"] = rep["first_at"] or r["sent_at"]
+        rep["last_at"] = r["sent_at"]
+        m = models.setdefault(r["file_name"] or "", {"name": r["file_name"] or "", "prints": 0, "grams": 0.0})
+        m["prints"] += 1
+        m["grams"] += g
+    for k in ("grams", "failed_grams"):
+        rep[k] = round(rep[k], 1)
+    for k in ("total_cost", "failed_cost"):
+        rep[k] = round(rep[k], 2)
+    rated = rep["success"] + rep["failed"]
+    rep["success_rate"] = round(rep["success"] / rated * 100, 1) if rated else None
+    rep["avg_g"] = round(rep["grams"] / rep["prints"], 1) if rep["prints"] else None
+    rep["top_models"] = [dict(m, grams=round(m["grams"], 1)) for m in
+                         sorted(models.values(), key=lambda x: (-x["prints"], -x["grams"]))[:5] if m["name"]]
+    return jsonify(rep), 200
+
+
+_MODEL_UPDATE_RECHECK_HOURS = 12
+_MODEL_UPDATE_MAX_PER_RUN = 150
+_model_update_runs = {}
+_model_update_runs_lock = threading.Lock()
+_printables_date_field = None
+_PRINTABLES_DATE_CANDIDATES = ['lastModifiedAt', 'dateModified', 'modified', 'updatedAt', 'dateUpdated', 'lastUpdate']
+
+
+def _model_ref_from_url(url):
+    u = str(url or '')
+    low = u.lower()
+    m = re.search(r'thing:(\d+)', u)
+    if 'thingiverse.com' in low and m:
+        return ('Thingiverse', m.group(1))
+    m = re.search(r'/model/(\d+)', u)
+    if 'printables.com' in low and m:
+        return ('Printables', m.group(1))
+    m = re.search(r'/models/(\d+)', u)
+    if 'makerworld.com' in low and m:
+        return ('MakerWorld', m.group(1))
+    return None
+
+
+def _parse_remote_dt(value):
+    if value in (None, ''):
+        return None
+    try:
+        if isinstance(value, (int, float)) or (isinstance(value, str) and value.strip().isdigit()):
+            x = float(value)
+            if x > 1e12:
+                x /= 1000.0
+            return datetime.datetime.fromtimestamp(x, datetime.timezone.utc).replace(tzinfo=None)
+        d = datetime.datetime.fromisoformat(str(value).strip().replace('Z', '+00:00'))
+        if d.tzinfo:
+            d = d.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        return d
+    except Exception:
+        return None
+
+
+def _fingerprint(lines):
+    lines = sorted(str(x) for x in lines if x)
+    return hashlib.sha1('\n'.join(lines).encode('utf-8')).hexdigest() if lines else None
+
+
+def _printables_fetch_state(model_id):
+    global _printables_date_field
+    q = ("query ModelState($id: ID!) { model: print(id: $id) { id name "
+         "stls { id name fileSize } otherFiles { id name fileSize } } }")
+    res = requests.post(PRINTABLES_API_URL, headers=PRINTABLES_HEADERS, timeout=15,
+                        json={"operationName": "ModelState", "query": q, "variables": {"id": str(model_id)}})
+    res.raise_for_status()
+    body = res.json()
+    model = (body.get('data') or {}).get('model')
+    if not model:
+        return {"ok": False, "reason": "gone"}
+    files = [f"{f.get('id')}|{f.get('name')}|{f.get('fileSize')}"
+             for f in (model.get('stls') or []) + (model.get('otherFiles') or [])]
+    modified = None
+    if _printables_date_field is not False:
+        candidates = [_printables_date_field] if _printables_date_field else _PRINTABLES_DATE_CANDIDATES
+        for field in candidates:
+            try:
+                r2 = requests.post(PRINTABLES_API_URL, headers=PRINTABLES_HEADERS, timeout=15, json={
+                    "operationName": "ModelDate", "variables": {"id": str(model_id)},
+                    "query": "query ModelDate($id: ID!) { model: print(id: $id) { id %s } }" % field})
+                b2 = r2.json() if r2.ok else {}
+                if not b2.get('errors') and (b2.get('data') or {}).get('model'):
+                    modified = _parse_remote_dt(b2['data']['model'].get(field))
+                    _printables_date_field = field
+                    break
+            except Exception:
+                continue
+        else:
+            if _printables_date_field is None:
+                _printables_date_field = False
+    return {"ok": True, "title": model.get('name') or '', "modified_at": modified, "fingerprint": _fingerprint(files)}
+
+
+def _makerworld_fetch_state(model_id):
+    headers = {"User-Agent": "BambuStudio/01.09.00.00", "Accept": "application/json",
+               "Referer": f"https://makerworld.com/en/models/{model_id}"}
+    r = requests.get(f"{MAKERWORLD_API}/v1/design-service/design/{model_id}", headers=headers, timeout=15)
+    if r.status_code == 404:
+        return {"ok": False, "reason": "gone"}
+    r.raise_for_status()
+    data = r.json()
+    instances = data.get("instances") or data.get("designProfileList") or data.get("profileList") or data.get("profiles") or []
+    dates = []
+    for k in ('updateTime', 'updatedAt', 'lastUpdateTime', 'modifyTime', 'lastModified'):
+        d = _parse_remote_dt(data.get(k))
+        if d:
+            dates.append(d)
+    lines = []
+    for inst in instances if isinstance(instances, list) else []:
+        for k in ('updateTime', 'updatedAt', 'createTime', 'createdAt'):
+            d = _parse_remote_dt(inst.get(k))
+            if d:
+                dates.append(d)
+        lines.append(f"{inst.get('id')}|{inst.get('title') or inst.get('name')}|{inst.get('updateTime') or inst.get('updatedAt') or ''}")
+    title = (data.get("title") or data.get("titleTranslated") or '').strip()
+    return {"ok": True, "title": title, "modified_at": max(dates) if dates else None, "fingerprint": _fingerprint(lines)}
+
+
+def _thingiverse_fetch_state(thing_id, token):
+    if not token:
+        return {"ok": False, "reason": "no_token"}
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    r = requests.get(f"https://api.thingiverse.com/things/{thing_id}", headers=headers, timeout=15)
+    if r.status_code == 404:
+        return {"ok": False, "reason": "gone"}
+    r.raise_for_status()
+    data = r.json()
+    lines = []
+    try:
+        rf = requests.get(f"https://api.thingiverse.com/things/{thing_id}/files", headers=headers, timeout=15)
+        if rf.ok and isinstance(rf.json(), list):
+            lines = [f"{f.get('id')}|{f.get('name')}|{f.get('size')}|{f.get('date')}" for f in rf.json()]
+    except Exception:
+        pass
+    return {"ok": True, "title": (data.get('name') or '').strip(),
+            "modified_at": _parse_remote_dt(data.get('modified')), "fingerprint": _fingerprint(lines)}
+
+
+def _insert_notification_once(user_id, notif_type, title, message, link_page, dedup_key):
+    with _notif_create_lock:
+        conn = get_db()
+        try:
+            if conn.execute("SELECT 1 FROM notifications WHERE user_id = ? AND dedup_key = ?", (user_id, dedup_key)).fetchone():
+                return False
+            conn.execute(
+                "INSERT INTO notifications (user_id, type, title, message, link_page, dedup_key) VALUES (?, ?, ?, ?, ?, ?)",
+                (user_id, notif_type, title, message, link_page, dedup_key)
+            )
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
+
+def _model_updates_collect(conn, user_id):
+    latest = {}
+    for r in conn.execute(
+        "SELECT source_url, file_name, downloaded_at FROM download_history WHERE user_id = ? AND source_url != '' ORDER BY downloaded_at ASC, id ASC",
+        (user_id,)
+    ).fetchall():
+        ref = _model_ref_from_url(r['source_url'])
+        if ref:
+            latest[ref] = {"url": r['source_url'], "dl": r['downloaded_at'], "name": os.path.splitext(r['file_name'] or '')[0]}
+    for (platform, mid), v in latest.items():
+        conn.execute(
+            """INSERT INTO model_updates (user_id, platform, model_id, source_url, title, downloaded_at)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(user_id, platform, model_id) DO UPDATE SET
+                   source_url = excluded.source_url, downloaded_at = excluded.downloaded_at""",
+            (user_id, platform, mid, v["url"], v["name"], v["dl"])
+        )
+    conn.commit()
+
+
+def _thingiverse_token_for(user_id):
+    try:
+        conn = get_db()
+        try:
+            row = conn.execute("SELECT api_key FROM account_credentials WHERE user_id = ? AND platform = 'thingiverse'", (user_id,)).fetchone()
+        finally:
+            conn.close()
+        if row and row['api_key']:
+            return decrypt_account_secret(row['api_key'])
+    except Exception:
+        pass
+    return None
+
+
+def _check_one_model_update(user_id, row, thingiverse_token):
+    platform, mid = row['platform'], row['model_id']
+    now_iso = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat(timespec='seconds')
+    try:
+        if platform == 'Printables':
+            state = _printables_fetch_state(mid)
+        elif platform == 'MakerWorld':
+            state = _makerworld_fetch_state(mid)
+        elif platform == 'Thingiverse':
+            state = _thingiverse_fetch_state(mid, thingiverse_token)
+        else:
+            state = {"ok": False, "reason": "unsupported"}
+    except Exception as e:
+        app_logger.info(f"[ModelUpdates] {platform} {mid}: {type(e).__name__}")
+        state = {"ok": False, "reason": "error"}
+
+    conn = get_db()
+    try:
+        if not state.get("ok"):
+            reason = state.get("reason") or "error"
+            status = 'unsupported' if reason in ('no_token', 'unsupported', 'gone') else row['status']
+            conn.execute("UPDATE model_updates SET status = ?, reason = ?, last_checked_at = ? WHERE id = ?",
+                         (status if status != 'new' else 'error', reason, now_iso, row['id']))
+            conn.commit()
+            return False
+
+        fp = state.get("fingerprint")
+        modified = state.get("modified_at")
+        baseline_fp = row['baseline_fingerprint']
+        dismissed = row['dismissed_modified_at']
+        if row['baseline_downloaded_at'] != row['downloaded_at']:
+            baseline_fp, dismissed = fp, None
+        elif baseline_fp is None:
+            baseline_fp = fp
+        dl = _parse_remote_dt((row['downloaded_at'] or '').replace(' ', 'T'))
+        dismissed_dt = _parse_remote_dt(dismissed)
+        update, reason = False, ''
+        if modified and dl and modified > dl + datetime.timedelta(minutes=5) and not (dismissed_dt and modified <= dismissed_dt):
+            update, reason = True, 'date'
+        elif fp and baseline_fp and fp != baseline_fp:
+            update, reason = True, 'files'
+        elif not modified:
+            reason = 'no_date'
+        status = 'update' if update else 'uptodate'
+        mod_iso = modified.isoformat(timespec='seconds') if modified else None
+        title = state.get("title") or row['title'] or ''
+        notif_key = f"model_update_{platform}_{mid}_{mod_iso or (fp or '')[:10]}"
+        newly = update and row['notified_key'] != notif_key
+        conn.execute(
+            """UPDATE model_updates SET status = ?, reason = ?, title = ?, fingerprint = ?, remote_modified_at = ?,
+                   baseline_fingerprint = ?, baseline_downloaded_at = ?, dismissed_modified_at = ?, last_checked_at = ?,
+                   notified_key = ? WHERE id = ?""",
+            (status, reason, title, fp, mod_iso, baseline_fp, row['downloaded_at'], dismissed, now_iso,
+             notif_key if update else row['notified_key'], row['id'])
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    if newly:
+        _insert_notification_once(
+            user_id, 'info', _server_t('modelupdate.notif_title', 'Nouvelle version disponible'),
+            f"{title or mid} ({platform})", 'history', notif_key
+        )
+    return newly
+
+
+def _model_updates_run(user_id, force):
+    state = _model_update_runs[user_id]
+    try:
+        conn = get_db()
+        try:
+            _model_updates_collect(conn, user_id)
+            rows = conn.execute("SELECT * FROM model_updates WHERE user_id = ? ORDER BY COALESCE(last_checked_at, '') ASC", (user_id,)).fetchall()
+        finally:
+            conn.close()
+        limit = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - datetime.timedelta(hours=_MODEL_UPDATE_RECHECK_HOURS)
+        due = []
+        for r in rows:
+            last = _parse_remote_dt(r['last_checked_at'])
+            if force or not last or last < limit:
+                due.append(r)
+        due = due[:_MODEL_UPDATE_MAX_PER_RUN]
+        state['total'] = len(due)
+        token = _thingiverse_token_for(user_id)
+        for r in due:
+            _check_one_model_update(user_id, r, token)
+            state['done'] += 1
+            time.sleep(0.6)
+    except Exception as e:
+        app_logger.warning(f"[ModelUpdates] Vérification interrompue: {type(e).__name__}: {e}")
+    finally:
+        state['running'] = False
+        state['finished'] = time.time()
+
+
+@app.route('/api/model-updates/check', methods=['POST'])
+@login_required
+def api_model_updates_check():
+    uid = session['user_id']
+    force = bool((request.get_json(silent=True) or {}).get('force'))
+    with _model_update_runs_lock:
+        cur = _model_update_runs.get(uid)
+        if cur and cur.get('running'):
+            return jsonify({"started": False, "running": True}), 200
+        _model_update_runs[uid] = {"running": True, "done": 0, "total": 0, "finished": None}
+    threading.Thread(target=_model_updates_run, args=(uid, force), daemon=True).start()
+    return jsonify({"started": True, "running": True}), 200
+
+
+@app.route('/api/model-updates', methods=['GET'])
+@login_required
+def api_model_updates_list():
+    uid = session['user_id']
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """SELECT id, platform, model_id, source_url, title, status, reason, remote_modified_at, downloaded_at, last_checked_at
+               FROM model_updates WHERE user_id = ?
+               ORDER BY CASE status WHEN 'update' THEN 0 ELSE 1 END, title COLLATE NOCASE""",
+            (uid,)
+        ).fetchall()
+        auto = (load_settings() or {}).get('model_updates_auto', True)
+    finally:
+        conn.close()
+    run = _model_update_runs.get(uid) or {}
+    items = [dict(r) for r in rows]
+    checked = [i['last_checked_at'] for i in items if i['last_checked_at']]
+    return jsonify({
+        "items": items,
+        "updates": sum(1 for i in items if i['status'] == 'update'),
+        "running": bool(run.get('running')), "done": run.get('done', 0), "total": run.get('total', 0),
+        "last_checked_at": max(checked) if checked else None,
+        "auto": bool(auto),
+    }), 200
+
+
+@app.route('/api/model-updates/<int:item_id>/dismiss', methods=['POST'])
+@login_required
+def api_model_updates_dismiss(item_id):
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT fingerprint, remote_modified_at FROM model_updates WHERE id = ? AND user_id = ?",
+                           (item_id, session['user_id'])).fetchone()
+        if not row:
+            return jsonify({"error": "Modèle introuvable"}), 404
+        conn.execute(
+            "UPDATE model_updates SET status = 'uptodate', reason = '', baseline_fingerprint = ?, dismissed_modified_at = ? WHERE id = ?",
+            (row['fingerprint'], row['remote_modified_at'], item_id)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"success": True}), 200
+
+
+_ABRASIVE_RE = re.compile(r'(?<![A-Z0-9])(CF|GF|CFK|GFK)(?![A-Z0-9])|CARBON|CARBONE|GLASS|VERRE|GLOW|LUMINE|PHOSPHOR|FIBER|FIBRE', re.I)
+_HARDENED_NOZZLE_RE = re.compile(r'acier|steel|hardened|tremp|tungst|rubis|ruby', re.I)
+
+
+def _append_stock_aware_warnings(warnings, user_id, file_path, printer_id):
+    conn = get_db()
+    try:
+        a = conn.execute(
+            "SELECT source_type, source_id, source_label, material FROM filament_assignments WHERE file_path=? AND user_id=?",
+            (file_path, user_id)
+        ).fetchone()
+        if not a:
+            return
+        material = (a['material'] or '').strip()
+        label = (a['source_label'] or '').strip()
+        display = label or material or '?'
+
+        if a['source_type'] in _DRYING_SOURCES:
+            last = conn.execute(
+                "SELECT kind, event_at FROM spool_drying_log WHERE user_id=? AND source_type=? AND source_id=? "
+                "ORDER BY event_at DESC, id DESC LIMIT 1",
+                (user_id, a['source_type'], str(a['source_id']))
+            ).fetchone()
+            if last:
+                st = _drying_state(last, material)
+                if st['state'] == 'due':
+                    days = int(st['days_since'] or 0)
+                    warnings.append({
+                        "level": "warning", "code": "drying_due",
+                        "params": {"name": display, "days": days},
+                        "message": f"Bobine {display} : séchage conseillé (dernière remise au sec il y a {days} j)."
+                    })
+
+        if _ABRASIVE_RE.search(f"{material} {label}"):
+            hardened = None
+            if printer_id:
+                try:
+                    for p in conn.execute(
+                        "SELECT name FROM printer_parts WHERE user_id=? AND category='nozzle' AND printer_id=? AND stock_qty>0",
+                        (user_id, int(printer_id))
+                    ).fetchall():
+                        if _HARDENED_NOZZLE_RE.search(p['name'] or ''):
+                            hardened = p['name']
+                            break
+                except (TypeError, ValueError):
+                    pass
+            mat_label = material or label
+            if hardened:
+                warnings.append({
+                    "level": "warning", "code": "abrasive_nozzle_have",
+                    "params": {"material": mat_label, "nozzle": hardened},
+                    "message": f"{mat_label} est abrasif : monte une buse en acier trempé (en stock : {hardened})."
+                })
+            else:
+                warnings.append({
+                    "level": "warning", "code": "abrasive_nozzle",
+                    "params": {"material": mat_label},
+                    "message": f"{mat_label} est abrasif : une buse en acier trempé est recommandée (le laiton s'use vite)."
+                })
+
+        if material and printer_id:
+            try:
+                pid_int = int(printer_id)
+            except (TypeError, ValueError):
+                pid_int = None
+            if pid_int is not None and conn.execute("SELECT 1 FROM filament_calibrations WHERE user_id=? LIMIT 1", (user_id,)).fetchone():
+                match = conn.execute(
+                    "SELECT 1 FROM filament_calibrations WHERE user_id=? AND lower(material)=lower(?) "
+                    "AND (printer_id IS NULL OR printer_id=?) LIMIT 1",
+                    (user_id, material, pid_int)
+                ).fetchone()
+                if not match:
+                    prow = conn.execute("SELECT name FROM printers WHERE id=? AND user_id=?", (pid_int, user_id)).fetchone()
+                    pname = prow['name'] if prow else f"#{pid_int}"
+                    warnings.append({
+                        "level": "info", "code": "calibration_missing",
+                        "params": {"material": material, "printer": pname},
+                        "message": f"Aucune calibration enregistrée pour {material} sur {pname}."
+                    })
+    finally:
+        conn.close()
+
+
+
+
+def _filament_info_for_file(conn, user_id, norm_path):
+    info = {'material': None, 'label': None, 'source_type': None, 'source_id': None, 'snapshot': None}
+    try:
+        row = conn.execute(
+            "SELECT material, source_label, source_type, source_id, color_hex, spoolman_url, printer_id "
+            "FROM filament_assignments WHERE file_path=? AND user_id=?",
+            (norm_path, user_id)
+        ).fetchone()
+        if row:
+            info['material'] = (row[0] or '').strip() or None
+            info['label'] = (row[1] or '').strip() or None
+            info['source_type'] = row[2]
+            info['source_id'] = str(row[3]) if row[3] is not None else None
+            info['snapshot'] = json.dumps({
+                'source_type': row[2], 'source_id': str(row[3]) if row[3] is not None else '',
+                'name': row[1] or '', 'material': row[0] or '', 'color_hex': row[4] or '',
+                'spoolman_url': row[5] or '', 'printer_id': row[6]
+            })
+    except Exception:
+        pass
+    return info
+
+
+
 import unicodedata as _unicodedata
 
-SHOP_HTTP_TIMEOUT = (4, 7)       # (connexion, lecture) en secondes, par requête
-SHOP_GLOBAL_TIMEOUT = 15         # durée max de toute la recherche, toutes boutiques confondues
-SHOP_CACHE_TTL = 900             # 15 min : évite de re-solliciter les boutiques à chaque ouverture du popup
+SHOP_HTTP_TIMEOUT = (4, 7)       
+SHOP_GLOBAL_TIMEOUT = 15         
+SHOP_CACHE_TTL = 900             
 SHOP_MAX_ALTERNATIVES = 8
 SHOP_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
            "Chrome/124.0 Safari/537.36")
@@ -18945,7 +21875,6 @@ _shop_avail_cache_lock = threading.Lock()
 _BRAND_STOPWORDS = {'lab', 'labs', '3d', 'filament', 'filaments', 'co', 'ltd', 'inc', 'the', 'by'}
 _BASE_MATERIALS = {'pla', 'petg', 'abs', 'asa', 'tpu', 'tpe', 'pc', 'pa', 'pa6', 'pa12', 'pva', 'hips', 'pp', 'pet',
                    'nylon', 'pctg', 'pbt', 'peek', 'pei'}
-# Variantes qui changent réellement la nature de la bobine (un « PLA » n'est pas un « PLA Silk »)
 _MATERIAL_MODS = {
     'silk': 'silk', 'soie': 'silk', 'matte': 'matte', 'mat': 'matte', 'cf': 'cf', 'carbon': 'cf', 'carbone': 'cf',
     'wood': 'wood', 'bois': 'wood', 'marble': 'marble', 'marbre': 'marble', 'glow': 'glow', 'galaxy': 'sparkle',
@@ -18974,7 +21903,6 @@ _COLOR_WORD_TO_GROUP = {w: g for g, ws in _COLOR_GROUPS.items() for w in ws}
 
 
 def _shop_norm(text):
-    """Minuscules, sans accents, ponctuation → espaces (le « + » est conservé : PLA+)."""
     s = _unicodedata.normalize('NFKD', str(text or '')).encode('ascii', 'ignore').decode('ascii').lower()
     return re.sub(r'[^a-z0-9+.]+', ' ', s).strip()
 
@@ -18984,7 +21912,6 @@ def _shop_tokens(text):
 
 
 def _hex_to_color_group(hex_color):
-    """Famille de couleur approchée d'un code hex (repli quand le nom de couleur est inconnu)."""
     try:
         import colorsys
         h = str(hex_color or '').strip().lstrip('#')
@@ -19017,15 +21944,13 @@ def _hex_to_color_group(hex_color):
 
 
 def _build_spool_spec(vendor, material, color, color_hex):
-    """Décompose une bobine en marque / matière de base / variantes / familles de couleur."""
     brand_tokens = [t for t in _shop_tokens(vendor) if t not in _BRAND_STOPWORDS]
     mat_tokens = _shop_tokens(material)
     base = next((t for t in mat_tokens if t in _BASE_MATERIALS), None)
     mods = {_MATERIAL_MODS[t] for t in mat_tokens if t in _MATERIAL_MODS}
-    # Les noms de bobine (« Geeetech PETG Noir ») contiennent marque + matière : on les retire pour isoler la couleur
     known = set(brand_tokens) | set(mat_tokens) | _BRAND_STOPWORDS
     color_tokens = _shop_tokens(color)
-    if base is None:   # matière absente du champ matière : on la cherche dans le nom
+    if base is None:   
         base = next((t for t in color_tokens if t in _BASE_MATERIALS), None)
     mods |= {_MATERIAL_MODS[t] for t in color_tokens if t in _MATERIAL_MODS}
     color_words = [t for t in color_tokens if t not in known and t not in _BASE_MATERIALS]
@@ -19048,7 +21973,6 @@ def _build_spool_spec(vendor, material, color, color_hex):
 
 
 def _eval_product(spec, title, vendor_field=''):
-    """Compare un produit de boutique à la bobine voulue. Retourne les critères satisfaits + un score."""
     norm = _shop_norm(f'{title} {vendor_field}')
     toks = set(norm.split())
     brand_ok = (not spec['brand_tokens']) or all(t in toks or t in norm for t in spec['brand_tokens'])
@@ -19101,7 +22025,6 @@ def _shop_origin(shop):
 
 
 def _shop_base(shop):
-    """Origine + préfixe de langue éventuel avant /search (ex. https://www.colorfabb.com/fr)."""
     from urllib.parse import urlsplit
     p = urlsplit(str(shop.get('search_url') or shop.get('url') or ''))
     if not (p.scheme and p.netloc):
@@ -19133,7 +22056,6 @@ def _shop_search_shopify(shop, query, spec):
         path = str(p.get('url') or '').split('?')[0]
         base_url = origin + path if path.startswith('/') else path
         ev = _eval_product(spec, title, p.get('vendor') or '')
-        # Les couleurs sont souvent des variantes d'un même produit (ex. Bambu Lab « PLA Basic ») : on lit les variantes
         if detail_budget > 0 and ev['material_ok'] and (ev['brand_ok'] or not spec['brand_tokens']) and path.startswith('/products/'):
             detail_budget -= 1
             try:
@@ -19159,7 +22081,6 @@ def _html_text(fragment):
 
 
 def _prestashop_parse_html(page, origin):
-    """Repli quand le thème ne renvoie pas de JSON : lit les vignettes produit de la page de recherche."""
     from urllib.parse import urljoin
     out = []
     for m in re.finditer(r'<article\b[^>]*product-miniature[^>]*>(.*?)</article>', page, re.S | re.I):
@@ -19182,7 +22103,6 @@ def _prestashop_parse_html(page, origin):
 
 
 def _page_availability(url):
-    """True / False / None (indéterminé) d'après les données structurées de la fiche produit."""
     try:
         page = _shop_http_get(url, as_json=False)
     except Exception:
@@ -19224,12 +22144,11 @@ def _shop_search_prestashop(shop, query, spec):
                         'price': _price_str(p.get('price_amount')), 'image': img})
         return out
     except Exception:
-        pass   # pas de JSON exploitable : on lit la page HTML de résultats
+        pass   
     page = _shop_http_get(url, as_json=False)
     out = _prestashop_parse_html(page, origin)
     if not out and not re.search(r'product-miniature|product-title|js-product|data-id-product', page, re.I):
         raise RuntimeError("page de résultats illisible (thème non reconnu ou accès bloqué)")
-    # Confirmation du stock sur la fiche des meilleurs candidats (la vignette seule n'est pas toujours fiable)
     budget = 3
     for p in out:
         if budget <= 0:
@@ -19269,7 +22188,6 @@ _SHOP_ADAPTERS = {'shopify': _shop_search_shopify, 'prestashop': _shop_search_pr
 
 
 def _check_shop(shop, spec):
-    """Interroge une boutique. Retourne {'platform','items','error','seen'} (error=None si la boutique a répondu)."""
     platform = _shop_platform(shop)
     adapter = _SHOP_ADAPTERS.get(platform)
     if not adapter:
@@ -19289,7 +22207,6 @@ def _check_shop(shop, spec):
                     continue
                 seen.add(key)
                 items.append(p)
-            # dès qu'on a une bobine exacte en stock, inutile d'élargir la recherche
             if any(p['available'] and _eval_product(spec, p['title'], p['vendor'])['exact'] for p in items):
                 break
     except Exception as e:
@@ -19303,30 +22220,17 @@ def _check_shop(shop, spec):
 
 
 def load_filament_shops():
-    """Boutiques interrogeables : useful_links.json (avec search_url) fusionné avec filament_shops.json s'il existe."""
+    # Les boutiques de recherche de stock sont les liens utiles qui ont une URL de recherche
+    # (champ search_url contenant {q}) dans languages/useful_links.json.
     shops, seen = [], set()
-
-    def _add(s):
+    for s in load_useful_links():
         if not isinstance(s, dict) or '{q}' not in str(s.get('search_url', '')):
-            return
+            continue
         sid = s.get('id') or s.get('name')
         if not sid or sid in seen:
-            return
+            continue
         seen.add(sid)
         shops.append(s)
-
-    for s in load_useful_links():
-        _add(s)
-    for path in (os.path.join(BASE_DIR, 'languages', 'filament_shops.json'), os.path.join(BASE_DIR, 'filament_shops.json')):
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                for s in json.load(f):
-                    _add(s)
-            break
-        except FileNotFoundError:
-            continue
-        except Exception as e:
-            app_logger.warning(f"[ShopAvail] Lecture {path} impossible: {e}")
     return shops
 
 
@@ -19345,7 +22249,7 @@ def _search_spool_in_shops(vendor, material, color, color_hex):
     low = (low_query or '').lower()
     candidates = []
     for s in shops:
-        vendors = s.get('vendors')   # boutique constructeur : seulement pour sa propre marque
+        vendors = s.get('vendors')   
         if vendors and not any(str(v).lower() in low for v in vendors):
             continue
         candidates.append(s)
@@ -19404,7 +22308,7 @@ def _search_spool_in_shops(vendor, material, color, color_hex):
     if not exact_rows:
         alts = [(s, p) for s, p in results if p['ev']['material_ok'] and p['ev']['dia_ok']
                 and (p['ev']['brand_ok'] or p['ev']['color_ok'] or p['ev']['mods_ok'])]
-        if not spec['base']:   # matière inconnue : on se rabat sur marque/couleur
+        if not spec['base']:  
             alts = [(s, p) for s, p in results if p['ev']['brand_ok'] or p['ev']['color_ok']]
         alts.sort(key=lambda sp: (-sp[1]['ev']['score'], float(sp[1]['price']) if sp[1].get('price') else 1e9))
         count = {}
@@ -19424,7 +22328,6 @@ def _search_spool_in_shops(vendor, material, color, color_hex):
               for s in failed]
     data = {'query': low_query, 'exact': exact_rows, 'alternatives': alt_rows,
             'checked_count': len(checked), 'manual_shops': manual, 'report': report}
-    # Pas de cache si une boutique a échoué (panne passagère) : on réessaiera à la prochaine ouverture
     if checked and not any(r['status'] in ('error', 'timeout') for r in report):
         with _shop_avail_cache_lock:
             _shop_avail_cache[cache_key] = (now, data)
@@ -19434,8 +22337,6 @@ def _search_spool_in_shops(vendor, material, color, color_hex):
 @app.route('/api/filament/shop-availability', methods=['GET'])
 @login_required
 def api_filament_shop_availability():
-    """?vendor=&material=&color=&color_hex= -> {exact[], alternatives[], manual_shops[], checked_count}.
-    exact : boutiques qui ont réellement la bobine en stock ; alternatives : sélection de remplacement si aucune."""
     def _arg(name, n=120):
         v = (request.args.get(name) or '').strip()[:n]
         return '' if name in ('vendor', 'material') and v.isdigit() else v
@@ -19450,7 +22351,6 @@ def api_filament_shop_availability():
 @app.route('/api/filament/low-stock', methods=['GET'])
 @login_required
 def api_filament_low_stock():
-    """Bobines presque vides (toutes sources confondues), avec la recherche d'achat (marque + matière + couleur) et les liens de chaque boutique (languages/useful_links.json)."""
     user_id = session['user_id']
     low = []
 
@@ -19592,6 +22492,11 @@ def api_pre_print_check():
     except Exception as e:
         app_logger.info(f"[PrePrintCheck] Vérif filament ignorée: {e}")
 
+    try:
+        _append_stock_aware_warnings(warnings, user_id, file_path, printer_id)
+    except Exception as e:
+        app_logger.info(f"[PrePrintCheck] Vérifs stock ignorées: {e}")
+
     return jsonify({"warnings": warnings}), 200
 
 
@@ -19656,7 +22561,6 @@ def api_filament_compatibility():
         "errors": errors
     }), 200
 
-# Filtre bibliothèque « imprimable avec mon stock » : mots-clés acceptés pour chaque famille de matière
 _STOCK_MATERIAL_ALIASES = {
     'pla': ('pla',),
     'petg': ('petg', 'pet-g', 'pet'),
@@ -19679,8 +22583,6 @@ def _slot_matches_material(slot, wanted):
 @app.route('/api/filament/printable-files', methods=['GET'])
 @login_required
 def api_filament_printable_files():
-    """Fichiers de la bibliothèque dont le poids estimé tient dans au moins une bobine en stock.
-    ?material= (pla|petg|abs|tpu|nylon) restreint aux bobines de cette matière ; vide = toutes."""
     wanted = (request.args.get('material') or '').strip().lower()
     if wanted and wanted not in _STOCK_MATERIAL_ALIASES:
         return jsonify({"error": "Matière inconnue"}), 400
@@ -19826,7 +22728,6 @@ def api_unassign_filament():
 @app.route('/api/filament/tigertag', methods=['GET'])
 @login_required
 def api_list_tigertag_spools():
-    """Bobines TigerTag de l'utilisateur (lecture seule), pour l'affichage dans l'inventaire filament."""
     return jsonify(_get_tigertag_slots(session['user_id'])), 200
 
 @app.route('/api/filament/manual', methods=['GET'])
@@ -19924,6 +22825,270 @@ def api_delete_manual_spool(spool_id):
     except Exception as e:
         app_logger.error(f"[API] Erreur non gérée: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+# ---------------------------------------------------------------------------
+# Import de bobines manuelles depuis un tableur (.xls / .xlsx / .csv)
+# ---------------------------------------------------------------------------
+_SPOOL_IMPORT_MAX_BYTES = 5 * 1024 * 1024
+_SPOOL_IMPORT_MAX_ROWS = 2000
+
+_SPOOL_IMPORT_HEADERS = {
+    'material': ('element', 'matiere', 'materiau', 'materiel', 'type', 'material', 'filament', 'nature'),
+    'color': ('couleur', 'color', 'colour', 'coloris'),
+    'vendor': ('marque', 'fournisseur', 'fabricant', 'vendor', 'brand', 'manufacturer'),
+    'storage': ('emplacement', 'lieux', 'lieu', 'rangement', 'localisation', 'location', 'storage', 'place'),
+    'remaining': ('poidsbobinenet', 'poidsnet', 'poidsrestant', 'restant', 'poids', 'weight', 'netweight', 'remaining'),
+    'capacity': ('poidstotal', 'capacite', 'capacity', 'totalweight'),
+    'price': ('prix', 'price', 'cout', 'tarif'),
+    'diameter': ('diametre', 'diameter'),
+    'notes': ('notes', 'note', 'remarques', 'remarque', 'commentaire', 'commentaires', 'comment'),
+    'bed_temp': ('tempbed', 'tempplateau', 'bed', 'plateau', 'bedtemp'),
+    'nozzle_temp': ('tempfilament', 'tempbuse', 'buse', 'nozzletemp', 'tempnozzle', 'temperature'),
+    'speed': ('vitesse', 'speed'),
+}
+
+_SPOOL_COLOR_NAMES = {
+    'noir': '#111111', 'black': '#111111', 'blanc': '#f5f5f5', 'white': '#f5f5f5',
+    'gris': '#808080', 'grey': '#808080', 'gray': '#808080', 'anthracite': '#2f3136',
+    'rouge': '#d32f2f', 'red': '#d32f2f', 'bordeaux': '#7b1e3a',
+    'bleu': '#1976d2', 'blue': '#1976d2', 'marine': '#1a2a5e', 'ciel': '#87ceeb', 'turquoise': '#1fb5ad', 'cyan': '#00bcd4',
+    'vert': '#388e3c', 'green': '#388e3c', 'kaki': '#7a7a3a', 'olive': '#808000', 'lime': '#9ccc2e',
+    'jaune': '#fbc02d', 'yellow': '#fbc02d', 'ocre': '#cc7722', 'or': '#d4af37', 'gold': '#d4af37',
+    'orange': '#f57c00', 'corail': '#ff7f50', 'saumon': '#fa8072',
+    'rose': '#f48fb1', 'pink': '#f48fb1', 'fuchsia': '#e91e8c', 'fushia': '#e91e8c', 'magenta': '#d81b60',
+    'violet': '#7b1fa2', 'purple': '#7b1fa2', 'lilas': '#b39ddb',
+    'marron': '#6d4c41', 'brown': '#6d4c41', 'chocolat': '#4e342e', 'bronze': '#cd7f32', 'cuivre': '#b87333',
+    'beige': '#d7c4a3', 'sable': '#e0cda0', 'creme': '#f5efd8', 'ivoire': '#f5efd8', 'chair': '#e8b99a',
+    'argent': '#c0c0c0', 'argente': '#c0c0c0', 'silver': '#c0c0c0',
+    'translucide': '#e0e0e0', 'transparent': '#e0e0e0', 'naturel': '#e0e0e0', 'natural': '#e0e0e0',
+}
+_SPOOL_COLOR_LIGHT = ('clair', 'light', 'pastel')
+_SPOOL_COLOR_DARK = ('fonce', 'dark')
+
+
+def _spool_import_norm(text):
+    import unicodedata
+    s = unicodedata.normalize('NFKD', str(text or '')).encode('ascii', 'ignore').decode('ascii')
+    return re.sub(r'[^a-z0-9]', '', s.lower())
+
+
+def _spool_import_color_hex(label):
+    raw = str(label or '').strip()
+    if re.fullmatch(r'#[0-9a-fA-F]{6}', raw):
+        return raw.lower()
+    import unicodedata
+    plain = unicodedata.normalize('NFKD', raw).encode('ascii', 'ignore').decode('ascii').lower()
+    tokens = [t for t in re.split(r'[^a-z]+', plain) if t]
+    base, mod = None, None
+    for t in tokens:
+        if t in _SPOOL_COLOR_NAMES:
+            base = _SPOOL_COLOR_NAMES[t]
+        elif t in _SPOOL_COLOR_LIGHT:
+            mod = 'light'
+        elif t in _SPOOL_COLOR_DARK:
+            mod = 'dark'
+    if not base:
+        return '#888888'
+    r, g, b = int(base[1:3], 16), int(base[3:5], 16), int(base[5:7], 16)
+    if mod == 'light':
+        r, g, b = [int(v + (255 - v) * 0.4) for v in (r, g, b)]
+    elif mod == 'dark':
+        r, g, b = [int(v * 0.6) for v in (r, g, b)]
+    return '#%02x%02x%02x' % (r, g, b)
+
+
+def _spool_import_read_table(filename, content):
+    ext = os.path.splitext(filename or '')[1].lower()
+    if ext == '.xls':
+        try:
+            import xlrd
+        except ImportError:
+            raise ValueError("Lecture des fichiers .xls indisponible (module xlrd manquant). Enregistrez le fichier en .xlsx ou .csv.")
+        book = xlrd.open_workbook(file_contents=content)
+        sheet = book.sheet_by_index(0)
+        return [[sheet.cell_value(r, c) for c in range(sheet.ncols)] for r in range(sheet.nrows)]
+    if ext in ('.xlsx', '.xlsm'):
+        try:
+            import openpyxl
+        except ImportError:
+            raise ValueError("Lecture des fichiers .xlsx indisponible (module openpyxl manquant). Enregistrez le fichier en .csv.")
+        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        ws = wb.worksheets[0]
+        return [list(row) for row in ws.iter_rows(values_only=True)]
+    if ext in ('.csv', '.txt', '.tsv'):
+        import csv
+        text = None
+        for enc in ('utf-8-sig', 'cp1252', 'latin-1'):
+            try:
+                text = content.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        if text is None:
+            raise ValueError("Encodage du fichier CSV illisible")
+        try:
+            dialect = csv.Sniffer().sniff(text[:4096], delimiters=';,\t')
+        except Exception:
+            dialect = csv.excel
+            dialect.delimiter = ';' if text[:2048].count(';') > text[:2048].count(',') else ','
+        return [row for row in csv.reader(io.StringIO(text), dialect)]
+    raise ValueError("Format non pris en charge (utilisez .xls, .xlsx ou .csv)")
+
+
+def _spool_import_to_float(value):
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value) if value == value else None
+    s = str(value).strip().replace('\u202f', '').replace(' ', '').replace('€', '').replace(',', '.')
+    s = re.sub(r'(?i)(gr?|kg|eur)$', '', s)
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def _spool_import_cell_text(value):
+    if value is None:
+        return ''
+    if isinstance(value, float) and value != value:
+        return ''
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+def _spool_import_parse(rows):
+    header_idx, col_map = None, {}
+    for i, row in enumerate(rows[:10]):
+        found = {}
+        for j, cell in enumerate(row):
+            key = _spool_import_norm(cell)
+            if not key:
+                continue
+            for field, synonyms in _SPOOL_IMPORT_HEADERS.items():
+                if key in synonyms:
+                    found.setdefault(field, []).append(j)
+                    break
+        if len(found) >= 2 and ('material' in found or 'color' in found):
+            header_idx, col_map = i, found
+            break
+    if header_idx is None:
+        raise ValueError("Aucune ligne d'en-têtes reconnue (colonnes attendues : Élément/Matière, Couleur, Poids, Prix, Rangement…)")
+
+    def cell(row, field, first_only=False):
+        idxs = col_map.get(field, [])
+        vals = [row[j] if j < len(row) else None for j in idxs]
+        if first_only:
+            return vals[0] if vals else None
+        return vals
+
+    out, skipped = [], 0
+    for row in rows[header_idx + 1:header_idx + 1 + _SPOOL_IMPORT_MAX_ROWS]:
+        material = _spool_import_cell_text(cell(row, 'material', True))
+        color_label = _spool_import_cell_text(cell(row, 'color', True))
+        if not material and not color_label:
+            skipped += 1
+            continue
+        vendor = _spool_import_cell_text(cell(row, 'vendor', True))
+        storage = ' / '.join(t for t in (_spool_import_cell_text(v) for v in cell(row, 'storage')) if t)
+        remaining = _spool_import_to_float(cell(row, 'remaining', True))
+        capacity = _spool_import_to_float(cell(row, 'capacity', True)) or 1000.0
+        if remaining is not None and remaining > capacity:
+            capacity = float(math.ceil(remaining / 250.0) * 250)
+        price = _spool_import_to_float(cell(row, 'price', True))
+        diameter = _spool_import_to_float(cell(row, 'diameter', True)) or 1.75
+        notes_parts = [t for t in (_spool_import_cell_text(v) for v in cell(row, 'notes')) if t]
+        nozzle = _spool_import_cell_text(cell(row, 'nozzle_temp', True))
+        bed = _spool_import_cell_text(cell(row, 'bed_temp', True))
+        speed = _spool_import_cell_text(cell(row, 'speed', True))
+        if nozzle:
+            notes_parts.append(f"Buse {nozzle} °C")
+        if bed:
+            notes_parts.append(f"Plateau {bed} °C")
+        if speed:
+            notes_parts.append(f"Vitesse {speed}")
+        out.append({
+            'name': ' '.join(p for p in (material, color_label, vendor) if p)[:120],
+            'material': material[:40],
+            'color_hex': _spool_import_color_hex(color_label),
+            'vendor': vendor[:80],
+            'remaining_g': remaining,
+            'capacity_g': capacity,
+            'price': price,
+            'diameter_mm': diameter,
+            'notes': ' · '.join(notes_parts)[:500],
+            'storage_location': storage[:120],
+        })
+    return out, skipped, {k: len(v) for k, v in col_map.items()}
+
+
+@app.route('/api/filament/manual/import/preview', methods=['POST'])
+@login_required
+def api_manual_spools_import_preview():
+    f = request.files.get('file')
+    if not f or not f.filename:
+        return jsonify({"error": "Aucun fichier fourni"}), 400
+    content = f.read(_SPOOL_IMPORT_MAX_BYTES + 1)
+    if len(content) > _SPOOL_IMPORT_MAX_BYTES:
+        return jsonify({"error": "Fichier trop volumineux (5 Mo maximum)"}), 413
+    try:
+        rows = _spool_import_read_table(f.filename, content)
+        spools, skipped, mapped = _spool_import_parse(rows)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        app_logger.warning(f"[SpoolImport] Lecture impossible ({f.filename}): {e}")
+        return jsonify({"error": "Impossible de lire ce fichier"}), 400
+    if not spools:
+        return jsonify({"error": "Aucune bobine trouvée dans ce fichier"}), 400
+    return jsonify({"spools": spools, "skipped": skipped, "columns": mapped}), 200
+
+
+@app.route('/api/filament/manual/import', methods=['POST'])
+@login_required
+def api_manual_spools_import():
+    data = request.json or {}
+    items = data.get('spools')
+    if not isinstance(items, list) or not items:
+        return jsonify({"error": "Aucune bobine à importer"}), 400
+    items = items[:_SPOOL_IMPORT_MAX_ROWS]
+    params = []
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        name = str(it.get('name') or '').strip()[:120]
+        if not name:
+            continue
+        color = str(it.get('color_hex') or '#888888').strip()
+        if not re.fullmatch(r'#[0-9a-fA-F]{6}', color):
+            color = '#888888'
+        price = _spool_import_to_float(it.get('price'))
+        params.append((
+            session['user_id'], name, str(it.get('material') or '').strip()[:40], color,
+            _spool_import_to_float(it.get('remaining_g')), _spool_import_to_float(it.get('capacity_g')) or 1000.0,
+            'Import', str(it.get('vendor') or '').strip()[:80], price,
+            _spool_import_to_float(it.get('diameter_mm')) or 1.75,
+            str(it.get('notes') or '').strip()[:500], str(it.get('storage_location') or '').strip()[:120],
+        ))
+    if not params:
+        return jsonify({"error": "Aucune bobine valide"}), 400
+    try:
+        conn = get_db()
+        try:
+            conn.executemany("""
+                INSERT INTO manual_filament_spools
+                    (user_id, name, material, color_hex, remaining_g, capacity_g, source_label, vendor, price, diameter_mm, notes, storage_location)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, params)
+            conn.commit()
+        finally:
+            conn.close()
+        return jsonify({"success": True, "imported": len(params)}), 200
+    except Exception as e:
+        app_logger.error(f"[API] Erreur non gérée: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
 
 def _consume_filament_slot(source_type, source_id, weight_g, user_id):
     if source_type == 'spoolman':
@@ -20037,6 +23202,7 @@ def api_spoolman_discover_decline():
 SLICER_ID_TO_DEFAULT_VALUE = {
     'orcaslicer': 'orca-slicer.exe',
     'bambustudio': 'bambu-studio.exe',
+    'qidistudio': 'qidi-studio.exe',
     'prusaslicer': 'prusa-slicer.exe',
     'superslicer': 'superslicer.exe',
     'crealityprint': 'Creality Print.exe',
@@ -20224,8 +23390,7 @@ def start_remote_access(data_dir, local_port=5000, logger=None, token=None, fixe
         my_generation = _remote_generation
 
     if custom_url:
-        # Adresse personnalisée : aucun tunnel Cloudflare, Stellio se contente de partager cette adresse
-        stop_remote_access()  # coupe un éventuel tunnel Cloudflare encore actif
+        stop_remote_access()  
         _set_remote_state(status="ready", url=custom_url, error=None, mode="custom")
         if logger:
             logger.info(f"[RemoteAccess] ✅ Adresse personnalisée (sans Cloudflare) : {custom_url}")
@@ -20473,7 +23638,6 @@ def api_remote_access_toggle():
 
 
 def _remote_start_kwargs(settings):
-    """Paramètres de démarrage de l'accès distant. Une adresse personnalisée prend le pas sur Cloudflare."""
     return {
         'token': settings.get('cloudflare_tunnel_token') or None,
         'fixed_url': settings.get('cloudflare_fixed_url') or None,
@@ -20482,7 +23646,6 @@ def _remote_start_kwargs(settings):
 
 
 def _normalize_custom_remote_url(raw):
-    """Valide et normalise l'adresse externe personnalisée. Retourne (url, message_d_erreur)."""
     from urllib.parse import urlsplit
     url = (raw or '').strip()
     if not url:
@@ -20493,7 +23656,7 @@ def _normalize_custom_remote_url(raw):
         url = 'https://' + url
     try:
         parts = urlsplit(url)
-        port = parts.port  # lève ValueError si le port est invalide
+        port = parts.port  
     except ValueError:
         return None, "Adresse ou port invalide"
     if parts.scheme not in ('http', 'https'):
@@ -20511,7 +23674,6 @@ def _normalize_custom_remote_url(raw):
 @app.route('/api/remote-access/custom', methods=['POST'])
 @login_required
 def api_remote_access_custom():
-    """Enregistre une adresse externe personnalisée : Stellio n'utilise alors pas Cloudflare."""
     data = request.json or {}
     url, err = _normalize_custom_remote_url(data.get('url'))
     if err:
@@ -20534,7 +23696,6 @@ def api_remote_access_custom():
 @app.route('/api/remote-access/disable-custom', methods=['POST'])
 @login_required
 def api_remote_access_disable_custom():
-    """Supprime l'adresse personnalisée et revient à Cloudflare (URL fixe si configurée, sinon mode rapide)."""
     current_settings = load_settings() or {}
     current_settings['remote_access_custom_url'] = ''
     save_settings(current_settings)
@@ -20665,7 +23826,10 @@ if __name__ in ('__main__', 'stellio_main'):
                 on_status('database')
             process_generation_queue()
             process_slice_estimate_queue()
+            threading.Thread(target=_startup_sync_slicer_profiles, daemon=True).start()
+            threading.Thread(target=_auto_backup_scheduler, daemon=True).start()
             threading.Thread(target=_auto_scan_scheduler, daemon=True).start()
+            threading.Thread(target=_push_watcher_loop, daemon=True).start()
             if os.path.exists(CACHE_FILE):
                 try:
                     with open(CACHE_FILE, 'r', encoding='utf-8') as f: json.load(f)

@@ -133,6 +133,12 @@ jobs:
             --collect-all waitress `
             --collect-all flask `
             --collect-all werkzeug `
+            --collect-all reportlab `
+            --collect-all psutil `
+            --collect-all plyer `
+            --collect-all openpyxl `
+            --collect-all xlrd `
+            --collect-all pyaes `
             --copy-metadata imageio `
             --copy-metadata pyrender `
             --copy-metadata trimesh `
@@ -172,7 +178,15 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "dist\Stellio\app\bin" | Out-Null
-          Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip" -OutFile ffmpeg.zip
+          # Version epinglee (tag date + SHA-256 calcule sur le fichier). Pour mettre a jour : choisir un tag
+          # "autobuild-..." sur https://github.com/BtbN/FFmpeg-Builds/releases, telecharger le zip, calculer son
+          # SHA-256 soi-meme, puis modifier ces deux valeurs. NB : BtbN purge ses anciens tags apres quelques semaines.
+          $ffUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-18-13-01/ffmpeg-N-127650-geceaa54a38-win64-gpl-shared.zip"
+          $ffSha = "8ebf4def186017a1cf3ac1e0065ad19c405628ec52b50f144b727e8def64928d"
+          Invoke-WebRequest -Uri $ffUrl -OutFile ffmpeg.zip
+          $ffActual = (Get-FileHash -Algorithm SHA256 ffmpeg.zip).Hash.ToLower()
+          if ($ffActual -ne $ffSha) { throw "SHA-256 ffmpeg (Windows) incorrect : attendu $ffSha, obtenu $ffActual. Build annule." }
+          Write-Host "SHA-256 ffmpeg (Windows) verifie : $ffActual"
           Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_extracted
           $binDir = (Get-ChildItem -Path ffmpeg_extracted -Recurse -Directory -Filter "bin" | Select-Object -First 1).FullName
           Copy-Item "$binDir\*" "dist\Stellio\app\bin\" -Force
@@ -186,6 +200,16 @@ jobs:
           # C'est un module SFX RAR : on l'extrait avec 7-Zip (preinstalle sur les runners GitHub) plutot que
           # de deviner ses switches silencieux internes.
           & "C:\Program Files\7-Zip\7z.exe" x unrarw64.exe -ounrar_extracted -y | Out-Null
+          # Verification : SHA-256 de l'UnRAR.exe extrait (version 7.22.0, signe Authenticode par win.rar GmbH / DigiCert,
+          # hash calcule sur le fichier fourni par l'auteur le 20/10/2026). L'URL de RARLAB n'a pas de numero de version :
+          # quand RARLAB publie une nouvelle version, ce controle echoue volontairement. Verifier alors le nouveau
+          # fichier (signature Authenticode, https://www.rarlab.com/rar_add.htm) puis mettre a jour la valeur.
+          $unrarSha = "a9333c4ea58a836259de7d23cb56b645ee56b7d04655e9e0da6b486f14de92c3"
+          $unrarActual = (Get-FileHash -Algorithm SHA256 "unrar_extracted\UnRAR.exe").Hash.ToLower()
+          if ($unrarActual -ne $unrarSha) { throw "SHA-256 UnRAR.exe incorrect : attendu $unrarSha, obtenu $unrarActual. Build annule (nouvelle version de RARLAB ? verifier puis mettre a jour la valeur)." }
+          Write-Host "SHA-256 UnRAR.exe (Windows) verifie : $unrarActual"
+          $unrarSig = Get-AuthenticodeSignature "unrar_extracted\UnRAR.exe"
+          Write-Host "Signature Authenticode d'UnRAR.exe (information) : $($unrarSig.Status) - $($unrarSig.SignerCertificate.Subject)"
           Copy-Item "unrar_extracted\UnRAR.exe" "dist\Stellio\app\bin\UnRAR.exe" -Force
           if (-not (Test-Path "dist\Stellio\app\bin\UnRAR.exe")) { throw "UnRAR.exe manquant apres telechargement" }
 
@@ -314,6 +338,12 @@ jobs:
             --collect-all waitress \
             --collect-all flask \
             --collect-all werkzeug \
+            --collect-all reportlab \
+            --collect-all psutil \
+            --collect-all plyer \
+            --collect-all openpyxl \
+            --collect-all xlrd \
+            --collect-all pyaes \
             --copy-metadata imageio \
             --copy-metadata pyrender \
             --copy-metadata trimesh \
@@ -351,13 +381,20 @@ jobs:
           mkdir -p "$APP_DIR/bin"
           # Binaires statiques eugeneware/ffmpeg-static : un build natif par architecture,
           # heberge sur GitHub (pas de blocage d'IP contrairement a evermeet.cx, qui est Intel uniquement).
+          # Version epinglee (b6.0) + SHA-256 calcule sur chaque binaire.
           case "${{ matrix.arch }}" in
-            arm64)  FF_ASSET="ffmpeg-darwin-arm64" ;;
-            x86_64) FF_ASSET="ffmpeg-darwin-x64" ;;
+            arm64)  FF_ASSET="ffmpeg-darwin-arm64"; FF_SHA="a90e3db6a3fd35f6074b013f948b1aa45b31c6375489d39e572bea3f18336584" ;;
+            x86_64) FF_ASSET="ffmpeg-darwin-x64";   FF_SHA="cfe20936c83ecf5d68e424b87e8cc45b24dd6be81787810123bb964a0df686f9" ;;
           esac
           URL="https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/${FF_ASSET}"
           echo "Telechargement depuis $URL"
           curl -fL --retry 3 -o ffmpeg_bin "$URL"
+          FF_ACTUAL=$(shasum -a 256 ffmpeg_bin | cut -d' ' -f1)
+          if [ "$FF_ACTUAL" != "$FF_SHA" ]; then
+            echo "SHA-256 ffmpeg (macOS ${{ matrix.arch }}) incorrect : attendu $FF_SHA, obtenu $FF_ACTUAL. Build annule."
+            exit 1
+          fi
+          echo "SHA-256 ffmpeg (macOS ${{ matrix.arch }}) verifie : $FF_ACTUAL"
           # Garde-fou : un vrai binaire ffmpeg fait plusieurs Mo, pas quelques octets
           SIZE=$(wc -c < ffmpeg_bin)
           if [ "$SIZE" -lt 1000000 ]; then
@@ -378,14 +415,25 @@ jobs:
           # depuis la CI de facon fiable. On fixe donc une version connue (a bumper manuellement de temps
           # en temps si RARLAB en sort une nouvelle - verifier sur https://www.rarlab.com/download.htm).
           RAR_VERSION="723"
+          # SHA-256 attendus des archives rarmacos-<arch>-<version>.tar.gz. Tant qu'une valeur est vide, le build
+          # continue mais affiche le hash obtenu en avertissement : le verifier a la main puis le coller ici.
           case "${{ matrix.arch }}" in
-            arm64) RAR_ARCH="arm" ;;
-            x86_64) RAR_ARCH="x64" ;;
+            arm64)  RAR_ARCH="arm"; RAR_SHA="" ;;
+            x86_64) RAR_ARCH="x64"; RAR_SHA="" ;;
           esac
           URL="https://www.rarlab.com/rar/rarmacos-${RAR_ARCH}-${RAR_VERSION}.tar.gz"
           echo "Telechargement depuis $URL"
           curl -fL -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36" \
             -o rar.tar.gz "$URL"
+          RAR_ACTUAL=$(shasum -a 256 rar.tar.gz | cut -d' ' -f1)
+          if [ -z "$RAR_SHA" ]; then
+            echo "::warning::SHA-256 de rarmacos-${RAR_ARCH}-${RAR_VERSION}.tar.gz non epingle (valeur obtenue : $RAR_ACTUAL)"
+          elif [ "$RAR_ACTUAL" != "$RAR_SHA" ]; then
+            echo "SHA-256 UnRAR (macOS ${{ matrix.arch }}) incorrect : attendu $RAR_SHA, obtenu $RAR_ACTUAL. Build annule."
+            exit 1
+          else
+            echo "SHA-256 UnRAR (macOS ${{ matrix.arch }}) verifie : $RAR_ACTUAL"
+          fi
           mkdir -p rar_extracted
           if ! tar -xzf rar.tar.gz -C rar_extracted; then
             echo "Echec d'extraction : RARLAB a probablement change de version. Mettre a jour RAR_VERSION dans ce step (voir https://www.rarlab.com/download.htm)."
@@ -557,6 +605,12 @@ jobs:
             --collect-all waitress \
             --collect-all flask \
             --collect-all werkzeug \
+            --collect-all reportlab \
+            --collect-all psutil \
+            --collect-all plyer \
+            --collect-all openpyxl \
+            --collect-all xlrd \
+            --collect-all pyaes \
             --copy-metadata imageio \
             --copy-metadata pyrender \
             --copy-metadata trimesh \
@@ -592,7 +646,16 @@ jobs:
         run: |
           APP_DIR="dist/Stellio/app"
           mkdir -p "$APP_DIR/bin"
-          curl -L -o ffmpeg.tar.xz "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"
+          # Version epinglee (tag date + SHA-256 calcule sur le fichier), voir le step Windows pour la mise a jour.
+          FF_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-18-13-01/ffmpeg-N-127651-gb60ab6c9a4-linux64-gpl.tar.xz"
+          FF_SHA="a5f2aed198efa8ef4c12d9112f42e7cefbdf11dced1b59a87503ca689bc52277"
+          curl -fL --retry 3 -o ffmpeg.tar.xz "$FF_URL"
+          FF_ACTUAL=$(sha256sum ffmpeg.tar.xz | cut -d' ' -f1)
+          if [ "$FF_ACTUAL" != "$FF_SHA" ]; then
+            echo "SHA-256 ffmpeg (Linux) incorrect : attendu $FF_SHA, obtenu $FF_ACTUAL. Build annule."
+            exit 1
+          fi
+          echo "SHA-256 ffmpeg (Linux) verifie : $FF_ACTUAL"
           mkdir -p ffmpeg_extracted
           tar -xf ffmpeg.tar.xz -C ffmpeg_extracted --strip-components=1
           cp ffmpeg_extracted/bin/ffmpeg "$APP_DIR/bin/ffmpeg"
@@ -603,6 +666,7 @@ jobs:
           APP_DIR="dist/Stellio/app"
           # unrar (le vrai, freeware RARLAB, pas unrar-free) est disponible dans le depot "multiverse"
           # d'Ubuntu, deja active par defaut sur les runners GitHub. Rien a compiler ni a versionner a la main.
+          # Integrite : le paquet est authentifie par la signature du depot apt (pas de SHA-256 epingle possible ici).
           sudo apt-get update -qq
           sudo apt-get install -y unrar
           cp "$(command -v unrar)" "$APP_DIR/bin/unrar"

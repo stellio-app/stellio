@@ -181,7 +181,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 ### 🪟 Windows (empfohlen)
 
 1. Laden Sie den neuesten Installer von [Releases](https://github.com/stellio-app/stellio/releases) herunter
-2. Führen Sie `Stellio-Setup.exe` aus
+2. Führen Sie `Stellio-Setup-<version>.exe` aus
 3. Fertig! 🎉
 
 ### 🐧 Raspberry Pi / Linux
@@ -197,7 +197,7 @@ chmod +x install-pi.sh
 ```
 
 Das Skript installiert automatisch:
-- Systemabhängigkeiten (`ffmpeg`, `unrar-free`, 3D-Rendering-Bibliotheken)
+- Systemabhängigkeiten (`ffmpeg`, `unrar`, 3D-Rendering-Bibliotheken)
 - eine dedizierte Python-Virtual-Environment
 - einen **systemd-Dienst** (`stellio.service`), der Stellio beim Booten startet und bei einem Absturz automatisch neu startet
 
@@ -281,7 +281,7 @@ stellio/
 ├── style.css           # Styles
 ├── launcher.py         # Schlanker Launcher / Runtime-Bootstrap
 ├── check_deps.py       # Selbstheilende Abhängigkeitsprüfung
-├── worker.py           # Hintergrund-Worker (Vorschaubilder, Scans)
+├── worker.py           # Ungenutztes 3MF-Worker-Gerüst (Platzhalter)
 ├── assets/             # Logos, Icons
 ├── languages/          # Übersetzungsdateien (JSON)
 ├── apk/                # Paket der Android-Begleit-App
@@ -336,7 +336,7 @@ Stellio ist local-first: Ihre Daten bleiben auf Ihrem Gerät, standardmäßig wi
 
 ## 🔏 Code-Signing-Richtlinie
 
-Die unter [Releases](https://github.com/stellio-app/stellio/releases) veröffentlichten Windows-Executables sind digital signiert. Details zu unserem Signaturprozess und dem Schutz des privaten Schlüssels finden Sie in [CODE_SIGNING_POLICY.md](../../CODE_SIGNING_POLICY.md).
+Der unter [Releases](https://github.com/stellio-app/stellio/releases) veröffentlichte Windows-Installer und das Linux-AppImage sind **noch nicht code-signiert**, daher kann Windows SmartScreen eine Warnung anzeigen. Die macOS-Builds sind nicht notarisiert. Jede Release-Datei wird mit einer SHA-256-Prüfsumme (`.sha256`) veröffentlicht, die Sie überprüfen können; der integrierte Updater prüft sie vor der Installation. Den aktuellen Stand, die Überprüfung eines Downloads und unsere Signaturpläne finden Sie in [CODE_SIGNING_POLICY.md](../../CODE_SIGNING_POLICY.md).
 
 ---
 

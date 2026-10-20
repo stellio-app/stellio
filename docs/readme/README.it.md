@@ -181,7 +181,7 @@ Che tu sia un maker alle prime armi o un utente esperto con più macchine, Stell
 ### 🪟 Windows (consigliato)
 
 1. Scarica l'ultimo installer dalle [Releases](https://github.com/stellio-app/stellio/releases)
-2. Esegui `Stellio-Setup.exe`
+2. Esegui `Stellio-Setup-<version>.exe`
 3. Fatto! 🎉
 
 ### 🐧 Raspberry Pi / Linux
@@ -197,7 +197,7 @@ chmod +x install-pi.sh
 ```
 
 Lo script installa automaticamente:
-- le dipendenze di sistema (`ffmpeg`, `unrar-free`, librerie di rendering 3D)
+- le dipendenze di sistema (`ffmpeg`, `unrar`, librerie di rendering 3D)
 - un ambiente virtuale Python dedicato
 - un **servizio systemd** (`stellio.service`) che avvia Stellio al boot e lo riavvia automaticamente in caso di crash
 
@@ -281,7 +281,7 @@ stellio/
 ├── style.css           # Stili
 ├── launcher.py         # Launcher leggero / bootstrap del runtime
 ├── check_deps.py       # Verifica dipendenze auto-riparante
-├── worker.py           # Worker in background (miniature, scansioni)
+├── worker.py           # Scheletro di worker 3MF non utilizzato (provvisorio)
 ├── assets/             # Loghi, icone
 ├── languages/          # File di traduzione (JSON)
 ├── apk/                # Pacchetto dell'app companion Android
@@ -336,7 +336,7 @@ Stellio è local-first: i tuoi dati restano sul tuo dispositivo, per impostazion
 
 ## 🔏 Policy di firma del codice
 
-Gli eseguibili Windows pubblicati nelle [Releases](https://github.com/stellio-app/stellio/releases) sono firmati digitalmente. Vedi [CODE_SIGNING_POLICY.md](../../CODE_SIGNING_POLICY.md) per i dettagli sul nostro processo di firma e sulla protezione della chiave privata.
+Il programma di installazione Windows e l'AppImage Linux pubblicati nelle [Releases](https://github.com/stellio-app/stellio/releases) **non sono ancora firmati digitalmente**, quindi Windows SmartScreen può mostrare un avviso. Le build macOS non sono notarizzate. Ogni file di una release è accompagnato da un checksum SHA-256 (`.sha256`) che puoi verificare, e l'aggiornatore integrato lo controlla prima dell'installazione. Vedi [CODE_SIGNING_POLICY.md](../../CODE_SIGNING_POLICY.md) per lo stato attuale, come verificare un download e i nostri piani di firma.
 
 ---
 

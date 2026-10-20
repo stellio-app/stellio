@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated:** September 1, 2026  
+**Last updated:** October 20, 2026  
 **Application:** Stellio  
 **Website:** [stellio-app.com](https://stellio-app.com)  
 **Repository:** [github.com/stellio-app/stellio](https://github.com/stellio-app/stellio)
@@ -26,11 +26,17 @@ The following items are saved only on your device:
 To function, certain *optional* features of Stellio may communicate with external services. You retain full control over enabling these features:
 
 - **Automatic updates**: Stellio may query GitHub repositories (`github.com/stellio-app/stellio`) to check for new version availability. No personal identifier is transmitted during this check.
-- **3D Model Platforms**: If you use the download feature, Stellio connects directly to the Printables, MakerWorld, or Thingiverse APIs using **your own credentials or API keys**. This information is never sent to Stellio servers.
+- **3D Model Platforms**: If you use the download feature, Stellio connects directly to the Printables, MakerWorld, Thingiverse, or Nexprint (Elegoo's model library) services using **your own credentials or API keys**. This information is never sent to Stellio servers.
 - **Printer Management**: Stellio communicates directly with your local/network printers or print servers (OctoPrint, Klipper/Moonraker, Bambu Lab via MQTT). These communications remain confined to your local network, unless you explicitly configure remote access.
 - **Remote Access (Cloudflare Tunnel)**: If you enable remote access, your traffic is securely routed through Cloudflare servers. Please refer to [Cloudflare's privacy policy](https://www.cloudflare.com/privacypolicy/) for details.
 - **Artificial Intelligence (Ollama)**: By default, AI (Ollama) runs locally on your machine. If you choose to configure a remote Ollama URL in settings, your requests (model descriptions, semantic search) will be sent to that third-party server you have chosen yourself.
 - **Spoolman**: If you connect Stellio to an external Spoolman server, filament consumption data is sent to that server you control or have chosen.
+- **Push notifications (optional, disabled by default)**: If you enable them in settings, Stellio sends the title and text of the notifications you select (for example the end or failure of a print, which may mention a file or printer name) to the service you choose: ntfy (the public `ntfy.sh` server or your own server), Telegram (using the bot token and chat identifier you provide), a Discord webhook, or a webhook URL of your own. That service's privacy policy then applies. On a public ntfy server, anyone who knows your topic name can read the messages: pick a hard-to-guess topic or host your own server.
+- **TigerTag (optional)**: If you use the TigerTag integration, Stellio connects to your TigerTag account through Google's authentication and database services (Firebase: `securetoken.googleapis.com`, `identitytoolkit.googleapis.com`, `firestore.googleapis.com`, plus `tigertag-cdn.web.app`) to read your spool inventory, and to `api.tigertag.io` to download the public reference tables. The session token is stored encrypted on your machine.
+- **Bug reports and suggestions (optional)**: Nothing is sent unless you submit the form and give your explicit consent. The type, title and description you write are sent to a relay hosted on Cloudflare Workers, which creates a **public** issue in the project's GitHub repository: do not include personal information or secrets. If you tick the technical information box, the Stellio version, operating system and interface language are added. Stellio then queries GitHub's public API to show the status and comments of your requests, and keeps a management token locally.
+- **Model update tracking (enabled by default, can be disabled in settings)**: Stellio automatically asks Printables, MakerWorld or Thingiverse (with your Thingiverse token if you configured one) whether the models you downloaded have a new version. Only the identifier of each model is sent.
+- **Filament shop search (only when you use it)**: When you check the availability of a spool in shops, Stellio sends your search terms (brand, material, color) to the shops' websites (for example Atome3D, Rainbow3D, Amazon, the Bambu Lab store, and the shops in your useful links list).
+- **Other Stellio instances (optional)**: If you add a remote Stellio instance or use the discovery function (which scans your local network), Stellio contacts the addresses involved. The files or folders you choose to send travel directly to the instance you picked, authenticated by its access key, and never through our servers.
 
 ## 5. Data Security
 - **Encryption**: Sensitive data (such as API keys or printer passwords) is encrypted locally using the AES-CFB algorithm.

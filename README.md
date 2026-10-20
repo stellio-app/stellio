@@ -181,7 +181,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 ### 🪟 Windows (recommended)
 
 1. Download the latest installer from [Releases](https://github.com/stellio-app/stellio/releases)
-2. Run `Stellio-Setup.exe`
+2. Run `Stellio-Setup-<version>.exe`
 3. That's it! 🎉
 
 ### 🐧 Raspberry Pi / Linux
@@ -197,7 +197,7 @@ chmod +x install-pi.sh
 ```
 
 The script automatically installs:
-- system dependencies (`ffmpeg`, `unrar-free`, 3D rendering libraries)
+- system dependencies (`ffmpeg`, `unrar`, 3D rendering libraries)
 - a dedicated Python virtual environment
 - a **systemd service** (`stellio.service`) that starts Stellio at boot and automatically restarts it on crash
 
@@ -281,7 +281,7 @@ stellio/
 ├── style.css               # Styles
 ├── launcher.py             # Thin launcher / runtime bootstrapper
 ├── check_deps.py           # Self-healing dependency checker
-├── worker.py               # Background worker (thumbnails, scans)
+├── worker.py               # Unused 3MF worker skeleton (placeholder, not wired in yet)
 ├── assets/                 # Logos, icons
 ├── languages/              # Translation files (JSON)
 ├── apk/                    # Android companion app package
@@ -336,7 +336,7 @@ Stellio is local-first: your data stays on your machine, nothing is collected or
 
 ## 🔏 Code Signing Policy
 
-Windows executables published in [Releases](https://github.com/stellio-app/stellio/releases) are digitally signed. See [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md) for details on our signing process and private key protection practices.
+The Windows installer and the Linux AppImage published in [Releases](https://github.com/stellio-app/stellio/releases) are **not code-signed yet**, so Windows SmartScreen may show a warning. macOS builds are not notarized. Every release file comes with a SHA-256 checksum (`.sha256`) that you can verify, and the built-in updater checks it before installing. See [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md) for the current status, how to verify a download, and our signing plans.
 
 ---
 
@@ -369,13 +369,6 @@ If Stellio is useful to you, consider:
 - Sharing the project around you
 - [Contributing code](#-contributing) or translations
 - Reporting bugs to help improve the app
-- Supporting development with a small tip on Ko-fi ☕
-
-<p align="center">
-  <a href="https://ko-fi.com/E6J828RYVD">
-    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support Stellio on Ko-fi">
-  </a>
-</p>
 
 ---
 

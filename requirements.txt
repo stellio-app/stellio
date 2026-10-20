@@ -32,6 +32,7 @@ py7zr
 defusedxml
 nest_asyncio
 psutil
+plyer
 packaging
 qrcode
 telethon
@@ -39,3 +40,5 @@ websocket-client
 flashforge-python-api
 reportlab
 pyaes
+openpyxl
+xlrd

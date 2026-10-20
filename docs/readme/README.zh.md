@@ -181,7 +181,7 @@
 ### 🪟 Windows（推荐）
 
 1. 从 [Releases](https://github.com/stellio-app/stellio/releases) 下载最新安装程序
-2. 运行 `Stellio-Setup.exe`
+2. 运行 `Stellio-Setup-<version>.exe`
 3. 大功告成！🎉
 
 ### 🐧 Raspberry Pi / Linux
@@ -197,7 +197,7 @@ chmod +x install-pi.sh
 ```
 
 该脚本会自动安装：
-- 系统依赖项（`ffmpeg`、`unrar-free`、3D渲染库）
+- 系统依赖项（`ffmpeg`、`unrar`、3D渲染库）
 - 专用的 Python 虚拟环境
 - 一个 **systemd 服务**（`stellio.service`），会在开机时启动 Stellio，并在崩溃时自动重启
 
@@ -281,7 +281,7 @@ stellio/
 ├── style.css           # 样式
 ├── launcher.py         # 轻量启动器／运行时引导程序
 ├── check_deps.py       # 自我修复式依赖检查工具
-├── worker.py           # 后台工作进程（缩略图、扫描）
+├── worker.py           # 未使用的 3MF 工作进程骨架（占位）
 ├── assets/             # 标志、图标
 ├── languages/          # 翻译文件（JSON）
 ├── apk/                # Android 配套应用安装包
@@ -336,7 +336,7 @@ Stellio 采用本地优先架构：您的数据保留在您的设备上，默认
 
 ## 🔏 代码签名政策
 
-发布在 [Releases](https://github.com/stellio-app/stellio/releases) 中的 Windows 可执行文件均经过数字签名。有关签名流程及私钥保护措施的详情，请参阅 [CODE_SIGNING_POLICY.md](../../CODE_SIGNING_POLICY.md)。
+发布在 [Releases](https://github.com/stellio-app/stellio/releases) 中的 Windows 安装程序和 Linux AppImage **目前尚未进行代码签名**，因此 Windows SmartScreen 可能会显示警告。macOS 版本也未经过公证。每个发布文件都附带 SHA-256 校验和（`.sha256`），您可以自行验证，内置更新程序在安装前也会检查它。有关当前状态、如何验证下载文件以及我们的签名计划，请参阅 [CODE_SIGNING_POLICY.md](../../CODE_SIGNING_POLICY.md)。
 
 ---
 

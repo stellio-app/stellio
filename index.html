@@ -40,15 +40,15 @@
     <meta name="apple-mobile-web-app-title" content="Stellio">
     <meta name="theme-color" content="#1a1d2e">
     <link rel="stylesheet" href="style.css?v=20260513">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/vendor/inter/inter.css">
     <link rel="stylesheet" href="assets/vendor/fontawesome/css/all.min.css">
 	<link rel="stylesheet" href="assets/vendor/mdi/css/materialdesignicons.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TrackballControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/3MFLoader.js"></script>
+    <script src="assets/vendor/threejs/three.min.js"></script>
+    <script src="assets/vendor/threejs/controls/OrbitControls.js"></script>
+    <script src="assets/vendor/threejs/controls/TrackballControls.js"></script>
+    <script src="assets/vendor/threejs/loaders/STLLoader.js"></script>
+    <script src="assets/vendor/threejs/loaders/OBJLoader.js"></script>
+    <script src="assets/vendor/threejs/loaders/3MFLoader.js"></script>
 </head>
 <body>
     <div id="auth-screen" class="auth-screen">
@@ -310,6 +310,11 @@
                         <i class="fa-brands fa-github"></i>
                         <span data-i18n="nav.github">GitHub</span>
                     </a>
+                    <button class="nav-btn" id="nav-feedback-btn" onclick="openFeedbackModal()" style="cursor: pointer;">
+                        <i class="fa-solid fa-comment-dots"></i>
+                        <span data-i18n="nav.feedback">Suggestions &amp; bugs</span>
+                        <span id="feedback-unread-dot" class="badge hidden" style="background:var(--accent);">0</span>
+                    </button>
                     <button class="nav-btn" onclick="openModal('modal-about')" style="cursor: pointer;">
                         <i class="fa-solid fa-circle-info"></i>
                         <span data-i18n="nav.about">À propos de</span>
@@ -327,6 +332,10 @@
 					</div>
 					<span id="current-username" style="flex:1; font-size:13px; color:var(--text-secondary);">Utilisateur</span>
 				</div>
+				<a id="nav-kofi-btn" class="kofi-btn hidden" href="#" target="_blank" rel="noopener noreferrer">
+					<i class="fa-solid fa-mug-hot"></i>
+					<span data-i18n="nav.kofi">Soutenir sur Ko-fi</span>
+				</a>
 			</div>
         </aside>
 
@@ -671,6 +680,18 @@
                                 </div>
                             </div>
 
+                            <div class="dashboard-widget" id="dashboard-widget-accounts" data-widget-id="accounts" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-plug"></i> <span data-i18n="dashboard.accounts_title">Comptes externes</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;settings&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('accounts')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-accounts-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
                             <div class="dashboard-widget" id="dashboard-widget-suggestions" data-widget-id="suggestions" draggable="false">
                                 <div class="dashboard-widget-header">
                                     <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
@@ -678,6 +699,30 @@
                                     <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('suggestions')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
                                 </div>
                                 <div class="dashboard-widget-body" id="dashboard-suggestions-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-backups" data-widget-id="backups" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-box-archive"></i> <span data-i18n="dashboard.backups_title">Sauvegardes</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="openBackupSettings(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('backups')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-backups-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-issues" data-widget-id="issues" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-comment-dots"></i> <span data-i18n="dashboard.issues_title">Demandes GitHub</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="openFeedbackModal('list'); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('issues')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-issues-body">
                                     <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
                                 </div>
                             </div>
@@ -703,6 +748,7 @@
                     <div class="stats-page">
                         <div class="stats-header">
                             <h2><i class="fa-solid fa-chart-pie"></i> <span data-i18n="stats.title">Statistiques de la bibliothèque</span></h2>
+                            <button class="btn btn-ghost btn-sm" onclick="openMonthlyReport()"><i class="fa-solid fa-file-lines"></i> <span data-i18n="report.open_btn">Bilan mensuel</span></button>
                             <button class="btn btn-ghost btn-sm" onclick="loadStats()" data-i18n-title="actions.refresh" title="Actualiser">
                                 <i class="fa-solid fa-arrows-rotate"></i>
                             </button>
@@ -907,6 +953,7 @@
                                     <i class="fa-solid fa-trash"></i> <span data-i18n="history.clear">Vider</span>
                                 </button>
                             </div>
+                            <div id="model-updates-card" class="model-updates-card"></div>
                             <div id="download-history-empty" class="empty-state hidden" style="padding:20px 0;">
                                 <i class="fa-solid fa-download"></i>
                                 <p data-i18n="history.no_downloads">Aucun fichier téléchargé depuis le web pour l'instant.</p>
@@ -1317,6 +1364,7 @@
                                         <option value="system_default" data-i18n="settings.slicer_select">Sélectionnez un slicer</option>
                                         <option value="orca-slicer.exe">OrcaSlicer</option>
                                         <option value="bambu-studio.exe">Bambu Studio</option>
+                                        <option value="qidi-studio.exe">Qidi Studio</option>
                                         <option value="prusa-slicer.exe">PrusaSlicer</option>
                                         <option value="superslicer.exe">SuperSlicer</option>
                                         <option value="Creality Print.exe">Creality Print</option>
@@ -1344,6 +1392,7 @@
                                         <option value="" data-i18n="settings.slicer_select">Sélectionnez un slicer</option>
                                         <option value="orcaslicer">OrcaSlicer</option>
                                         <option value="bambustudio">Bambu Studio</option>
+                                        <option value="qidistudio">Qidi Studio</option>
                                         <option value="prusaslicer">PrusaSlicer</option>
                                         <option value="superslicer">SuperSlicer</option>
                                         <option value="crealityprint">Creality Print</option>
@@ -1667,6 +1716,76 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="accord-section viewer-hide">
+                            <div class="accord-header" onclick="toggleAccord(this)">
+                                <span><i class="fa-solid fa-bell"></i> <span data-i18n="push.title">Notifications push</span></span>
+                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                            </div>
+                            <div class="accord-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <p class="settings-hint" data-i18n="push.hint">Reçois les alertes sur ton téléphone quand tu n'es pas devant l'écran.</p>
+                                <div class="settings-row" style="align-items:center;">
+                                    <label style="font-size:13px; font-weight:500;" data-i18n="push.enable">Activer les notifications push</label>
+                                    <label class="nav-toggle-switch">
+                                        <input type="checkbox" id="push-enabled">
+                                        <span class="nav-toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="settings-row">
+                                    <label data-i18n="push.provider">Service</label>
+                                    <select id="push-provider" class="settings-select" onchange="_pushShowProviderFields()">
+                                        <option value="ntfy" data-i18n="push.provider_ntfy">ntfy (auto-hébergeable)</option>
+                                        <option value="telegram" data-i18n="push.provider_telegram">Telegram</option>
+                                        <option value="discord" data-i18n="push.provider_discord">Discord (webhook)</option>
+                                        <option value="webhook" data-i18n="push.provider_webhook">Webhook générique</option>
+                                    </select>
+                                </div>
+                                <div data-push-provider="ntfy" style="display:flex; flex-direction:column; gap:8px;">
+                                    <label class="spool-extra-field"><span data-i18n="push.ntfy_server">Serveur ntfy</span><input type="url" id="push-ntfy-server" class="settings-select" placeholder="https://ntfy.sh" autocomplete="off"></label>
+                                    <label class="spool-extra-field"><span data-i18n="push.ntfy_topic">Sujet (topic)</span><input type="text" id="push-ntfy-topic" class="settings-select" autocomplete="off"></label>
+                                    <label class="spool-extra-field"><span data-i18n="push.ntfy_token">Jeton d'accès (optionnel)</span><input type="password" id="push-ntfy-token" class="settings-select" autocomplete="new-password"></label>
+                                </div>
+                                <div data-push-provider="telegram" class="hidden" style="display:flex; flex-direction:column; gap:8px;">
+                                    <label class="spool-extra-field"><span data-i18n="push.telegram_token">Jeton du bot</span><input type="password" id="push-telegram-token" class="settings-select" autocomplete="new-password"></label>
+                                    <label class="spool-extra-field"><span data-i18n="push.telegram_chat">Identifiant de conversation (chat_id)</span><input type="text" id="push-telegram-chat" class="settings-select" autocomplete="off"></label>
+                                </div>
+                                <div data-push-provider="discord" class="hidden" style="display:flex; flex-direction:column; gap:8px;">
+                                    <label class="spool-extra-field"><span data-i18n="push.discord_url">URL du webhook Discord</span><input type="password" id="push-discord-url" class="settings-select" autocomplete="new-password"></label>
+                                </div>
+                                <div data-push-provider="webhook" class="hidden" style="display:flex; flex-direction:column; gap:8px;">
+                                    <label class="spool-extra-field"><span data-i18n="push.webhook_url">URL du webhook</span><input type="url" id="push-webhook-url" class="settings-select" autocomplete="off"></label>
+                                </div>
+                                <div>
+                                    <div style="font-size:12.5px; font-weight:600; margin-bottom:6px;" data-i18n="push.types_title">Événements à envoyer</div>
+                                    <div style="display:flex; flex-direction:column; gap:6px;">
+                                        <label class="checkbox-label"><input type="checkbox" data-push-type="print_finished" checked> <span data-i18n="push.type_print_finished">Impression terminée</span></label>
+                                        <label class="checkbox-label"><input type="checkbox" data-push-type="print_failed" checked> <span data-i18n="push.type_print_failed">Échec d'impression</span></label>
+                                        <label class="checkbox-label"><input type="checkbox" data-push-type="maintenance" checked> <span data-i18n="push.type_maintenance">Maintenance et séchage</span></label>
+                                        <label class="checkbox-label"><input type="checkbox" data-push-type="low_stock" checked> <span data-i18n="push.type_low_stock">Stock bas et pièces</span></label>
+                                    </div>
+                                </div>
+                                <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
+                                    <button type="button" class="btn btn-ghost btn-sm" onclick="testPush()"><i class="fa-solid fa-paper-plane"></i> <span data-i18n="push.test">Envoyer un test</span></button>
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="savePushSettings()"><i class="fa-solid fa-check"></i> <span data-i18n="push.save">Enregistrer</span></button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accord-section viewer-hide">
+                            <div class="accord-header" onclick="toggleAccord(this)">
+                                <span><i class="fa-solid fa-user-lock"></i> <span data-i18n="guests.title">Comptes invités</span></span>
+                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                            </div>
+                            <div class="accord-body">
+                                <p class="settings-hint" data-i18n="guests.hint">Un compte invité consulte ta bibliothèque, tes imprimantes et ton stock en lecture seule : il ne peut rien modifier ni lancer. Pratique pour la famille ou un atelier.</p>
+                                <div id="guests-list" style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
+                                    <div class="empty-state small"><p data-i18n="guests.none">Aucun compte invité</p></div>
+                                </div>
+                                <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+                                    <input type="text" id="guest-new-username" class="settings-select" style="flex:1; min-width:120px;" maxlength="60" autocomplete="off" data-i18n-placeholder="guests.username_ph" placeholder="Nom de l'invité">
+                                    <input type="password" id="guest-new-password" class="settings-select" style="flex:1; min-width:120px;" autocomplete="new-password" data-i18n-placeholder="guests.password_ph" placeholder="Mot de passe (4 car. min.)">
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="createGuest()"><i class="fa-solid fa-plus"></i> <span data-i18n="guests.create">Créer</span></button>
+                                </div>
+                            </div>
+                        </div>
                         <div class="accord-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-database"></i> <span data-i18n="settings.file_sources">Sources de fichiers</span></span>
@@ -1702,6 +1821,25 @@
                                         </div>
                                         <button id="thingiverse-edit-btn" class="btn btn-ghost btn-sm" style="display:none;margin-top:10px;" onclick="showAccountKeyInput('thingiverse')"><i class="fa-solid fa-pen"></i> <span data-i18n="actions.edit">Modifier</span></button>
                                         <p class="settings-hint" style="margin-top:6px;"><span data-i18n="settings.hint">Obtenir sur</span> <a href="https://www.thingiverse.com/apps/create" style="color:var(--accent)" target="_blank" rel="noopener noreferrer">thingiverse.com/apps/create</a></p>
+                                    </div>
+
+                                    <div class="account-card" style="margin-top:12px;">
+                                        <div class="account-card-header">
+                                            <div style="display:flex;align-items:center;gap:10px;">
+                                                <div class="account-icon-badge" style="background:rgba(37,99,235,0.15);color:#2563eb;"><i class="fa-solid fa-cube"></i></div>
+                                                <div><div style="font-weight:600;font-size:13px;">Nexprint</div><div style="font-size:11px;color:var(--text-muted);">nexprint.com (Elegoo)</div></div>
+                                            </div>
+                                            <span id="nexprint-status-badge" class="account-badge disconnected">Non configuré</span>
+                                        </div>
+                                        <button id="nexprint-login-btn" class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="nexprintBrowserLogin()"><i class="fa-solid fa-right-to-bracket"></i> Se connecter avec Nexprint</button>
+                                        <p class="settings-hint" style="margin-top:6px;">Une fenêtre s'ouvre sur le site officiel : connecte-toi normalement, Stellio récupère la session automatiquement. Tes identifiants ne passent jamais par Stellio.</p>
+                                        <div id="nexprint-key-row" style="display:flex;gap:8px;margin-top:10px;">
+                                            <input type="password" id="nexprint-api-key" placeholder="Ou colle le cookie auth_token..."
+                                                style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;font-family:monospace;">
+                                            <button class="btn btn-primary btn-sm" onclick="saveAccountKey('nexprint')"><i class="fa-solid fa-floppy-disk"></i></button>
+                                        </div>
+                                        <button id="nexprint-edit-btn" class="btn btn-ghost btn-sm" style="display:none;margin-top:10px;" onclick="showAccountKeyInput('nexprint')"><i class="fa-solid fa-pen"></i> <span data-i18n="actions.edit">Modifier</span></button>
+                                        <p class="settings-hint" style="margin-top:6px;">Méthode manuelle (si la fenêtre ne fonctionne pas) : copie la valeur du cookie <code>auth_token</code> depuis les outils du navigateur (F12 → Application → Cookies).</p>
                                     </div>
 
                                     <div class="account-card" style="margin-top:12px;">
@@ -1774,6 +1912,66 @@
                                     <button class="btn btn-ghost btn-sm" onclick="document.getElementById('backup-import-input').click()">
                                         <i class="fa-solid fa-file-import"></i> <span data-i18n="settings.backup_import_btn">Importer une sauvegarde</span>
                                     </button>
+                                </div>
+                                <div id="auto-backup-block" style="border-top:1px solid var(--border); padding-top:14px;">
+                                    <div class="autobackup-title"><i class="fa-solid fa-clock-rotate-left"></i> <span data-i18n="autobackup.title">Sauvegarde automatique</span></div>
+                                    <label class="autobackup-toggle">
+                                        <input type="checkbox" id="autobackup-enabled" onchange="autoBackupToggleFields()">
+                                        <span data-i18n="autobackup.enable">Activer la sauvegarde automatique</span>
+                                    </label>
+                                    <p class="settings-hint" style="margin:6px 0 4px;" data-i18n="autobackup.enable_hint">Stellio crée une sauvegarde en arrière-plan selon le planning ci-dessous. Si l'application était fermée à l'heure prévue, elle est faite au lancement suivant.</p>
+                                    <div id="autobackup-fields">
+                                        <div class="settings-row">
+                                            <label for="autobackup-frequency" data-i18n="autobackup.frequency">Fréquence</label>
+                                            <select id="autobackup-frequency" class="settings-select" onchange="autoBackupToggleFields()">
+                                                <option value="daily" data-i18n="autobackup.freq_daily">Tous les jours</option>
+                                                <option value="weekly" data-i18n="autobackup.freq_weekly">Toutes les semaines</option>
+                                                <option value="monthly" data-i18n="autobackup.freq_monthly">Tous les mois</option>
+                                            </select>
+                                        </div>
+                                        <div class="settings-row" id="autobackup-weekday-row">
+                                            <label for="autobackup-weekday" data-i18n="autobackup.weekday">Jour de la semaine</label>
+                                            <select id="autobackup-weekday" class="settings-select"></select>
+                                        </div>
+                                        <div class="settings-row" id="autobackup-dom-row">
+                                            <label for="autobackup-dom" data-i18n="autobackup.day_of_month">Jour du mois (1 à 28)</label>
+                                            <input type="number" id="autobackup-dom" class="settings-select" min="1" max="28" step="1">
+                                        </div>
+                                        <div class="settings-row">
+                                            <label for="autobackup-time" data-i18n="autobackup.time">Heure</label>
+                                            <input type="time" id="autobackup-time" class="settings-select">
+                                        </div>
+                                        <div class="settings-row">
+                                            <label for="autobackup-keep" data-i18n="autobackup.keep">Sauvegardes automatiques à conserver</label>
+                                            <input type="number" id="autobackup-keep" class="settings-select" min="1" max="100" step="1">
+                                        </div>
+                                        <div style="padding:10px 0 2px; font-size:13px;" data-i18n="autobackup.include">Éléments à sauvegarder</div>
+                                        <div id="autobackup-include">
+                                            <label class="backup-option-row"><input type="checkbox" id="autobackup-opt-library" checked><div class="backup-option-text"><span data-i18n="backup.opt_library">Bibliothèque</span><small data-i18n="backup.opt_library_desc">Sources, tags, favoris, projets</small></div></label>
+                                            <label class="backup-option-row"><input type="checkbox" id="autobackup-opt-accounts" checked><div class="backup-option-text"><span data-i18n="backup.opt_accounts">Comptes externes connectés</span><small data-i18n="backup.opt_accounts_desc">Identifiants chiffrés Thingiverse / Printables / MakerWorld</small></div></label>
+                                            <label class="backup-option-row"><input type="checkbox" id="autobackup-opt-printers" checked><div class="backup-option-text"><span data-i18n="backup.opt_printers">Imprimantes configurées</span></div></label>
+                                            <label class="backup-option-row"><input type="checkbox" id="autobackup-opt-history" checked><div class="backup-option-text"><span data-i18n="backup.opt_history">Historique</span><small data-i18n="backup.opt_history_desc">Téléchargements, impressions, envois au slicer</small></div></label>
+                                            <label class="backup-option-row"><input type="checkbox" id="autobackup-opt-settings" checked><div class="backup-option-text"><span data-i18n="backup.opt_settings">Paramètres de l'application</span></div></label>
+                                        </div>
+                                        <div style="padding:10px 0 2px; font-size:13px;" data-i18n="autobackup.folder">Dossier des sauvegardes</div>
+                                        <div class="autobackup-folder">
+                                            <input type="text" id="autobackup-folder" class="settings-select" readonly>
+                                            <button type="button" class="btn btn-ghost btn-sm" onclick="autoBackupBrowseFolder()"><i class="fa-solid fa-folder-open"></i> <span data-i18n="autobackup.folder_browse">Parcourir…</span></button>
+                                            <button type="button" class="btn btn-ghost btn-sm" onclick="autoBackupResetFolder()" data-i18n="autobackup.folder_default">Par défaut</button>
+                                        </div>
+                                    </div>
+                                    <div class="autobackup-actions">
+                                        <button type="button" class="btn btn-primary btn-sm" id="autobackup-save-btn" onclick="saveAutoBackupSettings()"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="autobackup.save">Enregistrer</span></button>
+                                        <button type="button" class="btn btn-ghost btn-sm" id="autobackup-run-btn" onclick="runBackupNow()"><i class="fa-solid fa-box-archive"></i> <span data-i18n="autobackup.run_now">Sauvegarder maintenant</span></button>
+                                    </div>
+                                    <p class="settings-hint" id="autobackup-status" style="margin-top:8px;"></p>
+                                </div>
+                                <div id="backup-list-block" style="border-top:1px solid var(--border); padding-top:14px;">
+                                    <div class="autobackup-title">
+                                        <span><i class="fa-solid fa-list"></i> <span data-i18n="autobackup.list_title">Sauvegardes disponibles</span></span>
+                                        <button type="button" class="btn btn-ghost btn-sm" onclick="loadBackupList()" aria-label="Actualiser" data-i18n-aria="actions.refresh"><i class="fa-solid fa-rotate"></i></button>
+                                    </div>
+                                    <div id="backup-list"></div>
                                 </div>
                                 <div style="display:flex; gap:8px; align-items:flex-start; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:var(--radius); padding:10px 12px; font-size:11.5px; color:#f59e0b; line-height:1.5;">
                                     <i class="fa-solid fa-triangle-exclamation" style="margin-top:2px;"></i>
@@ -2133,8 +2331,11 @@
 				</div>
 				<div id="page-printers" class="page">
 					<div id="printers-grid" class="grid-printers"></div>
-					<button onclick="openAddPrinterModal()" class="btn btn-primary">
+					<button onclick="openAddPrinterModal()" class="btn btn-primary viewer-hide">
 						<i class="fa-solid fa-plus"></i> <span data-i18n="printers.add">Ajouter une imprimante</span>
+					</button>
+					<button onclick="openPartsModal()" class="btn btn-ghost" style="margin-left:8px;">
+						<i class="fa-solid fa-toolbox"></i> <span data-i18n="parts.open_btn">Pièces &amp; consommables</span>
 					</button>
 				</div>
 				<div id="page-spoolman" class="page">
@@ -2160,6 +2361,9 @@
 							</div>
 							<button id="add-manual-spool-btn" class="btn btn-primary btn-sm" style="display:none;" onclick="openSpoolInventoryModal()">
 								<i class="fa-solid fa-plus"></i> <span data-i18n="spoolman.add_spool_btn">Ajouter bobine</span>
+							</button>
+							<button id="import-manual-spool-btn" class="btn btn-ghost btn-sm" style="display:none;" onclick="openSpoolImportModal()">
+								<i class="fa-solid fa-file-excel"></i> <span data-i18n="spoolimport.btn">Importer (Excel/CSV)</span>
 							</button>
 							<button class="btn btn-ghost btn-sm" onclick="loadManualSpoolInventory()" data-i18n-title="actions.refresh" title="Rafraîchir">
 								<i class="fa-solid fa-rotate"></i> <span data-i18n="actions.refresh">Rafraîchir</span>
@@ -2521,6 +2725,7 @@
                 <p id="slicer-file-name" style="margin-bottom: 15px; font-weight: bold;"></p>
                 <div id="slicer-quick-estimate" class="slicer-quick-estimate hidden"></div>
                 <div id="slicer-preprint-warnings" style="display:none; margin-bottom:15px; flex-direction:column; gap:6px;"></div>
+                <div id="slicer-calib-box" class="slicer-calib-box" style="display:none;"></div>
                 <div id="slicer-spool-box" style="display:none; margin-bottom:15px; padding:10px 12px; border-radius:var(--radius); background:var(--bg-input); border:1px solid var(--border); font-size:12px;">
                     <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
                         <input type="checkbox" id="slicer-consume-spool-checkbox" checked>
@@ -2713,6 +2918,64 @@
         </div>
     </div>
 
+    <div id="modal-feedback" class="modal hidden">
+        <div class="modal-content" style="max-width:640px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-comment-dots"></i> <span data-i18n="feedback.title">Suggestions &amp; signalements</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-feedback')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="fb-tabs">
+                    <button type="button" class="fb-tab active" data-tab="new" onclick="switchFeedbackTab('new')" data-i18n="feedback.tab_new">Nouvelle demande</button>
+                    <button type="button" class="fb-tab" data-tab="list" onclick="switchFeedbackTab('list')"><span data-i18n="feedback.tab_list">Mes demandes</span> <span id="feedback-tab-count" class="fb-count hidden"></span></button>
+                </div>
+
+                <div id="feedback-pane-new">
+                    <p class="settings-hint" style="margin:0 0 12px;" data-i18n="feedback.intro">Votre demande est publiée sur GitHub sous forme d'issue, sans compte GitHub nécessaire. Vous pouvez en suivre l'avancement ici.</p>
+                    <div id="feedback-relay-missing" class="fb-banner hidden">
+                        <i class="fa-solid fa-circle-info"></i>
+                        <span data-i18n="feedback.relay_missing">L'envoi direct n'est pas configuré sur cette installation. Vous pouvez créer l'issue sur GitHub avec le texte pré-rempli (compte GitHub nécessaire).</span>
+                    </div>
+                    <div class="fb-field">
+                        <label for="feedback-type" data-i18n="feedback.type">Type de demande</label>
+                        <select id="feedback-type" class="settings-select" style="width:100%; max-width:none;">
+                            <option value="bug" data-i18n="feedback.type_bug">Problème / bug</option>
+                            <option value="idea" data-i18n="feedback.type_idea">Idée</option>
+                            <option value="improvement" data-i18n="feedback.type_improvement">Amélioration</option>
+                            <option value="question" data-i18n="feedback.type_question">Question</option>
+                        </select>
+                    </div>
+                    <div class="fb-field">
+                        <label for="feedback-title"><span data-i18n="feedback.subject">Titre</span> <span class="fb-counter" id="feedback-title-count">0/120</span></label>
+                        <input type="text" id="feedback-title" class="settings-select" style="width:100%; max-width:none;" maxlength="120" data-i18n-placeholder="feedback.subject_ph" placeholder="Résumez votre demande en une phrase">
+                    </div>
+                    <div class="fb-field">
+                        <label for="feedback-desc"><span data-i18n="feedback.description">Description (Markdown accepté)</span> <span class="fb-counter" id="feedback-desc-count">0/6000</span></label>
+                        <textarea id="feedback-desc" class="settings-select" style="width:100%; max-width:none; min-height:150px; resize:vertical;" maxlength="6000" data-i18n-placeholder="feedback.description_ph" placeholder="Décrivez le problème ou l'idée : que s'est-il passé, comment le reproduire, ce que vous attendiez…"></textarea>
+                    </div>
+                    <label class="fb-check"><input type="checkbox" id="feedback-tech" checked> <span data-i18n="feedback.include_tech">Inclure les informations techniques (version de Stellio, système, langue)</span></label>
+                    <label class="fb-check"><input type="checkbox" id="feedback-consent"> <span data-i18n="feedback.consent">Je comprends que ma demande sera publique sur GitHub et je n'y ai mis aucune information personnelle.</span></label>
+                    <div id="feedback-error" class="fb-error hidden"></div>
+                    <div class="fb-actions">
+                        <button type="button" class="btn btn-primary" id="feedback-submit-btn" onclick="submitFeedback()"><i class="fa-solid fa-paper-plane"></i> <span data-i18n="feedback.submit">Envoyer la demande</span></button>
+                        <button type="button" class="btn btn-ghost hidden" id="feedback-prefilled-btn" onclick="openPrefilledIssue()"><i class="fa-brands fa-github"></i> <span data-i18n="feedback.open_github_prefilled">Ouvrir sur GitHub avec le texte pré-rempli</span></button>
+                    </div>
+                </div>
+
+                <div id="feedback-pane-list" class="hidden">
+                    <div id="feedback-list-view">
+                        <div class="fb-list-head">
+                            <span id="feedback-list-note" class="settings-hint"></span>
+                            <button type="button" class="btn btn-ghost btn-sm" onclick="loadFeedbackList(true)"><i class="fa-solid fa-rotate"></i> <span data-i18n="feedback.refresh">Actualiser</span></button>
+                        </div>
+                        <div id="feedback-list"></div>
+                    </div>
+                    <div id="feedback-detail-view" class="hidden"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-about" class="modal hidden">
         <div class="modal-content modal-about-content">
             <div class="modal-header">
@@ -2736,7 +2999,7 @@
                 </div>
                 <div class="about-section">
                     <h4><i class="fa-solid fa-copyright"></i> <span data-i18n="about.license">Licence & Droits</span></h4>
-                    <p class="about-legal" data-i18n="about.legal">© 2026 Stellio Project. Tous droits réservés. Développé avec passion pour la communauté Maker.</p>
+                    <p class="about-legal" data-i18n="about.legal">© 2026 Stellio Project. Distribué sous licence GNU AGPL v3</p>
                 </div>
             </div>
         </div>

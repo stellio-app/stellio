@@ -181,7 +181,7 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 ### 🪟 Windows (recomendado)
 
 1. Baixe o instalador mais recente em [Releases](https://github.com/stellio-app/stellio/releases)
-2. Execute `Stellio-Setup.exe`
+2. Execute `Stellio-Setup-<version>.exe`
 3. Pronto! 🎉
 
 ### 🐧 Raspberry Pi / Linux
@@ -197,7 +197,7 @@ chmod +x install-pi.sh
 ```
 
 O script instala automaticamente:
-- as dependências do sistema (`ffmpeg`, `unrar-free`, bibliotecas de renderização 3D)
+- as dependências do sistema (`ffmpeg`, `unrar`, bibliotecas de renderização 3D)
 - um ambiente virtual Python dedicado
 - um **serviço systemd** (`stellio.service`) que inicia o Stellio ao ligar e o reinicia automaticamente em caso de falha
 
@@ -281,7 +281,7 @@ stellio/
 ├── style.css           # Estilos
 ├── launcher.py         # Launcher leve / bootstrap do runtime
 ├── check_deps.py       # Verificador de dependências autorreparável
-├── worker.py           # Worker em segundo plano (miniaturas, varreduras)
+├── worker.py           # Esqueleto de worker 3MF sem uso (provisório)
 ├── assets/             # Logos, ícones
 ├── languages/          # Arquivos de tradução (JSON)
 ├── apk/                # Pacote do app complementar Android
@@ -336,7 +336,7 @@ O Stellio é local-first: seus dados permanecem na sua máquina, e nada é colet
 
 ## 🔏 Política de assinatura de código
 
-Os executáveis do Windows publicados nas [Releases](https://github.com/stellio-app/stellio/releases) são assinados digitalmente. Veja [CODE_SIGNING_POLICY.md](../../CODE_SIGNING_POLICY.md) para detalhes sobre nosso processo de assinatura e a proteção da chave privada.
+O instalador do Windows e o AppImage do Linux publicados nas [Releases](https://github.com/stellio-app/stellio/releases) **ainda não são assinados digitalmente**, então o Windows SmartScreen pode exibir um aviso. As versões para macOS não são notarizadas. Cada arquivo de uma release acompanha uma soma de verificação SHA-256 (`.sha256`) que você pode conferir, e o atualizador integrado a verifica antes de instalar. Veja [CODE_SIGNING_POLICY.md](../../CODE_SIGNING_POLICY.md) para o estado atual, como verificar um download e nossos planos de assinatura.
 
 ---
 

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'stellio-v5';
+const CACHE_VERSION = 'stellio-v6';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const ASSETS_CACHE = `${CACHE_VERSION}-assets`;
 

@@ -59,12 +59,29 @@ sudo apt-get install -y \
     git curl \
     python3 python3-venv python3-pip python3-dev \
     build-essential \
-    ffmpeg unrar-free \
+    ffmpeg \
     libjpeg-dev zlib1g-dev libpng-dev \
     libatlas-base-dev libopenblas-dev \
     libgl1-mesa-dev libosmesa6-dev libegl1
 
 ok "Dépendances système installées."
+echo ""
+
+# unrar : Stellio a besoin du VRAI unrar (freeware RARLAB, archives RAR5 comprises).
+# Il se trouve dans la section "non-free" de Debian / Raspberry Pi OS et dans "multiverse" d'Ubuntu.
+# unrar-free (outil différent) n'est qu'un repli : il ne lit pas les archives RAR5.
+info "Installation de unrar (extraction des archives .rar)..."
+if sudo apt-get install -y unrar; then
+    ok "unrar installé."
+else
+    warn "Le paquet 'unrar' est introuvable (section non-free / multiverse non activée ?)."
+    warn "Repli sur 'unrar-free' : l'extraction des archives RAR5 ne sera PAS prise en charge."
+    warn "Pour avoir le vrai unrar : activez 'non-free' (Debian / Raspberry Pi OS) ou 'multiverse'"
+    warn "(Ubuntu), puis relancez ./install-pi.sh."
+    if ! sudo apt-get install -y unrar-free; then
+        warn "unrar-free n'a pas pu être installé non plus : les archives .rar ne pourront pas être extraites."
+    fi
+fi
 echo ""
 
 # ----------------------------------------------------------------------------

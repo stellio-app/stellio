@@ -181,7 +181,7 @@ Que vous soyez un maker débutant ou un propriétaire expérimenté gérant plus
 ### 🪟 Windows (recommandé)
 
 1. Téléchargez le dernier installeur depuis les [Releases](https://github.com/stellio-app/stellio/releases)
-2. Lancez `Stellio-Setup.exe`
+2. Lancez `Stellio-Setup-<version>.exe`
 3. C'est fait ! 🎉
 
 ### 🐧 Raspberry Pi / Linux
@@ -197,7 +197,7 @@ chmod +x install-pi.sh
 ```
 
 Le script installe automatiquement :
-- les dépendances système (`ffmpeg`, `unrar-free`, bibliothèques de rendu 3D)
+- les dépendances système (`ffmpeg`, `unrar`, bibliothèques de rendu 3D)
 - un environnement virtuel Python dédié
 - un **service systemd** (`stellio.service`) qui démarre Stellio au boot et le redémarre automatiquement en cas de crash
 
@@ -281,7 +281,7 @@ stellio/
 ├── style.css           # Styles
 ├── launcher.py         # Lanceur léger / bootstrap runtime
 ├── check_deps.py       # Vérificateur de dépendances auto-réparant
-├── worker.py           # Worker en arrière-plan (miniatures, scans)
+├── worker.py           # Squelette de worker 3MF non utilisé (provisoire)
 ├── assets/             # Logos, icônes
 ├── languages/          # Fichiers de traduction (JSON)
 ├── apk/                # Package de l'app compagnon Android
@@ -336,7 +336,7 @@ Stellio est local-first : vos données restent sur votre machine, rien n'est col
 
 ## 🔏 Politique de signature de code
 
-Les exécutables Windows publiés dans les [Releases](https://github.com/stellio-app/stellio/releases) sont signés numériquement. Voir [CODE_SIGNING_POLICY.md](../../CODE_SIGNING_POLICY.md) pour le détail de notre procédure de signature et la protection de la clé privée.
+L'installeur Windows et l'AppImage Linux publiés dans les [Releases](https://github.com/stellio-app/stellio/releases) ne sont **pas encore signés numériquement** : Windows SmartScreen peut afficher un avertissement. Les builds macOS ne sont pas notarisés. Chaque fichier d'une release est accompagné d'une somme de contrôle SHA-256 (`.sha256`) que vous pouvez vérifier, et le système de mise à jour intégré la contrôle avant d'installer. Voir [CODE_SIGNING_POLICY.md](../../CODE_SIGNING_POLICY.md) pour l'état actuel, la vérification d'un téléchargement et nos projets de signature.
 
 ---
 

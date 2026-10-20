@@ -84,6 +84,7 @@ _PRELOAD_MODULES = [
     "py7zr", "defusedxml", "defusedxml.ElementTree", "nest_asyncio",
     "psutil", "packaging", "packaging.version", "qrcode", "websocket",
     "flashforge", "reportlab", "reportlab.platypus",
+    "plyer", "openpyxl", "xlrd",
 ]
 
 

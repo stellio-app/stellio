@@ -181,7 +181,7 @@ Ya seas un maker principiante o un usuario experimentado con varias máquinas, S
 ### 🪟 Windows (recomendado)
 
 1. Descarga el último instalador desde [Releases](https://github.com/stellio-app/stellio/releases)
-2. Ejecuta `Stellio-Setup.exe`
+2. Ejecuta `Stellio-Setup-<version>.exe`
 3. ¡Listo! 🎉
 
 ### 🐧 Raspberry Pi / Linux
@@ -197,7 +197,7 @@ chmod +x install-pi.sh
 ```
 
 El script instala automáticamente:
-- las dependencias del sistema (`ffmpeg`, `unrar-free`, bibliotecas de renderizado 3D)
+- las dependencias del sistema (`ffmpeg`, `unrar`, bibliotecas de renderizado 3D)
 - un entorno virtual de Python dedicado
 - un **servicio systemd** (`stellio.service`) que inicia Stellio al arrancar y lo reinicia automáticamente si falla
 
@@ -281,7 +281,7 @@ stellio/
 ├── style.css           # Estilos
 ├── launcher.py         # Lanzador ligero / arranque del runtime
 ├── check_deps.py       # Verificador de dependencias autorreparable
-├── worker.py           # Worker en segundo plano (miniaturas, escaneos)
+├── worker.py           # Esqueleto de worker 3MF sin uso (provisional)
 ├── assets/             # Logos, iconos
 ├── languages/          # Archivos de traducción (JSON)
 ├── apk/                # Paquete de la app complementaria Android
@@ -336,7 +336,7 @@ Stellio es local-first: tus datos permanecen en tu equipo, por defecto no se rec
 
 ## 🔏 Política de firma de código
 
-Los ejecutables de Windows publicados en [Releases](https://github.com/stellio-app/stellio/releases) están firmados digitalmente. Consulta [CODE_SIGNING_POLICY.md](../../CODE_SIGNING_POLICY.md) para conocer nuestro proceso de firma y las prácticas de protección de la clave privada.
+El instalador de Windows y el AppImage de Linux publicados en [Releases](https://github.com/stellio-app/stellio/releases) **aún no están firmados digitalmente**, por lo que Windows SmartScreen puede mostrar una advertencia. Las compilaciones de macOS no están notarizadas. Cada archivo de las releases incluye una suma de comprobación SHA-256 (`.sha256`) que puedes verificar, y el actualizador integrado la comprueba antes de instalar. Consulta [CODE_SIGNING_POLICY.md](../../CODE_SIGNING_POLICY.md) para conocer el estado actual, cómo verificar una descarga y nuestros planes de firma.
 
 ---
 

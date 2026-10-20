@@ -1,394 +1,461 @@
-# CODEMAP — Stellio v0.6.9
+# CODEMAP — Stellio v0.7.2
 
-Code navigation map. Repository: https://github.com/stellio-app/stellio (commit "V 0.6.9"). The line numbers for `main.py`, `script.js` and `index.html` match the state of those files in that commit; they drift as soon as the files are edited. To find an item, prefer `grep -n "function_name" main.py`. This file sits at the repository root and is referenced by `llms.txt`.
+Carte de navigation du code. Dépôt : https://github.com/stellio-app/stellio. Les numéros de ligne de `main.py`, `script.js`, `index.html` et `style.css` correspondent aux fichiers analysés pour cette version (`CURRENT_VERSION = "0.7.2"`, `main.py` l.14289) ; ils dérivent dès qu'on édite. Pour retrouver un élément, préférer `grep -n "nom_de_fonction" main.py`. Ce fichier est à la racine du dépôt et référencé par `llms.txt`.
 
-| File | Lines | Role |
+> **Modifications d'octobre 2026** (Qidi Studio, bulle de survol des cartes, import de bobines depuis un tableur, logo TigerTag, `plyer`) : les numéros de ligne cités plus bas correspondent aux fichiers **avant** ces modifications ; pour retrouver une ligne dans les fichiers actuels, ajouter le décalage suivant (nombre de lignes ajoutées avant la ligne citée).
+> - `main.py` (24 207 lignes) : **+3** à partir de l.54, **+17** à partir de l.1248 (table `file_origins`), **+168** à partir de l.8310 (route `/api/files/origin` et helpers), **+169** à partir de l.8573 (hook renommage), **+170** à partir de l.9276 (hook déplacement), **+178** à partir de l.9586, **+181** à partir de l.10257, **+182** à partir de l.18744, **+184** à partir de l.20372, **+211** à partir de l.20387 (liste de secours des liens utiles agrandie), **+213** à partir de l.22012, **+199** à partir de l.22035 (lecture de `filament_shops.json` supprimée), **+463** à partir de l.22630, **+464** à partir de l.22742 (à ±1 près dans les zones modifiées). Repères actuels : `_SLICER_CANDIDATES` l.9741, `CURRENT_VERSION` l.15321, `_spool_import_*` l.22832–23084, point d'entrée l.23760.
+> - `script.js` (19 290 lignes) : **+4** à partir de l.5139, **+5** à partir de l.7502, **+7** à partir de l.10124, **+9** à partir de l.10128, **+102** à partir de l.10486, **+46** à partir de l.13705 (une partie de ces écarts vient de modifications de `script.js` faites en dehors de cette carte).
+> - `index.html` (4 136 lignes) : **+1** à partir de l.1367, **+2** à partir de l.1394, **+5** à partir de l.2362.
+> - `style.css` (8 278 lignes) : **+5** à partir de l.5358, **+10** à partir de l.8269.
+>
+> **Mise à jour 0.7.2 + fonctions restaurées de la 0.6.9** : cette carte décrit les fichiers `main.py`, `script.js`, `index.html`, `style.css` et `languages/*.json` **après** le portage dans la 0.7.2 de sept fonctions de la 0.6.9 qui avaient disparu : séchage des bobines, calibrations, pièces d'usure, rapports mensuels, mises à jour de modèles, notifications push, rôle invité (et le téléchargement Nexprint). Les numéros de ligne sont ceux des fichiers fusionnés (`CURRENT_VERSION = "0.7.2"`, `main.py` l.15140). Les fichiers non refournis (`sw.js`, `launcher.py`, `worker.py`, workflow, `.iss`, `install-pi.sh`, APK, docs traduites, LICENSE…) sont décrits dans les §9–14 d'après la version précédente ; les points non revérifiés sont signalés. La liste de ce qui a été (ou n'a pas été) restauré est au §15.
+
+> **Corrections du 18/10/2026** : (1) licence — `LICENSE` remplacé par le texte de l'AGPL v3 (README et traductions déjà conformes) et clé `about.legal` des 8 fichiers `languages/*.json` + texte de repli d'`index.html` l.3002 remplacés par « © 2026 Stellio Project. Distribué sous licence GNU AGPL v3 » (traduit dans les 7 autres langues) ; (2) signature — décision de ne pas signer Windows pour l'instant : `CODE_SIGNING_POLICY.md` réécrite, section « Code Signing » des 8 README corrigée, et `build-and-sign.yml` modifié (ffmpeg épinglé par version + SHA-256 sur Windows/Linux/macOS, contrôle SHA-256 d'UnRAR à renseigner) ; (3) route `/api/files/origin` restaurée dans `main.py` (+167 lignes : table `file_origins`, routes GET/POST, helper `_follow_file_origin` appelé par le renommage et le déplacement) — le tableau de décalages de `main.py` ci-dessus a été étendu en conséquence ; (4) dépendances — `openpyxl` et `xlrd` ajoutés à `check_deps.REQUIRED_MODULES` (listes synchronisées, 31 entrées), `plyer`/`openpyxl`/`xlrd` ajoutés à `launcher._PRELOAD_MODULES`, `--collect-all` pour `reportlab`, `psutil`, `plyer`, `openpyxl`, `xlrd`, `pyaes` ajoutés aux 3 jobs du workflow ; `telethon` et l'absence de versions dans `requirements.txt` conservés sur décision ; (5) confidentialité (19/10/2026) — les 8 `PRIVACY*.md` mis à jour (date, Nexprint, 7 nouvelles puces : push, TigerTag, signalements, mises à jour de modèles, boutiques, instances distantes, ressources web des CDN) ; (6) vérification de `script.js` : les doublons de `addPrinter`, `openAddPrinterModal` et `togglePrinterFields` n'existent plus dans le fichier fourni (rien à corriger, seule la documentation est mise à jour) ; (7) `install-pi.sh` installe le vrai `unrar` avec repli sur `unrar-free` (README mis à jour dans les 8 langues) ; (8) README (8 langues) : `worker.py` décrit comme squelette non utilisé (l.284, fichier conservé) et `Stellio-Setup-<version>.exe` (l.184) ; (9) liens utiles — `filament_shops.json` supprimé, `_DEFAULT_USEFUL_LINKS` = copie complète du JSON, `bambuwiki` ajouté (`main.py` +17 lignes, décalages recalculés ci-dessus) ; (10) ressources web en local (20/10/2026) — `index.html` l.43 et l.46–51 pointent vers `assets/vendor/`, `sw.js` en `stellio-v6`, puce « CDN » retirée des 8 `PRIVACY*` (date 20 octobre 2026), `changelog.json` 0.7.2 complété (+8 éléments, 8 langues) ; images `tigertag-logo.png` et `logo-stellio - Copie.png` supprimées par l'auteur ; CSP de `main.py` laissée inchangée ; (11) UnRAR Windows (20/10/2026) — SHA-256 de l'`UnRAR.exe` extrait (7.22.0, signé win.rar GmbH / DigiCert) épinglé dans le workflow ; reste le SHA-256 des archives macOS ; (12) `.gitignore` réécrit (20/10/2026, voir §14). `script.js` et `style.css` sont inchangés ; `index.html` et `languages/*.json` ne changent que par le texte `about.legal` (une ligne remplacée, aucun décalage). Les numéros de ligne de `build-and-sign.yml` cités ont été recalculés (763 lignes).
+
+| Fichier | Lignes | Rôle |
 |---|---|---|
-| `main.py` | ~22,255 | Monolithic Flask backend (258 routes, ~620 functions, 9 classes) |
-| `script.js` | ~18,266 | Frontend: all client-side logic (~516 top-level functions) |
-| `index.html` | ~3,973 | SPA: sidebar, 14 pages, 34 modals |
-| `style.css` | ~8,076 | Themes, components, gallery/details views |
-| `check_deps.py` | 225 | Python dependency checker/repairer (see §9) |
-| `sw.js` | 71 | PWA service worker (cache `stellio-v5`) |
-| `worker.py` | 27 | 3MF worker skeleton — **not used** by `main.py` (see §9) |
-| `conftest.py` | 61 | pytest configuration: stubs for heavy modules, temporary `STELLIO_DATA_DIR` |
-| `requirements.txt` | 40 lines | pip dependencies |
-| `stellio-setup.iss` | 242 | Inno Setup script for the Windows installer |
-| `entitlements.plist` | 14 | macOS code-signing entitlements (hardened runtime) |
-| `README.md` | 381 | Public presentation (EN), features, installation, shortcuts |
-| `LICENSE` | 674 | Full text of the **GNU GPL v3** — ⚠️ the README announces AGPL v3 (see §13) |
-| `CODE_SIGNING_POLICY.md` | 157 | Code signing policy (EN), linked from the README (see §13) |
-| `assets/logo-nom-stellio.ico` | 145 KB | App icon, 7 sizes from 16 to 256 px (see §13) |
-| `assets/tigertag-logo.svg` | 89 | Monochrome TigerTag logo, filament banner (see §13) |
-| `stellio_manager.bat` | 284 | Windows development menu (see §14) |
-| `.gitignore` | — | Repository exclusions (see §14) |
-| `assets/*.png`, `assets/vendor/` | — | Logos and local fonts/icons/Three.js (see §14) |
-| `library.png`, `monitoring.png`, `slicer.png`, `nesting.png` | 1920 px | README screenshots |
-| `launcher.py` | 158 | Entry point of the PyInstaller builds: loads `app/main.py` via `runpy` |
-| `install-pi.sh` | 180 | Raspberry Pi/Linux installer (venv + systemd service), see §10 |
-| `.github/workflows/build-and-sign.yml` | 683 | GitHub Actions workflow: Windows/macOS/Linux build + release (see §10) |
-| `apk/stellio.apk` | 4.8 MB | Android companion app (`com.stellioapp.companion`), WebView — see §11 |
-| `docs/readme/README.{fr,de,es,it,pt,ja,zh}.md` | ~381 each | Translated READMEs (same structure as `README.md`) |
-| `docs/privacy/PRIVACY[.fr,.de,…].md` | 54 each | Privacy policy in 8 languages (EN = `PRIVACY.md`) |
-| `languages/{fr,en,de,es,it,ja,pt,zh}.json` | 1,793 keys each | Translations (flat `section.key` keys) |
-| `languages/changelog.json` | — | Release notes per language |
-| `languages/useful_links.json` | 25 links (without Nexprint, see §14) | Default useful links |
-| `languages/filament_shops.json` | 4 shops | Shops used by the "Buy" button |
+| `main.py` | 23 743 | Backend Flask monolithique (277 routes, 699 fonctions de premier niveau, 833 au total, 9 classes de premier niveau + 4 imbriquées) |
+| `script.js` | 19 244 | Frontend : toute la logique client (562 fonctions `function` de premier niveau + de nombreux `window.xxx = function`) |
+| `index.html` | 4 131 | SPA : sidebar, 14 pages, 35 modales |
+| `style.css` | 8 268 | Thèmes, composants, vues galerie/détails |
+| `check_deps.py` | 227 | Vérificateur/réparateur de dépendances Python (voir §9 ; `openpyxl` et `xlrd` ajoutés à sa liste le 18/10/2026) |
+| `requirements.txt` | 44 lignes | Dépendances pip (ajout de `pyaes` depuis la 0.6.9, puis de `openpyxl` et `xlrd` pour l'import de bobines) |
+| `sw.js` | 71 | Service worker PWA (cache `stellio-v6` depuis le 20/10/2026 ; fichier relu) |
+| `worker.py` | 27 | Squelette de worker 3MF — **non utilisé** par `main.py` (voir §9) |
+| `conftest.py` | 61 | Configuration pytest : stubs de modules lourds, `STELLIO_DATA_DIR` temporaire |
+| `stellio-setup.iss` | 242 | Script Inno Setup de l'installeur Windows |
+| `entitlements.plist` | 14 | Droits de signature macOS (hardened runtime) |
+| `README.md` | 381 | Présentation publique (EN), fonctionnalités, installation, raccourcis |
+| `LICENSE` | 661 | Texte intégral de la **GNU AGPL v3** (19 novembre 2007), cohérent avec le README (voir §13) |
+| `CODE_SIGNING_POLICY.md` | 126 | Politique de signature de code (EN), réécrite le 18/10/2026 selon l'état réel : Windows/Linux non signés, mesures d'intégrité en place, politique cible (voir §13) |
+| `assets/logo-nom-stellio.ico` | 145 Ko | Icône de l'app, 7 tailles de 16 à 256 px (voir §13) |
+| `assets/tigertag-logo.svg` | 89 | Logo TigerTag monochrome, bannière filament (voir §13) |
+| `stellio_manager.bat` | 284 | Menu de développement Windows (voir §14) |
+| `.gitignore` | 76 | Exclusions du dépôt, réécrit le 20/10/2026 (voir §14) |
+| `assets/*.png`, `assets/vendor/` | — | Logos et polices/icônes locaux (voir §14) |
+| `library.png`, `monitoring.png`, `slicer.png`, `nesting.png` | 1920 px | Captures d'écran du README |
+| `launcher.py` | 159 | Point d'entrée des builds PyInstaller : charge `app/main.py` via `runpy` |
+| `install-pi.sh` | 197 | Installeur Raspberry Pi/Linux (venv + service systemd), voir §10 |
+| `.github/workflows/build-and-sign.yml` | 763 | Workflow GitHub Actions : build Windows/macOS/Linux + release ; binaires ffmpeg épinglés par SHA-256 (voir §10) |
+| `apk/stellio.apk` | 4,8 Mo | App Android compagnon (`com.stellioapp.companion`), WebView — voir §11 |
+| `docs/readme/README.{fr,de,es,it,pt,ja,zh}.md` | ~381 chacun | README traduits |
+| `docs/privacy/PRIVACY[.fr,.de,…].md` | 62 chacun | Politique de confidentialité en 8 langues (EN = `PRIVACY.md`) |
+| `languages/{fr,en,de,es,it,ja,pt,zh}.json` | 1948 clés chacun (+ 3 métadonnées) | Traductions (clés plates `section.cle`), jeux de clés identiques dans les 8 langues |
+| `languages/changelog.json` | 5 entrées | Notes de version par langue (0.7.2 : 21 éléments par langue dont 8 ajoutés le 20/10/2026, 0.7.1, 0.7.0, 0.6.9, 0.6.8) |
+| `languages/useful_links.json` | 41 liens (23 avec `search_url`) | Liens utiles par défaut, également source des boutiques du stock bas ; « Bambu Lab Wiki » ajouté le 19/10/2026 (groupe Ressources) |
 
 ---
 
-## 1. Overall architecture
+## 1. Architecture générale
 
 ```
-pywebview (window) ──► http://127.0.0.1:5000 ◄── browser / mobile / APK
+pywebview (fenêtre) ──► http://127.0.0.1:5000 ◄── navigateur / mobile / APK
                               │
                     waitress (threads=16) ── Flask (main.py)
                               │
         ┌─────────────┬───────┴────────┬──────────────────┐
-     SQLite       file_cache.json   thumbnails/       printers (MQTT/WS/HTTP)
-   (stellio.db)   (file index)      (pyrender…)       Spoolman / TigerTag / Ollama
+     SQLite       file_cache.json   thumbnails/       imprimantes (MQTT/WS/HTTP)
+   (stellio.db)   (index fichiers)  (pyrender…)       Spoolman / TigerTag / Ollama
 ```
 
-- Flask also serves the frontend: `Flask(__name__, static_folder=BASE_DIR, static_url_path='')` (l.3523); `GET /` → `index()` (l.5218).
-- Auth: session cookie (30 days), `@login_required` (l.3512), CSRF `_csrf_protect` (l.3543), read-only guest role `_viewer_guard` (l.3588), security headers `_set_security_headers` (l.3612), 50 MB upload limit.
-- Stellio ↔ Stellio peers: local key `require_peer_key` (l.7712), `/api/peer/*` routes.
-- Data folders (`get_data_path`, l.434): `~/.stellio` | `%APPDATA%\Stellio` | `$STELLIO_DATA_DIR`. Contains `stellio.db`, `app_settings.json`, `file_cache.json`, `thumbnails/`, `uploads/`, `print_photos/`, `sosprint_conversation_photos/`, `imported_slicer_profiles/`, `trash/`, `flask_secret.key`.
+- Flask sert aussi le frontend : `Flask(__name__, static_folder=BASE_DIR, static_url_path='')` (l.3482) ; `GET /` → `index()` (l.5175).
+- Auth : session cookie (30 jours), `@login_required` (l.3471), CSRF `_csrf_protect` (l.3502, en-tête `X-CSRF-Token` ↔ cookie `stellio_csrf`), en-têtes de sécurité + CSP `_set_security_headers` (l.3571), limite upload 50 Mo, anti-brute-force `_check_rate_limit` (l.5188). **Rôle « invité » en lecture seule** : `_is_viewer` (l.3535), `_viewer_sanitize` (l.3538) et `_viewer_guard` (l.3547, `before_request` : 403 sur toute écriture hors liste blanche) ; la session d'un invité pointe vers les données du propriétaire (`users.owner_id`), routes `/api/auth/guests*` (l.5311–5390).
+- Pairs Stellio ↔ Stellio : clé locale `require_peer_key` (l.7657), routes `/api/peer/*`.
+- Dossiers de données (`get_data_path`, l.434) : `~/.stellio` | `%APPDATA%\Stellio` | `$STELLIO_DATA_DIR`. Contient `stellio.db`, `app_settings.json`, `file_cache.json`, `thumbnails/`, `uploads/`, `print_photos/`, `sosprint_conversation_photos/`, `imported_slicer_profiles/`, `trash/`, `flask_secret.key`, ainsi que les sauvegardes automatiques (dossier configurable, `_auto_backup_folder` l.13796) et le logo de devis.
+- Variables d'environnement lues par `main.py` : `STELLIO_DATA_DIR` (l.435), `STELLIO_ALLOWED_SOURCE_TYPES` (l.450), `STELLIO_NO_AUTO_INSTALL` (l.79), `STELLIO_LAUNCHER_EXE` (l.778, 789, 15455), `STELLIO_HEADLESS` (l.5475, 23299), `STELLIO_START_MINIMIZED` (l.23303), `STELLIO_SERVER_URL` (l.23315), `STELLIO_PORT` (l.7922, 23316), `STELLIO_FEEDBACK_RELAY` (l.14190).
 
 ---
 
-## 2. main.py — sections (in line order)
+## 2. main.py — sections (par ordre de lignes)
 
-| Lines | Content | Key elements |
+| Lignes | Contenu | Éléments clés |
 |---|---|---|
-| 1–245 | Bootstrap and dependencies | `check_deps` (optional), `_REQUIRED_MODULES`, `_auto_install_missing_modules` (l.76), `_run_startup_module_check` (l.152), imports |
-| 246–430 | Thumbnail queue | `_queue_thumb_task`, generation session (`_thumb_session_*`), `get_thumb_timeout`, `_prevent_system_sleep` |
-| 431–545 | Paths, trash | `get_base_path`, `get_data_path`, `BASE_DIR/DATA_DIR/DB_PATH`, `_move_file_to_trash`, `_purge_expired_trash` |
-| 542–760 | Logs, external tools, settings | `setup_logging`, `_setup_rar_tool`, `_setup_ffmpeg_tool`, `load_settings/save_settings` (SETTINGS_FILE l.753) |
-| 777–960 | OS auto-start | `is_startup_enabled`, `set_startup_enabled` (Windows registry, macOS LaunchAgent, Linux autostart), `save_cache_on_exit` |
-| 962–1105 | Secret encryption | `encrypt_password`/`decrypt_password`, `decrypt_account_secret`, `migrate_account_passwords_to_random_iv`, `migrate_printer_api_keys` |
-| 1105–1700 | Database | `get_db`, `init_db` (l.1111), `migrate_*` (print_history, maintenance, stellio_extras, print_photos, manual filament, recovery code) |
-| 1759–3025 | Printer connections | `BambuPersistentConnection` (l.1827, MQTT), `ElegooSDCPConnection` (l.2384), `CrealityConnection` (l.2583), `FlashForgePersistentConnection` (l.2713), `ElegooCC2Connection` (l.2850), MJPEG/RTSP camera streams, LAN discovery (SSDP, broadcast) |
-| 3026–3445 | `PrinterManager` (l.3026) | Per-brand dispatch, normalized status, Klipper/Moonraker, active Spoolman |
-| 3445–3650 | Security & Flask app | `parse_printer_config`, password hashing (`hash_pw_strong`), recovery code, `app = Flask(...)` (l.3523), error handlers |
-| 3648–3765 | Archives | `UnsafeArchiveError`, `safe_extract_zip/tar/rar/7z`, virtual archive paths (`make_virtual_archive_path`), `list_archive_3d_entries` |
-| 3765–3985 | File cache | `load_file_cache`/`save_file_cache`/`invalidate_cache`, `_migrate_file_cache_schema`, `_backfill_multiplate_tags` |
-| 3984–5115 | Thumbnail generation and 3D analysis | `process_generation_queue` (l.3984), multi-plate 3MF (`load_3mf_mesh`, `get_3mf_plate_count`), rendering `generate_thumbnail_pyrender` → `_raster` → `_matplotlib` → `create_fallback_thumbnail`, `analyze_3d_file` |
-| 5115–5520 | Auth & configuration | `/api/files/analyze`, `/api/auth/*` (registration, login, guests, secret question, recovery), `/api/app-config` |
-| 5520–5800 | Sources | `/api/sources*`, `/api/files/upload-drop` |
-| 5800–6130 | External accounts | `/api/accounts*` (Thingiverse, Nexprint, MakerWorld), `validate_thingiverse_account` |
-| 6130–6830 | Thumbnails & tags (API) | `/api/file/mesh`, `/api/thumb*`, `/api/tags*`, `reconcile_thumbnails_with_disk`, `pregenerate_thumbnails_on_startup` |
-| 6826–7420 | Source scanning | `scan_local_folder`, `scan_smb_folder_recursive`, `_do_background_scan` (l.7208), `_auto_tag_new_files`, `_auto_scan_scheduler`, `GET /api/files` (l.7417) |
-| 7420–8140 | Sharing and remote instances | `/api/files/share`, `/share/<token>`, `/api/remote-instances*`, `/api/peer/*`, `_scan_lan_for_stellio` |
-| 8140–8810 | File operations | `/api/files/{open-with,exists,delete,delete-batch,restore-batch,rename,duplicates,duplicates/similar}` |
-| 8804–9260 | Stats, history, photos | `/api/stats`, `/api/print-history*` (rating, cost), `/api/print-photos*` |
-| 9255–9490 | Move / decompress | `/api/browse-folder`, `/api/files/{move,decompress}`, `/api/archive/*` |
-| 9486–10650 | Slicers | detection (`detect_installed_slicers`, `_locate_slicer[_macos]`), `run_silent_slice`, G-code parsing (`parse_bambu_orca_gcode3mf`, `parse_cura_gcode`…), `/api/slicer/*`, `/api/picker/*`, `/api/test-connection` |
-| 10650–12200 | Model downloads | `/api/download*`, `printables_get_*`, `nexprint_*`, `makerworld_*`, `save_download_history` |
-| 12194–12740 | Favorites, queue, presence, notifications | `/api/favorites`, `/api/print-queue*`, `/api/presence/*`, `/api/notifications*`, push (`_push_deliver`, `_push_watcher_loop`) |
-| 12735–13070 | Projects | `/api/projects*` |
-| 13068–13660 | Repair, conversion, integrity | `/api/files/{repair,convert,convert-batch}`, `/api/integrity/*`, `_repair_mesh_inplace` |
-| 13656–14290 | Backup, logs, quotes, debug | `/api/backup/*`, `/api/logs/*`, `build_quote_pdf_bytes` (l.13998), `/api/quote/export*`, `/api/debug/*` |
-| 14288–14540 | Settings and onboarding | `/api/settings` (+ `/undo`), `/api/suggestions`, `/api/onboarding/*`, `CURRENT_VERSION = "0.6.9"` (l.14384), `/api/changelog/*` |
-| 14550–15075 | Updates | `check_for_updates`, `download_update`, `install_update`, `/api/update/*` |
-| 15075–15930 | Printers (API) | `/api/printers*` (CRUD, discovery, status, camera, power), maintenance (`/api/printers/maintenance/*`) |
-| 15928–16060 | App shutdown | `/api/app/quit`, `_cleanup_before_exit`, `AIDisabledError` (l.16004), `_call_ollama`, `_call_ai` |
-| 16059–17330 | AI (Ollama) & SOS Print | `/api/ollama/*`, `/api/ai/predict-print-time`, `/api/sos-print/*`, `/api/ollama/semantic-search` |
-| 17327–18260 | Slicer profiles | `/api/slicer-profiles*`, `_parse_slicer_profile_file`, `_scan_dir_for_profiles`, `_autodetect_new_slicer_profiles`, profile recommendation |
-| 18477–18580 | Nesting | `/api/nesting/arrange` (`_pack_polygons`, rectpack/shapely) |
-| 18671–19520 | Filament | `/api/spoolman/spools`, restock, cost and eco (`_compute_estimated_cost`, `/api/eco/estimate`), TigerTag (Firebase), `/api/filament/spools` |
-| 19519–20110 | Links, drying, calibrations, parts | `/api/links`, `/api/filament/{buy-links,low-stock,drying*}`, `/api/calibrations*`, `/api/parts*` |
-| 20182–20330 | Reports | `/api/reports/*` (monthly PDF), `/api/filament/spool-report` |
-| 20648–20790 | Model updates | `/api/model-updates*` (Printables/MakerWorld/Thingiverse) |
-| 20791–21320 | Pre-print & filament inventory | `/api/files/pre-print-check`, `/api/filament/compatibility`, `/api/files/*filament*`, `/api/filament/{tigertag,manual*}`, `/api/spoolman/discover*`, `/api/slicers/discover*` |
-| 21319–21660 | PWA & network | `/manifest.json`, `/api/network-info`, `/api/ping`, `/api/qrcode` |
-| 21656–21810 | Remote access | `/api/remote-access*`, `start_remote_access` (cloudflared), custom address |
-| 21810–22255 | Entry point | `STELLIO_*` env vars, tkinter splash, waitress (`serve`, l.21897) or `app.run`, `webview.start` (l.22245), native drag and drop |
+| 1–245 | Bootstrap et dépendances | `check_deps` (optionnel, import l.11–19), copie de repli de `_REQUIRED_MODULES` (l.25–60), `_auto_install_missing_modules` (l.76), `_run_startup_module_check` (l.152), imports |
+| 246–430 | File de miniatures | `_queue_thumb_task`, `mark_repair_attempted`, session de génération (`_thumb_session_*`), `get_thumb_timeout`, `_prevent_system_sleep` (l.396) |
+| 431–541 | Chemins, corbeille | `get_base_path` (431), `get_data_path` (434), `BASE_DIR/DATA_DIR/DB_PATH` (446–457), `_purge_expired_trash` (487), `_move_file_to_trash` (502) |
+| 542–776 | Logs, outils externes, réglages | `setup_logging`, `_check_required_modules` (601), `_setup_rar_tool` (677), `_setup_ffmpeg_tool` (707), `SETTINGS_FILE` (753), `load_settings/save_settings` (756/766) |
+| 777–961 | Démarrage auto OS | `is_startup_enabled`, `set_startup_enabled` (838 : registre Windows, LaunchAgent macOS, autostart Linux), `save_cache_on_exit` (922), `_cleanup_expired_shares` (954) |
+| 962–1104 | Chiffrement secrets | `encrypt_password`/`decrypt_password`, `decrypt_account_secret`, `migrate_account_passwords_to_random_iv`, `migrate_printer_api_keys` |
+| 1105–1717 | Base de données | `get_db` (1105), `init_db` (1111), `migrate_*` (print_history 1407, printer_maintenance 1451, print_photos 1599, manual_filament_spools 1613, users_recovery_code 1645) |
+| 1718–2984 | Connexions imprimantes | `_build_bambu_result_from_state` (1718), `BambuPersistentConnection` (1786, MQTT), flux caméra MJPEG/RTSP (1901/1963), découverte LAN (SSDP, broadcast, FlashForge : 2017–2318), `ElegooSDCPConnection` (2343), `CrealityConnection` (2542), `FlashForgePersistentConnection` (2672), `ElegooCC2Connection` (2809), Klipper/Spoolman actif (2942) |
+| 2985–3403 | `PrinterManager` (l.2985) | Dispatch par type (`octoprint`, `prusalink`, `klipper`, `bambu`, `elegoo_sdcp`, `elegoo_cc2`, `creality`, `flashforge`), statut normalisé |
+| 3404–3606 | Sécurité & app Flask | `parse_printer_config` (3404), `is_first_launch`, hash mots de passe (`hash_pw_strong` 3434), code de récupération, `login_required` (3471), `STELLIO_COMPANION_APK_URL` (3480), `app = Flask(...)` (3482), CSRF, en-têtes, gestionnaires 413/500 |
+| 3607–3723 | Archives | `UnsafeArchiveError` (3607), `safe_extract_zip/tar/rar/7z`, chemins virtuels d'archive (`make_virtual_archive_path` 3661), `list_archive_3d_entries` (3664), `read_archive_entry_bytes` (3703) |
+| 3724–3941 | Cache fichiers | `load_file_cache`/`save_file_cache`/`invalidate_cache`, `_migrate_file_cache_schema` (3797), `_backfill_multiplate_tags` (3869), `mark_download_complete_and_refresh_thumbnail` (3928) |
+| 3942–5110 | Miniatures et analyse 3D | `process_generation_queue` (3942, `thumb_worker` 3948), 3MF multi-plaques (`load_3mf_mesh` 4380, `get_3mf_plate_count` 4198), rendu `generate_thumbnail_pyrender` (4615) → `_raster` (4837) → `_matplotlib` (4949) → `create_fallback_thumbnail` (4559), `analyze_3d_file` (5014) |
+| 5111–5478 | Auth & configuration | `POST /api/files/analyze`, `/api/auth/*` (inscription, login, question secrète, récupération), `/api/app-config` |
+| 5479–5833 | Sources | `/api/sources*` (suggestions 5511, ajout 5565, drop 5607), `/api/files/upload-drop` (5678) |
+| 5834–6163 | Comptes externes | `/api/accounts*` (Thingiverse, MakerWorld), `validate_thingiverse_account` (5901) |
+| 6164–6857 | Mesh, miniatures & tags (API) | `/api/file/mesh` (6166), `/api/thumb*` (6306–6684), `reconcile_thumbnails_with_disk` (6488), `pregenerate_thumbnails_on_startup` (6379), `/api/tags*` (6696–6857) |
+| 6858–7586 | Scan des sources | `extract_archive_to_disk` (6858), `scan_local_folder` (6929), `scan_smb_folder_recursive` (6983), `deduplicate_files_hybrid` (7048), `_auto_tag_new_files` (7113), `_do_background_scan` (7160), `_auto_scan_scheduler` (7337), `GET /api/files` (7363), `/api/files/changes`, `/api/scan/delta` (7566) |
+| 7587–8114 | Partage et instances distantes | `/api/files/share`, `/share/<token>`, `/api/remote-instances*`, `/api/peer/*`, `_scan_lan_for_stellio` (7920) |
+| 8115–8743 | Opérations fichiers | `_get_all_source_paths`, `_is_path_within_sources` (8131), `/api/files/{open-with,exists,delete,delete-batch,restore-batch,rename,duplicates,duplicates/similar}`, `GET/POST /api/files/origin` (« Origine du modèle » : `api_get_file_origin`, `api_set_file_origin`, `_origin_norm_path`, `_origin_path_allowed`, ajoutés le 18/10/2026 juste après `/api/files/exists`), `_follow_file_origin` (appelé par `rename` et `move`) |
+| 8744–9189 | Stats, historique, photos | `/api/stats` (8744), `/api/print-history*` (8886, note, coût), `/api/print-photos*` (9068) |
+| 9190–9420 | Déplacer / décompresser | `/api/browse-folder`, `/api/files/{move,decompress,cleanup-archive}` (`move` appelle `_follow_file_origin`), `/api/archive/extract-entry` |
+| 9421–10714 | Slicers | `get_slice_temp_dir`, détection (`_SLICER_CANDIDATES` 9571, `_locate_slicer[_macos]`, `detect_installed_slicers` 9751), `run_silent_slice` (9950), estimation (`process_slice_estimate_queue` 10088), parsing G-code (`parse_bambu_orca_gcode3mf`, `parse_cura_gcode`…), `/api/slicer/*` (10199–10516), `/api/picker/*`, `/api/test-connection` (10648) |
+| 10715–12193 | Téléchargement de modèles | `/api/download*` (dossier, progression, annulation), `printables_get_*` (10904), `makerworld_*` (11197–11445, token 11353), `api_download_file` (11446–12079), `save_download_history` (12115), `/api/download-history` (12129), `/api/file/data` (12162) |
+| 12194–12396 | Favoris, file d'attente, présence | `/api/favorites`, `/api/print-queue*`, `/api/presence/*` |
+| 12397–12721 | Notifications | `/api/notifications*`, `_send_native_notification` (12424, `plyer`) ; **dédoublonnage par sujet** : `_normalize_dedup_key` (l.12588) retire un suffixe de date, `api_create_notification` ne crée qu'une notification par `dedup_key` quelle que soit sa date (met seulement à jour le message), `_dedupe_notifications_once` (l.12594, appelée au chargement l.12618) fusionne les anciens doublons |
+| 12722–13021 | Projets | `/api/projects*` |
+| 13022–13056 | Statut des comptes | `/api/accounts/status` |
+| 13057–13578 | Réparation, conversion, intégrité | `/api/files/{repair,convert,convert-batch}`, `_repair_mesh_inplace` (13185), `/api/integrity/*` (13365–13578) |
+| 13579–14184 | Sauvegarde | `build_backup_zip_bytes` (13579), `/api/backup/{export,export-native,import}`, **sauvegarde automatique** (`_load_auto_backup_config` 13744, `_auto_backup_scheduler` 13914, `run_auto_backup` 13876, `_restore_backup_zip` 13980, `/api/backup/auto/*` 14046–14160) |
+| 14185–14443 | Suggestions & signalements | `_feedback_*` (14185–14285) : issues GitHub via relais, `/api/feedback/{config,submit,requests,request/<n>,close,remove}` (14284–14429) |
+| 14444–14621 | Diagnostic et logs | `_redact_secrets` (14444), `_collect_diagnostic_info` (14484), `build_diagnostic_zip_bytes` (14566), `/api/logs/export[-native]` |
+| 14622–15043 | Devis et débogage | logo du devis (`_load_quote_logo` 14673, `/api/quote/logo` 14688–14714), `_quote_pdf_encryption` (14726, `pyaes` optionnel), `build_quote_pdf_bytes` (14754), `/api/quote/export[-native]`, `/api/logs/tail` (14985), `/api/debug/*` (15025–15031) |
+| 15044–15305 | Réglages, onboarding, changelog | `/api/settings` (+ `/undo`), `CURRENT_VERSION = "0.7.2"` (15140), `load_changelog` (15144), `/api/suggestions` (15162), `/api/onboarding/*`, `/api/changelog/*` |
+| 15306–15832 | Mise à jour | `_fetch_expected_sha256` (15306), `check_for_updates` (15355), `install_update` (15450), `download_update` (15713), `/api/update/*` (15762–15815) |
+| 15833–16656 | Imprimantes (API) | `/api/printers*` (CRUD, découverte, statut, caméra, alimentation, heures), maintenance (`_serialize_maintenance_task` 16365, `/api/printers/maintenance/*`, `.../due` 16610) |
+| 16657–16713 | Arrêt app | `_cleanup_before_exit` (16657), `/api/app/quit`, `/api/app/save-cache` |
+| 16714–17254 | IA (Ollama) | `get_ollama_base_url`, `_call_ollama` (16738), `AIDisabledError` (16760), `_call_ai` (16769), `/api/ollama/models`, `_detect_hardware` (16835), `/api/ollama/recommend-model`, `/api/ai/predict-print-time` (17037), `auto-tag`, `explain-orientation`, `describe-file`, `/api/file-description` |
+| 17255–18148 | SOS Print | `_sosprint_*` (17265–17429), `/api/ollama/sos-print[/questions|/next-question]`, `/api/sos-print/conversations*` (17934–18073), `/api/ollama/semantic-search` (18085) |
+| 18149–19237 | Profils slicer | `load_slicer_profiles` (18149), parsing (`_parse_slicer_profile_file` 18426, `_parse_zip_bundle` 18350), `/api/slicer-profiles*` (18621–18895), `_autodetect_new_slicer_profiles` (18803), `_analyze_mesh_for_recommendation` (18909), `/api/ollama/recommend-profile` (19115) |
+| 19238–19470 | Nesting | `_pack_footprints_shelf`, `_pack_polygons` (19310), `/api/nesting/arrange` (19366) |
+| 19471–19561 | Recommandation de profil par lot | `/api/ollama/recommend-profile-batch` (19469) |
+| 19562–20390 | Filament, coût, TigerTag | `/api/spoolman/spools` (19560), restock (19621–19674), `_compute_estimated_cost` (19695), `/api/eco/estimate` (19830), AMS / manuel (19860–19943), TigerTag Firebase (19944–20322, `tigertag_auto_detect_studio` 20265), `_get_spoolman_slots` (20323), `/api/filament/spools` (20360) |
+| 20391–22207 | Liens utiles et boutiques | `USEFUL_LINKS_FILE` (20371), `_DEFAULT_USEFUL_LINKS` (20372, copie complète des 41 liens du JSON depuis le 19/10/2026), `load_useful_links` (20391), `/api/links`, `/api/filament/buy-links` (20467), moteur de recherche en boutique (`_shop_search_shopify/prestashop/woocommerce` 21834–21979, `load_filament_shops` 22011 (ne lit plus `filament_shops.json`), `_search_spool_in_shops` 22038), `/api/filament/shop-availability` (22138), `/api/filament/low-stock` (22152) |
+| 22208–22662 | Pré-impression & inventaire filament | `/api/files/pre-print-check` (22208), `/api/filament/{compatibility,printable-files}`, `/api/files/{assign-filament,filament-assignment,unassign-filament}`, `/api/filament/{tigertag,manual[/<id>]}`, `_consume_filament_slot` (22630) |
+| 22663–22804 | Découverte LAN | `get_local_ip`, `_scan_lan_for_spoolman` (22675), `/api/spoolman/discover*`, `/api/slicers/discover*` |
+| 22805–22888 | PWA & réseau | `/manifest.json`, `/api/network-info`, `/api/ping`, état d'accès distant |
+| 22889–23295 | Accès distant & QR | `_get_cloudflared_path`, `start_remote_access` (22922), `stop_remote_access` (23054), `/api/qrcode` (23072, `source=apk` l.23083), `/api/remote-access*` (23142–23277), adresse personnalisée |
+| 23296–23743 | Point d'entrée | `if __name__ in ('__main__', 'stellio_main')` (23296), env `STELLIO_*`, waitress `serve` (23385) ou `app.run` (23387), splash tkinter (23524), `StellioDesktopAPI` (23606), `webview.create_window` (23677), `_bind_drag_drop` (23709), `webview.start` (23733) |
 
 ### Classes
-`BambuPersistentConnection` 1827 · `ElegooSDCPConnection` 2384 · `CrealityConnection` 2583 · `FlashForgePersistentConnection` 2713 · `ElegooCC2Connection` 2850 · `PrinterManager` 3026 · `UnsafeArchiveError` 3648 · `NexprintError` 11009 · `AIDisabledError` 16004
+Premier niveau : `BambuPersistentConnection` 1786 · `ElegooSDCPConnection` 2343 · `CrealityConnection` 2542 · `FlashForgePersistentConnection` 2672 · `ElegooCC2Connection` 2809 · `PrinterManager` 2985 · `UnsafeArchiveError` 3607 · `NexprintError` 10992 · `AIDisabledError` 16760. Imbriquées : `OPENASINFO` 8220 (ctypes, « ouvrir avec » Windows) · `MEMORYSTATUSEX` 14463 · `_LockedEncryption` 14734 (chiffrement du PDF de devis) · `StellioDesktopAPI` 23606 (pont pywebview).
 
-### SQLite tables (`init_db`, l.1111)
-`users` 1118 · `sources` 1128 · `slicer_jobs` 1138 · `tags` 1145 · `file_tags` 1150 · `account_credentials` 1156 · `favorites` 1169 · `print_queue` 1175 · `notifications` 1185 · `remote_instances` 1197 · `printers` 1209 · `download_history` 1220 · `print_history` 1232 · `file_descriptions` 1243 · `print_photos` 1251 · `projects` 1260 · `project_files` 1271 · `spool_assignments` 1282 · `filament_assignments` 1294 · `manual_filament_spools` 1308 · `sos_print_diagnostics` 1320 · `sos_print_conversations` 1334 · `sos_print_messages` 1352 · `printer_maintenance_tasks` 1466 · `spool_drying_log` 1500 · `filament_calibrations` 1517 · `download_subfolders` 1569 · `model_updates` 1599 · `printer_parts` 1619
+### Tables SQLite (`init_db`, l.1111)
+`users` 1118 · `sources` 1128 · `slicer_jobs` 1138 · `tags` 1145 · `file_tags` 1150 · `account_credentials` 1156 · `favorites` 1169 · `print_queue` 1175 · `notifications` 1185 · `remote_instances` 1197 · `printers` 1209 · `download_history` 1220 · `print_history` 1232 · `file_descriptions` 1243 · `file_origins` (ajoutée le 18/10/2026, l.1254 actuelle ; colonnes `file_path`, `user_id`, `source_url`, `author`, `license`, `notes`, `from_download`, `downloaded_at`, `platform`, `updated_at` ; clé `(file_path, user_id)`) · `print_photos` 1251 · `projects` 1260 · `project_files` 1271 · `spool_assignments` 1282 · `filament_assignments` 1294 · `manual_filament_spools` 1308 · `sos_print_diagnostics` 1320 · `sos_print_conversations` 1334 · `sos_print_messages` 1352 · `printer_maintenance_tasks` 1466 · `spool_drying_log`, `filament_calibrations`, `model_updates`, `printer_parts` (créées par `migrate_stellio_extras`, l.1484 ; 29 tables).
+
+### Fonctions restaurées de la 0.6.9 (repères dans le `main.py` fusionné)
+
+| Lignes | Contenu |
+|---|---|
+| 1484–1599 | `migrate_stellio_extras` (appelée l.1641) : `users.owner_id` et `users.role`, colonnes de `print_history` (`filament_material`, `filament_label`, `spool_source_type`, `spool_source_id`, `assignment_json`), `printer_maintenance_tasks.part_id`, tables `spool_drying_log`, `filament_calibrations`, `printer_parts`, `model_updates` |
+| 3535–3569 | Rôle invité : `_is_viewer`, `_viewer_sanitize` (retire les clés dont le nom contient un indice de secret : clés API, mots de passe, jetons ; appliqué à `/api/settings` et au statut des imprimantes), `_viewer_guard` (`before_request`, vérifie aussi que le compte invité existe encore) |
+| 5311–5390 | `/api/auth/guests` (liste, création, mise à jour, suppression) ; `api_login` (5295) et `api_me` (5308) renvoient `role` ; la session d'un invité porte `viewer_id` |
+| 6049–6160 | Nexprint : `_nexprint_save_token`, `_nexprint_cookie_from_window`, `/api/accounts/nexprint/browser-login[/status]` (fenêtre pywebview sur le site officiel), clé manuelle via `/api/accounts` |
+| 10974–11196 | Nexprint : `NexprintError` (10992), `_nexprint_clean_token`, `_nexprint_json`, `_nexprint_auth_strategies`, `nexprint_get_model_files` (11042) ; branche `nexprint` de `api_download_file` (l.10176 pour l'historique, couleur l.7085) |
+| 12440–12622 | Notifications push (`_PUSH_TAGS`, `_server_t` l.12445) : `_push_http_post`, `_push_deliver` (ntfy, Telegram, Discord, webhook), `_push_notify_async` (appelée à la création d'une notification), `/api/push/test` (l.12520), `_push_watch_once` / `_push_watcher_loop` (thread démarré l.23368) |
+| 20496–20649 | Séchage : `_drying_advice_for`, `_drying_state`, `/api/filament/drying` (GET, POST, DELETE `<id>`), `/api/filament/drying/due` |
+| 20651–20791 | Calibrations : `_clean_calibration`, `/api/calibrations` (GET, POST, DELETE `<id>`), `/api/calibrations/suggest` |
+| 20793–20956 | Pièces d'usure : `_clean_part`, `/api/parts` (GET, POST, PUT/DELETE `<id>`, `/<id>/adjust`, `/low`) ; lien avec les tâches de maintenance (`part_id`, décrémentation du stock à la remise à zéro) |
+| 20958–21163 | Rapports : `_monthly_report_data`, `/api/reports/monthly`, `build_report_pdf_bytes` (21037), `/api/reports/export[-native]` |
+| 21164–21354 | Bilan d'une bobine : `/api/filament/spool-report` (21164) |
+| 21355–21546 | Mises à jour de modèles : `_model_updates_collect`, `_check_one_model_update`, `_model_updates_run` (thread), `/api/model-updates` (GET), `/check`, `/<id>/dismiss` |
+| 21548–21693 | `_append_stock_aware_warnings` (avertissements de pré-impression : buse abrasive, séchage, calibration manquante ; appelée par `/api/files/pre-print-check`) et `_filament_info_for_file` (matière/bobine associées à un fichier, écrites dans `print_history` aux deux `INSERT`, l.10499 et l.10590) |
 
 ---
 
-## 3. main.py — API routes by domain
+## 3. main.py — routes API par domaine
 
-Notation: `M` method, line of the `@app.route` declaration.
+Notation : ligne de la déclaration `@app.route` ; 249 routes.
 
-**Auth** (5217–5510) — `GET /` · `GET /api/auth/first-launch` · `POST register|login|logout` · `GET me` · `GET|POST /guests`, `PUT|DELETE /guests/<id>` · `GET security-question` · `POST recovery-code/regenerate` · `POST reset-with-recovery`
+**Auth** (5175–5470) — `GET /` · `GET /api/auth/first-launch` · `POST register|login|logout` · `GET me` · `GET security-question` · `POST recovery-code/regenerate` · `POST reset-with-recovery`
 
-**Config / sources** — `GET /api/app-config` · `GET|POST /api/sources`, `PUT|DELETE /api/sources/<id>`, `POST /api/sources/drop`, `POST /api/files/upload-drop` · `POST /api/browse-folder`, `/api/picker/folder|file`, `/api/test-connection`
+**Invités** (5311–5390) — `GET|POST /api/auth/guests` · `PUT|DELETE /api/auth/guests/<id>`
 
-**Files / library** — `GET /api/files` (7417) · `GET /api/files/changes` · `POST /api/files/invalidate-cache` · `GET /api/scan/delta` · `POST /api/files/{analyze, analyze-now, open-with, delete, delete-batch, restore-batch, rename, move, decompress, cleanup-archive, share, repair, convert, convert-batch}` · `GET /api/files/{exists, duplicates, duplicates/similar}` · `GET /api/file/{mesh, plate-count, data}` · `POST /api/archive/extract-entry` · `GET /share/<token>`
+**Config / sources** — `GET /api/app-config` (5470) · `GET|POST /api/sources`, `GET /api/sources/suggestions`, `PUT|DELETE /api/sources/<id>`, `POST /api/sources/drop`, `POST /api/files/upload-drop` · `POST /api/browse-folder`, `/api/picker/folder|file`, `/api/test-connection`
 
-**Thumbnails** — `GET /api/thumb` (6272) · `GET /api/thumb/{failures, progress, summary}` · `POST /api/thumb/{check, generate-now, regen-batch}`
+**Fichiers / bibliothèque** — `GET /api/files` (7363) · `GET /api/files/changes` · `POST /api/files/invalidate-cache` · `GET /api/scan/delta` · `POST /api/files/{analyze, analyze-now, open-with, delete, delete-batch, restore-batch, rename, move, decompress, cleanup-archive, share, repair, convert, convert-batch}` · `GET /api/files/{exists, duplicates, duplicates/similar}` · `GET, POST /api/files/origin` · `GET /api/file/{mesh, plate-count, data}` · `POST /api/archive/extract-entry` · `GET /share/<token>`
 
-**Tags / projects / favorites / queue** — `/api/tags` (GET, POST, PUT/DELETE `<id>`, `POST /restore`) · `POST /api/files/tags`, `/api/files/tags/bulk-add` · `/api/projects` (CRUD + `/restore` + `/<id>/files` POST/PUT/DELETE) · `/api/favorites` (GET, POST) · `/api/print-queue` (GET, POST, DELETE, `POST /reorder`)
+**Miniatures** — `GET /api/thumb` (6304) · `GET /api/thumb/{failures, progress, summary}` · `POST /api/thumb/{check, generate-now, regen-batch}`
 
-**Remote instances & peers** — `/api/remote-instances` (GET, POST, DELETE `<id>`, `POST <id>/ping|send`, `GET <id>/folders`, `GET /status`, `GET /discover`) · `/api/peer/{folders, identify, handshake, receive-file}`
+**Tags / projets / favoris / file d'attente** — `/api/tags` (GET, POST, PUT/DELETE `<id>`, `POST /restore`) · `POST /api/files/tags`, `/api/files/tags/bulk-add` · `/api/projects` (CRUD + `/restore` + `/<id>/files` POST/PUT/DELETE) · `/api/favorites` (GET, POST) · `/api/print-queue` (GET, POST, DELETE, `POST /reorder`)
 
-**History / stats / photos** — `GET /api/stats` · `/api/print-history` (GET, `file-status`, DELETE `<id>`, `DELETE /clear`, `POST <id>/rate|cost`) · `/api/print-photos` (GET, POST, `GET <id>/image`, DELETE `<id>`) · `/api/download-history` (GET, `DELETE /clear`)
+**Instances distantes & pairs** — `/api/remote-instances` (GET, POST, DELETE `<id>`, `POST <id>/ping|send`, `GET <id>/folders`, `GET /status`, `GET /discover`) · `/api/peer/{folders, identify, handshake, receive-file}`
 
-**Slicers & profiles** — `POST /api/slicer/{send, send-batch, pre-slice-estimate}` (+GET estimate) · `GET /api/slicers/discover` + `POST /decline` · `/api/slicer-profiles` (GET, `import`, `refresh`, `auto-detect`, PATCH `<id>/printer|type`, DELETE `<id>`) · `POST /api/nesting/arrange`
+**Historique / stats / photos** — `GET /api/stats` (8744) · `/api/print-history` (GET, DELETE `<id>`, `DELETE /clear`, `POST <id>/rate|cost`) · `/api/print-photos` (GET, POST, `GET <id>/image`, DELETE `<id>`) · `/api/download-history` (GET, `DELETE /clear`)
 
-**Model downloads / accounts** — `GET /api/download/targets`, `POST /api/download/create-folder`, `POST /api/download`, `GET /api/download/progress/<id>`, `POST /api/download/cancel/<id>` · `/api/accounts` (GET, POST, `/<platform>` GET/DELETE, `/<platform>/key`, `/thingiverse/validate`, `/nexprint/browser-login[/status]`, `/makerworld/{login,verify,disconnect}`, `/tigertag/auto-detect-studio`, `/status`)
+**Slicers & profils** — `POST|GET /api/slicer/pre-slice-estimate` · `GET /api/slicer/process-profiles` (nouveau : choix du profil de réglages à l'envoi/devis) · `POST /api/slicer/{send, send-batch}` · `GET /api/slicers/discover` + `POST /decline` · `/api/slicer-profiles` (GET, `import`, `refresh`, `auto-detect`, PATCH `<id>/printer|type`, DELETE `<id>`) · `POST /api/nesting/arrange`
 
-**Printers** — `/api/printers` (GET, POST, `discover`, `<pid>` PUT/DELETE, `<pid>/{status, upload, brand, power, camera, camera/stream, hours/add}`, `<pid>/maintenance` GET/POST, `maintenance/{<task_id>, <task_id>/reset, due}`)
+**Téléchargement de modèles / comptes** — `POST /api/download/create-folder`, `POST /api/download` (11444), `GET /api/download/progress/<id>`, `POST /api/download/cancel/<id>` · `/api/accounts` (GET, POST, `/nexprint/browser-login[/status]`, `/<platform>` GET/DELETE, `/<platform>/key`, `/thingiverse/validate`, `/makerworld/{login,verify,disconnect}`, `/tigertag/auto-detect-studio`, `/status`). Plateformes de téléchargement : Printables, MakerWorld, Thingiverse, Nexprint.
 
-**Filament / Stellio extras** — `/api/spoolman/{spools, discover, discover/decline}` · `/api/filament/{spools, tigertag, manual[/<id>], buy-links, low-stock, compatibility, spool-report, drying[/<id>, /due]}` · `/api/files/{assign-filament, filament-assignment, unassign-filament, pre-print-check}` · `/api/calibrations[/<id>, /suggest]` · `/api/parts[/<id>, /<id>/adjust, /low]` · `/api/ai/restock-check` · `/api/eco/estimate`
+**Imprimantes** — `/api/printers` (GET, POST, `discover`, `<pid>` PUT/DELETE, `<pid>/{status, upload, brand, power, camera, camera/stream, hours/add}`, `<pid>/maintenance` GET/POST, `maintenance/{<task_id> PUT/DELETE, <task_id>/reset, due}`)
 
-**Reports / quotes / backup / logs** — `/api/reports/{monthly, export, export-native}` · `/api/quote/{export, export-native}` · `/api/backup/{export, export-native, import}` · `/api/logs/{export, export-native, tail}` · `/api/integrity/{check, progress}`
+**Filament** — `/api/spoolman/{spools, discover, discover/decline}` · `/api/filament/{spools, tigertag, manual[/<id>], manual/import, manual/import/preview, buy-links, shop-availability, low-stock, compatibility, printable-files}` · `/api/files/{assign-filament, filament-assignment, unassign-filament, pre-print-check}` · `/api/ai/restock-check` · `/api/eco/estimate`
 
-**Notifications / presence** — `/api/notifications` (GET, POST, `<id>` DELETE, `<id>/read`, `read-all`) · `POST /api/push/test` · `/api/presence/{heartbeat, active}`
+**Sauvegarde / devis / logs / diagnostic** — `/api/backup/{export, export-native, import}` · `/api/backup/auto/{config GET|POST, missed GET|POST, list, run, restore, delete}` · `/api/quote/{export, export-native, logo GET|POST|DELETE}` · `/api/logs/{export, export-native, tail}` · `/api/integrity/{check, progress}`
 
-**AI / SOS Print** — `/api/ollama/{models, recommend-model, auto-tag, explain-orientation, describe-file, semantic-search, recommend-profile, recommend-profile-batch, sos-print, sos-print/questions, sos-print/next-question}` · `POST /api/ai/predict-print-time` · `GET /api/file-description` · `/api/sos-print/conversations[/<id>, /<id>/photo, /<id>/resolve, /<id>/reopen, /photo/<filename>]`
+**Suggestions & signalements (GitHub)** — `/api/feedback/{config, submit, requests, request/<n>, close, remove}`
 
-**System** — `/api/settings` (GET, POST, `POST /undo`) · `/api/suggestions` · `/api/onboarding/{status, dismiss}` · `/api/changelog/{latest, seen}` · `/api/update/{check, version, download, install}` · `/api/model-updates[/check, /<id>/dismiss]` · `/api/links` · `/api/debug/{session, enable}` · `/api/app/{quit, save-cache}` · `/manifest.json` · `/api/network-info` · `/api/ping` · `/api/qrcode` · `/api/remote-access[/toggle, /custom, /disable-custom, /configure, /disable-fixed]` · `/api/model-updates`
+**Séchage / calibrations / pièces / rapports / modèles** — `/api/filament/drying` (GET, POST, `DELETE <id>`, `GET /due`) · `/api/calibrations` (GET, POST, `DELETE <id>`, `GET /suggest`) · `/api/parts` (GET, POST, `PUT|DELETE <id>`, `POST <id>/adjust`, `GET /low`) · `/api/reports/{monthly, export, export-native}` · `GET /api/filament/spool-report` · `/api/model-updates` (GET, `POST /check`, `POST <id>/dismiss`)
+
+**Push** — `POST /api/push/test` (réglages `push_*` dans `/api/settings`)
+
+**Notifications / présence** — `/api/notifications` (GET, POST, `<id>` DELETE, `<id>/read`, `read-all`) · `/api/presence/{heartbeat, active}`
+
+**IA / SOS Print** — `/api/ollama/{models, recommend-model, auto-tag, explain-orientation, describe-file, semantic-search, recommend-profile, recommend-profile-batch, sos-print, sos-print/questions, sos-print/next-question}` · `POST /api/ai/predict-print-time` · `GET /api/file-description` · `/api/sos-print/conversations[/<id>, /<id>/photo, /<id>/resolve, /<id>/reopen, /photo/<filename>]`
+
+**Système** — `/api/settings` (GET, POST, `POST /undo`) · `/api/suggestions` · `/api/onboarding/{status, dismiss}` · `/api/changelog/{latest, seen}` · `/api/update/{check, version, download, install}` · `/api/links` · `/api/debug/{session, enable}` · `/api/app/{quit, save-cache}` · `/manifest.json` · `/api/network-info` · `/api/ping` · `/api/qrcode` · `/api/remote-access[/toggle, /custom, /disable-custom, /configure, /disable-fixed]`
+
+**Boutiques (stock bas)** — `load_filament_shops` (l.22011) ne garde que les entrées de `useful_links.json` qui ont un `search_url` contenant `{q}` (23 aujourd'hui), dédoublonnées par `id` ; `languages/filament_shops.json` a été supprimé le 19/10/2026 (il était redondant : ses 4 boutiques figuraient déjà dans les liens utiles). Les adaptateurs de recherche sont Shopify, PrestaShop et WooCommerce (`_SHOP_ADAPTERS`, l.21975).
 
 ---
 
 ## 4. index.html
 
-- `<head>` (l.1–60): theme init script, `style.css?v=…`, Inter (Google Fonts), local Font Awesome and MDI (`assets/vendor/`), Three.js r128 + OrbitControls, TrackballControls, STL/OBJ/3MF loaders (CDN). `<script src="script.js">` at the end (l.3972).
-- Sidebar: `data-page` buttons (l.221–317): dashboard, library, stats, projects, print-queue, gallery, history, repair, converter, sosprint, printers, spoolman, settings.
-- Pages (`id="page-*"`): dashboard 502 · library 693 · stats 702 · projects 813 · print-queue 833 · gallery 853 · history 875 · filters 932 · settings 964 · repair 1977 · converter 2014 · sosprint 2078 · printers 2235 · spoolman 2244 (Filament inventory: Spoolman / manual / TigerTag).
-- Modals (`id="modal-*"`): select-type 2418 · backup-options 2440 · local-manual 2491 · smb 2517 · nfs 2562 · slicer-import-assign 2599 · slicer 2618 · nesting 2664 · confirm 2723 · 3d-viewer 2741 · partners 2804 · about 2816 · shortcuts 2845 · rename-source 2882 · filters 2906 · tag-manager 3027 · bulk-tag 3077 · download 3107 · add-remote-instance 3250 · add-printer 3285 · file-actions 3437 · file-metadata 3509 · print-photos 3519 · photo-source 3551 · share-file 3574 · move-file 3611 · delete-file 3640 · rename-file 3658 · duplicates 3680 · qrcode-remote 3715 · qrcode-apk 3768 · whats-new 3814 · bulk-rename 3845 · repair-diff 3916
+- `<head>` (l.1–60) : script d'init thème (l.4), manifest PWA (l.36), `style.css?v=20260513` (l.42), Inter (`assets/vendor/inter/inter.css`, l.43), Font Awesome et MDI (`assets/vendor/`, l.44–45), Three.js r128 + OrbitControls, TrackballControls, STL/OBJ/3MF loaders (`assets/vendor/threejs/`, l.46–51) : **tout est local depuis le 20/10/2026** (auparavant Google Fonts et CDN cdnjs/jsdelivr). `<script src="script.js">` à la fin (l.4158).
+- Sidebar : boutons `.nav-btn[data-page]` (l.221–322) : dashboard, library, stats, projects, print-queue, history, gallery, repair, converter, sosprint, printers, spoolman, settings ; bouton Ko-fi `#nav-kofi-btn` en bas (l.335). Une barre de navigation mobile répète les entrées (l.2449–2506).
+- Pages (`id="page-*"`) : dashboard 511 · library 738 · stats 747 · projects 848 · print-queue 868 · gallery 888 · history 910 · filters 967 · settings 999 · repair 2072 · converter 2109 · sosprint 2173 · printers 2330 · spoolman 2339 (Inventaire filament : Spoolman / manuel / TigerTag).
+- Modales (`id="modal-*"`, 35) : select-type 2513 · backup-options 2535 · local-manual 2586 · smb 2612 · nfs 2657 · slicer-import-assign 2694 · slicer 2713 · nesting 2764 · confirm 2823 · 3d-viewer 2841 · partners 2904 · **feedback 2916** · about 2974 · shortcuts 3003 · rename-source 3040 · filters 3064 · tag-manager 3185 · bulk-tag 3235 · download 3265 · add-remote-instance 3408 · add-printer 3443 · file-actions 3595 · file-metadata 3667 · print-photos 3677 · photo-source 3709 · share-file 3732 · move-file 3769 · delete-file 3798 · rename-file 3816 · duplicates 3838 · qrcode-remote 3873 · qrcode-apk 3926 · whats-new 3972 · bulk-rename 4003 · repair-diff 4074
+- Éléments restaurés (0.6.9) : bouton « Rapport mensuel » `openMonthlyReport` (l.751), carte `#model-updates-card` (l.956), accordéons Paramètres « Notifications push » (l.1717–1769) et « Comptes invités » (l.1770–1786), tous deux `.viewer-hide`, carte de compte Nexprint (l.1822–1841, bouton `#nexprint-login-btn` → `nexprintBrowserLogin()`, clé manuelle `#nexprint-api-key`), bouton « Pièces d'usure » `openPartsModal` (l.2335) et `.viewer-hide` sur « Ajouter une imprimante » (l.2332), bloc `#slicer-calib-box` dans la modale slicer (l.2723). Les fenêtres des pièces et du rapport mensuel sont construites dynamiquement par `script.js`.
+- Widget « Comptes externes » (`#dashboard-widget-accounts`, l.683–693, id de widget `accounts`) : liste Thingiverse, MakerWorld, Nexprint et TigerTag avec leur état de connexion ; rempli par `_loadDashboardAccounts` (script.js l.2993) à partir de `/api/accounts/status`. Fonctionne comme les autres widgets (déplaçable, masquable, ordre mémorisé).
 
 ---
 
-## 5. script.js — functional areas
+## 5. script.js — zones fonctionnelles
 
-| Lines | Area | Main functions |
+| Lignes | Zone | Fonctions principales |
 |---|---|---|
-| 1–200 | `I18N` | `I18N` object (init, `_loadLang`, `t`, `apply`), supported languages zh/en/es/fr/de/it/ja/pt, `/languages` folder |
-| 203–360 | Init & PWA | `installStellioApp`, `_getCsrfCookie`, `DOMContentLoaded` (l.335) |
-| 356–600 | Config, backup | `loadAppConfig`, `applyAllowedSourceTypes`, `exportBackup`, `importBackup`, `showConfirmDialog` |
-| 596–760 | Integrity | `startIntegrityCheck`, `pollIntegrityProgress`, `renderIntegrityResults` |
-| 761–990 | Keyboard & hover | `setupKeyboardShortcuts` (l.794), arrow-key navigation, `setupHoverDelegation` |
-| 991–1360 | Languages, thumbnails, favorites | `populateLanguageSelectors`, `generateVisibleThumbnails`, `refreshFileThumbnail`, `loadFavorites`, `checkFavoritesRestock` |
-| 1363–1520 | "Print soon" queue | `loadPrintQueue`, `renderPrintQueue`, `setupPrintQueueDragDrop` |
-| 1603–1830 | Archives, auth, what's new | `decompressFile`, `checkAuth` (l.1732), `showPanel` (auth panels, l.1751), `showApp` (l.1758), `checkWhatsNew` |
-| 1836–2400 | Dashboard | `loadDashboard` (l.1841), widget config/order (`applyDashboardConfig`, `_setupDashboardDragAndDrop`), `_loadDashboard*` (sos, favorites, projects, stats, maintenance, queue, downloads, instances, update, suggestions, printers, history, stock, recent files) |
-| 2400–2660 | Notifications & presence | `loadNotifications`, `createNotification`, `startPresence`, `maybeFireBrowserNotifications` |
-| 2660–2810 | Guided tour | `getTourSteps`, `_showTourStepAt`, `endTour` |
-| 2809–3020 | Ctrl+K command palette | `_staticCommands`, `_navCommands`, `_fileCommands`, `_tagCommands`, `_executeCommand` |
-| 3162–3330 | Toasts | `showToast`, `showUndoToast`, `showGenericUndoToast` |
-| 3336–3480 | Discovery & startup | `checkSpoolmanAutoDiscovery`, `checkSlicerDefaultDiscovery`, `checkAccountsStatusOnStartup`, `startAutoFileMonitor` |
-| 3510–3720 | UI utilities, sources | `escapeHtml`, `formatSize`, `openModal`/`closeModal`, `pickPhoto` (camera/gallery), `addSource` |
-| 3720–4050 | Remote instances | `loadRemoteInstances`, `discoverRemoteInstances`, `sendFileToRemoteInstance`, `_openRemoteFolderPicker` |
-| 4044–5050 | Library | `loadSources`, `loadFiles` (l.4118), `pollScanProgress`, `renderFileCard` (4385), `renderFiles` (4675), `buildFolderBlock`, `renderChunk`, thumbnail generation/tracking |
-| 5048–5430 | Tags & bulk rename | `loadTags`, `openTagManagerModal`, `applyTagsToFile`, `openBulkRenameModal`, `_computeBulkRenameName`, `applyTagsToSelection` |
-| 5429–5620 | Model downloads | `openDownloadModal`, `handleDownload`, `startDownload`, progress toasts, `cancelDownload` |
-| 5766–5995 | Filters | `applyFilters` (l.5766), `openFiltersModal`, saved filters (`_loadSavedFilters`, `renderSavedFiltersList`) |
-| 5994–6130 | Slicer (send) | `openFileWith`, `sendToSlicer` (6020), `_loadSlicerQuickEstimate`, `_runPrePrintCheck`, `_loadSlicerSpoolBox` |
-| 6126–6735 | 3D viewer | `open3DViewer`, `load3DModel` (6579), orientation (`computeOverhangVertexColors`, `computeOrientationSuggestions`, `suggestBestOrientation`), multi-plate (`goToPlate`) |
-| 6735–7210 | Slicer profiles | `loadSlicerProfiles`, `renderSlicerProfiles`, `importSlicerProfiles`, `autoDetectSlicerProfiles` |
-| 7213–7410 | Profile recommendation & nesting | `requestProfileRecommendation`, `openNestingModal`, `runNesting`, `renderNestingPreview` |
-| 7413–8210 | Settings | theme/accent (`applyTheme`, `applyFabricant`), `initSettings` (7444), Spoolman, Ollama/AI, auto scan, auto start, print costs, quote settings (8110+) |
-| 8209–8470 | Ollama | `testOllamaConnection`, `recommendOllamaModel`, `ollamaAutoTag` |
-| 8472–9010 | SOS Print | `runSosprintDiagnosis`, `renderSosprintQuestionStep`, `loadSosprintHistory`, `resumeSosprintConversation` |
-| 9208–9645 | Filament inventory | `loadSpoolmanPage` (9219), `loadManualSpoolInventory`, `renderManualSpoolGrid`, `openSpoolInventoryModal`, `saveSpoolInventoryEntry` |
-| 9642–10125 | Extras (drying, calibrations, parts) | `applyRoleUI`, `_loadSpoolDrying`, `_loadSpoolCalib`, `openPartsModal`, `loadParts`, `checkPartsLowAlerts`, `checkDryingDueAlerts` |
-| 10122–10245 | Guests, pre-print check, reliability | `loadGuests`, `_prePrintWarningHtml`, `_renderStatsReliability` |
-| 10245–10360 | Push | `loadPushSettings`, `savePushSettings`, `testPush`, `_applyReprintContext` |
-| 10362–10535 | Monthly report | `openMonthlyReport`, `loadMonthlyReport`, `exportMonthlyReport`, `_loadSpoolReport` |
-| 10537–10625 | Model updates | `loadModelUpdates`, `autoCheckModelUpdates` |
-| 10625–10862 | Spool sheet & Spoolman grid | `showSpoolDetailPopup` (10697), `_detailFromSpoolman/Manual/TigerTag`, `renderSpoolmanGrid` |
-| 10862–11260 | External accounts & TigerTag | `saveAccountKey`, `nexprintBrowserLogin`, `makerWorldStep1/2`, `loadTigerTagSpools`, `renderTigerTagGrid` |
-| 11256–11410 | Side navigation | `setupNavDragAndDrop`, `applyNavOrderToSidebar`, `setupEventListeners` (11349) |
-| 11406–11540 | Auth UI | `loadSecurityQuestionFor`, `showRecoveryCodeModal` |
-| 11539–11700 | Header, search, mobile | `updateHeaderVisibilityForPage`, `resetGlobalSearch`, `toggleMobileSidebar` |
-| 11714–11950 | Drag and drop / upload | `_uploadDroppedFiles`, `handleFilePicker` |
-| 11946–12210 | Search | `isSemanticQuery`, `runSemanticSearch`, `handleSearchInput`, recent searches |
-| 12211–12430 | Mobile nav, slicer send, selection | `toggleNavItem`, mobile bar scroll arrows (12239), `_confirmSendToSlicer`, `updateFolderSelectionBar` |
-| 12485–12780 | Repair & converter | `loadRepairFiles`, `showRepairDiff` (12568), `loadConverterFiles`, `renderConverterFiles` |
-| 13162–13200 | Printer compatibility | `checkPrinterCompatibility` |
-| 13465–13800 | History | rating, cost, failure reason, `_populateHistoryPlatformFilter`, `_checkHistoryFileExists`, `loadDownloadHistory` |
-| 13942–14250 | Printers | `loadPrinters`, `renderPrinters`, card cameras, `refreshAllPrinters` |
-| 14244–14680 | Maintenance | `openMaintenanceModal`, tasks, `checkMaintenanceDueGlobal`, alert popups |
-| 14675–14800 | Low stock | `checkLowStockOnStartup`, `showLowStockToast`, `showLowStockShopPopup` |
-| 14796–15060 | Printer monitor | `openPrinterMonitor`, `fetchAndUpdateMonitor`, `updateMonitorUI`, `loadPrinterCamera` |
-| 15428–15570 | Diagnostics | `loadAppVersion`, `enableDebugSessionAndRestart`, `pollDiagnosticConsole`, `exportDiagnosticLogs` |
-| 17014–17030 | Cost | `_applyCostSpoolSelection`, `_applyCostPrinterSelection` |
-| 17365–17560 | Projects | `loadProjects`, `renderProjectCard`, `refreshProjectDetail` |
-| 17834–17940 | PWA / QR | `_detectMobileBrowserContext`, `_renderPwaBrowserHint`, `_loadQrCode` |
+| 1–200 | `I18N` | objet `I18N` (l.1–104 : `init` 31, `t` 79, `apply` 96), `_supportedLangs` zh/en/es/fr/de/it/ja/pt, dossier `/languages`, repli `fr` ; `API` ; enregistrement du service worker (l.192–196) |
+| 203–350 | Init & PWA | `installStellioApp`, `_getCsrfCookie` (215), `let IS_VIEWER` (219), `window.fetch` surchargé (222, ajoute le jeton CSRF et affiche un toast « lecture seule » sur un 403 d'invité), `DOMContentLoaded` (l.331) |
+| 352–607 | Config, sauvegarde manuelle | `loadAppConfig`, `applyAllowedSourceTypes`, `exportBackup`, `runBackupExport`, `importBackup`, `showConfirmDialog` (529), `showBackupRestartPopup`, `initKofiButton` (594) |
+| 608–892 | Suggestions & signalements | `_fb*`, `openFeedbackModal` (678), `submitFeedback` (713), `loadFeedbackList`, `openFeedbackDetail`, `closeFeedbackRequest`, `checkFeedbackUpdatesOnStartup` (878) |
+| 893–1013 | Widgets tableau de bord « Sauvegardes » / « Demandes GitHub » | `openBackupSettings`, `_loadDashboardBackups` (905), `dashboardBackupNow`, `_loadDashboardIssues` (968) |
+| 1014–1306 | Sauvegarde automatique | `loadAutoBackupSettings` (1069), `saveAutoBackupSettings`, `runBackupNow`, `checkMissedBackupOnStartup` (1176), `loadBackupList`, `restoreBackupFromList`, `deleteBackupFromList` |
+| 1307–1471 | Intégrité | `startIntegrityCheck`, `pollIntegrityProgress`, `renderIntegrityResults`, `deleteFileFromIntegrity`, `repairFileFromIntegrity` |
+| 1472–1671 | Clavier & survol | `setupKeyboardShortcuts` (l.1505), navigation fléchée, `setupHoverDelegation` |
+| 1672–2283 | Langues, miniatures, favoris, file d'attente | `populateLanguageSelectors`, `generateVisibleThumbnails`, `toggleHighContrast`/`toggleReduceMotion` (1779/1784), `undoLastSettingsChange`, `refreshFileThumbnail`, `checkFavoritesRestock`, `loadFavorites`, `loadPrintQueue`, `renderPrintQueue`, `setupPrintQueueDragDrop` |
+| 2284–2524 | Archives, auth, nouveautés | `decompressFile`, `extractArchiveEntry`, `checkAuth` (2413), `showPanel` (2432, panneaux d'auth), `showApp` (2439), `checkWhatsNew` (2491) |
+| 2525–3114 | Tableau de bord | `loadDashboard` (2525), checklist d'onboarding, config/ordre des widgets (`applyDashboardConfig`, `_setupDashboardDragAndDrop` 2706), `_loadDashboard*` (sos, favoris, projets, stats, maintenance, file, téléchargements, instances, comptes externes, mise à jour, suggestions) ; les widgets imprimantes/historique/stock/fichiers récents sont plus bas (l.3748–3888) |
+| 3115–3388 | Notifications & présence | `goToFileInLibrary`, `loadNotifications`, `createNotification`, `startPresence`, `maybeFireBrowserNotifications` |
+| 3389–3538 | Visite guidée | `getTourSteps`, `_showTourStepAt`, `endTour` |
+| 3539–3747 | Palette de commandes Ctrl+K | `_staticCommands`, `_navCommands`, `_fileCommands`, `_tagCommands`, `_filamentCommands`, `_slicerProfileCommands`, `_executeCommand` (3708) |
+| 3748–3888 | Widgets tableau de bord (suite) | `_loadDashboardPrinters`, `_loadDashboardHistory`, `_loadDashboardStock`, `_loadDashboardRecentFiles` |
+| 3889–4062 | Toasts | `showToast`, `showUndoToast`, `showGenericUndoToast` |
+| 4063–4236 | Découverte & démarrage | `checkSpoolmanAutoDiscovery`, `checkSlicerDefaultDiscovery`, `checkAccountsStatusOnStartup`, `startAutoFileMonitor` |
+| 4237–4446 | Utilitaires UI, sources | `escapeHtml`, `formatSize`, `openLinksModal` (4259), `openModal`/`closeModal`, `loadSourceSuggestions`, `pickPhoto` (4361), `addSource` |
+| 4447–4770 | Instances distantes | `loadRemoteInstances`, `discoverRemoteInstances`, `sendFileToRemoteInstance`, `_openRemoteFolderPicker` |
+| 4771–5772 | Bibliothèque | `loadSources`, `loadFiles` (4845), `pollScanProgress`, `renderFileCard` (5111), sélection multiple (`window.toggleSelectionMode` 5179…), `renderFiles` (5400), `buildFolderBlock`, `renderChunk`, génération/suivi de miniatures |
+| 5773–6153 | Tags & renommage en masse | `loadTags`, `openTagManagerModal`, `applyTagsToFile`, `openBulkRenameModal`, `_computeBulkRenameName`, `applyTagsToSelection` |
+| 6154–6472 | Téléchargement de modèles | `loadDownloadSources`, `openDownloadModal` (6187), `handleDownload`, `startDownload`, toasts de progression, `cancelDownload` |
+| 6473–6700 | Filtres | `applyFilters` (6473), `openFiltersModal`, filtres sauvegardés (`_loadSavedFilters`, `renderSavedFiltersList`) |
+| 6701–6870 | Slicer (envoi) | `openFileWith`, `sendToSlicer` (6727), `_loadSlicerQuickEstimate`, `_runPrePrintCheck`, `_loadProcessProfileSelect` (6811, choix « Réglages du slicer »), `_loadSlicerSpoolBox` |
+| 6871–7479 | Visionneuse 3D | `open3DViewer` (6940), `load3DModel` (7324), orientation (`computeOverhangVertexColors`, `computeOrientationSuggestions`, `suggestBestOrientation`), multi-plaques (`goToPlate`) |
+| 7480–8128 | Profils slicer & recommandation | `loadSlicerProfiles`, `renderSlicerProfiles`, `importSlicerProfiles`, `autoDetectSlicerProfiles`, `requestProfileRecommendation` (7958), `renderProfileSuggestions` (8005), `_refineSuggestionTime` (8064) |
+| 8129–8256 | Nesting | `openNestingModal`, `runNesting`, `renderNestingPreview`, `sendNestedPlateToSlicer` |
+| 8257–9079 | Paramètres | thème/accent (`applyTheme`, `applyFabricant`), `initSettings` (8292), Spoolman (8383), Ollama/IA (8467–8571), scan auto (8572), inventaire manuel (8638), démarrage auto (8675), tarifs d'impression (8761–8964), devis et logo (8965–9079) |
+| 9080–9342 | Ollama | `testOllamaConnection`, `recommendOllamaModel`, `ollamaAutoTag` |
+| 9343–10078 | SOS Print | `runSosprintDiagnosis` (9448), `renderSosprintQuestionStep`, `loadSosprintHistory`, `resumeSosprintConversation` |
+| 10079–11630 | Inventaire filament | `loadSpoolmanPage` (10090), `loadManualSpoolInventory`, `renderManualSpoolGrid`, `openSpoolInventoryModal`, `showSpoolDetailPopup` (11466), `renderSpoolmanGrid` (11578) |
+| 10523–11393 | **Fonctions restaurées (0.6.9)** | `applyRoleUI` (10523, classe `body.role-viewer` + masquage des `.viewer-hide`) ; extras de la fiche bobine : `_initSpoolDetailExtras` (10562), séchage `_loadSpoolDrying` (10582), calibrations `_loadSpoolCalib` (10695), `_loadSlicerCalibBox` (10769) ; pièces d'usure `openPartsModal` (10806), `loadParts`, choix de pièce dans la maintenance (`_maintenancePartOptions` 10920, `_handleMaintenanceResetPart` 10941) ; alertes `checkPartsLowAlerts` / `checkDryingDueAlerts` / `checkStellioExtrasAlerts` (10954–10983, appelée l.2469) ; invités `loadGuests` (10993), `createGuest` ; push `loadPushSettings` (11083), `savePushSettings`, `testPush` ; rapport mensuel `openMonthlyReport` (11169), `loadMonthlyReport`, `exportMonthlyReport` ; bilan de bobine `_loadSpoolReport` (11267) ; modèles `loadModelUpdates` (11306), `autoCheckModelUpdates` (11378) ; `_prePrintWarningHtml` (11052) |
+| 11394–11580 | Détail d'une bobine | `_detailFromSpoolman`, `showSpoolDetailPopup` (11466) |
+| 11699–11740 | Nexprint | `nexprintBrowserLogin` (11699) : ouvre la fenêtre de connexion et interroge `/api/accounts/nexprint/browser-login/status` |
+| 11631–12024 | Comptes externes & TigerTag | `saveAccountKey`, `makerWorldStep1/2`, `tigerTagAutoDetectStudio`, `loadTigerTagSpools`, `renderTigerTagGrid`, `loadAccountBadges` |
+| 12025–12174 | Navigation latérale | `setupNavDragAndDrop`, `applyNavOrderToSidebar`, `setupEventListeners` (12118) |
+| 12175–12307 | Auth UI | `loadSecurityQuestionFor`, `showRecoveryCodeModal` |
+| 12308–12482 | En-tête, recherche, navigation, mobile | `updateHeaderVisibilityForPage`, `resetGlobalSearch`, **gestionnaire de clic des `.nav-btn` (l.12354–~12393)**, `toggleMobileSidebar` |
+| 12483–12714 | Glisser-déposer / upload | `_uploadDroppedFiles`, `__stellioHandleDroppedPaths` (12513), `handleFilePicker` |
+| 12715–12979 | Recherche | `isSemanticQuery`, `runSemanticSearch`, `handleSearchInput`, recherches récentes |
+| 12980–13259 | Nav mobile, envoi slicer, sélection de dossier | `toggleNavItem` (12980), `DOMContentLoaded` (12997), `_confirmSendToSlicer` (13060), `updateFolderSelectionBar` |
+| 13260–13936 | Réparation & convertisseur | `loadRepairFiles`, `showRepairDiff` (13343), `loadConverterFiles`, `renderConverterFiles`, ajout/édition d'imprimante (`window.addPrinter` défini **une seule fois** (l.14067 dans le `script.js` fourni le 19/10/2026 ; l'ancien doublon n'existe plus)) |
+| 13937–14256 | Compatibilité imprimante, statistiques | `checkPrinterCompatibility`, `displayCompatibilityIndicator`, `DOMContentLoaded` (14007), `window.loadStats` (14141) |
+| 14257–14740 | Historique | notation, coût, raison d'échec, `window.loadHistory` (14464), `_checkHistoryFileExists`, `loadDownloadHistory` (14592) |
+| 14741–15019 | Imprimantes | `loadPrinters`, `renderPrinters`, caméras de cartes, `refreshAllPrinters` (14935) |
+| 15020–15473 | Maintenance | `openMaintenanceModal` (15043), tâches, `checkMaintenanceDueGlobal`, popups d'alerte |
+| 15474–15678 | Stock bas | `checkLowStockOnStartup`, `showLowStockToast`, `showLowStockListPopup`, `showLowStockShopPopup` (15560, recherche de la bobine exacte en boutique) |
+| 15679–16252 | Moniteur imprimante, ajout/découverte | `openPrinterMonitor`, `fetchAndUpdateMonitor`, `updateMonitorUI`, `loadPrinterCamera`, `deletePrinter`, `_printerTypeLabel` (15941), `window.discoverPrinters` (15946) |
+| 16253–16450 | Mise à jour, quitter, diagnostic | `manualCheckUpdate` (16035), `showQuitConfirmation` (16264), `loadAppVersion` (16311), `enableDebugSessionAndRestart`, `pollDiagnosticConsole`, `exportDiagnosticLogs` (16445) |
+| 17943–17955 | Coût | `_applyCostSpoolSelection`, `_applyCostPrinterSelection` |
+| 18343–18533 | Projets | `loadProjects`, `renderProjectCard`, `refreshProjectDetail`, `openProjectFormModal` (18408) |
+| 18812–19244 | PWA / QR | `_detectMobileBrowserContext`, `_renderPwaBrowserHint`, `_loadQrCode` (18910) |
 
-> Lines 15060–15428, 15570–17014 and 17030–17365 contain no named top-level functions: the code there is organized as event-listener blocks (`DOMContentLoaded` at l.12228, 13232, 15370, 15655) and nested functions (stats, print cost/quote, history, etc.). Use `grep` on DOM ids (`getElementById('…')`) to locate things.
+> Les lignes 16450–17943, 17955–18343 et 18533–18812 ne contiennent pas de fonctions de premier niveau nommées : le code y est organisé en blocs d'écouteurs d'événements (`DOMContentLoaded` aux l.16253 et 16538) et en fonctions imbriquées (coût d'impression/devis, historique, etc.). Utiliser `grep` sur les ids du DOM (`getElementById('…')`) pour les retrouver.
 
 ---
 
-## 6. style.css — landmarks
+## 6. style.css — repères
 
-- 1–60: download history
-- 62–131: variables (`:root`, `[data-theme="light"]`, `[data-fabricant="bambu|prusa|voron|creality"]`)
-- 134–227: reset, `.btn*`
-- 229–450: authentication screen, `.input-group` fields
-- 452–600: `.app-screen` layout, `.sidebar`, `.nav-btn`
-- 604–920: header, search (`.search-box`, history), view selectors, thumbnail progress
-- 921–970: `.main-content`, drop zone, pages
-- 972–2000: file grids (gallery/details), `.file-card`, badges, action buttons, metadata tooltips
-- 2000–8076: later components (modals, dashboard, printers, filament, etc.) — not mapped line by line; search by class name.
+- 1–60 : historique de téléchargement (`.download-history-section`)
+- 62–131 : variables (`:root` 62, `[data-theme="light"]` 94, `[data-fabricant="bambu|prusa|voron|creality"]` 109/115/121/127)
+- 134–227 : reset, `.auth-*` (154), `.btn*` (165)
+- 229–450 : écran d'authentification, champs `.input-group` (338)
+- 452–600 : layout `.app-screen` (452), `.sidebar` (457), `.nav-btn` (519)
+- 604–920 : en-tête, recherche (`.search-box` 650), sélecteurs de vue, progression de miniatures
+- 921–2000 : `.main-content` (923), grilles de fichiers (gallery/details), `.file-card` (991), badges, boutons d'action, infobulles de métadonnées
+- 2678 modales · 2713 visionneuse 3D · 2845 toasts · 3743 historique · 4293 bobines · 4450 cartes d'imprimante · 4545 moniteur · 5354 `.tigertag-banner-logo` · 5543 SOS Print · 6732 tableau de bord · 7235 visite guidée · 7468 palette de commandes
+- 7833 accessibilité (contraste élevé 7846, réduction des animations 7886) · 7932 présence légère · 7965 sauvegarde automatique et liste des sauvegardes · 8063 suggestions & signalements · 8114 bouton Ko-fi `.kofi-btn`
+- Le reste (2000–7800) n'est pas cartographié ligne par ligne ; chercher par nom de classe.
 
 ---
 
 ## 7. i18n
 
-- `languages/<code>.json` files: flat dictionary, `section.key` keys (e.g. `spoolman.sort_name`), plus `__dir`, `__name`, `__native`. 1,793 keys in each of the 8 languages (fr, en, de, es, it, ja, pt, zh).
-- HTML: `data-i18n*` attributes; JS: `I18N.t('key')`; backend: reads `languages/<lang>.json` directly for push notifications and the splash screen (l.12484, 22049); the frontend fetches them via `/languages/<lang>.json` (served by Flask's static folder).
-- `changelog.json`: `[{version, items:{<lang>:[…]}}]`; current version `0.6.9` (Nexprint entry), read via `load_changelog` (l.14388).
+- Fichiers `languages/<code>.json` : dictionnaire plat, clés `section.cle` (ex. `spoolman.sort_name`), plus `__dir`, `__name`, `__native`. **1948 clés** (1951 entrées avec les métadonnées) dans chacune des 8 langues (fr, en, de, es, it, ja, pt, zh) ; les jeux de clés sont strictement identiques (aucune clé manquante ni en trop).
+- HTML : attributs `data-i18n*` ; JS : `I18N.t('clé')` ; backend : lit `languages/<lang>.json` directement pour le splash (`load_splash_translations`, main.py l.23527–23556) ; le frontend les récupère via `/languages/<lang>.json` (servi par le dossier statique Flask).
+- `changelog.json` : `[{version, items:{<lang>:[…]}}]`, lu par `load_changelog` (main.py l.15144, tri par version décroissante). Entrées : 0.7.2 (21 éléments par langue ; 8 ajoutés le 20/10/2026 : licence AGPL v3, origine du modèle, ressources web locales, modules embarqués, `unrar` de l'installeur Linux, liens utiles, confidentialité, builds), 0.7.1 (8), 0.7.0, 0.6.9, 0.6.8 ; la version courante `CURRENT_VERSION` (0.7.2) a donc son entrée.
 
-## 8. Quick recipes
+## 8. Recettes rapides
 
-- **Add an API route**: `@app.route` decorator + `@login_required` in the domain's section (section 3), taking `_viewer_guard` into account for writes.
-- **Add a table**: `init_db` (l.1111) + a `migrate_*` function if needed for existing databases; remember the backup export/import (l.13592–13770).
-- **Add a page**: `<div class="page" id="page-xxx">` in `index.html`, a `data-page="xxx"` button in the sidebar, click handling of `.nav-btn[data-page]` in `setupEventListeners` (l.11349, to be verified: `showPanel` only serves the authentication panels), an entry in `_navCommands` (palette).
-- **New UI string**: add the key to the 8 `languages/*.json` files.
-- **New printer brand**: a `*Connection` class + `_build_*_result` + `_ensure_*/_stop_*_connection` + discovery, then dispatch in `PrinterManager` (l.3026).
-- **New Python dependency**: `requirements.txt`, `check_deps.REQUIRED_MODULES` and the fallback list in `main.py` (l.20–60).
-- **New version**: `CURRENT_VERSION` (l.14384) + an entry at the top of `changelog.json`; the workflow only publishes a release if this version changes.
-- **New model download site**: see the Nexprint example — `NexprintError` (l.11009) and `nexprint_get_model_files` (l.11059) in `main.py`, login through a window via `POST /api/accounts/nexprint/browser-login` (l.6051) + `/status` (l.6113), account card in `index.html` l.1793, `nexprintBrowserLogin` (`script.js` l.10930), startup status (`script.js` l.3460), link in `_DEFAULT_USEFUL_LINKS` (l.19491) **and** in `languages/useful_links.json`, label in the download history.
+- **Ajouter une route API** : décorateur `@app.route` + `@login_required` dans la section du domaine (§3). Les méthodes d'écriture exigent le jeton CSRF (`X-CSRF-Token`, ajouté automatiquement par le `window.fetch` surchargé de `script.js` l.222).
+- **Ajouter une table** : `init_db` (l.1111) + éventuelle fonction `migrate_*` pour les bases existantes ; penser à l'export/import de sauvegarde (`build_backup_zip_bytes` l.13540, `_restore_backup_zip` l.13941, catégories de la sauvegarde automatique `_merge_backup_categories` l.13920).
+- **Ajouter une page** : `<div class="page" id="page-xxx">` dans `index.html`, bouton `data-page="xxx"` dans la sidebar ; le clic est géré par le gestionnaire de `.nav-btn` (`script.js` l.12354) qui affiche `#page-xxx` et appelle les `load*` de la page ; ajouter l'entrée dans `_navCommands` (l.3552, palette) et, si besoin, dans la barre mobile (index.html l.2449+).
+- **Nouvelle chaîne UI** : ajouter la clé aux 8 fichiers `languages/*.json`.
+- **Nouvelle marque d'imprimante** : classe `*Connection` + `_build_*_result` + `_ensure_*/_stop_*_connection` + découverte, puis dispatch dans `PrinterManager` (l.2985) et dans les routes `/api/printers*` (l.15812–16178).
+- **Nouvelle dépendance Python** : `requirements.txt`, `check_deps.REQUIRED_MODULES`, la liste de repli de `main.py` (l.25–63) **et** les `--collect-all` des 3 jobs du workflow (PyInstaller n'analyse pas `main.py`, copié à côté de l'exécutable) ; `launcher._PRELOAD_MODULES` (diagnostic) est une 4ᵉ liste facultative. `pyaes` (optionnel, utilisé l.14742) n'est volontairement que dans `requirements.txt` et dans les `--collect-all`.
+- **Nouvelle version** : `CURRENT_VERSION` (l.15101) + entrée en tête de `changelog.json` (⚠️ ne pas dupliquer la version) ; le workflow ne publie une release que si cette version change.
+- **Nouveau site de téléchargement de modèles** : s'inspirer de MakerWorld (le plus complet) — `makerworld_get_model_files` (main.py l.11197), connexion en 2 étapes `makerworld_login_step1/2` (11372/11405) + routes `/api/accounts/makerworld/*` (11370–11432), branche dans `api_download_file` (11446), `makerWorldStep1/2` (`script.js` l.11741/11771), carte de compte dans `index.html` (chercher `makerworld`), lien dans `languages/useful_links.json` **et** `_DEFAULT_USEFUL_LINKS` (Nexprint est un deuxième exemple : `nexprint_get_model_files` l.11054, connexion par fenêtre `api_nexprint_browser_login` l.6097, clé manuelle via `/api/accounts`) (main.py l.20372), étiquette/couleur dans l'historique de téléchargements.
 
 ---
 
-## 9. Ancillary files (build, tests, PWA, installer)
+## 9. Fichiers annexes (build, tests, PWA, installeur)
 
 ### check_deps.py
-- `REQUIRED_MODULES` (l.28): 28 tuples `(import name, pip package, expected attribute, conflicting packages)`; `TELEGRAM_MODULES` (l.60, `telethon`) optional.
-- Functions: `find_owning_packages` (65), `deep_check_module` (74, checks the real import **and** an attribute to detect a wrong package installed under the same name), `auto_install_missing_modules` (84, uninstalls the wrong package then runs `pip install --force-reinstall/--upgrade`, retries with `--break-system-packages`), `check_required_modules` (157), `_cli_main` (185).
-- CLI: `python check_deps.py [--fix] [--telegram]`; exit code 1 if a dependency is missing.
-- `main.py` imports it at the top (l.11–19, `try` block) and keeps a fallback copy of `_REQUIRED_MODULES` if the import fails (l.20–60): **any new dependency must be added in both places** (plus `requirements.txt`).
+- `REQUIRED_MODULES` (l.28) : 31 tuples `(nom d'import, paquet pip, attribut attendu, paquets conflictuels)`, dont `openpyxl` et `xlrd` (ajoutés le 18/10/2026) ; `TELEGRAM_MODULES` (l.62, `telethon`) optionnel.
+- Fonctions : `find_owning_packages` (65), `deep_check_module` (74, vérifie l'import réel **et** un attribut pour détecter un mauvais paquet installé sous le même nom), `auto_install_missing_modules` (84, désinstalle le mauvais paquet puis `pip install --force-reinstall/--upgrade`, retente avec `--break-system-packages`), `check_required_modules` (157), `_cli_main` (185).
+- CLI : `python check_deps.py [--fix] [--telegram]` ; code de sortie 1 si une dépendance manque.
+- `main.py` l'importe en tête (l.11–19, bloc `try`) et possède une copie de repli de `_REQUIRED_MODULES` si l'import échoue (l.25–63, 31 entrées) : les deux listes sont **identiques depuis le 18/10/2026** (vérifié) ; toute nouvelle dépendance doit être ajoutée aux deux endroits (plus `requirements.txt` et le workflow). `TELEGRAM_MODULES` (`telethon`) n'a pas d'usage dans `main.py` 0.7.2 (aucune référence à Telegram) : `telethon` est **conservé volontairement** (variante Telegram prévue, décision du 18/10/2026) dans `requirements.txt`, `check_deps.py` (`--telegram`) et `launcher.py` (`STELLIO_TELEGRAM_VARIANT`).
 
 ### requirements.txt
-- Contains, in addition to `check_deps`: `pyinstaller`, `PyOpenGL-accelerate`, `telethon`.
-- Linux: `pywebview[gtk]` + system packages `libgtk-3-0 libwebkit2gtk-4.1-0` (not installable via pip). macOS: pyobjc is installed automatically.
-- ⚠️ `plyer` (used by `_send_native_notification`, main.py l.12460, and listed in `check_deps.REQUIRED_MODULES`) **does not appear** in `requirements.txt` — to be checked.
+- Contient en plus de `check_deps` : `pyinstaller`, `PyOpenGL-accelerate`, `telethon`, et depuis la 0.6.9 `pyaes` (optionnel : force de chiffrement AES-256 du PDF de devis, `main.py` l.14742 ; absent de `check_deps`, mais collecté par PyInstaller via `--collect-all pyaes`).
+- Linux : `pywebview[gtk]` + paquets système `libgtk-3-0 libwebkit2gtk-4.1-0` (non installables par pip). macOS : pyobjc installé automatiquement.
+- `plyer` (utilisé par `_send_native_notification`, main.py l.12424, et listé dans `check_deps.REQUIRED_MODULES`) a été ajouté à `requirements.txt` ; il figure désormais aussi dans la liste de repli de `main.py` (l.25–61).
 
-### sw.js (service worker, registered in script.js l.192–194)
-- Caches `stellio-v5-shell` and `stellio-v5-assets`; old `stellio-*` caches are deleted on activation; change `CACHE_VERSION` to force a refresh.
-- Strategy: `/api/*` and `/share/*` are never intercepted; `/assets/*` is cache-first; everything else is network-first with fallback to the cache, then `/index.html`. Only same-origin GET requests.
-- Pre-cache: `/`, `/index.html`, `/script.js`, `/style.css`. Served at `/sw.js` by Flask's static folder.
+### sw.js (service worker, enregistré dans script.js l.192–194)
+- Caches `stellio-v6-shell` et `stellio-v6-assets` ; les anciens caches `stellio-*` sont supprimés à l'activation ; changer `CACHE_VERSION` pour forcer un renouvellement.
+- Stratégie : `/api/*` et `/share/*` jamais interceptés ; `/assets/*` cache-first ; le reste réseau d'abord avec repli sur le cache puis `/index.html`. Seulement les requêtes GET de même origine.
+- Pré-cache : `/`, `/index.html`, `/script.js`, `/style.css`. Servi à `/sw.js` par le dossier statique Flask.
 
 ### worker.py
-- Contains only `process_3mf_task(file_path, plate_index=0)`, which returns **hard-coded** values (15000 vertices, 30000 faces): it is a skeleton. No reference in `main.py` (the only "worker" is `thumb_worker` in `process_generation_queue`, l.3990). The README nevertheless describes it as a "background worker (thumbnails, scans)".
+- Contient uniquement `process_3mf_task(file_path, plate_index=0)` qui renvoie des valeurs **codées en dur** (15000 sommets, 30000 faces) : c'est un squelette. Aucune référence dans `main.py` (le seul « worker » est `thumb_worker` dans `process_generation_queue`, l.3777). Le README le décrit pourtant comme « background worker (thumbnails, scans) ». Gardé volontairement (décision du 19/10/2026) ; le README (l.284) le décrit désormais comme un squelette non utilisé.
 
-### conftest.py (pytest tests)
-- `_try_real_or_stub` replaces `trimesh`, `pyrender`, `pymeshfix`, `smbclient`, `rarfile` with stubs if they are not installed.
-- Sets `STELLIO_DATA_DIR` to a temporary folder and `STELLIO_PORT=0` before importing `main.py` so the real data is never touched. The test files themselves were not provided.
+### conftest.py (tests pytest)
+- `_try_real_or_stub` remplace par des stubs `trimesh`, `pyrender`, `pymeshfix`, `smbclient`, `rarfile` s'ils ne sont pas installés.
+- Définit `STELLIO_DATA_DIR` sur un dossier temporaire et `STELLIO_PORT=0` avant l'import de `main.py` pour ne pas toucher aux vraies données. Les fichiers de tests eux-mêmes n'ont pas été fournis.
 
 ### stellio-setup.iss (Inno Setup, Windows)
-- Version injected at compile time via `/DMyAppVersion=…` (default `0.0.0-dev`); output `output/Stellio-Setup-<version>.exe`.
-- Installs `dist\Stellio\*` (PyInstaller output) into `{commonappdata}\Stellio-app`, executable `Stellio.exe`, `users-full` permissions on the folder so that `.zip` patches (automatic updates without admin) can be applied.
-- Prerequisites downloaded when needed (PowerShell): VC++ Redistributable x64 ≥ 14.40 and WebView2 (without WebView2, Stellio falls back to browser mode).
-- If an installation already exists (AppId `{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}`): choose repair/update, uninstall then reinstall, or cancel. Languages: French, English. Desktop shortcut unchecked by default; `/LAUNCH=1` launches the app after a silent install.
+- Version injectée à la compilation via `/DMyAppVersion=…` (défaut `0.0.0-dev`) ; sortie `output/Stellio-Setup-<version>.exe`.
+- Installe `dist\Stellio\*` (sortie PyInstaller) dans `{commonappdata}\Stellio-app`, exécutable `Stellio.exe`, droits `users-full` sur le dossier pour permettre les patchs `.zip` (mises à jour automatiques sans admin).
+- Prérequis téléchargés au besoin (PowerShell) : VC++ Redistributable x64 ≥ 14.40 et WebView2 (sans WebView2, Stellio retombe en mode navigateur).
+- Si une installation existe (AppId `{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}`) : choix réparer/mettre à jour, désinstaller puis réinstaller, ou annuler. Langues : français, anglais. Option de bureau décochée par défaut ; `/LAUNCH=1` pour lancer l'app après une installation silencieuse.
 
 ### entitlements.plist (macOS)
-- `allow-jit`, `allow-unsigned-executable-memory`, `disable-library-validation`, `allow-dyld-environment-variables` (required by the signed/notarized PyInstaller app).
+- `allow-jit`, `allow-unsigned-executable-memory`, `disable-library-validation`, `allow-dyld-environment-variables` (nécessaires à l'app PyInstaller signée/notarisée).
 
-### README.md — useful information
-- Announced license AGPL v3 (⚠️ the provided `LICENSE` is the GPL v3, see §13); Python 3.8+, Flask 3.0+; announced platforms: Windows and Raspberry Pi/Linux (64-bit); supported models: STL, 3MF, OBJ.
-- Printers: OctoPrint, PrusaLink, Klipper/Moonraker (HTTP), Bambu Lab (MQTT, AMS), Creality (WebSocket, CFS), FlashForge, Elegoo (SDCP).
-- Shortcuts: `Ctrl+K` palette, `Ctrl+F` search, `Ctrl+N` download, `Ctrl+,` settings, `Ctrl+Z` undo deletion, `Alt+1-8` navigation, `F` favorites, `T` tag manager, `?` help, `Esc`.
-- Files cited in the README and **absent from the repository**: `bin/` (ffmpeg/unrar binaries per OS, optional — ignored by `.gitignore`), test files. Everything else (`assets/`, the `library/monitoring/slicer/nesting.png` screenshots, `LICENSE`, `CODE_SIGNING_POLICY.md`) is in the repository (see §13–14).
+### README.md — informations utiles
+- Licence AGPL v3 (`LICENSE` aligné le 18/10/2026, voir §13) ; Python 3.8+, Flask 3.0+ ; plateformes annoncées : Windows et Raspberry Pi/Linux (64 bits) ; modèles supportés : STL, 3MF, OBJ.
+- Imprimantes : OctoPrint, PrusaLink, Klipper/Moonraker (HTTP), Bambu Lab (MQTT, AMS), Creality (WebSocket, CFS), FlashForge, Elegoo (SDCP).
+- Raccourcis : `Ctrl+K` palette, `Ctrl+F` recherche, `Ctrl+N` téléchargement, `Ctrl+,` réglages, `Ctrl+Z` annuler suppression, `Alt+1-8` navigation, `F` favoris, `T` gestionnaire de tags, `?` aide, `Esc`.
+- Fichiers cités dans le README et **absents du dépôt** : `bin/` (binaires ffmpeg/unrar par OS, optionnel — ignoré par `.gitignore`), fichiers de tests. Tout le reste (`assets/`, captures `library/monitoring/slicer/nesting.png`, `LICENSE`, `CODE_SIGNING_POLICY.md`) est dans le dépôt (voir §13–14).
 
 ---
 
-## 10. Launch, CI/CD and installation
+## 10. Lancement, CI/CD et installation
 
-### launcher.py (entry point of the frozen builds)
-- This is the script that PyInstaller compiles (`launcher.py` → `Stellio.exe` / `Stellio.app` / Linux binary); **`main.py` is not compiled**: it is copied next to it in an `app/` folder so it can be replaced by the auto-update `.zip` patches.
-- `_app_dir()` (l.10): locates `app/` — next to the executable (Windows/Linux `--onedir`), `Stellio.app/Contents/Resources/app` (macOS), or next to the script in source mode.
-- `_setup_early_env()` (l.33) adds `app/` to `sys.path`; `_setup_bootstrap_logger` (l.43) writes `launcher.log` (2 MB rotation ×2) into `<app_dir>/../logs/`; `_show_fatal_error` (l.56): Windows MessageBox, otherwise Tk, otherwise stderr.
-- `_preload_dependencies` (l.98): parallel import of `_PRELOAD_MODULES` for diagnostics, **disabled by default** (enable with `STELLIO_DIAG_PRELOAD=1`); `STELLIO_TELEGRAM_VARIANT=1` adds `telethon`.
-- `main()` (l.116): sets `STELLIO_LAUNCHER_EXE` (path of the executable, read by `install_update` main.py l.14699 and by the auto-start handling l.778/789), does `chdir(app_dir)` then `runpy.run_path(main.py, run_name="stellio_main")` — hence the `__name__ in ('__main__', 'stellio_main')` condition in `main.py` (l.21810).
-- Pitfall: the `_PRELOAD_MODULES` list is a 3rd dependency list (in addition to `check_deps` and `requirements.txt`); it does not contain `plyer`.
+### launcher.py (point d'entrée des builds figés)
+- C'est le script que PyInstaller compile (`launcher.py` → `Stellio.exe` / `Stellio.app` / binaire Linux) ; **`main.py` n'est pas compilé** : il est copié à côté dans un dossier `app/` pour pouvoir être remplacé par les patchs `.zip` d'auto-mise à jour.
+- `_app_dir()` (l.10) : localise `app/` — à côté de l'exécutable (Windows/Linux `--onedir`), `Stellio.app/Contents/Resources/app` (macOS), ou à côté du script en mode source.
+- `_setup_early_env()` (l.33) ajoute `app/` à `sys.path` ; `_setup_bootstrap_logger` (l.43) écrit `launcher.log` (rotation 2 Mo ×2) dans `<app_dir>/../logs/` ; `_show_fatal_error` (l.56) : MessageBox Windows, sinon Tk, sinon stderr.
+- `_preload_dependencies` (l.99) : import parallèle de `_PRELOAD_MODULES` pour diagnostic, **désactivé par défaut** (activer avec `STELLIO_DIAG_PRELOAD=1`) ; `STELLIO_TELEGRAM_VARIANT=1` ajoute `telethon`.
+- `main()` (l.116) : positionne `STELLIO_LAUNCHER_EXE` (chemin de l'exécutable, lu par `install_update` main.py l.15455 et par la gestion du démarrage auto l.778/789), fait `chdir(app_dir)` puis `runpy.run_path(main.py, run_name="stellio_main")` — d'où la condition `__name__ in ('__main__', 'stellio_main')` de `main.py` (l.23296).
+- La liste `_PRELOAD_MODULES` (l.74) est une 4ᵉ liste de dépendances (en plus de `check_deps`, de la copie de repli de `main.py` et de `requirements.txt`) ; elle contient depuis le 18/10/2026 `plyer`, `openpyxl` et `xlrd` (pas `pyaes`, optionnel).
 
-### .github/workflows/build-and-sign.yml (GitHub Actions, "Build, sign and release Stellio")
-- Triggers: push to `main` touching `main.py`, `index.html`, `script.js`, `style.css`, `launcher.py`, `check_deps.py`, `requirements.txt`, `stellio-setup.iss`, `assets/**`, `languages/**`, `bin/**`; or manual run with `dry_run` (build without release).
-- Jobs: `check-version` (reads `CURRENT_VERSION` in `main.py`, only publishes if the tag `v<version>` does not exist yet → **`CURRENT_VERSION` must be incremented to trigger a release**) → `build` (Windows: PyInstaller `--onedir --windowed`, copies the patchable files into `dist\Stellio\app`, downloads ffmpeg + UnRAR, creates `Stellio-v<version>-patch.zip` + `.sha256`, compiles the Inno Setup installer) ‖ `build-macos` (matrix: `arm64` on `macos-latest`, `x86_64` on `macos-15-intel`; `.app` signed with Developer ID if the secrets `MACOS_CERTIFICATE`, `MACOS_CERTIFICATE_PWD`, `MACOS_SIGNING_IDENTITY` exist, otherwise ad-hoc signature; `.dmg` + sha256) ‖ `build-linux` (x86_64 AppImage with GTK/WebKit, ffmpeg, unrar) → `release` (GitHub draft `v<version>` with `.exe`, `.dmg`, `.AppImage`, `.zip`, `.sha256`).
-- Every job runs `check_deps.py --fix` then `check_deps.py`; Python 3.11 everywhere.
-- "Patchable" files copied into `app/`: `main.py`, `check_deps.py`, `index.html`, `script.js`, `style.css`, `assets/`, `languages/`, `bin/` (`launcher.py` is **not** included). `worker.py` is copied nowhere → confirms it is unused.
-- ⚠️ The shared patch `.zip` is created in the **Windows** job: it therefore also contains `app\bin\` (ffmpeg.exe, DLLs, UnRAR.exe). The README announces a "pure source code" patch identical for Raspberry Pi/Linux — to be verified in the patch installation logic (`install_update`, main.py l.14694).
-- ⚠️ The Windows artifact is named `stellio-installer-unsigned`: no Authenticode signing step appears in this workflow despite its name and the README's `CODE_SIGNING_POLICY` (signing is probably done outside CI or by hand on the release draft).
-- `entitlements.plist` is also rewritten by the workflow (same content as the repository file).
+### .github/workflows/build-and-sign.yml (GitHub Actions, « Build, sign and release Stellio »)
+- Déclencheurs : push sur `main` touchant `main.py`, `index.html`, `script.js`, `style.css`, `launcher.py`, `check_deps.py`, `requirements.txt`, `stellio-setup.iss`, `assets/**`, `languages/**`, `bin/**` ; ou lancement manuel avec `dry_run` (build sans release).
+- Jobs : `check-version` (lit `CURRENT_VERSION` dans `main.py`, publie seulement si le tag `v<version>` n'existe pas encore → **il faut incrémenter `CURRENT_VERSION` pour déclencher une release**) → `build` (Windows : PyInstaller `--onedir --windowed`, copie des fichiers patchables dans `dist\Stellio\app`, télécharge ffmpeg (version épinglée, SHA-256 vérifié) + UnRAR (SHA-256 de l'`UnRAR.exe` extrait vérifié), crée `Stellio-v<version>-patch.zip` + `.sha256`, compile l'installeur Inno Setup) ‖ `build-macos` (matrice `arm64` sur `macos-latest`, `x86_64` sur `macos-15-intel` ; `.app` signée Developer ID si les secrets `MACOS_CERTIFICATE`, `MACOS_CERTIFICATE_PWD`, `MACOS_SIGNING_IDENTITY` existent, sinon signature ad-hoc, sans notarisation ; ffmpeg `b6.0` + SHA-256 vérifié ; `.dmg` + sha256) ‖ `build-linux` (AppImage x86_64 avec GTK/WebKit, ffmpeg épinglé + SHA-256 vérifié, unrar via apt) → `release` (brouillon GitHub `v<version>` avec `.exe`, `.dmg`, `.AppImage`, `.zip`, `.sha256`).
+- Chaque job exécute `check_deps.py --fix` puis `check_deps.py` ; Python 3.11 partout.
+- **Modules embarqués par PyInstaller** : chaque job a des `--collect-all` (+ `--hidden-import` `sqlite3`, `ssl`, `hashlib`, `tkinter`, `nest_asyncio`, et des `--copy-metadata` pour `imageio`, `pyrender`, `trimesh`, `Pillow`, `PyOpenGL`, `numpy`). Depuis le 18/10/2026 ils incluent aussi `reportlab`, `psutil`, `plyer`, `openpyxl`, `xlrd` et `pyaes`, **absents auparavant** (alors que `main.py` les importe : devis PDF, widget ressources, notifications natives, import de bobines, chiffrement du PDF) : `main.py` n'étant pas analysé par PyInstaller, ils n'étaient pas garantis dans les builds. ⚠️ `packaging` (import l.15317, mise à jour) n'est pas collecté explicitement : il est probablement tiré par matplotlib, **non vérifié** ; seul un vrai build confirmera le contenu final.
+- Les fichiers « patchables » copiés dans `app/` : `main.py`, `check_deps.py`, `index.html`, `script.js`, `style.css`, `assets/`, `languages/`, `bin/` (+ `launcher.py` n'y est **pas**). `worker.py` n'est copié nulle part → confirme qu'il est inutilisé.
+- ⚠️ Le patch `.zip` commun est créé dans le job **Windows** : il contient donc aussi `app\bin\` (ffmpeg.exe, DLL, UnRAR.exe). Le README annonce un patch « code source pur » identique pour Raspberry Pi/Linux — à vérifier côté logique d'installation du patch (`install_update`, main.py l.14599).
+- L'artefact Windows s'appelle `stellio-installer-unsigned` et le workflow ne contient **aucune** étape de signature Windows (ni `signtool`, ni SignPath, ni scan antivirus) : décision du 18/10/2026 de ne pas signer pour l'instant ; `CODE_SIGNING_POLICY.md` et le README ont été alignés sur cet état. macOS : signature Developer ID si les secrets existent, sinon ad-hoc, sans étape de notarisation.
+- Binaires tierces épinglés (18/10/2026) : ffmpeg Windows/Linux = BtbN `autobuild-2026-10-18-13-01` (`ffmpeg-N-127650-geceaa54a38-win64-gpl-shared.zip`, `ffmpeg-N-127651-gb60ab6c9a4-linux64-gpl.tar.xz`), ffmpeg macOS = eugeneware `b6.0` ; SHA-256 calculés sur les fichiers téléchargés, le build échoue en cas d'écart. UnRAR Windows : SHA-256 `a9333c4e…92c3` de l'`UnRAR.exe` **extrait** de `unrarw64.exe` (version 7.22.0, signé Authenticode par win.rar GmbH / DigiCert, fichier fourni par l'auteur le 20/10/2026), contrôle bloquant ; la signature Authenticode est seulement journalisée. L'URL de RARLAB n'ayant pas de numéro de version, une nouvelle version fait échouer le build volontairement jusqu'à vérification et mise à jour de la valeur. UnRAR macOS (`rarmacos-<arch>-723.tar.gz`, variable `RAR_SHA`) : valeurs **vides** → avertissement `::warning::` avec le hash obtenu, **à renseigner** ; UnRAR Linux via apt (signature du dépôt). ⚠️ BtbN purge ses anciens tags `autobuild-*` : l'URL ffmpeg Windows/Linux devra être mise à jour (procédure en commentaire dans le workflow).
+- `entitlements.plist` est aussi réécrit par le workflow (même contenu que le fichier du dépôt).
 
 ### install-pi.sh (Raspberry Pi / Linux headless)
-- 180-line bash script (`bash -n` passes; the git merge conflict from the previous version is resolved). The header gives the "swap" tip for low-RAM Raspberry Pis (`CONF_SWAPSIZE=2048` in `/etc/dphys-swapfile`).
-- Content: refuses root, checks `sudo` and RAM (<1.5 GB → warning), `apt-get install` (git, python3-venv, build-essential, ffmpeg, unrar-free, JPEG/PNG libs, OpenBLAS/ATLAS, OSMesa/EGL), `git clone`/`reset --hard origin/main` into `~/stellio` (variable `STELLIO_DIR`), venv `~/stellio/venv`, `pip install -r requirements.txt` (failure tolerated, `check_deps.py` repairs at startup), creates `~/.stellio`, writes `/etc/systemd/system/stellio.service` (`STELLIO_HEADLESS=1`, `STELLIO_DATA_DIR`, `STELLIO_PORT`, `Restart=always`, `ExecStart=venv/bin/python3 main.py`), enables it and waits up to 30 s, then prints `http://<ip>:5000`.
-- Re-running the script updates the code (`git reset --hard` + `git clean -fd`: any local modification in `~/stellio` is lost; data stays in `~/.stellio`).
-- Note: the installer uses `unrar-free` whereas the Linux AppImage build embeds the real `unrar`.
+- Script bash de 180 lignes (`bash -n` passe ; le conflit de fusion git de la version précédente est résolu). L'en-tête donne le conseil « swap » pour les Raspberry Pi à faible RAM (`CONF_SWAPSIZE=2048` dans `/etc/dphys-swapfile`).
+- Contenu : refuse root, vérifie `sudo` et la RAM (<1,5 Go → avertissement), `apt-get install` (git, python3-venv, build-essential, ffmpeg, libs JPEG/PNG, OpenBLAS/ATLAS, OSMesa/EGL), puis `apt-get install unrar` à part (voir la note ci-dessous), `git clone`/`reset --hard origin/main` dans `~/stellio` (variable `STELLIO_DIR`), venv `~/stellio/venv`, `pip install -r requirements.txt` (échec toléré, `check_deps.py` répare au démarrage), crée `~/.stellio`, écrit `/etc/systemd/system/stellio.service` (`STELLIO_HEADLESS=1`, `STELLIO_DATA_DIR`, `STELLIO_PORT`, `Restart=always`, `ExecStart=venv/bin/python3 main.py`), l'active et attend jusqu'à 30 s, puis affiche `http://<ip>:5000`.
+- Relancer le script met à jour le code (`git reset --hard` + `git clean -fd` : toute modification locale dans `~/stellio` est perdue ; les données restent dans `~/.stellio`).
+- `unrar` (corrigé le 19/10/2026) : le script installe le **vrai** `unrar` (section `non-free` de Debian / Raspberry Pi OS, `multiverse` d'Ubuntu), comme le build AppImage ; si le paquet est introuvable il se replie sur `unrar-free` avec un avertissement (RAR5 non pris en charge, options en ligne de commande différentes de celles qu'attend `rarfile`). `main.py` (`_setup_rar_tool`, l.680) ne cherche qu'un binaire nommé `unrar` (`bin/` ou PATH). Le README (8 langues, l.200) parle désormais de `unrar`.
 
 ---
 
-## 11. Android companion app (apk/stellio.apk)
+## 11. App Android compagnon (apk/stellio.apk)
 
-- Package `com.stellioapp.companion`, version `1.0.0` (code 1), minSdk 24, targetSdk 34, label "Stellio". Written in Kotlin (coroutines, AndroidX, Material), 912 entries, `classes.dex` ≈ 9 MB. **Only the APK is provided, not the Android Studio project.**
-- Activities: `MainActivity` (launcher) and `com.journeyapps.barcodescanner.CaptureActivity` (ZXing, QR code scanning). Providers: `androidx.core.content.FileProvider` (sharing the captured photo) and `InitializationProvider`.
-- Permissions: `INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `CAMERA`, `WRITE_EXTERNAL_STORAGE`.
-- App classes (from names in the dex): `MainActivity` (WebView: `setupWebView`, `connectToStellio`, `findReachableUrl`, `registerNetworkMonitor`, `scheduleOfflineCheck`, `startReconnectLoop`, `setupLanguageSpinner`) and `ConnectionPrefs` (remembered server address). Principle: the app remembers the Stellio server URL (typed or scanned via QR code, cf. `/api/qrcode`), tests that it is reachable, loads the web interface in a WebView and reconnects automatically after a drop.
-- Distribution: `STELLIO_COMPANION_APK_URL` (main.py l.3521) points to `https://www.github.com/stellio-app/stellio/raw/main/apk/stellio.apk`; `GET /api/qrcode?source=apk` (l.21586) generates the download QR code; on the web side, taking a photo goes through `pickPhoto` (script.js l.3634) and the `modal-photo-source` modal.
-- To change the native behavior (camera, mobile bar arrows…), the Android project (`MainActivity.kt`, `AndroidManifest.xml`) is required — not included here; the scrollable mobile navigation bar on the web side is in `script.js` (l.12239) and `style.css`.
-
----
-
-## 12. Translated documentation
-
-- `docs/readme/README.<lang>.md` (fr, de, es, it, pt, ja, zh): full translations of `README.md` (same sections, same project structure); relative links: `../../README.md`, `../../LICENSE`, `../privacy/PRIVACY.md`, `../../library.png`… Any new feature documented in `README.md` must be carried over to the 7 translations (and to `languages/changelog.json`).
-- `docs/privacy/`: `PRIVACY.md` (EN) + `PRIVACY.{fr,de,es,it,pt,ja,zh}.md`, "last updated" September 1, 2026. Content: "local-first" principle, locally stored data (library, thumbnails, configs, AES-CFB-encrypted API keys, history, logs), optional third-party services (GitHub updates, Printables/MakerWorld/Thingiverse, printers, Cloudflare Tunnel, remote Ollama, Spoolman), security, rights, contact `contact@stellio-app.com`.
-- ⚠️ Consistency gaps noted: the privacy policy does not mention TigerTag (Firebase), push notifications (ntfy/Telegram/Discord/webhook), remote Stellio instances or new-model-version detection — services that contact third parties according to the code and the README; the README announces `Stellio-Setup.exe` whereas the produced file is named `Stellio-Setup-<version>.exe`; it describes `worker.py` as a thumbnail worker although it is unused.
+- Paquet `com.stellioapp.companion`, version `1.0.0` (code 1), minSdk 24, targetSdk 34, libellé « Stellio ». Écrit en Kotlin (coroutines, AndroidX, Material), 912 entrées, `classes.dex` ≈ 9 Mo. **Seul l'APK est fourni, pas le projet Android Studio.**
+- Activités : `MainActivity` (lanceur) et `com.journeyapps.barcodescanner.CaptureActivity` (ZXing, scan de QR code). Providers : `androidx.core.content.FileProvider` (partage de la photo prise) et `InitializationProvider`.
+- Permissions : `INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `CAMERA`, `WRITE_EXTERNAL_STORAGE`.
+- Classes de l'app (par noms dans le dex) : `MainActivity` (WebView : `setupWebView`, `connectToStellio`, `findReachableUrl`, `registerNetworkMonitor`, `scheduleOfflineCheck`, `startReconnectLoop`, `setupLanguageSpinner`) et `ConnectionPrefs` (adresse du serveur mémorisée). Principe : l'app mémorise l'URL du serveur Stellio (saisie ou scannée par QR code, cf. `/api/qrcode`), teste son accessibilité, charge l'interface web dans une WebView et se reconnecte automatiquement en cas de coupure.
+- Distribution : `STELLIO_COMPANION_APK_URL` (main.py l.3480) pointe vers `https://www.github.com/stellio-app/stellio/raw/main/apk/stellio.apk` ; `GET /api/qrcode?source=apk` (l.23083) génère le QR code de téléchargement ; côté web, la prise de photo passe par `pickPhoto` (script.js l.4361) et la modale `modal-photo-source`.
+- Pour modifier le comportement natif (appareil photo, flèches de la barre mobile…), il faut le projet Android (`MainActivity.kt`, `AndroidManifest.xml`) — non inclus ici ; la barre de navigation mobile défilable côté web est dans `script.js` (`toggleNavItem` l.12980, non revérifié) et `style.css`.
 
 ---
 
-## 13. License, code signing and assets
+## 12. Documentation traduite
+
+- `docs/readme/README.<lang>.md` (fr, de, es, it, pt, ja, zh) : traductions complètes du `README.md` (mêmes sections, même structure de projet) ; liens relatifs : `../../README.md`, `../../LICENSE`, `../privacy/PRIVACY.md`, `../../library.png`… Toute nouvelle fonctionnalité documentée dans `README.md` doit être reportée dans les 7 traductions (et dans `languages/changelog.json`).
+- `docs/privacy/` : `PRIVACY.md` (EN) + `PRIVACY.{fr,de,es,it,pt,ja,zh}.md`, « dernière mise à jour » **20 octobre 2026** (62 lignes chacun, mêmes 8 sections). Contenu : principe « local-first », données stockées localement (bibliothèque, miniatures, configs, clés API chiffrées AES-CFB, historique, logs), services tiers (mises à jour GitHub, Printables/MakerWorld/Thingiverse/**Nexprint**, imprimantes, Cloudflare Tunnel, Ollama distant, Spoolman) et, ajoutés le 19/10/2026 dans la section 4 : **notifications push** (ntfy/Telegram/Discord/webhook, désactivées par défaut), **TigerTag** (Firebase/Google + `api.tigertag.io`), **signalements** (relais Cloudflare Workers → issue GitHub **publique**, consentement explicite, interrogation de l'API GitHub pour le suivi), **suivi des mises à jour de modèles** (activé par défaut, réglage `model_updates_auto`), **recherche de bobines en boutique** et **autres instances Stellio** (dont scan du réseau local) ; la puce « ressources web chargées par l'interface » (CDN Three.js, Google Fonts) a été retirée le 20/10/2026 puisque tout est désormais local ; puis sécurité, droits, contact `contact@stellio-app.com`.
+- Politique de confidentialité alignée sur le code le 19/10/2026 (voir ci-dessus). Le README (8 langues) a aussi été corrigé le 19/10/2026 : `Stellio-Setup-<version>.exe` (l.184) et `worker.py` décrit comme squelette non utilisé (l.284). La mention des CDN a été retirée de la politique le 20/10/2026 (Three.js et Inter sont servis en local).
+
+---
+
+## 13. Licence, signature de code et assets
 
 ### LICENSE
-- Standard text of the **GNU General Public License v3** (June 29, 2007, 674 lines), with no project-specific copyright line and no "or any later version" wording.
-- ⚠️ **License inconsistency**: `README.md` ("License: AGPL v3" badge + "📜 License" section) and its translations say **AGPL v3** and link to this file; the file is the **GPL v3** (clause 13 only allows combining with AGPL). Third version: the "About" modal (`index.html` l.2838–2840, key `about.legal`) displays "© 2026 Stellio Project. All rights reserved". A license must be chosen, `LICENSE` replaced with the AGPL v3 text if that is the one, and the README, translations and `about.legal` (8 `languages/*.json` files) aligned.
+- Texte officiel de la **GNU Affero General Public License v3** (19 novembre 2007, 661 lignes), remplaçant la GPL v3 le 18/10/2026 ; corps du texte vérifié identique à la version SPDX `AGPL-3.0-only` (la section 13 « Remote Network Interaction » est présente). Aucune ligne de copyright propre au projet n'y figure (usage : l'ajouter dans l'en-tête des sources, p. ex. `main.py`).
+- Licence désormais cohérente : `README.md` et ses 7 traductions (badge « License: AGPL v3 » + section « 📜 License ») annonçaient déjà l'**AGPL v3** et renvoient vers ce fichier. La modale « À propos » (`index.html` l.3002, clé `about.legal`) affiche depuis le 18/10/2026 « © 2026 Stellio Project. Distribué sous licence GNU AGPL v3 » (texte de repli en français dans `index.html`, traductions dans les 8 `languages/*.json` ; l'ancienne phrase « Développé avec passion pour la communauté Maker » a été retirée à ta demande).
 
 ### CODE_SIGNING_POLICY.md
-- Linked from the README's "🔏 Code Signing Policy" section ("Windows executables published in Releases are digitally signed").
-- Content (9 sections): §1 scope (Windows exe, installer, `bin/` binaries, CI); §2 why sign (local server + JS/Python bridge, third-party credentials encrypted with AES using `encryption.key`, TLS disabled for some MQTT brokers, auto-start via the `Run` key); §3 certificate from a public CA, EV recommended, OV as a transitional option; §4 non-exportable key (hardware token, cloud HSM or a service such as Azure Trusted Signing / DigiCert KeyLocker / SignPath); §5 process (build from a tag, antivirus scan, signing in CI with approval, RFC 3161 timestamp, SHA-256 of third-party binaries verified, `signtool verify /pa /v`); §6 update chain integrity; §7 compromise; §8 Author/Reviewer/Approver roles (a single maintainer may hold all of them, documented); §9 review.
-- ⚠️ Gaps with the provided code:
-  - `build-and-sign.yml` contains **no** Windows signing step (artifact `stellio-installer-unsigned`, no `signtool`, no SignPath), no antivirus scan and no SHA-256 verification of the `bin/` binaries: §3–5 describe a process that does not appear in the CI (it may happen outside CI, not verifiable here).
-  - §6 says "if an automatic update mechanism is added in the future" whereas one already exists (`install_update` l.14694, `download_update`). `download_update(download_url, progress_callback, expected_sha256=None)` can verify a SHA-256 (deletes the file and aborts on mismatch) but only if `expected_sha256` is provided; I found **no** Authenticode verification of the downloaded file, and the `.zip` patch is not a signed executable.
-  - §5.1 refers to `check_deps`/`REQUIRED_MODULES` as "locked dependencies": these are lists of module names, not pinned versions (`requirements.txt` pins no version: package names only, so the build is not reproducible).
-  - The policy covers "Windows"; macOS is signed/notarized in the CI (Developer ID if secrets exist, otherwise ad-hoc) without being mentioned — yet §9 plans to update it when a platform is added.
+- Réécrite le 18/10/2026 (126 lignes, EN) pour décrire l'état réel : la signature Windows n'est **pas** en place (choix de ne pas signer pour l'instant). Liée depuis la section « 🔏 Code Signing Policy » du README, dont le texte (8 langues) dit désormais : installeur Windows et AppImage non signés, SmartScreen possible, builds macOS non notarisés, checksums `.sha256` vérifiables.
+- Contenu (8 sections) : §1 périmètre ; §2 statut par plateforme (Windows non signé ; macOS Developer ID si secrets sinon ad-hoc, sans notarisation ; Linux non signé) ; §3 mesures d'intégrité en place (`.sha256` de chaque fichier de release, vérification SHA-256 par la mise à jour intégrée — HTTPS seul si aucun checksum publié —, ffmpeg épinglé, release en brouillon publiée à la main) ; §4 limites connues (pas d'Authenticode, checksum issu de la même release, pas de scan antivirus, `requirements.txt` sans versions, purge des tags BtbN) ; §5 vérifier un téléchargement (`Get-FileHash`, `sha256sum`, `shasum`) ; §6 politique cible si la signature est introduite (certificat EV/OV, clé sur HSM/token/service, horodatage RFC 3161, `signtool verify`, vérification Authenticode par le système de mise à jour, rôles Author/Reviewer/Approver tenus par un seul mainteneur) ; §7 réponse à compromission ; §8 relecture.
+- ⚠️ Reste à faire : renseigner les SHA-256 des archives UnRAR macOS (arm64/x86_64) dans le workflow (UnRAR Windows épinglé le 20/10/2026) ; la policy §3 le mentionne ; ajouter un scan antivirus ou une signature relèverait d'une décision future (la policy §6 décrit la cible).
 
 ### assets/logo-nom-stellio.ico
-- Multi-size ICO file (16, 24, 32, 48, 64, 128, 256 px), ~145 KB.
-- Uses: `stellio-setup.iss` (`SetupIconFile`); `.github/workflows/build-and-sign.yml` l.142 (`--icon` PyInstaller Windows), l.261–270 (conversion via Pillow + `iconutil` into `assets/logo-nom-stellio.icns` for macOS, l.322 `--icon`), l.602 (AppImage: `Image.open(...).resize((256, 256))` → `stellio.png`).
-- ⚠️ To check: `Image.open()` on a multi-size ICO loads only the largest image by default; if that is not 256×256, `resize((256, 256))` stretches it.
-- The logo `assets/logo-nom-stellio.png` (256×233, real PNG; displayed in `index.html` l.57, the PDF report in `main.py` and the `script.js` fallback) is not square.
+- Fichier ICO multi-tailles (16, 24, 32, 48, 64, 128, 256 px), ~145 Ko.
+- Utilisations : `stellio-setup.iss` (`SetupIconFile`) ; `.github/workflows/build-and-sign.yml` l.148 (`--icon` PyInstaller Windows), l.287–297 (conversion via Pillow + `iconutil` en `assets/logo-nom-stellio.icns` pour macOS, l.353 `--icon`), l.681 (AppImage : `Image.open(...).resize((256, 256))` → `stellio.png`).
+- ⚠️ À vérifier : `Image.open()` sur un ICO multi-tailles ne charge par défaut que l'image la plus grande ; si ce n'est pas du 256×256, `resize((256, 256))` l'étire.
+- Le logo `assets/logo-nom-stellio.png` (256×233, vrai PNG ; affiché dans `index.html` l.57, le rapport PDF `main.py` et le repli de `script.js`) n'est pas carré.
 
 ### assets/tigertag-logo.svg
-- "potrace" SVG (vector stencil generated from a bitmap): 92×92 pt, `viewBox 0 0 92 92`, group `translate(0,92) scale(0.1,-0.1)`, 11 `<path>` elements filled in black `#000000`, no `<style>` and no `currentColor`.
-- Usage: `index.html` l.2297, `<img src="assets/tigertag-logo.svg" class="tigertag-banner-logo" onerror="…hides the image…">` in the TigerTag banner of the inventory; `style.css` l.5347 (`height: 26px; width: auto; flex-shrink: 0`). No CSS filter is applied.
-- ⚠️ Being solid black with no filter, it will be barely visible on the dark theme if the banner background is dark (to be checked visually); if so, add `filter: invert(1)` in dark theme or switch the SVG to `fill="currentColor"` (requires inlining it or using a CSS mask).
-- The service worker caches `/assets/*` cache-first: after replacing the logo or the icon, bump `stellio-v5` in `sw.js` to force the refresh.
+- SVG « potrace » (pochoir vectoriel généré depuis un bitmap) : 92×92 pt, `viewBox 0 0 92 92`, groupe `translate(0,92) scale(0.1,-0.1)`, 11 `<path>` remplis en noir `#000000`, sans `<style>` ni `currentColor`.
+- Utilisation : `index.html` l.2392, `<img src="assets/tigertag-logo.svg" class="tigertag-banner-logo" onerror="…masque l'image…">` dans la bannière TigerTag de l'inventaire ; `style.css` l.5354 (`height: 26px; width: auto; flex-shrink: 0; filter: invert(1)`), avec `filter: none` en thème clair (`[data-theme="light"]`).
+- Le SVG étant noir uni, `filter: invert(1)` le rend blanc sur la bannière du thème sombre ; il reste noir en thème clair (corrigé).
+- Le service worker met `/assets/*` en cache-first : après remplacement du logo ou de l'icône, incrémenter `stellio-v6` (version actuelle) dans `sw.js` pour forcer le rafraîchissement.
 
 ---
 
-## 14. GitHub repository: ancillary files
+## 14. Dépôt GitHub : fichiers annexes
 
-The public repository (`stellio-app/stellio`, branch `main`, 84 files, last commit "V 0.6.9") contains, in addition to what is described above:
+Le dépôt public (`stellio-app/stellio`, branche `main`, 84 fichiers, dernier commit connu « V 0.6.9 » — non revérifié pour la 0.7.2) contient en plus de ce qui précède :
 
-### stellio_manager.bat (284 lines, Windows)
-- Relaunches its own console (`cmd /k`), switches to UTF-8, reads `CURRENT_VERSION` from `main.py` via `findstr`, then shows a menu: [1] run in test mode, [2] test mode DEBUG (detailed logs), [3] run the `test/` folder (new features, folder ignored by git), [4] check/install dependencies, [5] quit.
-- `:CHECK_VENV` creates `venv\` with the embedded `python\python.exe` if present; `:INSTALL_AND_CHECK_DEPS` runs `pip install --upgrade pip`, `pip install --upgrade -r requirements.txt` then `venv\Scripts\python.exe check_deps.py --fix`. Launch: `venv\Scripts\python.exe main.py`.
+### stellio_manager.bat (284 lignes, Windows)
+- Relance sa propre console (`cmd /k`), passe en UTF-8, lit `CURRENT_VERSION` dans `main.py` via `findstr`, puis affiche un menu : [1] lancer en mode test, [2] mode test DEBUG (logs détaillés), [3] lancer le dossier `test/` (nouvelles fonctionnalités, dossier ignoré par git), [4] vérifier/installer les dépendances, [5] quitter.
+- `:CHECK_VENV` crée `venv\` avec `python\python.exe` embarqué si présent ; `:INSTALL_AND_CHECK_DEPS` fait `pip install --upgrade pip`, `pip install --upgrade -r requirements.txt` puis `venv\Scripts\python.exe check_deps.py --fix`. Lancement : `venv\Scripts\python.exe main.py`.
 
 ### .gitignore
-- Ignores `python/`, `Lib/`, `Scripts/`, `redist/`, `venv/`, `env/`, **`bin/`**, `build/`, `dist/`, `output/`, `release/`, `test/`, `stellio-data*/`, `*.log`, `*.sqlite`, `*.db`, `StellioCompanion/` (local Android project), WebView2/VC++ installers, `token*.txt`, `.env`, `*.p12|*.pfx|*.pem`.
-- `bin/` is ignored although the workflow triggers on that path: ffmpeg and UnRAR do not come from the repository, the workflow downloads them on every build ("Download ffmpeg (not committed to the repo, fetched fresh each build)" and "Download UnRAR" steps).
+- Réécrit le 20/10/2026 d'après l'arborescence réelle du dossier de travail (testé avec `git` sur une copie de cette arborescence). Dossiers de la racine **ancrés** par un `/` initial (`/venv/`, `/env/`, `/.venv/`, `/python/`, `/Lib/`, `/Scripts/`, `/nodejs/`, `/build/`, `/dist/`, `/output/`, `/release/`, `/bin/`, `/redist/`, `/stellio-data*/`, `/test/`, `/logs/`, `/StellioCompanion/`) ; partout : `__pycache__/`, `*.py[cod]`, `*.egg-info/`, `.pytest_cache/`, `node_modules/`, `.wrangler/`, `.dev.vars`, `*.spec`, `*.log`, `*.db`, `*.sqlite(3)`, `app_settings.json`, `encryption.key`, `.env` / `.env.*` (sauf `.env.example`), `token*.txt`, `*.p12`, `*.pfx`, `*.pem`, `*.key`, installeurs `VC_redist*.exe` et `MicrosoftEdgeWebview2*.exe`, fichiers d'éditeurs et du système. `relay/` (relais Cloudflare Workers), `apk/`, `docs/`, `assets/`, `languages/` et `.github/` restent **versionnés**. ⚠️ Un `.gitignore` n'enlève pas les fichiers déjà suivis : `git ls-files -ci --exclude-standard` liste ceux à retirer avec `git rm -r --cached <chemin>`. Autres remarques : `FUNDING.yml` est à la racine alors que GitHub ne lit que `.github/FUNDING.yml` ; `PYINSTALLER.txt` (racine) est à supprimer si inutile (décision de l'auteur) ; le workflow se déclenche sur `bin/**` alors que ce dossier est ignoré.
+- `bin/` est ignoré alors que le workflow déclenche sur ce chemin : ffmpeg et UnRAR ne viennent pas du dépôt, le workflow les télécharge à chaque build (étapes « Download ffmpeg (not committed to the repo, fetched fresh each build) » et « Download UnRAR »).
 
 ### assets/
-- Logos: `logo-stellio.png` (234×256, favicon + apple-touch-icon `index.html` l.34–35, sidebar l.217, About l.2824), `nom-stellio.png` (256×48, sidebar logotype l.218), `logo-nom-stellio.png` (256×233, l.57, PDF reports), `logo-nom-stellio.ico`, `tigertag-logo.svg`, `tigertag-logo.png` (270×68 PNG, not referenced).
-- These `.png` files are now real PNGs. ⚠️ `logo-stellio - Copie.png` is still an **ICO file with a .png extension** and an unused duplicate: it should be deleted.
-- `vendor/`: `fontawesome/` (css + webfonts), `inter/` (5 latin weights), `mdi/` (Material Design Icons), `threejs/` (`three.min.js`, `controls/OrbitControls.js`, `controls/TrackballControls.js`, `loaders/{STL,OBJ,3MF}Loader.js`) each with a `LICENSE.txt`.
-- `index.html` l.46–51 now loads Three.js and its loaders from `assets/vendor/threejs/` (no more CDN): the 3D viewer works offline once the assets are cached (`sw.js` caches them cache-first on first load, without pre-caching).
+- Logos : `logo-stellio.png` (234×256, favicon + apple-touch-icon `index.html` l.34–35, sidebar l.217, À propos l.2982), `nom-stellio.png` (256×48, logotype sidebar l.218), `logo-nom-stellio.png` (256×233, l.57, rapports PDF), `logo-nom-stellio.ico`, `tigertag-logo.svg` (le `tigertag-logo.png` inutilisé a été supprimé le 20/10/2026).
+- Ces fichiers `.png` sont de vrais PNG. Le doublon inutilisé `logo-stellio - Copie.png` (ICO renommé en .png) a été supprimé le 20/10/2026.
+- `vendor/` : `fontawesome/` (css + webfonts), `inter/` (`inter.css` + `files/`, 5 graisses latin), `mdi/` (Material Design Icons), `threejs/` (`three.min.js`, `controls/` avec `OrbitControls.js` et `TrackballControls.js`, `loaders/` avec `{STL,OBJ,3MF}Loader.js`), avec une `LICENSE.txt` chacun. Contenu de `controls/`, `loaders/` et `inter/files/` confirmé seulement par les noms de dossiers (captures du 20/10/2026) : vérifier les noms de fichiers au premier lancement.
+- Corrigé le 20/10/2026 : `index.html` charge désormais Three.js r128 et ses loaders (l.46–51) depuis `assets/vendor/threejs/` et Inter (l.43) depuis `assets/vendor/inter/inter.css`, au lieu de cdnjs/jsdelivr et Google Fonts : la visionneuse 3D fonctionne hors ligne et l'application ne contacte plus de CDN. La CSP de `_set_security_headers` (main.py l.3571) autorise **toujours** ces CDN (laissée telle quelle sur décision du 20/10/2026) ; `sw.js` est passé à `stellio-v6` pour purger les anciens caches.
 
-### Gaps noted in the repository (v0.6.9)
-- **Nexprint / useful links**: the 0.6.9 changelog says Nexprint joins the "3D models" links. This is true for `_DEFAULT_USEFUL_LINKS` (`main.py` l.19491), but `languages/useful_links.json` (25 links, "3D models" group: Printables, MakerWorld, Thingiverse, Cults) does not contain Nexprint; if that file takes precedence, the link does not appear.
-- **README / PRIVACY**: neither `README.md` (and its translations) nor `docs/privacy/PRIVACY.md` mention Nexprint; `PRIVACY.md` also does not cite the third-party site contacted for downloading nor the login through the official site's window.
-- **License**: `LICENSE` is still the GPL v3 whereas the README announces AGPL v3, and `about.legal` displays "All rights reserved" (see §13).
-- **Windows signing**: still no Authenticode signing step in the workflow (see §13).
-- **`plyer`**: still absent from `requirements.txt` although `main.py` uses it (l.12460) and `check_deps.REQUIRED_MODULES` lists it.
+### Écarts constatés dans le dépôt (v0.7.2)
+- Voir le §15 pour la liste complète (restauration des fonctions de la 0.6.9, changelog, licence, signature, Three.js).
+- **README / PRIVACY** : le README fourni (381 lignes) ne mentionne pas Nexprint ; `worker.py` (l.284, désormais « squelette non utilisé ») et `Stellio-Setup-<version>.exe` (l.184) sont corrigés depuis le 19/10/2026. Les 8 politiques de confidentialité ont été mises à jour le 19/10/2026 (voir §13).
+- **Licence** : `LICENSE` est maintenant l'AGPL v3 (18/10/2026), cohérent avec le README et avec la modale « À propos » (`about.legal`, voir §13).
+- **Signature Windows** : volontairement absente pour l'instant ; `CODE_SIGNING_POLICY.md` et README alignés le 18/10/2026 (voir §10 et §13).
+- **Import de bobines depuis un tableur** : `POST /api/filament/manual/import/preview` (fichier `.xls`/`.xlsx`/`.csv` → aperçu, colonnes reconnues par synonymes, couleurs converties en hex) puis `POST /api/filament/manual/import` (insertion dans `manual_filament_spools`), code `_spool_import_*` dans `main.py` (constantes l.22648, `_spool_import_read_table` l.22716, `_spool_import_parse` l.22777, routes `api_manual_spools_import_preview` l.22844 et `api_manual_spools_import` l.22866, juste avant `_consume_filament_slot` l.22909) ; bouton `#import-manual-spool-btn` (`index.html` l.2365) et modale `openSpoolImportModal` (`script.js` l.10497, puis `previewSpoolImport` l.10530 et `confirmSpoolImport` l.10566, après `saveSpoolInventoryEntry`) ; clés i18n `spoolimport.*` (8). Limites : 5 Mo, 2000 lignes ; lignes sans matière ni couleur ignorées ; une bobine créée par ligne (pas de fusion des doublons). Dépendances `xlrd` (.xls) et `openpyxl` (.xlsx) : présentes dans `requirements.txt` et dans la liste de repli de `main.py` ; **à vérifier dans `check_deps.REQUIRED_MODULES`** (`check_deps.py` n'a pas été fourni).
+- **Qidi Studio** : ajouté comme slicer détecté (`_SLICER_CANDIDATES`, id `qidistudio`, exécutable `qidi-studio.exe`), famille « fork Bambu Studio » (`--load-settings`, préslice, `SLICER_VERSIONED_USER_DIRS` → `QIDIStudio\\user`), listes déroulantes d'`index.html` et libellé de `script.js`. Chemins d'installation et dossier utilisateur déduits de la convention des forks Bambu Studio : à vérifier sur une machine avec Qidi Studio installé.
+- **Bulle de survol des cartes** : n'affiche plus dimensions/poids/temps mais « Envoyé au slicer » (une ligne dans `print_history`) et « Imprimé » (résultat `success`), d'après `print_status` (main.py ~l.7494) ; clés `card.tooltip_sent_slicer`, `card.tooltip_printed`, `card.yes`, `card.no`.
+- **`plyer`** : présent dans `requirements.txt`, dans la liste de repli de `main.py`, dans `check_deps.REQUIRED_MODULES`, dans `launcher._PRELOAD_MODULES` et dans les `--collect-all` du workflow (corrigé).
+
+---
+
+## 15. Statut du portage 0.6.9 → 0.7.2 et écarts restants
+
+**Restauré dans la 0.7.2** (code repris de la 0.6.9, testé côté serveur avec le client de test Flask : création/lecture des données, PDF du rapport, liaison pièce ↔ maintenance, avertissement de buse abrasive, rôle invité en lecture seule) : séchage des bobines, calibrations, pièces d'usure, rapports mensuels et bilan de bobine, mises à jour de modèles, notifications push, rôle invité, téléchargement Nexprint. Repères au §2 (tableau « Fonctions restaurées »), §3, §4 et §5. Non testé en conditions réelles : l'envoi vers ntfy/Telegram/Discord/webhook, la vérification des mises à jour de modèles auprès des plateformes, la connexion Nexprint (fenêtre pywebview) et l'interface dans un navigateur.
+
+**Volontairement non repris de la 0.6.9** (hors périmètre demandé, ou remplacé par du code 0.7.x) : statut « envoyé/réussi » des cartes (`/api/print-history/file-status` ; seule une version simplifiée existe, la bulle de survol « Envoyé au slicer / Imprimé » basée sur `print_status`), fiabilité croisée par matière/bobine, « réimprimer comme la dernière fois », sous-dossiers de téléchargement (`/api/download/targets`), dédoublonnage des sources imbriquées. Les clés i18n correspondantes n'ont pas été réintégrées ; seules celles des fonctions restaurées l'ont été (préfixes `parts.`, `push.`, `report.`, `drying.`, `calib.`, `modelupdate.`, `guests.`, `spoolreport.`, `preprint.`, `viewer.`).
+
+- **Correctif (file « à imprimer bientôt »)** : le bouton « Ajouter à imprimer bientôt » du menu Actions (`#ctx-queue-btn`, script.js l.2191) appelait `togglePrintQueue(_ctxPath)` alors que `_ctxPath` n'existe que dans la fonction anonyme de `openFileCtxMenu` (l.16469) : ReferenceError au clic, rien n'était ajouté et la file restait vide. Le gestionnaire lit désormais `window._ctxFilePath`, renseigné par `openFileCtxMenu` (l.16475). Même cause possible dans la 0.6.9 (code identique).
+- **Correctif (notifications en double)** : les clés de dédoublonnage des alertes de stock bas, pièce à recommander, bobine à sécher et maintenance se terminaient par la date du jour (`..._${today}`) et le serveur ne dédoublonnait que sur 24 h : la même alerte réapparaissait chaque jour. Les clés n'ont plus de date (script.js l.3841, 10963, 10978, 15037) et `api_create_notification` ignore toute nouvelle notification dont le sujet existe déjà, lue ou non, quelle que soit sa date ; seul le message est mis à jour (ex. grammes restants). Au démarrage, `_dedupe_notifications_once` ne garde que la plus récente des anciennes notifications au même sujet. Les notifications d'événement (`print_finished_*`, `print_failed_*`, clé avec `Date.now()`) restent individuelles. Si l'utilisateur supprime une notification alors que la condition persiste, elle peut réapparaître au contrôle suivant.
+- **Nexprint** : l'interface (carte de compte, libellés) est en français codé en dur, comme dans la 0.6.9 ; aucune clé i18n dédiée. Le lien Nexprint a été ajouté à `languages/useful_links.json` (groupe « Modèles 3D ») et existe aussi dans la liste de repli `_DEFAULT_USEFUL_LINKS` (main.py l.20372).
+- **Changelog** : corrigé — la seconde entrée `0.7.1` (16 éléments) est devenue l'entrée `0.7.2` et ne garde que ses 8 éléments propres (les 8 autres, identiques, restent dans `0.7.1`). Un 9ᵉ élément, ajouté dans les 8 langues, annonce le retour des fonctions restaurées de la 0.6.9.
+- **Three.js et Inter** : servis depuis `assets/vendor/` (corrigé le 20/10/2026) ; la CSP autorise encore les CDN.
+- **Boutiques du stock bas** : corrigé le 19/10/2026 — `filament_shops.json` supprimé (et sa lecture dans `load_filament_shops`), `_DEFAULT_USEFUL_LINKS` = copie complète des 41 liens de `useful_links.json` (à garder synchronisée avec ce fichier ; commentaire ajouté au-dessus de la liste), « Bambu Lab Wiki » ajouté au JSON.
+- **`/api/files/origin`** : route restaurée le 18/10/2026 (GET/POST). Table `file_origins` ; la lecture fusionne la fiche saisie avec `download_history` (lien source, date et plateforme du téléchargement → `from_download`) ; l'écriture valide l'URL (`http(s)://`, `url_invalid`) et les longueurs (URL 500, auteur 120, licence 120, notes 1000 → `url_too_long`, `author_too_long`, `license_too_long`, `notes_too_long`) et refuse les chemins hors sources (403) ; une fiche entièrement vide est supprimée (sauf lien de téléchargement). `_follow_file_origin` fait suivre la fiche (et recopie le lien de téléchargement) lors d'un renommage ou d'un déplacement ; la corbeille n'efface pas la fiche (annulation possible).
+- **Doublons** dans `script.js` : corrigé — dans le fichier fourni le 19/10/2026, `window.addPrinter` (l.14067), `window.openAddPrinterModal` (l.15970) et `window.togglePrinterFields` (l.16058) ne sont définis qu'une fois (aucune modification n'a été nécessaire).
+- **Dépendances** : `telethon` conservé volontairement (variante Telegram prévue) alors que le push Telegram passe par des requêtes HTTP (`_push_deliver`, main.py l.12468) ; `pyaes` seulement dans `requirements.txt` et les `--collect-all` ; `requirements.txt` sans versions (choix du 18/10/2026 de les laisser libres).
+- **Licence** : `LICENSE` = AGPL v3 (18/10/2026), README = AGPL v3, À propos = « Distribué sous licence GNU AGPL v3 » (voir §13). **Signature Windows** : non signé par choix, policy et README alignés ; SHA-256 d'UnRAR Windows épinglé, celui des archives macOS reste à renseigner (voir §10 et §13). **README** : `worker.py` (squelette non utilisé) et le nom de l'installeur corrigés dans les 8 langues.

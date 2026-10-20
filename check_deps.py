@@ -55,6 +55,8 @@ REQUIRED_MODULES = [
     ("websocket",                               "websocket-client",       "WebSocketApp",       ["websocket", "websocket-client"]),
     ("flashforge",                              "flashforge-python-api",  "FlashForgeClient",   None),
     ("reportlab.platypus",                      "reportlab",              "SimpleDocTemplate",  None),
+    ("openpyxl",                                "openpyxl",               "load_workbook",      None),
+    ("xlrd",                                    "xlrd",                   "open_workbook",      None),
 ]
 
 TELEGRAM_MODULES = [

@@ -28,7 +28,8 @@
     "name": "3DJake",
     "group": "Boutiques généralistes",
     "url": "https://www.3djake.fr",
-    "icon": "fa-solid fa-store"
+    "icon": "fa-solid fa-store",
+    "search_url": "https://www.3djake.fr/recherche?keyword={q}"
   },
   {
     "id": "aliexpress",
@@ -36,6 +37,54 @@
     "group": "Boutiques généralistes",
     "url": "https://fr.aliexpress.com",
     "icon": "fa-solid fa-store"
+  },
+  {
+    "id": "filimprimante3d",
+    "name": "Filimprimante3D",
+    "group": "Boutiques généralistes",
+    "url": "https://www.filimprimante3d.fr",
+    "icon": "fa-solid fa-store",
+    "search_url": "https://www.filimprimante3d.fr/search?q={q}"
+  },
+  {
+    "id": "grossiste3d",
+    "name": "Grossiste 3D",
+    "group": "Boutiques généralistes",
+    "url": "https://www.grossiste3d.com",
+    "icon": "fa-solid fa-store",
+    "search_url": "https://www.grossiste3d.com/recherche?controller=search&s={q}"
+  },
+  {
+    "id": "makershop",
+    "name": "Makershop",
+    "group": "Boutiques généralistes",
+    "url": "https://www.makershop.fr",
+    "icon": "fa-solid fa-store",
+    "search_url": "https://www.makershop.fr/recherche?query={q}"
+  },
+  {
+    "id": "polyfab3d",
+    "name": "Polyfab3D",
+    "group": "Boutiques généralistes",
+    "url": "https://www.polyfab3d.fr",
+    "icon": "fa-solid fa-store",
+    "search_url": "https://www.polyfab3d.fr/recherche?controller=search&s={q}"
+  },
+  {
+    "id": "lv3d",
+    "name": "LV3D",
+    "group": "Boutiques généralistes",
+    "url": "https://www.lv3dofficiel.fr",
+    "icon": "fa-solid fa-store",
+    "search_url": "https://www.lv3dofficiel.fr/recherche?controller=search&s={q}"
+  },
+  {
+    "id": "matterhackers",
+    "name": "MatterHackers",
+    "group": "Boutiques généralistes",
+    "url": "https://www.matterhackers.com",
+    "icon": "fa-solid fa-store",
+    "search_url": "https://www.matterhackers.com/s/store?q={q}"
   },
   {
     "id": "bambulab",
@@ -67,7 +116,8 @@
     "name": "Prusa",
     "group": "Boutiques constructeurs",
     "url": "https://www.prusa3d.com",
-    "icon": "fa-solid fa-industry"
+    "icon": "fa-solid fa-industry",
+    "search_url": "https://www.prusa3d.com/search/?q={q}"
   },
   {
     "id": "anycubic",
@@ -92,14 +142,16 @@
     "name": "Polymaker",
     "group": "Boutiques constructeurs",
     "url": "https://polymaker.com",
-    "icon": "fa-solid fa-industry"
+    "icon": "fa-solid fa-industry",
+    "search_url": "https://shop.polymaker.com/search?q={q}"
   },
   {
     "id": "sunlu",
     "name": "Sunlu",
     "group": "Boutiques constructeurs",
     "url": "https://www.sunlu.com",
-    "icon": "fa-solid fa-industry"
+    "icon": "fa-solid fa-industry",
+    "search_url": "https://www.sunlu.com/search?q={q}"
   },
   {
     "id": "tigertag",
@@ -107,6 +159,70 @@
     "group": "Boutiques constructeurs",
     "url": "https://tigertag.io",
     "icon": "fa-solid fa-industry"
+  },
+  {
+    "id": "francofil",
+    "name": "Francofil",
+    "group": "Boutiques constructeurs",
+    "url": "https://francofil.fr",
+    "icon": "fa-solid fa-industry",
+    "search_url": "https://francofil.fr/?s={q}"
+  },
+  {
+    "id": "dagoma",
+    "name": "Dagoma",
+    "group": "Boutiques constructeurs",
+    "url": "https://www.dagoma3d.com",
+    "icon": "fa-solid fa-industry",
+    "search_url": "https://www.dagoma3d.com/shop?search={q}"
+  },
+  {
+    "id": "arianeplast",
+    "name": "Arianeplast",
+    "group": "Boutiques constructeurs",
+    "url": "https://www.arianeplast.com",
+    "icon": "fa-solid fa-industry",
+    "search_url": "https://www.arianeplast.com/search?controller=search&s={q}"
+  },
+  {
+    "id": "filo3d",
+    "name": "Filo3D",
+    "group": "Boutiques constructeurs",
+    "url": "https://www.filo3d.fr",
+    "icon": "fa-solid fa-industry",
+    "search_url": "https://www.filo3d.fr/recherche?controller=search&s={q}"
+  },
+  {
+    "id": "3dfils",
+    "name": "3DFils",
+    "group": "Boutiques constructeurs",
+    "url": "https://3dfils.com",
+    "icon": "fa-solid fa-industry",
+    "search_url": "https://3dfils.com/recherche?controller=search&s={q}"
+  },
+  {
+    "id": "colorfabb",
+    "name": "ColorFabb",
+    "group": "Boutiques constructeurs",
+    "url": "https://www.colorfabb.com",
+    "icon": "fa-solid fa-industry",
+    "search_url": "https://www.colorfabb.com/fr/search?q={q}"
+  },
+  {
+    "id": "lotactree",
+    "name": "Lotactree",
+    "group": "Boutiques constructeurs",
+    "url": "https://www.lotactree.com",
+    "icon": "fa-solid fa-industry",
+    "search_url": "https://www.lotactree.com/en-us/search?q={q}"
+  },
+  {
+    "id": "esun",
+    "name": "eSUN",
+    "group": "Boutiques constructeurs",
+    "url": "https://www.esun3d.com",
+    "icon": "fa-solid fa-industry",
+    "search_url": "https://www.esun3d.com/search?q={q}"
   },
   {
     "id": "printables",
@@ -137,6 +253,13 @@
     "icon": "fa-solid fa-cube"
   },
   {
+    "id": "nexprint",
+    "name": "Nexprint",
+    "group": "Modèles 3D",
+    "url": "https://www.nexprint.com",
+    "icon": "fa-solid fa-cube"
+  },
+  {
     "id": "spoolman",
     "name": "Spoolman",
     "group": "Ressources",
@@ -149,6 +272,13 @@
     "group": "Ressources",
     "url": "https://github.com/SoftFever/OrcaSlicer",
     "icon": "fa-brands fa-github"
+  },
+  {
+    "id": "bambuwiki",
+    "name": "Bambu Lab Wiki",
+    "group": "Ressources",
+    "url": "https://wiki.bambulab.com",
+    "icon": "fa-solid fa-book"
   },
   {
     "id": "tigertag-doc",

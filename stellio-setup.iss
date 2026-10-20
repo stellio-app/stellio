@@ -15,10 +15,7 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
-; Force le mode natif 64 bits (evite la redirection registre WOW6432Node qui
-; fait echouer IsVCRedistInstalled sur un runtime deja installe)
 ArchitecturesInstallIn64BitMode=x64compatible
-; Installation globale dans ProgramData
 DefaultDirName={commonappdata}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
@@ -41,7 +38,6 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Dirs]
-; Autorise tous les utilisateurs à modifier/écrire dans ce dossier pour permettre les patchs .zip
 Name: "{app}"; Permissions: users-full
 
 [Files]

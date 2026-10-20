@@ -1,73 +1,74 @@
 # Stellio
 
-> Stellio (v0.6.9) is a 3D file library management application for 3D printing: indexing of local/SMB/NFS folders, thumbnails and 3D viewer, sending to slicers, printer monitoring (Bambu, Elegoo, Creality, FlashForge, Klipper/Moonraker), filament inventory (Spoolman, manual, TigerTag), model downloads (Printables, MakerWorld, Thingiverse, Nexprint), print history, costs/PDF quotes, local AI diagnostics (Ollama). Flask backend (a single Python file; announced license AGPL v3, see the note on `LICENSE` below), vanilla HTML/JS/CSS frontend with no build step, SQLite data. Packaged as a desktop app (pywebview + PyInstaller) or as a headless server (Raspberry Pi/Linux), with an Android companion app (APK).
+> Stellio (v0.7.2) est une application de gestion de bibliothèque de fichiers 3D pour l'impression 3D : indexation de dossiers locaux/SMB/NFS, miniatures et visionneuse 3D, envoi vers slicers, suivi d'imprimantes (Bambu, Elegoo, Creality, FlashForge, Klipper/Moonraker), inventaire de filament (Spoolman, manuel avec import Excel/CSV, TigerTag), téléchargement de modèles (Printables, MakerWorld, Thingiverse, Nexprint), historique d'impressions, coûts/devis PDF, séchage des bobines, calibrations par matériau, pièces d'usure liées à la maintenance, rapports mensuels, suivi des mises à jour de modèles, origine du modèle (lien source, auteur, licence, notes ; reprise automatique du lien de téléchargement), notifications push (ntfy/Telegram/Discord/webhook), comptes invités en lecture seule, widget « Comptes externes » du tableau de bord, sauvegarde automatique planifiée, suggestions/signalements envoyés comme issues GitHub, diagnostic IA locale (Ollama). Backend Flask (un seul fichier Python ; licence AGPL v3), frontend HTML/JS/CSS vanilla sans build, données SQLite. Emballée en app de bureau (pywebview + PyInstaller) ou en serveur headless (Raspberry Pi/Linux), avec une app Android compagnon (APK).
 
-Important notes for an agent / LLM:
-- The project is monolithic: `main.py` (~22,000 lines), `script.js` (~18,300 lines), `index.html` (~4,000 lines), `style.css` (~8,000 lines). Consult `CODEMAP.md` to locate a function or a route by line number before reading these files in full.
-- No frontend framework: a single page (SPA) where the `<div class="page" id="page-*">` elements are shown/hidden; modals have the id `modal-*`.
-- All UI strings go through i18n (`data-i18n` / `I18N.t`), 8 languages, 1,793 keys each, `fr` = reference/fallback language. Any new string must be added to all 8 files.
-- Code comments and log messages are in French.
-- JSON REST API under `/api/*`, Flask session (cookie) + CSRF protection; read-only "guest" role.
-- Public repository: https://github.com/stellio-app/stellio (branch `main`, commit "V 0.6.9", 84 files, no tests folder, `bin/` ignored by `.gitignore`, no Android sources: only the APK is versioned). The line numbers in `CODEMAP.md` match this commit.
-- ⚠️ License: the README, its translations and the badge announce **AGPL v3**, but the provided `LICENSE` file is the text of the **GPL v3** (and the "About" window displays "All rights reserved"). To be settled before citing a license.
-- User data: `~/.stellio` (Linux/macOS) or `%APPDATA%\Stellio` (Windows), overridable via `STELLIO_DATA_DIR`. Database: `stellio.db`; settings: `app_settings.json`.
-- Useful environment variables: `STELLIO_HEADLESS`, `STELLIO_PORT` (default 5000), `STELLIO_SERVER_URL`, `STELLIO_START_MINIMIZED`, `STELLIO_DATA_DIR`, `STELLIO_ALLOWED_SOURCE_TYPES`.
+Notes importantes pour un agent / LLM :
+- Le projet est monolithique : `main.py` (~24 207 lignes), `script.js` (~19 290 lignes), `index.html` (~4 140 lignes), `style.css` (~8 280 lignes). Consulter `CODEMAP.md` pour retrouver une fonction ou une route par numéro de ligne avant de lire ces fichiers en entier.
+- Pas de framework front : une seule page (SPA) où les `<div class="page" id="page-*">` sont affichés/masqués ; les modales ont l'id `modal-*`.
+- Toutes les chaînes UI passent par i18n (`data-i18n` / `I18N.t`), 8 langues, 1948 clés chacune (jeux de clés identiques), `fr` = langue de référence/fallback. Toute nouvelle chaîne doit être ajoutée dans les 8 fichiers.
+- Commentaires et messages de log du code sont en français.
+- API REST JSON sous `/api/*`, session Flask (cookie) + protection CSRF ; rôle « invité » en lecture seule.
+- Dépôt public : https://github.com/stellio-app/stellio (branche `main` ; dernier état connu : commit « V 0.6.9 », 84 fichiers, non revérifié pour la 0.7.2 ; pas de dossier de tests, `bin/` ignoré par `.gitignore`, pas de sources Android : seul l'APK est versionné). Les numéros de ligne de `CODEMAP.md` correspondent aux fichiers de la v0.7.2 avant les modifications d'octobre 2026 (le décalage à appliquer est indiqué en tête de `CODEMAP.md`) (`CURRENT_VERSION` = "0.7.2", `main.py` l.15321 ; les numéros de ligne de `main.py` citées dans `CODEMAP.md` se corrigent avec le tableau de décalages de son en-tête, étendu le 18/10/2026).
+- Fonctionnalités restaurées de la 0.6.9 dans cette version (voir `CODEMAP.md` §2 « Fonctions restaurées » et §15) : séchage (`/api/filament/drying`), calibrations (`/api/calibrations`), pièces d'usure (`/api/parts`), rapports mensuels (`/api/reports/*`, `/api/filament/spool-report`), mises à jour de modèles (`/api/model-updates*`), push (`/api/push/test`, réglages `push_*`), rôle invité (`/api/auth/guests`, garde `_viewer_guard`), Nexprint (`nexprint_get_model_files`). Non reprises : statut « envoyé/réussi » des cartes (remplacé par une bulle de survol « Envoyé au slicer / Imprimé »), fiabilité croisée, « réimprimer comme la dernière fois », sous-dossiers de téléchargement.
+- Licence : **AGPL v3** — le fichier `LICENSE` contient depuis le 18/10/2026 le texte de l'AGPL v3 (19 novembre 2007), cohérent avec le README, ses traductions, le badge et la fenêtre « À propos » (`about.legal`, 8 langues : « © 2026 Stellio Project. Distribué sous licence GNU AGPL v3 »).
+- Signature et intégrité (état au 18/10/2026) : l'installeur Windows et l'AppImage ne sont **pas signés** (choix de ne pas signer pour l'instant) ; macOS est signé Developer ID si les secrets existent, sinon ad-hoc, sans notarisation. Chaque fichier de release a un `.sha256`, vérifié par la mise à jour intégrée quand il est publié. ffmpeg est épinglé par version et SHA-256 dans le workflow ; le SHA-256 de l'UnRAR.exe Windows (7.22.0) l'est aussi (une nouvelle version de RARLAB fait échouer le build jusqu'à mise à jour) ; ceux des archives UnRAR macOS restent à renseigner.
+- Données utilisateur : `~/.stellio` (Linux/macOS) ou `%APPDATA%\Stellio` (Windows), surchargeable via `STELLIO_DATA_DIR`. Base : `stellio.db` ; réglages : `app_settings.json`.
+- Variables d'environnement utiles : `STELLIO_HEADLESS`, `STELLIO_PORT` (défaut 5000), `STELLIO_SERVER_URL`, `STELLIO_START_MINIMIZED`, `STELLIO_DATA_DIR`, `STELLIO_ALLOWED_SOURCE_TYPES`, `STELLIO_FEEDBACK_RELAY`, `STELLIO_NO_AUTO_INSTALL`.
 
 ## Documentation
 
-- [CODEMAP.md](CODEMAP.md): detailed code map (main.py sections, API routes by domain, SQLite tables, JS functions by area, HTML pages/modals, i18n)
+- [CODEMAP.md](CODEMAP.md): carte détaillée du code (sections de main.py, routes API par domaine, tables SQLite, fonctions JS par zone, pages/modales HTML, i18n)
 
-## Build, tests and distribution
+## Build, tests et distribution
 
-- [check_deps.py](check_deps.py): checks/repairs dependencies (`--fix`, `--telegram`); `main.py` imports it and keeps a fallback list — any new dependency goes into `requirements.txt`, `check_deps.REQUIRED_MODULES` and this fallback list
-- [requirements.txt](requirements.txt): pip dependencies (Linux: additionally `pywebview[gtk]` and GTK/WebKit system packages)
-- [conftest.py](conftest.py): pytest config, stubs for `trimesh`/`pyrender`/`pymeshfix`/`smbclient`/`rarfile`, temporary `STELLIO_DATA_DIR`
-- [stellio-setup.iss](stellio-setup.iss): Inno Setup Windows installer (installs the PyInstaller output `dist\Stellio`, VC++ Redist and WebView2 when needed, updates via `.zip` patch)
-- [LICENSE](LICENSE): full text of the GNU GPL v3 (June 29, 2007) — inconsistent with the AGPL v3 announced everywhere else
-- [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md): code signing policy (EN) — EV/OV certificate, key on HSM/service (SignPath cited), Author/Reviewer/Approver roles, update integrity, response in case of compromise
-- [entitlements.plist](entitlements.plist): macOS signing entitlements
-- [sw.js](sw.js): PWA service worker (API never cached, assets cache-first)
-- [launcher.py](launcher.py): entry point compiled by PyInstaller; launches `app/main.py` (copied next to it, replaceable by the `.zip` patches) via `runpy` with `run_name="stellio_main"`
-- [.github/workflows/build-and-sign.yml](.github/workflows/build-and-sign.yml): GitHub Actions — Windows build (+ Inno Setup installer + `.zip` patch), macOS arm64/x86_64 (.dmg), Linux (AppImage), then draft release; only publishes if `CURRENT_VERSION` in `main.py` changes
-- [install-pi.sh](install-pi.sh): Raspberry Pi/Linux installer (venv + `stellio` systemd service, headless mode)
-- [stellio_manager.bat](stellio_manager.bat): Windows development menu (creates/uses `venv`, `pip install -r requirements.txt`, `check_deps.py --fix`, launches `main.py` in test or DEBUG mode, or the git-ignored `test/` folder)
-- [.gitignore](.gitignore): ignores `python/`, `venv/`, `bin/`, `dist/`, `build/`, `test/`, `*.db`, `*.log`, certificates (`*.p12`, `*.pfx`, `*.pem`), `StellioCompanion/` (local Android project)
-- [apk/stellio.apk](apk/stellio.apk): Android companion app (`com.stellioapp.companion`, WebView + QR scan + photo), sources not provided
-- [worker.py](worker.py): 3MF worker skeleton, currently unused by `main.py`
-- [README.md](README.md): public presentation, installation (Windows, Raspberry Pi/Linux), supported printers, keyboard shortcuts
+- [check_deps.py](check_deps.py): vérifie/répare les dépendances (`--fix`, `--telegram`) ; `main.py` l'importe et garde une liste de repli — toute nouvelle dépendance va dans `requirements.txt`, `check_deps.REQUIRED_MODULES`, cette liste de repli et les `--collect-all` du workflow (PyInstaller ne voit pas les imports de `main.py`) ; `launcher._PRELOAD_MODULES` est une liste de diagnostic facultative
+- [requirements.txt](requirements.txt): dépendances pip (Linux : en plus `pywebview[gtk]` et paquets système GTK/WebKit ; `pyaes` optionnel pour le chiffrement AES-256 du PDF de devis, `plyer` pour les notifications natives, `openpyxl` et `xlrd` pour l'import de bobines depuis un tableur)
+- [conftest.py](conftest.py): config pytest, stubs de `trimesh`/`pyrender`/`pymeshfix`/`smbclient`/`rarfile`, `STELLIO_DATA_DIR` temporaire
+- [stellio-setup.iss](stellio-setup.iss): installeur Windows Inno Setup (installe la sortie PyInstaller `dist\Stellio`, VC++ Redist et WebView2 au besoin, mises à jour par patch `.zip`)
+- [LICENSE](LICENSE): texte intégral de la GNU AGPL v3 (19 novembre 2007), cohérent avec le README
+- [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md): politique de signature de code (EN), réécrite le 18/10/2026 selon l'état réel — statut par plateforme (Windows/Linux non signés), mesures d'intégrité en place (SHA-256, binaires épinglés), limites connues, vérification d'un téléchargement, politique cible si une signature est introduite
+- [entitlements.plist](entitlements.plist): droits de signature macOS
+- [sw.js](sw.js): service worker PWA (API jamais mise en cache, assets cache-first ; cache `stellio-v6`, à incrémenter après tout changement de fichiers servis)
+- [launcher.py](launcher.py): point d'entrée compilé par PyInstaller ; lance `app/main.py` (copié à côté, remplaçable par les patchs `.zip`) via `runpy` avec `run_name="stellio_main"`
+- [.github/workflows/build-and-sign.yml](.github/workflows/build-and-sign.yml): GitHub Actions — build Windows (+ installeur Inno Setup + patch `.zip`), macOS arm64/x86_64 (.dmg), Linux (AppImage), puis release en brouillon ; ne publie que si `CURRENT_VERSION` de `main.py` change ; ffmpeg épinglé par version + SHA-256 vérifié (UnRAR.exe Windows : SHA-256 épinglé ; UnRAR macOS : à renseigner) ; aucune signature Windows ; `--collect-all` de tous les modules importés par `main.py` (dont reportlab, psutil, plyer, openpyxl, xlrd, pyaes)
+- [install-pi.sh](install-pi.sh): installeur Raspberry Pi/Linux (venv + service systemd `stellio`, mode headless ; installe le vrai `unrar`, avec repli sur `unrar-free` si le paquet est introuvable)
+- [stellio_manager.bat](stellio_manager.bat): menu de développement Windows (crée/utilise `venv`, `pip install -r requirements.txt`, `check_deps.py --fix`, lance `main.py` en mode test ou DEBUG, ou le dossier `test/` ignoré par git)
+- [.gitignore](.gitignore): réécrit le 20/10/2026 — ignore (dossiers de la racine ancrés) `venv/`, `python/`, `Lib/`, `Scripts/`, `nodejs/`, `build/`, `dist/`, `output/`, `release/`, `bin/`, `redist/`, `stellio-data*/`, `test/`, `logs/`, `StellioCompanion/` (projet Android local), et partout `__pycache__/`, `node_modules/`, `.wrangler/`, `*.db`, `*.log`, `app_settings.json`, `encryption.key`, `.env`, certificats et clés (`*.p12`, `*.pfx`, `*.pem`, `*.key`) ; `relay/`, `apk/`, `docs/` sont versionnés
+- [apk/stellio.apk](apk/stellio.apk): app Android compagnon (`com.stellioapp.companion`, WebView + scan QR + photo), sources non fournies
+- [worker.py](worker.py): squelette de worker 3MF, actuellement non utilisé par `main.py`
+- [README.md](README.md): présentation publique, installation (Windows, Raspberry Pi/Linux), imprimantes supportées, raccourcis clavier
 
 ## Backend
 
-- [main.py](main.py): Flask server + all business logic (auth, sources, scanning, thumbnails, downloads, slicers, printers, filament, reports, AI, remote access, updates). Entry point at line ~21810 (`if __name__ in ('__main__', 'stellio_main')`), waitress server on 0.0.0.0, pywebview window except in headless mode.
+- [main.py](main.py): serveur Flask + toute la logique métier (auth, sources, scan, miniatures, téléchargements, slicers, imprimantes, filament, sauvegardes manuelles/automatiques, suggestions GitHub, devis, IA, accès distant, mise à jour). Point d'entrée ligne 23760 (`if __name__ in ('__main__', 'stellio_main')`), serveur waitress sur 0.0.0.0, fenêtre pywebview sauf mode headless.
 
 ## Frontend
 
-- [index.html](index.html): SPA structure (sidebar, 14 `page-*` pages, ~50 `modal-*` modals), loads Three.js r128 (3D viewer), Font Awesome and Material Design Icons locally (`assets/vendor/`)
-- [script.js](script.js): all client logic (I18N, auth, library, dashboard, 3D viewer, slicers, printers, filament/Spoolman, SOS Print, history, settings, Ctrl+K palette)
-- [style.css](style.css): dark/light theme via CSS variables (`--accent`, `--bg-*`), per-manufacturer accent (`data-fabricant="bambu|prusa|voron|creality"`), gallery/details views
+- [index.html](index.html): structure de la SPA (sidebar, 14 pages `page-*`, 35 modales `modal-*`), charge Three.js r128 et ses loaders, la police Inter, Font Awesome et Material Design Icons depuis `assets/vendor/` (tout en local depuis le 20/10/2026 : la visionneuse 3D fonctionne hors ligne ; la CSP de `main.py` autorise encore les CDN)
+- [script.js](script.js): toute la logique client (I18N, auth, bibliothèque, tableau de bord, visionneuse 3D, slicers, imprimantes, filament/Spoolman, SOS Print, historique, paramètres, palette Ctrl+K)
+- [style.css](style.css): thème sombre/clair via variables CSS (`--accent`, `--bg-*`), accent par fabricant (`data-fabricant="bambu|prusa|voron|creality"`), vues galerie/détails
 
 ## Assets
 
-- [assets/logo-nom-stellio.ico](assets/logo-nom-stellio.ico): app icon (multi-size ICO, 16 to 256 px); used by the Inno Setup installer, PyInstaller (Windows) and, once converted, by the macOS (.icns) and AppImage builds
-- [assets/tigertag-logo.svg](assets/tigertag-logo.svg): TigerTag logo (monochrome black SVG, 92×92 pt) displayed in the TigerTag banner of the filament inventory
+- [assets/logo-nom-stellio.ico](assets/logo-nom-stellio.ico): icône de l'app (ICO multi-tailles 16 à 256 px) ; utilisée par l'installeur Inno Setup, PyInstaller (Windows) et, converties, par les builds macOS (.icns) et AppImage
+- [assets/tigertag-logo.svg](assets/tigertag-logo.svg): logo TigerTag (SVG monochrome noir, 92×92 pt) affiché dans la bannière TigerTag de l'inventaire filament
 
-- [assets/](assets/): `logo-stellio.png` (favicon, sidebar), `nom-stellio.png` (sidebar logotype), `logo-nom-stellio.png` (login screen, PDF reports), `tigertag-logo.png` (not referenced), `vendor/` (Font Awesome, Inter, Material Design Icons, Three.js r128 + loaders, all loaded locally by `index.html`); `logo-stellio - Copie.png` is an unused duplicate (ICO renamed to .png)
-- README screenshots at the root: `library.png`, `monitoring.png`, `slicer.png`, `nesting.png` (1920 px)
+- [assets/](assets/): `logo-stellio.png` (favicon, sidebar), `nom-stellio.png` (logotype sidebar), `logo-nom-stellio.png` (écran de connexion, rapports PDF), `tigertag-logo.svg`, `vendor/` (Font Awesome, Inter, Material Design Icons, Three.js r128 + loaders, tous chargés en local par `index.html` depuis le 20/10/2026) ; `tigertag-logo.png` et `logo-stellio - Copie.png` ont été supprimés
+- Captures du README à la racine : `library.png`, `monitoring.png`, `slicer.png`, `nesting.png` (1920 px)
 
-## Data and translations
+## Données et traductions
 
-- [languages/fr.json](languages/fr.json): reference language (flat `section.key` keys + `__dir`, `__name`, `__native` metadata); same for `en`, `de`, `es`, `it`, `ja`, `pt`, `zh`
-- [languages/changelog.json](languages/changelog.json): release notes per language (`[{version, items:{fr:[...], en:[...], ...}}]`), displayed in "What's new"
-- [languages/useful_links.json](languages/useful_links.json): default useful links (groups: general shops, manufacturer shops, 3D models, resources); optional `search_url` with `{q}` and `vendors`
-- [languages/filament_shops.json](languages/filament_shops.json): shops offered by a spool's "Buy" button (Atome3D, Rainbow3D, Amazon, Bambu Lab), search URL with `{q}`
+- [languages/fr.json](languages/fr.json): langue de référence (clés plates `section.cle` + métadonnées `__dir`, `__name`, `__native`) ; idem `en`, `de`, `es`, `it`, `ja`, `pt`, `zh`
+- [languages/changelog.json](languages/changelog.json): notes de version par langue (`[{version, items:{fr:[...], en:[...], ...}}]`), affiché dans « Nouveautés » ; l'entrée 0.7.2 a 21 éléments par langue (8 ajoutés le 20/10/2026)
+- [languages/useful_links.json](languages/useful_links.json): liens utiles par défaut, dont Nexprint (groupes : boutiques généralistes, boutiques constructeurs, modèles 3D, ressources) ; `search_url` avec `{q}` et `vendors` optionnels ; les 23 liens ayant un `search_url` servent aussi de boutiques pour la recherche de bobine en stock bas ; `main.py` en garde une copie complète (`_DEFAULT_USEFUL_LINKS`, liste de secours à synchroniser) ; `filament_shops.json` a été supprimé le 19/10/2026
 
-## User documentation
+## Documentation utilisateur
 
-- [README.md](README.md): public presentation (EN); translations in `docs/readme/README.{fr,de,es,it,pt,ja,zh}.md`
-- [docs/privacy/PRIVACY.md](docs/privacy/PRIVACY.md): "local-first" privacy policy; translations `PRIVACY.{fr,de,es,it,pt,ja,zh}.md`
+- [README.md](README.md): présentation publique (EN) ; traductions dans `docs/readme/README.{fr,de,es,it,pt,ja,zh}.md`
+- [docs/privacy/PRIVACY.md](docs/privacy/PRIVACY.md): politique de confidentialité « local-first » (dernière mise à jour 20/10/2026 ; liste les services tiers contactés : GitHub, plateformes de modèles dont Nexprint, push ntfy/Telegram/Discord/webhook, TigerTag, relais de signalements, boutiques, instances distantes) ; traductions `PRIVACY.{fr,de,es,it,pt,ja,zh}.md`
 
 ## Optional
 
-- External integrations: Printables, MakerWorld, Thingiverse, Nexprint (model downloads; Nexprint = Elegoo's library, login through a window of the official site or the `auth_token` cookie); Spoolman and TigerTag (filament); Ollama (local AI, can be disabled); ntfy/Telegram/Discord/webhook (push notifications); Cloudflare Tunnel (`cloudflared`) or custom address (remote access).
-- Supported printers: Bambu Lab (MQTT), Creality (WebSocket), FlashForge, Elegoo (SDCP, CC2), Klipper/Moonraker, OctoPrint, PrusaLink.
-- Detected slicers: Bambu Studio, OrcaSlicer, PrusaSlicer, SuperSlicer, Cura, Creality Print, Elegoo Slicer, Anycubic Slicer, Lychee (time/weight estimation via G-code).
+- Intégrations externes : Printables, MakerWorld, Thingiverse, Nexprint (téléchargement de modèles ; Nexprint = bibliothèque d'Elegoo, connexion par fenêtre du site officiel ou cookie `auth_token`) ; Spoolman et TigerTag (filament) ; Ollama (IA locale, désactivable) ; ntfy/Telegram/Discord/webhook (notifications push) ; relais GitHub pour les suggestions/signalements (`STELLIO_FEEDBACK_RELAY`) ; notifications natives (plyer) et navigateur ; Cloudflare Tunnel (`cloudflared`) ou adresse personnalisée (accès distant).
+- Imprimantes supportées : Bambu Lab (MQTT), Creality (WebSocket), FlashForge, Elegoo (SDCP, CC2), Klipper/Moonraker, OctoPrint, PrusaLink.
+- Slicers détectés (`_SLICER_CANDIDATES`, main.py l.9741) : OrcaSlicer, Bambu Studio, Qidi Studio, PrusaSlicer, SuperSlicer, Cura, Creality Print, Elegoo Slicer, Anycubic Slicer (Next), Simplify3D, ideaMaker, FlashPrint, Lychee Slicer, CraftWare, MatterControl, MakerBot Print, Voxelizer, Slic3r, KISSlicer (estimation de temps/poids via G-code pour ceux qui le supportent).

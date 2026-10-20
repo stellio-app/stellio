@@ -1,6 +1,6 @@
 # 隐私政策
 
-**最后更新：** 2026年9月1日  
+**最后更新：** 2026年10月20日  
 **应用程序：** Stellio  
 **网站：** [stellio-app.com](https://stellio-app.com)  
 **仓库：** [github.com/stellio-app/stellio](https://github.com/stellio-app/stellio)
@@ -26,11 +26,17 @@
 为了正常运行，Stellio的某些*可选*功能可能会与外部服务通信。您对这些功能的启用保留完全控制权：
 
 - **自动更新**：Stellio可能会查询GitHub仓库（`github.com/stellio-app/stellio`）以检查新版本的可用性。在此检查期间不会传输任何个人标识符。
-- **3D模型平台**：如果您使用下载功能，Stellio将使用**您自己的凭证或API密钥**直接连接到Printables、MakerWorld或Thingiverse的API。这些信息永远不会发送到Stellio服务器。
+- **3D模型平台**：如果您使用下载功能，Stellio将使用**您自己的凭证或API密钥**直接连接到Printables、MakerWorld、Thingiverse或Nexprint（Elegoo的模型库）的API。这些信息永远不会发送到Stellio服务器。
 - **打印机管理**：Stellio直接与您的本地/网络打印机或打印服务器（OctoPrint、Klipper/Moonraker、通过MQTT的Bambu Lab）通信。除非您明确配置远程访问，否则这些通信将限制在您的本地网络内。
 - **远程访问（Cloudflare隧道）**：如果您启用远程访问，您的流量将通过Cloudflare服务器安全路由。请参阅[Cloudflare隐私政策](https://www.cloudflare.com/privacypolicy/)了解详情。
 - **人工智能（Ollama）**：默认情况下，AI（Ollama）在您的机器上本地运行。如果您选择在设置中配置远程Ollama URL，您的请求（模型描述、语义搜索）将发送到您自己选择的该第三方服务器。
 - **Spoolman**：如果您将Stellio连接到外部Spoolman服务器，耗材消耗数据将发送到您控制或选择的该服务器。
+- **推送通知（可选，默认关闭）**：如果您在设置中启用，Stellio会将您所选通知的标题和文本（例如打印结束或失败，可能包含文件名或打印机名称）发送到您选择的服务：ntfy（公共服务器`ntfy.sh`或您自己的服务器）、Telegram（使用您提供的机器人令牌和聊天ID）、Discord Webhook，或您自己的Webhook URL。此后该服务的隐私政策适用。在公共ntfy服务器上，任何知道您主题名称的人都可以读取消息：请选择难以猜测的主题名称，或自行托管服务器。
+- **TigerTag（可选）**：如果您使用TigerTag集成，Stellio会通过Google的身份验证和数据库服务（Firebase：`securetoken.googleapis.com`、`identitytoolkit.googleapis.com`、`firestore.googleapis.com`，以及`tigertag-cdn.web.app`）连接到您的TigerTag账户以读取您的耗材盘库存，并连接到`api.tigertag.io`下载公开的参考表。会话令牌加密存储在您的机器上。
+- **错误报告和建议（可选）**：除非您提交表单并明确表示同意，否则不会发送任何内容。您填写的类型、标题和描述将发送到托管在Cloudflare Workers上的中继，由其在项目的GitHub仓库中创建一个**公开**的issue：请勿包含个人信息或机密。如果您勾选技术信息选项，将附加Stellio版本、操作系统和界面语言。之后Stellio会查询GitHub公共API以显示您请求的状态和评论，并在本地保留一个管理令牌。
+- **模型更新跟踪（默认启用，可在设置中关闭）**：Stellio会自动向Printables、MakerWorld或Thingiverse（如果您已配置，则使用您的Thingiverse令牌）查询您已下载的模型是否有新版本。仅发送每个模型的标识符。
+- **耗材商店搜索（仅在您使用时）**：当您在商店中查询某盘耗材的库存时，Stellio会将您的搜索词（品牌、材料、颜色）发送到商店网站（例如Atome3D、Rainbow3D、Amazon、Bambu Lab商店，以及您的实用链接列表中的商店）。
+- **其他Stellio实例（可选）**：如果您添加远程Stellio实例或使用发现功能（会扫描您的本地网络），Stellio会联系相关地址。您选择发送的文件或文件夹会直接传送到您选定的实例，并通过其访问密钥进行身份验证，绝不经过我们的服务器。
 
 ## 5. 数据安全
 - **加密**：敏感数据（如API密钥或打印机密码）使用AES-CFB算法在本地加密。

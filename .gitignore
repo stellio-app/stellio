@@ -1,48 +1,76 @@
-# Dossiers Python et environnements virtuels
-python/
-Lib/
-Scripts/
-redist/
-venv/
-env/
-bin/
+# ============================================================================
+# Stellio — .gitignore
+# Les dossiers de la racine sont ancrés par un « / » initial : ils ne
+# masquent donc pas un dossier du même nom situé plus bas dans l'arborescence.
+# ============================================================================
+
+# --- Python : caches et fichiers générés -------------------------------------
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
 
-# Dossiers de compilation et de sortie (recréés automatiquement)
-build/
-dist/
-output/
-release/
+# --- Environnements Python et runtime embarqué -------------------------------
+/venv/
+/env/
+/.venv/
+/python/
+/Lib/
+/Scripts/
 
-# Dossiers de données locales et logs
-test/
-stellio-data-test/
-stellio-data/
-*.log
-*.sqlite
-*.db
-StellioCompanion/
+# --- Node.js portable (utilisé pour wrangler, non versionné) -----------------
+/nodejs/
+node_modules/
 
-# Fichiers lourds ou sensibles
-*WebView2RuntimeInstaller*
+# --- Sorties de build et de distribution -------------------------------------
+/build/
+/dist/
+/output/
+/release/
+*.spec
+
+# --- Binaires tiers téléchargés par la CI (ffmpeg, UnRAR…) -------------------
+/bin/
+
+# --- Installeurs tiers (WebView2, VC++ Redistributable) ----------------------
+/redist/
 VC_redist*.exe
-token*.txt
-*.env
+MicrosoftEdgeWebview2*.exe
+
+# --- Données locales, tests et journaux --------------------------------------
+/stellio-data*/
+/test/
+/logs/
+*.log
+*.db
+*.sqlite
+*.sqlite3
+app_settings.json
+encryption.key
+
+# --- Secrets et certificats --------------------------------------------------
 .env
+.env.*
+!.env.example
+token*.txt
 *.p12
 *.pfx
 *.pem
-certificate.p12
+*.key
 
-# Fichiers système
+# --- Relais Cloudflare Workers (relay/ reste versionné, pas ses secrets) -----
+.dev.vars
+.wrangler/
+
+# --- Projet Android local (seul l'APK est versionné, dans apk/) --------------
+/StellioCompanion/
+
+# --- Éditeurs et système -----------------------------------------------------
+.vscode/
+.idea/
+*.swp
 .DS_Store
 Thumbs.db
 desktop.ini
-
-# Editeurs
-.vscode/
-.idea/

@@ -181,7 +181,7 @@
 ### 🪟 Windows（推奨）
 
 1. [Releases](https://github.com/stellio-app/stellio/releases) から最新のインストーラーをダウンロード
-2. `Stellio-Setup.exe` を実行
+2. `Stellio-Setup-<version>.exe` を実行
 3. 完了です！🎉
 
 ### 🐧 Raspberry Pi / Linux
@@ -197,7 +197,7 @@ chmod +x install-pi.sh
 ```
 
 このスクリプトは以下を自動でインストールします：
-- システム依存関係（`ffmpeg`、`unrar-free`、3Dレンダリングライブラリ）
+- システム依存関係（`ffmpeg`、`unrar`、3Dレンダリングライブラリ）
 - 専用のPython仮想環境
 - 起動時にStellioを起動し、クラッシュ時に自動再起動する **systemdサービス**（`stellio.service`）
 
@@ -281,7 +281,7 @@ stellio/
 ├── style.css           # スタイル
 ├── launcher.py         # 軽量ランチャー／ランタイムブートストラップ
 ├── check_deps.py       # 自己修復型の依存関係チェッカー
-├── worker.py           # バックグラウンドワーカー（サムネイル、スキャン）
+├── worker.py           # 未使用の3MFワーカーの雛形（仮実装）
 ├── assets/             # ロゴ、アイコン
 ├── languages/          # 翻訳ファイル（JSON）
 ├── apk/                # Androidコンパニオンアプリのパッケージ
@@ -336,7 +336,7 @@ Stellioはローカルファースト設計です：データはお使いの端�
 
 ## 🔏 コード署名ポリシー
 
-[Releases](https://github.com/stellio-app/stellio/releases) で公開されているWindows実行ファイルはデジタル署名されています。署名プロセスと秘密鍵の保護方法については[CODE_SIGNING_POLICY.md](../../CODE_SIGNING_POLICY.md)をご覧ください。
+[Releases](https://github.com/stellio-app/stellio/releases) で公開されているWindowsインストーラーとLinux AppImageは、**まだコード署名されていません**。そのため、Windows SmartScreenの警告が表示される場合があります。macOS版もノータリゼーション（公証）されていません。各リリースファイルにはSHA-256チェックサム（`.sha256`）が付属しており、ご自身で検証できます。内蔵アップデーターもインストール前にこれを確認します。現在の状況、ダウンロードの検証方法、署名の計画については[CODE_SIGNING_POLICY.md](../../CODE_SIGNING_POLICY.md)をご覧ください。
 
 ---
 
