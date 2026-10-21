@@ -15,12 +15,12 @@
 
 <p align="center">
   <a href="../../README.md">🇬🇧 English</a> |
-  <a href="README.fr.md">🇫🇷 Français</a> |
-  <a href="README.de.md">🇩🇪 Deutsch</a> |
-  <a href="README.es.md">🇪🇸 Español</a> |
-  <a href="README.it.md">🇮🇹 Italiano</a> |
-  <a href="README.pt.md">🇵🇹 Português</a> |
-  <a href="README.ja.md">🇯🇵 日本語</a> |
+  <a href="README_fr.md">🇫🇷 Français</a> |
+  <a href="README_de.md">🇩🇪 Deutsch</a> |
+  <a href="README_es.md">🇪🇸 Español</a> |
+  <a href="README_it.md">🇮🇹 Italiano</a> |
+  <a href="README_pt.md">🇵🇹 Português</a> |
+  <a href="README_ja.md">🇯🇵 日本語</a> |
   🇨🇳 <strong>中文</strong>
 </p>
 
