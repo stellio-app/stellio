@@ -13,7 +13,6 @@ if sys.platform.startswith('linux'):
 
 
 def _early_extra_libs_dir():
-    # Même logique que get_data_path() (défini plus bas), sans créer de dossier.
     env_override = os.environ.get('STELLIO_DATA_DIR')
     if env_override:
         base = env_override
@@ -25,8 +24,6 @@ def _early_extra_libs_dir():
 
 
 _EXTRA_LIBS_DIR = _early_extra_libs_dir()
-# Version empaquetée (PyInstaller) : les modules réparés au lancement sont lus depuis ce dossier.
-# Ajouté EN FIN de sys.path : un module déjà embarqué dans l'exécutable reste prioritaire.
 if getattr(sys, 'frozen', False) and os.path.isdir(_EXTRA_LIBS_DIR) and _EXTRA_LIBS_DIR not in sys.path:
     sys.path.append(_EXTRA_LIBS_DIR)
 
