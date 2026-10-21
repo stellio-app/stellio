@@ -1,5 +1,66 @@
 [
   {
+    "version": "0.7.4",
+    "items": {
+      "fr": [
+        "Projets : un projet dont toutes les pièces sont imprimées passe en « Terminé » au lieu de rester « En cours »",
+        "Historique des impressions : chaque jour se replie et se déplie avec une flèche",
+        "Bilan des impressions : fréquence au choix (hebdomadaire, mensuel, trimestriel, annuel) et export en PDF",
+        "Historique : la pastille à côté d'« Historique » dans le menu se met désormais à jour correctement : elle disparaît quand l'historique est vide (après « Vider l'historique » ou la suppression de la dernière entrée) et n'affiche plus un total faussé par les filtres",
+        "Traductions : 16 textes qui s'affichaient toujours en français (connexion Nexprint, bilan des impressions, sélection d'un projet, dossier créé depuis le téléchargement, modules, adresse personnalisée, affichage des jours de l'historique) sont maintenant traduits dans les 8 langues"
+      ],
+      "en": [
+        "Projects: a project whose parts are all printed now shows \"Done\" instead of \"In progress\"",
+        "Print history: each day can be collapsed and expanded with an arrow",
+        "Print report: choose the frequency (weekly, monthly, quarterly, yearly) and export to PDF",
+        "History: the badge next to \"History\" in the menu now updates correctly: it disappears when the history is empty (after \"Clear history\" or deleting the last entry) and no longer shows a total skewed by filters",
+        "Translations: 16 texts that were always displayed in French (Nexprint sign-in, print report, project selection, folder created from download, modules, custom address, history day toggle) are now translated in all 8 languages"
+      ],
+      "de": [
+        "Projekte: Ein Projekt, dessen Teile alle gedruckt sind, zeigt jetzt „Abgeschlossen“ statt „In Arbeit“",
+        "Druckverlauf: Jeder Tag lässt sich per Pfeil ein- und ausklappen",
+        "Druckbericht: Häufigkeit wählbar (wöchentlich, monatlich, vierteljährlich, jährlich) und PDF-Export",
+        "Verlauf: Das Badge neben „Verlauf“ im Menü wird jetzt korrekt aktualisiert: Es verschwindet, wenn der Verlauf leer ist (nach „Verlauf leeren“ oder dem Löschen des letzten Eintrags) und zeigt keine durch Filter verfälschte Gesamtzahl mehr an",
+        "Übersetzungen: 16 Texte, die immer auf Französisch angezeigt wurden (Nexprint-Anmeldung, Druckbericht, Projektauswahl, beim Download erstellter Ordner, Module, benutzerdefinierte Adresse, Tagesanzeige im Verlauf), sind jetzt in allen 8 Sprachen übersetzt"
+      ],
+      "es": [
+        "Proyectos: un proyecto con todas las piezas impresas pasa a « Terminado » en lugar de « En curso »",
+        "Historial de impresiones: cada día se pliega y se despliega con una flecha",
+        "Informe de impresiones: frecuencia a elegir (semanal, mensual, trimestral, anual) y exportación a PDF",
+        "Historial: la insignia junto a «Historial» en el menú ahora se actualiza correctamente: desaparece cuando el historial está vacío (tras «Vaciar el historial» o al eliminar la última entrada) y ya no muestra un total alterado por los filtros",
+        "Traducciones: 16 textos que siempre se mostraban en francés (inicio de sesión de Nexprint, informe de impresiones, selección de proyecto, carpeta creada desde la descarga, módulos, dirección personalizada, visualización de los días del historial) ahora están traducidos a los 8 idiomas"
+      ],
+      "it": [
+        "Progetti: un progetto con tutti i pezzi stampati passa a « Completato » invece di « In corso »",
+        "Cronologia stampe: ogni giorno si chiude e si apre con una freccia",
+        "Report delle stampe: frequenza a scelta (settimanale, mensile, trimestrale, annuale) ed esportazione in PDF",
+        "Cronologia: il badge accanto a «Cronologia» nel menu ora si aggiorna correttamente: scompare quando la cronologia è vuota (dopo «Svuota cronologia» o l'eliminazione dell'ultima voce) e non mostra più un totale alterato dai filtri",
+        "Traduzioni: 16 testi che venivano sempre mostrati in francese (accesso a Nexprint, resoconto delle stampe, selezione del progetto, cartella creata dal download, moduli, indirizzo personalizzato, visualizzazione dei giorni della cronologia) sono ora tradotti in tutte le 8 lingue"
+      ],
+      "pt": [
+        "Projetos: um projeto com todas as peças impressas passa a « Concluído » em vez de « Em curso »",
+        "Histórico de impressões: cada dia recolhe-se e expande-se com uma seta",
+        "Relatório de impressões: frequência à escolha (semanal, mensal, trimestral, anual) e exportação para PDF",
+        "Histórico: o selo ao lado de «Histórico» no menu passa a atualizar-se corretamente: desaparece quando o histórico está vazio (após «Limpar histórico» ou ao eliminar a última entrada) e já não mostra um total alterado pelos filtros",
+        "Traduções: 16 textos que apareciam sempre em francês (início de sessão no Nexprint, relatório de impressões, seleção de projeto, pasta criada a partir da transferência, módulos, endereço personalizado, apresentação dos dias do histórico) estão agora traduzidos nos 8 idiomas"
+      ],
+      "ja": [
+        "プロジェクト：すべてのパーツが印刷済みのプロジェクトは「完了」と表示されるようになりました",
+        "印刷履歴：日ごとに矢印で折りたたみ・展開できるようになりました",
+        "印刷レポート：頻度（週次・月次・四半期・年次）を選べ、PDF出力に対応",
+        "履歴：メニューの「履歴」の横にあるバッジが正しく更新されるようになりました。履歴が空のとき（「履歴を消去」または最後のエントリーの削除後）は非表示になり、フィルターによって合計がずれて表示されることもなくなりました",
+        "翻訳：常にフランス語で表示されていた16件のテキスト（Nexprint のログイン、印刷レポート、プロジェクトの選択、ダウンロードで作成したフォルダー、モジュール、カスタムアドレス、履歴の日付表示の切り替え）を8言語すべてに翻訳しました"
+      ],
+      "zh": [
+        "项目：所有零件都已打印的项目现在显示“已完成”，不再停留在“进行中”",
+        "打印历史：每一天都可以用箭头折叠和展开",
+        "打印报告：可选择频率（每周、每月、每季度、每年）并导出 PDF",
+        "历史记录：菜单中“历史记录”旁的徽章现在能正确更新：历史记录为空时（执行“清空历史记录”或删除最后一条记录后）会消失，也不再显示被筛选条件扭曲的总数",
+        "翻译：16 条一直以法语显示的文本（Nexprint 登录、打印报告、项目选择、下载时创建的文件夹、模块、自定义地址、历史记录按日折叠）现已翻译为全部 8 种语言"
+      ]
+    }
+  },
+  {
     "version": "0.7.3",
     "items": {
       "fr": [

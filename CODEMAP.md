@@ -50,7 +50,7 @@ Carte de navigation du code. Dépôt : https://github.com/stellio-app/stellio. L
 | `apk/stellio.apk` | 4,8 Mo | App Android compagnon (`com.stellioapp.companion`), WebView — voir §11 |
 | `docs/readme/README.{fr,de,es,it,pt,ja,zh}.md` | ~381 chacun | README traduits |
 | `docs/privacy/PRIVACY[.fr,.de,…].md` | 62 chacun | Politique de confidentialité en 8 langues (EN = `PRIVACY.md`) |
-| `languages/{fr,en,de,es,it,ja,pt,zh}.json` | 1948 clés chacun (+ 3 métadonnées) | Traductions (clés plates `section.cle`), jeux de clés identiques dans les 8 langues |
+| `languages/{fr,en,de,es,it,ja,pt,zh}.json` | 1989 clés chacun (+ 3 métadonnées) | Traductions (clés plates `section.cle`), jeux de clés identiques dans les 8 langues |
 | `languages/changelog.json` | 5 entrées | Notes de version par langue (0.7.2, 0.7.1, 0.7.0, 0.6.9, 0.6.8) |
 | `languages/useful_links.json` | 41 liens (23 avec `search_url`) | Liens utiles par défaut, également source des boutiques du stock bas ; « Bambu Lab Wiki » ajouté le 19/10/2026 (groupe Ressources) |
 
@@ -291,7 +291,7 @@ Notation : ligne de la déclaration `@app.route` ; 249 routes.
 
 ## 7. i18n
 
-- Fichiers `languages/<code>.json` : dictionnaire plat, clés `section.cle` (ex. `spoolman.sort_name`), plus `__dir`, `__name`, `__native`. **1948 clés** (1951 entrées avec les métadonnées) dans chacune des 8 langues (fr, en, de, es, it, ja, pt, zh) ; les jeux de clés sont strictement identiques (aucune clé manquante ni en trop).
+- Fichiers `languages/<code>.json` : dictionnaire plat, clés `section.cle` (ex. `spoolman.sort_name`), plus `__dir`, `__name`, `__native`. **1989 clés** (1992 entrées avec les métadonnées) dans chacune des 8 langues (fr, en, de, es, it, ja, pt, zh) ; les jeux de clés sont strictement identiques (aucune clé manquante ni en trop).
 - HTML : attributs `data-i18n*` ; JS : `I18N.t('clé')` ; backend : lit `languages/<lang>.json` directement pour le splash (`load_splash_translations`, main.py l.23527–23556) ; le frontend les récupère via `/languages/<lang>.json` (servi par le dossier statique Flask).
 - `changelog.json` : `[{version, items:{<lang>:[…]}}]`, lu par `load_changelog` (main.py l.15144, tri par version décroissante). Entrées : 0.7.2 (9 éléments), 0.7.1 (8), 0.7.0, 0.6.9, 0.6.8 ; la version courante `CURRENT_VERSION` (0.7.2) a donc son entrée.
 

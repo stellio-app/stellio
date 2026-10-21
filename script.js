@@ -11338,9 +11338,28 @@ function _reportDelta(cur, prev, fmt) {
     return `${d > 0 ? '+' : '−'}${fmt ? fmt(Math.abs(d)) : Math.abs(Math.round(d * 10) / 10)}`;
 }
 
-function _monthlyReportModel(data) {
+const _REPORT_FREQS = ['week', 'month', 'quarter', 'year'];
+const _REPORT_FREQ_FALLBACKS = { week: 'Hebdomadaire', month: 'Mensuel', quarter: 'Trimestriel', year: 'Annuel' };
+const _REPORT_TITLE_FALLBACKS = { week: 'Bilan hebdomadaire', month: 'Bilan mensuel', quarter: 'Bilan trimestriel', year: 'Bilan annuel' };
+const _REPORT_VS_FALLBACKS = { week: 'vs semaine précédente', month: 'vs mois précédent', quarter: 'vs trimestre précédent', year: 'vs année précédente' };
+
+function _reportTitle(freq) {
+    return freq === 'month' ? _t3('report.title', _REPORT_TITLE_FALLBACKS.month) : _t3(`report.title_${freq}`, _REPORT_TITLE_FALLBACKS[freq] || _REPORT_TITLE_FALLBACKS.month);
+}
+
+function _reportLoadFreq() {
+    try { const v = localStorage.getItem('stellio_report_freq'); return _REPORT_FREQS.includes(v) ? v : 'month'; } catch (e) { return 'month'; }
+}
+function _reportSaveFreq(v) { try { localStorage.setItem('stellio_report_freq', v); } catch (e) { /* stockage indisponible */ } }
+
+function _reportIso(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function _reportParseIso(s) { const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); }
+
+function _reportModel(data) {
     const t = data.totals, p = data.previous || {};
-    const vs = (txt) => txt ? _tf('report.vs_prev', '{{delta}} vs mois précédent', { delta: txt }) : '';
+    const freq = _REPORT_FREQS.includes(data.frequency) ? data.frequency : 'month';
+    const vsKey = freq === 'month' ? 'report.vs_prev' : `report.vs_prev_${freq}`;
+    const vs = (txt) => txt ? _tf(vsKey, `{{delta}} ${_REPORT_VS_FALLBACKS[freq]}`, { delta: txt }) : '';
     const kpis = [
         [_t3('report.kpi_prints', 'Impressions'), String(t.prints), vs(_reportDelta(t.prints, p.prints))],
         [_t3('report.kpi_success', 'Taux de réussite'), t.success_rate === null || t.success_rate === undefined ? '—' : `${t.success_rate}%`, `${t.success}✓ / ${t.failed}✗${t.unrated ? ` / ${t.unrated}?` : ''}`],
@@ -11362,59 +11381,107 @@ function _monthlyReportModel(data) {
     return { kpis, tables };
 }
 
-function _monthLabel(month) {
-    const [y, m] = month.split('-').map(Number);
-    return new Date(y, m - 1, 1).toLocaleDateString(I18N.lang, { month: 'long', year: 'numeric' });
+function _reportPeriodLabel(data) {
+    const s = _reportParseIso(data.start), e = _reportParseIso(data.end);
+    if (data.frequency === 'year') return String(s.getFullYear());
+    if (data.frequency === 'quarter') return _tf('report.quarter_label', 'T{{q}} {{year}}', { q: Math.floor(s.getMonth() / 3) + 1, year: s.getFullYear() });
+    if (data.frequency === 'week') {
+        const f = { day: 'numeric', month: 'short', year: 'numeric' };
+        return `${s.toLocaleDateString(I18N.lang, f)} – ${e.toLocaleDateString(I18N.lang, f)}`;
+    }
+    return s.toLocaleDateString(I18N.lang, { month: 'long', year: 'numeric' });
 }
 
+let _reportFreq = 'month';
+let _reportAnchor = new Date();
+let _lastReport = null;
+let _reportReqId = 0;
+
 function openMonthlyReport() {
-    let modal = document.getElementById('modal-monthly-report');
+    let modal = document.getElementById('modal-print-report');
     if (!modal) {
         modal = document.createElement('div');
-        modal.id = 'modal-monthly-report';
+        modal.id = 'modal-print-report';
         modal.className = 'modal hidden';
         modal.innerHTML = `
-            <div class="modal-content" style="max-width:640px;">
+            <div class="modal-content" style="max-width:680px;">
                 <div class="modal-header">
-                    <h3><i class="fa-solid fa-file-lines"></i> <span>${escapeHtml(_t3('report.title', 'Bilan mensuel'))}</span></h3>
-                    <button class="modal-close" onclick="closeModal('modal-monthly-report')">&times;</button>
+                    <h3><i class="fa-solid fa-file-lines"></i> <span>${escapeHtml(_t3('report.modal_title', 'Bilan des impressions'))}</span></h3>
+                    <button class="modal-close" onclick="closeModal('modal-print-report')">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
-                        <label for="monthly-report-month" style="font-size:12.5px; color:var(--text-muted);">${escapeHtml(_t3('report.month', 'Mois'))}</label>
-                        <input type="month" id="monthly-report-month" class="settings-select" style="max-width:180px;">
-                        <button type="button" class="btn btn-primary btn-sm" id="monthly-report-export" style="margin-left:auto;"><i class="fa-solid fa-file-pdf"></i> ${escapeHtml(_t3('report.export_pdf', 'Exporter en PDF'))}</button>
+                    <div class="report-controls">
+                        <label for="print-report-frequency" class="report-controls-label">${escapeHtml(_t3('report.frequency', 'Fréquence'))}</label>
+                        <select id="print-report-frequency" class="settings-select" style="max-width:170px;">
+                            ${_REPORT_FREQS.map(f => `<option value="${f}">${escapeHtml(_t3(`report.freq_${f}`, _REPORT_FREQ_FALLBACKS[f]))}</option>`).join('')}
+                        </select>
+                        <div class="report-nav">
+                            <button type="button" class="btn btn-ghost btn-sm" id="print-report-prev" title="${escapeHtml(_t3('report.prev', 'Période précédente'))}"><i class="fa-solid fa-chevron-left"></i></button>
+                            <span id="print-report-period" class="report-period-label"></span>
+                            <button type="button" class="btn btn-ghost btn-sm" id="print-report-next" title="${escapeHtml(_t3('report.next', 'Période suivante'))}"><i class="fa-solid fa-chevron-right"></i></button>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm" id="print-report-export" style="margin-left:auto;"><i class="fa-solid fa-file-pdf"></i> ${escapeHtml(_t3('report.export_pdf', 'Exporter en PDF'))}</button>
                     </div>
-                    <div id="monthly-report-body"></div>
+                    <div id="print-report-body"></div>
                 </div>
             </div>`;
         document.body.appendChild(modal);
-        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-monthly-report'); });
-        modal.querySelector('#monthly-report-month').addEventListener('change', (e) => loadMonthlyReport(e.target.value));
-        modal.querySelector('#monthly-report-export').addEventListener('click', exportMonthlyReport);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-print-report'); });
+        modal.querySelector('#print-report-frequency').addEventListener('change', (e) => {
+            _reportFreq = _REPORT_FREQS.includes(e.target.value) ? e.target.value : 'month';
+            _reportSaveFreq(_reportFreq);
+            loadReport();
+        });
+        modal.querySelector('#print-report-prev').addEventListener('click', () => _reportShift(-1));
+        modal.querySelector('#print-report-next').addEventListener('click', () => _reportShift(1));
+        modal.querySelector('#print-report-export').addEventListener('click', exportReport);
     }
-    const input = modal.querySelector('#monthly-report-month');
-    if (!input.value) { const n = new Date(); input.value = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; }
-    openModal('modal-monthly-report');
-    loadMonthlyReport(input.value);
+    _reportFreq = _reportLoadFreq();
+    _reportAnchor = new Date();
+    modal.querySelector('#print-report-frequency').value = _reportFreq;
+    openModal('modal-print-report');
+    loadReport();
 }
 window.openMonthlyReport = openMonthlyReport;
+window.openPrintReport = openMonthlyReport;
 
-let _lastMonthlyReport = null;
-async function loadMonthlyReport(month) {
-    const body = document.getElementById('monthly-report-body');
+function _reportShift(dir) {
+    const a = new Date(_reportAnchor.getFullYear(), _reportAnchor.getMonth(), _reportAnchor.getDate());
+    if (_reportFreq === 'week') {
+        a.setDate(a.getDate() + 7 * dir);
+    } else {
+        a.setDate(1);
+        a.setMonth(a.getMonth() + dir * (_reportFreq === 'quarter' ? 3 : _reportFreq === 'year' ? 12 : 1));
+    }
+    _reportAnchor = a;
+    loadReport();
+}
+
+async function loadReport() {
+    const body = document.getElementById('print-report-body');
     if (!body) return;
+    const reqId = ++_reportReqId;
+    const periodEl = document.getElementById('print-report-period');
+    const prevBtn = document.getElementById('print-report-prev');
+    const nextBtn = document.getElementById('print-report-next');
+    const exportBtn = document.getElementById('print-report-export');
+    if (exportBtn) exportBtn.disabled = true;
     body.innerHTML = `<div style="text-align:center; padding:24px; color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
     try {
-        const res = await fetch(`${API}/api/reports/monthly?month=${encodeURIComponent(month)}`);
+        const res = await fetch(`${API}/api/reports/period?frequency=${encodeURIComponent(_reportFreq)}&date=${encodeURIComponent(_reportIso(_reportAnchor))}`);
         if (!res.ok) throw new Error('http');
         const data = await res.json();
-        _lastMonthlyReport = data;
+        if (reqId !== _reportReqId) return;   // une réponse plus récente est attendue
+        _lastReport = data;
+        if (periodEl) periodEl.textContent = _reportPeriodLabel(data);
+        if (nextBtn) nextBtn.disabled = data.end >= _reportIso(new Date());
+        if (prevBtn) prevBtn.disabled = !data.first_date || data.start <= data.first_date;
         if (!data.totals.prints) {
-            body.innerHTML = `<p class="settings-hint">${escapeHtml(_t3('report.empty', 'Aucune impression enregistrée ce mois-là.'))}</p>`;
+            body.innerHTML = `<p class="settings-hint">${escapeHtml(_t3('report.empty_period', 'Aucune impression enregistrée sur cette période.'))}</p>`;
             return;
         }
-        const model = _monthlyReportModel(data);
+        if (exportBtn) exportBtn.disabled = false;
+        const model = _reportModel(data);
         body.innerHTML = `
             <div class="report-kpis">${model.kpis.map(k => `<div class="report-kpi"><div class="report-kpi-label">${escapeHtml(k[0])}</div><div class="report-kpi-value">${escapeHtml(k[1])}</div>${k[2] ? `<div class="report-kpi-note">${escapeHtml(k[2])}</div>` : ''}</div>`).join('')}</div>
             ${model.tables.map(tb => `<div class="report-table-title">${escapeHtml(tb.title)}</div>
@@ -11422,23 +11489,26 @@ async function loadMonthlyReport(month) {
                 <tbody>${tb.rows.map(r => `<tr>${r.map((c, i) => `<td${i ? ' class="num"' : ''}>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`).join('')}
             <p class="settings-hint" style="margin-top:12px;">${escapeHtml(_t3('report.hint_estimated', "Durées et CO₂ : estimations d'après les données enregistrées à l'envoi."))}</p>`;
     } catch (e) {
+        if (reqId !== _reportReqId) return;
         body.innerHTML = `<p style="color:var(--danger); font-size:13px;">${escapeHtml(_t3('toast.connection_error', 'Erreur de connexion'))}</p>`;
     }
 }
 
-async function exportMonthlyReport() {
-    const data = _lastMonthlyReport;
-    if (!data) return;
-    const model = _monthlyReportModel(data);
-    const month = data.month;
+async function exportReport() {
+    const data = _lastReport;
+    if (!data || !data.totals.prints) return;
+    const model = _reportModel(data);
+    const periodLabel = _reportPeriodLabel(data);
+    const fmt = { day: 'numeric', month: 'long', year: 'numeric' };
     const payload = {
-        filename: `${_t3('report.file_prefix', 'bilan')}-${month}.pdf`, lang: I18N.lang,
-        title: `${_t3('report.title', 'Bilan mensuel')} — ${_monthLabel(month)}`, subtitle: 'Stellio',
+        filename: `${_t3('report.file_prefix', 'bilan')}-${data.frequency}-${data.start}.pdf`, lang: I18N.lang,
+        title: `${_reportTitle(data.frequency)} — ${periodLabel}`,
+        subtitle: `Stellio · ${_reportParseIso(data.start).toLocaleDateString(I18N.lang, fmt)} → ${_reportParseIso(data.end).toLocaleDateString(I18N.lang, fmt)}`,
         kpis: model.kpis, tables: model.tables,
-        footer: _tf('report.footer', 'Généré par Stellio le {{date}}', { date: new Date().toLocaleDateString(I18N.lang, { day: 'numeric', month: 'long', year: 'numeric' }) })
+        footer: _tf('report.footer', 'Généré par Stellio le {{date}}', { date: new Date().toLocaleDateString(I18N.lang, fmt) })
     };
     const init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(payload) };
-    const btn = document.getElementById('monthly-report-export');
+    const btn = document.getElementById('print-report-export');
     if (btn) btn.disabled = true;
     try {
         try {
@@ -11458,7 +11528,7 @@ async function exportMonthlyReport() {
     } catch (e) {
         showToast(_t3('report.export_error', "Échec de l'export du PDF"), 'error');
     } finally {
-        if (btn) btn.disabled = false;
+        if (btn) btn.disabled = !(_lastReport && _lastReport.totals.prints);
     }
 }
 
@@ -14415,6 +14485,7 @@ window.loadStats = async function () {
 
 
 let _historyOffset = 0;
+const _historyCollapsedDays = new Set();   // jours repliés dans l'historique (conservés entre deux rechargements)
 let _historyEntries = [];
 const HISTORY_LIMIT = 30;
 
@@ -14668,15 +14739,27 @@ window.loadHistory = async function (reset = true) {
 
         const listEl = document.getElementById('history-list');
         listEl.classList.remove('hidden');
-        let lastDate = '';
         data.history.forEach(entry => {
             _historyEntries.push(entry);
             const d = new Date(entry.sent_at);
             const dateStr = d.toLocaleDateString(I18N.lang, { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-            if (dateStr !== lastDate) {
-                listEl.insertAdjacentHTML('beforeend', `<div class="history-date-sep">${dateStr}</div>`);
-                lastDate = dateStr;
+            const dayKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            let dayEl = listEl.querySelector(`.history-day[data-day="${dayKey}"]`);
+            if (!dayEl) {
+                const collapsed = _historyCollapsedDays.has(dayKey);
+                listEl.insertAdjacentHTML('beforeend', `
+                    <div class="history-day${collapsed ? ' collapsed' : ''}" data-day="${dayKey}">
+                        <button type="button" class="history-date-sep history-date-toggle" aria-expanded="${collapsed ? 'false' : 'true'}"
+                                title="${escapeHtml(_t3('history.toggle_day', 'Afficher / masquer les fichiers de ce jour'))}" onclick="toggleHistoryDay('${dayKey}')">
+                            <i class="fa-solid fa-chevron-down history-day-chevron"></i>
+                            <span class="history-day-label">${escapeHtml(dateStr)}</span>
+                            <span class="history-day-count">0</span>
+                        </button>
+                        <div class="history-day-body"></div>
+                    </div>`);
+                dayEl = listEl.lastElementChild;
             }
+            const dayBody = dayEl.querySelector('.history-day-body');
             const timeStr = d.toLocaleTimeString(I18N.lang, { hour:'2-digit', minute:'2-digit' });
             const extColor = { '.stl':'#63b3ed', '.3mf':'#68d391', '.obj':'#f6ad55' }[entry.file_ext] || '#a0aec0';
             const platformIcons = { 'Thingiverse': 'fa-cube', 'Printables': 'fa-print', 'MakerWorld': 'fa-globe' };
@@ -14687,7 +14770,7 @@ window.loadHistory = async function (reset = true) {
                    </span>`
                 : '';
             const costBadge = `<span class="history-entry-cost" id="hcost-${entry.id}">${_renderHistoryCostBadge(entry)}</span>`;
-            listEl.insertAdjacentHTML('beforeend', `
+            dayBody.insertAdjacentHTML('beforeend', `
                 <div class="history-entry" id="hentry-${entry.id}">
                     <div class="history-entry-icon" style="background:${extColor}22;color:${extColor};">
                         <i class="fa-solid fa-cube"></i>
@@ -14714,6 +14797,7 @@ window.loadHistory = async function (reset = true) {
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>`);
+            _refreshHistoryDay(dayEl);
         });
         _historyOffset += data.history.length;
         const moreBtn = document.getElementById('history-load-more');
@@ -14729,6 +14813,22 @@ window.loadHistory = async function (reset = true) {
 };
 
 window.loadMoreHistory = function () { loadHistory(false); };
+
+function _refreshHistoryDay(dayEl) {
+    if (!dayEl) return;
+    const n = dayEl.querySelectorAll('.history-day-body > .history-entry').length;
+    if (n === 0) { dayEl.remove(); return; }
+    const badge = dayEl.querySelector('.history-day-count');
+    if (badge) badge.textContent = n;
+}
+
+window.toggleHistoryDay = function (dayKey) {
+    const dayEl = document.querySelector(`#history-list .history-day[data-day="${dayKey}"]`);
+    if (!dayEl) return;
+    const collapsed = dayEl.classList.toggle('collapsed');
+    dayEl.querySelector('.history-date-toggle')?.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    if (collapsed) _historyCollapsedDays.add(dayKey); else _historyCollapsedDays.delete(dayKey);
+};
 
 async function _checkHistoryFileExists(filePath) {
     try {
@@ -14883,7 +14983,10 @@ window.deleteHistoryEntry = async function (id) {
     try {
         const res = await fetch(`${API}/api/print-history/${id}`, { method: 'DELETE' });
         if (res.ok) {
-            document.getElementById(`hentry-${id}`)?.remove();
+            const entryEl = document.getElementById(`hentry-${id}`);
+            const dayEl = entryEl?.closest('.history-day');
+            entryEl?.remove();
+            _refreshHistoryDay(dayEl);
             showToast(I18N.t('history.entry_deleted'), 'success');
         }
     } catch { showToast(I18N.t('toast.error'), 'error'); }
@@ -17791,8 +17894,13 @@ startThumbAutoRefresh();
                         <i class="fa-solid fa-xmark" style="font-size:11px;"></i>
                     </button>
                     <div style="padding:6px 8px;">
-                        <div style="font-size:11px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;" title="${escapeHtml(p.file_name)}" onclick="openPrintPhotosModal('${escapeJs(p.file_path)}', '${escapeJs(p.file_name)}')">
-                            <i class="fa-solid fa-cube" style="color:var(--text-muted);"></i> ${escapeHtml(p.file_name)}
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <div style="flex:1; min-width:0; font-size:11px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;" title="${escapeHtml(p.file_name)}" onclick="openPrintPhotosModal('${escapeJs(p.file_path)}', '${escapeJs(p.file_name)}')">
+                                <i class="fa-solid fa-cube" style="color:var(--text-muted);"></i> ${escapeHtml(p.file_name)}
+                            </div>
+                            <button type="button" class="gallery-file-link" title="${escapeHtml(_t3('history.view_file', 'Voir le fichier'))}" aria-label="${escapeHtml(_t3('history.view_file', 'Voir le fichier'))}" onclick="event.stopPropagation(); viewHistoryFile('${escapeJs(p.file_path)}', '${escapeJs(p.file_name)}')">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                            </button>
                         </div>
                         ${p.note ? `<div style="font-size:11px; color:var(--text-secondary); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(p.note)}">${escapeHtml(p.note)}</div>` : ''}
                     </div>
@@ -18585,7 +18693,9 @@ function renderProjectCard(p) {
             : `<div class="folder-preview-thumb"><span class="folder-preview-icon"><i class="fa-solid fa-cube"></i></span></div>`;
     }).join('');
     const progress = p.progress || 0;
-    const statusLabel = p.status === 'done' ? I18N.t('projects.status_done') : I18N.t('projects.status_in_progress');
+    const allPrinted = (p.total_needed || 0) > 0 && (p.total_printed || 0) >= p.total_needed;
+    const projectStatus = (p.status === 'done' || allPrinted) ? 'done' : (p.status || 'in_progress');
+    const statusLabel = projectStatus === 'done' ? I18N.t('projects.status_done') : I18N.t('projects.status_in_progress');
     return `<div class="project-card" onclick="openProjectDetailModal(${p.id})">
         <div class="project-card-thumbs">${thumbs || `<div class="folder-preview-thumb"><span class="folder-preview-icon"><i class="fa-solid fa-diagram-project"></i></span></div>`}</div>
         <div class="project-card-body">
@@ -18602,7 +18712,7 @@ function renderProjectCard(p) {
             <div class="project-card-meta">
                 <span><i class="fa-solid fa-cube"></i> ${p.file_count} ${I18N.t('projects.parts')}</span>
                 <span>${p.total_printed}/${p.total_needed} ${I18N.t('projects.printed')}</span>
-                <span class="project-status-badge project-status-badge--${p.status}">${statusLabel}</span>
+                <span class="project-status-badge project-status-badge--${projectStatus}">${statusLabel}</span>
             </div>
         </div>
     </div>`;

@@ -8317,3 +8317,64 @@ body.role-viewer .nav-btn[data-page="settings"] {
 .picker-error.visible { display: block; }
 .picker-actions { display: flex; gap: 8px; margin-top: 8px; }
 .picker-actions .btn { flex: 1; justify-content: center; }
+
+
+/* ===== Statut « Terminé » des cartes projet ===== */
+.project-status-badge--done {
+    background: rgba(52, 211, 153, 0.15);
+    color: #34d399;
+}
+
+/* ===== Historique : jours repliables ===== */
+.history-date-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    background: none;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    user-select: none;
+}
+.history-date-toggle:hover { color: var(--text-primary); }
+.history-date-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.history-day-chevron { font-size: 10px; width: 12px; transition: transform 0.15s ease; }
+.history-day.collapsed .history-day-chevron { transform: rotate(-90deg); }
+.history-day-label { flex: 1; min-width: 0; }
+.history-day-count {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0;
+    padding: 1px 7px;
+    border-radius: 10px;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+.history-day-body { display: flex; flex-direction: column; gap: 2px; }
+.history-day.collapsed .history-day-body { display: none; }
+.history-header-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* ===== Bilan : fréquence et navigation entre périodes ===== */
+.report-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.report-controls-label { font-size: 12.5px; color: var(--text-muted); }
+.report-nav { display: flex; align-items: center; gap: 4px; }
+.report-period-label { min-width: 140px; text-align: center; font-size: 13px; font-weight: 600; text-transform: capitalize; }
+.report-nav .btn:disabled { opacity: 0.35; cursor: default; }
+
+/* ===== Galerie d'impressions : lien vers le fichier ===== */
+.gallery-file-link {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    cursor: pointer;
+}
+.gallery-file-link:hover { background: var(--bg-tertiary); color: var(--accent); }
+

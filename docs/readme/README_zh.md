@@ -114,6 +114,7 @@
 - 🟠 **Printables**（GraphQL API）
 - 🟢 **MakerWorld**（Bambu Lab 两步登录）
 - 🔵 **Thingiverse**（通过 API 密钥）
+- 🟣 **Nexprint**（Elegoo 的模型库；使用账户邮箱和密码登录，加密存储）
 - 📁 直接下载到您配置的来源
 - 🆕 **新版本检测**：Stellio 每天检查已下载的模型（Printables、MakerWorld、Thingiverse）是否有更新
 - 🛒 **实用链接**：商店、厂商、3D模型网站和资源，按可折叠分组展示
@@ -164,6 +165,7 @@
 - 🔄 从 GitHub 自动更新（`.zip` 补丁 — Windows 与 Raspberry Pi/Linux 使用相同机制）
 - 🔁 更新后或启用调试模式后，在 Windows 和 Raspberry Pi/Linux 上都能可靠重启
 - 📋 导出诊断日志（隐藏敏感信息）
+- 💬 **直接在应用内提交建议与问题**：无需离开 Stellio 即可发送建议或错误报告——系统会为您创建一个 GitHub issue（通过专用的 GitHub App 匿名提交），并提供该 issue 的链接，收到回复时会显示“新回复”徽章
 
 ---
 
@@ -312,6 +314,8 @@ stellio/
 
 ### 报告问题
 
+最简单的方式是直接在应用内提交：打开侧边栏中的 **建议与问题** 并描述问题——它会作为 GitHub issue 自动为您提交。您也可以自行在 GitHub 上创建 issue。
+
 请使用错误报告模板，并包含以下信息：
 - Stellio 版本
 - 操作系统
@@ -355,7 +359,7 @@ Stellio 采用本地优先架构：您的数据保留在您的设备上，默认
 
 ## 📞 联系与支持
 
-- 🐛 **报告问题**：[GitHub Issues](https://github.com/stellio-app/stellio/issues)
+- 🐛 **报告问题**：[GitHub Issues](https://github.com/stellio-app/stellio/issues)，或直接在应用内提交（**建议与问题**）
 - 💡 **功能建议**：[GitHub Discussions](https://github.com/stellio-app/stellio/discussions)
 - 📧 **邮箱**：contact@stellio-app.com
 - 🌐 **官网**：[stellio-app.com](https://stellio-app.com)

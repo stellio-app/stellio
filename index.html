@@ -748,7 +748,7 @@
                     <div class="stats-page">
                         <div class="stats-header">
                             <h2><i class="fa-solid fa-chart-pie"></i> <span data-i18n="stats.title">Statistiques de la bibliothèque</span></h2>
-                            <button class="btn btn-ghost btn-sm" onclick="openMonthlyReport()"><i class="fa-solid fa-file-lines"></i> <span data-i18n="report.open_btn">Bilan mensuel</span></button>
+                            <button class="btn btn-ghost btn-sm" onclick="openMonthlyReport()"><i class="fa-solid fa-file-lines"></i> <span data-i18n="report.btn">Bilan</span></button>
                             <button class="btn btn-ghost btn-sm" onclick="loadStats()" data-i18n-title="actions.refresh" title="Actualiser">
                                 <i class="fa-solid fa-arrows-rotate"></i>
                             </button>
@@ -911,9 +911,14 @@
                     <div class="history-page">
                         <div class="history-header">
                             <h2><i class="fa-solid fa-clock-rotate-left"></i> <span data-i18n="history.title">Historique des impressions</span></h2>
-                            <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="clearAllHistory()" data-i18n-title="history.clear" title="Vider l'historique">
-                                <i class="fa-solid fa-trash"></i> <span data-i18n="history.clear">Vider</span>
-                            </button>
+                            <div class="history-header-actions">
+                                <button class="btn btn-ghost btn-sm" onclick="openMonthlyReport()">
+                                    <i class="fa-solid fa-file-lines"></i> <span data-i18n="report.btn">Bilan</span>
+                                </button>
+                                <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="clearAllHistory()" data-i18n-title="history.clear" title="Vider l'historique">
+                                    <i class="fa-solid fa-trash"></i> <span data-i18n="history.clear">Vider</span>
+                                </button>
+                            </div>
                         </div>
                         <div class="history-filters">
                             <select id="history-filter-platform" onchange="applyHistoryFilters()">

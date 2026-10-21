@@ -114,6 +114,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 - 🟠 **Printables** (GraphQL-API)
 - 🟢 **MakerWorld** (zweistufiger Bambu-Lab-Login)
 - 🔵 **Thingiverse** (via API-Schlüssel)
+- 🟣 **Nexprint** (Modellbibliothek von Elegoo; Anmeldung mit E-Mail-Adresse und Passwort des Kontos, verschlüsselt gespeichert)
 - 📁 Direkter Download in Ihre konfigurierten Quellen
 - 🆕 **Erkennung neuer Versionen**: Stellio prüft täglich, ob heruntergeladene Modelle (Printables, MakerWorld, Thingiverse) aktualisiert wurden
 - 🛒 **Nützliche Links**: Shops, Hersteller, 3D-Modell-Seiten und Ressourcen in einklappbaren Abschnitten
@@ -164,6 +165,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 - 🔄 Automatische Updates von GitHub (`.zip`-Patch — gleicher Mechanismus unter Windows und Raspberry Pi/Linux)
 - 🔁 Zuverlässiger Neustart nach einem Update oder nach dem Aktivieren des Debug-Modus, unter Windows und Raspberry Pi/Linux
 - 📋 Export des Diagnoseprotokolls (Geheimnisse maskiert)
+- 💬 **Vorschläge und Fehlermeldungen direkt aus der App**: Sende einen Vorschlag oder einen Fehler, ohne Stellio zu verlassen — es wird ein GitHub-Issue für dich erstellt (anonym, über eine dedizierte GitHub-App), mit Link zum Issue und einem Badge „Neue Antwort“, sobald du eine Antwort erhältst
 
 ---
 
@@ -312,6 +314,8 @@ Beiträge sind willkommen! 🎉
 
 ### Einen Fehler melden
 
+Am einfachsten direkt aus der App: Öffne **Vorschläge & Fehler** in der Seitenleiste und beschreibe das Problem — es wird für dich als GitHub-Issue gesendet. Du kannst auch selbst ein Issue auf GitHub erstellen.
+
 Nutzen Sie die Bug-Report-Vorlage und geben Sie an:
 - Stellio-Version
 - Betriebssystem
@@ -355,7 +359,7 @@ Der unter [Releases](https://github.com/stellio-app/stellio/releases) veröffent
 
 ## 📞 Kontakt & Support
 
-- 🐛 **Fehler melden**: [GitHub Issues](https://github.com/stellio-app/stellio/issues)
+- 🐛 **Fehler melden**: [GitHub Issues](https://github.com/stellio-app/stellio/issues) oder direkt in der App (**Vorschläge & Fehler**)
 - 💡 **Funktionswunsch**: [GitHub Discussions](https://github.com/stellio-app/stellio/discussions)
 - 📧 **E-Mail**: contact@stellio-app.com
 - 🌐 **Website**: [stellio-app.com](https://stellio-app.com)

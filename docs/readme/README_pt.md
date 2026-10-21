@@ -114,6 +114,7 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 - 🟠 **Printables** (API GraphQL)
 - 🟢 **MakerWorld** (login Bambu Lab em 2 etapas)
 - 🔵 **Thingiverse** (via chave de API)
+- 🟣 **Nexprint** (biblioteca de modelos da Elegoo; início de sessão com o e-mail e a palavra-passe da conta, guardados de forma cifrada)
 - 📁 Download direto para suas fontes configuradas
 - 🆕 **Detecção de novas versões**: o Stellio verifica todos os dias se os modelos baixados (Printables, MakerWorld, Thingiverse) foram atualizados
 - 🛒 **Links úteis**: lojas, fabricantes, sites de modelos 3D e recursos agrupados em seções recolhíveis
@@ -164,6 +165,7 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 - 🔄 Atualizações automáticas a partir do GitHub (patch `.zip` — mesmo mecanismo no Windows e no Raspberry Pi/Linux)
 - 🔁 Reinício confiável após uma atualização ou ao ativar o modo de depuração, no Windows e no Raspberry Pi/Linux
 - 📋 Exportação de logs de diagnóstico (segredos ocultados)
+- 💬 **Sugestões e relatórios de erros a partir da app**: envie uma sugestão ou um erro sem sair do Stellio — é criada uma issue no GitHub por si (de forma anónima, através de uma aplicação GitHub dedicada), com uma ligação para a issue e um selo «Nova resposta» quando recebe uma resposta
 
 ---
 
@@ -312,6 +314,8 @@ Contribuições são bem-vindas! 🎉
 
 ### Reportar um bug
 
+A forma mais simples é diretamente a partir da app: abra **Sugestões e erros** na barra lateral e descreva o problema — é enviado como uma issue do GitHub por si. Também pode abrir uma issue você mesmo no GitHub.
+
 Use o modelo de relatório de bug e inclua:
 - Versão do Stellio
 - Sistema operacional
@@ -355,7 +359,7 @@ O instalador do Windows e o AppImage do Linux publicados nas [Releases](https://
 
 ## 📞 Contato e suporte
 
-- 🐛 **Reportar um bug**: [GitHub Issues](https://github.com/stellio-app/stellio/issues)
+- 🐛 **Reportar um bug**: [GitHub Issues](https://github.com/stellio-app/stellio/issues) ou diretamente na app (**Sugestões e erros**)
 - 💡 **Solicitar uma funcionalidade**: [GitHub Discussions](https://github.com/stellio-app/stellio/discussions)
 - 📧 **Email**: contact@stellio-app.com
 - 🌐 **Site**: [stellio-app.com](https://stellio-app.com)

@@ -5,7 +5,7 @@
 Notes importantes pour un agent / LLM :
 - Le projet est monolithique : `main.py` (~24 900 lignes), `script.js` (~19 480 lignes), `index.html` (~4 160 lignes), `style.css` (~8 320 lignes). Consulter `CODEMAP.md` pour retrouver une fonction ou une route par numéro de ligne avant de lire ces fichiers en entier.
 - Pas de framework front : une seule page (SPA) où les `<div class="page" id="page-*">` sont affichés/masqués ; les modales ont l'id `modal-*`.
-- Toutes les chaînes UI passent par i18n (`data-i18n` / `I18N.t`), 8 langues, 1948 clés chacune (jeux de clés identiques), `fr` = langue de référence/fallback. Toute nouvelle chaîne doit être ajoutée dans les 8 fichiers.
+- Toutes les chaînes UI passent par i18n (`data-i18n` / `I18N.t`), 8 langues, 1989 clés chacune (jeux de clés identiques), `fr` = langue de référence/fallback. Toute nouvelle chaîne doit être ajoutée dans les 8 fichiers.
 - Commentaires et messages de log du code sont en français.
 - API REST JSON sous `/api/*`, session Flask (cookie) + protection CSRF ; rôle « invité » en lecture seule.
 - Dépôt public : https://github.com/stellio-app/stellio (branche `main` ; dernier état connu : commit « V 0.6.9 », 84 fichiers, non revérifié pour la 0.7.2 ; pas de dossier de tests, `bin/` ignoré par `.gitignore`, pas de sources Android : seul l'APK est versionné). Les numéros de ligne de `CODEMAP.md` correspondent aux fichiers de la v0.7.2 avant les modifications d'octobre 2026 (le décalage à appliquer est indiqué en tête de `CODEMAP.md`) (`CURRENT_VERSION` = "0.7.2", `main.py` l.15321 ; les numéros de ligne de `main.py` citées dans `CODEMAP.md` se corrigent avec le tableau de décalages de son en-tête, étendu le 18/10/2026).

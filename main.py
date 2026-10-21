@@ -13538,6 +13538,16 @@ def api_delete_notification(notif_id):
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 
+def _project_effective_status(stored, total_needed, total_printed):
+    """Un projet dont toutes les pièces sont imprimées est « terminé », même si le statut enregistré
+    est resté « in_progress » (le statut n'est jamais mis à jour à la main dans l'interface)."""
+    if stored == 'done':
+        return 'done'
+    if total_needed > 0 and total_printed >= total_needed:
+        return 'done'
+    return stored or 'in_progress'
+
+
 @app.route('/api/projects', methods=['GET'])
 @login_required
 def api_get_projects():
@@ -13563,7 +13573,7 @@ def api_get_projects():
                     "name": p['name'],
                     "description": p['description'],
                     "color": p['color'],
-                    "status": p['status'],
+                    "status": _project_effective_status(p['status'], total_needed, total_printed),
                     "created_at": p['created_at'],
                     "updated_at": p['updated_at'],
                     "file_count": len(files),
@@ -13634,12 +13644,14 @@ def api_get_project(project_id):
         (project_id,)
     ).fetchall()
     conn.close()
+    _needed = sum(int(f['quantity_needed'] or 0) for f in files)
+    _printed = sum(min(int(f['quantity_printed'] or 0), int(f['quantity_needed'] or 0)) for f in files)
     return jsonify({
         "id": p['id'],
         "name": p['name'],
         "description": p['description'],
         "color": p['color'],
-        "status": p['status'],
+        "status": _project_effective_status(p['status'], _needed, _printed),
         "created_at": p['created_at'],
         "updated_at": p['updated_at'],
         "files": [dict(f) for f in files]
@@ -15992,7 +16004,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.7.3"
+CURRENT_VERSION = "0.7.4"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -21857,14 +21869,44 @@ def _prev_month(month):
     return f"{y - 1}-12" if mth == 1 else f"{y}-{mth - 1:02d}"
 
 
+REPORT_FREQUENCIES = ('week', 'month', 'quarter', 'year')
+
+
+def _report_period_bounds(frequency, anchor):
+    """(début, fin exclue) de la période de bilan contenant la date `anchor` (datetime.date).
+    Semaine : du lundi au dimanche ; trimestre : T1 = janv.-mars, etc."""
+    if frequency == 'week':
+        start = anchor - datetime.timedelta(days=anchor.weekday())
+        return start, start + datetime.timedelta(days=7)
+    if frequency == 'quarter':
+        first_month = 3 * ((anchor.month - 1) // 3) + 1
+        start = datetime.date(anchor.year, first_month, 1)
+        end = datetime.date(anchor.year + 1, 1, 1) if first_month == 10 else datetime.date(anchor.year, first_month + 3, 1)
+        return start, end
+    if frequency == 'year':
+        return datetime.date(anchor.year, 1, 1), datetime.date(anchor.year + 1, 1, 1)
+    start = datetime.date(anchor.year, anchor.month, 1)
+    end = datetime.date(anchor.year + 1, 1, 1) if anchor.month == 12 else datetime.date(anchor.year, anchor.month + 1, 1)
+    return start, end
+
+
 def _monthly_report_data(conn, user_id, month):
+    start = datetime.date(int(month[:4]), int(month[5:7]), 1)
+    start, end = _report_period_bounds('month', start)
+    report = _report_data_range(conn, user_id, start.isoformat(), end.isoformat())
+    report["month"] = month
+    return report
+
+
+def _report_data_range(conn, user_id, start_iso, end_iso):
+    """Totaux et ventilations des impressions envoyées entre start_iso (inclus) et end_iso (exclu), en heure locale."""
     rows = conn.execute(
         """SELECT h.file_name, h.result, h.spool_weight_used_g AS grams, h.estimated_seconds AS secs,
                   h.material_cost, h.elec_cost, h.total_cost, h.filament_material AS material,
                   COALESCE((SELECT p.name FROM printers p WHERE p.id = h.printer_id), '') AS printer
            FROM print_history h
-           WHERE h.user_id = ? AND strftime('%Y-%m', h.sent_at, 'localtime') = ?""",
-        (user_id, month)
+           WHERE h.user_id = ? AND date(h.sent_at, 'localtime') >= ? AND date(h.sent_at, 'localtime') < ?""",
+        (user_id, start_iso, end_iso)
     ).fetchall()
     totals = {"prints": 0, "success": 0, "failed": 0, "unrated": 0, "grams": 0.0, "seconds": 0,
               "material_cost": 0.0, "elec_cost": 0.0, "total_cost": 0.0, "failed_cost": 0.0, "failed_grams": 0.0, "co2_g": 0.0}
@@ -21913,7 +21955,7 @@ def _monthly_report_data(conn, user_id, month):
         totals[k] = round(totals[k], 2 if k.endswith("cost") else 1)
     rated = totals["success"] + totals["failed"]
     totals["success_rate"] = round(totals["success"] / rated * 100, 1) if rated else None
-    return {"month": month, "totals": totals, "by_printer": finish(by_printer), "by_material": finish(by_material),
+    return {"totals": totals, "by_printer": finish(by_printer), "by_material": finish(by_material),
             "top_models": finish(by_model, 5)}
 
 
@@ -21933,6 +21975,34 @@ def api_report_monthly():
         report["first_month"] = first
     finally:
         conn.close()
+    return jsonify(report), 200
+
+
+@app.route('/api/reports/period', methods=['GET'])
+@login_required
+def api_report_period():
+    """Bilan des impressions sur une période de fréquence choisie (week | month | quarter | year)
+    contenant la date `date` (AAAA-MM-JJ, par défaut aujourd'hui), avec comparaison à la période précédente."""
+    frequency = (request.args.get('frequency') or 'month').strip().lower()
+    if frequency not in REPORT_FREQUENCIES:
+        frequency = 'month'
+    try:
+        anchor = datetime.date.fromisoformat((request.args.get('date') or '').strip())
+    except ValueError:
+        anchor = datetime.date.today()
+    start, end = _report_period_bounds(frequency, anchor)
+    prev_start, prev_end = _report_period_bounds(frequency, start - datetime.timedelta(days=1))
+    conn = get_db()
+    try:
+        report = _report_data_range(conn, session['user_id'], start.isoformat(), end.isoformat())
+        report["previous"] = _report_data_range(conn, session['user_id'], prev_start.isoformat(), prev_end.isoformat())["totals"]
+        report["first_date"] = conn.execute(
+            "SELECT MIN(date(sent_at, 'localtime')) FROM print_history WHERE user_id = ?", (session['user_id'],)
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    report.update({"frequency": frequency, "start": start.isoformat(),
+                   "end": (end - datetime.timedelta(days=1)).isoformat()})
     return jsonify(report), 200
 
 
@@ -23113,6 +23183,7 @@ def api_pre_print_check():
         warnings.append({
             "level": "warning",
             "code": "non_manifold",
+            "params": {},
             "message": "Maillage non-manifold détecté — le slicer devra le réparer automatiquement (résultat parfois imprévisible)."
         })
 
@@ -23134,6 +23205,10 @@ def api_pre_print_check():
                 warnings.append({
                     "level": "error",
                     "code": "oversized",
+                    "params": {
+                        "x": analysis['dimensions']['x'], "y": analysis['dimensions']['y'], "z": analysis['dimensions']['z'],
+                        "bx": f"{bed_x:g}", "by": f"{bed_y:g}", "bz": (f"{bed_z:g}" if bed_z else "?")
+                    },
                     "message": f"Pièce ({analysis['dimensions']['x']}×{analysis['dimensions']['y']}×{analysis['dimensions']['z']} mm) plus grande que le plateau ({bed_x:g}×{bed_y:g}×{(f'{bed_z:g}' if bed_z else '?')} mm)."
                 })
         except Exception:
@@ -23179,6 +23254,7 @@ def api_pre_print_check():
                 warnings.append({
                     "level": "error",
                     "code": "insufficient_filament",
+                    "params": {"name": slot_name or "?", "remaining": round(remaining, 1), "required": round(required_g, 1)},
                     "message": f"Filament assigné ({slot_name or '?'}) : {round(remaining,1)}g restants pour {round(required_g,1)}g nécessaires."
                 })
     except Exception as e:

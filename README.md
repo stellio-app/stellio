@@ -114,6 +114,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 🟠 **Printables** (GraphQL API)
 - 🟢 **MakerWorld** (2-step Bambu Lab login)
 - 🔵 **Thingiverse** (via API key)
+- 🟣 **Nexprint** (Elegoo's model library; sign in with your account email and password, stored encrypted)
 - 📁 Direct download to your configured sources
 - 🆕 **New version detection**: Stellio checks every day whether the models you downloaded (Printables, MakerWorld, Thingiverse) have been updated
 - 🛒 **Useful links**: shops, printer manufacturers, 3D model sites and resources grouped in collapsible sections
@@ -164,6 +165,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 🔄 Automatic updates from GitHub (`.zip` patch — same mechanism on Windows and Raspberry Pi/Linux)
 - 🔁 Reliable restart after an update or after enabling debug mode, on Windows and Raspberry Pi/Linux
 - 📋 Diagnostic log export (secrets masked)
+- 💬 **Suggestions & bug reports from the app**: send a suggestion or a bug report without leaving Stellio — it is created as a GitHub issue (anonymously, through a dedicated GitHub App), with a link to the issue and a "New reply" badge when you get an answer
 
 ---
 
@@ -312,6 +314,8 @@ Contributions are welcome! 🎉
 
 ### Reporting a bug
 
+The easiest way is directly from the app: open **Suggestions & bugs** in the sidebar and describe the problem — it is sent as a GitHub issue for you. You can also open an issue on GitHub yourself.
+
 Use the bug report template and include:
 - Stellio version
 - Operating system
@@ -355,7 +359,7 @@ The Windows installer and the Linux AppImage published in [Releases](https://git
 
 ## 📞 Contact & Support
 
-- 🐛 **Bug report**: [GitHub Issues](https://github.com/stellio-app/stellio/issues)
+- 🐛 **Bug report**: [GitHub Issues](https://github.com/stellio-app/stellio/issues) or directly from the app (**Suggestions & bugs**)
 - 💡 **Feature request**: [GitHub Discussions](https://github.com/stellio-app/stellio/discussions)
 - 📧 **Email**: contact@stellio-app.com
 - 🌐 **Website**: [stellio-app.com](https://stellio-app.com)
@@ -369,6 +373,13 @@ If Stellio is useful to you, consider:
 - Sharing the project around you
 - [Contributing code](#-contributing) or translations
 - Reporting bugs to help improve the app
+- Support the development with a small tip on Ko-fi ☕
+
+<p align="center">
+  <a href="https://ko-fi.com/E6J828RYVD">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support Stellio on Ko-fi">
+  </a>
+</p>
 
 ---
 

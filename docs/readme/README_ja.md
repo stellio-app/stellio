@@ -114,6 +114,7 @@
 - 🟠 **Printables**（GraphQL API）
 - 🟢 **MakerWorld**（2段階のBambu Labログイン）
 - 🔵 **Thingiverse**（APIキー経由）
+- 🟣 **Nexprint**（Elegoo のモデルライブラリ。アカウントのメールアドレスとパスワードでログイン。暗号化して保存）
 - 📁 設定済みのソースへの直接ダウンロード
 - 🆕 **新バージョンの検出**：ダウンロード済みモデル（Printables、MakerWorld、Thingiverse）が更新されていないか、Stellioが毎日確認
 - 🛒 **便利なリンク**：ショップ、メーカー、3Dモデルサイト、リソースを折りたたみ式セクションにまとめて表示
@@ -164,6 +165,7 @@
 - 🔄 GitHubからの自動アップデート（`.zip`パッチ — WindowsとRaspberry Pi/Linuxで同じ仕組み）
 - 🔁 アップデート後やデバッグモード有効化後の再起動が、WindowsでもRaspberry Pi/Linuxでも確実に動作
 - 📋 診断ログのエクスポート（機密情報はマスク）
+- 💬 **アプリから直接ご提案・バグ報告**：Stellio を離れずに提案やバグを送信できます。GitHub の Issue が自動で作成され（専用の GitHub App 経由で匿名）、Issue へのリンクと、返信が届いたときの「新しい返信」バッジが表示されます
 
 ---
 
@@ -312,6 +314,8 @@ stellio/
 
 ### バグ報告
 
+最も簡単なのはアプリから直接送信する方法です。サイドバーの **ご提案・バグ報告** を開いて問題を説明すると、GitHub の Issue として自動送信されます。GitHub 上で自分で Issue を作成することもできます。
+
 バグ報告テンプレートを使用し、以下を含めてください：
 - Stellioのバージョン
 - OS
@@ -355,7 +359,7 @@ Stellioはローカルファースト設計です：データはお使いの端�
 
 ## 📞 お問い合わせ・サポート
 
-- 🐛 **バグ報告**：[GitHub Issues](https://github.com/stellio-app/stellio/issues)
+- 🐛 **バグ報告**：[GitHub Issues](https://github.com/stellio-app/stellio/issues)、またはアプリから直接（**ご提案・バグ報告**）
 - 💡 **機能リクエスト**：[GitHub Discussions](https://github.com/stellio-app/stellio/discussions)
 - 📧 **メール**：contact@stellio-app.com
 - 🌐 **ウェブサイト**：[stellio-app.com](https://stellio-app.com)
