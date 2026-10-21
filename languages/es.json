@@ -681,6 +681,8 @@
   "printers.type": "Tipo",
   "printers.edit": "Editar impresora",
   "printers.save": "Guardar",
+  "printers.bed_size": "Tamaño de la cama (mm)",
+  "printers.bed_size_hint": "Ancho × profundidad × altura máxima de impresión. Sirve para avisar cuando una pieza es demasiado grande antes de enviarla al slicer.",
   "printers.saving": "Guardando...",
   "printers.keep_current_key": "Dejar vacío para conservar la clave actual",
   "viewer.send_to_slicer": "Enviar al slicer",
@@ -1949,5 +1951,11 @@
   "spoolimport.summary": "{{n}} bobina(s) encontrada(s)",
   "spoolimport.skipped": "{{n}} fila(s) vacía(s) omitida(s)",
   "spoolimport.confirm": "Importar",
-  "spoolimport.done": "{{n}} bobina(s) importada(s)"
+  "spoolimport.done": "{{n}} bobina(s) importada(s)",
+  "feedback.new_reply": "Nueva respuesta",
+  "feedback.new_replies": "{{n}} respuestas nuevas",
+  "feedback.new_reply_toast": "Nueva respuesta a tu solicitud n.º {{n}}",
+  "modules.repaired_toast": "Módulos reparados tras la actualización: {{list}}",
+  "modules.missing_toast": "Módulos que faltan: {{list}}. Algunas funciones (presupuesto en PDF, importación de hojas de cálculo, notificaciones) pueden no funcionar. Reinstala la última versión completa de Stellio.",
+  "cost.quote_missing_module": "No se pudo generar el presupuesto: falta el módulo «{{module}}» en esta instalación. Reinstala la última versión completa de Stellio."
 }

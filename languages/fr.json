@@ -693,6 +693,8 @@
   "printers.type": "Type",
   "printers.edit": "Modifier l'imprimante",
   "printers.save": "Enregistrer",
+  "printers.bed_size": "Taille du plateau (mm)",
+  "printers.bed_size_hint": "Largeur × profondeur × hauteur maximale d'impression. Sert à avertir quand une pièce est trop grande avant l'envoi au slicer.",
   "printers.saving": "Enregistrement...",
   "printers.keep_current_key": "Laisser vide pour conserver la clé actuelle",
   "viewer.send_to_slicer": "Envoyer au slicer",
@@ -1949,5 +1951,11 @@
   "spoolimport.summary": "{{n}} bobine(s) trouvée(s)",
   "spoolimport.skipped": "{{n}} ligne(s) vide(s) ignorée(s)",
   "spoolimport.confirm": "Importer",
-  "spoolimport.done": "{{n}} bobine(s) importée(s)"
+  "spoolimport.done": "{{n}} bobine(s) importée(s)",
+  "feedback.new_reply": "Nouvelle réponse",
+  "feedback.new_replies": "{{n}} nouvelles réponses",
+  "feedback.new_reply_toast": "Nouvelle réponse sur votre demande n°{{n}}",
+  "modules.repaired_toast": "Modules réparés après la mise à jour : {{list}}",
+  "modules.missing_toast": "Modules manquants : {{list}}. Certaines fonctions (devis PDF, import de tableur, notifications) peuvent ne pas marcher. Réinstallez la dernière version complète de Stellio.",
+  "cost.quote_missing_module": "Génération du devis impossible : le module « {{module}} » est absent de cette installation. Réinstallez la dernière version complète de Stellio."
 }

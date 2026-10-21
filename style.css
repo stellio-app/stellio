@@ -736,7 +736,12 @@ body {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
     z-index: 50;
     overflow: hidden;
-    animation: slideUp 0.15s ease;
+    animation: recentSearchIn 0.15s ease;
+}
+/* Animation dédiée : le @keyframes slideUp global décale l'élément de -50 % en X (menu qui partait de la gauche) */
+@keyframes recentSearchIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .search-recent-dropdown-header {
@@ -4976,7 +4981,7 @@ kbd {
     transition: transform 0.25s ease;
 }
 
-.accord-section.open .accord-arrow {
+.accord-section.open > .accord-header .accord-arrow {
     transform: rotate(180deg);
 }
 
@@ -4987,13 +4992,13 @@ kbd {
     padding: 0 16px;
 }
 
-.accord-section.open .accord-body {
+.accord-section.open > .accord-body {
     max-height: 800px;
     overflow-y: auto;
     padding: 0 16px 16px;
 }
 
-.accord-section.open .accord-header {
+.accord-section.open > .accord-header {
     border-bottom: 1px solid var(--border);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
@@ -8080,6 +8085,11 @@ html.reduce-motion * {
     color: var(--text-primary); cursor: pointer; margin-bottom: 8px; font-family: inherit;
 }
 .fb-row:hover { border-color: var(--accent); }
+.fb-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.fb-row-unread { border-color: var(--accent); }
+.fb-new-reply { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; padding: 1px 8px; border-radius: 20px; background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+.fb-gh-btn { flex-shrink: 0; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 15px; }
+.fb-gh-btn:hover { color: var(--text-primary); border-color: var(--accent); }
 .fb-row-main { flex: 1; min-width: 0; }
 .fb-row-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fb-row-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
@@ -8256,3 +8266,54 @@ body.role-viewer .nav-btn[data-page="settings"] {
 .file-metadata-tooltip .meta-no { color: var(--text-muted); }
 
 :root:not([data-theme="light"]) .tigertag-banner-logo { filter: invert(1); }
+
+
+/* ===== Historique des impressions : mise en page mobile / tactile ===== */
+@media (max-width: 768px) {
+    .history-entry {
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 6px 12px;
+        padding: 10px 4px;
+    }
+    .history-entry-body {
+        flex: 1 1 calc(100% - 48px);
+        min-width: 0;
+    }
+    .history-entry-meta {
+        flex-wrap: wrap;
+        gap: 4px 10px;
+    }
+    .history-entry-meta > span { white-space: nowrap; }
+    .history-entry-time {
+        margin-left: 48px;
+        align-self: center;
+    }
+    .history-entry-rating {
+        margin-left: auto;
+        align-self: center;
+    }
+}
+/* Écrans tactiles : pas de survol, donc les boutons d'action restent visibles */
+@media (hover: none) {
+    .history-entry-view,
+    .history-entry-reprint,
+    .history-entry-del { opacity: 1; }
+}
+
+
+/* ===== Popups « ajouter à un projet » : message d'aide / erreur ===== */
+.picker-hint { font-size: 12px; color: var(--text-muted); margin: 0 0 8px; }
+.picker-error {
+    display: none;
+    margin: 0 0 10px;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: var(--danger, #ef4444);
+    font-size: 12px;
+}
+.picker-error.visible { display: block; }
+.picker-actions { display: flex; gap: 8px; margin-top: 8px; }
+.picker-actions .btn { flex: 1; justify-content: center; }

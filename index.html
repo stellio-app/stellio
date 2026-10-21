@@ -345,7 +345,7 @@
                     <button id="mobile-menu-toggle" class="mobile-menu-toggle" data-i18n-aria="nav.menu" aria-label="Menu" type="button">
                         <i class="fa-solid fa-bars"></i>
                     </button>
-                    <h2 id="header-page-title"><i class="fa-solid fa-layer-group"></i><span data-i18n="nav.library"></span></h2>
+                    <h2 id="header-page-title"><i class="fa-solid fa-gauge-high"></i><span data-i18n="nav.dashboard"></span></h2>
                 </div>
                 <button id="mobile-search-toggle" class="mobile-search-toggle" data-i18n-aria="shortcuts.focus_search" aria-label="Rechercher" type="button">
                     <i class="fa-solid fa-search"></i>
@@ -1831,15 +1831,28 @@
                                             </div>
                                             <span id="nexprint-status-badge" class="account-badge disconnected">Non configuré</span>
                                         </div>
-                                        <button id="nexprint-login-btn" class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="nexprintBrowserLogin()"><i class="fa-solid fa-right-to-bracket"></i> Se connecter avec Nexprint</button>
-                                        <p class="settings-hint" style="margin-top:6px;">Une fenêtre s'ouvre sur le site officiel : connecte-toi normalement, Stellio récupère la session automatiquement. Tes identifiants ne passent jamais par Stellio.</p>
-                                        <div id="nexprint-key-row" style="display:flex;gap:8px;margin-top:10px;">
-                                            <input type="password" id="nexprint-api-key" placeholder="Ou colle le cookie auth_token..."
-                                                style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;font-family:monospace;">
-                                            <button class="btn btn-primary btn-sm" onclick="saveAccountKey('nexprint')"><i class="fa-solid fa-floppy-disk"></i></button>
+                                        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+                                            <input type="email" id="nexprint-email" autocomplete="off" data-i18n-placeholder="accounts.nexprint_email_ph" placeholder="Email du compte Nexprint"
+                                                style="flex:1;min-width:160px;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;">
+                                            <input type="password" id="nexprint-password" autocomplete="new-password" data-i18n-placeholder="accounts.nexprint_password_ph" placeholder="Mot de passe"
+                                                style="flex:1;min-width:160px;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;">
                                         </div>
-                                        <button id="nexprint-edit-btn" class="btn btn-ghost btn-sm" style="display:none;margin-top:10px;" onclick="showAccountKeyInput('nexprint')"><i class="fa-solid fa-pen"></i> <span data-i18n="actions.edit">Modifier</span></button>
-                                        <p class="settings-hint" style="margin-top:6px;">Méthode manuelle (si la fenêtre ne fonctionne pas) : copie la valeur du cookie <code>auth_token</code> depuis les outils du navigateur (F12 → Application → Cookies).</p>
+                                        <div style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;padding:8px 10px;border-radius:var(--radius);background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);font-size:11px;color:var(--text-primary);">
+                                            <i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;margin-top:2px;"></i>
+                                            <span data-i18n="accounts.nexprint_google_warning">La connexion avec Google n'est pas prise en charge : utilise l'email et le mot de passe de ton compte Nexprint.</span>
+                                        </div>
+                                        <button id="nexprint-login-btn" class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="nexprintBrowserLogin()"><i class="fa-solid fa-right-to-bracket"></i> <span data-i18n="accounts.nexprint_login_btn">Se connecter avec Nexprint</span></button>
+                                        <p class="settings-hint" style="margin-top:6px;" data-i18n="accounts.nexprint_login_hint">Stellio remplit le formulaire du site officiel dans une fenêtre puis enregistre la session. L'email et le mot de passe sont stockés chiffrés sur cet appareil. Si le site demande une vérification (captcha, code), termine-la dans la fenêtre.</p>
+                                        <details style="margin-top:8px;">
+                                            <summary style="cursor:pointer;font-size:11px;color:var(--text-muted);" data-i18n="accounts.nexprint_manual_title">Méthode manuelle (cookie auth_token)</summary>
+                                            <div id="nexprint-key-row" style="display:flex;gap:8px;margin-top:10px;">
+                                                <input type="password" id="nexprint-api-key" data-i18n-placeholder="accounts.nexprint_token_ph" placeholder="Ou colle le cookie auth_token..."
+                                                    style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;font-family:monospace;">
+                                                <button class="btn btn-primary btn-sm" onclick="saveAccountKey('nexprint')"><i class="fa-solid fa-floppy-disk"></i></button>
+                                            </div>
+                                            <button id="nexprint-edit-btn" class="btn btn-ghost btn-sm" style="display:none;margin-top:10px;" onclick="showAccountKeyInput('nexprint')"><i class="fa-solid fa-pen"></i> <span data-i18n="actions.edit">Modifier</span></button>
+                                            <p class="settings-hint" style="margin-top:6px;" data-i18n="accounts.nexprint_manual_hint">Méthode manuelle (si la fenêtre ne fonctionne pas) : copie la valeur du cookie <code>auth_token</code> depuis les outils du navigateur (F12 → Application → Cookies).</p>
+                                        </details>
                                     </div>
 
                                     <div class="account-card" style="margin-top:12px;">
@@ -3585,6 +3598,15 @@
 							<label data-i18n="printers.check_code">🔑 Code de vérification</label>
 							<input type="text" id="printer-flashforge-code" autocomplete="off">
 						</div>
+					</div>
+					<div class="input-group" id="group-bed-size">
+						<label data-i18n="printers.bed_size">Taille du plateau (mm)</label>
+						<div style="display:flex; gap:8px;">
+							<input type="number" id="printer-bed-x" min="1" step="1" placeholder="X (ex: 300)" autocomplete="off">
+							<input type="number" id="printer-bed-y" min="1" step="1" placeholder="Y (ex: 300)" autocomplete="off">
+							<input type="number" id="printer-bed-z" min="1" step="1" placeholder="Z (ex: 300)" autocomplete="off">
+						</div>
+						<small style="color:var(--text-muted);font-size:11px;" data-i18n="printers.bed_size_hint">Largeur × profondeur × hauteur maximale d'impression. Sert à avertir quand une pièce est trop grande avant l'envoi au slicer.</small>
 					</div>
 				</form>
 			</div>

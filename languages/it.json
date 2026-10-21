@@ -681,6 +681,8 @@
   "printers.type": "Tipo",
   "printers.edit": "Modifica stampante",
   "printers.save": "Salva",
+  "printers.bed_size": "Dimensioni del piano (mm)",
+  "printers.bed_size_hint": "Larghezza × profondità × altezza massima di stampa. Serve ad avvisare quando un pezzo è troppo grande prima dell'invio allo slicer.",
   "printers.saving": "Salvataggio...",
   "printers.keep_current_key": "Lascia vuoto per mantenere la chiave attuale",
   "viewer.send_to_slicer": "Invia allo slicer",
@@ -1949,5 +1951,11 @@
   "spoolimport.summary": "{{n}} bobina/e trovata/e",
   "spoolimport.skipped": "{{n}} riga/righe vuota/e ignorata/e",
   "spoolimport.confirm": "Importa",
-  "spoolimport.done": "{{n}} bobina/e importata/e"
+  "spoolimport.done": "{{n}} bobina/e importata/e",
+  "feedback.new_reply": "Nuova risposta",
+  "feedback.new_replies": "{{n}} nuove risposte",
+  "feedback.new_reply_toast": "Nuova risposta alla tua richiesta n. {{n}}",
+  "modules.repaired_toast": "Moduli riparati dopo l'aggiornamento: {{list}}",
+  "modules.missing_toast": "Moduli mancanti: {{list}}. Alcune funzioni (preventivo PDF, importazione da foglio di calcolo, notifiche) potrebbero non funzionare. Reinstalla l'ultima versione completa di Stellio.",
+  "cost.quote_missing_module": "Impossibile generare il preventivo: il modulo «{{module}}» manca in questa installazione. Reinstalla l'ultima versione completa di Stellio."
 }

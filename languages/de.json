@@ -681,6 +681,8 @@
   "printers.type": "Typ",
   "printers.edit": "Drucker bearbeiten",
   "printers.save": "Speichern",
+  "printers.bed_size": "Druckbettgröße (mm)",
+  "printers.bed_size_hint": "Breite × Tiefe × maximale Druckhöhe. Dient dazu, vor dem Senden an den Slicer zu warnen, wenn ein Teil zu groß ist.",
   "printers.saving": "Wird gespeichert...",
   "printers.keep_current_key": "Leer lassen, um den aktuellen Schlüssel zu behalten",
   "viewer.send_to_slicer": "An Slicer senden",
@@ -1949,5 +1951,11 @@
   "spoolimport.summary": "{{n}} Spule(n) gefunden",
   "spoolimport.skipped": "{{n}} leere Zeile(n) übersprungen",
   "spoolimport.confirm": "Importieren",
-  "spoolimport.done": "{{n}} Spule(n) importiert"
+  "spoolimport.done": "{{n}} Spule(n) importiert",
+  "feedback.new_reply": "Neue Antwort",
+  "feedback.new_replies": "{{n}} neue Antworten",
+  "feedback.new_reply_toast": "Neue Antwort auf Ihre Anfrage Nr. {{n}}",
+  "modules.repaired_toast": "Nach dem Update reparierte Module: {{list}}",
+  "modules.missing_toast": "Fehlende Module: {{list}}. Einige Funktionen (PDF-Angebot, Tabellenimport, Benachrichtigungen) funktionieren eventuell nicht. Installieren Sie die neueste Vollversion von Stellio neu.",
+  "cost.quote_missing_module": "Angebot konnte nicht erstellt werden: Das Modul „{{module}}“ fehlt in dieser Installation. Installieren Sie die neueste Vollversion von Stellio neu."
 }

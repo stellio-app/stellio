@@ -681,6 +681,8 @@
   "printers.type": "Type",
   "printers.edit": "Edit printer",
   "printers.save": "Save",
+  "printers.bed_size": "Bed size (mm)",
+  "printers.bed_size_hint": "Width × depth × maximum print height. Used to warn when a part is too large before sending it to the slicer.",
   "printers.saving": "Saving...",
   "printers.keep_current_key": "Leave blank to keep the current key",
   "viewer.send_to_slicer": "Send to slicer",
@@ -1949,5 +1951,11 @@
   "spoolimport.summary": "{{n}} spool(s) found",
   "spoolimport.skipped": "{{n}} empty row(s) skipped",
   "spoolimport.confirm": "Import",
-  "spoolimport.done": "{{n}} spool(s) imported"
+  "spoolimport.done": "{{n}} spool(s) imported",
+  "feedback.new_reply": "New reply",
+  "feedback.new_replies": "{{n}} new replies",
+  "feedback.new_reply_toast": "New reply on your request #{{n}}",
+  "modules.repaired_toast": "Modules repaired after the update: {{list}}",
+  "modules.missing_toast": "Missing modules: {{list}}. Some features (PDF quote, spreadsheet import, notifications) may not work. Reinstall the latest full version of Stellio.",
+  "cost.quote_missing_module": "Quote generation failed: the module “{{module}}” is missing from this installation. Reinstall the latest full version of Stellio."
 }

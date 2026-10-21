@@ -681,6 +681,8 @@
   "printers.type": "タイプ",
   "printers.edit": "プリンターを編集",
   "printers.save": "保存",
+  "printers.bed_size": "ベッドサイズ (mm)",
+  "printers.bed_size_hint": "幅 × 奥行き × 最大造形高さ。スライサーに送る前に、パーツが大きすぎる場合に警告するために使用します。",
   "printers.saving": "保存中...",
   "printers.keep_current_key": "現在のキーを維持する場合は空欄のままにしてください",
   "viewer.send_to_slicer": "スライサーに送信",
@@ -1949,5 +1951,11 @@
   "spoolimport.summary": "{{n}} 個のスプールが見つかりました",
   "spoolimport.skipped": "空の行 {{n}} 件をスキップしました",
   "spoolimport.confirm": "インポート",
-  "spoolimport.done": "{{n}} 個のスプールをインポートしました"
+  "spoolimport.done": "{{n}} 個のスプールをインポートしました",
+  "feedback.new_reply": "新しい返信",
+  "feedback.new_replies": "新しい返信が{{n}}件",
+  "feedback.new_reply_toast": "リクエスト #{{n}} に新しい返信があります",
+  "modules.repaired_toast": "アップデート後に修復されたモジュール：{{list}}",
+  "modules.missing_toast": "モジュールが見つかりません：{{list}}。一部の機能（PDF見積書、表計算の取り込み、通知）が動作しない可能性があります。Stellio の最新の完全版を再インストールしてください。",
+  "cost.quote_missing_module": "見積書を生成できません：この環境にモジュール「{{module}}」がありません。Stellio の最新の完全版を再インストールしてください。"
 }

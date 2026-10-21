@@ -681,6 +681,8 @@
   "printers.type": "Tipo",
   "printers.edit": "Editar impressora",
   "printers.save": "Salvar",
+  "printers.bed_size": "Tamanho da mesa (mm)",
+  "printers.bed_size_hint": "Largura × profundidade × altura máxima de impressão. Serve para avisar quando uma peça é grande demais antes de enviá-la ao slicer.",
   "printers.saving": "Salvando...",
   "printers.keep_current_key": "Deixe em branco para manter a chave atual",
   "viewer.send_to_slicer": "Enviar para o slicer",
@@ -1949,5 +1951,11 @@
   "spoolimport.summary": "{{n}} bobine(s) encontrada(s)",
   "spoolimport.skipped": "{{n}} linha(s) vazia(s) ignorada(s)",
   "spoolimport.confirm": "Importar",
-  "spoolimport.done": "{{n}} bobine(s) importada(s)"
+  "spoolimport.done": "{{n}} bobine(s) importada(s)",
+  "feedback.new_reply": "Nova resposta",
+  "feedback.new_replies": "{{n}} novas respostas",
+  "feedback.new_reply_toast": "Nova resposta ao seu pedido n.º {{n}}",
+  "modules.repaired_toast": "Módulos reparados após a atualização: {{list}}",
+  "modules.missing_toast": "Módulos ausentes: {{list}}. Algumas funções (orçamento em PDF, importação de planilhas, notificações) podem não funcionar. Reinstale a versão completa mais recente do Stellio.",
+  "cost.quote_missing_module": "Não foi possível gerar o orçamento: o módulo “{{module}}” está ausente desta instalação. Reinstale a versão completa mais recente do Stellio."
 }

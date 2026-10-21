@@ -11,6 +11,25 @@ if sys.platform.startswith('linux'):
     os.environ['PYOPENGL_PLATFORM'] = 'osmesa'
     os.environ['PYRENDER_OFFSCREEN'] = '1'
 
+
+def _early_extra_libs_dir():
+    # Même logique que get_data_path() (défini plus bas), sans créer de dossier.
+    env_override = os.environ.get('STELLIO_DATA_DIR')
+    if env_override:
+        base = env_override
+    elif os.name == 'nt':
+        base = os.path.join(os.environ.get('APPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Roaming')), 'Stellio')
+    else:
+        base = os.path.join(os.path.expanduser('~'), '.stellio')
+    return os.path.join(base, 'extra_libs')
+
+
+_EXTRA_LIBS_DIR = _early_extra_libs_dir()
+# Version empaquetée (PyInstaller) : les modules réparés au lancement sont lus depuis ce dossier.
+# Ajouté EN FIN de sys.path : un module déjà embarqué dans l'exécutable reste prioritaire.
+if getattr(sys, 'frozen', False) and os.path.isdir(_EXTRA_LIBS_DIR) and _EXTRA_LIBS_DIR not in sys.path:
+    sys.path.append(_EXTRA_LIBS_DIR)
+
 try:
     from check_deps import (
         REQUIRED_MODULES as _REQUIRED_MODULES,
@@ -152,8 +171,442 @@ def _auto_install_missing_modules():
     print("[MODULES] ✅ Tous les modules corrigés avec succès")
 
 
+# Modules 100 % Python (roues « py3-none-any ») que la version empaquetée peut récupérer seule
+# quand une mise à jour par patch .zip (qui ne remplace que main.py & co) en a besoin alors que
+# l'exécutable d'origine ne les embarque pas. Version ET SHA-256 épinglés : un fichier différent est refusé.
+# Chaque entrée : (distribution PyPI, version, sha256, nom d'import servant à tester sa présence)
+_FROZEN_REPAIR_WHEELS = {
+    'plyer': [
+        ('plyer', '2.1.0', '1b1772060df8b3045ed4f08231690ec8f7de30f5a004aa1724665a9074eed113', 'plyer'),
+    ],
+    'reportlab': [
+        ('charset-normalizer', '3.5.2', 'b6b751274acb69d77b3323d6b7dbaa3c7fdfc1eb829b7eb61d262f32e1af9685', 'charset_normalizer'),
+        ('reportlab', '5.0.1', '1c36e6bb0e71780c72331eba60da7f602e8d4389a8723825af71342e49d791e8', 'reportlab'),
+    ],
+    'openpyxl': [
+        ('et-xmlfile', '2.0.0', '7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa', 'et_xmlfile'),
+        ('openpyxl', '3.1.5', '5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2', 'openpyxl'),
+    ],
+    'xlrd': [
+        ('xlrd', '2.0.2', 'ea762c3d29f4cca48d82df517b6d89fbce4db3107f9d78713e48cd321d5c9aa9', 'xlrd'),
+    ],
+}
+
+# Fonctionnalités touchées quand un module manque (affichées à l'utilisateur)
+_MODULE_FEATURES = {
+    'reportlab': 'quote_pdf', 'plyer': 'native_notifications',
+    'openpyxl': 'spool_import_xlsx', 'xlrd': 'spool_import_xls',
+}
+
+# Rapport du dernier contrôle au lancement (lu par /api/system/modules)
+_MODULES_STARTUP_REPORT = {'repaired': [], 'still_missing': [], 'checked_version': None, 'first_launch_after_update': False}
+
+
+def _frozen_install_wheel(dist, version, expected_sha256):
+    """Télécharge une roue pure-Python depuis PyPI, vérifie son SHA-256 et l'extrait dans extra_libs."""
+    import json as _json
+    import hashlib
+    import zipfile
+    import urllib.request
+    ua = {'User-Agent': 'Stellio-App/module-repair'}
+    api_url = f"https://pypi.org/pypi/{dist}/{version}/json"
+    with urllib.request.urlopen(urllib.request.Request(api_url, headers=ua), timeout=20) as r:
+        meta = _json.load(r)
+    wheel = next((u for u in meta.get('urls', [])
+                  if u.get('packagetype') == 'bdist_wheel' and u.get('filename', '').endswith('-none-any.whl')
+                  and (u.get('digests') or {}).get('sha256') == expected_sha256), None)
+    if not wheel or not str(wheel.get('url', '')).startswith('https://files.pythonhosted.org/'):
+        raise RuntimeError(f"roue {dist}=={version} introuvable ou empreinte différente de celle attendue")
+    with urllib.request.urlopen(urllib.request.Request(wheel['url'], headers=ua), timeout=120) as r:
+        blob = r.read()
+    if hashlib.sha256(blob).hexdigest() != expected_sha256:
+        raise RuntimeError(f"SHA-256 de {dist}=={version} invalide après téléchargement")
+    os.makedirs(_EXTRA_LIBS_DIR, exist_ok=True)
+    root = os.path.realpath(_EXTRA_LIBS_DIR)
+    import io as _io
+    with zipfile.ZipFile(_io.BytesIO(blob)) as zf:
+        for member in zf.infolist():
+            name = member.filename
+            if member.is_dir() or '.data/' in name:
+                continue
+            dest = os.path.realpath(os.path.join(root, name))
+            if not dest.startswith(root + os.sep):
+                raise RuntimeError(f"chemin suspect dans la roue : {name}")
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            with zf.open(member) as src, open(dest, 'wb') as out:
+                out.write(src.read())
+
+
+# Noms d'import usuels quand ils diffèrent du nom de la distribution (dépendances transitives)
+_FROZEN_IMPORT_NAMES = {
+    'pillow': 'PIL', 'pyyaml': 'yaml', 'pyopengl': 'OpenGL', 'smbprotocol': 'smbclient',
+    'paho-mqtt': 'paho', 'websocket-client': 'websocket', 'pywebview': 'webview',
+    'typing-extensions': 'typing_extensions', 'charset-normalizer': 'charset_normalizer',
+    'python-dateutil': 'dateutil', 'beautifulsoup4': 'bs4', 'scikit-image': 'skimage',
+}
+
+_FROZEN_REPAIR_BUDGET_SECONDS = 240
+_FROZEN_REPAIR_MAX_WHEEL_BYTES = 200 * 1024 * 1024
+
+
+def _frozen_http_json(url, timeout=25):
+    import json as _json
+    import urllib.request
+    req = urllib.request.Request(url, headers={'User-Agent': 'Stellio-App/module-repair'})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return _json.load(r)
+
+
+def _frozen_http_bytes(url, deadline, max_bytes=_FROZEN_REPAIR_MAX_WHEEL_BYTES):
+    import time as _time
+    import urllib.request
+    req = urllib.request.Request(url, headers={'User-Agent': 'Stellio-App/module-repair'})
+    chunks, total = [], 0
+    with urllib.request.urlopen(req, timeout=40) as r:
+        while True:
+            if _time.time() > deadline:
+                raise RuntimeError("délai maximal de réparation dépassé")
+            chunk = r.read(1024 * 256)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                raise RuntimeError("roue trop volumineuse")
+            chunks.append(chunk)
+    return b''.join(chunks)
+
+
+def _frozen_supported_tags():
+    from packaging import tags
+    try:
+        found = list(tags.sys_tags())
+        if found:
+            return found
+    except Exception:
+        pass
+    # Repli : environnement empaqueté où sysconfig ne donne pas tout
+    py = f"cp{sys.version_info[0]}{sys.version_info[1]}"
+    out = []
+    for plat in tags.platform_tags():
+        out += [tags.Tag(py, py, plat), tags.Tag(py, 'abi3', plat), tags.Tag(f"py{sys.version_info[0]}", 'none', plat)]
+    out += [tags.Tag(f"py{sys.version_info[0]}", 'none', 'any'), tags.Tag(py, 'none', 'any')]
+    return out
+
+
+def _frozen_pick_wheel(files, tag_rank):
+    from packaging.utils import parse_wheel_filename
+    from packaging.specifiers import SpecifierSet
+    py_ver = '.'.join(str(x) for x in sys.version_info[:3])
+    best = None
+    for f in files:
+        if f.get('packagetype') != 'bdist_wheel' or f.get('yanked'):
+            continue
+        try:
+            wtags = parse_wheel_filename(f['filename'])[3]
+        except Exception:
+            continue
+        rp = f.get('requires_python')
+        if rp:
+            try:
+                if not SpecifierSet(rp).contains(py_ver, prereleases=True):
+                    continue
+            except Exception:
+                pass
+        ranks = [tag_rank[t] for t in wtags if t in tag_rank]
+        if ranks and (best is None or min(ranks) < best[0]):
+            best = (min(ranks), f)
+    return best[1] if best else None
+
+
+def _frozen_dist_importable(dist):
+    key = dist.lower().replace('_', '-')
+    for probe in (_FROZEN_IMPORT_NAMES.get(key), key.replace('-', '_'), key):
+        if probe:
+            try:
+                if importlib.util.find_spec(probe) is not None:
+                    return True
+            except Exception:
+                pass
+    return False
+
+
+def _frozen_extract_wheel(blob, expected_sha256=None):
+    import hashlib
+    import io as _io
+    import zipfile
+    if expected_sha256 and hashlib.sha256(blob).hexdigest() != expected_sha256:
+        raise RuntimeError("SHA-256 invalide après téléchargement")
+    os.makedirs(_EXTRA_LIBS_DIR, exist_ok=True)
+    root = os.path.realpath(_EXTRA_LIBS_DIR)
+    with zipfile.ZipFile(_io.BytesIO(blob)) as zf:
+        for member in zf.infolist():
+            name = member.filename
+            if member.is_dir() or '.data/' in name:
+                continue
+            dest = os.path.realpath(os.path.join(root, name))
+            if not dest.startswith(root + os.sep):
+                raise RuntimeError(f"chemin suspect dans la roue : {name}")
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            with zf.open(member) as src, open(dest, 'wb') as out:
+                out.write(src.read())
+            mode = (member.external_attr >> 16) & 0o777
+            if mode and os.name != 'nt':
+                try:
+                    os.chmod(dest, mode | 0o600)
+                except OSError:
+                    pass
+
+
+def _frozen_install_pure_sdist(meta, versions, import_top, deadline):
+    """Dernier recours quand PyPI ne publie aucune roue (ex. rectpack) : copie le dossier du paquet depuis l'archive
+    source, SANS exécuter de code, et seulement si ce dossier ne contient aucune extension C."""
+    import io as _io
+    import hashlib
+    import tarfile
+    sdist = None
+    for _pv, v in versions[:10]:
+        sdist = next((f for f in meta['releases'][v]
+                      if f.get('packagetype') == 'sdist' and not f.get('yanked') and f.get('filename', '').endswith('.tar.gz')), None)
+        if sdist:
+            break
+    if not sdist or not str(sdist.get('url', '')).startswith('https://files.pythonhosted.org/'):
+        raise RuntimeError("aucune roue ni archive source exploitable")
+    sha = (sdist.get('digests') or {}).get('sha256')
+    if not sha:
+        raise RuntimeError("empreinte SHA-256 absente pour l'archive source")
+    print(f"[MODULES] Pas de roue publiée : copie du paquet Python pur depuis {sdist['filename']} ...")
+    blob = _frozen_http_bytes(sdist['url'], deadline, 30 * 1024 * 1024)
+    if hashlib.sha256(blob).hexdigest() != sha:
+        raise RuntimeError("SHA-256 de l'archive source invalide")
+    root = os.path.realpath(_EXTRA_LIBS_DIR)
+    with tarfile.open(fileobj=_io.BytesIO(blob), mode='r:gz') as tf:
+        members = [m for m in tf.getmembers() if m.isfile()]
+        inits = [m.name for m in members
+                 if m.name.rsplit('/', 1)[-1] == '__init__.py' and m.name.count('/') >= 2 and m.name.split('/')[-2] == import_top]
+        if not inits:
+            raise RuntimeError(f"dossier « {import_top} » introuvable dans l'archive source")
+        prefix = min(inits, key=len).rsplit('/', 1)[0] + '/'
+        chosen = [m for m in members if m.name.startswith(prefix)]
+        if any(m.name.endswith(('.c', '.cc', '.cpp', '.pyx', '.pxd', '.h')) for m in chosen):
+            raise RuntimeError("ce paquet contient du code natif : il faut une roue ou une version complète de Stellio")
+        for m in chosen:
+            rel = m.name[len(prefix):]
+            dest = os.path.realpath(os.path.join(root, import_top, rel))
+            if not dest.startswith(os.path.join(root, import_top) + os.sep):
+                raise RuntimeError(f"chemin suspect dans l'archive : {m.name}")
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            data = tf.extractfile(m).read()
+            with open(dest, 'wb') as out:
+                out.write(data)
+    importlib.invalidate_caches()
+
+
+def _frozen_resolve_dist(dist, deadline, depth=0, seen=None, import_hint=None):
+    """Installe `dist` (dernière version ayant une roue compatible avec CE Python / CE système) et ses
+    dépendances manquantes dans extra_libs. Roues uniquement, SHA-256 vérifié contre l'empreinte publiée par PyPI."""
+    import io as _io
+    import zipfile
+    from packaging.requirements import Requirement
+    from packaging.version import Version, InvalidVersion
+    seen = seen if seen is not None else set()
+    key = dist.lower().replace('_', '-')
+    if key in seen or depth > 4:
+        return
+    seen.add(key)
+    meta = _frozen_http_json(f"https://pypi.org/pypi/{dist}/json")
+    versions = []
+    for v in meta.get('releases', {}):
+        try:
+            pv = Version(v)
+        except InvalidVersion:
+            continue
+        if not pv.is_prerelease and not pv.is_devrelease:
+            versions.append((pv, v))
+    versions.sort(reverse=True)
+    tag_rank = {t: i for i, t in enumerate(_frozen_supported_tags())}
+    wheel = None
+    for _pv, v in versions[:30]:
+        wheel = _frozen_pick_wheel(meta['releases'][v], tag_rank)
+        if wheel:
+            break
+    if not wheel and import_hint and depth == 0:
+        _frozen_install_pure_sdist(meta, versions, import_hint, deadline)
+        return
+    if not wheel or not str(wheel.get('url', '')).startswith('https://files.pythonhosted.org/'):
+        raise RuntimeError(f"aucune roue compatible avec ce système pour {dist}")
+    sha = (wheel.get('digests') or {}).get('sha256')
+    if not sha:
+        raise RuntimeError(f"empreinte SHA-256 absente pour {wheel.get('filename')}")
+    print(f"[MODULES] Téléchargement de {wheel['filename']} ...")
+    blob = _frozen_http_bytes(wheel['url'], deadline)
+    with zipfile.ZipFile(_io.BytesIO(blob)) as zf:
+        meta_name = next((n for n in zf.namelist() if n.endswith('.dist-info/METADATA')), None)
+        metadata_text = zf.read(meta_name).decode('utf-8', 'replace') if meta_name else ''
+        top_name = next((n for n in zf.namelist() if n.endswith('.dist-info/top_level.txt')), None)
+        tops = [t.strip() for t in zf.read(top_name).decode('utf-8', 'replace').split() if t.strip()] if top_name else []
+        if not tops:
+            tops = sorted({n.split('/')[0] for n in zf.namelist()
+                           if '/' in n and not n.split('/')[0].endswith(('.dist-info', '.data', '.libs'))})
+    already = False
+    if tops:
+        try:
+            already = all(importlib.util.find_spec(t) is not None for t in tops)
+        except Exception:
+            already = False
+    if not already:
+        _frozen_extract_wheel(blob, sha)
+        importlib.invalidate_caches()
+    for line in metadata_text.splitlines():
+        if not line.startswith('Requires-Dist:'):
+            continue
+        try:
+            req = Requirement(line.split(':', 1)[1].strip())
+        except Exception:
+            continue
+        if req.marker is not None:
+            try:
+                if not req.marker.evaluate({'extra': ''}):
+                    continue
+            except Exception:
+                continue
+        if _frozen_dist_importable(req.name):
+            continue
+        _frozen_resolve_dist(req.name, deadline, depth + 1, seen)
+
+
+def _frozen_repair_one(pip_name, deadline=None, import_name=None):
+    """Installe (si besoin) un module et ses dépendances. Roues épinglées (version + SHA-256) quand elles existent,
+    sinon résolution depuis PyPI. Retourne True si aucune erreur n'a été levée."""
+    import time as _time
+    deadline = deadline or (_time.time() + _FROZEN_REPAIR_BUDGET_SECONDS)
+    steps = _FROZEN_REPAIR_WHEELS.get(pip_name)
+    if steps:
+        for dist, version, sha, probe in steps:
+            try:
+                importlib.import_module(probe)
+                continue
+            except Exception:
+                pass
+            print(f"[MODULES] Téléchargement de {dist}=={version} (SHA-256 vérifié)...")
+            _frozen_install_wheel(dist, version, sha)
+            importlib.invalidate_caches()
+            for mod_name in list(sys.modules):
+                if mod_name == probe or mod_name.startswith(probe + '.'):
+                    del sys.modules[mod_name]
+    else:
+        _frozen_resolve_dist(pip_name, deadline, import_hint=(import_name or '').split('.')[0] or None)
+    if _EXTRA_LIBS_DIR not in sys.path:
+        sys.path.append(_EXTRA_LIBS_DIR)
+    importlib.invalidate_caches()
+    return True
+
+
+def _ensure_optional_module(import_name, pip_name):
+    """Utilisable à tout moment : retente l'import ; en version empaquetée, tente une réparation unique."""
+    try:
+        importlib.import_module(import_name)
+        return True
+    except Exception:
+        pass
+    if not getattr(sys, 'frozen', False):
+        return False
+    if os.environ.get('STELLIO_NO_AUTO_INSTALL', '').strip().lower() in ('1', 'true', 'yes'):
+        return False
+    try:
+        _frozen_repair_one(pip_name)
+        importlib.import_module(import_name)
+        return True
+    except Exception as e:
+        print(f"[MODULES] Réparation de {pip_name} impossible : {e}")
+        return False
+
+
+def _early_app_version():
+    """CURRENT_VERSION lu dans ce fichier (défini bien plus bas, donc non disponible à ce stade)."""
+    import re as _re
+    try:
+        with open(__file__, 'r', encoding='utf-8', errors='ignore') as f:
+            m = _re.search(r'^CURRENT_VERSION\s*=\s*["\']([^"\']+)["\']', f.read(), _re.M)
+        return m.group(1) if m else None
+    except Exception:
+        return None
+
+
+def _frozen_repair_modules():
+    """Version empaquetée : contrôle de TOUS les modules requis. Fait au premier lancement de chaque version
+    (donc après chaque mise à jour) puis à chaque lancement pour ce qui manque encore ; les modules absents sont
+    téléchargés dans extra_libs. Un échec n'est retenté qu'une fois toutes les 24 h tant que la version ne change pas."""
+    import json as _json
+    import time as _time
+    no_auto = os.environ.get('STELLIO_NO_AUTO_INSTALL', '').strip().lower() in ('1', 'true', 'yes')
+    version = _early_app_version()
+    state_path = os.path.join(os.path.dirname(_EXTRA_LIBS_DIR), 'modules_check.json')
+    state = {}
+    try:
+        with open(state_path, 'r', encoding='utf-8') as f:
+            state = _json.load(f) or {}
+    except Exception:
+        state = {}
+    new_version = state.get('version') != version
+    _MODULES_STARTUP_REPORT['checked_version'] = version
+    _MODULES_STARTUP_REPORT['first_launch_after_update'] = bool(state) and new_version
+    attempts = {} if new_version else dict(state.get('attempts') or {})
+    if new_version:
+        print(f"[MODULES] Premier lancement de la version {version} : contrôle complet des modules requis")
+
+    missing = []
+    for import_name, pip_name, _attr, _conf in _REQUIRED_MODULES:
+        try:
+            if pip_name in _FROZEN_REPAIR_WHEELS:
+                importlib.import_module(import_name)          # modules légers : import réel
+            elif importlib.util.find_spec(import_name.split('.')[0]) is None:
+                raise ImportError(import_name)                # modules lourds : présence seulement (pas d'import anticipé)
+        except Exception as e:
+            missing.append((import_name, pip_name, str(e)))
+
+    if not missing:
+        print(f"[MODULES] ✅ Contrôle au lancement : les {len(_REQUIRED_MODULES)} modules requis sont présents")
+    else:
+        print(f"[MODULES] {len(missing)} module(s) absent(s) de cette version : {', '.join(m[1] for m in missing)}")
+        if no_auto:
+            print("[MODULES] Réparation automatique désactivée (STELLIO_NO_AUTO_INSTALL=1)")
+        deadline = _time.time() + _FROZEN_REPAIR_BUDGET_SECONDS
+        for import_name, pip_name, reason in missing:
+            last = attempts.get(pip_name)
+            if no_auto:
+                _MODULES_STARTUP_REPORT['still_missing'].append(pip_name)
+                continue
+            if last and not last.get('ok') and _time.time() - last.get('ts', 0) < 86400:
+                print(f"[MODULES] {pip_name} : dernière tentative échouée il y a moins de 24 h, nouvel essai plus tard")
+                _MODULES_STARTUP_REPORT['still_missing'].append(pip_name)
+                continue
+            try:
+                _frozen_repair_one(pip_name, deadline, import_name)
+                importlib.invalidate_caches()
+                if pip_name in _FROZEN_REPAIR_WHEELS:
+                    importlib.import_module(import_name)
+                elif importlib.util.find_spec(import_name.split('.')[0]) is None:
+                    raise ImportError(f"{import_name} toujours introuvable après installation")
+                attempts[pip_name] = {'ts': _time.time(), 'ok': True}
+                _MODULES_STARTUP_REPORT['repaired'].append(pip_name)
+                print(f"[MODULES] ✅ {pip_name} réparé (dossier {_EXTRA_LIBS_DIR})")
+            except Exception as e:
+                attempts[pip_name] = {'ts': _time.time(), 'ok': False}
+                _MODULES_STARTUP_REPORT['still_missing'].append(pip_name)
+                print(f"[MODULES] ❌ {pip_name} non réparé : {e}")
+
+    try:
+        os.makedirs(os.path.dirname(state_path), exist_ok=True)
+        with open(state_path, 'w', encoding='utf-8') as f:
+            _json.dump({'version': version, 'checked_at': int(_time.time()), 'attempts': attempts,
+                        'still_missing': _MODULES_STARTUP_REPORT['still_missing']}, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"[MODULES] État du contrôle non enregistré : {e}")
+
+
 def _run_startup_module_check():
     if getattr(sys, 'frozen', False):
+        _frozen_repair_modules()
         return
     if os.environ.get('STELLIO_NO_AUTO_INSTALL', '').strip().lower() in ('1', 'true', 'yes'):
         print("[MODULES] Vérification/installation automatique désactivée (STELLIO_NO_AUTO_INSTALL=1)")
@@ -663,7 +1116,7 @@ def _check_required_modules(log=True):
 
     return results
 
-_check_required_modules()
+_MODULES_REPORT = _check_required_modules()
 
 
 def formatSize(bytes):
@@ -6020,6 +6473,9 @@ def api_save_account():
         elif platform == 'nexprint':
             if not api_key:
                 return jsonify({"error": "Cookie auth_token requis pour Nexprint"}), 400
+            # Saisie manuelle du cookie : on garde l'email / mot de passe déjà enregistrés
+            _nexprint_save_token(session['user_id'], api_key)
+            return jsonify({"message": "Compte enregistré avec succès"}), 200
         elif platform and platform != 'thingiverse':
             if not email and not password:
                 return jsonify({"error": "Email et/ou mot de passe requis"}), 400
@@ -6081,6 +6537,80 @@ def _nexprint_save_token(user_id, token):
         conn.close()
 
 
+def _nexprint_save_credentials(user_id, email, password):
+    """Enregistre email + mot de passe Nexprint (chiffré) sans toucher au jeton de session."""
+    conn = get_db()
+    try:
+        conn.execute("""
+            INSERT INTO account_credentials (user_id, platform, email, password_encrypted, last_login)
+            VALUES (?, 'nexprint', ?, ?, ?)
+            ON CONFLICT(user_id, platform) DO UPDATE SET
+                email = excluded.email,
+                password_encrypted = excluded.password_encrypted
+        """, (user_id, email, encrypt_password(password), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _nexprint_load_credentials(user_id):
+    """Retourne (email, mot_de_passe) enregistrés pour Nexprint, ou (None, None)."""
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT email, password_encrypted FROM account_credentials WHERE user_id = ? AND platform = 'nexprint'",
+            (user_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row or not row['email'] or not row['password_encrypted']:
+        return None, None
+    try:
+        return row['email'], decrypt_password(row['password_encrypted'])
+    except Exception:
+        return None, None
+
+
+def _nexprint_autofill_js(email, password):
+    """Script injecté dans la page de connexion officielle : remplit email + mot de passe puis valide.
+    Idempotent (un seul essai par chargement de page). Retourne 'wait', 'filled' ou 'skip'."""
+    return """(function(email, pwd) {
+  if (window.__stellioAuto) return 'skip';
+  function setVal(el, v) {
+    var setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value').set;
+    setter.call(el, v);
+    el.dispatchEvent(new Event('input', {bubbles: true}));
+    el.dispatchEvent(new Event('change', {bubbles: true}));
+  }
+  var pw = document.querySelector('input[type="password"]');
+  if (!pw || pw.offsetParent === null) return 'wait';
+  var user = null;
+  var all = document.querySelectorAll('input');
+  for (var i = 0; i < all.length; i++) {
+    var t = (all[i].type || 'text').toLowerCase();
+    if (all[i].offsetParent !== null && (t === 'text' || t === 'email' || t === 'tel')
+        && (all[i].compareDocumentPosition(pw) & Node.DOCUMENT_POSITION_FOLLOWING)) user = all[i];
+  }
+  if (!user) return 'wait';
+  setVal(user, email);
+  setVal(pw, pwd);
+  window.__stellioAuto = true;
+  setTimeout(function() {
+    var form = pw.closest('form');
+    var btn = form && form.querySelector('button[type="submit"],input[type="submit"]');
+    if (!btn) {
+      var btns = (form || document).querySelectorAll('button');
+      for (var j = 0; j < btns.length; j++) {
+        if (btns[j].offsetParent !== null && !btns[j].disabled && /log\\s*in|sign\\s*in|connexion|\u767b\u5f55/i.test(btns[j].textContent)) { btn = btns[j]; break; }
+      }
+    }
+    if (btn) btn.click();
+    else if (form && form.requestSubmit) form.requestSubmit();
+  }, 400);
+  return 'filled';
+})(""" + json.dumps(email) + ", " + json.dumps(password) + ");"
+
+
 def _nexprint_cookie_from_window(win):
     """Lit le cookie auth_token dans la fenêtre de connexion (None si absent)."""
     try:
@@ -6103,7 +6633,19 @@ def api_nexprint_browser_login():
     """Ouvre la page de connexion officielle Nexprint dans une fenêtre Stellio
     et récupère automatiquement le cookie de session une fois connecté."""
     import threading
+    from urllib.parse import urlparse
     user_id = session['user_id']
+    body = request.get_json(silent=True) or {}
+    new_email = (body.get('email') or '').strip()
+    new_password = body.get('password') or ''
+    if new_email and new_password:
+        _nexprint_save_credentials(user_id, new_email, new_password)
+    elif new_email:
+        # Email modifié sans nouveau mot de passe : on garde l'ancien mot de passe s'il existe
+        _, old_pwd = _nexprint_load_credentials(user_id)
+        if old_pwd:
+            _nexprint_save_credentials(user_id, new_email, old_pwd)
+    cred_email, cred_password = _nexprint_load_credentials(user_id)
     try:
         import webview as _wv
         if not _wv.windows:
@@ -6124,6 +6666,7 @@ def api_nexprint_browser_login():
 
     def _watch():
         deadline = time.time() + 600
+        autofilled = False
         try:
             while time.time() < deadline:
                 time.sleep(1.5)
@@ -6135,6 +6678,16 @@ def api_nexprint_browser_login():
                 except Exception:
                     current = ''
                 if '/account/login' in current:
+                    # Remplissage automatique, uniquement sur le site officiel Nexprint
+                    host = (urlparse(current).hostname or '').lower()
+                    if cred_email and cred_password and not autofilled and (host == 'nexprint.com' or host.endswith('.nexprint.com')):
+                        try:
+                            res = win.evaluate_js(_nexprint_autofill_js(cred_email, cred_password))
+                            if res == 'filled':
+                                autofilled = True
+                                app_logger.info("[Nexprint] Formulaire de connexion rempli automatiquement")
+                        except Exception as e:
+                            app_logger.warning(f"[Nexprint] Remplissage automatique impossible: {e}")
                     continue
                 token = _nexprint_cookie_from_window(win)
                 if token:
@@ -9159,6 +9712,29 @@ def api_clear_print_history():
 
 VALID_PRINT_RESULTS = ('success', 'failed', 'partial')
 
+def _sync_print_success_links(conn, user_id, file_path, was_success, is_success):
+    """Impression notée « réussie » : +1 imprimé dans les projets contenant le fichier et retrait de
+    « À imprimer bientôt ». Si la note repasse de « réussie » à autre chose : -1 dans les projets."""
+    if not file_path or was_success == is_success:
+        return
+    variants = {file_path, file_path.replace('\\', '/'), file_path.replace('/', '\\')}
+    ph = ','.join('?' * len(variants))
+    vals = tuple(variants)
+    own = "project_id IN (SELECT id FROM projects WHERE user_id = ?)"
+    if is_success:
+        conn.execute(
+            f"UPDATE project_files SET quantity_printed = MIN(quantity_printed + 1, quantity_needed) "
+            f"WHERE file_path IN ({ph}) AND {own}", vals + (user_id,))
+        conn.execute(f"DELETE FROM print_queue WHERE user_id = ? AND file_path IN ({ph})", (user_id,) + vals)
+    else:
+        conn.execute(
+            f"UPDATE project_files SET quantity_printed = MAX(quantity_printed - 1, 0) "
+            f"WHERE file_path IN ({ph}) AND {own}", vals + (user_id,))
+    conn.execute(
+        f"UPDATE projects SET updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND id IN "
+        f"(SELECT project_id FROM project_files WHERE file_path IN ({ph}))", (user_id,) + vals)
+
+
 @app.route('/api/print-history/<int:entry_id>/rate', methods=['POST'])
 @login_required
 def api_rate_print_history(entry_id):
@@ -9173,13 +9749,23 @@ def api_rate_print_history(entry_id):
     try:
         conn = get_db()
         try:
+            prev = conn.execute(
+                "SELECT file_path, result FROM print_history WHERE id=? AND user_id=?",
+                (entry_id, session['user_id'])
+            ).fetchone()
             cur = conn.execute(
                 """UPDATE print_history SET result=?, failure_reason=?, rating_notes=?, rated_at=CURRENT_TIMESTAMP
                    WHERE id=? AND user_id=?""",
                 (result, failure_reason, notes, entry_id, session['user_id'])
             )
-            conn.commit()
             found = cur.rowcount > 0
+            if found and prev:
+                try:
+                    _sync_print_success_links(conn, session['user_id'], prev['file_path'],
+                                              prev['result'] == 'success', result == 'success')
+                except Exception as link_err:
+                    app_logger.warning(f"[PrintHistory] Synchronisation projets/file d'attente échouée: {link_err}")
+            conn.commit()
         finally:
             conn.close()
         if not found:
@@ -10893,6 +11479,35 @@ def api_test_connection():
         app_logger.error(f"[TestConn] Erreur générale: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
+def _find_covering_source(user_id, folder_path):
+    """Si folder_path est (ou se trouve dans) une source de dossier déjà déclarée, retourne
+    (source_id, nom_source, chemin_relatif) ; sinon None. Évite d'ajouter en double une source
+    dont le contenu est déjà scanné via son dossier parent."""
+    def _norm(p):
+        return (p or '').replace('\\', '/').rstrip('/')
+    target = _norm(folder_path)
+    if not target:
+        return None
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, name, path FROM sources WHERE user_id = ? AND type IN ('folder', 'smb', 'nfs')",
+            (user_id,)
+        ).fetchall()
+    finally:
+        conn.close()
+    best = None
+    for r in rows:
+        sp = _norm(r['path'])
+        if not sp:
+            continue
+        tl, sl = target.lower(), sp.lower()
+        if tl == sl or tl.startswith(sl + '/'):
+            if best is None or len(sp) > best[0]:
+                best = (len(sp), r['id'], r['name'], target[len(sp):].lstrip('/'))
+    return (best[1], best[2], best[3]) if best else None
+
+
 @app.route('/api/download/create-folder', methods=['POST'])
 @login_required
 def api_create_download_folder():
@@ -10954,7 +11569,8 @@ def api_create_download_folder():
                     smbclient.makedirs(base_path, exist_ok=True, **kwargs)
 
                 added_as_source = False
-                if add_as_source:
+                covering = _find_covering_source(session['user_id'], base_path) if add_as_source else None
+                if add_as_source and not covering:
                     try:
                         unc_path = base_path.replace('/', '\\')
                         conn = get_db()
@@ -10989,7 +11605,10 @@ def api_create_download_folder():
                     "message": "Dossier SMB créé",
                     "path": base_path,
                     "is_local": False,
-                    "added_as_source": added_as_source
+                    "added_as_source": added_as_source,
+                    "covered_source_id": covering[0] if covering else None,
+                    "covered_source_name": covering[1] if covering else None,
+                    "relative_path": covering[2] if covering else None
                 }), 200
             except Exception as smb_err:
                 err_msg = str(smb_err)
@@ -11003,7 +11622,8 @@ def api_create_download_folder():
                 os.makedirs(folder_path, exist_ok=True)
 
             added_as_source = False
-            if add_as_source and is_local:
+            covering = _find_covering_source(session['user_id'], folder_path) if add_as_source else None
+            if add_as_source and is_local and not covering:
                 try:
                     conn = get_db()
                     try:
@@ -11039,7 +11659,10 @@ def api_create_download_folder():
                 "message": "Dossier créé",
                 "path": folder_path.replace('\\', '/'),
                 "is_local": True,
-                "added_as_source": added_as_source
+                "added_as_source": added_as_source,
+                "covered_source_id": covering[0] if covering else None,
+                "covered_source_name": covering[1] if covering else None,
+                "relative_path": covering[2] if covering else None
             }), 200
 
     except Exception as e:
@@ -11652,6 +12275,21 @@ def api_download_file():
                 save_dir = src['path']
         except Exception:
             pass
+
+    # Sous-dossier de destination (relatif à la source, ex. dossier créé depuis le popup)
+    sub_rel = (data.get('target_subfolder') or '').replace('\\', '/').strip('/')
+    if save_dir and sub_rel:
+        parts = [p for p in sub_rel.split('/') if p]
+        if parts and all(p not in ('.', '..') and not re.search(r'[<>:"|?*]', p) for p in parts):
+            try:
+                candidate = os.path.join(save_dir, *parts)
+                os.makedirs(candidate, exist_ok=True)
+                save_dir = candidate
+            except Exception as e:
+                app_logger.warning(f"[Download] Sous-dossier de destination inaccessible: {e}")
+                return jsonify({"error": "Dossier de destination inaccessible"}), 500
+        else:
+            return jsonify({"error": "Dossier de destination invalide"}), 400
 
     if not save_dir:
         save_dir = os.path.join(os.path.expanduser('~'), 'Downloads', 'Stellio')
@@ -13211,7 +13849,7 @@ def api_accounts_status():
     conn = get_db()
     try:
         accounts = conn.execute(
-            "SELECT platform, email, api_key, last_login FROM account_credentials WHERE user_id = ?",
+            "SELECT platform, email, api_key, password_encrypted, last_login FROM account_credentials WHERE user_id = ?",
             (session['user_id'],)
         ).fetchall()
     finally:
@@ -13221,8 +13859,12 @@ def api_accounts_status():
         platform = acc['platform']
         if platform == 'thingiverse' and acc['api_key']:
             status['thingiverse'] = True
-        elif platform == 'nexprint' and acc['api_key']:
-            status['nexprint'] = True
+        elif platform == 'nexprint':
+            if acc['api_key']:
+                status['nexprint'] = True
+            if acc['email']:
+                status['nexprint_email'] = acc['email']
+                status['nexprint_has_password'] = bool(acc['password_encrypted'])
         elif platform == 'makerworld' and acc['api_key']:
             status['makerworld'] = True
             status['makerworld_email'] = acc['email'] or ''
@@ -14412,6 +15054,8 @@ def _feedback_public(e):
         'created_at': e.get('created_at'), 'updated_at': e.get('updated_at'),
         'state': e.get('state'), 'status': status, 'comments': e.get('comments', 0),
         'unread': status != e.get('seen_status') or e.get('comments', 0) > e.get('seen_comments', 0),
+        'new_replies': max(0, e.get('comments', 0) - e.get('seen_comments', 0)),
+        'status_changed': status != e.get('seen_status'),
         'can_close': bool(e.get('manage_token')) and e.get('state') != 'closed',
     }
 
@@ -14467,6 +15111,20 @@ def _feedback_find(entries, number):
 def api_feedback_config():
     return jsonify({'relay_configured': bool(_feedback_relay()), 'repo': _feedback_repo(),
                     'version': CURRENT_VERSION}), 200
+
+
+@app.route('/api/system/modules', methods=['GET'])
+@login_required
+def api_system_modules():
+    """État des modules Python requis (contrôle au lancement, y compris après une mise à jour)."""
+    missing = []
+    for r in (_MODULES_REPORT or []):
+        if not r.get('installed'):
+            missing.append({'module': r.get('pip'), 'feature': _MODULE_FEATURES.get(r.get('pip')), 'reason': r.get('reason')})
+    return jsonify({'version': CURRENT_VERSION, 'frozen': bool(getattr(sys, 'frozen', False)),
+                    'missing': missing, 'repaired': _MODULES_STARTUP_REPORT['repaired'],
+                    'first_launch_after_update': _MODULES_STARTUP_REPORT.get('first_launch_after_update', False),
+                    'still_missing': _MODULES_STARTUP_REPORT['still_missing']}), 200
 
 
 @app.route('/api/feedback/submit', methods=['POST'])
@@ -15099,6 +15757,16 @@ def build_quote_pdf_bytes(data):
     return buf.getvalue()
 
 
+def _build_quote_pdf_with_repair(data):
+    """Génère le devis ; si reportlab manque (version empaquetée mise à jour par patch), tente une réparation puis réessaie."""
+    try:
+        return build_quote_pdf_bytes(data)
+    except ImportError:
+        if _ensure_optional_module('reportlab.platypus', 'reportlab'):
+            return build_quote_pdf_bytes(data)
+        raise
+
+
 def _safe_quote_pdf_filename(name):
     name = os.path.basename(str(name or '')).strip()
     name = re.sub(r'[\\/:*?"<>|\x00-\x1f]', '_', name)[:120]
@@ -15113,7 +15781,10 @@ def api_quote_export_native():
     data = request.get_json(silent=True) or {}
     filename = _safe_quote_pdf_filename(data.get('filename'))
     try:
-        pdf_bytes = build_quote_pdf_bytes(data)
+        pdf_bytes = _build_quote_pdf_with_repair(data)
+    except ImportError as e:
+        app_logger.error(f"[QUOTE] Échec génération PDF : {e}")
+        return jsonify({"success": False, "error": "missing_module", "module": getattr(e, 'name', None) or 'reportlab'}), 503
     except Exception as e:
         app_logger.error(f"[QUOTE] Échec génération PDF : {e}")
         return jsonify({"success": False, "error": str(e)}), 500
@@ -15152,7 +15823,10 @@ def api_quote_export_native():
 def api_quote_export():
     data = request.get_json(silent=True) or {}
     try:
-        pdf_bytes = build_quote_pdf_bytes(data)
+        pdf_bytes = _build_quote_pdf_with_repair(data)
+    except ImportError as e:
+        app_logger.error(f"[QUOTE] Échec génération PDF : {e}")
+        return jsonify({"success": False, "error": "missing_module", "module": getattr(e, 'name', None) or 'reportlab'}), 503
     except Exception as e:
         app_logger.error(f"[QUOTE] Échec génération PDF : {e}")
         return jsonify({"success": False, "error": str(e)}), 500
@@ -15318,7 +15992,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.7.2"
+CURRENT_VERSION = "0.7.3"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -16029,6 +16703,21 @@ def api_get_printers():
         result = _viewer_sanitize(result)
     return jsonify(result)
 
+def _extract_bed_config(cfg):
+    """Extrait bed_x/bed_y/bed_z (mm) de la config reçue ; ignore les valeurs absentes ou invalides."""
+    out = {}
+    if not isinstance(cfg, dict):
+        return out
+    for k in ('bed_x', 'bed_y', 'bed_z'):
+        try:
+            v = float(cfg.get(k))
+        except (TypeError, ValueError):
+            continue
+        if 0 < v < 10000:
+            out[k] = int(v) if v == int(v) else v
+    return out
+
+
 @app.route('/api/printers', methods=['POST'])
 @login_required
 def api_add_printer():
@@ -16054,6 +16743,7 @@ def api_add_printer():
         api_key = code
         raw_config = {'code': code, 'serial': serial}
 
+    raw_config.update(_extract_bed_config(data.get('config')))
     config = json.dumps(raw_config)
 
     if not name or not ip or not ptype:
@@ -16344,6 +17034,7 @@ def api_edit_printer(pid):
                 has_new_api_key = True
                 data['api_key'] = code
 
+        raw_config.update(_extract_bed_config(data.get('config')))
         config = json.dumps(raw_config)
         api_key = data.get('api_key', '') if has_new_api_key else decrypt_account_secret(existing['api_key']) if existing['api_key'] else ''
 
@@ -22431,16 +23122,19 @@ def api_pre_print_check():
             printer = conn.execute("SELECT config FROM printers WHERE id=? AND user_id=?", (printer_id, user_id)).fetchone()
             conn.close()
             bed = json.loads(printer["config"]) if printer and printer["config"] else {}
-            bed_x = float(bed.get('bed_x') or 220)
-            bed_y = float(bed.get('bed_y') or 220)
-            bed_z = float(bed.get('bed_z') or 250)
+            # Taille du plateau non renseignée : pas de jugement possible, donc pas d'avertissement (évite les faux positifs)
+            if not (bed.get('bed_x') and bed.get('bed_y')):
+                raise ValueError('bed size not set')
+            bed_x = float(bed.get('bed_x'))
+            bed_y = float(bed.get('bed_y'))
+            bed_z = float(bed.get('bed_z') or 0)
             dims = sorted([analysis['dimensions']['x'], analysis['dimensions']['y']])
             bed_xy = sorted([bed_x, bed_y])
-            if dims[0] > bed_xy[0] or dims[1] > bed_xy[1] or analysis['dimensions']['z'] > bed_z:
+            if dims[0] > bed_xy[0] or dims[1] > bed_xy[1] or (bed_z and analysis['dimensions']['z'] > bed_z):
                 warnings.append({
                     "level": "error",
                     "code": "oversized",
-                    "message": f"Pièce ({analysis['dimensions']['x']}×{analysis['dimensions']['y']}×{analysis['dimensions']['z']} mm) plus grande que le plateau ({bed_x}×{bed_y}×{bed_z} mm)."
+                    "message": f"Pièce ({analysis['dimensions']['x']}×{analysis['dimensions']['y']}×{analysis['dimensions']['z']} mm) plus grande que le plateau ({bed_x:g}×{bed_y:g}×{(f'{bed_z:g}' if bed_z else '?')} mm)."
                 })
         except Exception:
             pass

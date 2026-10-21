@@ -49,6 +49,8 @@ MicrosoftEdgeWebview2*.exe
 *.sqlite3
 app_settings.json
 encryption.key
+*.diff
+*.patch
 
 # --- Secrets et certificats --------------------------------------------------
 .env

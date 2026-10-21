@@ -243,6 +243,18 @@ window.fetch = function (input, init = {}) {
 };
 
 let allFiles = [];
+// Retire les doublons (même chemin) quand deux sources se recouvrent
+function _dedupeFilesByPath(list) {
+    if (!Array.isArray(list)) return list;
+    const seen = new Set();
+    return list.filter(f => {
+        const key = f && f.path ? String(f.path).replace(/\\/g, '/') : '';
+        if (!key) return true;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
 let filteredFiles = [];
 let currentSlicerFile = null;
 let currentView = 'gallery';
@@ -626,6 +638,20 @@ function _fbFmtDate(iso) {
     catch (e) { return iso || ''; }
 }
 
+function openFeedbackOnGithub(url, ev) {
+    if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+    if (/^https:\/\/github\.com\//.test(url || '')) window.open(url, '_blank', 'noopener');
+}
+window.openFeedbackOnGithub = openFeedbackOnGithub;
+
+function _fbNewReplyBadge(r) {
+    if (!r.new_replies) return '';
+    const label = r.new_replies > 1
+        ? _fbT('feedback.new_replies', '{{n}} nouvelles réponses', { n: r.new_replies })
+        : _fbT('feedback.new_reply', 'Nouvelle réponse');
+    return `<span class="fb-new-reply"><i class="fa-solid fa-comment-dots"></i> ${escapeHtml(label)}</span>`;
+}
+
 function _fbUpdateBadge(items) {
     const unread = (items || []).filter(r => r.unread).length;
     const dot = document.getElementById('feedback-unread-dot');
@@ -788,15 +814,21 @@ async function loadFeedbackList(refresh = false) {
             return;
         }
         box.innerHTML = items.map(r => `
-            <button type="button" class="fb-row" data-number="${r.number}">
+            <div class="fb-row ${r.unread ? 'fb-row-unread' : ''}" role="button" tabindex="0" data-number="${r.number}" data-url="${escapeHtml(r.url || '')}">
                 ${r.unread ? '<span class="fb-unread"></span>' : ''}
                 <div class="fb-row-main">
                     <div class="fb-row-title">#${r.number} · ${escapeHtml(r.title || '')}</div>
-                    <div class="fb-row-meta">${escapeHtml(_fbTypeLabel(r.type))} · ${escapeHtml(_fbFmtDate(r.created_at))}${r.comments ? ` · <i class="fa-solid fa-comment"></i> ${r.comments}` : ''}</div>
+                    <div class="fb-row-meta">${escapeHtml(_fbTypeLabel(r.type))} · ${escapeHtml(_fbFmtDate(r.created_at))}${r.comments ? ` · <i class="fa-solid fa-comment"></i> ${r.comments}` : ''} ${_fbNewReplyBadge(r)}</div>
                 </div>
                 <span class="fb-status fb-status-${escapeHtml(r.status)}">${escapeHtml(_fbStatusLabel(r.status))}</span>
-            </button>`).join('');
-        box.querySelectorAll('.fb-row').forEach(b => b.addEventListener('click', () => openFeedbackDetail(parseInt(b.dataset.number, 10))));
+                <button type="button" class="fb-gh-btn" data-gh="1" title="${escapeHtml(_fbT('feedback.open_on_github', 'Ouvrir sur GitHub'))}" aria-label="${escapeHtml(_fbT('feedback.open_on_github', 'Ouvrir sur GitHub'))}"><i class="fa-brands fa-github"></i></button>
+            </div>`).join('');
+        box.querySelectorAll('.fb-row').forEach(b => {
+            const open = () => openFeedbackDetail(parseInt(b.dataset.number, 10));
+            b.addEventListener('click', open);
+            b.addEventListener('keydown', ev => { if (ev.target === b && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); open(); } });
+            b.querySelector('[data-gh]')?.addEventListener('click', ev => openFeedbackOnGithub(b.dataset.url, ev));
+        });
         window._loadDashboardIssues?.();
     } catch (e) { /* liste inchangée */ }
 }
@@ -835,7 +867,7 @@ async function openFeedbackDetail(number) {
                 ${r.can_close ? `<button type="button" class="btn btn-ghost btn-sm" id="fb-close-req"><i class="fa-solid fa-circle-xmark"></i> ${escapeHtml(_fbT('feedback.close_request', 'Fermer ma demande'))}</button>` : ''}
                 <button type="button" class="btn btn-ghost btn-sm" id="fb-remove-req"><i class="fa-solid fa-trash"></i> ${escapeHtml(_fbT('feedback.remove', 'Retirer de la liste'))}</button>
             </div>`;
-        document.getElementById('fb-open-gh').addEventListener('click', () => { if (/^https:\/\/github\.com\//.test(r.url || '')) window.open(r.url, '_blank', 'noopener'); });
+        document.getElementById('fb-open-gh').addEventListener('click', () => openFeedbackOnGithub(r.url));
         document.getElementById('fb-close-req')?.addEventListener('click', () => closeFeedbackRequest(r.number));
         document.getElementById('fb-remove-req').addEventListener('click', () => removeFeedbackRequest(r.number));
         loadFeedbackList(false);
@@ -884,7 +916,37 @@ async function checkFeedbackUpdatesOnStartup() {
         _fbUpdateBadge(data.requests || []);
         const first = (data.requests || []).find(r => (data.changed || []).includes(r.number));
         if (first) {
-            showToast(_fbT('feedback.updated_toast', 'Votre demande n°{{n}} a été mise à jour : {{status}}', { n: first.number, status: _fbStatusLabel(first.status) }), 'info');
+            if (first.new_replies > 0) {
+                showToast(_fbT('feedback.new_reply_toast', 'Nouvelle réponse sur votre demande n°{{n}}', { n: first.number }), 'info');
+            } else {
+                showToast(_fbT('feedback.updated_toast', 'Votre demande n°{{n}} a été mise à jour : {{status}}', { n: first.number, status: _fbStatusLabel(first.status) }), 'info');
+            }
+        }
+    } catch (e) { /* pas de blocage du démarrage */ }
+}
+
+// Au lancement (donc aussi après une mise à jour) : signale les modules Python absents ou réparés
+async function checkModulesOnStartup() {
+    try {
+        await new Promise(r => setTimeout(r, 2500));
+        const res = await fetch(`${API}/api/system/modules`);
+        if (!res.ok) return;
+        const d = await res.json();
+        const key = `stellio_modules_notice_${d.version}`;
+        const missing = d.missing || [];
+        const repaired = d.repaired || [];
+        const sig = JSON.stringify([missing.map(m => m.module), repaired]);
+        if (sessionStorage.getItem(key) === sig) return;
+        sessionStorage.setItem(key, sig);
+        if (d.first_launch_after_update && !repaired.length && !missing.length) {
+            showToast(_t3('modules.update_ok_toast', 'Mise à jour terminée : tous les modules requis sont présents', {}), 'success');
+        }
+        if (repaired.length) {
+            showToast(_t3('modules.repaired_toast', 'Modules réparés après la mise à jour : {{list}}', { list: repaired.join(', ') }).split('{{list}}').join(repaired.join(', ')), 'success');
+        }
+        if (missing.length) {
+            const list = missing.map(m => m.module).join(', ');
+            showToast(_t3('modules.missing_toast', 'Modules manquants : {{list}}. Certaines fonctions (devis PDF, import de tableur, notifications) peuvent ne pas marcher. Réinstallez la dernière version complète de Stellio.', { list }).split('{{list}}').join(list), 'warning');
         }
     } catch (e) { /* pas de blocage du démarrage */ }
 }
@@ -992,6 +1054,8 @@ async function _loadDashboardIssues() {
                     <div class="dashboard-row-title">${r.unread ? '<i class="fa-solid fa-circle" style="font-size:7px;color:var(--accent);vertical-align:middle;"></i> ' : ''}#${r.number} · ${escapeHtml(r.title || '')}</div>
                     <div class="dashboard-row-sub">${escapeHtml(_fbStatusLabel(r.status))} · ${escapeHtml(_fbTypeLabel(r.type))} · ${escapeHtml(_fbFmtDate(r.created_at))}${r.comments ? ` · <i class="fa-solid fa-comment"></i> ${r.comments}` : ''}</div>
                 </div>
+                ${_fbNewReplyBadge(r)}
+                <button type="button" class="fb-gh-btn" title="${escapeHtml(_fbT('feedback.open_on_github', 'Ouvrir sur GitHub'))}" aria-label="${escapeHtml(_fbT('feedback.open_on_github', 'Ouvrir sur GitHub'))}" onclick="openFeedbackOnGithub('${escapeHtml(r.url || '')}', event)"><i class="fa-brands fa-github"></i></button>
             </div>`;
         }).join('');
     } catch (err) {
@@ -2460,9 +2524,19 @@ if (!IS_VIEWER) checkSlicerDefaultDiscovery();
 if (!IS_VIEWER) checkWhatsNew();
 if (!IS_VIEWER) checkMissedBackupOnStartup();
 if (!IS_VIEWER) checkFeedbackUpdatesOnStartup();
+if (!IS_VIEWER) checkModulesOnStartup();
 initKofiButton();
 loadPrintQueueSet();
 loadDashboard();
+(function syncHeaderWithActivePage() {
+    const activePage = (document.querySelector('.page.active')?.id || 'page-dashboard').replace(/^page-/, '');
+    const activeBtn = document.querySelector(`.nav-btn[data-page="${activePage}"]`);
+    const titleEl = document.getElementById('header-page-title');
+    if (titleEl && activeBtn) {
+        titleEl.innerHTML = `<i class="fa-solid ${activeBtn.dataset.icon || 'fa-layer-group'}"></i> ${I18N.t(activeBtn.dataset.titleKey || 'app.title')}`;
+    }
+    updateHeaderVisibilityForPage(activePage);
+})();
 startNotificationPolling();
 if (!IS_VIEWER) maybeAutoStartTour();
 startPresence();
@@ -2470,7 +2544,7 @@ checkStellioExtrasAlerts();
 if (filesPromise) {
     filesPromise.then(async (cachedFiles) => {
         if (cachedFiles && Array.isArray(cachedFiles)) {
-            allFiles = cachedFiles;
+            allFiles = _dedupeFilesByPath(cachedFiles);
             filteredFiles = [...allFiles];
             applySorting();
             renderFiles();
@@ -4185,6 +4259,10 @@ if (res.ok) {
 const status = await res.json();
 updateThingiverseFooterStatus(status.thingiverse, status.thingiverse ? null : I18N.t('settings.no_accounts'));
 if (status.nexprint) { updateAccountBadge('nexprint', true); showAccountKeyConfigured('nexprint'); }
+const nexEmail = document.getElementById('nexprint-email');
+if (nexEmail && status.nexprint_email) nexEmail.value = status.nexprint_email;
+const nexPwd = document.getElementById('nexprint-password');
+if (nexPwd && status.nexprint_has_password) nexPwd.placeholder = '••••••••';
 if (status.makerworld) {
     updateAccountBadge('makerworld', true);
     const emailDisplay = document.getElementById('makerworld-email-display');
@@ -4213,7 +4291,7 @@ if (changesData.has_changes) {
 const tagParams = activeTagFilters.size > 0 ? `&tags=${encodeURIComponent([...activeTagFilters].join(','))}` : '';
 const filesRes = await fetch(`${API}/api/files?since=${lastKnownTimestamp}${tagParams}`);
 if (!filesRes.ok) return;
-const newFiles = await filesRes.json();
+const newFiles = _dedupeFilesByPath(await filesRes.json());
 const oldHash = allFiles.map(f => `${f.name}-${f.size}-${f.path}`).join('|');
 const newHash = newFiles.map(f => `${f.name}-${f.size}-${f.path}`).join('|');
 if (oldHash !== newHash) {
@@ -4858,7 +4936,7 @@ throw new Error(`${I18N.t('toast.server_error')}: ${res.status} - ${errorText.su
     const data = await res.json();
     if (!Array.isArray(data)) throw new Error(I18N.t('toast.parse_error'));
 
-    allFiles = data;
+    allFiles = _dedupeFilesByPath(data);
     filteredFiles = showFavoritesOnly ? allFiles.filter(f => favoriteFiles.has(f.path)) : [...allFiles];
     applySorting();
     renderFiles();
@@ -4917,7 +4995,7 @@ scanPollingInterval = setInterval(async () => {
             updateScanBadge(I18N.t('scan.in_progress', { count: data.found }));
 
             if (data.new_files && data.new_files.length > 0) {
-                allFiles = allFiles.concat(data.new_files);
+                allFiles = _dedupeFilesByPath(allFiles.concat(data.new_files));
                 filteredFiles = showFavoritesOnly ? allFiles.filter(f => favoriteFiles.has(f.path)) : [...allFiles];
                 applySorting();
                 renderFiles();
@@ -6205,13 +6283,16 @@ async function handleDownload(e) {
 e.preventDefault();
 if (isFormLocked) { showToast(I18N.t('toast.please_wait'), 'warning'); return; }
 const url = document.getElementById('download-url').value.trim();
-const sourceId = document.getElementById('download-source').value;
+const _dlSel = document.getElementById('download-source');
+const _dlOpt = _dlSel.options[_dlSel.selectedIndex];
+const sourceId = (_dlOpt && _dlOpt.dataset.baseSourceId) || _dlSel.value;
+const targetSubfolder = (_dlOpt && _dlOpt.dataset.relPath) || '';
 const preferredFormat = document.getElementById('makerworld-format')?.value || '';
 if (!url) { showToast(I18N.t('toast.url_required'), 'warning'); return; }
 isFormLocked = true;
 try {
 const downloadId = ++downloadIdCounter;
-const downloadInfo = { id: downloadId, url, sourceId, preferredFormat, status: 'starting', filename: '', progress: 0, current: 0, total: 0, toastElement: null };
+const downloadInfo = { id: downloadId, url, sourceId, targetSubfolder, preferredFormat, status: 'starting', filename: '', progress: 0, current: 0, total: 0, toastElement: null };
 activeDownloads.push(downloadInfo);
 createDownloadToast(downloadInfo);
 startDownload(downloadInfo);
@@ -6245,7 +6326,7 @@ updateDownloadToast(downloadInfo, currentMB, totalMB);
     const res = await fetch(`${API}/api/download`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: downloadInfo.url, target_source_id: downloadInfo.sourceId || null, download_id: downloadInfo.id, preferred_format: downloadInfo.preferredFormat || '' })
+        body: JSON.stringify({ url: downloadInfo.url, target_source_id: downloadInfo.sourceId || null, target_subfolder: downloadInfo.targetSubfolder || '', download_id: downloadInfo.id, preferred_format: downloadInfo.preferredFormat || '' })
     });
     clearInterval(progressPollingInterval);
     const data = await res.json();
@@ -6341,11 +6422,14 @@ showToast(I18N.t('download.cancelled_toast'), 'info');
 window.openCreateFolderModal = async function() {
 const sourceSelect = document.getElementById('download-source');
 const selectedSourceId = sourceSelect ? sourceSelect.value : null;
+const _selOpt = sourceSelect ? sourceSelect.options[sourceSelect.selectedIndex] : null;
+const baseSourceId = (_selOpt && _selOpt.dataset.baseSourceId) || selectedSourceId;
+const baseRelPath = (_selOpt && _selOpt.dataset.relPath) || '';
 let parentPath = null;
 let sourceConfig = null;
 if (selectedSourceId && selectedSourceId !== "") {
     const selectedOption = sourceSelect.options[sourceSelect.selectedIndex];
-    const match = selectedOption.text.match(/\((.*?)\)$/);
+    const match = selectedOption.dataset.fullPath ? [null, selectedOption.dataset.fullPath] : selectedOption.text.match(/\((.*?)\)$/);
     if (match) {
         parentPath = match[1];
     } else {
@@ -6356,7 +6440,7 @@ if (selectedSourceId && selectedSourceId !== "") {
         const srcRes = await fetch(`${API}/api/sources`);
         if (srcRes.ok) {
             const allSources = await srcRes.json();
-            const matchedSource = allSources.find(s => String(s.id) === String(selectedSourceId));
+            const matchedSource = allSources.find(s => String(s.id) === String(baseSourceId));
             if (matchedSource && matchedSource.config) {
                 sourceConfig = matchedSource.config;
             }
@@ -6432,18 +6516,33 @@ const createFolder = async () => {
         });
         const result = await createRes.json();
         if (createRes.ok) {
-            showToast(I18N.t('toast.folder_created') || 'Dossier créé avec succès', 'success');
-            await loadSources();
-            await loadDownloadSources();
-            setTimeout(() => {
-                const opts = sourceSelect.options;
-                for (let i = 0; i < opts.length; i++) {
-                    if (opts[i].text.includes(cleanFolderName)) {
-                        sourceSelect.selectedIndex = i;
-                        break;
+            if (result.covered_source_id) {
+                // Dossier créé dans une source déjà déclarée : pas de nouvelle source (sinon les fichiers apparaîtraient en double)
+                showToast(_t3('download.folder_created_in_source', 'Dossier créé dans « {{source}} » (aucune nouvelle source ajoutée)', { source: result.covered_source_name || '' }), 'success');
+                await loadDownloadSources();
+                const rel = result.relative_path || [baseRelPath, cleanFolderName].filter(Boolean).join('/');
+                const opt = document.createElement('option');
+                opt.value = `sub:${result.covered_source_id}:${rel}`;
+                opt.dataset.baseSourceId = String(result.covered_source_id);
+                opt.dataset.relPath = rel;
+                opt.dataset.fullPath = result.path || newFolderPath;
+                opt.textContent = `📂 ${result.covered_source_name || ''} / ${rel} (${opt.dataset.fullPath})`;
+                sourceSelect.appendChild(opt);
+                sourceSelect.value = opt.value;
+            } else {
+                showToast(I18N.t('toast.folder_created') || 'Dossier créé avec succès', 'success');
+                await loadSources();
+                await loadDownloadSources();
+                setTimeout(() => {
+                    const opts = sourceSelect.options;
+                    for (let i = 0; i < opts.length; i++) {
+                        if (opts[i].text.includes(cleanFolderName)) {
+                            sourceSelect.selectedIndex = i;
+                            break;
+                        }
                     }
-                }
-            }, 500);
+                }, 500);
+            }
         } else {
             showToast(result.error || I18N.t('toast.folder_create_error') || 'Erreur de création', 'error');
         }
@@ -11800,9 +11899,15 @@ showToast(I18N.t('toast.network_error_backend'), 'error');
 window.saveAccountKey = saveAccountKey;
 async function nexprintBrowserLogin() {
 const btn = document.getElementById('nexprint-login-btn');
+const email = (document.getElementById('nexprint-email')?.value || '').trim();
+const password = document.getElementById('nexprint-password')?.value || '';
 if (btn) btn.disabled = true;
 try {
-const res = await fetch(`${API}/api/accounts/nexprint/browser-login`, { method: 'POST' });
+const res = await fetch(`${API}/api/accounts/nexprint/browser-login`, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ email, password })
+});
 const data = await res.json().catch(() => ({}));
 if (!res.ok) {
 showToast(data.error || I18N.t('accounts.nexprint_login_failed'), 'error');
@@ -11821,6 +11926,8 @@ if (st === 'ok') {
 showToast(I18N.t('accounts.nexprint_connected'), 'success');
 updateAccountBadge('nexprint', true);
 showAccountKeyConfigured('nexprint');
+const pwdField = document.getElementById('nexprint-password');
+if (pwdField) { pwdField.value = ''; pwdField.placeholder = '••••••••'; }
 } else if (st === 'closed') {
 showToast(I18N.t('accounts.nexprint_window_closed'), 'warning');
 } else {
@@ -14077,6 +14184,9 @@ window.addPrinter = async function() {
     const elegooCc2Code = document.getElementById('printer-elegoo-cc2-code')?.value.trim() || '';
     const flashforgeSerial = document.getElementById('printer-flashforge-serial')?.value.trim() || '';
     const flashforgeCode = document.getElementById('printer-flashforge-code')?.value.trim() || '';
+    const bedX = parseFloat(document.getElementById('printer-bed-x')?.value);
+    const bedY = parseFloat(document.getElementById('printer-bed-y')?.value);
+    const bedZ = parseFloat(document.getElementById('printer-bed-z')?.value);
 
     if (!name || !ip || !type) {
         showToast(I18N.t('toast.fill_required') || 'Champs requis manquants', 'warning');
@@ -14098,6 +14208,9 @@ window.addPrinter = async function() {
         config.serial = flashforgeSerial;
         config.code = flashforgeCode;
     }
+    if (bedX > 0) config.bed_x = bedX;
+    if (bedY > 0) config.bed_y = bedY;
+    if (bedZ > 0) config.bed_z = bedZ;
 
     const isEdit = !!editId;
     const btn = document.getElementById('add-printer-submit-btn');
@@ -14172,6 +14285,12 @@ window.editPrinter = function(pid) {
     if (flashforgeSerialField) flashforgeSerialField.value = cfg.serial || '';
     const flashforgeCodeField = document.getElementById('printer-flashforge-code');
     if (flashforgeCodeField) flashforgeCodeField.value = cfg.code || '';
+    const bedXField = document.getElementById('printer-bed-x');
+    if (bedXField) bedXField.value = cfg.bed_x || '';
+    const bedYField = document.getElementById('printer-bed-y');
+    if (bedYField) bedYField.value = cfg.bed_y || '';
+    const bedZField = document.getElementById('printer-bed-z');
+    if (bedZField) bedZField.value = cfg.bed_z || '';
 
     togglePrinterFields();
 
@@ -14472,6 +14591,9 @@ async function rateHistoryEntry(id, result, failureReason) {
             el.innerHTML = _renderHistoryRatingBlock({ id, result, failure_reason: failureReason || '' });
         }
         showToast(_t3('toast.rating_saved', 'Notation enregistrée, merci !'), 'success');
+        // Une impression réussie met à jour les projets et retire le fichier de « À imprimer bientôt »
+        loadPrintQueueSet().then(() => { try { _loadDashboardQueue(); } catch (e) {} });
+        refreshProjectsViews();
     } catch (err) {
         showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error');
     }
@@ -15878,13 +16000,26 @@ function updateMonitorUI(data) {
         if (data.last_print.filename) {
             let lpHtml = `<div class="stat-row"><span class="stat-label">${I18N.t('printers.last_print_file')}</span><span class="stat-value" style="font-size:12px">${escapeHtml(data.last_print.filename)}</span></div><div class="stat-row"><span class="stat-label">${I18N.t('printers.duration')}</span><span class="stat-value">${formatDuration(data.last_print.duration)}</span></div>`;
             if (data.last_print.finished_at) {
-                lpHtml += `<div class="stat-row"><span class="stat-label">${I18N.t('printers.finished_at')}</span><span class="stat-value" style="font-size:12px">${new Date(data.last_print.finished_at * 1000).toLocaleString(I18N.lang)}</span></div>`;
+                lpHtml += `<div class="stat-row"><span class="stat-label">${I18N.t('printers.finished_at')}</span><span class="stat-value" style="font-size:12px">${_formatPrinterFinishedAt(data.last_print.finished_at)}</span></div>`;
             }
             lastPrintContainer.innerHTML = lpHtml;
         } else {
             lastPrintContainer.innerHTML = `<p style="color:var(--text-muted); font-size:13px">${I18N.t('printers.no_recent_print')}</p>`;
         }
     }
+}
+
+// finished_at peut être un timestamp (s ou ms) ou une chaîne « YYYY-MM-DD HH:MM:SS » selon le type d'imprimante
+function _formatPrinterFinishedAt(value) {
+    if (value === null || value === undefined || value === '') return '—';
+    let d;
+    if (typeof value === 'number' || /^\d+(\.\d+)?$/.test(String(value).trim())) {
+        const n = Number(value);
+        d = new Date(n < 1e12 ? n * 1000 : n);
+    } else {
+        d = new Date(String(value).trim().replace(' ', 'T'));
+    }
+    return isNaN(d.getTime()) ? '—' : d.toLocaleString(I18N.lang);
 }
 
 let cameraLoadedForPid = null;
@@ -18132,6 +18267,10 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             const res = await fetch(`${API}/api/quote/export`, init);
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
+                if (data.error === 'missing_module') {
+                    showToast(_t3('cost.quote_missing_module', 'Génération du devis impossible : le module « {{module}} » est absent de cette installation. Réinstallez la dernière version complète de Stellio.', { module: data.module || 'reportlab' }).split('{{module}}').join(data.module || 'reportlab'), 'error');
+                    return;
+                }
                 throw new Error(data.error || t('cost.quote_error'));
             }
             const blob = await res.blob();
@@ -18394,6 +18533,24 @@ function projectFileThumb(filePath) {
     return null;
 }
 
+async function refreshProjectsViews(projectId) {
+    await loadProjects();
+    if (projectId && _currentProjectDetailId === projectId && !document.getElementById('modal-project-detail')?.classList.contains('hidden')) {
+        await refreshProjectDetail(projectId);
+    }
+    try { _loadDashboardProjects(); } catch (e) { /* tableau de bord non affiché */ }
+}
+
+function _pickerShowError(errId, message) {
+    const el = document.getElementById(errId);
+    if (!el) { showToast(message, 'warning'); return; }
+    el.textContent = message;
+    el.classList.add('visible');
+}
+function _pickerClearError(errId) {
+    document.getElementById(errId)?.classList.remove('visible');
+}
+
 async function loadProjects() {
     const loading = document.getElementById('projects-loading');
     const empty = document.getElementById('projects-empty');
@@ -18402,7 +18559,7 @@ async function loadProjects() {
     empty?.classList.add('hidden');
     grid?.classList.add('hidden');
     try {
-        const res = await fetch(`${API}/api/projects`);
+        const res = await fetch(`${API}/api/projects`, { cache: 'no-store' });
         const data = await res.json();
         allProjects = Array.isArray(data) ? data : [];
         loading?.classList.add('hidden');
@@ -18490,6 +18647,7 @@ window.openProjectFormModal = function (projectId = null) {
     document.getElementById('project-form-color').value = p?.color || '#4ea1d3';
     modal.dataset.editId = projectId || '';
     delete modal.dataset.attachSelection;
+    delete modal.dataset.attachFile;
     openModal('modal-project-form');
     setTimeout(() => document.getElementById('project-form-name')?.focus(), 100);
 };
@@ -18502,8 +18660,10 @@ window.saveProjectForm = async function () {
     if (!name) { showToast(I18N.t('projects.name_required'), 'warning'); return; }
     const editId = modal?.dataset.editId;
     const attachSelection = !editId && modal?.dataset.attachSelection === '1';
+    const attachFile = !editId ? (modal?.dataset.attachFile || '') : '';
     const payload = { name, description, color };
     if (attachSelection) payload.files = [...selectedFiles].map(path => ({ path, quantity: 1 }));
+    else if (attachFile) payload.files = [{ path: attachFile, quantity: 1 }];
     try {
         const url = editId ? `${API}/api/projects/${editId}` : `${API}/api/projects`;
         const method = editId ? 'PUT' : 'POST';
@@ -18517,11 +18677,12 @@ window.saveProjectForm = async function () {
         showToast(editId ? I18N.t('toast.updated') : I18N.t('projects.created'), 'success');
         closeModal('modal-project-form');
         delete modal.dataset.attachSelection;
+        delete modal.dataset.attachFile;
         if (attachSelection) {
             selectedFiles.clear();
             toggleSelectionMode();
         }
-        await loadProjects();
+        await refreshProjectsViews();
         if (editId && _currentProjectDetailId === parseInt(editId)) openProjectDetailModal(parseInt(editId));
     } catch (err) {
         showToast(I18N.t('toast.connection_error'), 'error');
@@ -18579,7 +18740,7 @@ window.openProjectDetailModal = async function (projectId) {
 async function refreshProjectDetail(projectId) {
     const body = document.getElementById('project-detail-body');
     try {
-        const res = await fetch(`${API}/api/projects/${projectId}`);
+        const res = await fetch(`${API}/api/projects/${projectId}`, { cache: 'no-store' });
         const p = await res.json();
         if (!res.ok) { body.innerHTML = `<p style="color:var(--danger)">${p.error || I18N.t('toast.error')}</p>`; return; }
         document.getElementById('project-detail-name').textContent = p.name;
@@ -18637,7 +18798,7 @@ window.updateProjectFileQty = async function (projectId, filePath, delta) {
             body: JSON.stringify({ path: filePath, quantity_printed: newPrinted })
         });
         await refreshProjectDetail(projectId);
-        loadProjects();
+        refreshProjectsViews();
     } catch (err) {
         showToast(I18N.t('toast.connection_error'), 'error');
     }
@@ -18686,10 +18847,14 @@ window.openAddToProjectModal = async function (filePath, fileName, forceProjectI
         const notInProject = allFiles.filter(f => f.path);
         body.innerHTML = `
             <input type="text" id="project-picker-search" placeholder="${I18N.t('library.search_placeholder') || 'Rechercher...'}" style="width:100%; margin-bottom:10px; padding:8px 10px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary);">
-            <div id="project-picker-file-list" style="max-height:320px; overflow-y:auto;"></div>
-            <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="confirmAddFilesToProject(${forceProjectId})">
-                <i class="fa-solid fa-check"></i> ${I18N.t('actions.add')}
-            </button>
+            <p id="project-picker-error" class="picker-error"></p>
+            <div id="project-picker-file-list" style="max-height:320px; overflow-y:auto;" onchange="_pickerClearError('project-picker-error')"></div>
+            <div class="picker-actions" style="margin-top:10px;">
+                <button class="btn btn-ghost" onclick="closeModal('modal-add-to-project')">${I18N.t('actions.cancel')}</button>
+                <button class="btn btn-primary" onclick="confirmAddFilesToProject(${forceProjectId})">
+                    <i class="fa-solid fa-check"></i> ${I18N.t('actions.add')}
+                </button>
+            </div>
         `;
         const renderList = (filter = '') => {
             const list = document.getElementById('project-picker-file-list');
@@ -18719,20 +18884,33 @@ window.openAddToProjectModal = async function (filePath, fileName, forceProjectI
         : `<p style="color:var(--text-muted); font-size:13px; padding:10px 0;">${I18N.t('projects.no_projects_yet')}</p>`;
     body.innerHTML = `
         <p style="font-size:12px; color:var(--text-muted); margin-bottom:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(fileName || '')}</p>
-        <div style="max-height:260px; overflow-y:auto; margin-bottom:12px;">${listHtml}</div>
+        <p class="picker-hint">${_t3('projects.select_project_hint', 'Veuillez sélectionner le projet')}</p>
+        <p id="add-to-project-error" class="picker-error"></p>
+        <div style="max-height:260px; overflow-y:auto; margin-bottom:12px;" onchange="_pickerClearError('add-to-project-error')">${listHtml}</div>
         <button class="btn btn-primary" style="width:100%;" onclick="confirmAddFileToProjects('${escapeJs(filePath)}')">
             <i class="fa-solid fa-check"></i> ${I18N.t('actions.add')}
         </button>
-        <button class="btn btn-ghost" style="width:100%; margin-top:8px;" onclick="closeModal('modal-add-to-project'); openProjectFormModal();">
-            <i class="fa-solid fa-plus"></i> ${I18N.t('projects.new')}
-        </button>
+        <div class="picker-actions">
+            <button class="btn btn-ghost" onclick="closeModal('modal-add-to-project')">${I18N.t('actions.cancel')}</button>
+            <button class="btn btn-ghost" onclick="openProjectFormForFile('${escapeJs(filePath)}')">
+                <i class="fa-solid fa-plus"></i> ${I18N.t('projects.new')}
+            </button>
+        </div>
     `;
     openModal('modal-add-to-project');
 };
 
+// « Nouveau projet » depuis le popup d'un fichier : le projet créé contiendra ce fichier
+window.openProjectFormForFile = function (filePath) {
+    closeModal('modal-add-to-project');
+    openProjectFormModal();
+    const formModal = document.getElementById('modal-project-form');
+    if (formModal) formModal.dataset.attachFile = filePath || '';
+};
+
 window.confirmAddFileToProjects = async function (filePath) {
     const checked = [...document.querySelectorAll('.project-picker-project-checkbox:checked')].map(el => parseInt(el.value));
-    if (checked.length === 0) { showToast(I18N.t('projects.select_at_least_one'), 'warning'); return; }
+    if (checked.length === 0) { _pickerShowError('add-to-project-error', _t3('projects.select_project_error', 'Veuillez sélectionner au moins un projet avant d\'ajouter.')); return; }
     try {
         await Promise.all(checked.map(projectId =>
             fetch(`${API}/api/projects/${projectId}/files`, {
@@ -18743,7 +18921,7 @@ window.confirmAddFileToProjects = async function (filePath) {
         ));
         showToast(I18N.t('projects.added_to_project'), 'success');
         closeModal('modal-add-to-project');
-        loadProjects();
+        await refreshProjectsViews();
     } catch (err) {
         showToast(I18N.t('toast.connection_error'), 'error');
         console.error('[Projects] confirmAddFileToProjects', err);
@@ -18752,15 +18930,17 @@ window.confirmAddFileToProjects = async function (filePath) {
 
 window.confirmAddFilesToProject = async function (projectId) {
     const checked = [...document.querySelectorAll('.project-picker-checkbox:checked')].map(el => ({ path: el.value, quantity: 1 }));
-    if (checked.length === 0) { showToast(I18N.t('projects.select_at_least_one'), 'warning'); return; }
+    if (checked.length === 0) { _pickerShowError('project-picker-error', I18N.t('projects.select_at_least_one')); return; }
     try {
-        await fetch(`${API}/api/projects/${projectId}/files`, {
+        const addRes = await fetch(`${API}/api/projects/${projectId}/files`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ files: checked })
         });
+        if (!addRes.ok) throw new Error('HTTP ' + addRes.status);
         showToast(I18N.t('projects.added_to_project'), 'success');
         closeModal('modal-add-to-project');
+        await refreshProjectsViews(projectId);
         openProjectDetailModal(projectId);
     } catch (err) {
         showToast(I18N.t('toast.connection_error'), 'error');
@@ -18823,19 +19003,24 @@ window.selectionOpenExistingProjectList = async function () {
             </label>`).join('')
         : `<p style="color:var(--text-muted); font-size:13px; padding:10px 0;">${I18N.t('projects.no_projects_yet')}</p>`;
     body.innerHTML = `
-        <div style="max-height:260px; overflow-y:auto; margin-bottom:12px;">${listHtml}</div>
+        <p class="picker-hint">${_t3('projects.select_project_hint', 'Veuillez sélectionner le projet')}</p>
+        <p id="selection-project-error" class="picker-error"></p>
+        <div style="max-height:260px; overflow-y:auto; margin-bottom:12px;" onchange="_pickerClearError('selection-project-error')">${listHtml}</div>
         <button class="btn btn-primary" style="width:100%;" onclick="confirmSendSelectionToProjects()">
             <i class="fa-solid fa-check"></i> ${I18N.t('actions.add')}
         </button>
-        <button class="btn btn-ghost" style="width:100%; margin-top:8px;" onclick="selectionOpenNewProject()">
-            <i class="fa-solid fa-plus"></i> ${I18N.t('projects.new')}
-        </button>
+        <div class="picker-actions">
+            <button class="btn btn-ghost" onclick="closeModal('modal-selection-project')">${I18N.t('actions.cancel')}</button>
+            <button class="btn btn-ghost" onclick="selectionOpenNewProject()">
+                <i class="fa-solid fa-plus"></i> ${I18N.t('projects.new')}
+            </button>
+        </div>
     `;
 };
 
 window.confirmSendSelectionToProjects = async function () {
     const checked = [...document.querySelectorAll('.selection-project-checkbox:checked')].map(el => parseInt(el.value));
-    if (checked.length === 0) { showToast(I18N.t('projects.select_at_least_one'), 'warning'); return; }
+    if (checked.length === 0) { _pickerShowError('selection-project-error', _t3('projects.select_project_error', 'Veuillez sélectionner au moins un projet avant d\'ajouter.')); return; }
     const files = [...selectedFiles].map(path => ({ path, quantity: 1 }));
     try {
         await Promise.all(checked.map(projectId =>
@@ -18849,7 +19034,7 @@ window.confirmSendSelectionToProjects = async function () {
         closeModal('modal-selection-project');
         selectedFiles.clear();
         toggleSelectionMode();
-        loadProjects();
+        await refreshProjectsViews();
     } catch (err) {
         showToast(I18N.t('toast.connection_error'), 'error');
         console.error('[Projects] confirmSendSelectionToProjects', err);

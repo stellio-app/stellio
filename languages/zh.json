@@ -681,6 +681,8 @@
   "printers.type": "类型",
   "printers.edit": "编辑打印机",
   "printers.save": "保存",
+  "printers.bed_size": "热床尺寸 (mm)",
+  "printers.bed_size_hint": "宽 × 深 × 最大打印高度。用于在发送到切片软件之前，提醒零件是否超出打印范围。",
   "printers.saving": "保存中...",
   "printers.keep_current_key": "留空以保留当前密钥",
   "viewer.send_to_slicer": "发送到切片软件",
@@ -1949,5 +1951,11 @@
   "spoolimport.summary": "找到 {{n}} 个料盘",
   "spoolimport.skipped": "已跳过 {{n}} 个空行",
   "spoolimport.confirm": "导入",
-  "spoolimport.done": "已导入 {{n}} 个料盘"
+  "spoolimport.done": "已导入 {{n}} 个料盘",
+  "feedback.new_reply": "有新回复",
+  "feedback.new_replies": "有 {{n}} 条新回复",
+  "feedback.new_reply_toast": "您的请求 #{{n}} 有新回复",
+  "modules.repaired_toast": "更新后已修复的模块：{{list}}",
+  "modules.missing_toast": "缺少模块：{{list}}。部分功能（PDF 报价单、表格导入、通知）可能无法使用。请重新安装最新的完整版 Stellio。",
+  "cost.quote_missing_module": "无法生成报价单：此安装缺少模块“{{module}}”。请重新安装最新的完整版 Stellio。"
 }
