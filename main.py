@@ -13,6 +13,7 @@ if sys.platform.startswith('linux'):
 
 
 def _early_extra_libs_dir():
+    # Même logique que get_data_path() (défini plus bas), sans créer de dossier.
     env_override = os.environ.get('STELLIO_DATA_DIR')
     if env_override:
         base = env_override
@@ -24,6 +25,8 @@ def _early_extra_libs_dir():
 
 
 _EXTRA_LIBS_DIR = _early_extra_libs_dir()
+# Version empaquetée (PyInstaller) : les modules réparés au lancement sont lus depuis ce dossier.
+# Ajouté EN FIN de sys.path : un module déjà embarqué dans l'exécutable reste prioritaire.
 if getattr(sys, 'frozen', False) and os.path.isdir(_EXTRA_LIBS_DIR) and _EXTRA_LIBS_DIR not in sys.path:
     sys.path.append(_EXTRA_LIBS_DIR)
 
@@ -24108,7 +24111,6 @@ def api_pre_print_check():
         warnings.append({
             "level": "warning",
             "code": "non_manifold",
-            "params": {},
             "message": "Maillage non-manifold détecté — le slicer devra le réparer automatiquement (résultat parfois imprévisible)."
         })
 
@@ -24130,10 +24132,6 @@ def api_pre_print_check():
                 warnings.append({
                     "level": "error",
                     "code": "oversized",
-                    "params": {
-                        "x": analysis['dimensions']['x'], "y": analysis['dimensions']['y'], "z": analysis['dimensions']['z'],
-                        "bx": f"{bed_x:g}", "by": f"{bed_y:g}", "bz": (f"{bed_z:g}" if bed_z else "?")
-                    },
                     "message": f"Pièce ({analysis['dimensions']['x']}×{analysis['dimensions']['y']}×{analysis['dimensions']['z']} mm) plus grande que le plateau ({bed_x:g}×{bed_y:g}×{(f'{bed_z:g}' if bed_z else '?')} mm)."
                 })
         except Exception:
@@ -24179,7 +24177,6 @@ def api_pre_print_check():
                 warnings.append({
                     "level": "error",
                     "code": "insufficient_filament",
-                    "params": {"name": slot_name or "?", "remaining": round(remaining, 1), "required": round(required_g, 1)},
                     "message": f"Filament assigné ({slot_name or '?'}) : {round(remaining,1)}g restants pour {round(required_g,1)}g nécessaires."
                 })
     except Exception as e:

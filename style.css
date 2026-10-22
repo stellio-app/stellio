@@ -8378,8 +8378,6 @@ body.role-viewer .nav-btn[data-page="settings"] {
 }
 .gallery-file-link:hover { background: var(--bg-tertiary); color: var(--accent); }
 
-<<<<<<< HEAD
-=======
 
 
 /* --- v0.7.5 : filtre des projets --- */
@@ -8420,4 +8418,3 @@ body.role-viewer .nav-btn[data-page="settings"] {
 .account-card.open .account-card-arrow { transform: rotate(180deg); }
 .account-card[data-collapsible] > .account-card-body { display: none; }
 .account-card[data-collapsible].open > .account-card-body { display: block; }
->>>>>>> bb1f10f (V 0.7.5)

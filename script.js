@@ -19110,12 +19110,7 @@ function renderProjectCard(p) {
             : `<div class="folder-preview-thumb"><span class="folder-preview-icon"><i class="fa-solid fa-cube"></i></span></div>`;
     }).join('');
     const progress = p.progress || 0;
-<<<<<<< HEAD
-    const allPrinted = (p.total_needed || 0) > 0 && (p.total_printed || 0) >= p.total_needed;
-    const projectStatus = (p.status === 'done' || allPrinted) ? 'done' : (p.status || 'in_progress');
-=======
     const projectStatus = _isProjectDone(p) ? 'done' : (p.status || 'in_progress');
->>>>>>> bb1f10f (V 0.7.5)
     const statusLabel = projectStatus === 'done' ? I18N.t('projects.status_done') : I18N.t('projects.status_in_progress');
     return `<div class="project-card" onclick="openProjectDetailModal(${p.id})">
         <div class="project-card-thumbs">${thumbs || `<div class="folder-preview-thumb"><span class="folder-preview-icon"><i class="fa-solid fa-diagram-project"></i></span></div>`}</div>
