@@ -1,5 +1,114 @@
 [
   {
+    "version": "0.7.5",
+    "items": {
+      "fr": [
+        "Bibliothèque : le tri choisi (A → Z, Dossier A-Z, taille, date, tag…) est mémorisé et retrouvé à la réouverture de l'application",
+        "Tableau de bord : nouveau widget « Projets terminés »",
+        "Tableau de bord : nouveau widget « Galerie » qui fait défiler les photos de la galerie (pause au survol, clic pour agrandir)",
+        "Projets : filtre « Tous / En cours / Terminés », mémorisé d'une session à l'autre",
+        "Fichiers multi-plateaux : nouvelle action « Découper les plateaux » (menu ⋯ d'un fichier) qui crée un fichier STL ou 3MF distinct par plateau",
+        "Comptes externes : connexion à Creality Cloud et à Snapmaker Space depuis Paramètres (email et mot de passe stockés chiffrés, remplissage automatique du formulaire officiel) ; la connexion Google n'est pas prise en charge",
+        "Bibliothèque : nouveaux filtres de statut d'impression « Envoyé au slicer » et « Déjà imprimé (réussi ou raté) », en plus de « Déjà réussi » et « Déjà échoué »",
+        "Téléchargement : Creality Cloud et Snapmaker Space et astuces Nexprint / Creality Cloud / Snapmaker Space dans la fenêtre de téléchargement ; un lien menant à une page web n'est plus enregistré comme fichier sans extension",
+        "Imprimantes : la carte affiche la miniature et le nom du fichier en cours d'impression lorsqu'il est dans la bibliothèque",
+        "Paramètres : chaque compte externe, ainsi que Spoolman et TigerTag, est une section dépliable (repliée par défaut)",
+        "Imprimantes Klipper/Moonraker : la carte affiche aussi la miniature du G-code pour les impressions lancées hors Stellio ; Spoolman a maintenant un badge « Configuré »"
+      ],
+      "en": [
+        "Library: the selected sort order (A → Z, Folder A-Z, size, date, tag…) is remembered and restored when the app is reopened",
+        "Dashboard: new “Completed projects” widget",
+        "Dashboard: new “Gallery” widget that scrolls through the gallery photos (pauses on hover, click to enlarge)",
+        "Projects: “All / In progress / Completed” filter, remembered between sessions",
+        "Multi-plate files: new “Split plates” action (a file's ⋯ menu) that creates a separate STL or 3MF file for each plate",
+        "External accounts: sign in to Creality Cloud and Snapmaker Space from Settings (email and password stored encrypted, official form filled in automatically); Google sign-in is not supported",
+        "Library: new print status filters “Sent to slicer” and “Already printed (success or failed)”, in addition to “Already succeeded” and “Already failed”",
+        "Download: Creality Cloud and Snapmaker Space and Nexprint / Creality Cloud / Snapmaker Space tips in the download window; a link leading to a web page is no longer saved as a file without extension",
+        "Printers: the card shows the thumbnail and name of the file being printed when it is in the library",
+        "Settings: each external account, as well as Spoolman and TigerTag, is a collapsible section (collapsed by default)",
+        "Klipper/Moonraker printers: the card also shows the G-code thumbnail for prints started outside Stellio; Spoolman now has a “Configured” badge"
+      ],
+      "de": [
+        "Bibliothek: Die gewählte Sortierung (A → Z, Ordner A-Z, Größe, Datum, Tag …) wird gespeichert und beim erneuten Öffnen der App wiederhergestellt",
+        "Dashboard: neues Widget „Abgeschlossene Projekte“",
+        "Dashboard: neues Widget „Galerie“, das die Fotos der Galerie durchlaufen lässt (Pause beim Überfahren, Klick zum Vergrößern)",
+        "Projekte: Filter „Alle / In Arbeit / Abgeschlossen“, der sitzungsübergreifend gespeichert wird",
+        "Dateien mit mehreren Platten: neue Aktion „Platten aufteilen“ (⋯-Menü einer Datei), die pro Platte eine eigene STL- oder 3MF-Datei erstellt",
+        "Externe Konten: Anmeldung bei Creality Cloud und Snapmaker Space in den Einstellungen (E-Mail und Passwort verschlüsselt gespeichert, offizielles Formular wird automatisch ausgefüllt); die Anmeldung über Google wird nicht unterstützt",
+        "Bibliothek: neue Druckstatus-Filter „An den Slicer gesendet“ und „Bereits gedruckt (erfolgreich oder fehlgeschlagen)“ zusätzlich zu „Bereits erfolgreich“ und „Bereits fehlgeschlagen“",
+        "Download: Creality Cloud und Snapmaker Space sowie Tipps zu Nexprint / Creality Cloud / Snapmaker Space im Download-Fenster; ein Link auf eine Webseite wird nicht mehr als Datei ohne Endung gespeichert",
+        "Drucker: Die Karte zeigt Vorschaubild und Namen der gerade gedruckten Datei, sofern sie in der Bibliothek liegt",
+        "Einstellungen: Jedes externe Konto sowie Spoolman und TigerTag sind aufklappbare Bereiche (standardmäßig eingeklappt)",
+        "Klipper/Moonraker-Drucker: Die Karte zeigt auch das G-Code-Vorschaubild für Drucke, die außerhalb von Stellio gestartet wurden; Spoolman hat jetzt ein Badge „Konfiguriert“"
+      ],
+      "es": [
+        "Biblioteca: el orden elegido (A → Z, Carpeta A-Z, tamaño, fecha, etiqueta…) se recuerda y se recupera al reabrir la aplicación",
+        "Panel: nuevo widget «Proyectos terminados»",
+        "Panel: nuevo widget «Galería» que hace desfilar las fotos de la galería (pausa al pasar el cursor, clic para ampliar)",
+        "Proyectos: filtro «Todos / En curso / Terminados», recordado entre sesiones",
+        "Archivos con varias placas: nueva acción «Dividir placas» (menú ⋯ de un archivo) que crea un archivo STL o 3MF independiente por placa",
+        "Cuentas externas: inicio de sesión en Creality Cloud y Snapmaker Space desde Ajustes (correo y contraseña guardados cifrados, formulario oficial rellenado automáticamente); el inicio de sesión con Google no es compatible",
+        "Biblioteca: nuevos filtros de estado de impresión «Enviado al slicer» y «Ya impreso (éxito o fallo)», además de «Ya logrado» y «Ya fallido»",
+        "Descarga: Creality Cloud y Snapmaker Space y consejos de Nexprint / Creality Cloud / Snapmaker Space en la ventana de descarga; un enlace que lleva a una página web ya no se guarda como archivo sin extensión",
+        "Impresoras: la tarjeta muestra la miniatura y el nombre del archivo en impresión cuando está en la biblioteca",
+        "Ajustes: cada cuenta externa, así como Spoolman y TigerTag, es una sección desplegable (plegada por defecto)",
+        "Impresoras Klipper/Moonraker: la tarjeta también muestra la miniatura del G-code para impresiones iniciadas fuera de Stellio; Spoolman ahora tiene una insignia «Configurado»"
+      ],
+      "it": [
+        "Libreria: l'ordinamento scelto (A → Z, Cartella A-Z, dimensione, data, tag…) viene ricordato e ripristinato alla riapertura dell'app",
+        "Dashboard: nuovo widget «Progetti completati»",
+        "Dashboard: nuovo widget «Galleria» che fa scorrere le foto della galleria (pausa al passaggio del mouse, clic per ingrandire)",
+        "Progetti: filtro «Tutti / In corso / Completati», ricordato tra una sessione e l'altra",
+        "File con più piatti: nuova azione «Dividi i piatti» (menu ⋯ di un file) che crea un file STL o 3MF separato per ogni piatto",
+        "Account esterni: accesso a Creality Cloud e Snapmaker Space dalle Impostazioni (email e password salvate in forma cifrata, modulo ufficiale compilato automaticamente); l'accesso con Google non è supportato",
+        "Libreria: nuovi filtri di stato di stampa «Inviato allo slicer» e «Già stampato (riuscito o fallito)», oltre a «Già riuscito» e «Già fallito»",
+        "Download: Creality Cloud e Snapmaker Space e suggerimenti per Nexprint / Creality Cloud / Snapmaker Space nella finestra di download; un link che porta a una pagina web non viene più salvato come file senza estensione",
+        "Stampanti: la scheda mostra miniatura e nome del file in stampa quando è presente nella libreria",
+        "Impostazioni: ogni account esterno, così come Spoolman e TigerTag, è una sezione comprimibile (chiusa per impostazione predefinita)",
+        "Stampanti Klipper/Moonraker: la scheda mostra anche la miniatura del G-code per le stampe avviate fuori da Stellio; Spoolman ora ha un badge «Configurato»"
+      ],
+      "pt": [
+        "Biblioteca: a ordenação escolhida (A → Z, Pasta A-Z, tamanho, data, tag…) é lembrada e restaurada ao reabrir o aplicativo",
+        "Painel: novo widget «Projetos concluídos»",
+        "Painel: novo widget «Galeria» que faz desfilar as fotos da galeria (pausa ao passar o cursor, clique para ampliar)",
+        "Projetos: filtro «Todos / Em andamento / Concluídos», lembrado entre sessões",
+        "Arquivos com várias placas: nova ação «Dividir placas» (menu ⋯ de um arquivo) que cria um arquivo STL ou 3MF separado para cada placa",
+        "Contas externas: login no Creality Cloud e no Snapmaker Space em Configurações (e-mail e senha armazenados criptografados, formulário oficial preenchido automaticamente); o login com o Google não é compatível",
+        "Biblioteca: novos filtros de status de impressão «Enviado ao slicer» e «Já impresso (sucesso ou falha)», além de «Já bem-sucedido» e «Já falhou»",
+        "Download: Creality Cloud e Snapmaker Space e dicas do Nexprint / Creality Cloud / Snapmaker Space na janela de download; um link que leva a uma página web não é mais salvo como arquivo sem extensão",
+        "Impressoras: o cartão mostra a miniatura e o nome do arquivo em impressão quando ele está na biblioteca",
+        "Configurações: cada conta externa, assim como Spoolman e TigerTag, é uma seção expansível (recolhida por padrão)",
+        "Impressoras Klipper/Moonraker: o cartão também mostra a miniatura do G-code para impressões iniciadas fora do Stellio; o Spoolman agora tem um selo «Configurado»"
+      ],
+      "ja": [
+        "ライブラリ：選択した並び順（A → Z、フォルダ A-Z、サイズ、日付、タグなど）を記憶し、アプリを開き直したときに復元します",
+        "ダッシュボード：新しいウィジェット「完了したプロジェクト」",
+        "ダッシュボード：ギャラリーの写真を順番に表示する新しいウィジェット「ギャラリー」（ホバーで一時停止、クリックで拡大）",
+        "プロジェクト：「すべて / 進行中 / 完了」フィルターを追加（セッション間で記憶）",
+        "複数プレートのファイル：ファイルの「⋯」メニューに「プレートを分割」を追加し、プレートごとに個別のSTLまたは3MFファイルを作成",
+        "外部アカウント：設定から Creality Cloud と Snapmaker Space にログインできるようになりました（メールアドレスとパスワードは暗号化して保存、公式フォームを自動入力）。Googleでのログインには対応していません",
+        "ライブラリ：印刷ステータスのフィルターに「スライサーに送信済み」と「印刷済み（成功または失敗）」を追加（既存の「成功済み」「失敗済み」に加えて）",
+        "ダウンロード：Creality Cloud と Snapmaker Space に対応。ダウンロード画面に Nexprint / Creality Cloud / Snapmaker Space のヒントを追加。Webページへのリンクは拡張子のないファイルとして保存されなくなりました",
+        "プリンター：印刷中のファイルがライブラリにある場合、カードにサムネイルとファイル名を表示",
+        "設定：外部アカウントおよび Spoolman・TigerTag ごとに開閉できるセクションになりました（初期状態は閉じています）",
+        "Klipper/Moonraker プリンター：Stellio 以外から開始した印刷でも、カードに G-code のサムネイルを表示。Spoolman に「設定済み」バッジを追加"
+      ],
+      "zh": [
+        "资料库：所选的排序方式（A → Z、文件夹 A-Z、大小、日期、标签等）会被记住，重新打开应用时自动恢复",
+        "仪表盘：新增“已完成的项目”小组件",
+        "仪表盘：新增“图库”小组件，轮播图库中的照片（悬停暂停，点击放大）",
+        "项目：新增“全部 / 进行中 / 已完成”筛选，并在不同会话之间保留",
+        "多打印板文件：文件的“⋯”菜单新增“拆分打印板”，为每个打印板生成单独的 STL 或 3MF 文件",
+        "外部账户：可在“设置”中登录 Creality Cloud 和 Snapmaker Space（邮箱和密码加密保存，自动填写官方登录表单）；不支持 Google 登录",
+        "资料库：打印状态筛选新增“已发送到切片软件”和“已打印（成功或失败）”，与原有的“已成功”“已失败”并列",
+        "下载：支持 Creality Cloud 和 Snapmaker Space，并在下载窗口中新增 Nexprint / Creality Cloud / Snapmaker Space 提示；指向网页的链接不再被保存为无扩展名的文件",
+        "打印机：当正在打印的文件位于资料库中时，卡片会显示其缩略图和文件名",
+        "设置：每个外部账户以及 Spoolman 和 TigerTag 都是可折叠的分区（默认折叠）",
+        "Klipper/Moonraker 打印机：对于在 Stellio 之外启动的打印，卡片也会显示 G-code 缩略图；Spoolman 新增“已配置”徽章"
+      ]
+    }
+  },
+  {
     "version": "0.7.4",
     "items": {
       "fr": [

@@ -6473,6 +6473,12 @@ def api_save_account():
             # Saisie manuelle du cookie : on garde l'email / mot de passe déjà enregistrés
             _nexprint_save_token(session['user_id'], api_key)
             return jsonify({"message": "Compte enregistré avec succès"}), 200
+        elif platform in BROWSER_LOGIN_PLATFORMS:
+            if not api_key:
+                return jsonify({"error": "Cookie de session requis"}), 400
+            # Saisie manuelle : on garde l'email / mot de passe déjà enregistrés
+            _bl_save_token(session['user_id'], platform, _clean_cookie_header(api_key))
+            return jsonify({"message": "Compte enregistré avec succès"}), 200
         elif platform and platform != 'thingiverse':
             if not email and not password:
                 return jsonify({"error": "Email et/ou mot de passe requis"}), 400
@@ -6715,6 +6721,293 @@ def api_nexprint_browser_login_status():
     return jsonify({"state": nexprint_login_state.get(session['user_id'], 'idle')})
 
 
+# --- Connexion Creality Cloud / Snapmaker Space par fenêtre de connexion (v0.7.5) ---
+# Même principe que Nexprint : une fenêtre Stellio ouvre la page de connexion officielle, le formulaire est
+# rempli avec l'email / mot de passe enregistrés (chiffrés), puis les cookies de session sont conservés.
+BROWSER_LOGIN_PLATFORMS = {
+    'crealitycloud': {
+        'label': 'Creality Cloud',
+        'start_url': ('https://id.creality.com/?lang=fr-FR&client_id=f9c302ecc29c59a0a6e921ff39a073ca'
+                      '&app_id=cxy-gen2&redirect_uri=https%3A%2F%2Fwww.crealitycloud.com%2Ffr&platform=-100'
+                      '&back_url=https%3A%2F%2Fwww.crealitycloud.com%2Foauth'),
+        'id_hosts': ('id.creality.com',),
+        'site_hosts': ('crealitycloud.com', 'crealitycloud.cn'),
+        'cookie_domains': ('creality.com', 'crealitycloud.com', 'crealitycloud.cn'),
+        'autofill_hosts': ('creality.com',),
+    },
+    'snapmaker': {
+        'label': 'Snapmaker Space',
+        'start_url': 'https://id.snapmaker.com/?redirect=https://space.snapmaker.com/en&from=3dwiki',
+        'id_hosts': ('id.snapmaker.com',),
+        'site_hosts': ('space.snapmaker.com',),
+        'cookie_domains': ('snapmaker.com',),
+        'autofill_hosts': ('id.snapmaker.com',),
+        'capture_jwt': True,
+    },
+}
+browser_login_state = {}
+
+
+def _host_matches(host, domains):
+    host = (host or '').lower()
+    return any(host == d or host.endswith('.' + d) for d in domains)
+
+
+def _clean_cookie_header(raw):
+    v = (raw or '').strip()
+    if v.lower().startswith('cookie:'):
+        v = v[7:].strip()
+    return re.sub(r'[\r\n]+', ' ', v)
+
+
+def _bl_save_token(user_id, platform, token):
+    conn = get_db()
+    try:
+        conn.execute("""
+            INSERT INTO account_credentials (user_id, platform, email, api_key, last_login)
+            VALUES (?, ?, NULL, ?, ?)
+            ON CONFLICT(user_id, platform) DO UPDATE SET
+                api_key = excluded.api_key,
+                last_login = CURRENT_TIMESTAMP
+        """, (user_id, platform, encrypt_password(token), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _bl_save_credentials(user_id, platform, email, password):
+    conn = get_db()
+    try:
+        conn.execute("""
+            INSERT INTO account_credentials (user_id, platform, email, password_encrypted, last_login)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, platform) DO UPDATE SET
+                email = excluded.email,
+                password_encrypted = excluded.password_encrypted
+        """, (user_id, platform, email, encrypt_password(password), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _bl_load_credentials(user_id, platform):
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT email, password_encrypted FROM account_credentials WHERE user_id = ? AND platform = ?",
+            (user_id, platform)
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row or not row['email'] or not row['password_encrypted']:
+        return None, None
+    try:
+        return row['email'], decrypt_password(row['password_encrypted'])
+    except Exception:
+        return None, None
+
+
+def _bl_autofill_js(email, password):
+    """Remplit email + mot de passe puis valide (un seul essai par page). Retourne 'wait', 'filled' ou 'skip'."""
+    return """(function(email, pwd) {
+  if (window.__stellioAuto) return 'skip';
+  function setVal(el, v) {
+    var setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value').set;
+    setter.call(el, v);
+    el.dispatchEvent(new Event('input', {bubbles: true}));
+    el.dispatchEvent(new Event('change', {bubbles: true}));
+  }
+  var pw = document.querySelector('input[type="password"]');
+  if (!pw || pw.offsetParent === null) return 'wait';
+  var user = null;
+  var all = document.querySelectorAll('input');
+  for (var i = 0; i < all.length; i++) {
+    var t = (all[i].type || 'text').toLowerCase();
+    if (all[i].offsetParent !== null && (t === 'text' || t === 'email' || t === 'tel')
+        && (all[i].compareDocumentPosition(pw) & Node.DOCUMENT_POSITION_FOLLOWING)) user = all[i];
+  }
+  if (!user) return 'wait';
+  setVal(user, email);
+  setVal(pw, pwd);
+  window.__stellioAuto = true;
+  setTimeout(function() {
+    var form = pw.closest('form');
+    var btn = form && form.querySelector('button[type="submit"],input[type="submit"]');
+    if (!btn) {
+      var btns = (form || document).querySelectorAll('button');
+      for (var j = 0; j < btns.length; j++) {
+        if (btns[j].offsetParent !== null && !btns[j].disabled && /log\\s*in|sign\\s*in|connexion|se\\s*connecter|\\u767b\\u5f55/i.test(btns[j].textContent)) { btn = btns[j]; break; }
+      }
+    }
+    if (btn) btn.click();
+    else if (form && form.requestSubmit) form.requestSubmit();
+  }, 400);
+  return 'filled';
+})(""" + json.dumps(email) + ", " + json.dumps(password) + ");"
+
+
+_JWT_RE = re.compile(r'eyJ[\w-]+\.[\w-]+\.[\w-]+')
+_BL_JWT_SCAN_JS = r"""(function() {
+  var out = [], keys = [];
+  function scan(v) {
+    var m = String(v || '').match(/eyJ[\w-]+\.[\w-]+\.[\w-]+/g);
+    if (m) for (var i = 0; i < m.length; i++) if (out.indexOf(m[i]) < 0) out.push(m[i]);
+  }
+  try { for (var i = 0; i < localStorage.length; i++) { keys.push('ls:' + localStorage.key(i)); scan(localStorage.getItem(localStorage.key(i))); } } catch (e) {}
+  try { for (var j = 0; j < sessionStorage.length; j++) { keys.push('ss:' + sessionStorage.key(j)); scan(sessionStorage.getItem(sessionStorage.key(j))); } } catch (e) {}
+  try { scan(document.cookie); } catch (e) {}
+  return JSON.stringify({tokens: out, keys: keys});
+})();"""
+
+
+def _bl_scan_jwt(win):
+    """Jetons JWT présents dans le stockage local / les cookies de la page ouverte : (jetons, noms de clés)."""
+    try:
+        res = win.evaluate_js(_BL_JWT_SCAN_JS)
+        data = json.loads(res) if isinstance(res, str) else (res or {})
+        return list(data.get('tokens') or []), list(data.get('keys') or [])
+    except Exception:
+        return [], []
+
+
+def _bl_cookies_from_window(win, cfg):
+    """Cookies de session de la fenêtre pour les domaines de la plateforme : (en-tête Cookie, noms)."""
+    try:
+        cookies = win.get_cookies() or []
+    except Exception:
+        return '', []
+    pairs = {}
+    for c in cookies:
+        try:
+            for name, morsel in c.items():
+                dom = (morsel['domain'] or '').lstrip('.').lower()
+                if dom and not _host_matches(dom, cfg['cookie_domains']):
+                    continue
+                if morsel.value:
+                    pairs[name] = morsel.value
+        except Exception:
+            continue
+    return '; '.join(f"{k}={v}" for k, v in pairs.items()), sorted(pairs)
+
+
+@app.route('/api/accounts/<platform>/browser-login', methods=['POST'])
+@login_required
+def api_platform_browser_login(platform):
+    import threading
+    platform = platform.lower()
+    cfg = BROWSER_LOGIN_PLATFORMS.get(platform)
+    if not cfg:
+        return jsonify({"error": "Plateforme inconnue"}), 404
+    label = cfg['label']
+    user_id = session['user_id']
+    state_key = (user_id, platform)
+    body = request.get_json(silent=True) or {}
+    new_email = (body.get('email') or '').strip()
+    new_password = body.get('password') or ''
+    if new_email and new_password:
+        _bl_save_credentials(user_id, platform, new_email, new_password)
+    elif new_email:
+        _, old_pwd = _bl_load_credentials(user_id, platform)
+        if old_pwd:
+            _bl_save_credentials(user_id, platform, new_email, old_pwd)
+    cred_email, cred_password = _bl_load_credentials(user_id, platform)
+    try:
+        import webview as _wv
+        if not _wv.windows:
+            raise RuntimeError("no window")
+    except Exception:
+        return jsonify({"error": "La connexion automatique n'est disponible que dans l'application Stellio. Utilise la saisie manuelle des cookies."}), 501
+
+    if browser_login_state.get(state_key) == 'waiting':
+        return jsonify({"state": "waiting"})
+
+    try:
+        win = _wv.create_window(f'Connexion {label}', cfg['start_url'], width=520, height=760)
+    except Exception as e:
+        app_logger.warning(f"[{label}] Ouverture fenêtre de connexion impossible: {e}")
+        return jsonify({"error": "Impossible d'ouvrir la fenêtre de connexion."}), 500
+
+    browser_login_state[state_key] = 'waiting'
+
+    def _watch():
+        deadline = time.time() + 600
+        autofilled = False
+        last_header = ''
+        site_since = None
+        try:
+            while time.time() < deadline:
+                time.sleep(1.5)
+                if win not in _wv.windows:
+                    browser_login_state[state_key] = 'closed'
+                    return
+                try:
+                    current = win.get_current_url() or ''
+                except Exception:
+                    current = ''
+                host = (urlparse(current).hostname or '').lower()
+                if host in cfg['id_hosts']:
+                    # Page de connexion : remplissage automatique, uniquement sur le site officiel
+                    if cred_email and cred_password and not autofilled and _host_matches(host, cfg['autofill_hosts']):
+                        try:
+                            res = win.evaluate_js(_bl_autofill_js(cred_email, cred_password))
+                            if res == 'filled':
+                                autofilled = True
+                                app_logger.info(f"[{label}] Formulaire de connexion rempli automatiquement")
+                        except Exception as e:
+                            app_logger.warning(f"[{label}] Remplissage automatique impossible: {e}")
+                    last_header = ''
+                    continue
+                if not _host_matches(host, cfg['site_hosts']):
+                    continue  # autre page (vérification, captcha…) : on attend
+                header, names = _bl_cookies_from_window(win, cfg)
+                if cfg.get('capture_jwt'):
+                    # Le site s'authentifie avec un jeton « Bearer » (stockage local), pas avec un cookie
+                    if site_since is None:
+                        site_since = time.time()
+                    tokens, keys = _bl_scan_jwt(win)
+                    if not tokens:
+                        if time.time() - site_since > 45:
+                            app_logger.warning(f"[{label}] Aucun jeton JWT trouvé après connexion ; clés de stockage vues : {keys} ; cookies : {names}")
+                            browser_login_state[state_key] = 'error'
+                            try:
+                                win.destroy()
+                            except Exception:
+                                pass
+                            return
+                        continue
+                    header = '; '.join([h for h in [header] if h] + [f"__stellio_jwt{i}={t}" for i, t in enumerate(tokens)])
+                if header and header == last_header:
+                    _bl_save_token(user_id, platform, header)
+                    browser_login_state[state_key] = 'ok'
+                    app_logger.info(f"[{label}] Connexion enregistrée (cookies : {', '.join(names)})")
+                    try:
+                        win.destroy()
+                    except Exception:
+                        pass
+                    return
+                last_header = header
+            browser_login_state[state_key] = 'timeout'
+            try:
+                win.destroy()
+            except Exception:
+                pass
+        except Exception as e:
+            app_logger.warning(f"[{label}] Surveillance connexion: {e}")
+            browser_login_state[state_key] = 'error'
+
+    threading.Thread(target=_watch, daemon=True).start()
+    return jsonify({"state": "waiting"})
+
+
+@app.route('/api/accounts/<platform>/browser-login/status', methods=['GET'])
+@login_required
+def api_platform_browser_login_status(platform):
+    platform = platform.lower()
+    if platform not in BROWSER_LOGIN_PLATFORMS:
+        return jsonify({"error": "Plateforme inconnue"}), 404
+    return jsonify({"state": browser_login_state.get((session['user_id'], platform), 'idle')})
+
+
 @app.route('/api/accounts/<platform>', methods=['DELETE'])
 @login_required
 def api_delete_account(platform):
@@ -6866,6 +7159,215 @@ def api_file_plate_count():
     except Exception as e:
         app_logger.warning(f"[3MF] Erreur comptage plateaux {file_path}: {e}")
         return jsonify({"plate_count": 1})
+
+
+# --- Découpe d'un fichier multi-plateaux (3MF) en un fichier par plateau (v0.7.5) ---
+_PLATE_META_FILE_RE = re.compile(r'^(metadata/)((?:plate|plate_no_light|top|pick)_)(\d+)(\.[A-Za-z0-9.]+)$', re.I)
+
+
+def _unique_file_path(directory, base, ext):
+    """Chemin libre `directory/base+ext` (suffixe _2, _3… si le nom existe déjà)."""
+    candidate = os.path.join(directory, base + ext)
+    n = 2
+    while os.path.exists(candidate):
+        candidate = os.path.join(directory, f"{base}_{n}{ext}")
+        n += 1
+    return candidate
+
+
+def _rewrite_3mf_model_settings(data, plate_key, keep_ids, other_ids, renamed):
+    """Ne garde dans model_settings.config que le plateau voulu (renuméroté 1) et ses objets."""
+    import xml.etree.ElementTree as _ET
+    root = _safe_xml_parse(io.BytesIO(data)).getroot()
+    parent = {c: p for p in root.iter() for c in p}
+    lower_map = {k.lower(): v for k, v in renamed.items()}
+
+    for obj in list(root.findall('object')):
+        if str(obj.get('id')) in other_ids:
+            root.remove(obj)
+
+    for i, plate_el in enumerate(list(root.findall('.//plate'))):
+        pid_meta = None
+        pid = None
+        for meta in plate_el.findall('metadata'):
+            if meta.get('key') == 'plater_id':
+                pid_meta = meta
+                pid = meta.get('value')
+                break
+        key = pid or str(i + 1)
+        if key != str(plate_key):
+            parent[plate_el].remove(plate_el)
+            continue
+        if pid_meta is not None:
+            pid_meta.set('value', '1')
+        else:
+            _ET.SubElement(plate_el, 'metadata', {'key': 'plater_id', 'value': '1'})
+        for meta in plate_el.findall('metadata'):
+            if (meta.get('key') or '').endswith('_file') and meta.get('value'):
+                old = meta.get('value').lstrip('/').lower()
+                if old in lower_map:
+                    meta.set('value', lower_map[old] or '')
+
+    for assemble in root.findall('assemble'):
+        for item in list(assemble):
+            if str(item.get('object_id')) in other_ids:
+                assemble.remove(item)
+
+    return _ET.tostring(root, encoding='utf-8', xml_declaration=True)
+
+
+def _rewrite_3mf_build_items(data, keep_ids):
+    """Retire de <build> les objets des autres plateaux (édition textuelle : préserve les espaces de noms)."""
+    text = data.decode('utf-8-sig')
+    kept = [0]
+
+    def _filter_block(m):
+        def _item(im):
+            oid = re.search(r'\bobjectid="(\d+)"', im.group(0))
+            if oid and oid.group(1) in keep_ids:
+                kept[0] += 1
+                return im.group(0)
+            return ''
+        return re.sub(r'<item\b[^>]*?/>', _item, m.group(0))
+
+    new_text = re.sub(r'<build\b.*?</build>', _filter_block, text, flags=re.S)
+    if kept[0] == 0:
+        raise RuntimeError("Aucun objet de ce plateau trouvé dans le modèle 3MF")
+    return new_text.encode('utf-8')
+
+
+def _rewrite_3mf_xml_parts(data, renamed, tag_attr):
+    """Met à jour les relations (.rels) ou les types de contenu après suppression/renommage de fichiers."""
+    import xml.etree.ElementTree as _ET
+    try:
+        root = _safe_xml_parse(io.BytesIO(data)).getroot()
+    except Exception:
+        return data
+    lower_map = {k.lower(): v for k, v in renamed.items()}
+    changed = False
+    for el in list(root):
+        target = el.get(tag_attr) or ''
+        key = target.lstrip('/').lower()
+        if key in lower_map:
+            new_name = lower_map[key]
+            if new_name is None:
+                root.remove(el)
+            else:
+                el.set(tag_attr, ('/' if target.startswith('/') else '') + new_name)
+            changed = True
+    if not changed:
+        return data
+    ns = root.tag.split('}')[0].lstrip('{') if root.tag.startswith('{') else ''
+    if ns:
+        _ET.register_namespace('', ns)
+    return _ET.tostring(root, encoding='utf-8', xml_declaration=True)
+
+
+def _split_3mf_plate_to_3mf(src_path, plate_key, plates, dest_path):
+    """Écrit un 3MF autonome ne contenant que le plateau `plate_key` (devenu plateau 1)."""
+    keep_ids = {str(x) for x in plates[plate_key]}
+    other_ids = set()
+    for k, ids in plates.items():
+        if k != plate_key:
+            other_ids |= {str(x) for x in ids}
+    other_ids -= keep_ids
+
+    with zipfile.ZipFile(src_path, 'r') as zin:
+        names = zin.namelist()
+        renamed = {}
+        for n in names:
+            m = _PLATE_META_FILE_RE.match(n)
+            if m:
+                renamed[n] = (f"{m.group(1)}{m.group(2)}1{m.group(4)}"
+                              if m.group(3) == str(plate_key) else None)
+            elif n.lower() == 'metadata/slice_info.config':
+                renamed[n] = None  # infos de découpe de tous les plateaux : régénérées par le slicer
+
+        ordered = sorted(names, key=lambda n: 0 if n == '[Content_Types].xml' else 1)
+        with zipfile.ZipFile(dest_path, 'w', zipfile.ZIP_DEFLATED) as zout:
+            for n in ordered:
+                if n.endswith('/'):
+                    continue
+                new_name = renamed.get(n, n)
+                if new_name is None:
+                    continue
+                content = zin.read(n)
+                low = n.lower()
+                if low.endswith('model_settings.config'):
+                    content = _rewrite_3mf_model_settings(content, plate_key, keep_ids, other_ids, renamed)
+                elif low == '3d/3dmodel.model':
+                    content = _rewrite_3mf_build_items(content, keep_ids)
+                elif low.endswith('.rels'):
+                    content = _rewrite_3mf_xml_parts(content, renamed, 'Target')
+                elif n == '[Content_Types].xml':
+                    content = _rewrite_3mf_xml_parts(content, renamed, 'PartName')
+                zout.writestr(new_name, content)
+
+
+def _split_3mf_plate_to_stl(src_path, plate_index, dest_path):
+    mesh = load_3mf_mesh(src_path, plate_index=plate_index)
+    if mesh is None or getattr(mesh, 'is_empty', False) or len(getattr(mesh, 'vertices', [])) == 0:
+        raise RuntimeError(f"Plateau {plate_index} vide : aucun maillage à exporter")
+    mesh.export(dest_path, file_type='stl')
+
+
+@app.route('/api/files/split-plates', methods=['POST'])
+@login_required
+def api_split_plates():
+    created = []
+    try:
+        data = request.get_json(silent=True) or {}
+        file_path = (data.get('file_path') or '').strip()
+        fmt = (data.get('format') or '3mf').lower().strip('.')
+        if fmt not in ('stl', '3mf'):
+            return jsonify({"error": "Format invalide (stl ou 3mf)"}), 400
+        if not file_path:
+            return jsonify({"error": "Chemin requis"}), 400
+        if '::' in file_path or is_virtual_archive_path(file_path):
+            return jsonify({"error": "Découpe impossible pour un fichier situé dans une archive : extrais-le d'abord"}), 400
+        if '..' in file_path.replace('\\', '/').split('/'):
+            return jsonify({"error": "Chemin invalide"}), 400
+        if os.name == 'nt':
+            file_path = file_path.replace('/', '\\')
+        if not os.path.isfile(file_path):
+            return jsonify({"error": "Fichier non trouvé"}), 404
+        if not _is_path_within_sources(file_path, session['user_id']):
+            app_logger.warning(f"[SECURITY] Tentative de découpe hors sources: {file_path}")
+            return jsonify({"error": "Ce fichier n'appartient à aucune source configurée"}), 403
+        if os.path.splitext(file_path)[1].lower() != '.3mf':
+            return jsonify({"error": "Seuls les fichiers 3MF multi-plateaux peuvent être découpés"}), 400
+
+        plates = _parse_3mf_plate_object_ids(file_path)
+        if not plates:
+            return jsonify({"error": "Ce fichier ne contient qu'un seul plateau"}), 400
+        keys = sorted(plates.keys(), key=lambda k: (len(k), k))
+        base_dir = os.path.dirname(file_path)
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+
+        for idx, key in enumerate(keys, start=1):
+            dest = _unique_file_path(base_dir, f"{base_name}_plateau_{idx}", '.' + fmt)
+            created.append(dest)
+            if fmt == '3mf':
+                _split_3mf_plate_to_3mf(file_path, key, plates, dest)
+            else:
+                _split_3mf_plate_to_stl(file_path, idx, dest)
+
+        invalidate_cache()
+        names = [os.path.basename(p) for p in created]
+        app_logger.info(f"[SPLIT] {os.path.basename(file_path)} → {len(created)} fichier(s) {fmt.upper()}: {names}")
+        return jsonify({"success": True, "count": len(created), "files": names,
+                        "message": f"{len(created)} fichiers créés"}), 200
+    except Exception as e:
+        for p in created:  # tout ou rien : on ne laisse pas de découpe partielle
+            try:
+                if os.path.exists(p):
+                    os.remove(p)
+            except OSError:
+                pass
+        app_logger.error(f"[SPLIT] Erreur: {e}")
+        import traceback
+        app_logger.error(traceback.format_exc())
+        return jsonify({"error": f"Découpe impossible : {e}"}), 500
 
 
 @app.route('/api/thumb', methods=['GET'])
@@ -12242,6 +12744,363 @@ def makerworld_disconnect():
         conn.close()
     return jsonify({"message": "Compte MakerWorld supprimé"}), 200
 
+# --- Creality Cloud / Snapmaker Space (v0.7.5) ---
+# Ces deux sites n'ont pas d'API publique documentée : Stellio lit la page du modèle (avec le cookie de
+# session optionnel de l'utilisateur) et en extrait les liens directs vers les fichiers 3D. Si le site charge
+# ses fichiers via une API privée après coup, rien n'est trouvé : le journal « [Creality Cloud] » /
+# « [Snapmaker Space] » indique alors les chemins d'API repérés dans la page, pour brancher l'appel exact.
+_MODEL_PAGE_FILE_EXTS = ('stl', '3mf', 'obj', 'step', 'stp', 'amf', 'zip', 'rar', '7z', 'gcode')
+_MODEL_PAGE_FILE_RE = re.compile(
+    r'https?://[^\s"\'<>\\]+?\.(?:' + '|'.join(_MODEL_PAGE_FILE_EXTS) + r')(?![A-Za-z0-9_]|\.[A-Za-z0-9])(?:\?[^\s"\'<>\\]*)?',
+    re.I)
+_MODEL_PAGE_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+
+
+class ModelPageError(Exception):
+    def __init__(self, message, status=502):
+        super().__init__(message)
+        self.status = status
+
+
+def _is_public_http_url(u):
+    """Refuse les URL vers le réseau local (protection contre les redirections malveillantes)."""
+    import ipaddress
+    try:
+        p = urlparse(u)
+        if p.scheme not in ('http', 'https') or not p.hostname:
+            return False
+        for info in socket.getaddrinfo(p.hostname, None):
+            ip = ipaddress.ip_address(info[4][0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def model_page_get_files(page_url, label, cookie):
+    """Liste les fichiers 3D trouvés dans la page d'un modèle : [{'name', 'url', 'size'}]."""
+    headers = {
+        "User-Agent": _MODEL_PAGE_UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    ck = _clean_cookie_header(cookie)
+    if ck:
+        headers["Cookie"] = ck
+    try:
+        r = requests.get(page_url, headers=headers, timeout=30, allow_redirects=True)
+    except requests.RequestException as e:
+        raise ModelPageError(f"Impossible de joindre {label} : {e}")
+    if r.status_code in (401, 403):
+        raise ModelPageError(
+            f"Session {label} refusée (HTTP {r.status_code}). Vérifie le cookie dans Paramètres → Comptes externes.",
+            status=r.status_code)
+    if r.status_code >= 400:
+        raise ModelPageError(f"{label} a répondu HTTP {r.status_code} pour cette page.")
+
+    text = r.text or ''
+    norm = (text.replace('\\u002F', '/').replace('\\u002f', '/').replace('\\/', '/')
+                .replace('\\u0026', '&').replace('&amp;', '&'))
+    urls, seen = [], set()
+    for m in _MODEL_PAGE_FILE_RE.finditer(norm):
+        u = m.group(0).rstrip('.,;)')
+        key = u.split('?')[0]
+        if key in seen:
+            continue
+        seen.add(key)
+        if not _is_public_http_url(u):
+            continue
+        urls.append(u)
+        if len(urls) >= 20:
+            break
+    app_logger.info(f"[{label}] {page_url} : HTTP {r.status_code}, {len(text)} octets, {len(urls)} lien(s) de fichier trouvé(s)")
+    if not urls:
+        hints = sorted(set(re.findall(r'["\'](/[A-Za-z0-9_\-/]*api[A-Za-z0-9_\-/]*)', norm)))[:10]
+        dbg = None
+        try:
+            dbg_dir = os.path.join(DATA_DIR, 'debug')
+            os.makedirs(dbg_dir, exist_ok=True)
+            dbg = os.path.join(dbg_dir, re.sub(r'[^a-z0-9]+', '_', label.lower()) + '_page.html')
+            with open(dbg, 'w', encoding='utf-8') as f_dbg:
+                f_dbg.write(text)
+        except Exception:
+            dbg = None
+        app_logger.info(f"[{label}] aucun lien de fichier dans la page ; chemins d'API repérés : {hints} ; page enregistrée : {dbg}")
+        raise ModelPageError(
+            f"Aucun fichier 3D trouvé dans la page {label} : le site charge probablement ses fichiers via une API "
+            f"qui n'est pas encore prise en charge."
+            + (f" La page a été enregistrée dans {dbg} pour analyse." if dbg else ""), status=404)
+    files = []
+    for idx, u in enumerate(urls):
+        name = unquote(urlparse(u).path.rsplit('/', 1)[-1]) or f"modele_{idx + 1}"
+        files.append({'name': name, 'url': u, 'size': 0})
+    return files
+
+
+# --- Creality Cloud : API de téléchargement 3MF (v0.7.5) ---
+# Le bouton « Télécharger 3MF » du site appelle POST /api/cxy/v3/model/3mfDownload avec {"id": <profileId>}
+# et reçoit une URL signée temporaire. Les en-têtes d'authentification reprennent les cookies de session
+# (model_token / model_user_id).
+CREALITY_3MF_API = "https://www.crealitycloud.com/api/cxy/v3/model/3mfDownload"
+
+
+def _cookie_header_to_dict(header):
+    out = {}
+    for part in (header or '').split(';'):
+        if '=' in part:
+            k, v = part.split('=', 1)
+            out[k.strip()] = v.strip()
+    return out
+
+
+def crealitycloud_get_model_files(page_url, cookie):
+    """Retourne [{'name', 'url', 'size'}] pour le profil d'impression indiqué dans l'URL (profileId=…)."""
+    import uuid
+    from urllib.parse import parse_qs
+    ck_header = _clean_cookie_header(cookie)
+    ck = _cookie_header_to_dict(ck_header)
+    token, uid = ck.get('model_token'), ck.get('model_user_id')
+    if not token or not uid:
+        raise ModelPageError("Compte Creality Cloud non connecté : connecte-toi dans Paramètres → Comptes externes → Creality Cloud.", status=401)
+
+    parsed = urlparse(page_url)
+    profile_id = (parse_qs(parsed.query).get('profileId') or [None])[0]
+    if not profile_id:
+        # Repli : cherche l'identifiant du profil affiché dans la page
+        try:
+            r0 = requests.get(page_url, headers={"User-Agent": _MODEL_PAGE_UA, "Cookie": ck_header}, timeout=30)
+            m = re.search(r'profileId["\']?\s*[:=]\s*["\']?([0-9a-f]{24})', (r0.text or '').replace('\\"', '"'))
+            profile_id = m.group(1) if m else None
+        except requests.RequestException:
+            profile_id = None
+    if not profile_id:
+        raise ModelPageError("Profil d'impression introuvable dans le lien : ouvre le modèle, choisis un profil, puis copie l'URL (elle contient profileId=…).", status=400)
+
+    slug = ''
+    m_slug = re.search(r'/model-detail/([^/?#]+)', parsed.path)
+    if m_slug:
+        slug = unquote(m_slug.group(1))
+    name = re.sub(r'[<>:"/\\|?*]', '_', slug or f"creality_{profile_id}") + '.3mf'
+
+    offset = -(time.altzone if (time.daylight and time.localtime().tm_isdst > 0) else time.timezone)
+    headers = {
+        "User-Agent": _MODEL_PAGE_UA,
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Origin": "https://www.crealitycloud.com",
+        "Referer": page_url,
+        "Cookie": ck_header,
+        "__cxy_app_ch_": "Chrome 124.0",
+        "__cxy_app_id_": "cxy-gen2",
+        "__cxy_app_ver_": "7.3.28",
+        "__cxy_brand_": "creality",
+        "__cxy_duid_": ck.get('model_device_id') or str(uuid.uuid4()),
+        "__cxy_os_lang_": ck.get('__CXY_OS_LANG_') or ck.get('model_lang') or '9',
+        "__cxy_os_ver_": "Windows 10",
+        "__cxy_platform_": "2",
+        "__cxy_requestid_": str(uuid.uuid4()),
+        "__cxy_timezone_": str(offset),
+        "__cxy_token_": token,
+        "__cxy_uid_": uid,
+    }
+    try:
+        r = requests.post(CREALITY_3MF_API, headers=headers, json={"id": profile_id}, timeout=30)
+    except requests.RequestException as e:
+        raise ModelPageError(f"Impossible de joindre Creality Cloud : {e}")
+    if r.status_code in (401, 403):
+        raise ModelPageError(f"Creality Cloud a refusé la requête (HTTP {r.status_code}) : reconnecte-toi dans Paramètres → Comptes externes.", status=r.status_code)
+    try:
+        data = r.json()
+    except ValueError:
+        raise ModelPageError(f"Réponse Creality Cloud invalide (HTTP {r.status_code}).")
+    app_logger.info(f"[Creality Cloud] 3mfDownload profil {profile_id} : HTTP {r.status_code}, code={data.get('code')}, msg={data.get('msg')!r}")
+    url = ((data.get('result') or {}).get('downloadUrl') or '').strip()
+    if data.get('code') != 0 or not url:
+        raise ModelPageError(f"Creality Cloud : téléchargement refusé (code {data.get('code')}{' : ' + str(data.get('msg')) if data.get('msg') else ''}).",
+                             status=401 if data.get('code') in (401, 10001) else 502)
+    if not _is_public_http_url(url):
+        raise ModelPageError("Creality Cloud : lien de téléchargement invalide.")
+    return [{'name': name, 'url': url, 'size': 0}]
+
+
+# --- Snapmaker Space : API de téléchargement (v0.7.5) ---
+# GET https://api-models.snapmaker.com/api/model/download/<id> avec « Authorization: Bearer <JWT> » renvoie
+# les fichiers du modèle (modelFiles) et ceux de chaque profil d'impression (printProfiles), avec des URL signées.
+SNAPMAKER_DOWNLOAD_API = "https://api-models.snapmaker.com/api/model/download/{model_id}"
+
+
+def snapmaker_get_model_files(page_url, stored):
+    parsed = urlparse(page_url)
+    m = re.search(r'/model/(\d+)', parsed.path)
+    if not m:
+        raise ModelPageError("Lien Snapmaker Space invalide. Format attendu : https://space.snapmaker.com/en/model/24304-nom-du-modele", status=400)
+    model_id = m.group(1)
+    mp = re.search(r'profileId[-=](\d+)', (parsed.fragment or '') + '&' + (parsed.query or ''))
+    profile_id = mp.group(1) if mp else None
+
+    tokens = _JWT_RE.findall(stored or '')
+    if not tokens:
+        raise ModelPageError("Compte Snapmaker Space non connecté : connecte-toi dans Paramètres → Comptes externes → Snapmaker Space.", status=401)
+
+    data, last_err = None, None
+    for tok in tokens:
+        headers = {
+            "User-Agent": _MODEL_PAGE_UA,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "x-custom-site": "Web-Space",
+            "Authorization": f"Bearer {tok}",
+            "Origin": "https://space.snapmaker.com",
+            "Referer": "https://space.snapmaker.com/",
+        }
+        try:
+            r = requests.get(SNAPMAKER_DOWNLOAD_API.format(model_id=model_id), headers=headers, timeout=30)
+        except requests.RequestException as e:
+            raise ModelPageError(f"Impossible de joindre Snapmaker Space : {e}")
+        try:
+            js = r.json()
+        except ValueError:
+            last_err = f"réponse invalide (HTTP {r.status_code})"
+            continue
+        app_logger.info(f"[Snapmaker Space] download/{model_id} : HTTP {r.status_code}, code={js.get('code')}, msg={js.get('msg')!r}")
+        if r.status_code == 200 and js.get('code') == 200 and isinstance(js.get('data'), dict):
+            data = js['data']
+            break
+        last_err = f"HTTP {r.status_code}, code {js.get('code')}{' : ' + str(js.get('msg')) if js.get('msg') else ''}"
+    if data is None:
+        raise ModelPageError(f"Snapmaker Space a refusé la requête ({last_err}). La session a peut-être expiré : reconnecte-toi dans Paramètres → Comptes externes.", status=401)
+
+    def _clean(name, fallback):
+        n = re.sub(r'[<>:"/\\|?*]', '_', (name or '').strip()) or fallback
+        return n if os.path.splitext(n)[1] else n + '.3mf'
+
+    files, seen = [], set()
+    profiles = [p for p in (data.get('printProfiles') or []) if isinstance(p, dict) and p.get('downloadUrl')]
+    if profile_id:
+        chosen = [p for p in profiles if str(p.get('profileId')) == profile_id]
+        profiles = chosen or profiles   # profil introuvable : on prend tous les profils
+    for p in profiles:
+        key = p['downloadUrl'].split('?')[0]
+        if key in seen:
+            continue
+        seen.add(key)
+        files.append({'name': _clean(p.get('fileName'), f"snapmaker_{model_id}_{p.get('profileId')}.3mf"), 'url': p['downloadUrl'], 'size': 0})
+    if not (profile_id and files):
+        for f in (data.get('modelFiles') or []):
+            if not isinstance(f, dict) or not f.get('downloadUrl'):
+                continue
+            key = f['downloadUrl'].split('?')[0]
+            if key in seen:
+                continue
+            seen.add(key)
+            files.append({'name': _clean(f.get('fileName'), f"snapmaker_{model_id}_{len(files) + 1}.3mf"), 'url': f['downloadUrl'], 'size': 0})
+    files = [f for f in files if _is_public_http_url(f['url'])]
+    if not files:
+        raise ModelPageError("Aucun fichier téléchargeable pour ce modèle Snapmaker Space.", status=404)
+    return files
+
+
+def _download_model_page_platform(download_id, url, save_dir, label, account_platform, cookie_domains):
+    """Téléchargement générique pour les plateformes dont les fichiers sont lus dans la page du modèle."""
+    cookie = None
+    try:
+        conn = get_db()
+        row = conn.execute(
+            "SELECT api_key FROM account_credentials WHERE user_id = ? AND platform = ?",
+            (session['user_id'], account_platform)
+        ).fetchone()
+        conn.close()
+        if row and row['api_key']:
+            cookie = decrypt_account_secret(row['api_key'])
+    except Exception:
+        pass
+
+    try:
+        if account_platform == 'crealitycloud':
+            files = crealitycloud_get_model_files(url, cookie)
+        elif account_platform == 'snapmaker':
+            files = snapmaker_get_model_files(url, cookie)
+        else:
+            files = model_page_get_files(url, label, cookie)
+    except ModelPageError as err:
+        active_downloads.pop(download_id, None)
+        return jsonify({"error": str(err)}), err.status
+
+    cookie_header = _clean_cookie_header(cookie)
+    total_files = len(files)
+    results = []
+    for idx, nf in enumerate(files):
+        safe = re.sub(r'[<>:"/\\|?*]', '_', nf['name']) or f"{account_platform}_{idx}.3mf"
+        base, ext = os.path.splitext(safe)
+        dest_path = _unique_file_path(save_dir, base, ext)
+        fname_item = os.path.basename(dest_path)
+        active_downloads[download_id]['filename'] = fname_item
+        currently_downloading_paths.add(dest_path.replace('\\', '/'))
+
+        hdrs = {"User-Agent": _MODEL_PAGE_UA, "Referer": url}
+        host = (urlparse(nf['url']).hostname or '').lower()
+        if cookie_header and any(host == d or host.endswith('.' + d) for d in cookie_domains):
+            hdrs["Cookie"] = cookie_header
+
+        file_ok = False
+        try:
+            with requests.get(nf['url'], headers=hdrs, stream=True, timeout=120) as r_dl:
+                r_dl.raise_for_status()
+                total_bytes = int(r_dl.headers.get('Content-Length', 0))
+                downloaded_bytes = 0
+                with open(dest_path, 'wb') as f_out:
+                    for chunk in r_dl.iter_content(chunk_size=65536):
+                        if download_id in cancelled_downloads:
+                            break
+                        if chunk:
+                            f_out.write(chunk)
+                            downloaded_bytes += len(chunk)
+                            base_pct = int(idx * 100 / total_files)
+                            file_pct = int(downloaded_bytes * 100 / total_bytes / total_files) if total_bytes else 0
+                            active_downloads[download_id]['percentage'] = base_pct + file_pct
+            file_ok = download_id not in cancelled_downloads and os.path.getsize(dest_path) > 0
+        except Exception as file_err:
+            app_logger.warning(f"[Download][{label}] Échec sur {fname_item}: {file_err}")
+        finally:
+            if file_ok:
+                mark_download_complete_and_refresh_thumbnail(dest_path)
+                results.append(os.path.basename(dest_path))
+                app_logger.info(f"[Download][{label}] {fname_item} → {dest_path}")
+            else:
+                currently_downloading_paths.discard(dest_path.replace('\\', '/'))
+                try:
+                    if os.path.exists(dest_path):
+                        os.remove(dest_path)
+                except OSError as cleanup_err:
+                    app_logger.warning(f"[Download][{label}] Échec suppression fichier partiel {dest_path}: {cleanup_err}")
+        if download_id in cancelled_downloads:
+            break
+
+    active_downloads.pop(download_id, None)
+    if download_id in cancelled_downloads:
+        cancelled_downloads.discard(download_id)
+        return jsonify({"cancelled": True, "download_id": download_id}), 200
+    if not results:
+        return jsonify({"error": f"Impossible de télécharger les fichiers {label} pour ce modèle."}), 502
+
+    fname = results[0]
+    file_size = os.path.getsize(os.path.join(save_dir, fname))
+    for rf in results:
+        rp = os.path.join(save_dir, rf)
+        save_download_history(session['user_id'], rf, rp, os.path.getsize(rp) if os.path.exists(rp) else 0,
+                              os.path.splitext(rf)[1], url, label)
+    invalidate_cache()
+    return jsonify({
+        "success": True,
+        "filename": fname,
+        "path": os.path.join(save_dir, fname),
+        "size": file_size,
+        "count": len(results),
+    })
+
+
 @app.route('/api/download', methods=['POST'])
 @login_required
 def api_download_file():
@@ -12626,6 +13485,13 @@ def api_download_file():
                 "count": len(results),
             })
 
+        elif _host_matches(parsed.hostname, BROWSER_LOGIN_PLATFORMS['crealitycloud']['site_hosts']):
+            return _download_model_page_platform(download_id, url, save_dir, 'Creality Cloud', 'crealitycloud',
+                                                 BROWSER_LOGIN_PLATFORMS['crealitycloud']['cookie_domains'])
+
+        elif _host_matches(parsed.hostname, BROWSER_LOGIN_PLATFORMS['snapmaker']['site_hosts']):
+            return _download_model_page_platform(download_id, url, save_dir, 'Snapmaker Space', 'snapmaker', ())
+
         elif 'makerworld.com' in parsed.netloc:
             m_id = re.search(r'/models/(\d+)', parsed.path)
             if not m_id:
@@ -12801,6 +13667,12 @@ def api_download_file():
                 active_downloads.pop(download_id, None)
                 return jsonify({
                     "error": "Thingiverse requiert une clé API pour télécharger. Ajoutez votre token dans Paramètres → Comptes externes → Thingiverse."
+                }), 400
+
+            if 'text/html' in content_type.lower():
+                active_downloads.pop(download_id, None)
+                return jsonify({
+                    "error": "Cette adresse mène à une page web et non à un fichier 3D : plateforme non prise en charge ou lien incorrect."
                 }), 400
 
             cd = r.headers.get('Content-Disposition', '')
@@ -13853,6 +14725,8 @@ def api_accounts_status():
         'makerworld': False,
         'tigertag': False,
         'nexprint': False,
+        'crealitycloud': False,
+        'snapmaker': False,
     }
 
     conn = get_db()
@@ -13874,6 +14748,12 @@ def api_accounts_status():
             if acc['email']:
                 status['nexprint_email'] = acc['email']
                 status['nexprint_has_password'] = bool(acc['password_encrypted'])
+        elif platform in ('crealitycloud', 'snapmaker'):
+            if acc['api_key']:
+                status[platform] = True
+            if acc['email']:
+                status[platform + '_email'] = acc['email']
+                status[platform + '_has_password'] = bool(acc['password_encrypted'])
         elif platform == 'makerworld' and acc['api_key']:
             status['makerworld'] = True
             status['makerworld_email'] = acc['email'] or ''
@@ -16001,7 +16881,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.7.4"
+CURRENT_VERSION = "0.7.5"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -16820,6 +17700,54 @@ def api_discover_printers():
         filtered.append(r)
 
     return jsonify({"printers": filtered}), 200
+
+
+# --- Miniature du fichier en cours pour les impressions lancées hors Stellio (Klipper / Moonraker) ---
+def _klipper_fetch_job_thumbnail(base, filename):
+    """Miniature intégrée au G-code (slicer) via Moonraker : (octets, type MIME) ou None."""
+    from urllib.parse import quote
+    meta = requests.get(f"{base}/server/files/metadata", params={'filename': filename}, timeout=5).json()
+    thumbs = [t for t in ((meta.get('result') or {}).get('thumbnails') or []) if t.get('relative_path')]
+    if not thumbs:
+        return None
+    # plus grande miniature de 400 px de large maximum, sinon la plus petite disponible
+    small = [t for t in thumbs if (t.get('width') or 0) <= 400]
+    best = max(small, key=lambda t: (t.get('width') or 0) * (t.get('height') or 0)) if small \
+        else min(thumbs, key=lambda t: (t.get('width') or 0) * (t.get('height') or 0))
+    folder = os.path.dirname(filename.replace('\\', '/'))
+    rel = best['relative_path']
+    path = f"{folder}/{rel}" if folder else rel
+    img = requests.get(f"{base}/server/files/gcodes/{quote(path)}", timeout=8)
+    img.raise_for_status()
+    return img.content, img.headers.get('Content-Type', 'image/png')
+
+
+@app.route('/api/printers/<int:pid>/job-thumb', methods=['GET'])
+@login_required
+def api_printer_job_thumb(pid):
+    conn = get_db()
+    p = conn.execute("SELECT * FROM printers WHERE id = ? AND user_id = ?", (pid, session['user_id'])).fetchone()
+    conn.close()
+    if not p:
+        return jsonify({"error": "Not found"}), 404
+    printer = parse_printer_config(p)
+    if printer.get('type') != 'klipper':
+        return jsonify({"error": "Miniature non disponible pour ce type d'imprimante"}), 404
+    filename = (request.args.get('file') or '').strip()
+    if not filename or '..' in filename.replace('\\', '/').split('/'):
+        return jsonify({"error": "Fichier invalide"}), 400
+    cfg = printer.get('config') if isinstance(printer.get('config'), dict) else {}
+    base = f"http://{printer['ip']}:{cfg.get('port', '7125')}"
+    try:
+        result = _klipper_fetch_job_thumbnail(base, filename)
+    except Exception as e:
+        app_logger.info(f"[Printer] Miniature du job indisponible ({filename}): {e}")
+        result = None
+    if not result:
+        return jsonify({"error": "Miniature non trouvée"}), 404
+    resp = Response(result[0], mimetype=result[1])
+    resp.headers['Cache-Control'] = 'private, max-age=300'
+    return resp
 
 
 @app.route('/api/printers/<int:pid>/status', methods=['GET'])

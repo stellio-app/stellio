@@ -8378,3 +8378,46 @@ body.role-viewer .nav-btn[data-page="settings"] {
 }
 .gallery-file-link:hover { background: var(--bg-tertiary); color: var(--accent); }
 
+<<<<<<< HEAD
+=======
+
+
+/* --- v0.7.5 : filtre des projets --- */
+.projects-filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 14px; }
+.projects-filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.projects-filter-count { display: inline-block; min-width: 18px; margin-left: 4px; padding: 0 5px; border-radius: 9px; background: rgba(127,127,127,0.22); font-size: 10px; font-weight: 600; text-align: center; }
+.projects-filter-btn.active .projects-filter-count { background: rgba(255,255,255,0.25); }
+
+/* --- v0.7.5 : widget galerie du tableau de bord (diaporama) --- */
+.dash-gallery { position: relative; }
+.dash-gallery-stage { position: relative; width: 100%; aspect-ratio: 16 / 10; border-radius: var(--radius); overflow: hidden; background: var(--bg-card); border: 1px solid var(--border); cursor: pointer; }
+.dash-gallery-slide { position: absolute; inset: 0; opacity: 0; transition: opacity 0.6s ease; pointer-events: none; }
+.dash-gallery-slide.active { opacity: 1; pointer-events: auto; }
+.dash-gallery-slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.dash-gallery-caption { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 6px; padding: 18px 10px 8px; background: linear-gradient(transparent, rgba(0,0,0,0.65)); color: #fff; font-size: 11px; font-weight: 600; }
+.dash-gallery-caption-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-gallery-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; }
+.dash-gallery-dot.ok { background: #28a745; }
+.dash-gallery-dot.fail { background: #dc3545; }
+.dash-gallery-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; border: none; border-radius: 50%; background: rgba(0,0,0,0.55); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s ease; }
+.dash-gallery-nav.prev { left: 8px; }
+.dash-gallery-nav.next { right: 8px; }
+.dash-gallery:hover .dash-gallery-nav, .dash-gallery-nav:focus-visible { opacity: 1; }
+.dash-gallery-counter { position: absolute; top: 8px; right: 8px; padding: 2px 8px; border-radius: 10px; background: rgba(0,0,0,0.55); color: #fff; font-size: 10px; font-weight: 600; }
+.reduce-motion .dash-gallery-slide { transition: none; }
+@media (hover: none) { .dash-gallery-nav { opacity: 1; } }
+
+
+/* --- v0.7.5 : miniature du fichier en cours dans les cartes imprimante --- */
+.printer-card-job { align-items: center; gap: 10px; margin-top: 8px; padding: 6px; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border); }
+.printer-card-job-thumb { flex: 0 0 auto; width: 48px; height: 48px; border-radius: 6px; overflow: hidden; background: var(--bg-input); display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+.printer-card-job-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.printer-card-job-name { min-width: 0; font-size: 12px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- v0.7.5 : comptes externes dépliables --- */
+.account-card[data-collapsible] > .account-card-header { cursor: pointer; user-select: none; gap: 8px; }
+.account-card-arrow { margin-left: 8px; font-size: 11px; color: var(--text-muted); transition: transform 0.2s ease; }
+.account-card.open .account-card-arrow { transform: rotate(180deg); }
+.account-card[data-collapsible] > .account-card-body { display: none; }
+.account-card[data-collapsible].open > .account-card-body { display: block; }
+>>>>>>> bb1f10f (V 0.7.5)

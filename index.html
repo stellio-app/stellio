@@ -608,6 +608,30 @@
                                 </div>
                             </div>
 
+                            <div class="dashboard-widget" id="dashboard-widget-projects-done" data-widget-id="projects_done" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-circle-check"></i> <span data-i18n="dashboard.projects_done_title">Projets terminés</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="setProjectsFilter('done'); document.querySelector('.nav-btn[data-page=&quot;projects&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('projects_done')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-projects-done-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-gallery" data-widget-id="gallery" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-camera"></i> <span data-i18n="dashboard.gallery_title">Galerie</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;gallery&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('gallery')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-gallery-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
                             <div class="dashboard-widget" id="dashboard-widget-stats" data-widget-id="stats" draggable="false">
                                 <div class="dashboard-widget-header">
                                     <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
@@ -852,6 +876,14 @@
                             <button class="btn btn-primary btn-sm" onclick="openProjectFormModal()">
                                 <i class="fa-solid fa-plus"></i> <span data-i18n="projects.new">Nouveau projet</span>
                             </button>
+                        </div>
+                        <div id="projects-filter-bar" class="projects-filter-bar hidden">
+                            <button type="button" class="btn btn-ghost btn-sm projects-filter-btn active" data-filter="all" onclick="setProjectsFilter('all')"><span data-i18n="projects.filter_all">Tous</span> <span class="projects-filter-count"></span></button>
+                            <button type="button" class="btn btn-ghost btn-sm projects-filter-btn" data-filter="in_progress" onclick="setProjectsFilter('in_progress')"><span data-i18n="projects.filter_in_progress">En cours</span> <span class="projects-filter-count"></span></button>
+                            <button type="button" class="btn btn-ghost btn-sm projects-filter-btn" data-filter="done" onclick="setProjectsFilter('done')"><span data-i18n="projects.filter_done">Terminés</span> <span class="projects-filter-count"></span></button>
+                        </div>
+                        <div id="projects-filter-empty" class="empty-state hidden">
+                            <p data-i18n="projects.filter_empty">Aucun projet dans cette catégorie</p>
                         </div>
                         <div id="projects-loading" class="stats-loading">
                             <i class="fa-solid fa-spinner fa-spin fa-2x" style="color:var(--accent);"></i>
@@ -1482,6 +1514,7 @@
                                             <div class="account-icon-badge" style="background:rgba(0,130,200,0.15);color:#0082c8;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="22"/><line x1="2" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="22" y2="12"/></svg></div>
                                             <div><div style="font-weight:600;font-size:13px;">Spoolman</div><div style="font-size:11px;color:var(--text-muted);" data-i18n="settings.self_hosted_server">Serveur auto-hébergé</div></div>
                                         </div>
+                                        <span id="spoolman-status-badge" class="account-badge disconnected" data-i18n="settings.account_not_configured">Non configuré</span>
                                     </div>
                                 <div id="spoolman-configured-view" style="margin-top:10px;display:none;flex-direction:column;gap:8px;">
                                     <label style="font-size:13px;color:var(--text-secondary);" data-i18n="settings.server_url">URL du serveur</label>
@@ -1826,6 +1859,70 @@
                                         </div>
                                         <button id="thingiverse-edit-btn" class="btn btn-ghost btn-sm" style="display:none;margin-top:10px;" onclick="showAccountKeyInput('thingiverse')"><i class="fa-solid fa-pen"></i> <span data-i18n="actions.edit">Modifier</span></button>
                                         <p class="settings-hint" style="margin-top:6px;"><span data-i18n="settings.hint">Obtenir sur</span> <a href="https://www.thingiverse.com/apps/create" style="color:var(--accent)" target="_blank" rel="noopener noreferrer">thingiverse.com/apps/create</a></p>
+                                    </div>
+
+                                    <div class="account-card" style="margin-top:12px;">
+                                        <div class="account-card-header">
+                                            <div style="display:flex;align-items:center;gap:10px;">
+                                                <div class="account-icon-badge" style="background:rgba(0,150,214,0.15);color:#0096d6;"><i class="fa-solid fa-cloud"></i></div>
+                                                <div><div style="font-weight:600;font-size:13px;">Creality Cloud</div><div style="font-size:11px;color:var(--text-muted);">crealitycloud.com</div></div>
+                                            </div>
+                                            <span id="crealitycloud-status-badge" class="account-badge disconnected" data-i18n="settings.account_not_configured">Non configuré</span>
+                                        </div>
+                                        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+                                            <input type="email" id="crealitycloud-email" autocomplete="off" data-i18n-placeholder="accounts.crealitycloud_email_ph" placeholder="Email du compte Creality Cloud"
+                                                style="flex:1;min-width:160px;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;">
+                                            <input type="password" id="crealitycloud-password" autocomplete="new-password" data-i18n-placeholder="accounts.nexprint_password_ph" placeholder="Mot de passe"
+                                                style="flex:1;min-width:160px;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;">
+                                        </div>
+                                        <div style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;padding:8px 10px;border-radius:var(--radius);background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);font-size:11px;color:var(--text-primary);">
+                                            <i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;margin-top:2px;"></i>
+                                            <span data-i18n="accounts.crealitycloud_google_warning">La connexion avec Google n'est pas prise en charge : utilise l'email et le mot de passe de ton compte Creality Cloud.</span>
+                                        </div>
+                                        <button id="crealitycloud-login-btn" class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="platformBrowserLogin('crealitycloud', 'Creality Cloud')"><i class="fa-solid fa-right-to-bracket"></i> <span data-i18n="accounts.crealitycloud_login_btn">Se connecter avec Creality Cloud</span></button>
+                                        <p class="settings-hint" style="margin-top:6px;" data-i18n="accounts.platform_login_hint">Stellio remplit le formulaire du site officiel dans une fenêtre puis enregistre la session. L'email et le mot de passe sont stockés chiffrés sur cet appareil. Si le site demande une vérification (code, captcha), termine-la dans la fenêtre.</p>
+                                        <details style="margin-top:8px;">
+                                            <summary style="cursor:pointer;font-size:11px;color:var(--text-muted);" data-i18n="accounts.platform_manual_title">Méthode manuelle (cookies de session)</summary>
+                                            <div id="crealitycloud-key-row" style="display:flex;gap:8px;margin-top:10px;">
+                                                <input type="password" id="crealitycloud-api-key" autocomplete="off" data-i18n-placeholder="accounts.platform_manual_ph" placeholder="Ou colle l'en-tête Cookie..."
+                                                    style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;font-family:monospace;">
+                                                <button class="btn btn-primary btn-sm" onclick="saveAccountKey('crealitycloud')"><i class="fa-solid fa-floppy-disk"></i></button>
+                                            </div>
+                                            <button id="crealitycloud-edit-btn" class="btn btn-ghost btn-sm" style="display:none;margin-top:10px;" onclick="showAccountKeyInput('crealitycloud')"><i class="fa-solid fa-pen"></i> <span data-i18n="actions.edit">Modifier</span></button>
+                                            <p class="settings-hint" style="margin-top:6px;" data-i18n="accounts.platform_manual_hint">Méthode manuelle (si la fenêtre ne fonctionne pas) : connecte-toi sur le site, ouvre les outils du navigateur (F12 → Réseau), clique sur une requête vers le site et copie la valeur de l'en-tête « Cookie ».</p>
+                                        </details>
+                                    </div>
+
+                                    <div class="account-card" style="margin-top:12px;">
+                                        <div class="account-card-header">
+                                            <div style="display:flex;align-items:center;gap:10px;">
+                                                <div class="account-icon-badge" style="background:rgba(226,35,26,0.15);color:#e2231a;"><i class="fa-solid fa-cube"></i></div>
+                                                <div><div style="font-weight:600;font-size:13px;">Snapmaker Space</div><div style="font-size:11px;color:var(--text-muted);">space.snapmaker.com</div></div>
+                                            </div>
+                                            <span id="snapmaker-status-badge" class="account-badge disconnected" data-i18n="settings.account_not_configured">Non configuré</span>
+                                        </div>
+                                        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+                                            <input type="email" id="snapmaker-email" autocomplete="off" data-i18n-placeholder="accounts.snapmaker_email_ph" placeholder="Email du compte Snapmaker Space"
+                                                style="flex:1;min-width:160px;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;">
+                                            <input type="password" id="snapmaker-password" autocomplete="new-password" data-i18n-placeholder="accounts.nexprint_password_ph" placeholder="Mot de passe"
+                                                style="flex:1;min-width:160px;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;">
+                                        </div>
+                                        <div style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;padding:8px 10px;border-radius:var(--radius);background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);font-size:11px;color:var(--text-primary);">
+                                            <i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;margin-top:2px;"></i>
+                                            <span data-i18n="accounts.snapmaker_google_warning">La connexion avec Google n'est pas prise en charge : utilise l'email et le mot de passe de ton compte Snapmaker Space.</span>
+                                        </div>
+                                        <button id="snapmaker-login-btn" class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="platformBrowserLogin('snapmaker', 'Snapmaker Space')"><i class="fa-solid fa-right-to-bracket"></i> <span data-i18n="accounts.snapmaker_login_btn">Se connecter avec Snapmaker Space</span></button>
+                                        <p class="settings-hint" style="margin-top:6px;" data-i18n="accounts.platform_login_hint">Stellio remplit le formulaire du site officiel dans une fenêtre puis enregistre la session. L'email et le mot de passe sont stockés chiffrés sur cet appareil. Si le site demande une vérification (code, captcha), termine-la dans la fenêtre.</p>
+                                        <details style="margin-top:8px;">
+                                            <summary style="cursor:pointer;font-size:11px;color:var(--text-muted);" data-i18n="accounts.platform_manual_title">Méthode manuelle (cookies de session)</summary>
+                                            <div id="snapmaker-key-row" style="display:flex;gap:8px;margin-top:10px;">
+                                                <input type="password" id="snapmaker-api-key" autocomplete="off" data-i18n-placeholder="accounts.platform_manual_ph" placeholder="Ou colle l'en-tête Cookie..."
+                                                    style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;font-family:monospace;">
+                                                <button class="btn btn-primary btn-sm" onclick="saveAccountKey('snapmaker')"><i class="fa-solid fa-floppy-disk"></i></button>
+                                            </div>
+                                            <button id="snapmaker-edit-btn" class="btn btn-ghost btn-sm" style="display:none;margin-top:10px;" onclick="showAccountKeyInput('snapmaker')"><i class="fa-solid fa-pen"></i> <span data-i18n="actions.edit">Modifier</span></button>
+                                            <p class="settings-hint" style="margin-top:6px;" data-i18n="accounts.platform_manual_hint">Méthode manuelle (si la fenêtre ne fonctionne pas) : connecte-toi sur le site, ouvre les outils du navigateur (F12 → Réseau), clique sur une requête vers le site et copie la valeur de l'en-tête « Cookie ».</p>
+                                        </details>
                                     </div>
 
                                     <div class="account-card" style="margin-top:12px;">
@@ -3152,6 +3249,8 @@
                     <select id="filter-print-status" class="settings-select" style="width:100%;">
                         <option value="" data-i18n="filters.print_status_all">Tous</option>
                         <option value="never" data-i18n="filters.print_status_never">Jamais imprimé</option>
+                        <option value="sent" data-i18n="filters.print_status_sent">Envoyé au slicer</option>
+                        <option value="printed" data-i18n="filters.print_status_printed">Déjà imprimé (réussi ou raté)</option>
                         <option value="success" data-i18n="filters.print_status_success">Déjà réussi</option>
                         <option value="failed" data-i18n="filters.print_status_failed">Déjà échoué (jamais réussi)</option>
                     </select>
@@ -3349,7 +3448,7 @@
 						</div>
 
 
-						<div style="margin-bottom: 0;">
+						<div style="margin-bottom: 8px;">
 							<button type="button" class="btn btn-ghost btn-sm btn-block"
 									onclick="toggleAstuceSubmenu('thingiverse-astuces')"
 									style="justify-content: space-between; text-align: left;">
@@ -3366,6 +3465,67 @@
 								<div style="margin-top: 8px; padding: 6px 8px; background: rgba(33, 150, 243, 0.1); border-left: 3px solid #2196F3; border-radius: 4px;">
 									<i class="fa-solid fa-circle-info" style="color: #2196F3;"></i>
 									<small style="color: var(--text-secondary);" data-i18n="tips.thingiverse.note">Téléchargement direct une fois renseigner le token dans les paramètres</small>
+								</div>
+							</div>
+						</div>
+
+						<div style="margin-bottom: 8px;">
+							<button type="button" class="btn btn-ghost btn-sm btn-block"
+									onclick="toggleAstuceSubmenu('nexprint-astuces')"
+									style="justify-content: space-between; text-align: left;">
+								<span><i class="fa-solid fa-globe" style="color: #2563eb; margin-right: 8px;"></i> Nexprint</span>
+								<i class="fa-solid fa-chevron-right" id="nexprint-astuces-icon"></i>
+							</button>
+							<div id="nexprint-astuces" style="display: none; margin-top: 8px; padding: 10px; background: var(--bg-primary); border-radius: 6px; font-size: 12px; line-height: 1.6;">
+								<strong style="color: var(--accent);" data-i18n="tips.nexprint.title">Comment télécharger depuis Nexprint :</strong><br>
+								<span data-i18n="tips.makerworld.step1_pre">1. Va sur </span><a href="https://www.nexprint.com" target="_blank" style="color: var(--accent);">nexprint.com</a><br>
+								<span data-i18n="tips.makerworld.step2">2. Trouve le modèle à télécharger</span><br>
+								<span data-i18n="tips.makerworld.step3">3. Copie l'URL de la page</span><br>
+								&nbsp;&nbsp;&nbsp;&nbsp;<code style="background:var(--bg-input); padding:2px 6px; border-radius:4px; font-size:11px;">https://www.nexprint.com/models/G1234567</code><br>
+								<span data-i18n="tips.makerworld.step4">4. Colle le lien ci-dessus</span><br>
+								<div style="margin-top: 8px; padding: 6px 8px; background: rgba(37, 99, 235, 0.1); border-left: 3px solid #2563eb; border-radius: 4px;">
+									<i class="fa-solid fa-circle-info" style="color: #2563eb;"></i>
+									<small style="color: var(--text-secondary);" data-i18n="tips.nexprint.note">Compte requis : connecte-toi d'abord dans Paramètres → Comptes externes → Nexprint</small>
+								</div>
+							</div>
+						</div>
+
+						<div style="margin-bottom: 8px;">
+							<button type="button" class="btn btn-ghost btn-sm btn-block"
+									onclick="toggleAstuceSubmenu('crealitycloud-astuces')"
+									style="justify-content: space-between; text-align: left;">
+								<span><i class="fa-solid fa-globe" style="color: #0096d6; margin-right: 8px;"></i> Creality Cloud</span>
+								<i class="fa-solid fa-chevron-right" id="crealitycloud-astuces-icon"></i>
+							</button>
+							<div id="crealitycloud-astuces" style="display: none; margin-top: 8px; padding: 10px; background: var(--bg-primary); border-radius: 6px; font-size: 12px; line-height: 1.6;">
+								<strong style="color: var(--accent);" data-i18n="tips.crealitycloud.title">Comment télécharger depuis Creality Cloud :</strong><br>
+								<span data-i18n="tips.makerworld.step1_pre">1. Va sur </span><a href="https://www.crealitycloud.com" target="_blank" style="color: var(--accent);">crealitycloud.com</a><br>
+								<span data-i18n="tips.makerworld.step2">2. Trouve le modèle à télécharger</span><br>
+								<span data-i18n="tips.makerworld.step3">3. Copie l'URL de la page</span><br>
+								<span data-i18n="tips.makerworld.step4">4. Colle le lien ci-dessus</span><br>
+								<div style="margin-top: 8px; padding: 6px 8px; background: rgba(0, 150, 214, 0.1); border-left: 3px solid #0096d6; border-radius: 4px;">
+									<i class="fa-solid fa-circle-info" style="color: #0096d6;"></i>
+									<small style="color: var(--text-secondary);" data-i18n="tips.crealitycloud.note">Compte requis : connecte-toi d'abord dans Paramètres → Comptes externes → Creality Cloud (la connexion Google n'est pas prise en charge)</small>
+								</div>
+							</div>
+						</div>
+
+						<div style="margin-bottom: 8px;">
+							<button type="button" class="btn btn-ghost btn-sm btn-block"
+									onclick="toggleAstuceSubmenu('snapmaker-astuces')"
+									style="justify-content: space-between; text-align: left;">
+								<span><i class="fa-solid fa-globe" style="color: #e2231a; margin-right: 8px;"></i> Snapmaker Space</span>
+								<i class="fa-solid fa-chevron-right" id="snapmaker-astuces-icon"></i>
+							</button>
+							<div id="snapmaker-astuces" style="display: none; margin-top: 8px; padding: 10px; background: var(--bg-primary); border-radius: 6px; font-size: 12px; line-height: 1.6;">
+								<strong style="color: var(--accent);" data-i18n="tips.snapmaker.title">Comment télécharger depuis Snapmaker Space :</strong><br>
+								<span data-i18n="tips.makerworld.step1_pre">1. Va sur </span><a href="https://space.snapmaker.com" target="_blank" style="color: var(--accent);">space.snapmaker.com</a><br>
+								<span data-i18n="tips.makerworld.step2">2. Trouve le modèle à télécharger</span><br>
+								<span data-i18n="tips.makerworld.step3">3. Copie l'URL de la page</span><br>
+								<span data-i18n="tips.makerworld.step4">4. Colle le lien ci-dessus</span><br>
+								<div style="margin-top: 8px; padding: 6px 8px; background: rgba(226, 35, 26, 0.1); border-left: 3px solid #e2231a; border-radius: 4px;">
+									<i class="fa-solid fa-circle-info" style="color: #e2231a;"></i>
+									<small style="color: var(--text-secondary);" data-i18n="tips.snapmaker.note">Compte requis : connecte-toi d'abord dans Paramètres → Comptes externes → Snapmaker Space (la connexion Google n'est pas prise en charge)</small>
 								</div>
 							</div>
 						</div>
@@ -3692,6 +3852,11 @@
                     <span class="file-action-label" data-i18n="modal.regen_thumb">Régénérer la miniature</span>
                     <i class="fa-solid fa-chevron-right file-action-arrow"></i>
                 </button>
+                <button class="file-action-row" id="ctx-split-btn" style="display:none;">
+                    <span class="file-action-icon"><i class="fa-solid fa-scissors"></i></span>
+                    <span class="file-action-label" data-i18n="modal.split_plates">Découper les plateaux</span>
+                    <i class="fa-solid fa-chevron-right file-action-arrow"></i>
+                </button>
             </div>
         </div>
     </div>
@@ -3862,6 +4027,34 @@
                 <button class="btn btn-ghost" onclick="closeModal('modal-rename-file')" data-i18n="actions.cancel">Annuler</button>
                 <button class="btn btn-primary" onclick="confirmRenameFile()">
                     <i class="fa-solid fa-check"></i> <span data-i18n="actions.rename">Renommer</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-split-plates" class="modal hidden">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-scissors"></i> <span data-i18n="modal.split_plates">Découper les plateaux</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-split-plates')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="split-plates-name" style="font-size:13px; font-weight:600; margin-bottom:8px; word-break:break-all;"></p>
+                <p id="split-plates-hint" style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;"></p>
+                <p style="font-size:12px; font-weight:600; margin-bottom:8px;" data-i18n="modal.split_plates_format">Format des fichiers créés</p>
+                <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:8px; cursor:pointer;">
+                    <input type="radio" name="split-plates-format" value="3mf" checked>
+                    <span data-i18n="modal.split_plates_3mf">3MF — conserve les réglages du plateau</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                    <input type="radio" name="split-plates-format" value="stl">
+                    <span data-i18n="modal.split_plates_stl">STL — géométrie seule</span>
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" onclick="closeModal('modal-split-plates')" data-i18n="actions.cancel">Annuler</button>
+                <button class="btn btn-primary" id="split-plates-confirm-btn" onclick="confirmSplitPlates()">
+                    <i class="fa-solid fa-scissors"></i> <span data-i18n="modal.split_plates_confirm">Découper</span>
                 </button>
             </div>
         </div>

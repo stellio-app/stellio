@@ -258,7 +258,15 @@ function _dedupeFilesByPath(list) {
 let filteredFiles = [];
 let currentSlicerFile = null;
 let currentView = 'gallery';
-let currentSort = 'name-asc';
+const LIBRARY_SORT_STORAGE_KEY = 'stellio-library-sort';
+const LIBRARY_SORT_VALUES = ['name-asc', 'name-desc', 'folder-asc', 'folder-desc', 'size-asc', 'size-desc', 'date-desc', 'date-asc', 'tag-asc', 'tag-desc'];
+let currentSort = (() => {
+    try {
+        const saved = localStorage.getItem(LIBRARY_SORT_STORAGE_KEY);
+        if (saved && LIBRARY_SORT_VALUES.includes(saved)) return saved;
+    } catch (e) { /* stockage local indisponible : tri par défaut */ }
+    return 'name-asc';
+})();
 let allTags = [];
 let currentTagFile = null;
 let activeTagFilters = new Set();
@@ -2592,7 +2600,7 @@ async function dismissWhatsNew() {
 window.dismissWhatsNew = dismissWhatsNew;
 
 // --- Tableau de bord ---
-const DASHBOARD_WIDGET_IDS = ['printers', 'stock', 'history', 'recent', 'sos', 'favorites', 'projects', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'suggestions', 'backups', 'issues'];
+const DASHBOARD_WIDGET_IDS = ['printers', 'stock', 'history', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'suggestions', 'backups', 'issues'];
 let _dashboardEditMode = false;
 let _draggedDashboardWidget = null;
 
@@ -2606,6 +2614,8 @@ async function loadDashboard() {
     _loadDashboardSos();
     _loadDashboardFavorites();
     _loadDashboardProjects();
+    _loadDashboardDoneProjects();
+    _loadDashboardGallery();
     _loadDashboardStats();
     _loadDashboardMaintenance();
     _loadDashboardQueue();
@@ -2914,6 +2924,128 @@ async function _loadDashboardProjects() {
     }
 }
 
+function _isProjectDone(p) {
+    return p.status === 'done' || ((p.total_needed || 0) > 0 && (p.total_printed || 0) >= p.total_needed);
+}
+
+async function _loadDashboardDoneProjects() {
+    const body = document.getElementById('dashboard-projects-done-body');
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/api/projects`, { cache: 'no-store' });
+        const projects = await res.json();
+        const done = (Array.isArray(projects) ? projects : [])
+            .filter(_isProjectDone)
+            .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))
+            .slice(0, 5);
+        if (!done.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-circle-check"></i><p>${escapeHtml(_t2('dashboard.projects_done_empty', 'Aucun projet terminé pour l\'instant'))}</p></div>`;
+            return;
+        }
+        body.innerHTML = done.map(p => `
+            <div class="dashboard-row" onclick="openProjectDetailModal(${p.id})" style="cursor:pointer;">
+                <div class="dashboard-row-icon" style="background:${p.color || 'var(--accent)'}22;color:${p.color || 'var(--accent)'};"><i class="fa-solid fa-circle-check"></i></div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>
+                    <div class="progress-track" style="margin-top:4px;"><div class="progress-bar" style="width:100%;"></div></div>
+                </div>
+                <div class="dashboard-row-meta">${p.total_printed || 0}/${p.total_needed || 0}</div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('[Dashboard] Erreur projets terminés:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
+// --- Widget « Galerie » : diaporama des photos d'impression ---
+let _dashGalleryTimer = null;
+let _dashGalleryPhotos = [];
+let _dashGalleryIdx = 0;
+const DASH_GALLERY_INTERVAL_MS = 4500;
+const DASH_GALLERY_MAX_SLIDES = 24;
+
+function _dashGalleryStop() {
+    if (_dashGalleryTimer) { clearInterval(_dashGalleryTimer); _dashGalleryTimer = null; }
+}
+
+function _dashGalleryStart() {
+    _dashGalleryStop();
+    if (_dashGalleryPhotos.length < 2) return;
+    if (document.documentElement.classList.contains('reduce-motion')) return;
+    _dashGalleryTimer = setInterval(() => {
+        const body = document.getElementById('dashboard-gallery-body');
+        if (!body || !body.isConnected) { _dashGalleryStop(); return; }
+        if (body.offsetParent === null) return; // tableau de bord non visible : on ne fait pas défiler
+        _dashGalleryGo(_dashGalleryIdx + 1);
+    }, DASH_GALLERY_INTERVAL_MS);
+}
+
+function _dashGalleryGo(i) {
+    const body = document.getElementById('dashboard-gallery-body');
+    if (!body) return;
+    const slides = body.querySelectorAll('.dash-gallery-slide');
+    if (!slides.length) return;
+    _dashGalleryIdx = ((i % slides.length) + slides.length) % slides.length;
+    slides.forEach((s, n) => s.classList.toggle('active', n === _dashGalleryIdx));
+    const counter = body.querySelector('.dash-gallery-counter');
+    if (counter) counter.textContent = `${_dashGalleryIdx + 1} / ${slides.length}`;
+}
+
+window.dashboardGalleryStep = function (delta, ev) {
+    if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+    _dashGalleryGo(_dashGalleryIdx + delta);
+    _dashGalleryStart();
+};
+
+window.dashboardGalleryOpen = function () {
+    const p = _dashGalleryPhotos[_dashGalleryIdx];
+    if (p && typeof window.openPhotoLightbox === 'function') window.openPhotoLightbox(`${API}${p.url}`, p.file_name || '');
+};
+
+async function _loadDashboardGallery() {
+    const body = document.getElementById('dashboard-gallery-body');
+    if (!body) return;
+    _dashGalleryStop();
+    try {
+        const res = await fetch(`${API}/api/print-photos`, { cache: 'no-store' });
+        const photos = await res.json();
+        if (!res.ok || !Array.isArray(photos) || !photos.length) {
+            _dashGalleryPhotos = [];
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-camera"></i><p>${escapeHtml(_t2('dashboard.gallery_empty', 'Aucune photo pour l\'instant'))}</p></div>`;
+            return;
+        }
+        _dashGalleryPhotos = photos.slice(0, DASH_GALLERY_MAX_SLIDES);
+        _dashGalleryIdx = 0;
+        const prevLabel = escapeHtml(_t2('dashboard.gallery_prev', 'Photo précédente'));
+        const nextLabel = escapeHtml(_t2('dashboard.gallery_next', 'Photo suivante'));
+        body.innerHTML = `
+            <div class="dash-gallery">
+                <div class="dash-gallery-stage" onclick="dashboardGalleryOpen()">
+                    ${_dashGalleryPhotos.map((p, n) => `
+                        <div class="dash-gallery-slide${n === 0 ? ' active' : ''}">
+                            <img src="${API}${p.url}" alt="${escapeHtml(p.file_name || '')}" loading="${n < 2 ? 'eager' : 'lazy'}">
+                            <div class="dash-gallery-caption">
+                                <span class="dash-gallery-dot ${p.result === 'failed' ? 'fail' : 'ok'}"></span>
+                                <span class="dash-gallery-caption-text">${escapeHtml(p.file_name || '')}</span>
+                            </div>
+                        </div>`).join('')}
+                </div>
+                ${_dashGalleryPhotos.length > 1 ? `
+                    <button type="button" class="dash-gallery-nav prev" onclick="dashboardGalleryStep(-1, event)" title="${prevLabel}" aria-label="${prevLabel}"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button type="button" class="dash-gallery-nav next" onclick="dashboardGalleryStep(1, event)" title="${nextLabel}" aria-label="${nextLabel}"><i class="fa-solid fa-chevron-right"></i></button>
+                    <div class="dash-gallery-counter">1 / ${_dashGalleryPhotos.length}</div>` : ''}
+            </div>`;
+        const root = body.querySelector('.dash-gallery');
+        root?.addEventListener('mouseenter', _dashGalleryStop);
+        root?.addEventListener('mouseleave', _dashGalleryStart);
+        _dashGalleryStart();
+    } catch (err) {
+        console.error('[Dashboard] Erreur galerie:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
 async function _loadDashboardStats() {
     const body = document.getElementById('dashboard-stats-body');
     if (!body) return;
@@ -3075,6 +3207,8 @@ async function _loadDashboardAccounts() {
             { id: 'thingiverse', name: 'Thingiverse', icon: 'fa-cube' },
             { id: 'makerworld', name: 'MakerWorld', icon: 'fa-globe', email: st.makerworld_email },
             { id: 'nexprint', name: 'Nexprint', icon: 'fa-print' },
+            { id: 'crealitycloud', name: 'Creality Cloud', icon: 'fa-cloud', email: st.crealitycloud_email },
+            { id: 'snapmaker', name: 'Snapmaker Space', icon: 'fa-cube', email: st.snapmaker_email },
             { id: 'tigertag', name: 'TigerTag', icon: 'fa-tag', email: st.tigertag_email },
         ].map(p => ({ ...p, connected: !!st[p.id] }));
         platforms.sort((a, b) => Number(b.connected) - Number(a.connected));
@@ -4263,6 +4397,13 @@ const nexEmail = document.getElementById('nexprint-email');
 if (nexEmail && status.nexprint_email) nexEmail.value = status.nexprint_email;
 const nexPwd = document.getElementById('nexprint-password');
 if (nexPwd && status.nexprint_has_password) nexPwd.placeholder = '••••••••';
+for (const pid of ['crealitycloud', 'snapmaker']) {
+    if (status[pid]) { updateAccountBadge(pid, true); showAccountKeyConfigured(pid); }
+    const emailEl = document.getElementById(`${pid}-email`);
+    if (emailEl && status[`${pid}_email`]) emailEl.value = status[`${pid}_email`];
+    const pwdEl = document.getElementById(`${pid}-password`);
+    if (pwdEl && status[`${pid}_has_password`]) pwdEl.placeholder = '••••••••';
+}
 if (status.makerworld) {
     updateAccountBadge('makerworld', true);
     const emailDisplay = document.getElementById('makerworld-email-display');
@@ -6578,7 +6719,12 @@ let files = [...allFiles];
 if (activeTypeFilters?.length > 0 && activeTypeFilters.length < 3) files = files.filter(f => activeTypeFilters.includes(f.extension));
 if (currentSizeFilter) files = files.filter(f => { const mb = (f.size || 0) / (1024 * 1024); return mb >= (currentSizeFilter.min || 0) && mb <= (currentSizeFilter.max !== undefined ? currentSizeFilter.max : Infinity); });
 if (currentWeightFilter) files = files.filter(f => { if (f.weight_g === null || f.weight_g === undefined) return false; return f.weight_g >= (currentWeightFilter.min || 0) && f.weight_g <= (currentWeightFilter.max !== undefined ? currentWeightFilter.max : Infinity); });
-if (printStatusFilter) files = files.filter(f => (f.print_status || 'never') === printStatusFilter);
+if (printStatusFilter) files = files.filter(f => {
+    const ps = f.print_status || 'never';
+    if (printStatusFilter === 'sent') return ps !== 'never';
+    if (printStatusFilter === 'printed') return ps === 'success' || ps === 'failed';
+    return ps === printStatusFilter;
+});
 if (stockFilter && stockPrintableMap) files = files.filter(f => !!stockPrintableMap[(f.path || '').replace(/\\/g, '/')]);
 if (activeTagFilters.size > 0) files = files.filter(f => { const fileTags = new Set((f.tags || []).map(t => t.name.toLowerCase())); for (const tag of activeTagFilters) { if (!fileTags.has(tag.toLowerCase())) return false; } return true; });
 if (noThumbFilterOnly) files = files.filter(f => !f.has_thumb);
@@ -8532,6 +8678,7 @@ try {
 const res = await fetch(`${API}/api/settings`);
 if (res.ok) {
 const data = await res.json();
+updateAccountBadge('spoolman', !!data.spoolman_url);
 if (data.spoolman_url) {
 if (addressSpan) addressSpan.textContent = data.spoolman_url;
 configuredView.style.display = 'flex';
@@ -12013,6 +12160,53 @@ showToast(I18N.t('toast.network_error_backend'), 'error');
 }
 window.nexprintBrowserLogin = nexprintBrowserLogin;
 
+// Connexion par fenêtre officielle (Creality Cloud, Snapmaker Space) : même principe que Nexprint
+async function platformBrowserLogin(platform, name) {
+    const btn = document.getElementById(`${platform}-login-btn`);
+    const email = (document.getElementById(`${platform}-email`)?.value || '').trim();
+    const password = document.getElementById(`${platform}-password`)?.value || '';
+    if (btn) btn.disabled = true;
+    try {
+        const res = await fetch(`${API}/api/accounts/${platform}/browser-login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            showToast(data.error || I18N.t('accounts.nexprint_login_failed'), 'error');
+            if (btn) btn.disabled = false;
+            return;
+        }
+        showToast(I18N.t('accounts.login_window_opened', { name }), 'info');
+        const timer = setInterval(async () => {
+            try {
+                const r = await fetch(`${API}/api/accounts/${platform}/browser-login/status`);
+                const st = (await r.json()).state;
+                if (st === 'waiting') return;
+                clearInterval(timer);
+                if (btn) btn.disabled = false;
+                if (st === 'ok') {
+                    showToast(I18N.t('accounts.login_connected', { name }), 'success');
+                    updateAccountBadge(platform, true);
+                    showAccountKeyConfigured(platform);
+                    const pwdField = document.getElementById(`${platform}-password`);
+                    if (pwdField) { pwdField.value = ''; pwdField.placeholder = '••••••••'; }
+                } else if (st === 'closed') {
+                    showToast(I18N.t('accounts.nexprint_window_closed'), 'warning');
+                } else {
+                    showToast(I18N.t('accounts.login_not_completed', { name }), 'error');
+                }
+            } catch (e) { clearInterval(timer); if (btn) btn.disabled = false; }
+        }, 1500);
+    } catch (err) {
+        console.error('[platformBrowserLogin]', err);
+        if (btn) btn.disabled = false;
+        showToast(I18N.t('toast.network_error_backend'), 'error');
+    }
+}
+window.platformBrowserLogin = platformBrowserLogin;
+
 
 
 let _makerWorldEmail = '';
@@ -13331,7 +13525,18 @@ document.addEventListener('DOMContentLoaded', function restoreNavPrefs() {
 })();
 
 
-document.getElementById('sort-select')?.addEventListener('change', (e) => { currentSort = e.target.value; applySorting(); renderFiles(); });
+(function initLibrarySortSelect() {
+    const sortSelect = document.getElementById('sort-select');
+    if (!sortSelect) return;
+    // Restaure le tri mémorisé dans la liste déroulante (le tri est déjà appliqué via currentSort)
+    if ([...sortSelect.options].some(o => o.value === currentSort)) sortSelect.value = currentSort;
+    sortSelect.addEventListener('change', (e) => {
+        currentSort = e.target.value;
+        try { localStorage.setItem(LIBRARY_SORT_STORAGE_KEY, currentSort); } catch (err) { /* ignoré */ }
+        applySorting();
+        renderFiles();
+    });
+})();
 document.getElementById('apply-filters')?.addEventListener('click', applyFilters);
 
 document.getElementById('confirm-slicer')?.addEventListener('click', () => _confirmSendToSlicer(false));
@@ -15054,6 +15259,7 @@ function renderPrinters() {
                 <div class="progress-track" style="margin-top:6px">
                     <div class="progress-bar" id="progress-${p.id}" style="width: 0%;"></div>
                 </div>
+                <div id="card-job-${p.id}" class="printer-card-job" style="display:none;"></div>
                 <div style="display:flex; gap:10px; margin-top:8px; font-size:11px; color:var(--text-secondary);">
                     <span title="${I18N.t('printers.extruder')}">🔥 <span id="card-ext-${p.id}">--°C</span></span>
                     <span title="${I18N.t('printers.bed')}">🛏️ <span id="card-bed-${p.id}">--°C</span></span>
@@ -15203,6 +15409,107 @@ window._openMiniWidgetTarget = function () {
 };
 
 
+// --- Miniature du fichier en cours d'impression (carte imprimante) ---
+// Le nom du fichier envoyé par l'imprimante est rapproché de la bibliothèque (nom sans extension).
+let _printJobIndex = null;
+let _printJobIndexSize = -1;
+
+function _normalizePrintJobName(name) {
+    let s = String(name || '').split(/[\\/]/).pop().toLowerCase().trim();
+    let prev;
+    do {
+        prev = s;
+        s = s.replace(/\.(gcode|bgcode|gco|3mf|stl|ufp|sl1)$/, '');
+    } while (s !== prev);
+    return s.replace(/[\s_\-]+/g, ' ');
+}
+
+function _findLibraryFileForPrintJob(name) {
+    if (!name || !Array.isArray(allFiles) || !allFiles.length) return null;
+    if (_printJobIndex === null || _printJobIndexSize !== allFiles.length) {
+        _printJobIndex = new Map();
+        for (const f of allFiles) {
+            const key = _normalizePrintJobName(f.name || f.path);
+            if (!key) continue;
+            const known = _printJobIndex.get(key);
+            if (!known || (!known.has_thumb && f.has_thumb)) _printJobIndex.set(key, f);
+        }
+        _printJobIndexSize = allFiles.length;
+    }
+    return _printJobIndex.get(_normalizePrintJobName(name)) || null;
+}
+
+function _printJobThumbError(img) {
+    // Miniature introuvable : on n'affiche rien (la clé reste en place, donc pas de nouvel essai à chaque rafraîchissement)
+    const box = img && img.closest ? img.closest('.printer-card-job') : null;
+    if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+}
+window._printJobThumbError = _printJobThumbError;
+
+function _updatePrinterCardJob(pid, data) {
+    const el = document.getElementById(`card-job-${pid}`);
+    if (!el) return;
+    const active = ['printing', 'paused'].includes(data.status) && data.file;
+    if (!active) {
+        if (el.style.display !== 'none') { el.style.display = 'none'; el.innerHTML = ''; el.dataset.key = ''; }
+        return;
+    }
+    const lib = _findLibraryFileForPrintJob(data.file);
+    let thumbUrl = lib && lib.has_thumb
+        ? `${API}/api/thumb?path=${encodeURIComponent(lib.path)}${lib.thumb_mtime ? '&t=' + lib.thumb_mtime : ''}`
+        : '';
+    if (!thumbUrl) {
+        // Impression lancée hors Stellio : miniature intégrée au G-code (Klipper / Moonraker)
+        const pr = printersList.find(x => x.id === pid);
+        if (pr && pr.type === 'klipper') thumbUrl = `${API}/api/printers/${pid}/job-thumb?file=${encodeURIComponent(data.file)}`;
+    }
+    const key = `${data.file}|${thumbUrl}`;
+    if (el.dataset.key === key) return;   // inchangé : évite de recharger l'image à chaque rafraîchissement
+    el.dataset.key = key;
+    if (!thumbUrl) {   // aucune miniature disponible : rien à afficher
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+    }
+    const shownName = String(data.file).split(/[\\/]/).pop();
+    el.innerHTML = `
+        <div class="printer-card-job-thumb"><img src="${thumbUrl}" alt="" loading="lazy" onerror="_printJobThumbError(this)"></div>
+        <div class="printer-card-job-name" title="${escapeHtml(shownName)}">${escapeHtml(shownName)}</div>`;
+    el.style.display = 'flex';
+}
+
+// --- Cartes de compte (comptes externes, Spoolman, TigerTag) : sections dépliables, repliées par défaut ---
+function initAccountCardsCollapsible() {
+    // Comptes externes + Spoolman + TigerTag ; on laisse de côté les cartes dont l'en-tête contient
+    // déjà un contrôle (ex. l'interrupteur de l'inventaire manuel).
+    document.querySelectorAll('.account-card').forEach(card => {
+        if (card.dataset.collapsible) return;
+        const header = card.querySelector(':scope > .account-card-header');
+        if (!header || header.querySelector('input, label, button')) return;
+        card.dataset.collapsible = '1';
+        const body = document.createElement('div');
+        body.className = 'account-card-body';
+        [...card.children].filter(c => c !== header).forEach(c => body.appendChild(c));
+        card.appendChild(body);
+        const arrow = document.createElement('i');
+        arrow.className = 'fa-solid fa-chevron-down account-card-arrow';
+        header.appendChild(arrow);
+        header.setAttribute('role', 'button');
+        header.setAttribute('tabindex', '0');
+        header.setAttribute('aria-expanded', 'false');
+        const toggle = () => {
+            const open = card.classList.toggle('open');
+            header.setAttribute('aria-expanded', open ? 'true' : 'false');
+        };
+        header.addEventListener('click', toggle);
+        header.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+        });
+    });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initAccountCardsCollapsible);
+else initAccountCardsCollapsible();
+
 async function refreshAllPrinters() {
     if (_refreshAllPrintersRunning) return;
     _refreshAllPrintersRunning = true;
@@ -15270,6 +15577,7 @@ async function refreshAllPrinters() {
                     cardStatus.textContent = statusMap[data.status] || data.status;
                 }
 
+                _updatePrinterCardJob(p.id, data);
                 if (cardExt) cardExt.textContent = `${data.temps?.extruder?.current || 0}°C`;
                 if (cardBed) cardBed.textContent = `${data.temps?.bed?.current || 0}°C`;
 
@@ -16816,10 +17124,21 @@ startThumbAutoRefresh();
             if (el) el.style.display = isVirtualEntry ? 'none' : '';
         });
 
+        const splitBtn = document.getElementById('ctx-split-btn');
+        if (splitBtn) {
+            const fileObj = (typeof allFiles !== 'undefined') ? allFiles.find(x => x.path === filePath) : null;
+            const canSplit = !isVirtualEntry && /\.3mf$/i.test(filePath) && !!fileObj && (!!fileObj.multi_plate || (fileObj.plate_count || 1) > 1);
+            splitBtn.style.display = canSplit ? '' : 'none';
+        }
+
         openModal('modal-file-actions');
     };
 
     document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('ctx-split-btn')?.addEventListener('click', () => {
+            closeModal('modal-file-actions');
+            openSplitPlatesModal(_ctxPath, _ctxName);
+        });
         document.getElementById('ctx-rename-btn')?.addEventListener('click', () => {
             closeModal('modal-file-actions');
             openRenameFileModal(_ctxPath, _ctxName);
@@ -16865,6 +17184,58 @@ startThumbAutoRefresh();
             openAddToProjectModal(_ctxPath, _ctxName);
         });
     });
+
+    let _splitPlatesPath = null;
+
+    window.openSplitPlatesModal = async function (filePath, fileName) {
+        _splitPlatesPath = filePath;
+        const f = (typeof allFiles !== 'undefined') ? allFiles.find(x => x.path === filePath) : null;
+        let count = (f && f.plate_count) || 0;
+        if (count < 2) {
+            try {
+                const r = await fetch(`${API}/api/file/plate-count?path=${encodeURIComponent(filePath)}`);
+                count = (await r.json()).plate_count || 0;
+            } catch (e) { count = 0; }
+        }
+        if (count < 2) {
+            showToast(I18N.t('toast.split_plates_error'), 'warning');
+            return;
+        }
+        const nameEl = document.getElementById('split-plates-name');
+        if (nameEl) nameEl.textContent = fileName || '';
+        const hint = document.getElementById('split-plates-hint');
+        if (hint) hint.textContent = I18N.t('modal.split_plates_hint', { count });
+        openModal('modal-split-plates');
+    };
+
+    window.confirmSplitPlates = async function () {
+        if (!_splitPlatesPath) return;
+        const format = document.querySelector('input[name="split-plates-format"]:checked')?.value || '3mf';
+        const btn = document.getElementById('split-plates-confirm-btn');
+        const originalHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
+        try {
+            const res = await fetch(`${API}/api/files/split-plates`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_path: _splitPlatesPath, format })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+                closeModal('modal-split-plates');
+                const n = data.count || (data.files || []).length;
+                showToast(I18N.t('toast.split_plates_success', { count: n }), 'success');
+                if (typeof loadFiles === 'function') loadFiles();
+            } else {
+                showToast(data.error || I18N.t('toast.split_plates_error'), 'error');
+            }
+        } catch (err) {
+            console.error('[SplitPlates]', err);
+            showToast(I18N.t('toast.network_error_backend'), 'error');
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+        }
+    };
 
     window.openShareFileModal = async function (filePath, fileName) {
         openModal('modal-share-file');
@@ -18647,6 +19018,7 @@ async function refreshProjectsViews(projectId) {
         await refreshProjectDetail(projectId);
     }
     try { _loadDashboardProjects(); } catch (e) { /* tableau de bord non affiché */ }
+    try { _loadDashboardDoneProjects(); } catch (e) { /* tableau de bord non affiché */ }
 }
 
 function _pickerShowError(errId, message) {
@@ -18658,6 +19030,57 @@ function _pickerShowError(errId, message) {
 function _pickerClearError(errId) {
     document.getElementById(errId)?.classList.remove('visible');
 }
+
+let _projectsFilter = (() => {
+    try {
+        const v = localStorage.getItem('stellio-projects-filter');
+        if (v === 'all' || v === 'in_progress' || v === 'done') return v;
+    } catch (e) { /* stockage local indisponible */ }
+    return 'all';
+})();
+
+function renderProjectsGrid() {
+    const grid = document.getElementById('projects-grid');
+    const empty = document.getElementById('projects-empty');
+    const filterEmpty = document.getElementById('projects-filter-empty');
+    const bar = document.getElementById('projects-filter-bar');
+    const total = allProjects.length;
+    const doneCount = allProjects.filter(_isProjectDone).length;
+    const counts = { all: total, in_progress: total - doneCount, done: doneCount };
+    bar?.querySelectorAll('.projects-filter-btn').forEach(btn => {
+        const f = btn.dataset.filter;
+        btn.classList.toggle('active', f === _projectsFilter);
+        const c = btn.querySelector('.projects-filter-count');
+        if (c) c.textContent = counts[f] ?? 0;
+    });
+    bar?.classList.toggle('hidden', total === 0);
+    if (total === 0) {
+        empty?.classList.remove('hidden');
+        filterEmpty?.classList.add('hidden');
+        grid?.classList.add('hidden');
+        return;
+    }
+    empty?.classList.add('hidden');
+    const list = allProjects.filter(p => _projectsFilter === 'all' ? true : (_projectsFilter === 'done' ? _isProjectDone(p) : !_isProjectDone(p)));
+    if (!list.length) {
+        grid?.classList.add('hidden');
+        filterEmpty?.classList.remove('hidden');
+        return;
+    }
+    filterEmpty?.classList.add('hidden');
+    if (grid) {
+        grid.innerHTML = list.map(renderProjectCard).join('');
+        grid.classList.remove('hidden');
+    }
+    I18N.apply();
+}
+
+window.setProjectsFilter = function (filter) {
+    if (filter !== 'all' && filter !== 'in_progress' && filter !== 'done') filter = 'all';
+    _projectsFilter = filter;
+    try { localStorage.setItem('stellio-projects-filter', filter); } catch (e) { /* ignoré */ }
+    renderProjectsGrid();
+};
 
 async function loadProjects() {
     const loading = document.getElementById('projects-loading');
@@ -18671,13 +19094,7 @@ async function loadProjects() {
         const data = await res.json();
         allProjects = Array.isArray(data) ? data : [];
         loading?.classList.add('hidden');
-        if (allProjects.length === 0) {
-            empty?.classList.remove('hidden');
-            return;
-        }
-        grid.innerHTML = allProjects.map(renderProjectCard).join('');
-        grid?.classList.remove('hidden');
-        I18N.apply();
+        renderProjectsGrid();
     } catch (err) {
         loading?.classList.add('hidden');
         showToast(I18N.t('toast.connection_error'), 'error');
@@ -18693,8 +19110,12 @@ function renderProjectCard(p) {
             : `<div class="folder-preview-thumb"><span class="folder-preview-icon"><i class="fa-solid fa-cube"></i></span></div>`;
     }).join('');
     const progress = p.progress || 0;
+<<<<<<< HEAD
     const allPrinted = (p.total_needed || 0) > 0 && (p.total_printed || 0) >= p.total_needed;
     const projectStatus = (p.status === 'done' || allPrinted) ? 'done' : (p.status || 'in_progress');
+=======
+    const projectStatus = _isProjectDone(p) ? 'done' : (p.status || 'in_progress');
+>>>>>>> bb1f10f (V 0.7.5)
     const statusLabel = projectStatus === 'done' ? I18N.t('projects.status_done') : I18N.t('projects.status_in_progress');
     return `<div class="project-card" onclick="openProjectDetailModal(${p.id})">
         <div class="project-card-thumbs">${thumbs || `<div class="folder-preview-thumb"><span class="folder-preview-icon"><i class="fa-solid fa-diagram-project"></i></span></div>`}</div>
