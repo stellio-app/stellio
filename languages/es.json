@@ -2001,5 +2001,13 @@
   "tips.crealitycloud.title": "Cómo descargar desde Creality Cloud:",
   "tips.crealitycloud.note": "Cuenta necesaria: inicia sesión antes en Ajustes → Cuentas externas → Creality Cloud (el inicio de sesión con Google no es compatible)",
   "tips.snapmaker.title": "Cómo descargar desde Snapmaker Space:",
-  "tips.snapmaker.note": "Cuenta necesaria: inicia sesión antes en Ajustes → Cuentas externas → Snapmaker Space (el inicio de sesión con Google no es compatible)"
+  "tips.snapmaker.note": "Cuenta necesaria: inicia sesión antes en Ajustes → Cuentas externas → Snapmaker Space (el inicio de sesión con Google no es compatible)",
+  "dashboard.quotes_title": "Presupuestos",
+  "dashboard.quotes_empty": "Aún no hay presupuestos creados",
+  "quotes.history_title": "Historial de presupuestos",
+  "quotes.download": "Descargar el PDF",
+  "quotes.delete": "Eliminar este presupuesto",
+  "quotes.deleted": "Presupuesto eliminado",
+  "quotes.confirm_delete": "¿Eliminar este presupuesto del historial?",
+  "quotes.no_client": "Sin cliente"
 }

@@ -2001,5 +2001,13 @@
   "tips.crealitycloud.title": "So lädst du von Creality Cloud herunter:",
   "tips.crealitycloud.note": "Konto erforderlich: melde dich zuerst unter Einstellungen → Externe Konten → Creality Cloud an (die Anmeldung über Google wird nicht unterstützt)",
   "tips.snapmaker.title": "So lädst du von Snapmaker Space herunter:",
-  "tips.snapmaker.note": "Konto erforderlich: melde dich zuerst unter Einstellungen → Externe Konten → Snapmaker Space an (die Anmeldung über Google wird nicht unterstützt)"
+  "tips.snapmaker.note": "Konto erforderlich: melde dich zuerst unter Einstellungen → Externe Konten → Snapmaker Space an (die Anmeldung über Google wird nicht unterstützt)",
+  "dashboard.quotes_title": "Angebote",
+  "dashboard.quotes_empty": "Noch keine Angebote erstellt",
+  "quotes.history_title": "Angebotsverlauf",
+  "quotes.download": "PDF herunterladen",
+  "quotes.delete": "Dieses Angebot löschen",
+  "quotes.deleted": "Angebot gelöscht",
+  "quotes.confirm_delete": "Dieses Angebot aus dem Verlauf löschen?",
+  "quotes.no_client": "Ohne Kunde"
 }

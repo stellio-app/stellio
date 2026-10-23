@@ -2001,5 +2001,13 @@
   "tips.crealitycloud.title": "如何从 Creality Cloud 下载：",
   "tips.crealitycloud.note": "需要账户：请先在“设置 → 外部账户 → Creality Cloud”中登录（不支持 Google 登录）",
   "tips.snapmaker.title": "如何从 Snapmaker Space 下载：",
-  "tips.snapmaker.note": "需要账户：请先在“设置 → 外部账户 → Snapmaker Space”中登录（不支持 Google 登录）"
+  "tips.snapmaker.note": "需要账户：请先在“设置 → 外部账户 → Snapmaker Space”中登录（不支持 Google 登录）",
+  "dashboard.quotes_title": "报价单",
+  "dashboard.quotes_empty": "暂无已创建的报价单",
+  "quotes.history_title": "报价单历史",
+  "quotes.download": "下载 PDF",
+  "quotes.delete": "删除此报价单",
+  "quotes.deleted": "报价单已删除",
+  "quotes.confirm_delete": "要从历史记录中删除此报价单吗？",
+  "quotes.no_client": "无客户"
 }

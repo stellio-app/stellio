@@ -8418,3 +8418,39 @@ body.role-viewer .nav-btn[data-page="settings"] {
 .account-card.open .account-card-arrow { transform: rotate(180deg); }
 .account-card[data-collapsible] > .account-card-body { display: none; }
 .account-card[data-collapsible].open > .account-card-body { display: block; }
+
+
+/* --- v0.7.6 : hauteur réelle de l'écran (évite que la barre du bas masque le contenu sur téléphone) --- */
+body, .app-screen, .auth-screen {
+    height: 100vh;
+    height: 100dvh;
+    height: var(--app-height, 100dvh);
+}
+@media (max-width: 860px) {
+    .main-content { padding-bottom: calc(54px + env(safe-area-inset-bottom) + 28px); }
+    body.has-mini-printer .main-content { padding-bottom: calc(54px + env(safe-area-inset-bottom) + 92px); }
+    .dashboard-widget { transition: none; }
+}
+
+/* --- v0.7.6 : tous les widgets du tableau de bord ont la même taille --- */
+:root { --dashboard-widget-height: 320px; }   /* hauteur commune de tous les widgets : une seule valeur à changer */
+.dashboard-grid { grid-auto-rows: var(--dashboard-widget-height); }
+.dashboard-widget {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    content-visibility: auto;              /* les widgets hors écran ne sont pas dessinés : tableau de bord plus fluide */
+    contain-intrinsic-size: auto var(--dashboard-widget-height);
+    transition: border-color 0.15s ease, opacity 0.15s ease;
+}
+.dashboard-widget-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+#dashboard-gallery-body .dash-gallery { flex: 1; min-height: 0; }
+#dashboard-gallery-body .dash-gallery-stage { height: 100%; aspect-ratio: auto; }
+
+/* --- v0.7.6 : historique des devis --- */
+.quote-history-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.quote-history-main { flex: 1; min-width: 0; }
+.quote-history-title { font-size: 13px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quote-history-sub { font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quote-history-total { font-size: 13px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+.quote-history-actions { display: flex; gap: 4px; flex: 0 0 auto; }

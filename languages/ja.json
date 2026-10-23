@@ -2001,5 +2001,13 @@
   "tips.crealitycloud.title": "Creality Cloud からダウンロードする方法：",
   "tips.crealitycloud.note": "アカウントが必要です：先に「設定 → 外部アカウント → Creality Cloud」でログインしてください（Googleでのログインには対応していません）",
   "tips.snapmaker.title": "Snapmaker Space からダウンロードする方法：",
-  "tips.snapmaker.note": "アカウントが必要です：先に「設定 → 外部アカウント → Snapmaker Space」でログインしてください（Googleでのログインには対応していません）"
+  "tips.snapmaker.note": "アカウントが必要です：先に「設定 → 外部アカウント → Snapmaker Space」でログインしてください（Googleでのログインには対応していません）",
+  "dashboard.quotes_title": "見積書",
+  "dashboard.quotes_empty": "見積書はまだ作成されていません",
+  "quotes.history_title": "見積書の履歴",
+  "quotes.download": "PDFをダウンロード",
+  "quotes.delete": "この見積書を削除",
+  "quotes.deleted": "見積書を削除しました",
+  "quotes.confirm_delete": "この見積書を履歴から削除しますか？",
+  "quotes.no_client": "顧客なし"
 }

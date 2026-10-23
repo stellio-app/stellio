@@ -2485,6 +2485,16 @@ function prefillRememberedLogin() {
 async function checkAuth(preFetchedFirstLaunch = null) {
 try {
 
+// Reprise de session : si la session du serveur est toujours valide (retour dans l'app sans l'avoir fermée,
+// rechargement de la page par le téléphone…), on ne redemande pas les identifiants.
+try {
+    const meRes = await fetch(`${API}/api/auth/me`, { credentials: 'same-origin', cache: 'no-store' });
+    if (meRes.ok) {
+        const me = await meRes.json();
+        if (me && me.user && me.user.username) { showApp(me.user); return; }
+    }
+} catch (e) { /* serveur injoignable : on affiche l'écran de connexion */ }
+
 
 const firstLaunchData = preFetchedFirstLaunch
     ? await preFetchedFirstLaunch
@@ -2517,6 +2527,19 @@ loadAppVersion();
 loadAppConfig();
 loadSources();
 if (!IS_VIEWER) loadAccountBadges();
+// Réglages relus une fois connecté : `initSettings()` les charge dès le chargement du script, avant que la session
+// n'existe (GET /api/settings répond alors 401, ignoré). Sans cette relecture, la carte Spoolman restait sur « Non configuré »
+// et les listes/interrupteurs des Paramètres (slicer, IA…) revenaient à leur valeur par défaut alors que les réglages
+// étaient bien enregistrés (il fallait les resélectionner/réactiver). Les profils de slicer sont déjà chargés ci-dessous.
+if (!IS_VIEWER) {
+    loadSlicerSettings(true);
+    loadSpoolmanSettings();
+    loadOllamaSettings();
+    loadAutoScanSettings();
+    loadManualInventorySettings();
+    loadStartupSettings();
+    loadPrintCostSettings();
+}
 loadTags();
 loadFavorites();
 loadSeenFiles();
@@ -2535,7 +2558,7 @@ if (!IS_VIEWER) checkFeedbackUpdatesOnStartup();
 if (!IS_VIEWER) checkModulesOnStartup();
 initKofiButton();
 loadPrintQueueSet();
-loadDashboard();
+loadDashboard(true);
 (function syncHeaderWithActivePage() {
     const activePage = (document.querySelector('.page.active')?.id || 'page-dashboard').replace(/^page-/, '');
     const activeBtn = document.querySelector(`.nav-btn[data-page="${activePage}"]`);
@@ -2599,12 +2622,31 @@ async function dismissWhatsNew() {
 }
 window.dismissWhatsNew = dismissWhatsNew;
 
+// --- Hauteur réelle de l'écran (téléphone) ---
+// Sur Android (WebView), 100vh peut dépasser la zone réellement visible : la barre de navigation du bas
+// masquait alors le bas des pages. On mesure la hauteur visible et on la met à disposition du CSS.
+function _syncAppHeight() {
+    document.documentElement.style.setProperty('--app-height', `${Math.round(window.innerHeight)}px`);
+}
+window.addEventListener('resize', _syncAppHeight);
+window.addEventListener('orientationchange', _syncAppHeight);
+document.addEventListener('visibilitychange', _syncAppHeight);
+_syncAppHeight();
+
 // --- Tableau de bord ---
-const DASHBOARD_WIDGET_IDS = ['printers', 'stock', 'history', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'suggestions', 'backups', 'issues'];
+const DASHBOARD_WIDGET_IDS = ['printers', 'stock', 'history', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'suggestions', 'backups', 'issues'];
 let _dashboardEditMode = false;
 let _draggedDashboardWidget = null;
 
-async function loadDashboard() {
+// Les widgets ne sont rechargés que si les données ont plus de quelques secondes : revenir sur le tableau
+// de bord n'envoie plus une vingtaine de requêtes à chaque fois (force = true pour forcer).
+let _dashboardLastLoad = 0;
+const DASHBOARD_REFRESH_MIN_MS = 10000;
+
+async function loadDashboard(force = false) {
+    const now = Date.now();
+    if (!force && _dashboardLastLoad && now - _dashboardLastLoad < DASHBOARD_REFRESH_MIN_MS) return;
+    _dashboardLastLoad = now;
     await applyDashboardConfig();
     _loadOnboardingChecklist();
     _loadDashboardPrinters();
@@ -2616,6 +2658,7 @@ async function loadDashboard() {
     _loadDashboardProjects();
     _loadDashboardDoneProjects();
     _loadDashboardGallery();
+    _loadDashboardQuotes();
     _loadDashboardStats();
     _loadDashboardMaintenance();
     _loadDashboardQueue();
@@ -2681,34 +2724,72 @@ function _getStoredDashboardConfig() {
     return null;
 }
 
-async function applyDashboardConfig() {
-    let config = null;
-    try {
-        const res = await fetch(`${API}/api/settings`);
-        if (res.ok) {
-            const data = await res.json();
-            if (data.dashboard_config) config = data.dashboard_config;
-        }
-    } catch {}
-    if (!config) config = _getStoredDashboardConfig();
-    if (!config) config = { order: [...DASHBOARD_WIDGET_IDS], hidden: [] };
+let _dashboardConfigCache = null;
 
-    // Ajoute automatiquement les nouveaux widgets (ex: futures fonctionnalités) qui n'existaient pas
-    // encore dans une config déjà sauvegardée par l'utilisateur.
-    DASHBOARD_WIDGET_IDS.forEach(id => { if (!config.order.includes(id)) config.order.push(id); });
+function _normalizeDashboardConfig(config) {
+    const c = { order: Array.isArray(config?.order) ? [...config.order] : [], hidden: Array.isArray(config?.hidden) ? [...config.hidden] : [] };
+    // Ajoute automatiquement les nouveaux widgets absents d'une config déjà sauvegardée.
+    DASHBOARD_WIDGET_IDS.forEach(id => { if (!c.order.includes(id)) c.order.push(id); });
+    return c;
+}
 
+function _paintDashboardConfig(config) {
     const grid = document.getElementById('dashboard-grid');
-    if (grid) {
+    if (!grid) return;
+    // On ne touche au DOM que si l'ordre diffère réellement (évite des reflows inutiles).
+    const current = _getCurrentDashboardOrder().filter(id => config.order.includes(id));
+    const wanted = config.order.filter(id => current.includes(id));
+    if (current.join() !== wanted.join()) {
+        const frag = document.createDocumentFragment();
         config.order.forEach(id => {
             const el = grid.querySelector(`[data-widget-id="${id}"]`);
-            if (el) grid.appendChild(el);
+            if (el) frag.appendChild(el);
         });
-        grid.querySelectorAll('.dashboard-widget').forEach(el => {
-            el.classList.toggle('dashboard-widget-hidden-flag', config.hidden.includes(el.dataset.widgetId));
-        });
+        grid.appendChild(frag);
     }
-    _renderHiddenWidgetsPanel(config.hidden);
-    return config;
+    grid.querySelectorAll('.dashboard-widget').forEach(el => {
+        el.classList.toggle('dashboard-widget-hidden-flag', config.hidden.includes(el.dataset.widgetId));
+    });
+}
+
+async function applyDashboardConfig() {
+    if (_dashboardConfigCache) return _dashboardConfigCache;   // déjà appliquée pendant cette session
+
+    // 1) Affichage immédiat avec la configuration locale (aucune attente réseau)
+    const local = _getStoredDashboardConfig();
+    if (local) {
+        _dashboardConfigCache = _normalizeDashboardConfig(local);
+        _paintDashboardConfig(_dashboardConfigCache);
+        _renderHiddenWidgetsPanel(_dashboardConfigCache.hidden);
+    }
+
+    // 2) Synchronisation avec le serveur (autres appareils) : en arrière-plan si on a déjà une config locale
+    const syncServer = async () => {
+        try {
+            const res = await fetch(`${API}/api/settings`);
+            if (!res.ok) return;
+            const data = await res.json();
+            if (!data.dashboard_config) return;
+            const srv = _normalizeDashboardConfig(data.dashboard_config);
+            if (!_dashboardConfigCache || JSON.stringify(srv) !== JSON.stringify(_dashboardConfigCache)) {
+                _dashboardConfigCache = srv;
+                _paintDashboardConfig(srv);
+                _renderHiddenWidgetsPanel(srv.hidden);
+                try { localStorage.setItem('stellio-dashboard-config', JSON.stringify(srv)); } catch {}
+            }
+        } catch {}
+    };
+    if (local) {
+        syncServer();
+    } else {
+        await syncServer();
+        if (!_dashboardConfigCache) {
+            _dashboardConfigCache = _normalizeDashboardConfig(null);
+            _paintDashboardConfig(_dashboardConfigCache);
+            _renderHiddenWidgetsPanel(_dashboardConfigCache.hidden);
+        }
+    }
+    return _dashboardConfigCache;
 }
 
 function _getCurrentDashboardOrder() {
@@ -2719,19 +2800,26 @@ function _getCurrentDashboardHidden() {
     return [...document.querySelectorAll('#dashboard-grid .dashboard-widget.dashboard-widget-hidden-flag')].map(el => el.dataset.widgetId);
 }
 
-async function _saveDashboardConfig() {
+let _dashboardSaveTimer = null;
+
+function _saveDashboardConfig() {
     const config = { order: _getCurrentDashboardOrder(), hidden: _getCurrentDashboardHidden() };
+    _dashboardConfigCache = config;
     try { localStorage.setItem('stellio-dashboard-config', JSON.stringify(config)); } catch {}
-    try {
-        await fetch(`${API}/api/settings`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dashboard_config: config }),
-        });
-    } catch (err) {
-        console.warn('[Dashboard] Échec sauvegarde config:', err);
-    }
-    _renderHiddenWidgetsPanel(config.hidden);
+    _renderHiddenWidgetsPanel(config.hidden);   // retour visuel immédiat
+    // Envoi au serveur différé : plusieurs changements rapprochés = une seule requête
+    clearTimeout(_dashboardSaveTimer);
+    _dashboardSaveTimer = setTimeout(async () => {
+        try {
+            await fetch(`${API}/api/settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dashboard_config: _dashboardConfigCache }),
+            });
+        } catch (err) {
+            console.warn('[Dashboard] Échec sauvegarde config:', err);
+        }
+    }, 600);
 }
 
 function _widgetLabel(id) {
@@ -2963,7 +3051,7 @@ let _dashGalleryTimer = null;
 let _dashGalleryPhotos = [];
 let _dashGalleryIdx = 0;
 const DASH_GALLERY_INTERVAL_MS = 4500;
-const DASH_GALLERY_MAX_SLIDES = 24;
+const DASH_GALLERY_MAX_SLIDES = 12;
 
 function _dashGalleryStop() {
     if (_dashGalleryTimer) { clearInterval(_dashGalleryTimer); _dashGalleryTimer = null; }
@@ -3045,6 +3133,132 @@ async function _loadDashboardGallery() {
         body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
     }
 }
+
+// --- Devis : widget du tableau de bord et historique (v0.7.6) ---
+function _quoteDateLabel(q) {
+    const d = new Date(String(q.created_at || '').replace(' ', 'T') + 'Z');
+    return isNaN(d) ? '' : d.toLocaleDateString(I18N.lang, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+async function _loadDashboardQuotes() {
+    const body = document.getElementById('dashboard-quotes-body');
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/api/quotes?limit=5`, { cache: 'no-store' });
+        const data = await res.json();
+        const quotes = Array.isArray(data.quotes) ? data.quotes : [];
+        if (!res.ok || !quotes.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-file-invoice"></i><p>${escapeHtml(_t2('dashboard.quotes_empty', "Aucun devis créé pour l'instant"))}</p></div>`;
+            return;
+        }
+        body.innerHTML = quotes.map(q => `
+            <div class="dashboard-row" onclick="openQuoteHistoryModal()" style="cursor:pointer;">
+                <div class="dashboard-row-icon"><i class="fa-solid fa-file-invoice"></i></div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title" title="${escapeHtml(q.number)}">${escapeHtml(q.client || q.number)}</div>
+                    <div class="dashboard-row-sub">${escapeHtml(q.item_desc || q.number)} — ${escapeHtml(_quoteDateLabel(q))}</div>
+                </div>
+                <div class="dashboard-row-meta">${escapeHtml(q.total)}</div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('[Dashboard] Erreur devis:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+window._loadDashboardQuotes = _loadDashboardQuotes;
+
+async function _renderQuoteHistory() {
+    const body = document.getElementById('quote-history-body');
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/api/quotes?limit=200`, { cache: 'no-store' });
+        const data = await res.json();
+        const quotes = Array.isArray(data.quotes) ? data.quotes : [];
+        if (!quotes.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-file-invoice"></i><p>${escapeHtml(_t2('dashboard.quotes_empty', "Aucun devis créé pour l'instant"))}</p></div>`;
+            return;
+        }
+        body.innerHTML = quotes.map(q => `
+            <div class="quote-history-row">
+                <div class="quote-history-main">
+                    <div class="quote-history-title">${escapeHtml(q.number)} · ${escapeHtml(q.client || _t2('quotes.no_client', 'Sans client'))}</div>
+                    <div class="quote-history-sub">${escapeHtml(q.item_desc)} — ${escapeHtml(_quoteDateLabel(q))}</div>
+                </div>
+                <div class="quote-history-total">${escapeHtml(q.total)}</div>
+                <div class="quote-history-actions">
+                    ${q.has_pdf ? `<button type="button" class="btn btn-ghost btn-sm" onclick="downloadStoredQuote(${q.id})" title="${escapeHtml(_t2('quotes.download', 'Télécharger le PDF'))}"><i class="fa-solid fa-file-pdf"></i></button>` : ''}
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="deleteStoredQuote(${q.id})" title="${escapeHtml(_t2('quotes.delete', 'Supprimer ce devis'))}"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('[Quotes] Historique:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
+window.openQuoteHistoryModal = async function () {
+    let modal = document.getElementById('modal-quote-history');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-quote-history';
+        modal.className = 'modal hidden';
+        modal.innerHTML = `<div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-file-invoice"></i> ${escapeHtml(_t2('quotes.history_title', 'Historique des devis'))}</h3>
+                <button class="modal-close" onclick="closeModal('modal-quote-history')">×</button>
+            </div>
+            <div class="modal-body" id="quote-history-body"></div>
+        </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-quote-history'); });
+    }
+    openModal('modal-quote-history');
+    await _renderQuoteHistory();
+};
+
+window.downloadStoredQuote = async function (id) {
+    try {
+        // Application de bureau : fenêtre « Enregistrer sous » ; sinon téléchargement par le navigateur
+        try {
+            const res = await fetch(`${API}/api/quotes/${id}/save-native`, { method: 'POST' });
+            const result = await res.json().catch(() => ({}));
+            if (res.ok && result.success) { showToast(I18N.t('cost.quote_saved', { path: result.path }), 'success'); return; }
+            if (result.cancelled) return;
+        } catch (e) { /* repli ci-dessous */ }
+        const res = await fetch(`${API}/api/quotes/${id}/pdf`);
+        if (!res.ok) throw new Error('pdf');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `devis-${id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+        console.error('[Quotes] Téléchargement:', err);
+        showToast(I18N.t('cost.quote_error'), 'error');
+    }
+};
+
+window.deleteStoredQuote = async function (id) {
+    const ok = await showConfirmDialog(_t2('quotes.confirm_delete', "Supprimer ce devis de l'historique ?"), {
+        danger: true, confirmLabel: I18N.t('actions.delete')
+    });
+    if (!ok) return;
+    try {
+        const res = await fetch(`${API}/api/quotes/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('delete');
+        showToast(_t2('quotes.deleted', 'Devis supprimé'), 'success');
+        await _renderQuoteHistory();
+        _loadDashboardQuotes();
+    } catch (err) {
+        showToast(I18N.t('toast.connection_error'), 'error');
+    }
+};
 
 async function _loadDashboardStats() {
     const body = document.getElementById('dashboard-stats-body');
@@ -7726,7 +7940,7 @@ container.appendChild(viewerRenderer.domElement);
 }
 
 
-async function loadSlicerSettings() {
+async function loadSlicerSettings(skipProfiles = false) {
 const select = document.getElementById('default-slicer-select');
 const preferredSelect = document.getElementById('preferred-slicer-select');
 if (select || preferredSelect) {
@@ -7739,7 +7953,7 @@ if (preferredSelect && data.preferred_slicer_id) preferredSelect.value = data.pr
 }
 } catch (err) { console.warn('[Slicer Settings] Échec'); }
 }
-loadSlicerProfiles();
+if (!skipProfiles) loadSlicerProfiles();
 }
 
 
@@ -15374,6 +15588,7 @@ function _updateMiniPrinterWidget(activeList) {
     const widget = document.getElementById('mini-printer-widget');
     if (!widget) return;
     const visible = activeList.filter(({ printer }) => !_miniWidgetDismissedFor.has(printer.id));
+    document.body.classList.toggle('has-mini-printer', visible.length > 0);   // réserve de la place en bas des pages (mobile)
     if (!visible.length) {
         widget.classList.add('hidden');
         _miniWidgetCurrentPid = null;
@@ -15400,6 +15615,7 @@ function _updateMiniPrinterWidget(activeList) {
 window.dismissMiniPrinterWidget = function () {
     if (_miniWidgetCurrentPid != null) _miniWidgetDismissedFor.add(_miniWidgetCurrentPid);
     document.getElementById('mini-printer-widget')?.classList.add('hidden');
+    document.body.classList.remove('has-mini-printer');
 };
 
 window._openMiniWidgetTarget = function () {
@@ -18717,7 +18933,9 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             qty: String(q.qty),
             unit_price: formatCost(q.unit),
             line_total: formatCost(q.total),
-            notes: ctx.notes
+            notes: ctx.notes,
+            unit_value: q.unit,
+            total_value: q.total
         };
         const init = {
             method: 'POST',
@@ -18735,6 +18953,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                 const result = await res.json().catch(() => ({}));
                 if (res.ok && result.success) {
                     showToast(t('cost.quote_saved', { path: result.path }), 'success');
+                    try { _loadDashboardQuotes(); } catch (e) {}
                     return;
                 }
                 if (result.cancelled) return;
@@ -18762,6 +18981,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             a.remove();
             setTimeout(() => URL.revokeObjectURL(url), 1000);
             showToast(t('cost.quote_done'), 'success');
+            try { _loadDashboardQuotes(); } catch (e) {}
         } catch (err) {
             console.error('[Quote] Export PDF échoué:', err);
             showToast(t('cost.quote_error'), 'error');
@@ -19260,6 +19480,7 @@ window.openProjectDetailModal = async function (projectId) {
     const body = document.getElementById('project-detail-body');
     body.innerHTML = `<div style="text-align:center; padding:30px;"><i class="fa-solid fa-spinner fa-spin fa-2x" style="color:var(--accent);"></i></div>`;
     openModal('modal-project-detail');
+    _projectDetailRetryCount = 0;
     await refreshProjectDetail(projectId);
 };
 
@@ -19304,10 +19525,44 @@ async function refreshProjectDetail(projectId) {
             </button>
         `;
         I18N.apply();
+        // Fichiers tout juste créés (plateaux d'un 3MF découpé) : le scan et les miniatures se font en arrière-plan,
+        // on relit donc la bibliothèque discrètement jusqu'à ce qu'ils apparaissent.
+        _scheduleProjectDetailRefresh(projectId, p.files.some(f => !allFiles.find(x => x.path === f.file_path)));
     } catch (err) {
         body.innerHTML = `<p style="color:var(--danger)">${I18N.t('toast.connection_error')}</p>`;
         console.error('[Projects] refreshProjectDetail', err);
     }
+}
+
+let _projectDetailRetryTimer = null;
+let _projectDetailRetryCount = 0;
+function _scheduleProjectDetailRefresh(projectId, needed) {
+    clearTimeout(_projectDetailRetryTimer);
+    if (!needed) { _projectDetailRetryCount = 0; return; }
+    if (_projectDetailRetryCount >= 12) return;
+    _projectDetailRetryCount++;
+    _projectDetailRetryTimer = setTimeout(async () => {
+        const modal = document.getElementById('modal-project-detail');
+        if (!modal || modal.classList.contains('hidden') || _currentProjectDetailId !== projectId) return;
+        try {
+            const res = await fetch(`${API}/api/files`);
+            if (res.ok) {
+                const newFiles = _dedupeFilesByPath(await res.json());
+                const oldHash = allFiles.map(f => `${f.name}-${f.size}-${f.path}`).join('|');
+                const newHash = newFiles.map(f => `${f.name}-${f.size}-${f.path}`).join('|');
+                if (oldHash !== newHash) {
+                    allFiles = newFiles;
+                    filteredFiles = showFavoritesOnly ? allFiles.filter(f => favoriteFiles.has(f.path)) : [...allFiles];
+                    applySorting();
+                    renderFiles();
+                    startThumbnailGeneration();
+                    updateSidebarCounts(filteredFiles);
+                    updateFooterCounts();
+                }
+            }
+        } catch (e) { /* réessai au prochain tour */ }
+        refreshProjectDetail(projectId);
+    }, 3000);
 }
 
 window.updateProjectFileQty = async function (projectId, filePath, delta) {

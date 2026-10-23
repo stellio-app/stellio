@@ -632,6 +632,18 @@
                                 </div>
                             </div>
 
+                            <div class="dashboard-widget" id="dashboard-widget-quotes" data-widget-id="quotes" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-file-invoice"></i> <span data-i18n="dashboard.quotes_title">Devis</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="openQuoteHistoryModal(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('quotes')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-quotes-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
                             <div class="dashboard-widget" id="dashboard-widget-stats" data-widget-id="stats" draggable="false">
                                 <div class="dashboard-widget-header">
                                     <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>

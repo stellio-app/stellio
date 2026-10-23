@@ -2001,5 +2001,13 @@
   "tips.crealitycloud.title": "Come scaricare da Creality Cloud:",
   "tips.crealitycloud.note": "Account necessario: accedi prima in Impostazioni → Account esterni → Creality Cloud (l'accesso con Google non è supportato)",
   "tips.snapmaker.title": "Come scaricare da Snapmaker Space:",
-  "tips.snapmaker.note": "Account necessario: accedi prima in Impostazioni → Account esterni → Snapmaker Space (l'accesso con Google non è supportato)"
+  "tips.snapmaker.note": "Account necessario: accedi prima in Impostazioni → Account esterni → Snapmaker Space (l'accesso con Google non è supportato)",
+  "dashboard.quotes_title": "Preventivi",
+  "dashboard.quotes_empty": "Nessun preventivo creato per ora",
+  "quotes.history_title": "Cronologia dei preventivi",
+  "quotes.download": "Scarica il PDF",
+  "quotes.delete": "Elimina questo preventivo",
+  "quotes.deleted": "Preventivo eliminato",
+  "quotes.confirm_delete": "Eliminare questo preventivo dalla cronologia?",
+  "quotes.no_client": "Senza cliente"
 }

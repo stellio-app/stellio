@@ -2001,5 +2001,13 @@
   "tips.crealitycloud.title": "Comment télécharger depuis Creality Cloud :",
   "tips.crealitycloud.note": "Compte requis : connecte-toi d'abord dans Paramètres → Comptes externes → Creality Cloud (la connexion Google n'est pas prise en charge)",
   "tips.snapmaker.title": "Comment télécharger depuis Snapmaker Space :",
-  "tips.snapmaker.note": "Compte requis : connecte-toi d'abord dans Paramètres → Comptes externes → Snapmaker Space (la connexion Google n'est pas prise en charge)"
+  "tips.snapmaker.note": "Compte requis : connecte-toi d'abord dans Paramètres → Comptes externes → Snapmaker Space (la connexion Google n'est pas prise en charge)",
+  "dashboard.quotes_title": "Devis",
+  "dashboard.quotes_empty": "Aucun devis créé pour l'instant",
+  "quotes.history_title": "Historique des devis",
+  "quotes.download": "Télécharger le PDF",
+  "quotes.delete": "Supprimer ce devis",
+  "quotes.deleted": "Devis supprimé",
+  "quotes.confirm_delete": "Supprimer ce devis de l'historique ?",
+  "quotes.no_client": "Sans client"
 }

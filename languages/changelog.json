@@ -1,5 +1,106 @@
 [
   {
+    "version": "0.7.6",
+    "items": {
+      "fr": [
+        "Téléphone : la barre de navigation du bas ne masque plus le bas des pages (hauteur d'écran réelle et marge pour la pastille d'impression)",
+        "Téléphone : revenir dans l'application sans l'avoir fermée ne redemande plus les identifiants tant que la session est valide",
+        "Tableau de bord : plus rapide et plus fluide (configuration appliquée instantanément, sauvegarde groupée, widgets hors écran non dessinés, rechargement limité quand on revient sur la page)",
+        "Tableau de bord : tous les widgets ont désormais la même taille (le contenu défile à l'intérieur)",
+        "Tableau de bord : nouveau widget « Devis » qui affiche les 5 derniers devis créés",
+        "Devis : chaque devis généré est conservé dans un historique (copie du PDF), consultable, re-téléchargeable et supprimable depuis le widget « Devis »",
+        "Projets : ajouter un fichier 3MF multi-plateaux à un projet le découpe automatiquement en un fichier 3MF par plateau (par exemple 6 plateaux = 6 fichiers à imprimer dans le projet), créés à côté de l'original",
+        "Paramètres : Spoolman n'affiche plus « Non configuré » à tort quand son adresse est bien enregistrée (le statut est relu après la connexion)",
+        "Paramètres : après une mise à jour (ou une reconnexion), le slicer choisi, l'IA activée et les autres réglages s'affichent correctement au lieu d'être à resélectionner/réactiver (ils étaient bien enregistrés mais relus trop tôt, avant la connexion)",
+        "Projets : l'ajout d'un 3MF multi-plateaux ne fige plus l'application — les plateaux apparaissent dans le projet tout de suite, puis l'analyse de la bibliothèque et la génération des miniatures se font en arrière-plan"
+      ],
+      "en": [
+        "Phone: the bottom navigation bar no longer hides the bottom of pages (real screen height and room for the print pill)",
+        "Phone: coming back to the app without closing it no longer asks for your credentials again while the session is valid",
+        "Dashboard: faster and smoother (configuration applied instantly, batched saving, off-screen widgets not drawn, limited reloading when you come back to the page)",
+        "Dashboard: all widgets now have the same size (content scrolls inside)",
+        "Dashboard: new “Quotes” widget showing the last 5 quotes created",
+        "Quotes: every generated quote is kept in a history (PDF copy) that can be browsed, re-downloaded and deleted from the “Quotes” widget",
+        "Projects: adding a multi-plate 3MF file to a project now automatically splits it into one 3MF file per plate (for example 6 plates = 6 files to print in the project), created next to the original",
+        "Settings: Spoolman no longer wrongly shows “Not configured” when its address is saved (the status is now reloaded after login)",
+        "Settings: after an update (or signing in again), the chosen slicer, the enabled AI and the other settings are displayed correctly instead of having to be reselected/re-enabled (they were saved but read too early, before login)",
+        "Projects: adding a multi-plate 3MF no longer freezes the app — the plates show up in the project right away, then library scanning and thumbnail generation happen in the background"
+      ],
+      "de": [
+        "Handy: Die untere Navigationsleiste verdeckt nicht mehr das Seitenende (echte Bildschirmhöhe und Platz für die Druck-Anzeige)",
+        "Handy: Beim Zurückkehren in die App, ohne sie zu schließen, werden die Zugangsdaten nicht mehr erneut abgefragt, solange die Sitzung gültig ist",
+        "Dashboard: schneller und flüssiger (Konfiguration sofort angewendet, gebündeltes Speichern, Widgets außerhalb des Bildschirms werden nicht gezeichnet, weniger Nachladen beim Zurückkehren zur Seite)",
+        "Dashboard: Alle Widgets haben jetzt dieselbe Größe (Inhalt scrollt im Widget)",
+        "Dashboard: neues Widget „Angebote“ mit den 5 zuletzt erstellten Angeboten",
+        "Angebote: Jedes erzeugte Angebot wird in einem Verlauf (PDF-Kopie) gespeichert, der über das Widget „Angebote“ durchsucht, erneut heruntergeladen und gelöscht werden kann",
+        "Projekte: Wird eine 3MF-Datei mit mehreren Platten zu einem Projekt hinzugefügt, wird sie automatisch in eine 3MF-Datei pro Platte aufgeteilt (z. B. 6 Platten = 6 zu druckende Dateien im Projekt), neben dem Original angelegt",
+        "Einstellungen: Spoolman zeigt nicht mehr fälschlich „Nicht konfiguriert“ an, wenn die Adresse gespeichert ist (der Status wird nach der Anmeldung neu geladen)",
+        "Einstellungen: Nach einem Update (oder erneuter Anmeldung) werden der gewählte Slicer, die aktivierte KI und die übrigen Einstellungen korrekt angezeigt, statt neu gewählt/aktiviert werden zu müssen (sie waren gespeichert, wurden aber zu früh vor der Anmeldung gelesen)",
+        "Projekte: Das Hinzufügen einer 3MF mit mehreren Platten blockiert die App nicht mehr – die Platten erscheinen sofort im Projekt, danach laufen Bibliotheksscan und Vorschaubild-Erzeugung im Hintergrund"
+      ],
+      "es": [
+        "Teléfono: la barra de navegación inferior ya no oculta el final de las páginas (altura real de la pantalla y espacio para la pastilla de impresión)",
+        "Teléfono: volver a la aplicación sin haberla cerrado ya no vuelve a pedir las credenciales mientras la sesión sea válida",
+        "Panel: más rápido y fluido (configuración aplicada al instante, guardado agrupado, widgets fuera de pantalla sin dibujar, recarga limitada al volver a la página)",
+        "Panel: todos los widgets tienen ahora el mismo tamaño (el contenido se desplaza dentro)",
+        "Panel: nuevo widget « Presupuestos » con los 5 últimos presupuestos creados",
+        "Presupuestos: cada presupuesto generado se conserva en un historial (copia del PDF) que se puede consultar, volver a descargar y eliminar desde el widget « Presupuestos »",
+        "Proyectos: al añadir un archivo 3MF de varias placas a un proyecto, se divide automáticamente en un archivo 3MF por placa (por ejemplo, 6 placas = 6 archivos para imprimir en el proyecto), creados junto al original",
+        "Ajustes: Spoolman ya no muestra por error « No configurado » cuando su dirección está guardada (el estado se vuelve a leer tras iniciar sesión)",
+        "Ajustes: tras una actualización (o al volver a iniciar sesión), el slicer elegido, la IA activada y el resto de ajustes se muestran correctamente en lugar de tener que reseleccionarlos/reactivarlos (estaban guardados pero se leían demasiado pronto, antes del inicio de sesión)",
+        "Proyectos: añadir un 3MF de varias placas ya no bloquea la aplicación: las placas aparecen enseguida en el proyecto y después el análisis de la biblioteca y la generación de miniaturas se hacen en segundo plano"
+      ],
+      "it": [
+        "Telefono: la barra di navigazione in basso non nasconde più il fondo delle pagine (altezza reale dello schermo e spazio per l'indicatore di stampa)",
+        "Telefono: tornare nell'app senza averla chiusa non richiede più le credenziali finché la sessione è valida",
+        "Dashboard: più veloce e fluida (configurazione applicata subito, salvataggio raggruppato, widget fuori schermo non disegnati, ricaricamento limitato quando si torna alla pagina)",
+        "Dashboard: tutti i widget hanno ora la stessa dimensione (il contenuto scorre all'interno)",
+        "Dashboard: nuovo widget « Preventivi » con gli ultimi 5 preventivi creati",
+        "Preventivi: ogni preventivo generato viene conservato in una cronologia (copia del PDF) consultabile, riscaricabile ed eliminabile dal widget « Preventivi »",
+        "Progetti: aggiungendo a un progetto un file 3MF con più piatti, viene diviso automaticamente in un file 3MF per piatto (ad esempio 6 piatti = 6 file da stampare nel progetto), creati accanto all'originale",
+        "Impostazioni: Spoolman non mostra più per errore « Non configurato » quando l'indirizzo è salvato (lo stato viene riletto dopo l'accesso)",
+        "Impostazioni: dopo un aggiornamento (o un nuovo accesso), lo slicer scelto, l'IA attivata e le altre impostazioni vengono mostrati correttamente invece di doverli riselezionare/riattivare (erano salvati ma letti troppo presto, prima dell'accesso)",
+        "Progetti: aggiungere un 3MF con più piatti non blocca più l'app: i piatti compaiono subito nel progetto, poi la scansione della libreria e la generazione delle miniature avvengono in background"
+      ],
+      "pt": [
+        "Telemóvel: a barra de navegação inferior já não esconde o fundo das páginas (altura real do ecrã e espaço para o indicador de impressão)",
+        "Telemóvel: voltar à aplicação sem a ter fechado já não volta a pedir as credenciais enquanto a sessão for válida",
+        "Painel: mais rápido e fluido (configuração aplicada de imediato, gravação agrupada, widgets fora do ecrã não desenhados, recarregamento limitado ao voltar à página)",
+        "Painel: todos os widgets têm agora o mesmo tamanho (o conteúdo desloca-se dentro)",
+        "Painel: novo widget « Orçamentos » com os 5 últimos orçamentos criados",
+        "Orçamentos: cada orçamento gerado é guardado num histórico (cópia do PDF) que pode ser consultado, transferido de novo e eliminado a partir do widget « Orçamentos »",
+        "Projetos: ao adicionar um arquivo 3MF com várias placas a um projeto, ele é dividido automaticamente em um arquivo 3MF por placa (por exemplo, 6 placas = 6 arquivos para imprimir no projeto), criados ao lado do original",
+        "Configurações: o Spoolman deixa de mostrar « Não configurado » por engano quando o endereço está salvo (o estado é relido após o login)",
+        "Configurações: após uma atualização (ou novo login), o slicer escolhido, a IA ativada e as demais configurações são exibidos corretamente, sem precisar selecionar/ativar de novo (estavam salvos, mas eram lidos cedo demais, antes do login)",
+        "Projetos: adicionar um 3MF com várias placas já não trava o aplicativo — as placas aparecem logo no projeto e, depois, a análise da biblioteca e a geração de miniaturas acontecem em segundo plano"
+      ],
+      "ja": [
+        "スマートフォン：下部のナビゲーションバーがページ下部を隠さなくなりました（実際の画面の高さを使用し、印刷インジケーター分の余白を確保）",
+        "スマートフォン：アプリを終了せずに戻った場合、セッションが有効な間は認証情報を再度求められなくなりました",
+        "ダッシュボード：高速かつ滑らかに（設定を即時反映、保存をまとめて実行、画面外のウィジェットは描画しない、ページに戻った際の再読み込みを抑制）",
+        "ダッシュボード：すべてのウィジェットが同じサイズになりました（内容はウィジェット内でスクロール）",
+        "ダッシュボード：最新5件の見積書を表示する新ウィジェット「見積書」",
+        "見積書：作成した見積書は履歴（PDFのコピー）として保存され、「見積書」ウィジェットから閲覧・再ダウンロード・削除できます",
+        "プロジェクト：複数プレートの3MFファイルをプロジェクトに追加すると、プレートごとに1つの3MFファイルへ自動的に分割されます（例：6プレート＝プロジェクト内に印刷用ファイル6個）。元のファイルと同じ場所に作成されます",
+        "設定：Spoolman のアドレスが保存されているのに「未設定」と誤表示される問題を修正しました（ログイン後に状態を再読み込みします）",
+        "設定：アップデート後（または再ログイン後）に、選択済みのスライサー、有効化したAI、その他の設定が正しく表示されるようになりました。再選択・再有効化は不要です（設定は保存されていましたが、ログイン前に読み込まれていました）",
+        "プロジェクト：複数プレートの3MFを追加してもアプリが固まらなくなりました。プレートはすぐにプロジェクトへ表示され、ライブラリのスキャンとサムネイル生成はバックグラウンドで行われます"
+      ],
+      "zh": [
+        "手机：底部导航栏不再遮挡页面底部（使用真实屏幕高度，并为打印进度条预留空间）",
+        "手机：未关闭应用直接返回时，只要会话有效就不再重新要求输入凭据",
+        "仪表板：更快更流畅（配置即时生效、合并保存、屏幕外的小组件不再绘制、返回页面时限制重新加载）",
+        "仪表板：所有小组件现在大小一致（内容在组件内部滚动）",
+        "仪表板：新增“报价单”小组件，显示最近创建的 5 份报价单",
+        "报价单：每次生成的报价单都会保存到历史记录（含 PDF 副本），可在“报价单”小组件中查看、重新下载和删除",
+        "项目：将多盘（多打印板）3MF 文件添加到项目时，会自动按盘拆分为每盘一个 3MF 文件（例如 6 个盘 = 项目中 6 个待打印文件），并创建在原文件旁边",
+        "设置：当 Spoolman 地址已保存时，不再错误显示“未配置”（登录后会重新读取状态）",
+        "设置：更新后（或重新登录后），已选择的切片软件、已启用的 AI 及其他设置会正确显示，无需重新选择/重新启用（设置本已保存，只是在登录前被过早读取）",
+        "项目：添加多盘 3MF 文件不再卡住应用——各盘会立即出现在项目中，随后资料库扫描和缩略图生成在后台进行"
+      ]
+    }
+  },
+  {
     "version": "0.7.5",
     "items": {
       "fr": [

@@ -1749,6 +1749,23 @@ def init_db():
         FOREIGN KEY (project_id) REFERENCES projects(id),
         PRIMARY KEY (project_id, file_path)
     )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS quotes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        number TEXT DEFAULT '',
+        client TEXT DEFAULT '',
+        item_desc TEXT DEFAULT '',
+        item_details TEXT DEFAULT '',
+        qty TEXT DEFAULT '',
+        unit_price TEXT DEFAULT '',
+        total TEXT DEFAULT '',
+        total_value REAL DEFAULT 0,
+        notes TEXT DEFAULT '',
+        filename TEXT DEFAULT '',
+        pdf_file TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )""")
     c.execute("""CREATE TABLE IF NOT EXISTS spool_assignments (
         file_path TEXT NOT NULL,
         user_id INTEGER NOT NULL,
@@ -7287,7 +7304,7 @@ def _split_3mf_plate_to_3mf(src_path, plate_key, plates, dest_path):
                 renamed[n] = None  # infos de découpe de tous les plateaux : régénérées par le slicer
 
         ordered = sorted(names, key=lambda n: 0 if n == '[Content_Types].xml' else 1)
-        with zipfile.ZipFile(dest_path, 'w', zipfile.ZIP_DEFLATED) as zout:
+        with zipfile.ZipFile(dest_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=1) as zout:
             for n in ordered:
                 if n.endswith('/'):
                     continue
@@ -7355,7 +7372,7 @@ def api_split_plates():
             else:
                 _split_3mf_plate_to_stl(file_path, idx, dest)
 
-        invalidate_cache()
+        _rescan_sources_in_background()
         names = [os.path.basename(p) for p in created]
         app_logger.info(f"[SPLIT] {os.path.basename(file_path)} → {len(created)} fichier(s) {fmt.upper()}: {names}")
         return jsonify({"success": True, "count": len(created), "files": names,
@@ -7371,6 +7388,94 @@ def api_split_plates():
         import traceback
         app_logger.error(traceback.format_exc())
         return jsonify({"error": f"Découpe impossible : {e}"}), 500
+
+
+def _rescan_sources_in_background():
+    """Rescan des sources dans un thread, sans bloquer la requête ni supprimer le cache de la bibliothèque.
+
+    Évite `invalidate_cache()` : sans cache, le prochain GET /api/files lancerait un scan complet bloquant
+    (gel de l'interface). Les nouveaux fichiers apparaissent dès la fin du scan et leurs miniatures sont
+    ensuite générées en arrière-plan par la file habituelle (`_queue_thumb_task`, priorité basse)."""
+    def _run():
+        try:
+            _lower_thread_priority()
+            conn = get_db()
+            try:
+                srcs = [dict(x) for x in conn.execute("SELECT * FROM sources").fetchall()]
+            finally:
+                conn.close()
+            if srcs:
+                _do_background_scan(srcs, None, blocking=True)
+        except Exception as e:
+            app_logger.warning(f"[SCAN] Rescan en arrière-plan échoué: {e}")
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def _expand_multiplate_3mf_for_project(file_path, user_id):
+    """Ajout à un projet : un 3MF multi-plateaux est remplacé par un 3MF autonome par plateau.
+
+    Même découpe que /api/files/split-plates (format 3MF), fichiers créés à côté de l'original
+    et nommés <nom>_plateau_N.3mf. Les fichiers déjà créés par un ajout précédent sont réutilisés
+    (pas de doublons). Renvoie la liste des chemins à ajouter au projet (même style de séparateurs
+    que `file_path`), ou None si le fichier n'est pas concerné : il est alors ajouté tel quel."""
+    created = []
+    try:
+        if not isinstance(file_path, str) or os.path.splitext(file_path)[1].lower() != '.3mf':
+            return None
+        if '::' in file_path or is_virtual_archive_path(file_path):
+            return None
+        if '..' in file_path.replace('\\', '/').split('/'):
+            return None
+        real = file_path.replace('/', '\\') if os.name == 'nt' else file_path
+        if not os.path.isfile(real) or not _is_path_within_sources(real, user_id):
+            return None
+        plates = _parse_3mf_plate_object_ids(real)
+        if not plates:
+            return None
+        keys = sorted(plates.keys(), key=lambda k: (len(k), k))
+        base_dir = os.path.dirname(real)
+        base_name = os.path.splitext(os.path.basename(real))[0]
+        keep_slashes = '\\' not in file_path
+        result = []
+        for idx, key in enumerate(keys, start=1):
+            dest = os.path.join(base_dir, f"{base_name}_plateau_{idx}.3mf")
+            if not os.path.isfile(dest):
+                _split_3mf_plate_to_3mf(real, key, plates, dest)
+                created.append(dest)
+            result.append(dest.replace('\\', '/') if keep_slashes else dest)
+        if created:
+            _rescan_sources_in_background()
+        app_logger.info(f"[PROJETS] {os.path.basename(real)} : {len(keys)} plateaux → {len(keys)} fichiers 3MF "
+                        f"({len(created)} créé(s), {len(keys) - len(created)} réutilisé(s))")
+        return result
+    except Exception as e:
+        for p in created:  # tout ou rien : pas de découpe partielle
+            try:
+                if os.path.exists(p):
+                    os.remove(p)
+            except OSError:
+                pass
+        app_logger.error(f"[PROJETS] Découpe multi-plateaux impossible, fichier ajouté tel quel : {e}")
+        return None
+
+
+def _expand_project_file_items(files, user_id):
+    """Liste [(chemin, quantité)] prête à insérer : chaque 3MF multi-plateaux est remplacé par ses plateaux."""
+    out = []
+    seen = set()
+    for item in files or []:
+        file_path = item.get('path') if isinstance(item, dict) else item
+        if not file_path:
+            continue
+        try:
+            qty = max(1, int(item.get('quantity', 1))) if isinstance(item, dict) else 1
+        except (TypeError, ValueError):
+            qty = 1
+        for path in (_expand_multiplate_3mf_for_project(file_path, user_id) or [file_path]):
+            if path not in seen:
+                seen.add(path)
+                out.append((path, qty))
+    return out
 
 
 @app.route('/api/thumb', methods=['GET'])
@@ -14481,15 +14586,11 @@ def api_create_project():
         conn.commit()
         project_id = cur.lastrowid
 
-        files = data.get('files', [])
-        for i, item in enumerate(files):
-            file_path = item.get('path') if isinstance(item, dict) else item
-            qty = item.get('quantity', 1) if isinstance(item, dict) else 1
-            if file_path:
-                conn.execute(
-                    "INSERT OR IGNORE INTO project_files (project_id, file_path, quantity_needed, position) VALUES (?, ?, ?, ?)",
-                    (project_id, file_path, max(1, int(qty)), i)
-                )
+        for i, (file_path, qty) in enumerate(_expand_project_file_items(data.get('files', []), session['user_id'])):
+            conn.execute(
+                "INSERT OR IGNORE INTO project_files (project_id, file_path, quantity_needed, position) VALUES (?, ?, ?, ?)",
+                (project_id, file_path, qty, i)
+            )
         conn.commit()
         return jsonify({"id": project_id, "message": "Projet créé"}), 201
     except Exception as e:
@@ -14634,19 +14735,14 @@ def api_add_project_files(project_id):
         conn.close()
         return jsonify({"error": "Introuvable"}), 404
     try:
-        files = data.get('files', [])
         max_pos = conn.execute(
             "SELECT COALESCE(MAX(position), -1) as m FROM project_files WHERE project_id = ?", (project_id,)
         ).fetchone()['m']
         added = 0
-        for i, item in enumerate(files):
-            file_path = item.get('path') if isinstance(item, dict) else item
-            qty = item.get('quantity', 1) if isinstance(item, dict) else 1
-            if not file_path:
-                continue
+        for i, (file_path, qty) in enumerate(_expand_project_file_items(data.get('files', []), session['user_id'])):
             conn.execute(
                 "INSERT OR IGNORE INTO project_files (project_id, file_path, quantity_needed, position) VALUES (?, ?, ?, ?)",
-                (project_id, file_path, max(1, int(qty)), max_pos + 1 + i)
+                (project_id, file_path, qty, max_pos + 1 + i)
             )
             added += 1
         conn.execute("UPDATE projects SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", (project_id,))
@@ -16667,6 +16763,139 @@ def _safe_quote_pdf_filename(name):
     return name
 
 
+# --- Historique des devis (v0.7.6) ---
+QUOTES_DIR = os.path.join(DATA_DIR, 'quotes')
+
+
+def _record_quote(user_id, data, pdf_bytes):
+    """Enregistre un devis généré dans l'historique, avec une copie du PDF. Ne doit jamais faire échouer l'export."""
+    try:
+        os.makedirs(QUOTES_DIR, exist_ok=True)
+
+        def t(key, limit):
+            return str(data.get(key) or '')[:limit]
+        try:
+            total_value = float(data.get('total_value') or 0)
+        except (TypeError, ValueError):
+            total_value = 0.0
+        conn = get_db()
+        try:
+            cur = conn.execute(
+                """INSERT INTO quotes (user_id, number, client, item_desc, item_details, qty, unit_price,
+                                       total, total_value, notes, filename)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (user_id, t('number', 40), t('client', 120), t('item_desc', 200), t('item_details', 200),
+                 t('qty', 20), t('unit_price', 40), t('line_total', 40), total_value, t('notes', 500),
+                 _safe_quote_pdf_filename(data.get('filename')))
+            )
+            qid = cur.lastrowid
+            pdf_name = f"quote_{user_id}_{qid}.pdf"
+            with open(os.path.join(QUOTES_DIR, pdf_name), 'wb') as f_pdf:
+                f_pdf.write(pdf_bytes)
+            conn.execute("UPDATE quotes SET pdf_file = ? WHERE id = ?", (pdf_name, qid))
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        app_logger.warning(f"[QUOTE] Historique : enregistrement impossible : {e}")
+
+
+@app.route('/api/quotes', methods=['GET'])
+@login_required
+def api_quotes_list():
+    try:
+        limit = max(1, min(int(request.args.get('limit', 200)), 500))
+    except (TypeError, ValueError):
+        limit = 200
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """SELECT id, number, client, item_desc, item_details, qty, unit_price, total, total_value, notes,
+                      filename, created_at, (pdf_file != '') AS has_pdf
+               FROM quotes WHERE user_id = ? ORDER BY id DESC LIMIT ?""",
+            (session['user_id'], limit)
+        ).fetchall()
+        total = conn.execute("SELECT COUNT(*) FROM quotes WHERE user_id = ?", (session['user_id'],)).fetchone()[0]
+    finally:
+        conn.close()
+    return jsonify({"quotes": [dict(r) for r in rows], "total": total})
+
+
+def _stored_quote(qid):
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT * FROM quotes WHERE id = ? AND user_id = ?", (qid, session['user_id'])).fetchone()
+    finally:
+        conn.close()
+    return row
+
+
+def _stored_quote_path(row):
+    name = os.path.basename(row['pdf_file'] or '')
+    path = os.path.join(QUOTES_DIR, name) if name else ''
+    return path if path and os.path.isfile(path) else None
+
+
+@app.route('/api/quotes/<int:qid>/pdf', methods=['GET'])
+@login_required
+def api_quote_history_pdf(qid):
+    row = _stored_quote(qid)
+    path = _stored_quote_path(row) if row else None
+    if not path:
+        return jsonify({"error": "PDF introuvable"}), 404
+    return send_file(path, mimetype='application/pdf', as_attachment=True,
+                     download_name=_safe_quote_pdf_filename(row['filename'] or row['number']))
+
+
+@app.route('/api/quotes/<int:qid>/save-native', methods=['POST'])
+@login_required
+def api_quote_history_save_native(qid):
+    row = _stored_quote(qid)
+    path = _stored_quote_path(row) if row else None
+    if not path:
+        return jsonify({"success": False, "error": "PDF introuvable"}), 404
+    try:
+        import webview
+        result = webview.windows[0].create_file_dialog(
+            webview.SAVE_DIALOG, directory=str(Path.home() / 'Documents'),
+            save_filename=_safe_quote_pdf_filename(row['filename'] or row['number']),
+            file_types=('Document PDF (*.pdf)',))
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    dest = result[0] if isinstance(result, (list, tuple)) and result else result
+    if not dest:
+        return jsonify({"success": False, "cancelled": True}), 200
+    dest = str(dest)
+    if not dest.lower().endswith('.pdf'):
+        dest += '.pdf'
+    try:
+        shutil.copyfile(path, dest)
+        return jsonify({"success": True, "path": dest}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/quotes/<int:qid>', methods=['DELETE'])
+@login_required
+def api_quote_history_delete(qid):
+    row = _stored_quote(qid)
+    if not row:
+        return jsonify({"error": "Devis introuvable"}), 404
+    path = _stored_quote_path(row)
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM quotes WHERE id = ? AND user_id = ?", (qid, session['user_id']))
+        conn.commit()
+    finally:
+        conn.close()
+    if path:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    return jsonify({"success": True})
+
+
 @app.route('/api/quote/export-native', methods=['POST'])
 @login_required
 def api_quote_export_native():
@@ -16704,6 +16933,7 @@ def api_quote_export_native():
         with open(dest_path, 'wb') as f:
             f.write(pdf_bytes)
         app_logger.info(f"[QUOTE] 🧾 Devis PDF enregistré : {dest_path}")
+        _record_quote(session['user_id'], data, pdf_bytes)
         return jsonify({"success": True, "path": dest_path}), 200
     except Exception as e:
         app_logger.error(f"[QUOTE] Échec écriture fichier : {e}")
@@ -16722,6 +16952,7 @@ def api_quote_export():
     except Exception as e:
         app_logger.error(f"[QUOTE] Échec génération PDF : {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+    _record_quote(session['user_id'], data, pdf_bytes)
     return send_file(io.BytesIO(pdf_bytes), mimetype='application/pdf', as_attachment=True,
                      download_name=_safe_quote_pdf_filename(data.get('filename')))
 
@@ -16884,7 +17115,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.7.5"
+CURRENT_VERSION = "0.7.6"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 

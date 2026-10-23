@@ -2001,5 +2001,13 @@
   "tips.crealitycloud.title": "How to download from Creality Cloud:",
   "tips.crealitycloud.note": "Account required: first sign in under Settings → External accounts → Creality Cloud (Google sign-in is not supported)",
   "tips.snapmaker.title": "How to download from Snapmaker Space:",
-  "tips.snapmaker.note": "Account required: first sign in under Settings → External accounts → Snapmaker Space (Google sign-in is not supported)"
+  "tips.snapmaker.note": "Account required: first sign in under Settings → External accounts → Snapmaker Space (Google sign-in is not supported)",
+  "dashboard.quotes_title": "Quotes",
+  "dashboard.quotes_empty": "No quotes created yet",
+  "quotes.history_title": "Quote history",
+  "quotes.download": "Download the PDF",
+  "quotes.delete": "Delete this quote",
+  "quotes.deleted": "Quote deleted",
+  "quotes.confirm_delete": "Delete this quote from the history?",
+  "quotes.no_client": "No client"
 }
