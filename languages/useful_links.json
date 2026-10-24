@@ -117,7 +117,11 @@
     "group": "Boutiques constructeurs",
     "url": "https://www.prusa3d.com",
     "icon": "fa-solid fa-industry",
-    "search_url": "https://www.prusa3d.com/search/?q={q}"
+    "search_url": "https://www.prusa3d.com/search/?q={q}",
+    "brands": [
+      "prusa",
+      "prusament"
+    ]
   },
   {
     "id": "anycubic",
@@ -143,7 +147,15 @@
     "group": "Boutiques constructeurs",
     "url": "https://polymaker.com",
     "icon": "fa-solid fa-industry",
-    "search_url": "https://shop.polymaker.com/search?q={q}"
+    "search_url": "https://shop.polymaker.com/search?q={q}",
+    "brands": [
+      "polymaker",
+      "polylite",
+      "polyterra",
+      "polymax",
+      "panchroma",
+      "polysonic"
+    ]
   },
   {
     "id": "sunlu",
@@ -182,7 +194,7 @@
     "group": "Boutiques constructeurs",
     "url": "https://www.arianeplast.com",
     "icon": "fa-solid fa-industry",
-    "search_url": "https://www.arianeplast.com/search?controller=search&s={q}"
+    "search_url": "https://www.arianeplast.com/en/#23e8/fullscreen-brand-categories/m=and&q={q}"
   },
   {
     "id": "filo3d",

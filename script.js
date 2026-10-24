@@ -218,6 +218,21 @@ function _getCsrfCookie() {
 }
 let IS_VIEWER = false;
 let _viewerToastAt = 0;
+// Signal d'activité envoyé au serveur (au plus toutes les 2 s) : tant que l'utilisateur se sert de l'interface,
+// la génération de miniatures en arrière-plan reste en pause (voir `_user_is_active` côté serveur).
+let _activityPingOn = false;
+(function setupActivityPing() {
+    let last = 0;
+    const ping = () => {
+        if (!_activityPingOn || document.hidden) return;
+        const now = Date.now();
+        if (now - last < 2000) return;
+        last = now;
+        fetch(`${API}/api/ui/activity`, { method: 'POST', keepalive: true }).catch(() => {});
+    };
+    ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach(ev =>
+        window.addEventListener(ev, ping, { passive: true, capture: true }));
+})();
 const _nativeFetch = window.fetch.bind(window);
 window.fetch = function (input, init = {}) {
     const url = typeof input === 'string' ? input : (input?.url || '');
@@ -256,6 +271,15 @@ function _dedupeFilesByPath(list) {
     });
 }
 let filteredFiles = [];
+
+// Liste affichée recalculée après un rechargement des fichiers. La version complète (qui tient compte de la recherche IA)
+// est définie dans setupEventListeners() et publiée sur window._rebuildFilteredFilesImpl ; cette fonction globale la relaie,
+// et sert de repli tant que setupEventListeners() n'a pas encore tourné.
+function rebuildFilteredFiles() {
+    if (typeof window._rebuildFilteredFilesImpl === 'function') return window._rebuildFilteredFilesImpl();
+    if (typeof hasActiveFilters === 'function' && hasActiveFilters()) return _filterByAdvancedFilters([...allFiles]);
+    return showFavoritesOnly ? allFiles.filter(f => favoriteFiles.has(f.path)) : [...allFiles];
+}
 let currentSlicerFile = null;
 let currentView = 'gallery';
 const LIBRARY_SORT_STORAGE_KEY = 'stellio-library-sort';
@@ -288,6 +312,7 @@ function hasActiveFilters() {
 
 function clearSearchAndFilters() {
     currentSearchQuery = '';
+    cancelSemanticSearch();
     [globalSearchInput, mobileSearchInput].forEach(input => { if (input) input.value = ''; });
     if (hasActiveFilters()) {
         resetFilters();
@@ -2482,6 +2507,46 @@ function prefillRememberedLogin() {
     }
 }
 
+// ── Confirmation du compte à l'ouverture de l'app ────────────────────────────────────────────────────────────────
+// Quand l'app s'ouvre avec une session déjà valide (« Se souvenir de moi »), on ne rentre plus directement : on demande
+// « Est-ce bien <compte> ? ». Oui → l'app s'ouvre ; Non → la session est fermée et l'écran d'authentification s'affiche.
+// La réponse est mémorisée dans sessionStorage : un simple rechargement de la page ne repose pas la question, mais un
+// nouveau lancement de l'application (nouvelle fenêtre / nouvel onglet) si.
+const SESSION_CONFIRMED_KEY = 'stellio_session_confirmed';
+function _isSessionConfirmed(username) {
+    try { return sessionStorage.getItem(SESSION_CONFIRMED_KEY) === username; } catch (e) { return false; }
+}
+function _markSessionConfirmed(username) {
+    try { sessionStorage.setItem(SESSION_CONFIRMED_KEY, username); } catch (e) { /* stockage indisponible */ }
+}
+function _clearSessionConfirmed() {
+    try { sessionStorage.removeItem(SESSION_CONFIRMED_KEY); } catch (e) { /* stockage indisponible */ }
+}
+
+function showAutoLoginConfirm(user) {
+    showPanel('confirm-user-panel');
+    const question = document.getElementById('confirm-user-question');
+    const yesBtn = document.getElementById('confirm-user-yes');
+    const noBtn = document.getElementById('confirm-user-no');
+    if (question) question.textContent = I18N.t('auth.confirm_user_question', { username: user.username });
+    if (yesBtn) { yesBtn.disabled = false; yesBtn.onclick = () => showApp(user); }
+    if (noBtn) {
+        noBtn.disabled = false;
+        noBtn.onclick = async () => {
+            if (yesBtn) yesBtn.disabled = true;
+            noBtn.disabled = true;
+            try { await fetch(`${API}/api/auth/logout`, { method: 'POST' }); } catch (e) { /* serveur injoignable : l'écran de connexion s'affiche quand même */ }
+            _clearSessionConfirmed();
+            // Ce n'est pas la bonne personne : on n'oublie pas seulement la session, on retire aussi les identifiants mémorisés
+            // pour ne pas préremplir le formulaire avec le compte qui vient d'être refusé.
+            try { localStorage.removeItem(REMEMBER_LOGIN_KEY); } catch (e) { /* stockage indisponible */ }
+            ['login-username', 'login-password'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+            showPanel('login-panel');
+        };
+    }
+    yesBtn?.focus();
+}
+
 async function checkAuth(preFetchedFirstLaunch = null) {
 try {
 
@@ -2491,7 +2556,11 @@ try {
     const meRes = await fetch(`${API}/api/auth/me`, { credentials: 'same-origin', cache: 'no-store' });
     if (meRes.ok) {
         const me = await meRes.json();
-        if (me && me.user && me.user.username) { showApp(me.user); return; }
+        if (me && me.user && me.user.username) {
+            if (_isSessionConfirmed(me.user.username)) showApp(me.user);
+            else showAutoLoginConfirm(me.user);
+            return;
+        }
     }
 } catch (e) { /* serveur injoignable : on affiche l'écran de connexion */ }
 
@@ -2519,6 +2588,8 @@ I18N.apply();
 translateAuthFields();
 }
 function showApp(user, filesPromise = null) {
+    _activityPingOn = true;
+    _markSessionConfirmed(user.username);
 document.getElementById('auth-screen').classList.add('hidden');
 document.getElementById('app-screen').classList.remove('hidden');
 document.getElementById('current-username').textContent = user.username;
@@ -4651,7 +4722,7 @@ const oldHash = allFiles.map(f => `${f.name}-${f.size}-${f.path}`).join('|');
 const newHash = newFiles.map(f => `${f.name}-${f.size}-${f.path}`).join('|');
 if (oldHash !== newHash) {
 allFiles = newFiles;
-filteredFiles = showFavoritesOnly ? allFiles.filter(f => favoriteFiles.has(f.path)) : [...allFiles];
+filteredFiles = rebuildFilteredFiles();
 applySorting();
 renderFiles();
 startThumbnailGeneration();
@@ -5292,7 +5363,7 @@ throw new Error(`${I18N.t('toast.server_error')}: ${res.status} - ${errorText.su
     if (!Array.isArray(data)) throw new Error(I18N.t('toast.parse_error'));
 
     allFiles = _dedupeFilesByPath(data);
-    filteredFiles = showFavoritesOnly ? allFiles.filter(f => favoriteFiles.has(f.path)) : [...allFiles];
+    filteredFiles = rebuildFilteredFiles();
     applySorting();
     renderFiles();
     setTimeout(() => generateVisibleThumbnails(), 200);
@@ -5351,7 +5422,7 @@ scanPollingInterval = setInterval(async () => {
 
             if (data.new_files && data.new_files.length > 0) {
                 allFiles = _dedupeFilesByPath(allFiles.concat(data.new_files));
-                filteredFiles = showFavoritesOnly ? allFiles.filter(f => favoriteFiles.has(f.path)) : [...allFiles];
+                filteredFiles = rebuildFilteredFiles();
                 applySorting();
                 renderFiles();
                 generateVisibleThumbnails();
@@ -6928,8 +6999,7 @@ showToast(I18N.t('toast.picker_unavailable'), 'warning');
 };
 
 
-function applyFilters() {
-let files = [...allFiles];
+function _filterByAdvancedFilters(files) {
 if (activeTypeFilters?.length > 0 && activeTypeFilters.length < 3) files = files.filter(f => activeTypeFilters.includes(f.extension));
 if (currentSizeFilter) files = files.filter(f => { const mb = (f.size || 0) / (1024 * 1024); return mb >= (currentSizeFilter.min || 0) && mb <= (currentSizeFilter.max !== undefined ? currentSizeFilter.max : Infinity); });
 if (currentWeightFilter) files = files.filter(f => { if (f.weight_g === null || f.weight_g === undefined) return false; return f.weight_g >= (currentWeightFilter.min || 0) && f.weight_g <= (currentWeightFilter.max !== undefined ? currentWeightFilter.max : Infinity); });
@@ -6943,7 +7013,10 @@ if (stockFilter && stockPrintableMap) files = files.filter(f => !!stockPrintable
 if (activeTagFilters.size > 0) files = files.filter(f => { const fileTags = new Set((f.tags || []).map(t => t.name.toLowerCase())); for (const tag of activeTagFilters) { if (!fileTags.has(tag.toLowerCase())) return false; } return true; });
 if (noThumbFilterOnly) files = files.filter(f => !f.has_thumb);
 if (failedThumbFilterOnly) files = files.filter(f => !!f.thumb_fallback);
-filteredFiles = files;
+return files;
+}
+function applyFilters() {
+filteredFiles = _filterByAdvancedFilters([...allFiles]);
 applySorting();
 renderFiles();
 updateSidebarCounts(filteredFiles);
@@ -12803,6 +12876,12 @@ setupNavDragAndDrop();
 
 
 function setupEventListeners() {
+// Définies plus bas dans cette fonction mais appelées depuis du code global (loadFiles, scan, clearSearchAndFilters…) :
+// sans ça, « rebuildFilteredFiles is not defined » (les déclarations de fonction sont remontées en début de portée).
+window._rebuildFilteredFilesImpl = rebuildFilteredFiles;
+window.cancelSemanticSearch = cancelSemanticSearch;
+window.handleSearchInput = handleSearchInput;
+window.closeMobileSidebar = closeMobileSidebar;
 document.getElementById('reg-security-question')?.addEventListener('change', (e) => {
     document.getElementById('reg-security-question-custom-group')?.classList.toggle('hidden', e.target.value !== 'custom');
     document.getElementById('reg-security-answer-group')?.classList.toggle('hidden', !e.target.value);
@@ -12974,6 +13053,7 @@ function showRecoveryCodeModal(code, onContinue) {
 
 document.getElementById('global-logout-btn')?.addEventListener('click', async () => {
     await fetch(`${API}/api/auth/logout`, { method: 'POST' });
+    _clearSessionConfirmed();
     location.reload();
 });
 
@@ -13386,6 +13466,50 @@ async function handleFilePicker(type) {
 document.getElementById('refresh-files')?.addEventListener('click', () => { loadFiles(); showToast(I18N.t('toast.refreshing'), 'info'); });
 
 
+// Liste affichée recalculée après un rechargement des fichiers (actualisation auto, scan, ajout…) : on garde
+// la recherche en cours, les résultats de la recherche IA et les filtres au lieu de réafficher toute la bibliothèque.
+function rebuildFilteredFiles() {
+    const q = (currentSearchQuery || '').trim();
+    if (q) {
+        if (lastSemanticResultPaths && lastSemanticQuery === q) {
+            const byPath = new Map(allFiles.map(f => [f.path, f]));
+            let r = lastSemanticResultPaths.map(p => byPath.get(p)).filter(Boolean);
+            if (activeTagFilters.size > 0) {
+                r = r.filter(f => {
+                    const ft = new Set((f.tags || []).map(t => t.name.toLowerCase()));
+                    for (const tag of activeTagFilters) { if (!ft.has(tag.toLowerCase())) return false; }
+                    return true;
+                });
+            }
+            if (showFavoritesOnly) r = r.filter(f => favoriteFiles.has(f.path));
+            return r;
+        }
+        const ql = q.toLowerCase();
+        return allFiles.filter(f =>
+            f.name.toLowerCase().includes(ql) ||
+            f.path.toLowerCase().includes(ql) ||
+            (f.tags || []).some(t => t.name.toLowerCase().includes(ql))
+        );
+    }
+    if (hasActiveFilters()) return _filterByAdvancedFilters([...allFiles]);
+    return showFavoritesOnly ? allFiles.filter(f => favoriteFiles.has(f.path)) : [...allFiles];
+}
+
+let semanticSearchToken = 0;
+let semanticAbortController = null;
+let lastSemanticResultPaths = null;
+
+// Annule toute recherche IA en attente ou en cours (champ vidé, nouvelle saisie, réinitialisation) : plus de
+// témoin « l'IA cherche » ni de résultats tardifs qui écraseraient la liste.
+function cancelSemanticSearch() {
+    clearTimeout(semanticSearchTimeout);
+    semanticSearchToken++;
+    if (semanticAbortController) { try { semanticAbortController.abort(); } catch (e) { /* déjà terminée */ } semanticAbortController = null; }
+    document.querySelectorAll('.search-box').forEach(box => box.classList.remove('semantic-loading'));
+    lastSemanticResultPaths = null;
+    lastSemanticQuery = '';
+}
+
 const SEMANTIC_INTENT_WORDS = [
     'je cherche', 'trouver', 'quelque chose', 'un truc', 'un objet', 'une pièce',
     'pour ranger', 'pour fixer', 'pour accrocher', 'pour réparer', 'pour organiser',
@@ -13435,11 +13559,17 @@ function setSearchMode(mode) {
 async function runSemanticSearch(query) {
     if (query === lastSemanticQuery) return;
     lastSemanticQuery = query;
+    if (semanticAbortController) { try { semanticAbortController.abort(); } catch (e) { /* déjà terminée */ } }
+    const token = ++semanticSearchToken;
+    const ctrl = new AbortController();
+    semanticAbortController = ctrl;
+    const isStale = () => token !== semanticSearchToken || currentSearchQuery !== query;
     const boxes = document.querySelectorAll('.search-box');
     boxes.forEach(box => box.classList.add('semantic-loading'));
     try {
         const res = await fetch(`${API}/api/ollama/semantic-search`, {
             method:  'POST',
+            signal:  ctrl.signal,
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({
                 query,
@@ -13452,6 +13582,7 @@ async function runSemanticSearch(query) {
             })
         });
         const data = await res.json();
+        if (isStale()) return;
         if (!res.ok) throw new Error(data.error || 'Erreur Ollama');
 
         const resultSet = new Set(data.results || []);
@@ -13461,6 +13592,7 @@ async function runSemanticSearch(query) {
         }
 
         const ordered = (data.results || []).filter(p => resultSet.has(p));
+        lastSemanticResultPaths = ordered;
         filteredFiles = ordered.map(p => allFiles.find(f => f.path === p)).filter(Boolean);
 
         if (typeof activeTagFilters !== 'undefined' && activeTagFilters.size > 0) {
@@ -13482,6 +13614,7 @@ async function runSemanticSearch(query) {
             showToast(I18N.t('toast.ollama_slow_fallback'), 'warning');
         }
     } catch (err) {
+        if (err.name === 'AbortError' || isStale()) return;
         console.error('[SemanticSearch]', err);
         const q = query.toLowerCase();
         filteredFiles = allFiles.filter(f =>
@@ -13493,14 +13626,17 @@ async function runSemanticSearch(query) {
         updateSidebarCounts(filteredFiles);
         showToast(I18N.t('toast.ai_unavailable_fallback'), 'warning');
     } finally {
-        boxes.forEach(box => box.classList.remove('semantic-loading'));
+        if (token === semanticSearchToken) {
+            boxes.forEach(box => box.classList.remove('semantic-loading'));
+            if (semanticAbortController === ctrl) semanticAbortController = null;
+        }
     }
 }
 
 function handleSearchInput(query, sourceInput) {
     const trimmed = query.trim();
     currentSearchQuery = trimmed;
-    clearTimeout(semanticSearchTimeout);
+    cancelSemanticSearch();
 
     [globalSearchInput, mobileSearchInput].forEach(input => {
         if (input && input !== sourceInput && input.value !== query) {
@@ -13510,7 +13646,6 @@ function handleSearchInput(query, sourceInput) {
 
     if (!trimmed) {
         setSearchMode('normal');
-        lastSemanticQuery = '';
         filteredFiles = (typeof showFavoritesOnly !== 'undefined' && showFavoritesOnly)
             ? allFiles.filter(f => favoriteFiles.has(f.path))
             : [...allFiles];
@@ -13540,6 +13675,8 @@ function handleSearchInput(query, sourceInput) {
 
 const globalSearchInput = document.getElementById('global-search');
 const mobileSearchInput = document.getElementById('mobile-search-input');
+window.globalSearchInput = globalSearchInput;
+window.mobileSearchInput = mobileSearchInput;
 
 globalSearchInput?.addEventListener('input', (e) => handleSearchInput(e.target.value, e.target));
 mobileSearchInput?.addEventListener('input', (e) => handleSearchInput(e.target.value, e.target));
@@ -14936,7 +15073,6 @@ function toggleCostEditor(id) {
     const el = document.getElementById(`hcost-${id}`);
     if (!el) return;
     if (el.dataset.editing === '1') {
-        _historyLastData = _historyLastData || {};
         const entry = (_historyEntries || []).find(e => e.id === id);
         el.innerHTML = _renderHistoryCostBadge(entry || {});
         el.dataset.editing = '0';
@@ -15345,6 +15481,8 @@ if (typeof failedThumbFilterOnly !== 'undefined') failedThumbFilterOnly = false;
     activeTagFilters?.clear?.();
     if (globalSearchInput) globalSearchInput.value = '';
     if (mobileSearchInput) mobileSearchInput.value = '';
+    currentSearchQuery = '';
+    cancelSemanticSearch();
     if (typeof setSearchMode === 'function') setSearchMode('normal');
 
     filteredFiles = [...allFiles];
@@ -16365,8 +16503,8 @@ function showLowStockShopPopup(spool) {
     // Liste simple (boutiques sans vérification de stock : recherche manuelle)
     const manualRows = (shops) => shops.map(shop => `
         <button class="low-stock-shop-btn" data-url="${escapeHtml(shop.url || '')}" style="${rowStyle} font-size:14px; font-weight:500;">
-            <i class="fa-solid fa-store" style="color:var(--accent); width:18px; text-align:center;"></i>
-            <span style="flex:1;">${escapeHtml(shop.name)}</span>
+            <i class="fa-solid ${shop.brand ? 'fa-industry' : 'fa-store'}" style="color:var(--accent); width:18px; text-align:center;"></i>
+            <span style="flex:1;">${escapeHtml(shop.name)}${shop.brand ? ` <span style="display:inline-block; margin-left:4px; font-size:11px; padding:1px 7px; border-radius:20px; border:1px solid var(--border); color:var(--text-muted); font-weight:400;">${escapeHtml(_t3('spoolman.low_stock_brand_title', 'Boutique du fabricant'))}</span>` : ''}</span>
             <i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--text-muted); font-size:12px;"></i>
         </button>`).join('');
 
@@ -16387,6 +16525,27 @@ function showLowStockShopPopup(spool) {
             <i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--text-muted); font-size:12px;"></i>
         </button>`;
     }).join('');
+
+    // Boutique du fabricant de la bobine : toujours proposée, avec le stock trouvé si la boutique a pu être vérifiée
+    const brandSection = (rows) => rows.length ? `
+        <div style="font-size:12.5px; color:var(--text-muted); margin:0 0 8px;"><i class="fa-solid fa-industry"></i> ${_t3('spoolman.low_stock_brand_title', 'Boutique du fabricant')}</div>
+        ${rows.map(b => {
+            const sub = b.status === 'in_stock'
+                ? _t3('spoolman.low_stock_brand_in_stock', '{{n}} produit(s) en stock trouvé(s)', { n: b.in_stock }).replace('{{n}}', b.in_stock)
+                : b.status === 'not_found'
+                    ? _t3('spoolman.low_stock_brand_none', "Aucun produit en stock trouvé automatiquement : ouvrez la recherche du site")
+                    : _t3('spoolman.low_stock_brand_manual', 'Stock non vérifié automatiquement : ouvrez la recherche du site');
+            return `
+        <button class="low-stock-shop-btn" data-url="${escapeHtml(b.url || '')}" style="${rowStyle}">
+            <i class="fa-solid fa-industry" style="color:var(--accent); width:18px; text-align:center;"></i>
+            <span style="flex:1; min-width:0;">
+                <span style="display:block; font-size:14px; font-weight:600;">${escapeHtml(b.name)}</span>
+                <span style="display:block; font-size:12.5px; color:var(--text-muted);">${escapeHtml(sub)}</span>
+            </span>
+            <i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--text-muted); font-size:12px;"></i>
+        </button>`;
+        }).join('')}
+        <div style="height:12px;"></div>` : '';
 
     const manualSection = (shops) => shops.length ? `
         <div style="font-size:12.5px; color:var(--text-muted); margin:12px 0 8px;">${_t3('spoolman.low_stock_manual_title', 'Autres boutiques (recherche manuelle, stock non vérifié)')}</div>
@@ -16453,6 +16612,7 @@ function showLowStockShopPopup(spool) {
             const exact = data.exact || [];
             const alts = data.alternatives || [];
             const manual = data.manual_shops || [];
+            const brandShops = data.brand_shops || [];
             let html;
             if (exact.length) {
                 html = `<div style="font-size:13px; color:var(--text-muted); margin-bottom:8px;"><i class="fa-solid fa-circle-check" style="color:var(--success, #4caf50);"></i> ${_t3('spoolman.low_stock_in_stock_title', 'Disponible dans ces boutiques')}</div>${productRows(exact)}`;
@@ -16461,7 +16621,7 @@ function showLowStockShopPopup(spool) {
             } else {
                 html = `<div style="${noteStyle}">${_t3('spoolman.low_stock_nothing', "La bobine exacte n'a pas été trouvée et aucune bobine de remplacement en stock n'a été trouvée dans les boutiques vérifiées.")}</div>`;
             }
-            body.innerHTML = html + manualSection(manual) + detailsSection(data.report);
+            body.innerHTML = brandSection(brandShops) + html + manualSection(manual) + detailsSection(data.report);
         } catch (e) {
             if (!overlay.isConnected) return;
             body.innerHTML = `<div style="${noteStyle}">${_t3('spoolman.low_stock_search_error', 'Recherche automatique indisponible : utilisez les liens de recherche ci-dessous.')}</div>`
@@ -17825,19 +17985,23 @@ startThumbAutoRefresh();
     let _aiTimePrediction = null;
     let _ecoEstimate = null;
 
-    function _costSaveSettings() {
+    const _COST_IDS = { material: 'cost-material-select', spool: 'cost-spool-select', spoolPrice: 'cost-spool-price', spoolWeight: 'cost-spool-weight',
+        elec: 'cost-elec-price', power: 'cost-printer-power', printer: 'cost-printer-select', wear: 'cost-wear-rate', fixed: 'cost-fixed-fee', margin: 'cost-margin-pct' };
+
+    function _costSaveSettings(ids) {
+        const I = ids || _COST_IDS;
         clearTimeout(_costSaveTimer);
         _costSaveTimer = setTimeout(async () => {
-            const material = document.getElementById('cost-material-select')?.value;
-            const spoolId = document.getElementById('cost-spool-select')?.value;
-            const spoolPrice = parseFloat(document.getElementById('cost-spool-price')?.value);
-            const spoolWeight = parseFloat(document.getElementById('cost-spool-weight')?.value);
-            const elecPrice = document.getElementById('cost-elec-price')?.value;
-            const printerPower = document.getElementById('cost-printer-power')?.value;
-            const printerId = document.getElementById('cost-printer-select')?.value || null;
-            const wearRate = document.getElementById('cost-wear-rate')?.value ?? '';
-            const fixedFee = document.getElementById('cost-fixed-fee')?.value ?? '';
-            const marginPct = document.getElementById('cost-margin-pct')?.value ?? '';
+            const material = document.getElementById(I.material)?.value;
+            const spoolId = document.getElementById(I.spool)?.value;
+            const spoolPrice = parseFloat(document.getElementById(I.spoolPrice)?.value);
+            const spoolWeight = parseFloat(document.getElementById(I.spoolWeight)?.value);
+            const elecPrice = document.getElementById(I.elec)?.value;
+            const printerPower = document.getElementById(I.power)?.value;
+            const printerId = document.getElementById(I.printer)?.value || null;
+            const wearRate = document.getElementById(I.wear)?.value ?? '';
+            const fixedFee = document.getElementById(I.fixed)?.value ?? '';
+            const marginPct = document.getElementById(I.margin)?.value ?? '';
 
             try {
                 const res = await fetch(`${API}/api/settings`);
@@ -18145,6 +18309,7 @@ startThumbAutoRefresh();
         manual: '⚪',
         tigertag: '🟡'
     };
+    window.FILAMENT_SOURCE_BADGES = FILAMENT_SOURCE_BADGES;
     const FILAMENT_SOURCE_LABELS = {
         spoolman: 'Spoolman',
         bambu_ams: 'AMS',
@@ -18896,7 +19061,16 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
     window._buildQuoteHtml = _buildQuoteHtml;
 
     async function _downloadQuote() {
-        if (!_lastQuote) return;
+        return _exportQuote({
+            quote: _lastQuote, fileName: _costCurrentFileName,
+            ids: { client: 'cost-quote-client', notes: 'cost-quote-notes', item: 'cost-quote-item-name', btn: 'cost-quote-btn' }
+        });
+    }
+
+    // Génère le devis PDF (enregistrement natif ou téléchargement) ; commun au coût d'une pièce et au coût d'un projet.
+    async function _exportQuote(opts) {
+        const _q0 = opts.quote;
+        if (!_q0) return;
         const t = (k, p) => I18N.t(k, p);
         const now = new Date();
         const pad = (n) => String(n).padStart(2, '0');
@@ -18905,14 +19079,14 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             lang: I18N.lang,
             number: `DEV-${stamp}-${pad(now.getHours())}${pad(now.getMinutes())}`,
             date: now.toLocaleDateString(I18N.lang, { day: 'numeric', month: 'long', year: 'numeric' }),
-            client: (document.getElementById('cost-quote-client')?.value || '').trim().slice(0, 120),
-            notes: (document.getElementById('cost-quote-notes')?.value || '').trim().slice(0, 500),
-            fileName: String(_costCurrentFileName || '').replace(/\.[^.]+$/, '') || '—'
+            client: (document.getElementById(opts.ids.client)?.value || '').trim().slice(0, 120),
+            notes: (document.getElementById(opts.ids.notes)?.value || '').trim().slice(0, 500),
+            fileName: (opts.stripExt === false ? String(opts.fileName || '') : String(opts.fileName || '').replace(/\.[^.]+$/, '')) || '—'
         };
-        ctx.itemName = (document.getElementById('cost-quote-item-name')?.value || '').trim().slice(0, 120) || ctx.fileName;
+        ctx.itemName = (document.getElementById(opts.ids.item)?.value || '').trim().slice(0, 120) || ctx.fileName;
         const clientSlug = ctx.client.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
         const filename = [t('cost.quote_file_prefix'), clientSlug, ctx.number].filter(Boolean).join('-') + '.pdf';
-        const q = _lastQuote;
+        const q = _q0;
         const payload = {
             filename,
             lang: ctx.lang,
@@ -18929,7 +19103,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             line_total_label: t('cost.quote_line_total'),
             total_label: t('cost.quote_total'),
             item_desc: t('cost.quote_item_desc', { name: ctx.itemName }),
-            item_details: t('cost.quote_item_details', { material: String(q.material_key || '').toUpperCase(), weight: q.weightG.toFixed(1) }),
+            item_details: t('cost.quote_item_details', { material: String(q.material_key || '').toUpperCase(), weight: q.weightG.toFixed(1) }) + (opts.extraDetails || ''),
             qty: String(q.qty),
             unit_price: formatCost(q.unit),
             line_total: formatCost(q.total),
@@ -18944,7 +19118,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             body: JSON.stringify(payload)
         };
 
-        const btn = document.getElementById('cost-quote-btn');
+        const btn = document.getElementById(opts.ids.btn);
         if (btn) btn.disabled = true;
         try {
             // 1) App desktop : fenêtre « Enregistrer sous » native, au format PDF
@@ -18989,6 +19163,440 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             if (btn) btn.disabled = false;
         }
     }
+
+    // ── Coût du projet : même moteur que « Coût de l'impression », cumulé sur tous les fichiers du projet ──
+    // (estimation précise du slicer fichier par fichier, poids et temps × quantité, devis PDF). Les frais fixes
+    // sont comptés une fois par exemplaire du projet.
+    let _pc = null;
+    const _PC_IDS = { material: 'pcost-material', spool: 'pcost-spool', spoolPrice: 'pcost-spool-price', spoolWeight: 'pcost-spool-weight',
+        elec: 'pcost-elec', power: 'pcost-power', printer: 'pcost-printer', wear: 'pcost-wear', fixed: 'pcost-fixed', margin: 'pcost-margin' };
+
+    function _pcDuration(seconds) {
+        const s = Math.max(0, Math.round(seconds || 0));
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        return h > 0 ? `${h} h ${String(m).padStart(2, '0')} min` : `${m} min`;
+    }
+
+    function _pcEstimateParams() {
+        const profileId = document.getElementById('pcost-process')?.value || '';
+        if (!profileId) return {};
+        const p = { profile_id: profileId };
+        const printerId = document.getElementById('pcost-printer')?.value || '';
+        const material = document.getElementById('pcost-material')?.value || '';
+        if (printerId) p.printer_id = printerId;
+        if (material) p.material_type = material;
+        return p;
+    }
+
+    function _pcProfileSuffix() {
+        const sel = document.getElementById('pcost-process');
+        const name = sel?.value ? (sel.selectedOptions[0]?.dataset.name || '') : '';
+        return name ? ` · ${name}` : '';
+    }
+
+    async function _pcAnalyzeAll(files, token, onProgress) {
+        const out = new Array(files.length);
+        let next = 0, done = 0;
+        const worker = async () => {
+            while (next < files.length) {
+                const i = next++;
+                const f = files[i];
+                const base = {
+                    path: f.file_path,
+                    name: f.name || String(f.file_path).replace(/\\/g, '/').split('/').pop(),
+                    needed: Math.max(0, parseInt(f.quantity_needed, 10) || 0),
+                    printed: Math.max(0, parseInt(f.quantity_printed, 10) || 0),
+                    ok: false, weights: {}, seconds: 0, est: null, eco: null, timer: null, polls: 0
+                };
+                try {
+                    if (!(f.hidden && f.exists === false)) {
+                        const res = await fetch(`${API}/api/files/analyze`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ path: f.file_path })
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.metadata) {
+                            base.ok = true;
+                            base.weights = data.metadata.weights || {};
+                            base.seconds = data.metadata.estimated_time?.seconds || 0;
+                        }
+                    }
+                } catch (e) { /* fichier ignoré */ }
+                out[i] = base;
+                done++;
+                if (_pc && _pc.token === token) onProgress(done, files.length);
+            }
+        };
+        await Promise.all([worker(), worker(), worker()]);
+        return out;
+    }
+
+    async function _pcFetchEco(f, token, key) {
+        try {
+            const res = await fetch(`${API}/api/eco/estimate?path=${encodeURIComponent(f.path)}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.status !== 'done' || !_pc || _pc.token !== token || f.est?.key !== key) return;
+            f.eco = Number(data.total_co2_g) || 0;
+            _pcRecompute();
+        } catch (e) { /* indicatif seulement */ }
+    }
+
+    function _pcHandleEstimate(f, data, params, key, token) {
+        if (!_pc || _pc.token !== token || f.est?.key !== key) return;
+        if (document.getElementById('modal-project-cost')?.classList.contains('hidden')) return;
+        const status = data && data.status;
+        if (status === 'done' && data.data) {
+            f.est = { status: 'done', key, weight_g: data.data.weight_g, time_seconds: data.data.time_seconds, slicer_name: data.data.slicer_name || '' };
+            _pcFetchEco(f, token, key);
+            _pcRecompute();
+            return;
+        }
+        if (!status || status === 'unavailable' || status === 'error') {
+            f.est = { status: status === 'unavailable' ? 'unavailable' : 'error', key, reason: (data && data.reason) || '', detail: (data && data.detail) || '' };
+            _pcRecompute();
+            return;
+        }
+        f.est = { status: 'pending', key };
+        _pcRecompute();
+        clearTimeout(f.timer);
+        if (++f.polls > 120) { f.est = { status: 'error', key }; _pcRecompute(); return; }
+        f.timer = setTimeout(async () => {
+            try {
+                const qs = new URLSearchParams({ path: f.path, ...params });
+                const res = await fetch(`${API}/api/slicer/pre-slice-estimate?${qs}`);
+                _pcHandleEstimate(f, await res.json(), params, key, token);
+            } catch (e) { /* nouvelle tentative au prochain démarrage */ }
+        }, 3000);
+    }
+
+    async function _pcStartEstimate(f, token) {
+        const params = _pcEstimateParams();
+        const key = JSON.stringify(params);
+        clearTimeout(f.timer);
+        f.polls = 0;
+        f.eco = null;
+        f.est = { status: 'pending', key };
+        try {
+            const res = await fetch(`${API}/api/slicer/pre-slice-estimate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: f.path, ...params })
+            });
+            _pcHandleEstimate(f, await res.json(), params, key, token);
+        } catch (e) {
+            console.debug('[PreSlice] Requête impossible:', e);
+        }
+    }
+
+    async function _pcRestartEstimates() {
+        if (!_pc) return;
+        const token = _pc.token;
+        _pc.files.forEach(f => { clearTimeout(f.timer); f.est = null; f.eco = null; });
+        _pcRecompute();
+        for (const f of _pc.files) {
+            if (!f.ok) continue;
+            if (!_pc || _pc.token !== token) return;
+            await _pcStartEstimate(f, token);
+        }
+    }
+
+    function _pcRecompute() {
+        const resultsEl = document.getElementById('pcost-results');
+        if (!resultsEl || !_pc) return;
+        const val = (id) => document.getElementById(id)?.value;
+        const mat = val('pcost-material') || 'pla';
+        const mode = val('pcost-mode') || 'needed';
+        const spW = parseFloat(val('pcost-spool-weight')) || 1000;
+        const pricePerGram = spW > 0 ? ((parseFloat(val('pcost-spool-price')) || 0) / spW) : 0;
+        const elecRaw = val('pcost-elec') ?? '';
+        const elecPrice = parseFloat(elecRaw);
+        const hasElec = elecRaw !== '' && !isNaN(elecPrice) && elecPrice > 0;
+        const power = parseFloat(val('pcost-power')) || 120;
+        const common = { pricePerGram, hasElec, elecPrice, printerPower: power, wearPerHour: val('pcost-wear') };
+
+        let totalW = 0, totalS = 0, co2 = 0, hasCo2 = false, ignored = 0, nPrecise = 0, nPending = 0, nUnavailable = 0, nFailed = 0, nOk = 0;
+        let slicerName = '';
+        const rows = _pc.files.map(f => {
+            const qty = mode === 'remaining' ? Math.max(0, f.needed - f.printed) : f.needed;
+            if (!f.ok) { ignored++; return { f, qty, w: 0, s: 0, cost: 0, precise: false }; }
+            nOk++;
+            const precise = f.est?.status === 'done';
+            if (precise) { nPrecise++; slicerName = slicerName || f.est.slicer_name || ''; }
+            else if (f.est?.status === 'pending') nPending++;
+            else if (f.est?.status === 'unavailable') nUnavailable++;
+            else if (f.est?.status === 'error') nFailed++;
+            const w1 = precise ? (Number(f.est.weight_g) || 0) : (f.weights?.[mat] ?? 0);
+            const s1 = precise ? (Number(f.est.time_seconds) || 0) : f.seconds;
+            const w = w1 * qty, s = s1 * qty;
+            totalW += w; totalS += s;
+            if (f.eco != null) { co2 += f.eco * qty; hasCo2 = true; }
+            const line = _computeQuote({ ...common, weightG: w, timeHours: s / 3600, fixedFee: 0, marginPct: 0, qty: 1 });
+            return { f, qty, w, s, cost: line.cost, precise };
+        });
+        const q = _computeQuote({ ...common, weightG: totalW, timeHours: totalS / 3600,
+            fixedFee: val('pcost-fixed'), marginPct: val('pcost-margin'), qty: val('pcost-quantity') });
+        _pc.quote = { ...q, material_key: mat, weightG: totalW, timeFormatted: _pcDuration(totalS) };
+
+        const badge = (icon, color, txt) => `<div style="display:flex; align-items:center; gap:6px; font-size:11px; color:${color}; margin-bottom:10px;"><i class="fa-solid ${icon}"></i> ${txt}</div>`;
+        let preciseHtml = '';
+        if (nOk > 0) {
+            if (nPending > 0) preciseHtml = badge('fa-spinner fa-spin', 'var(--text-muted)', `${I18N.t('cost.precise_searching')} (${nPrecise}/${nOk})`);
+            else if (nPrecise === nOk) preciseHtml = badge('fa-circle-check', '#68d391', I18N.t('cost.precise_via_slicer', { slicer: escapeHtml(slicerName + _pcProfileSuffix()) }));
+            else if (nPrecise > 0) preciseHtml = badge('fa-circle-check', '#68d391', `${I18N.t('cost.precise_via_slicer', { slicer: escapeHtml(slicerName + _pcProfileSuffix()) })} (${nPrecise}/${nOk})`)
+                + badge('fa-circle-info', 'var(--text-muted)', I18N.t('cost.precise_failed'));
+            else if (nUnavailable > 0 && nFailed === 0) preciseHtml = badge('fa-circle-info', 'var(--text-muted)', I18N.t('cost.precise_no_slicer'));
+            else if (nFailed > 0 || nUnavailable > 0) preciseHtml = badge('fa-circle-info', 'var(--text-muted)', I18N.t('cost.precise_failed'));
+        }
+
+        const line = (icon, label, value, color) => `<div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+            <span><i class="fa-solid ${icon}" style="width:16px;"></i> ${label}</span><strong style="color:${color || 'var(--text-primary)'};">${value}</strong></div>`;
+        const big = (label, value) => `<div style="display:flex; justify-content:space-between; align-items:center; font-size:15px;">
+            <span style="color:var(--text-primary); font-weight:600;">${label}</span><strong style="color:var(--accent); font-size:18px;">${value}</strong></div>`;
+        const fileRows = rows.map(r => `<div style="display:flex; align-items:center; gap:8px; font-size:12.5px; padding:5px 0; border-bottom:1px solid var(--border); ${r.f.ok ? '' : 'opacity:.6;'}">
+            <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(r.f.path)}">${r.f.ok ? (r.precise ? '<i class="fa-solid fa-circle-check" style="color:#68d391;"></i> ' : '') : '<i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i> '}${escapeHtml(r.f.name)}</span>
+            <span style="color:var(--text-muted); white-space:nowrap;">× ${r.qty}</span>
+            <span style="color:var(--text-muted); white-space:nowrap;">${r.w.toFixed(1)} g</span>
+            <strong style="white-space:nowrap; min-width:64px; text-align:right;">${r.f.ok ? formatCost(r.cost) : '—'}</strong>
+        </div>`).join('');
+
+        resultsEl.innerHTML = `
+            <div style="display:flex; flex-direction:column; gap:8px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:14px; margin-top:14px;">
+                ${preciseHtml}
+                ${line('fa-weight-hanging', I18N.t('cost.estimated_weight_label', { material: mat.toUpperCase() }), `${totalW.toFixed(1)} g`)}
+                ${line('fa-clock', I18N.t('cost.estimated_time_label'), _pcDuration(totalS))}
+                <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
+                ${line('fa-spool', I18N.t('cost.material_cost_label'), formatCost(q.material))}
+                ${line('fa-bolt', I18N.t('cost.electricity_cost_label'), hasElec ? formatCost(q.elec) : I18N.t('printers.no_value_set'), hasElec ? '' : 'var(--text-muted)')}
+                ${q.wear > 0 ? line('fa-screwdriver-wrench', I18N.t('cost.wear_cost_label'), formatCost(q.wear)) : ''}
+                ${q.fixed > 0 ? line('fa-hand', I18N.t('cost.fixed_fee_cost_label'), formatCost(q.fixed)) : ''}
+                <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
+                ${big(I18N.t('cost.total_estimated_label'), formatCost(q.cost))}
+                ${q.marginPct > 0 ? `${line('fa-percent', I18N.t('cost.margin_line_label', { pct: q.marginPct }), `+ ${formatCost(q.margin)}`)}
+                    ${big(_t2('projects.cost_sale_price', 'Prix de vente du projet'), formatCost(q.unit))}` : ''}
+                ${q.qty > 1 ? big(_t2('projects.cost_total_copies', 'Total pour {{n}} exemplaire(s)', { n: q.qty }).replace('{{n}}', q.qty), formatCost(q.total)) : ''}
+                <div style="font-size:13px; color:var(--text-secondary);">${I18N.t('cost.slicer_estimate_note')}</div>
+                ${hasCo2 ? `<div style="border-top:1px solid var(--border); margin:4px 0;"></div>
+                ${line('fa-leaf', _t2('cost.eco_score_label', 'Empreinte carbone estimée'), `${Math.round(co2 * q.qty * 10) / 10} g CO₂e`, '#4ade80')}` : ''}
+            </div>
+            <div style="margin-top:14px;">
+                <div style="font-size:12px; color:var(--text-secondary); margin-bottom:4px;"><i class="fa-solid fa-list"></i> ${escapeHtml(_t2('projects.cost_files_title', 'Détail par fichier'))}</div>
+                ${fileRows}
+                ${ignored ? `<div style="font-size:12px; color:var(--warning); margin-top:8px;"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(_t2('projects.cost_ignored', '{{n}} fichier(s) ignoré(s) : analyse impossible').replace('{{n}}', ignored))}</div>` : ''}
+            </div>`;
+    }
+
+    window.openProjectCostModal = async function (projectId) {
+        let modal = document.getElementById('modal-project-cost');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modal-project-cost';
+            modal.className = 'modal hidden';
+            modal.innerHTML = `<div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fa-solid fa-coins"></i> <span id="project-cost-title">${escapeHtml(I18N.t('projects.cost'))}</span></h3>
+                    <button class="modal-close" onclick="closeModal('modal-project-cost')">×</button>
+                </div>
+                <div class="modal-body" id="project-cost-body"></div>
+            </div>`;
+            document.body.appendChild(modal);
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-project-cost'); });
+        }
+        const body = document.getElementById('project-cost-body');
+        if (_pc) _pc.files.forEach(f => clearTimeout(f.timer));
+        const token = (_pc ? _pc.token : 0) + 1;
+        _pc = { token, files: [], quote: null, name: '' };
+        body.innerHTML = `<div style="text-align:center; padding:40px; color:var(--text-muted)"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p id="project-cost-progress" style="margin-top:10px">${escapeHtml(I18N.t('cost.analyzing'))}</p></div>`;
+        openModal('modal-project-cost');
+
+        const failBox = (msg) => `<div style="text-align:center; padding:30px; color:var(--text-muted)"><i class="fa-solid fa-triangle-exclamation" style="font-size:28px; color:var(--danger);"></i><p style="margin-top:10px;">${escapeHtml(msg)}</p></div>`;
+        try {
+            const [pRes, sRes] = await Promise.all([
+                fetch(`${API}/api/projects/${projectId}`, { cache: 'no-store' }),
+                fetch(`${API}/api/settings`)
+            ]);
+            const project = await pRes.json();
+            if (!pRes.ok) { body.innerHTML = failBox(project.error || I18N.t('toast.error')); return; }
+            const settings = sRes.ok ? await sRes.json() : {};
+            document.getElementById('project-cost-title').textContent = `${I18N.t('projects.cost')} · ${project.name}`;
+            const files = project.files || [];
+            if (!files.length) { body.innerHTML = failBox(I18N.t('projects.cost_no_files')); return; }
+
+            // Bobines : inventaire en direct (manuel + Spoolman + TigerTag), les prix des réglages priment si la source n'en donne pas
+            let spools = Array.isArray(settings.print_cost_spools) ? settings.print_cost_spools : [];
+            try {
+                const spRes = await fetch(`${API}/api/filament/spools`);
+                if (spRes.ok) {
+                    const live = (await spRes.json()).slots || [];
+                    if (live.length) {
+                        const savedById = {};
+                        spools.forEach(sp => { savedById[sp.id] = sp; });
+                        const overrides = (settings.print_cost_price_overrides && typeof settings.print_cost_price_overrides === 'object') ? settings.print_cost_price_overrides : {};
+                        spools = live.map(sl => {
+                            const id = `${sl.source_type}:${sl.source_id}`;
+                            const saved = savedById[id];
+                            const srcPrice = (typeof sl.price === 'number' && sl.price > 0) ? sl.price : null;
+                            return {
+                                id, name: sl.name || I18N.t('cost.spool_default_name') || 'Bobine',
+                                price: srcPrice != null ? srcPrice : (Number((saved && saved.price) ?? overrides[id] ?? 0) || 0),
+                                weight: Number(sl.capacity_g) || Number(saved && saved.weight) || 1000
+                            };
+                        });
+                    }
+                }
+            } catch (e) { /* bobines enregistrées utilisées */ }
+
+            const analyzed = await _pcAnalyzeAll(files, token, (d, n) => {
+                const el = document.getElementById('project-cost-progress');
+                if (el) el.textContent = _t2('projects.cost_progress', 'Analyse des fichiers… {{done}}/{{total}}').replace('{{done}}', d).replace('{{total}}', n);
+            });
+            if (!_pc || _pc.token !== token) return;
+            _pc.files = analyzed;
+            _pc.name = project.name || '';
+
+            const printers = (typeof printersList !== 'undefined' ? printersList : []);
+            const defaultPrinterId = settings.print_cost_printer_id != null ? String(settings.print_cost_printer_id) : '';
+            const matchedPrinter = printers.find(p => String(p.id) === defaultPrinterId);
+            const defaultSpool = spools.find(s => s.id === settings.print_cost_default_spool_id) || spools[0] || null;
+            const spoolPrice = defaultSpool ? (defaultSpool.price ?? 20) : (settings.print_cost_spool_price ?? 20);
+            const spoolWeight = defaultSpool ? (defaultSpool.weight ?? 1000) : (settings.print_cost_spool_weight ?? 1000);
+            const spoolOptions = spools.length ? spools : [{ id: '__legacy', name: I18N.t('cost.spool_default_name') || 'Bobine', price: spoolPrice, weight: spoolWeight }];
+            const material = settings.print_cost_material || 'pla';
+            const cur = printCostCurrency === 'USD' ? '$' : '€';
+            const fieldStyle = 'width:100%; padding:8px 10px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary);';
+            const labelStyle = 'display:block; font-size:12px; color:var(--text-secondary); margin-bottom:4px;';
+            const opt = (v, label, sel, extra = '') => `<option value="${escapeHtml(String(v))}" ${extra} ${sel ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+            const projectItemName = escapeHtml(String(project.name || '')).replace(/"/g, '&quot;');
+
+            body.innerHTML = `
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    <div>
+                        <label style="${labelStyle}">${I18N.t('cost.printer_select_label') || 'Imprimante'}</label>
+                        <select id="pcost-printer" style="${fieldStyle}">
+                            ${opt('', I18N.t('cost.printer_manual_option') || 'Personnalisée (saisie manuelle)', !matchedPrinter)}
+                            ${printers.map(p => opt(p.id, p.name, matchedPrinter && p.id === matchedPrinter.id, `data-power="${p.power_w ?? 120}"`)).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="${labelStyle}">${_t2('modal.slicer_settings_label', 'Réglages du slicer')}</label>
+                        <select id="pcost-process" style="${fieldStyle}">
+                            <option value="">${_t2('cost.slicer_settings_default', "Réglages par défaut de l'application")}</option>
+                        </select>
+                        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${_t2('cost.slicer_settings_hint', "L'estimation précise du slicer utilisera ce profil.")}</div>
+                    </div>
+                    <div>
+                        <label style="${labelStyle}">${I18N.t('cost.material_label')}</label>
+                        <select id="pcost-material" style="${fieldStyle}">
+                            ${['pla', 'petg', 'abs', 'tpu', 'nylon'].map(m => opt(m, m.toUpperCase(), m === material)).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="${labelStyle}">${I18N.t('cost.spool_select_label') || 'Bobine'}</label>
+                        <select id="pcost-spool" style="${fieldStyle}">
+                            ${spoolOptions.map(s => opt(s.id, `${s.name || ''}${s.price ? ` — ${formatCost(s.price)}` : ''}`, s.id === defaultSpool?.id, `data-price="${s.price}" data-weight="${s.weight}"`)).join('')}
+                        </select>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;"><label style="${labelStyle}">${I18N.t('cost.spool_price_label')} (${cur})</label>
+                            <input type="number" id="pcost-spool-price" min="0" step="0.01" value="${spoolPrice}" style="${fieldStyle}"></div>
+                        <div style="flex:1;"><label style="${labelStyle}">${I18N.t('cost.spool_weight_label')}</label>
+                            <input type="number" id="pcost-spool-weight" min="1" step="1" value="${spoolWeight}" style="${fieldStyle}"></div>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;"><label style="${labelStyle}">${I18N.t('cost.elec_price_label')} (${cur}/kWh) <span style="color:var(--text-muted);">${I18N.t('cost.optional_suffix')}</span></label>
+                            <input type="number" id="pcost-elec" min="0" step="0.001" value="${settings.print_cost_elec_price ?? ''}" placeholder="ex: 0.2062" style="${fieldStyle}"></div>
+                        <div style="flex:1;"><label style="${labelStyle}">${I18N.t('cost.printer_power_label')}</label>
+                            <input type="number" id="pcost-power" min="1" step="1" value="${matchedPrinter ? (matchedPrinter.power_w ?? 120) : (settings.print_cost_printer_power ?? 120)}" style="${fieldStyle}"></div>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;"><label style="${labelStyle}">${I18N.t('cost.wear_label')} (${cur}/h) <span style="color:var(--text-muted);">${I18N.t('cost.optional_suffix')}</span></label>
+                            <input type="number" id="pcost-wear" min="0" step="0.01" value="${settings.print_cost_wear_per_hour ?? ''}" placeholder="ex: 0.15" style="${fieldStyle}"></div>
+                        <div style="flex:1;"><label style="${labelStyle}">${I18N.t('cost.fixed_fee_label')} (${cur}) <span style="color:var(--text-muted);">${escapeHtml(_t2('projects.cost_fixed_hint', '(une seule fois pour le projet)'))}</span></label>
+                            <input type="number" id="pcost-fixed" min="0" step="0.01" value="${settings.print_cost_fixed_fee ?? ''}" placeholder="ex: 2" style="${fieldStyle}"></div>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;"><label style="${labelStyle}">${I18N.t('cost.margin_label')} <span style="color:var(--text-muted);">${I18N.t('cost.optional_suffix')}</span></label>
+                            <input type="number" id="pcost-margin" min="0" max="1000" step="1" value="${settings.print_cost_margin_pct ?? ''}" placeholder="ex: 30" style="${fieldStyle}"></div>
+                        <div style="flex:1;"><label style="${labelStyle}">${escapeHtml(_t2('projects.cost_copies_label', 'Exemplaires du projet'))}</label>
+                            <input type="number" id="pcost-quantity" min="1" max="10000" step="1" value="1" style="${fieldStyle}"></div>
+                    </div>
+                    <div>
+                        <label style="${labelStyle}">${escapeHtml(_t2('projects.cost_quantities_label', 'Quantités prises en compte'))}</label>
+                        <select id="pcost-mode" style="${fieldStyle}">
+                            ${opt('needed', _t2('projects.cost_qty_needed', 'Toutes les pièces prévues'), true)}
+                            ${opt('remaining', _t2('projects.cost_qty_remaining', 'Seulement les pièces restantes'), false)}
+                        </select>
+                    </div>
+                </div>
+                <div id="pcost-results"></div>
+                <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:10px;">
+                    <div>
+                        <label style="${labelStyle}">${I18N.t('cost.quote_client')}</label>
+                        <input type="text" id="pcost-quote-client" maxlength="120" style="${fieldStyle}" autocomplete="off">
+                    </div>
+                    <div>
+                        <label style="${labelStyle}">${I18N.t('cost.quote_item_name')}</label>
+                        <input type="text" id="pcost-quote-item-name" maxlength="120" value="${projectItemName}" style="${fieldStyle}" autocomplete="off">
+                    </div>
+                    <div>
+                        <label style="${labelStyle}">${I18N.t('cost.quote_notes')}</label>
+                        <textarea id="pcost-quote-notes" rows="2" maxlength="500" style="${fieldStyle} resize:vertical;"></textarea>
+                    </div>
+                    <p style="margin:0; font-size:12px; color:var(--text-muted);"><i class="fa-solid fa-circle-info"></i> ${I18N.t('cost.quote_header_hint')}</p>
+                    <button type="button" class="btn btn-primary btn-sm" id="pcost-quote-btn"><i class="fa-solid fa-file-invoice"></i> ${I18N.t('cost.quote_generate')}</button>
+                </div>
+                <p style="display:flex; align-items:flex-start; gap:8px; font-size:12px; color:var(--text-muted); margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
+                    <i class="fa-solid fa-triangle-exclamation" style="margin-top:1px; color:var(--warning);"></i>
+                    <span>${I18N.t('cost.slicer_settings_disclaimer')}</span>
+                </p>`;
+
+            ['pcost-material', 'pcost-spool-price', 'pcost-spool-weight', 'pcost-elec', 'pcost-power', 'pcost-wear', 'pcost-fixed', 'pcost-margin', 'pcost-quantity', 'pcost-mode'].forEach(id => {
+                const el = document.getElementById(id);
+                const persist = id !== 'pcost-quantity' && id !== 'pcost-mode';
+                el?.addEventListener('input', () => { _pcRecompute(); if (persist) _costSaveSettings(_PC_IDS); });
+                el?.addEventListener('change', () => { _pcRecompute(); if (persist) _costSaveSettings(_PC_IDS); });
+            });
+            document.getElementById('pcost-spool')?.addEventListener('change', (e) => {
+                const o = e.target.selectedOptions[0];
+                if (!o) return;
+                document.getElementById('pcost-spool-price').value = o.dataset.price ?? '';
+                document.getElementById('pcost-spool-weight').value = o.dataset.weight ?? '';
+                _pcRecompute();
+                _costSaveSettings(_PC_IDS);
+            });
+            document.getElementById('pcost-quote-btn')?.addEventListener('click', () => _exportQuote({
+                quote: _pc && _pc.quote, fileName: _pc && _pc.name, stripExt: false,
+                ids: { client: 'pcost-quote-client', notes: 'pcost-quote-notes', item: 'pcost-quote-item-name', btn: 'pcost-quote-btn' },
+                extraDetails: ` · ${_pc.files.length} ${I18N.t('projects.parts')}`
+            }));
+
+            // Réglages du slicer : liste filtrée sur l'imprimante ; tout changement relance l'estimation précise
+            const procSel = document.getElementById('pcost-process');
+            const printerSel = document.getElementById('pcost-printer');
+            _loadProcessProfileSelect('pcost-process', printerSel?.value || null, { allSlicers: true });
+            procSel?.addEventListener('change', _pcRestartEstimates);
+            printerSel?.addEventListener('change', async (e) => {
+                const o = e.target.selectedOptions[0];
+                if (o && o.dataset.power) document.getElementById('pcost-power').value = o.dataset.power;
+                const hadProfile = !!procSel?.value;
+                await _loadProcessProfileSelect('pcost-process', printerSel.value || null, { allSlicers: true });
+                _pcRecompute();
+                _costSaveSettings(_PC_IDS);
+                if (hadProfile) _pcRestartEstimates();
+            });
+            document.getElementById('pcost-material')?.addEventListener('change', () => {
+                if (procSel?.value) _pcRestartEstimates();
+            });
+
+            _pcRecompute();
+            _pcRestartEstimates();
+        } catch (err) {
+            console.error('[Projects] openProjectCostModal', err);
+            if (_pc && _pc.token === token) body.innerHTML = failBox(I18N.t('toast.connection_error'));
+        }
+    };
 
     window.openPrintCostModal = async function (filePath, fileName) {
         let modal = document.getElementById('modal-print-cost');
@@ -19224,13 +19832,44 @@ let allProjects = [];
 let _currentProjectDetailId = null;
 let _projectPickerSelected = new Set();
 
-function projectFileThumb(filePath) {
+// Plateaux séparés d'un 3MF multi-plateaux : rangés dans un sous-dossier masqué, absents de la bibliothèque
+// (donc de `allFiles`) mais visibles dans les projets.
+function _isHiddenPlatePath(p) {
+    return typeof p === 'string' && p.replace(/\\/g, '/').includes('/.stellio_plateaux/');
+}
+
+function projectFileThumb(filePath, info) {
     const f = allFiles.find(x => x.path === filePath);
     if (f && f.has_thumb) {
         return `${API}/api/thumb?path=${encodeURIComponent(filePath)}${f.thumb_mtime ? '&t=' + f.thumb_mtime : ''}`;
     }
+    if (_isHiddenPlatePath(filePath) && (!info || info.has_thumb !== false)) {
+        return `${API}/api/thumb?path=${encodeURIComponent(filePath)}`;
+    }
     return null;
 }
+
+// Clic sur une miniature de la carte d'un projet : ouvre la visionneuse 3D du fichier
+// (les plateaux séparés d'un 3MF, absents de `allFiles`, sont des fichiers à un seul plateau).
+window.openProjectFile3D = async function (filePath) {
+    const f = allFiles.find(x => x.path === filePath);
+    const name = (f && f.name) || String(filePath).replace(/\\/g, '/').split('/').pop();
+    let plates = (f && f.plate_count) || 1;
+    if (!f && !_isHiddenPlatePath(filePath) && /\.3mf$/i.test(name)) {
+        try {
+            const res = await fetch(`${API}/api/file/plate-count?path=${encodeURIComponent(filePath)}`);
+            if (res.ok) plates = (await res.json()).plate_count || 1;
+        } catch (e) { /* un seul plateau par défaut */ }
+    }
+    open3DViewer(name, filePath, plates);
+};
+
+window.openProjectFileInSlicer = function (path, name) {
+    // la fenêtre du slicer est dans le HTML d'origine : on la replace en fin de <body> pour qu'elle passe au-dessus du projet
+    const m = document.getElementById('modal-slicer');
+    if (m) document.body.appendChild(m);
+    sendToSlicer(path, name);
+};
 
 async function refreshProjectsViews(projectId) {
     await loadProjects();
@@ -19325,9 +19964,10 @@ async function loadProjects() {
 function renderProjectCard(p) {
     const thumbs = (p.files || []).map(fp => {
         const url = projectFileThumb(fp);
+        const open3d = `onclick="event.stopPropagation(); openProjectFile3D('${escapeJs(fp)}')" title="${escapeHtml(I18N.t('viewer.3d_title'))}"`;
         return url
-            ? `<div class="folder-preview-thumb"><img src="${url}" loading="lazy"></div>`
-            : `<div class="folder-preview-thumb"><span class="folder-preview-icon"><i class="fa-solid fa-cube"></i></span></div>`;
+            ? `<div class="folder-preview-thumb project-thumb-3d" ${open3d}><img src="${url}" loading="lazy" onerror="this.style.display='none'"></div>`
+            : `<div class="folder-preview-thumb project-thumb-3d" ${open3d}><span class="folder-preview-icon"><i class="fa-solid fa-cube"></i></span></div>`;
     }).join('');
     const progress = p.progress || 0;
     const projectStatus = _isProjectDone(p) ? 'done' : (p.status || 'in_progress');
@@ -19339,6 +19979,7 @@ function renderProjectCard(p) {
                 <span class="project-card-color" style="background:${p.color || '#4ea1d3'}"></span>
                 <h4 title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</h4>
                 <div class="project-card-actions">
+                    <button type="button" class="dv-btn" onclick="event.stopPropagation(); openProjectCostModal(${p.id})" title="${escapeHtml(I18N.t('projects.cost'))}"><i class="fa-solid fa-coins"></i></button>
                     <button type="button" class="dv-btn" onclick="event.stopPropagation(); openProjectFormModal(${p.id})" title="${I18N.t('actions.rename')}"><i class="fa-solid fa-pencil"></i></button>
                     <button type="button" class="dv-btn" onclick="event.stopPropagation(); deleteProjectConfirm(${p.id}, '${escapeJs(p.name)}')" title="${I18N.t('modal.delete_file')}" style="color:var(--danger)"><i class="fa-solid fa-trash"></i></button>
                 </div>
@@ -19498,20 +20139,23 @@ async function refreshProjectDetail(projectId) {
 
         const rows = p.files.map(f => {
             const file = allFiles.find(x => x.path === f.file_path);
-            const thumbUrl = projectFileThumb(f.file_path);
+            const known = !!file || (f.hidden && f.exists);
+            const fileName = file?.name || f.name || f.file_path.split(/[\\/]/).pop();
+            const thumbUrl = projectFileThumb(f.file_path, f);
             const isDone = f.quantity_printed >= f.quantity_needed;
             const safeId = f.file_path.replace(/[^\w]/g, '-');
             return `<div class="project-file-row${isDone ? ' project-file-row--done' : ''}" data-path="${escapeHtml(f.file_path)}">
-                <div class="project-file-thumb">${thumbUrl ? `<img src="${thumbUrl}">` : `<i class="fa-solid fa-cube"></i>`}</div>
+                <div class="project-file-thumb">${thumbUrl ? `<img src="${thumbUrl}" onerror="this.style.display='none'">` : `<i class="fa-solid fa-cube"></i>`}</div>
                 <div class="project-file-info">
-                    <span class="project-file-name" title="${escapeHtml(f.file_path)}">${escapeHtml(file?.name || f.file_path.split(/[\\/]/).pop())}</span>
-                    ${!file ? `<span class="project-file-missing">${I18N.t('projects.file_missing')}</span>` : ''}
+                    <span class="project-file-name" title="${escapeHtml(f.file_path)}">${escapeHtml(fileName)}</span>
+                    ${!known ? `<span class="project-file-missing">${I18N.t('projects.file_missing')}</span>` : ''}
                 </div>
                 <div class="project-file-qty">
                     <button type="button" class="qty-btn" onclick="updateProjectFileQty(${projectId}, '${escapeJs(f.file_path)}', -1)">−</button>
                     <span>${f.quantity_printed}/${f.quantity_needed}</span>
                     <button type="button" class="qty-btn" onclick="updateProjectFileQty(${projectId}, '${escapeJs(f.file_path)}', 1)">+</button>
                 </div>
+                ${known ? `<button type="button" class="dv-btn" title="${I18N.t('modal.send_to_slicer')}" onclick="openProjectFileInSlicer('${escapeJs(f.file_path)}', '${escapeJs(fileName)}')"><i class="fa-solid fa-paper-plane"></i></button>` : ''}
                 <button type="button" class="dv-btn" title="${I18N.t('actions.delete')}" style="color:var(--danger)" onclick="removeProjectFile(${projectId}, '${escapeJs(f.file_path)}')"><i class="fa-solid fa-xmark"></i></button>
             </div>`;
         }).join('');
@@ -19527,7 +20171,7 @@ async function refreshProjectDetail(projectId) {
         I18N.apply();
         // Fichiers tout juste créés (plateaux d'un 3MF découpé) : le scan et les miniatures se font en arrière-plan,
         // on relit donc la bibliothèque discrètement jusqu'à ce qu'ils apparaissent.
-        _scheduleProjectDetailRefresh(projectId, p.files.some(f => !allFiles.find(x => x.path === f.file_path)));
+        _scheduleProjectDetailRefresh(projectId, p.files.some(f => f.hidden ? (f.exists && !f.has_thumb) : !allFiles.find(x => x.path === f.file_path)));
     } catch (err) {
         body.innerHTML = `<p style="color:var(--danger)">${I18N.t('toast.connection_error')}</p>`;
         console.error('[Projects] refreshProjectDetail', err);
@@ -19552,7 +20196,7 @@ function _scheduleProjectDetailRefresh(projectId, needed) {
                 const newHash = newFiles.map(f => `${f.name}-${f.size}-${f.path}`).join('|');
                 if (oldHash !== newHash) {
                     allFiles = newFiles;
-                    filteredFiles = showFavoritesOnly ? allFiles.filter(f => favoriteFiles.has(f.path)) : [...allFiles];
+                    filteredFiles = rebuildFilteredFiles();
                     applySorting();
                     renderFiles();
                     startThumbnailGeneration();

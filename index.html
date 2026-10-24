@@ -132,6 +132,18 @@
                 </div>
             </div>
 
+            <div id="confirm-user-panel" class="auth-panel hidden">
+                <h2 id="confirm-user-question"></h2>
+                <div class="confirm-user-actions">
+                    <button type="button" id="confirm-user-yes" class="btn btn-primary">
+                        <i class="fa-solid fa-check"></i> <span data-i18n="auth.confirm_user_yes">Oui</span>
+                    </button>
+                    <button type="button" id="confirm-user-no" class="btn btn-secondary">
+                        <i class="fa-solid fa-xmark"></i> <span data-i18n="auth.confirm_user_no">Non</span>
+                    </button>
+                </div>
+            </div>
+
             <div id="forgot-panel" class="auth-panel hidden">
                 <h2 data-i18n="auth.forgot_title">🔑 Mot de passe oublié ?</h2>
                 <p class="auth-subtitle" data-i18n="auth.forgot_desc_local">Réinitialisation 100% locale, avec le code de récupération et la question secrète définis à la création du compte.</p>
@@ -222,6 +234,7 @@
                     <i class="fa-solid fa-gauge-high"></i>
                     <span data-i18n="nav.dashboard">Tableau de bord</span>
                 </button>
+                <div class="sidebar-nav-separator" role="separator"></div>
                 <div class="sidebar-nav-scroll">
                 <button class="nav-btn" data-page="library" data-icon="fa-layer-group" data-title-key="nav.library">
                     <i class="fa-solid fa-layer-group"></i>

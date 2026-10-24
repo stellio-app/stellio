@@ -25,6 +25,183 @@ def _early_extra_libs_dir():
 
 
 _EXTRA_LIBS_DIR = _early_extra_libs_dir()
+
+# ── Splash précoce ───────────────────────────────────────────────────────────
+# Affiché dès les premières millisecondes, AVANT la vérification des modules et les gros
+# imports (trimesh, numpy, pyrender...). Il tourne dans son propre thread : tous les objets Tk y
+# sont créés ET détruits, pendant que le reste du démarrage continue dans le thread principal.
+import threading as _early_threading
+import queue as _early_queue
+
+_EARLY_SPLASH = None
+
+
+def _early_splash_wanted():
+    if __name__ not in ('__main__', 'stellio_main'):
+        return False
+    if sys.platform == 'darwin':
+        return False  # conflit Tk/Cocoa avec pywebview : pas de splash Tkinter sur macOS
+    if os.environ.get('STELLIO_HEADLESS', '').strip().lower() in ('1', 'true', 'yes'):
+        return False
+    if sys.platform.startswith('linux') and not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
+        return False
+    return True
+
+
+def _early_splash_version():
+    import re as _re
+    try:
+        with open(__file__, 'r', encoding='utf-8', errors='ignore') as f:
+            m = _re.search(r'^CURRENT_VERSION\s*=\s*["\']([^"\']+)["\']', f.read(), _re.M)
+        return m.group(1) if m else ''
+    except Exception:
+        return ''
+
+
+def _early_splash_texts(base_dir, data_dir):
+    import json as _json
+    texts = {
+        'init': 'Initialisation du moteur 3D...',
+        'modules': 'Vérification des modules...',
+        'database': 'Chargement de la base de données...',
+        'server': 'Démarrage du serveur web...',
+        'thumbnails': 'Préparation des miniatures 3D...',
+        'version': 'Version {version}',
+    }
+    lang = 'fr'
+    try:
+        with open(os.path.join(data_dir, 'app_settings.json'), 'r', encoding='utf-8') as f:
+            lang = _json.load(f).get('lang', 'fr')
+    except Exception:
+        pass
+    for code in (lang, 'fr'):
+        path = os.path.join(base_dir, 'languages', f'{code}.json')
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    tr = _json.load(f)
+                for k in texts:
+                    texts[k] = tr.get(f'splash.{k}', texts[k])
+                break
+            except Exception:
+                pass
+    return texts
+
+
+def _early_splash_run(q, ready, base_dir, data_dir):
+    root = lbl_status = progress = style = logo = poll = None
+    try:
+        import tkinter as tk
+        from tkinter import ttk
+
+        texts = _early_splash_texts(base_dir, data_dir)
+        root = tk.Tk()
+        root.overrideredirect(True)
+        root.attributes('-topmost', True)
+        root.configure(bg='#1a1d23')
+        width, height = 650, 500
+        x = (root.winfo_screenwidth() - width) // 2
+        y = (root.winfo_screenheight() - height) // 2
+        root.geometry(f"{width}x{height}+{x}+{y}")
+
+        logo = None
+        logo_path = os.path.join(base_dir, 'assets', 'logo-nom-stellio.png')
+        if os.path.exists(logo_path):
+            try:
+                logo = tk.PhotoImage(master=root, file=logo_path)  # PNG natif Tk 8.6, sans charger Pillow
+            except Exception:
+                try:
+                    from PIL import Image, ImageTk
+                    logo = ImageTk.PhotoImage(Image.open(logo_path))
+                except Exception:
+                    logo = None
+            if logo is not None:
+                tk.Label(root, image=logo, bg='#1a1d23').pack(pady=(40, 10))
+
+        tk.Label(root, text=texts['version'].format(version=_early_splash_version()),
+                 font=("Segoe UI", 10), fg="#9ca3af", bg='#1a1d23').pack(pady=(5, 20))
+        lbl_status = tk.Label(root, text=texts['init'], font=("Segoe UI", 11), fg="#e6e6e6", bg='#1a1d23')
+        lbl_status.pack(pady=10)
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure("Custom.Horizontal.TProgressbar", troughcolor='#2a2f3a', background='#4ea1d3', thickness=8)
+        progress = ttk.Progressbar(root, style="Custom.Horizontal.TProgressbar", mode='indeterminate', length=400)
+        progress.pack(pady=15)
+        progress.start(20)
+        root.update()  # force l'affichage immédiat de la fenêtre
+        ready.set()
+
+        def poll():
+            try:
+                while True:
+                    kind, value = q.get_nowait()
+                    if kind == 'close':
+                        root.quit()
+                        return
+                    if kind == 'status':
+                        lbl_status.config(text=texts.get(value, value))
+            except _early_queue.Empty:
+                pass
+            root.after(60, poll)
+
+        root.after(60, poll)
+        root.mainloop()
+    except Exception:
+        pass
+    finally:
+        # Tk exige que ses objets soient détruits ET libérés dans le thread qui les a créés,
+        # sinon crash « Tcl_AsyncDelete: async handler deleted by the wrong thread » à la sortie.
+        try:
+            if root is not None:
+                root.destroy()
+        except Exception:
+            pass
+        root = lbl_status = progress = style = logo = poll = None
+        try:
+            import gc
+            gc.collect()
+        except Exception:
+            pass
+        ready.set()
+
+
+class _EarlySplash:
+    def __init__(self):
+        self._q = _early_queue.Queue()
+        self._ready = _early_threading.Event()
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        data_dir = os.path.dirname(_EXTRA_LIBS_DIR)
+        self._thread = _early_threading.Thread(
+            target=_early_splash_run, args=(self._q, self._ready, base_dir, data_dir), daemon=True)
+        self._thread.start()
+        self._ready.wait(timeout=3)
+
+    def status(self, key):
+        self._q.put(('status', key))
+
+    def close(self, delay=0.0):
+        import time as _t
+        if delay:
+            _t.sleep(delay)
+        self._q.put(('close', None))
+        self._thread.join(timeout=5)
+
+
+def _early_splash_status(key):
+    if _EARLY_SPLASH is not None:
+        try:
+            _EARLY_SPLASH.status(key)
+        except Exception:
+            pass
+
+
+if _early_splash_wanted():
+    try:
+        _EARLY_SPLASH = _EarlySplash()
+    except Exception:
+        _EARLY_SPLASH = None
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Version empaquetée (PyInstaller) : les modules réparés au lancement sont lus depuis ce dossier.
 # Ajouté EN FIN de sys.path : un module déjà embarqué dans l'exécutable reste prioritaire.
 if getattr(sys, 'frozen', False) and os.path.isdir(_EXTRA_LIBS_DIR) and _EXTRA_LIBS_DIR not in sys.path:
@@ -622,6 +799,7 @@ def _run_startup_module_check():
     _auto_install_missing_modules()
 
 
+_early_splash_status('modules')
 _run_startup_module_check()
 
 import nest_asyncio
@@ -676,6 +854,7 @@ import time
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, wait as futures_wait, FIRST_COMPLETED
 import queue
+import itertools
 import collections
 import requests
 import re
@@ -688,7 +867,18 @@ import platform
 import multiprocessing as mp
 
 
-thumb_generation_queue = queue.Queue()
+thumb_generation_queue = queue.PriorityQueue()  # éléments (0 = haute priorité | 1 = basse, n° d'ordre, tâche)
+_thumb_task_seq = itertools.count()
+_thumb_high_pending = 0  # tâches prioritaires en attente (un fichier que l'utilisateur est en train d'ouvrir…)
+_thumb_high_lock = threading.Lock()
+# Activité de l'utilisateur : l'interface envoie un signal (souris, clavier, tactile) via POST /api/ui/activity ;
+# tant qu'il est récent, les rendus de fond sont mis en pause pour que l'application reste fluide.
+_last_user_activity = 0.0
+USER_IDLE_SECONDS = 3.0
+
+
+def _user_is_active():
+    return (time.time() - _last_user_activity) < USER_IDLE_SECONDS
 metadata_generation_queue = queue.Queue()
 currently_downloading_paths = set()
 is_generation_running = False
@@ -700,12 +890,18 @@ _thumb_inflight_paths = set()
 
 
 def _queue_thumb_task(path, thumb_path, priority='low'):
+    global _thumb_high_pending
     normalized = path.replace('\\', '/')
     with _thumb_inflight_lock:
         if normalized in _thumb_inflight_paths:
             return False
         _thumb_inflight_paths.add(normalized)
-    thumb_generation_queue.put({'path': path, 'thumb_path': thumb_path, 'priority': priority})
+    high = (priority == 'high')
+    if high:
+        with _thumb_high_lock:
+            _thumb_high_pending += 1
+    thumb_generation_queue.put((0 if high else 1, next(_thumb_task_seq),
+                                {'path': path, 'thumb_path': thumb_path, 'priority': priority}))
     return True
 
 
@@ -2080,6 +2276,7 @@ def migrate_stellio_extras():
     finally:
         conn.close()
 
+_early_splash_status('database')
 init_db()
 migrate_account_passwords_to_random_iv()
 migrate_printer_api_keys()
@@ -4433,16 +4630,26 @@ def process_generation_queue():
     is_generation_running = True
 
     def thumb_worker(worker_id):
+        global _thumb_high_pending
         _lower_thread_priority()
         app_logger.info(f"[BACKGROUND] Générateur lazy #{worker_id} démarré")
         processed_count = 0
         consecutive_errors = 0
         while True:
+            # L'utilisateur se sert de l'interface : rendus de fond en pause (sauf demandes prioritaires),
+            # ils reprennent dès qu'il ne fait plus rien. Un rendu déjà commencé va jusqu'au bout.
+            if _user_is_active() and _thumb_high_pending <= 0:
+                time.sleep(0.5)
+                continue
             try:
-                task = thumb_generation_queue.get(timeout=1)
+                item = thumb_generation_queue.get(timeout=1)
             except queue.Empty:
                 time.sleep(0.5)
                 continue
+            if item[0] == 0:
+                with _thumb_high_lock:
+                    _thumb_high_pending = max(0, _thumb_high_pending - 1)
+            task = item[2]
             try:
                 file_path = task.get('path')
                 thumb_path = task.get('thumb_path')
@@ -4544,6 +4751,7 @@ def process_generation_queue():
                 for source in sources:
                     if source['type'] == 'folder' and os.path.exists(source['path']):
                         for root, dirs, files in os.walk(source['path']):
+                            dirs[:] = [d for d in dirs if d != PLATE_SPLIT_DIRNAME]
                             for f in sorted(files, key=str.lower):
                                 if f.lower().endswith(('.stl', '.obj', '.3mf')):
                                     file_path = os.path.join(root, f).replace('\\', '/')
@@ -7390,6 +7598,62 @@ def api_split_plates():
         return jsonify({"error": f"Découpe impossible : {e}"}), 500
 
 
+PLATE_SPLIT_DIRNAME = '.stellio_plateaux'  # sous-dossier masqué des plateaux séparés (projets) : hors bibliothèque et hors sources
+
+
+def _is_hidden_plate_path(path):
+    return isinstance(path, str) and f'/{PLATE_SPLIT_DIRNAME}/' in path.replace('\\', '/')
+
+
+def _thumb_base_path(file_path):
+    """Chemin (sans extension) de la miniature d'un fichier : même clé que /api/thumb et le scan."""
+    return os.path.join(THUMBNAILS_DIR, hashlib.md5(file_path.replace('\\', '/').encode()).hexdigest())
+
+
+def _has_thumb_on_disk(file_path):
+    base = _thumb_base_path(file_path)
+    return any(os.path.exists(base + ext) for ext in ('.webp', '.png', '.jpg'))
+
+
+def _write_thumb_from_3mf_preview(model_path):
+    """Miniature instantanée d'un 3MF à partir de l'aperçu déjà embarqué par le slicer (Metadata/plate_1.png),
+    sans rendu 3D (le rendu complet prend plusieurs secondes par fichier). Renvoie True si la miniature existe."""
+    try:
+        if _has_thumb_on_disk(model_path):
+            return True
+        with zipfile.ZipFile(model_path, 'r') as z:
+            names = {n.lower(): n for n in z.namelist()}
+            data = None
+            for cand in ('metadata/plate_1.png', 'metadata/top_1.png', 'metadata/plate_no_light_1.png', 'metadata/thumbnail.png'):
+                if cand in names:
+                    data = z.read(names[cand])
+                    break
+        if not data:
+            return False
+        img = Image.open(io.BytesIO(data))
+        img.load()
+        img = img.convert('RGBA')
+        img.thumbnail((768, 768))
+        os.makedirs(THUMBNAILS_DIR, exist_ok=True)
+        thumb_path = _thumb_base_path(model_path) + '.webp'
+        tmp_path = thumb_path + '.tmp'
+        img.save(tmp_path, 'WEBP', quality=85)
+        os.replace(tmp_path, thumb_path)
+        return True
+    except Exception as e:
+        app_logger.info(f"[PROJETS] Aperçu embarqué inutilisable pour {os.path.basename(model_path)}: {e}")
+        return False
+
+
+def _hide_dir_on_windows(path):
+    if os.name == 'nt':
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetFileAttributesW(str(path), 0x02)
+        except Exception:
+            pass
+
+
 def _rescan_sources_in_background():
     """Rescan des sources dans un thread, sans bloquer la requête ni supprimer le cache de la bibliothèque.
 
@@ -7435,18 +7699,30 @@ def _expand_multiplate_3mf_for_project(file_path, user_id):
         keys = sorted(plates.keys(), key=lambda k: (len(k), k))
         base_dir = os.path.dirname(real)
         base_name = os.path.splitext(os.path.basename(real))[0]
+        hidden_dir = os.path.join(base_dir, PLATE_SPLIT_DIRNAME)
         keep_slashes = '\\' not in file_path
         result = []
         for idx, key in enumerate(keys, start=1):
-            dest = os.path.join(base_dir, f"{base_name}_plateau_{idx}.3mf")
-            if not os.path.isfile(dest):
+            fname = f"{base_name}_plateau_{idx}.3mf"
+            dest = os.path.join(hidden_dir, fname)
+            legacy = os.path.join(base_dir, fname)  # plateaux créés à côté de l'original par une version précédente
+            if os.path.isfile(dest):
+                chosen = dest
+            elif os.path.isfile(legacy):
+                chosen = legacy
+            else:
+                if not os.path.isdir(hidden_dir):
+                    os.makedirs(hidden_dir, exist_ok=True)
+                    _hide_dir_on_windows(hidden_dir)
                 _split_3mf_plate_to_3mf(real, key, plates, dest)
                 created.append(dest)
-            result.append(dest.replace('\\', '/') if keep_slashes else dest)
-        if created:
-            _rescan_sources_in_background()
+                chosen = dest
+            if not _has_thumb_on_disk(chosen) and not _write_thumb_from_3mf_preview(chosen):
+                # pas d'aperçu embarqué : rendu 3D en arrière-plan, en priorité haute
+                _queue_thumb_task(chosen, _thumb_base_path(chosen) + '.webp', priority='high')
+            result.append(chosen.replace('\\', '/') if keep_slashes else chosen)
         app_logger.info(f"[PROJETS] {os.path.basename(real)} : {len(keys)} plateaux → {len(keys)} fichiers 3MF "
-                        f"({len(created)} créé(s), {len(keys) - len(created)} réutilisé(s))")
+                        f"({len(created)} créé(s), {len(keys) - len(created)} réutilisé(s)) dans {PLATE_SPLIT_DIRNAME}")
         return result
     except Exception as e:
         for p in created:  # tout ou rien : pas de découpe partielle
@@ -7476,6 +7752,15 @@ def _expand_project_file_items(files, user_id):
                 seen.add(path)
                 out.append((path, qty))
     return out
+
+
+@app.route('/api/ui/activity', methods=['POST'])
+@login_required
+def api_ui_activity():
+    """Signal d'activité envoyé par l'interface (au plus toutes les 2 s) : met les rendus de miniatures en pause."""
+    global _last_user_activity
+    _last_user_activity = time.time()
+    return '', 204
 
 
 @app.route('/api/thumb', methods=['GET'])
@@ -7568,6 +7853,7 @@ def pregenerate_thumbnails_on_startup(limit=90):
         try:
             if source['type'] == 'folder' and os.path.exists(source['path']):
                 for root, dirs, files in os.walk(source['path']):
+                    dirs[:] = [d for d in dirs if d != PLATE_SPLIT_DIRNAME]
                     for f in sorted(files, key=str.lower):
                         if len(to_process) >= limit:
                             break
@@ -8112,6 +8398,7 @@ def scan_local_folder(folder_path):
     extensions_archive = {'.rar', '.tar.gz', '.tgz', '.zip', '.7z'}
 
     for root, dirs, filenames in os.walk(folder_path):
+        dirs[:] = [d for d in dirs if d != PLATE_SPLIT_DIRNAME]
         for filename in filenames:
             ext = os.path.splitext(filename)[1].lower()
             file_path = os.path.join(root, filename)
@@ -14619,6 +14906,22 @@ def api_get_project(project_id):
     conn.close()
     _needed = sum(int(f['quantity_needed'] or 0) for f in files)
     _printed = sum(min(int(f['quantity_printed'] or 0), int(f['quantity_needed'] or 0)) for f in files)
+    out_files = []
+    for f in files:
+        d = dict(f)
+        fp = d['file_path']
+        if _is_hidden_plate_path(fp):
+            # plateau séparé : absent de la bibliothèque, ses infos viennent donc d'ici
+            real = fp.replace('/', '\\') if os.name == 'nt' else fp
+            d['hidden'] = True
+            d['name'] = os.path.basename(fp)
+            d['exists'] = os.path.isfile(real)
+            d['has_thumb'] = _has_thumb_on_disk(fp)
+            if d['exists'] and not d['has_thumb']:
+                if not _write_thumb_from_3mf_preview(real):
+                    _queue_thumb_task(real, _thumb_base_path(fp) + '.webp', priority='high')
+                d['has_thumb'] = _has_thumb_on_disk(fp)
+        out_files.append(d)
     return jsonify({
         "id": p['id'],
         "name": p['name'],
@@ -14627,7 +14930,7 @@ def api_get_project(project_id):
         "status": _project_effective_status(p['status'], _needed, _printed),
         "created_at": p['created_at'],
         "updated_at": p['updated_at'],
-        "files": [dict(f) for f in files]
+        "files": out_files
     })
 
 @app.route('/api/projects/<int:project_id>', methods=['PUT'])
@@ -17115,7 +17418,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.7.6"
+CURRENT_VERSION = "0.7.7"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -22430,15 +22733,15 @@ _DEFAULT_USEFUL_LINKS = [
     {"id": "bambulab", "name": "Bambu Lab", "group": "Boutiques constructeurs", "url": "https://eu.store.bambulab.com", "icon": "fa-solid fa-industry", "search_url": "https://eu.store.bambulab.com/search?q={q}", "vendors": ["bambu"]},
     {"id": "creality", "name": "Creality", "group": "Boutiques constructeurs", "url": "https://store.creality.com", "icon": "fa-solid fa-industry"},
     {"id": "elegoo", "name": "Elegoo", "group": "Boutiques constructeurs", "url": "https://www.elegoo.com", "icon": "fa-solid fa-industry"},
-    {"id": "prusa", "name": "Prusa", "group": "Boutiques constructeurs", "url": "https://www.prusa3d.com", "icon": "fa-solid fa-industry", "search_url": "https://www.prusa3d.com/search/?q={q}"},
+    {"id": "prusa", "name": "Prusa", "group": "Boutiques constructeurs", "url": "https://www.prusa3d.com", "icon": "fa-solid fa-industry", "search_url": "https://www.prusa3d.com/search/?q={q}", "brands": ["prusa", "prusament"]},
     {"id": "anycubic", "name": "Anycubic", "group": "Boutiques constructeurs", "url": "https://store.anycubic.com", "icon": "fa-solid fa-industry", "search_url": "https://store.anycubic.com/search?q={q}", "vendors": ["anycubic"]},
     {"id": "geeetech", "name": "Geeetech", "group": "Boutiques constructeurs", "url": "https://www.geeetech.com", "icon": "fa-solid fa-industry"},
-    {"id": "polymaker", "name": "Polymaker", "group": "Boutiques constructeurs", "url": "https://polymaker.com", "icon": "fa-solid fa-industry", "search_url": "https://shop.polymaker.com/search?q={q}"},
+    {"id": "polymaker", "name": "Polymaker", "group": "Boutiques constructeurs", "url": "https://polymaker.com", "icon": "fa-solid fa-industry", "search_url": "https://shop.polymaker.com/search?q={q}", "brands": ["polymaker", "polylite", "polyterra", "polymax", "panchroma", "polysonic"]},
     {"id": "sunlu", "name": "Sunlu", "group": "Boutiques constructeurs", "url": "https://www.sunlu.com", "icon": "fa-solid fa-industry", "search_url": "https://www.sunlu.com/search?q={q}"},
     {"id": "tigertag", "name": "TigerTag", "group": "Boutiques constructeurs", "url": "https://tigertag.io", "icon": "fa-solid fa-industry"},
     {"id": "francofil", "name": "Francofil", "group": "Boutiques constructeurs", "url": "https://francofil.fr", "icon": "fa-solid fa-industry", "search_url": "https://francofil.fr/?s={q}"},
     {"id": "dagoma", "name": "Dagoma", "group": "Boutiques constructeurs", "url": "https://www.dagoma3d.com", "icon": "fa-solid fa-industry", "search_url": "https://www.dagoma3d.com/shop?search={q}"},
-    {"id": "arianeplast", "name": "Arianeplast", "group": "Boutiques constructeurs", "url": "https://www.arianeplast.com", "icon": "fa-solid fa-industry", "search_url": "https://www.arianeplast.com/search?controller=search&s={q}"},
+    {"id": "arianeplast", "name": "Arianeplast", "group": "Boutiques constructeurs", "url": "https://www.arianeplast.com", "icon": "fa-solid fa-industry", "search_url": "https://www.arianeplast.com/en/#23e8/fullscreen-brand-categories/m=and&q={q}"},
     {"id": "filo3d", "name": "Filo3D", "group": "Boutiques constructeurs", "url": "https://www.filo3d.fr", "icon": "fa-solid fa-industry", "search_url": "https://www.filo3d.fr/recherche?controller=search&s={q}"},
     {"id": "3dfils", "name": "3DFils", "group": "Boutiques constructeurs", "url": "https://3dfils.com", "icon": "fa-solid fa-industry", "search_url": "https://3dfils.com/recherche?controller=search&s={q}"},
     {"id": "colorfabb", "name": "ColorFabb", "group": "Boutiques constructeurs", "url": "https://www.colorfabb.com", "icon": "fa-solid fa-industry", "search_url": "https://www.colorfabb.com/fr/search?q={q}"},
@@ -22520,6 +22823,61 @@ def _spool_search_query(brand, material, color):
     return ' '.join(words)
 
 
+def _brand_key(text):
+    """Clé de comparaison d'une marque : minuscules, sans accents, sans espaces ni ponctuation."""
+    return re.sub(r'[^a-z0-9]+', '', _shop_norm(text))
+
+
+def _shop_brand_aliases(shop):
+    """Marques vendues par une boutique : (aliases explicites, aliases déduits du nom de la boutique).
+    Explicites = champs `brands` / `vendors` de useful_links.json. Déduits = nom et id des « Boutiques constructeurs »."""
+    explicit, derived = set(), set()
+    for field in ('brands', 'vendors'):
+        for v in (shop.get(field) or []):
+            k = _brand_key(v)
+            if len(k) >= 3:
+                explicit.add(k)
+    if str(shop.get('group') or '') == 'Boutiques constructeurs':
+        for v in (shop.get('name'), shop.get('id')):
+            k = _brand_key(v)
+            if len(k) >= 3:
+                derived.add(k)
+    return explicit, derived
+
+
+def _shop_matches_brand(shop, vendor, query=''):
+    """True si la boutique est celle du fabricant de la bobine (marque du filament)."""
+    explicit, derived = _shop_brand_aliases(shop)
+    vk, qk = _brand_key(vendor), _brand_key(query)
+    for a in explicit | derived:
+        if vk and (a == vk or a in vk or (len(vk) >= 4 and vk in a)):
+            return True
+    if qk:
+        for a in explicit:           # marque citée dans le nom de la bobine (ex. « PolyLite PLA »)
+            if len(a) >= 4 and a in qk:
+                return True
+        if not vk:
+            for a in derived:
+                if a in qk:
+                    return True
+    return False
+
+
+def _brand_shop_query(shop, vendor, material, color):
+    """Requête pour la boutique du fabricant elle-même : on retire le nom de la marque (inutile sur son propre site)."""
+    explicit, derived = _shop_brand_aliases(shop)
+    drop = {t for t in _shop_tokens(vendor)} | {t for t in _shop_tokens(shop.get('name'))}
+    kept, seen = [], set()
+    for part in (material, color):
+        for w in str(part or '').split():
+            k = w.lower()
+            if k in seen or k in drop or _brand_key(w) in (explicit | derived):
+                continue
+            seen.add(k)
+            kept.append(w)
+    return ' '.join(kept) or _spool_search_query('', material, color) or str(vendor or '')
+
+
 def _spool_buy_info(brand, material, color):
     from urllib.parse import quote_plus
     query = _spool_search_query(brand, material, color)
@@ -22527,12 +22885,23 @@ def _spool_buy_info(brand, material, color):
     low = query.lower()
     shops = []
     for s in load_useful_links():
-        if '{q}' not in str(s.get('search_url', '')):
+        search_url = str(s.get('search_url', ''))
+        is_brand = _shop_matches_brand(s, brand, query)
+        sid = s.get('id') or s['name']
+        if '{q}' not in search_url:
+            # Boutique du fabricant sans recherche configurée : on propose au moins sa page d'accueil
+            if is_brand and str(s.get('url', '')).lower().startswith(('http://', 'https://')):
+                shops.append({'id': sid, 'name': s['name'], 'url': s['url'], 'brand': True, 'search': False})
             continue
         vendors = s.get('vendors')
-        if vendors and not any(str(v).lower() in low for v in vendors):
+        if vendors and not is_brand and not any(str(v).lower() in low for v in vendors):
             continue
-        shops.append({'id': s.get('id') or s['name'], 'name': s['name'], 'url': s['search_url'].replace('{q}', q)})
+        if is_brand:
+            link = search_url.replace('{q}', quote_plus(_brand_shop_query(s, brand, material, color)))
+        else:
+            link = search_url.replace('{q}', q)
+        shops.append({'id': sid, 'name': s['name'], 'url': link, 'brand': is_brand, 'search': True})
+    shops.sort(key=lambda x: not x.get('brand'))   # boutique du fabricant en premier (tri stable)
     return {'vendor': brand or '', 'material': material or '', 'color': color or '',
             'search_query': query, 'shops': shops}
 
@@ -24168,9 +24537,13 @@ def _search_spool_in_shops(vendor, material, color, color_hex):
     candidates = []
     for s in shops:
         vendors = s.get('vendors')   
-        if vendors and not any(str(v).lower() in low for v in vendors):
+        if vendors and not any(str(v).lower() in low for v in vendors) and not _shop_matches_brand(s, vendor, low_query):
             continue
         candidates.append(s)
+    # Boutique(s) du fabricant : toujours proposée(s), même sans recherche configurée ou sans stock trouvé automatiquement
+    brand_shops = [s for s in load_useful_links()
+                   if isinstance(s, dict) and s.get('name') and _shop_matches_brand(s, vendor, low_query)
+                   and ('{q}' in str(s.get('search_url', '')) or str(s.get('url', '')).lower().startswith(('http://', 'https://')))]
 
     checked, failed, results, report = [], [], [], []
     pool = ThreadPoolExecutor(max_workers=8)
@@ -24241,10 +24614,23 @@ def _search_spool_in_shops(vendor, material, color, color_hex):
             if len(alt_rows) >= SHOP_MAX_ALTERNATIVES:
                 break
 
+    brand_ids = {(s.get('id') or s['name']) for s in brand_shops}
+    checked_ids = {(s.get('id') or s['name']) for s in checked}
+    brand_rows = []
+    for s in brand_shops:
+        sid = s.get('id') or s['name']
+        if '{q}' in str(s.get('search_url', '')):
+            link = str(s['search_url']).replace('{q}', quote_plus(_brand_shop_query(s, vendor, material, color)))
+        else:
+            link = s['url']
+        n_stock = sum(1 for sh, _p in results if (sh.get('id') or sh['name']) == sid)
+        status = 'in_stock' if n_stock else ('not_found' if sid in checked_ids else 'manual')
+        brand_rows.append({'id': sid, 'name': s['name'], 'url': link, 'status': status, 'in_stock': n_stock})
+
     q_manual = quote_plus(low_query)
     manual = [{'id': s.get('id') or s['name'], 'name': s['name'], 'url': str(s['search_url']).replace('{q}', q_manual)}
-              for s in failed]
-    data = {'query': low_query, 'exact': exact_rows, 'alternatives': alt_rows,
+              for s in failed if (s.get('id') or s['name']) not in brand_ids]
+    data = {'query': low_query, 'exact': exact_rows, 'alternatives': alt_rows, 'brand_shops': brand_rows,
             'checked_count': len(checked), 'manual_shops': manual, 'report': report}
     if checked and not any(r['status'] in ('error', 'timeout') for r in report):
         with _shop_avail_cache_lock:
@@ -25903,84 +26289,11 @@ if __name__ in ('__main__', 'stellio_main'):
             app_logger.info("[*] macOS : démarrage backend sans splash Tkinter (évite le conflit Tk/Cocoa avec pywebview)...")
             run_backend_startup(on_status=lambda key: app_logger.info(f"[STARTUP] {key}..."))
         else:
-            import tkinter as tk
-            from tkinter import ttk
-
-            def load_splash_translations():
-                lang = 'fr'
-                try:
-                    if os.path.exists(SETTINGS_FILE):
-                        with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-                            settings = json.load(f)
-                        lang = settings.get('lang', 'fr')
-                except:
-                    pass
-                translations = {}
-                lang_file = os.path.join(BASE_DIR, 'languages', f'{lang}.json')
-                fallback_file = os.path.join(BASE_DIR, 'languages', 'fr.json')
-                for file_path in [lang_file, fallback_file]:
-                    if os.path.exists(file_path):
-                        try:
-                            with open(file_path, 'r', encoding='utf-8') as f:
-                                translations.update(json.load(f))
-                            if file_path == lang_file:
-                                break
-                        except:
-                            pass
-                return {
-                    'init': translations.get('splash.init', 'Initialisation du moteur 3D...'),
-                    'database': translations.get('splash.database', 'Chargement de la base de données...'),
-                    'server': translations.get('splash.server', 'Démarrage du serveur web...'),
-                    'thumbnails': translations.get('splash.thumbnails', 'Préparation des miniatures 3D...'),
-                    'version': translations.get('splash.version', 'Version {version}')
-                }
-
-            SPLASH_TEXTS = load_splash_translations()
-            root = tk.Tk()
-            root.overrideredirect(True)
-            root.attributes('-topmost', True)
-            root.configure(bg='#1a1d23')
-            width, height = 650, 500
-            screen_w = root.winfo_screenwidth()
-            screen_h = root.winfo_screenheight()
-            x = (screen_w - width) // 2
-            y = (screen_h - height) // 2
-            root.geometry(f"{width}x{height}+{x}+{y}")
-            logo_path = os.path.join(BASE_DIR, 'assets', 'logo-nom-stellio.png')
-            if os.path.exists(logo_path):
-                try:
-                    from PIL import Image, ImageTk
-                    img = Image.open(logo_path)
-                    photo = ImageTk.PhotoImage(img)
-                    lbl_logo = tk.Label(root, image=photo, bg='#1a1d23')
-                    lbl_logo.image = photo
-                    lbl_logo.pack(pady=(40, 10))
-                except Exception as e:
-                    app_logger.info(f"[Splash] Erreur chargement logo: {e}")
-            tk.Label(root, text=SPLASH_TEXTS['version'].format(version=CURRENT_VERSION),
-                     font=("Segoe UI", 10), fg="#9ca3af", bg='#1a1d23').pack(pady=(5, 20))
-            lbl_status = tk.Label(root, text=SPLASH_TEXTS['init'],
-                                  font=("Segoe UI", 11), fg="#e6e6e6", bg='#1a1d23')
-            lbl_status.pack(pady=10)
-            style = ttk.Style()
-            style.theme_use('clam')
-            style.configure("Custom.Horizontal.TProgressbar",
-                            troughcolor='#2a2f3a',
-                            background='#4ea1d3',
-                            thickness=8)
-            progress = ttk.Progressbar(root, style="Custom.Horizontal.TProgressbar",
-                                       mode='indeterminate', length=400)
-            progress.pack(pady=15)
-            progress.start(20)
-
-            def heavy_backend_startup():
-                def on_status(key):
-                    root.after(0, lambda: lbl_status.config(text=SPLASH_TEXTS[key]))
-                ready = run_backend_startup(on_status=on_status)
-                root.after(1500 if ready else 5000, root.destroy)
-
-            threading.Thread(target=heavy_backend_startup, daemon=True).start()
-            root.mainloop()
+            # Le splash a déjà été affiché tout en haut du fichier (_EARLY_SPLASH) : on lance simplement
+            # le démarrage backend dans le thread principal en lui envoyant les statuts, puis on le ferme.
+            ready = run_backend_startup(on_status=_early_splash_status)
+            if _EARLY_SPLASH is not None:
+                _EARLY_SPLASH.close(delay=1.5 if ready else 5)
         app_logger.info("[OK] Splash fermé, lancement de l'interface principale...")
         try:
             import webview

@@ -1,5 +1,106 @@
 [
   {
+    "version": "0.7.7",
+    "items": {
+      "fr": [
+        "Projets : les plateaux séparés d'un 3MF multi-plateaux sont maintenant rangés dans un dossier masqué : ils n'encombrent plus ni la bibliothèque ni les sources, restent visibles dans le projet et peuvent être envoyés au slicer depuis celui-ci",
+        "Projets : les miniatures des plateaux séparés s'affichent immédiatement, sans redémarrer l'application (reprise de l'aperçu déjà présent dans le fichier, sans rendu 3D)",
+        "Bibliothèque : la recherche n'est plus perdue quand l'actualisation automatique des fichiers se déclenche — seuls les fichiers correspondants restent affichés (idem pour les résultats de la recherche IA et les filtres actifs)",
+        "Recherche IA : vider le champ de recherche arrête immédiatement la recherche IA en cours (plus de « l'IA cherche » avec un champ vide ni de résultats tardifs qui remplacent la bibliothèque)",
+        "L'application reste fluide pendant la génération des miniatures : celle-ci se met en pause dès que vous utilisez l'application et reprend quand vous ne faites plus rien",
+        "Menu latéral : un séparateur distingue maintenant « Tableau de bord » du reste de la navigation",
+        "Connexion : quand l'application s'ouvre avec une session déjà enregistrée, un message demande « Est-ce bien <compte> ? » : Oui ouvre l'application, Non affiche l'écran d'authentification",
+        "Projets : un clic sur une miniature de la carte d'un projet ouvre la visionneuse 3D du fichier",
+        "Projets : nouveau bouton « Coût du projet » à côté du crayon : même calcul que le coût d'une pièce (estimation précise du slicer, bobine, électricité, usure, frais fixes, marge) cumulé sur tous les fichiers du projet avec leurs quantités, et export du devis en PDF",
+        "Boutiques : l'achat d'une bobine propose maintenant toujours la boutique du fabricant de la marque (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo, etc.), avec une recherche sans le nom de la marque et le stock trouvé quand le site peut être vérifié"
+      ],
+      "en": [
+        "Projects: the plates split from a multi-plate 3MF are now stored in a hidden folder: they no longer clutter the library or the sources, stay visible in the project and can be sent to the slicer from there",
+        "Projects: the thumbnails of split plates now show up immediately, without restarting the app (the preview already stored in the file is reused, with no 3D rendering)",
+        "Library: your search is no longer lost when the automatic file refresh runs — only matching files stay displayed (same for AI search results and active filters)",
+        "AI search: clearing the search field now immediately stops the AI search in progress (no more “AI is searching” with an empty field, and no late results replacing the library)",
+        "The app stays smooth while thumbnails are being generated: generation pauses as soon as you use the app and resumes when you stop",
+        "Side menu: a separator now sets “Dashboard” apart from the rest of the navigation",
+        "Sign-in: when the app opens with a saved session, a prompt now asks “Is this <account>?”: Yes opens the app, No shows the sign-in screen",
+        "Projects: clicking a thumbnail on a project card opens the file's 3D viewer",
+        "Projects: new “Project cost” button next to the pencil: same calculation as the cost of a single part (precise slicer estimate, spool, electricity, wear, fixed fee, margin) added up over all the files of the project with their quantities, plus PDF quote export",
+        "Shops: buying a spool now always offers the manufacturer's own shop for its brand (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo, etc.), with a search that leaves out the brand name and the stock found when the site can be checked"
+      ],
+      "de": [
+        "Projekte: Die aus einer 3MF mit mehreren Platten abgetrennten Platten liegen jetzt in einem versteckten Ordner: Sie füllen weder die Bibliothek noch die Quellen, bleiben im Projekt sichtbar und können von dort an den Slicer gesendet werden",
+        "Projekte: Die Vorschaubilder der abgetrennten Platten erscheinen sofort, ohne die App neu zu starten (die bereits in der Datei gespeicherte Vorschau wird wiederverwendet, ohne 3D-Rendering)",
+        "Bibliothek: Die Suche geht nicht mehr verloren, wenn die automatische Dateiaktualisierung läuft – es bleiben nur passende Dateien sichtbar (ebenso bei KI-Suchergebnissen und aktiven Filtern)",
+        "KI-Suche: Beim Leeren des Suchfelds wird die laufende KI-Suche sofort beendet (kein „KI sucht“ mehr bei leerem Feld und keine verspäteten Ergebnisse, die die Bibliothek ersetzen)",
+        "Die App bleibt während der Vorschaubild-Erzeugung flüssig: Die Erzeugung pausiert, sobald Sie die App benutzen, und läuft weiter, wenn Sie nichts mehr tun",
+        "Seitenmenü: Ein Trennstrich setzt „Dashboard“ jetzt vom Rest der Navigation ab",
+        "Anmeldung: Wenn die App mit einer gespeicherten Sitzung startet, fragt ein Hinweis „Ist das <Konto>?“ – Ja öffnet die App, Nein zeigt den Anmeldebildschirm",
+        "Projekte: Ein Klick auf eine Vorschau auf der Projektkarte öffnet die 3D-Ansicht der Datei",
+        "Projekte: Neue Schaltfläche „Projektkosten“ neben dem Stift: gleiche Berechnung wie die Kosten eines einzelnen Teils (genaue Slicer-Schätzung, Spule, Strom, Verschleiß, Fixkosten, Marge), summiert über alle Dateien des Projekts mit ihren Mengen, samt Export des Angebots als PDF",
+        "Shops: Beim Nachkauf einer Spule wird jetzt immer der Shop des Herstellers der Marke angeboten (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo usw.), mit einer Suche ohne Markennamen und dem gefundenen Lagerbestand, sofern die Seite geprüft werden kann"
+      ],
+      "es": [
+        "Proyectos: las placas separadas de un 3MF de varias placas se guardan ahora en una carpeta oculta: ya no saturan la biblioteca ni las fuentes, siguen visibles en el proyecto y se pueden enviar al slicer desde allí",
+        "Proyectos: las miniaturas de las placas separadas aparecen al instante, sin reiniciar la aplicación (se reutiliza la vista previa ya incluida en el archivo, sin renderizado 3D)",
+        "Biblioteca: la búsqueda ya no se pierde cuando se ejecuta la actualización automática de archivos: solo permanecen visibles los archivos coincidentes (igual con los resultados de la búsqueda IA y los filtros activos)",
+        "Búsqueda IA: vaciar el campo de búsqueda detiene al instante la búsqueda IA en curso (se acabó el « la IA busca » con el campo vacío y los resultados tardíos que reemplazaban la biblioteca)",
+        "La aplicación se mantiene fluida durante la generación de miniaturas: esta se pausa en cuanto usas la aplicación y se reanuda cuando dejas de hacer algo",
+        "Menú lateral: un separador distingue ahora « Panel » del resto de la navegación",
+        "Inicio de sesión: al abrir la aplicación con una sesión guardada, aparece un mensaje «¿Eres <cuenta>?»: Sí abre la aplicación, No muestra la pantalla de inicio de sesión",
+        "Proyectos: al hacer clic en una miniatura de la tarjeta de un proyecto se abre el visor 3D del archivo",
+        "Proyectos: nuevo botón «Coste del proyecto» junto al lápiz: mismo cálculo que el coste de una pieza (estimación precisa del slicer, bobina, electricidad, desgaste, gastos fijos, margen) sumado sobre todos los archivos del proyecto con sus cantidades, y exportación del presupuesto en PDF",
+        "Tiendas: al comprar una bobina ahora se ofrece siempre la tienda del fabricante de la marca (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo, etc.), con una búsqueda sin el nombre de la marca y el stock encontrado cuando se puede verificar el sitio"
+      ],
+      "it": [
+        "Progetti: i piatti separati da un 3MF con più piatti sono ora salvati in una cartella nascosta: non ingombrano più la libreria né le sorgenti, restano visibili nel progetto e si possono inviare allo slicer da lì",
+        "Progetti: le miniature dei piatti separati compaiono subito, senza riavviare l'app (viene riutilizzata l'anteprima già presente nel file, senza rendering 3D)",
+        "Libreria: la ricerca non viene più persa quando scatta l'aggiornamento automatico dei file: restano visibili solo i file corrispondenti (lo stesso vale per i risultati della ricerca IA e i filtri attivi)",
+        "Ricerca IA: svuotare il campo di ricerca interrompe subito la ricerca IA in corso (niente più « l'IA sta cercando » con il campo vuoto né risultati tardivi che sostituiscono la libreria)",
+        "L'app resta fluida durante la generazione delle miniature: questa si mette in pausa appena usi l'app e riprende quando smetti di fare qualcosa",
+        "Menu laterale: un separatore distingue ora « Dashboard » dal resto della navigazione",
+        "Accesso: quando l'app si apre con una sessione salvata, un messaggio chiede «Sei proprio <account>?»: Sì apre l'app, No mostra la schermata di accesso",
+        "Progetti: un clic su una miniatura della scheda di un progetto apre il visualizzatore 3D del file",
+        "Progetti: nuovo pulsante «Costo del progetto» accanto alla matita: stesso calcolo del costo di un singolo pezzo (stima precisa dello slicer, bobina, elettricità, usura, costi fissi, margine) sommato su tutti i file del progetto con le loro quantità, ed esportazione del preventivo in PDF",
+        "Negozi: l'acquisto di una bobina ora propone sempre il negozio del produttore della marca (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo, ecc.), con una ricerca senza il nome della marca e la disponibilità trovata quando il sito può essere verificato"
+      ],
+      "pt": [
+        "Projetos: as placas separadas de um 3MF com várias placas ficam agora em uma pasta oculta: não poluem mais a biblioteca nem as fontes, continuam visíveis no projeto e podem ser enviadas ao slicer a partir dele",
+        "Projetos: as miniaturas das placas separadas aparecem imediatamente, sem reiniciar o aplicativo (a pré-visualização já presente no arquivo é reutilizada, sem renderização 3D)",
+        "Biblioteca: a pesquisa já não se perde quando a atualização automática dos arquivos é executada — só os arquivos correspondentes continuam visíveis (o mesmo vale para os resultados da pesquisa por IA e os filtros ativos)",
+        "Pesquisa por IA: limpar o campo de pesquisa interrompe de imediato a pesquisa por IA em curso (acabou o « IA a pesquisar » com o campo vazio e os resultados tardios que substituíam a biblioteca)",
+        "O aplicativo continua fluido durante a geração de miniaturas: ela é pausada assim que você usa o aplicativo e retomada quando você para",
+        "Menu lateral: um separador distingue agora « Painel » do resto da navegação",
+        "Login: ao abrir o aplicativo com uma sessão salva, uma mensagem pergunta “Você é mesmo <conta>?”: Sim abre o aplicativo, Não mostra a tela de login",
+        "Projetos: clicar numa miniatura do cartão de um projeto abre o visualizador 3D do arquivo",
+        "Projetos: novo botão «Custo do projeto» ao lado do lápis: mesmo cálculo do custo de uma peça (estimativa precisa do slicer, bobina, eletricidade, desgaste, custos fixos, margem) somado em todos os arquivos do projeto com as suas quantidades, e exportação do orçamento em PDF",
+        "Lojas: a compra de uma bobina agora oferece sempre a loja do fabricante da marca (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo, etc.), com uma pesquisa sem o nome da marca e o estoque encontrado quando o site pode ser verificado"
+      ],
+      "ja": [
+        "プロジェクト：複数プレートの3MFから分割したプレートは非表示フォルダーに保存されるようになりました。ライブラリやソースには表示されませんが、プロジェクト内で確認でき、そこからスライサーへ送信できます",
+        "プロジェクト：分割したプレートのサムネイルが、アプリを再起動しなくてもすぐに表示されます（ファイルに含まれるプレビューを再利用するため、3Dレンダリングは不要です）",
+        "ライブラリ：ファイルの自動更新が実行されても検索が解除されなくなりました。一致するファイルだけが表示されたままになります（AI検索の結果や有効なフィルターも同様です）",
+        "AI検索：検索欄を空にすると、実行中のAI検索がすぐに停止します（欄が空なのに「AI検索中」と表示されたり、遅れて届いた結果でライブラリが置き換わったりしなくなりました）",
+        "サムネイル生成中もアプリが快適に動作します。アプリを操作するとすぐに生成が一時停止し、操作をやめると再開します",
+        "サイドメニュー：「ダッシュボード」とそれ以外のナビゲーションの間に区切り線を追加しました",
+        "ログイン：保存済みのセッションでアプリを開くと「<アカウント>さんですか？」と確認します。「はい」でアプリが開き、「いいえ」でログイン画面が表示されます",
+        "プロジェクト：プロジェクトカードのサムネイルをクリックすると、そのファイルの3Dビューアーが開きます",
+        "プロジェクト：鉛筆アイコンの隣に新しい「プロジェクトのコスト」ボタンを追加。単品のコストと同じ計算（スライサーによる正確な見積もり、スプール、電気代、消耗、固定費、マージン）を、プロジェクト内の全ファイルの数量分で合計し、見積書をPDFで出力できます",
+        "ショップ：スプールの買い足し時に、そのブランドのメーカー公式ショップ（Arianeplast、Bambu Lab、Polymaker、eSUN、Sunlu、Elegoo など）が常に表示されるようになりました。ブランド名を除いた検索で、サイトを確認できる場合は在庫も表示します"
+      ],
+      "zh": [
+        "项目：从多盘 3MF 拆分出的各盘文件现在存放在隐藏文件夹中：不再占用资料库和来源列表，在项目中仍可见，并可直接从项目发送到切片软件",
+        "项目：拆分出的各盘缩略图现在会立即显示，无需重启应用（直接复用文件内已有的预览图，无需 3D 渲染）",
+        "资料库：自动刷新文件时不再丢失搜索——只会继续显示匹配的文件（AI 搜索结果和已启用的筛选同样适用）",
+        "AI 搜索：清空搜索框会立即停止正在进行的 AI 搜索（搜索框为空时不再显示“AI 搜索中”，也不会再出现延迟返回的结果替换整个资料库）",
+        "生成缩略图期间应用保持流畅：一旦您操作应用，生成会立即暂停，停止操作后自动恢复",
+        "侧边菜单：在“仪表板”与其余导航之间新增分隔线",
+        "登录：使用已保存的会话打开应用时，会先询问“您是<账户>吗？”：选择“是”进入应用，选择“否”则显示登录界面",
+        "项目：点击项目卡片上的缩略图即可打开该文件的 3D 查看器",
+        "项目：铅笔图标旁新增“项目成本”按钮：与单个零件成本相同的计算方式（切片软件精确估算、耗材盘、电费、损耗、固定费用、利润率），按各文件数量汇总整个项目，并可导出 PDF 报价单",
+        "商店：购买耗材盘时，现在总会提供该品牌厂商的官方商店（Arianeplast、Bambu Lab、Polymaker、eSUN、Sunlu、Elegoo 等），搜索时会省略品牌名，并在可核实该网站时显示找到的库存"
+      ]
+    }
+  },
+  {
     "version": "0.7.6",
     "items": {
       "fr": [
