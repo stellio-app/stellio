@@ -48,7 +48,8 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 
 ### 🏠 Dashboard & productivity
 - 📊 **Dashboard on launch**: prints in progress, low filament stock, recent prints and recent files at a glance
-- 🧱 **Fully customizable**: drag-and-drop reordering and hiding of widgets (12 available: current prints, low stock, latest S.O.S Print, suggestions, Stellio instances…)
+- 🧱 **Fully customizable**: drag-and-drop reordering and hiding of widgets (20 available: current prints, low stock, latest S.O.S Print, suggestions, Stellio instances…)
+- 🖼️ **More widgets**: “Completed projects”, “Gallery” (gallery photos scroll by, pause on hover, click to enlarge) and “Quotes” (the 5 latest quotes created); all widgets have the same size and their content scrolls inside
 - ✅ **"Getting started" checklist** for new users
 - 💡 **"Suggestions" widget**: spots files you reprint often but haven't touched in a while, and slicer profiles with a high failure rate
 - ⌨️ **Command palette (`Ctrl+K`)**: navigate, run an action or instantly find a file, tag, filament spool or slicer profile
@@ -60,17 +61,23 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 ### 📚 Library management
 - 🗂️ **Multiple sources**: local folders, single files, SMB/NFS shares — 3D folders detected on your computer are suggested and can be added in one click
 - 🖼️ **Automatic 3D thumbnails** via PyRender (high-quality rendering) or a numpy CPU rasterizer (fallback), with loading-effect placeholders and an **enlarged preview on hover**
+- 🌀 **Always smooth**: thumbnail generation pauses as soon as you use the app and resumes when you stop
 - 🏷️ **Custom tags** with colors + AI auto-tagging, and **one-click tagging of several selected files** at once
 - 🔍 **AI-assisted semantic search** ("I'm looking for a support for...") with **recent searches remembered**
 - ⭐ **Favorites** and advanced filters (type, size, weight, print status), with a **restock warning** when filament stock is insufficient for your favorites
 - 🧵 **"Filament stock" filter**: keeps only the files printable with the spools you actually have (Spoolman, manual inventory, TigerTag), by material
 - 💾 **Saved filters**: save any combination of library filters and reuse it in one click
+- 🔀 **Remembered sort and search**: the chosen sort order (A → Z, folder, size, date, tag…) is restored when the app reopens, and the search, active filters and AI search results stay in place when the library refreshes automatically; clearing the search field immediately stops the AI search in progress
+- 🖨️ **Print status filters**: “Sent to slicer”, “Already printed (success or failed)”, “Already succeeded” and “Already failed”
 - 📋 **"Print soon" queue**, separate from favorites, reorderable by drag-and-drop and sendable straight to the slicer
 - 🖱️ **Fast selection**: range selection (`Shift+click`) and keyboard navigation (arrows + `Enter`)
 - ✏️ **Bulk rename** (find/replace, prefix, suffix, numbering) with a preview before applying
 - ↩️ **Undo deletions** (`Ctrl+Z`) thanks to a 5-minute temporary trash — deleting a tag, project or source is also undoable, with no blocking confirmation
 - 🔗 **Model origin**: source link, author, license and notes on each file sheet, with the download date when applicable
 - 🧩 **Projects/Assemblies**: group several files for a single object, with multi-plate 3MF support (plate navigation in the viewer)
+- 🧱 **Multi-plate 3MF in projects**: adding a multi-plate 3MF to a project automatically splits it into one 3MF file per plate (6 plates = 6 files to print), stored in a hidden folder so the library stays tidy, with instant thumbnails and sending to the slicer from the project; the **“Split plates”** action (a file's ⋯ menu) creates a separate STL or 3MF per plate
+- 🔎 **Project cards**: clicking a thumbnail opens the file in the 3D viewer; the “All / In progress / Completed” filter is remembered between sessions; rating a print “successful” adds the printed part to the projects containing the file and removes it from “Print soon”
+- 💰 **Project cost**: a button on the project card calculates the cost of all its files with the same settings as the cost of a single part (precise slicer estimate, spool, electricity, wear, fixed fee, margin, quantities) and exports the PDF quote
 - 🔁 **Duplicate detection** (exact and geometry-similar)
 - 🗜️ **Archive support**: browse and extract models directly from archives
 - 🖱️ **Drag & drop 3D files** from your file explorer — works on the desktop app and also through a browser (Raspberry Pi, mobile, remote access)
@@ -89,6 +96,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 🔌 Support for **OctoPrint**, **Klipper/Moonraker**, **Bambu Lab** (MQTT), **Creality** (WebSocket), **FlashForge**, **Elegoo** (SDCP) and **PrusaLink**
 - 📡 **Automatic network discovery**: Stellio scans your local network (SSDP for Bambu Lab, UDP broadcast for Elegoo/Centauri/FlashForge, targeted probing for Klipper/OctoPrint/PrusaLink/Creality) and lets you add detected printers with one click
 - 📡 Real-time monitoring (temperatures, progress, camera)
+- 🖼️ **Current print on the card**: thumbnail and name of the file being printed when it is in the library (G-code thumbnail for Klipper/Moonraker prints started outside Stellio); the build plate size (X, Y, Z) is set per printer and triggers a warning before sending if the part is too large
 - 🔧 **Predictive maintenance** with brand-specific task tracking and recommendations (Bambu, Prusa, Creality, etc.)
 - 🔩 **Wear parts & consumables**: stock of nozzles, plates, belts… with low-stock alerts, linked to maintenance tasks (each service deducts one part)
 - ⏱️ Automatic print-hour counter
@@ -107,6 +115,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - ⚪ Manual spools
 - 📉 Automatic consumption tracking on send-to-slicer, with a compatibility check before printing (enough material left?)
 - 🔔 **Low-stock alerts** on startup, with a quick link to buy more
+- 🛒 **Buying a spool again**: Stellio first offers the manufacturer's own shop for the brand (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu…), then general shops, with stock checked automatically when the site allows it
 - 💨 **Spool drying**: drying log, status (dry / needs drying) based on the material, suggested temperature and duration, and reminders in notifications
 - 📈 **Spool summary**: prints, grams, cost and untracked difference in each spool's sheet
 
@@ -115,6 +124,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 🟢 **MakerWorld** (2-step Bambu Lab login)
 - 🔵 **Thingiverse** (via API key)
 - 🟣 **Nexprint** (Elegoo's model library; sign in with your account email and password, stored encrypted)
+- 🔷 **Creality Cloud** and **Snapmaker Space** (sign in from Settings, credentials stored encrypted; Google sign-in is not supported)
 - 📁 Direct download to your configured sources
 - 🆕 **New version detection**: Stellio checks every day whether the models you downloaded (Printables, MakerWorld, Thingiverse) have been updated
 - 🛒 **Useful links**: shops, printer manufacturers, 3D model sites and resources grouped in collapsible sections
@@ -126,6 +136,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 🛡️ **Integrity check** (corrupted/missing files)
 - 💰 **Print cost calculation**: material, electricity, machine wear (per hour), fixed fee, margin in % and quantity — unit price and total computed to the cent
 - 🧾 **PDF quotes**: generated from the cost calculator with customizable client, item name and notes; configurable quote header (name/company, logo, address, phone, email, website, tax ID) and legal notices in the footer
+- 🗃️ **Quote history**: every generated quote is kept (PDF copy) and can be browsed, re-downloaded and deleted from the “Quotes” widget on the dashboard
 - 🌱 **Environmental estimate**: CO₂ footprint of your prints (material + electricity)
 - 📸 **Print photo gallery** (successful/failed)
 - 🕒 **History** with success/failure rating (feeds the AI), a **"View file"** and **"Reprint"** button on each row (with detection of moved/deleted files), and filters by platform, result (successful/failed/partial/unrated) and date range
@@ -147,6 +158,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 
 ### 👥 Accounts & multi-instance
 - 🔐 **Local accounts** with a recovery code and a secret question: 100% local password reset, no email or internet needed
+- 🙋 **Session confirmation**: when the app opens with a saved session, Stellio asks you to confirm the account (Yes / No); on a phone, coming back to the app does not ask for credentials again while the session is valid
 - 👤 **Read-only guest accounts**: share your library, printers and stock with family or friends without any risk
 - 🔄 **Stellio instances**: other installations on your local network are detected automatically and added in one click (you only need to enter their local key)
 - 📨 **Send a file to another instance**: choose the destination folder on the target instance — the received file shows up in its library right away
@@ -163,6 +175,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 ### 💾 Backup & Updates
 - 📦 Full backup export/import (.zip)
 - 🔄 Automatic updates from GitHub (`.zip` patch — same mechanism on Windows and Raspberry Pi/Linux)
+- 🧰 **Module check**: on the first launch of each version, missing modules (PDF quotes, spreadsheet import, notifications…) are downloaded automatically
 - 🔁 Reliable restart after an update or after enabling debug mode, on Windows and Raspberry Pi/Linux
 - 📋 Diagnostic log export (secrets masked)
 - 💬 **Suggestions & bug reports from the app**: send a suggestion or a bug report without leaving Stellio — it is created as a GitHub issue (anonymously, through a dedicated GitHub App), with a link to the issue and a "New reply" badge when you get an answer

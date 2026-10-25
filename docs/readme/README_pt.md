@@ -48,7 +48,8 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 
 ### 🏠 Painel e produtividade
 - 📊 **Painel ao iniciar**: impressões em andamento, estoque de filamento baixo, últimas impressões e arquivos recentes num relance
-- 🧱 **Totalmente personalizável**: reordene e oculte widgets arrastando e soltando (12 disponíveis: impressões em andamento, estoque baixo, último S.O.S Print, sugestões, instâncias do Stellio…)
+- 🧱 **Totalmente personalizável**: reordene e oculte widgets arrastando e soltando (20 disponíveis: impressões em andamento, estoque baixo, último S.O.S Print, sugestões, instâncias do Stellio…)
+- 🖼️ **Mais widgets**: «Projetos concluídos», «Galeria» (as fotos da galeria desfilam, pausa ao passar o cursor, clique para ampliar) e «Orçamentos» (os 5 últimos orçamentos criados); todos os widgets têm o mesmo tamanho e o conteúdo rola dentro deles
 - ✅ **Checklist «Primeiros passos»** para novos usuários
 - 💡 **Widget «Sugestões»**: identifica arquivos que você reimprime com frequência mas não revê há algum tempo, e perfis de slicer com alta taxa de falha
 - ⌨️ **Paleta de comandos (`Ctrl+K`)**: navegue, execute uma ação ou encontre instantaneamente um arquivo, uma tag, um carretel ou um perfil de slicer
@@ -60,17 +61,23 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 ### 📚 Gerenciamento de biblioteca
 - 🗂️ **Múltiplas fontes**: pastas locais, arquivos individuais, compartilhamentos SMB/NFS — as pastas 3D detectadas no computador são sugeridas e podem ser adicionadas com um clique
 - 🖼️ **Miniaturas 3D automáticas** via PyRender (renderização de alta qualidade) ou um rasterizador de CPU numpy (alternativa), com efeito de carregamento e **pré-visualização ampliada ao passar o mouse**
+- 🌀 **Sempre fluido**: a geração de miniaturas pausa assim que você usa o aplicativo e retoma quando você para
 - 🏷️ **Tags personalizadas** com cores + marcação automática por IA, e **marcação com um clique de vários arquivos selecionados**
 - 🔍 **Busca semântica assistida por IA** ("estou procurando um suporte para...") com **buscas recentes memorizadas**
 - ⭐ **Favoritos** e filtros avançados (tipo, tamanho, peso, status de impressão), com um **aviso de reposição** quando o estoque de filamento não é suficiente para seus favoritos
 - 🧵 **Filtro «Estoque de filamento»**: mantém apenas os arquivos imprimíveis com os carretéis que você realmente tem (Spoolman, inventário manual, TigerTag), por material
 - 💾 **Filtros salvos**: salve qualquer combinação de filtros e reutilize-a com um clique
+- 🔀 **Ordenação e busca lembradas**: a ordenação escolhida (A → Z, pasta, tamanho, data, tag…) é restaurada ao reabrir o aplicativo, e a busca, os filtros ativos e os resultados da busca com IA permanecem quando a biblioteca é atualizada automaticamente; limpar o campo de busca interrompe imediatamente a busca com IA em andamento
+- 🖨️ **Filtros de status de impressão**: «Enviado ao slicer», «Já impresso (sucesso ou falha)», «Já bem-sucedido» e «Já falhou»
 - 📋 **Fila «Imprimir em breve»**, separada dos favoritos, reordenável por arrastar e soltar e enviável diretamente ao slicer
 - 🖱️ **Seleção rápida**: seleção por intervalo (`Shift+clique`) e navegação pelo teclado (setas + `Enter`)
 - ✏️ **Renomeação em massa** (localizar/substituir, prefixo, sufixo, numeração) com pré-visualização antes de aplicar
 - ↩️ **Desfazer exclusões** (`Ctrl+Z`) graças a uma lixeira temporária de 5 minutos — excluir uma tag, um projeto ou uma fonte também pode ser desfeito, sem confirmação bloqueante
 - 🔗 **Origem do modelo**: link de origem, autor, licença e notas na ficha do arquivo, com a data de download quando aplicável
 - 🧩 **Projetos/Montagens**: agrupe vários arquivos em um único objeto, com suporte a múltiplas bandejas 3MF (navegação entre bandejas no visualizador)
+- 🧱 **3MF com várias placas nos projetos**: ao adicionar um 3MF com várias placas a um projeto, ele é dividido automaticamente em um arquivo 3MF por placa (6 placas = 6 arquivos para imprimir), guardados em uma pasta oculta para não sobrecarregar a biblioteca, com miniaturas imediatas e envio ao slicer a partir do projeto; a ação **«Dividir placas»** (menu ⋯ de um arquivo) cria um STL ou 3MF separado para cada placa
+- 🔎 **Cartões de projeto**: um clique em uma miniatura abre o arquivo no visualizador 3D; o filtro «Todos / Em andamento / Concluídos» é lembrado entre sessões; avaliar uma impressão como «bem-sucedida» adiciona a peça impressa aos projetos que contêm o arquivo e a remove de «Imprimir em breve»
+- 💰 **Custo do projeto**: um botão no cartão do projeto calcula o custo de todos os seus arquivos com as mesmas configurações do custo de uma peça (estimativa precisa do slicer, bobina, eletricidade, desgaste, custos fixos, margem, quantidades) e exporta o orçamento em PDF
 - 🔁 **Detecção de duplicatas** (exatas e semelhantes por geometria)
 - 🗜️ **Suporte a arquivos compactados**: navegue e extraia modelos diretamente de arquivos compactados
 - 🖱️ **Arrastar e soltar arquivos 3D** do explorador de arquivos — funciona no app de desktop e também por um navegador (Raspberry Pi, celular, acesso remoto)
@@ -89,6 +96,7 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 - 🔌 Suporte a **OctoPrint**, **Klipper/Moonraker**, **Bambu Lab** (MQTT), **Creality** (WebSocket), **FlashForge**, **Elegoo** (SDCP) e **PrusaLink**
 - 📡 **Descoberta automática na rede**: o Stellio varre sua rede local (SSDP para Bambu Lab, broadcast UDP para Elegoo/Centauri/FlashForge, sondagem direcionada para Klipper/OctoPrint/PrusaLink/Creality) e permite adicionar as impressoras detectadas com um clique
 - 📡 Monitoramento em tempo real (temperaturas, progresso, câmera)
+- 🖼️ **Impressão em andamento no cartão**: miniatura e nome do arquivo em impressão quando ele está na biblioteca (miniatura do G-code para impressões Klipper/Moonraker iniciadas fora do Stellio); o tamanho da mesa (X, Y, Z) é informado por impressora e gera um aviso antes do envio se a peça for grande demais
 - 🔧 **Manutenção preditiva** com acompanhamento de tarefas e recomendações específicas por marca (Bambu, Prusa, Creality, etc.)
 - 🔩 **Peças de desgaste e consumíveis**: estoque de bicos, mesas, correias… com alertas, vinculado às tarefas de manutenção (cada intervenção desconta uma peça)
 - ⏱️ Contador automático de horas de impressão
@@ -107,6 +115,7 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 - ⚪ Carretéis manuais
 - 📉 Acompanhamento automático do consumo ao enviar para o slicer, com verificação de compatibilidade antes de imprimir (material suficiente?)
 - 🔔 **Alertas de estoque baixo** na inicialização, com um link rápido para comprar mais
+- 🛒 **Comprar uma bobina de novo**: o Stellio oferece primeiro a loja do fabricante da marca (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu…) e depois as lojas generalistas, com o estoque verificado automaticamente quando o site permite
 - 💨 **Secagem de carretéis**: registro de secagem, status (seco / precisa secar) conforme o material, temperatura e duração sugeridas e lembretes nas notificações
 - 📈 **Resumo por carretel**: impressões, gramas, custo e diferença não rastreada na ficha de cada carretel
 
@@ -115,6 +124,7 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 - 🟢 **MakerWorld** (login Bambu Lab em 2 etapas)
 - 🔵 **Thingiverse** (via chave de API)
 - 🟣 **Nexprint** (biblioteca de modelos da Elegoo; início de sessão com o e-mail e a palavra-passe da conta, guardados de forma cifrada)
+- 🔷 **Creality Cloud** e **Snapmaker Space** (login em Configurações, credenciais armazenadas criptografadas; o login com o Google não é compatível)
 - 📁 Download direto para suas fontes configuradas
 - 🆕 **Detecção de novas versões**: o Stellio verifica todos os dias se os modelos baixados (Printables, MakerWorld, Thingiverse) foram atualizados
 - 🛒 **Links úteis**: lojas, fabricantes, sites de modelos 3D e recursos agrupados em seções recolhíveis
@@ -126,6 +136,7 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 - 🛡️ **Verificação de integridade** (arquivos corrompidos/ausentes)
 - 💰 **Cálculo de custo de impressão**: material, eletricidade, desgaste da máquina (por hora), custos fixos, margem em % e quantidade — preço unitário e total calculados ao centavo
 - 🧾 **Orçamentos em PDF**: gerados a partir do cálculo de custo, com cliente, designação e notas personalizáveis; cabeçalho do orçamento configurável (nome/empresa, logotipo, endereço, telefone, e-mail, site, CNPJ/NIF) e avisos legais no rodapé
+- 🗃️ **Histórico de orçamentos**: cada orçamento gerado é guardado (cópia do PDF) e pode ser consultado, baixado de novo e excluído a partir do widget «Orçamentos» do painel
 - 🌱 **Estimativa ambiental**: pegada de CO₂ das suas impressões (material + eletricidade)
 - 📸 **Galeria de fotos de impressões** (bem-sucedidas/com falha)
 - 🕒 **Histórico** com avaliação de sucesso/falha (alimenta a IA), botões **«Ver arquivo»** e **«Reimprimir»** em cada linha (com detecção de arquivos movidos/excluídos) e filtros por plataforma, resultado (bem-sucedida/falha/parcial/sem avaliação) e intervalo de datas
@@ -147,6 +158,7 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 
 ### 👥 Contas e multi-instância
 - 🔐 **Contas locais** com código de recuperação e pergunta secreta: redefinição de senha 100 % local, sem e-mail nem internet
+- 🙋 **Confirmação da sessão**: quando o aplicativo abre com uma sessão salva, o Stellio pede para confirmar a conta (Sim / Não); no telefone, voltar ao aplicativo não pede as credenciais de novo enquanto a sessão for válida
 - 👤 **Contas de convidado somente leitura**: compartilhe sua biblioteca, impressoras e estoque sem nenhum risco
 - 🔄 **Instâncias do Stellio**: detecção automática de outras instalações na rede local e adição com um clique (basta informar a chave local delas)
 - 📨 **Envio de arquivo para outra instância**: escolha da pasta de destino na instância de destino, e o arquivo recebido aparece imediatamente na biblioteca dela
@@ -163,6 +175,7 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 ### 💾 Backup e atualizações
 - 📦 Exportação/importação de backup completo (.zip)
 - 🔄 Atualizações automáticas a partir do GitHub (patch `.zip` — mesmo mecanismo no Windows e no Raspberry Pi/Linux)
+- 🧰 **Verificação de módulos**: na primeira inicialização de cada versão, os módulos ausentes (orçamentos PDF, importação de planilhas, notificações…) são baixados automaticamente
 - 🔁 Reinício confiável após uma atualização ou ao ativar o modo de depuração, no Windows e no Raspberry Pi/Linux
 - 📋 Exportação de logs de diagnóstico (segredos ocultados)
 - 💬 **Sugestões e relatórios de erros a partir da app**: envie uma sugestão ou um erro sem sair do Stellio — é criada uma issue no GitHub por si (de forma anónima, através de uma aplicação GitHub dedicada), com uma ligação para a issue e um selo «Nova resposta» quando recebe uma resposta

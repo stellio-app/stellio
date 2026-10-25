@@ -48,7 +48,8 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 
 ### 🏠 Dashboard & Produktivität
 - 📊 **Dashboard beim Start**: laufende Drucke, niedriger Filamentbestand, letzte Drucke und zuletzt verwendete Dateien auf einen Blick
-- 🧱 **Vollständig anpassbar**: Widgets per Drag & Drop anordnen und ausblenden (12 verfügbar: laufende Drucke, niedriger Bestand, letzter S.O.S Print, Vorschläge, Stellio-Instanzen …)
+- 🧱 **Vollständig anpassbar**: Widgets per Drag & Drop anordnen und ausblenden (20 verfügbar: laufende Drucke, niedriger Bestand, letzter S.O.S Print, Vorschläge, Stellio-Instanzen …)
+- 🖼️ **Weitere Widgets**: „Abgeschlossene Projekte“, „Galerie“ (die Fotos der Galerie laufen durch, Pause beim Überfahren, Klick zum Vergrößern) und „Angebote“ (die 5 zuletzt erstellten Angebote); alle Widgets haben dieselbe Größe, der Inhalt scrollt im Widget
 - ✅ **Checkliste „Erste Schritte“** für neue Nutzer
 - 💡 **Widget „Vorschläge“**: erkennt Dateien, die Sie oft erneut drucken, aber länger nicht angesehen haben, sowie Slicer-Profile mit hoher Fehlerquote
 - ⌨️ **Befehlspalette (`Strg+K`)**: navigieren, Aktionen ausführen oder sofort Dateien, Tags, Spulen und Slicer-Profile finden
@@ -60,17 +61,23 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 ### 📚 Bibliotheksverwaltung
 - 🗂️ **Mehrere Quellen**: lokale Ordner, einzelne Dateien, SMB/NFS-Freigaben — auf dem Computer erkannte 3D-Ordner werden vorgeschlagen und lassen sich mit einem Klick hinzufügen
 - 🖼️ **Automatische 3D-Vorschaubilder** via PyRender (hochwertiges Rendering) oder einen numpy-CPU-Rasterizer (Fallback), mit Lade-Effekt und **vergrößerter Vorschau beim Darüberfahren**
+- 🌀 **Immer flüssig**: Die Erzeugung der Vorschaubilder pausiert, sobald Sie die App benutzen, und läuft weiter, wenn Sie nichts mehr tun
 - 🏷️ **Individuelle Tags** mit Farben + automatisches Tagging per KI, sowie **Tagging mehrerer ausgewählter Dateien mit einem Klick**
 - 🔍 **KI-gestützte semantische Suche** ("ich suche eine Stütze für...") mit **gemerkten letzten Suchen**
 - ⭐ **Favoriten** und erweiterte Filter (Typ, Größe, Gewicht, Druckstatus), mit einer **Nachkauf-Warnung**, wenn der Filamentbestand für Ihre Favoriten nicht ausreicht
 - 🧵 **Filter „Filamentbestand“**: zeigt nur Dateien, die mit den tatsächlich vorhandenen Spulen druckbar sind (Spoolman, manuelles Inventar, TigerTag), nach Material
 - 💾 **Gespeicherte Filter**: Filterkombinationen speichern und mit einem Klick wiederverwenden
+- 🔀 **Gemerkte Sortierung und Suche**: Die gewählte Sortierung (A → Z, Ordner, Größe, Datum, Tag …) wird beim erneuten Öffnen wiederhergestellt; Suche, aktive Filter und Ergebnisse der KI-Suche bleiben bei der automatischen Aktualisierung der Bibliothek erhalten; ein leeres Suchfeld beendet die laufende KI-Suche sofort
+- 🖨️ **Druckstatus-Filter**: „An den Slicer gesendet“, „Bereits gedruckt (erfolgreich oder fehlgeschlagen)“, „Bereits erfolgreich“ und „Bereits fehlgeschlagen“
 - 📋 **Warteschlange „Bald drucken“**, getrennt von den Favoriten, per Drag & Drop sortierbar und direkt an den Slicer sendbar
 - 🖱️ **Schnelle Auswahl**: Bereichsauswahl (`Umschalt+Klick`) und Tastaturnavigation (Pfeiltasten + `Enter`)
 - ✏️ **Massenumbenennung** (Suchen/Ersetzen, Präfix, Suffix, Nummerierung) mit Vorschau vor dem Anwenden
 - ↩️ **Löschungen rückgängig machen** (`Strg+Z`) dank 5-minütigem temporärem Papierkorb — auch das Löschen von Tags, Projekten oder Quellen ist rückgängig machbar, ohne blockierende Bestätigung
 - 🔗 **Modellherkunft**: Quelllink, Autor, Lizenz und Notizen im Dateiblatt, ggf. mit Download-Datum
 - 🧩 **Projekte/Baugruppen**: mehrere Dateien zu einem Objekt gruppieren, mit Multi-Plate-3MF-Unterstützung (Plattennavigation im Viewer)
+- 🧱 **Mehrplatten-3MF in Projekten**: Wird eine 3MF-Datei mit mehreren Platten zu einem Projekt hinzugefügt, wird sie automatisch in eine 3MF-Datei pro Platte aufgeteilt (6 Platten = 6 zu druckende Dateien) und in einem versteckten Ordner abgelegt, damit die Bibliothek übersichtlich bleibt – mit sofortigen Vorschaubildern und Versand an den Slicer direkt aus dem Projekt; die Aktion **„Platten aufteilen“** (⋯-Menü einer Datei) erstellt pro Platte eine eigene STL- oder 3MF-Datei
+- 🔎 **Projektkarten**: Ein Klick auf ein Vorschaubild öffnet die Datei im 3D-Viewer; der Filter „Alle / In Arbeit / Abgeschlossen“ wird sitzungsübergreifend gespeichert; wird ein Druck als „erfolgreich“ bewertet, wird das gedruckte Teil in den betreffenden Projekten ergänzt und aus „Bald drucken“ entfernt
+- 💰 **Projektkosten**: Eine Schaltfläche auf der Projektkarte berechnet die Kosten aller Dateien mit denselben Einstellungen wie die Kosten eines einzelnen Teils (genaue Slicer-Schätzung, Spule, Strom, Verschleiß, Fixkosten, Marge, Mengen) und exportiert das Angebot als PDF
 - 🔁 **Duplikaterkennung** (exakt und geometrisch ähnlich)
 - 🗜️ **Archivunterstützung**: Modelle direkt aus Archiven durchsuchen und extrahieren
 - 🖱️ **Drag & Drop von 3D-Dateien** aus dem Datei-Explorer — funktioniert in der Desktop-App und auch über einen Browser (Raspberry Pi, Mobilgerät, Fernzugriff)
@@ -89,6 +96,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 - 🔌 Unterstützung für **OctoPrint**, **Klipper/Moonraker**, **Bambu Lab** (MQTT), **Creality** (WebSocket), **FlashForge**, **Elegoo** (SDCP) und **PrusaLink**
 - 📡 **Automatische Netzwerkerkennung**: Stellio scannt Ihr lokales Netzwerk (SSDP für Bambu Lab, UDP-Broadcast für Elegoo/Centauri/FlashForge, gezielte Abfrage für Klipper/OctoPrint/PrusaLink/Creality) und lässt Sie gefundene Drucker mit einem Klick hinzufügen
 - 📡 Echtzeit-Überwachung (Temperaturen, Fortschritt, Kamera)
+- 🖼️ **Laufender Druck auf der Karte**: Vorschaubild und Name der gedruckten Datei, sofern sie in der Bibliothek liegt (G-Code-Vorschaubild bei außerhalb von Stellio gestarteten Klipper/Moonraker-Drucken); die Druckbettgröße (X, Y, Z) wird pro Drucker angegeben und löst vor dem Senden eine Warnung aus, wenn das Teil zu groß ist
 - 🔧 **Vorausschauende Wartung** mit markenspezifischer Aufgabenverfolgung und Empfehlungen (Bambu, Prusa, Creality usw.)
 - 🔩 **Verschleißteile & Verbrauchsmaterial**: Bestand an Düsen, Druckplatten, Riemen … mit Warnungen, verknüpft mit Wartungsaufgaben (jede Wartung bucht ein Teil ab)
 - ⏱️ Automatischer Druckstundenzähler
@@ -107,6 +115,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 - ⚪ Manuelle Spulen
 - 📉 Automatische Verbrauchsverfolgung beim Senden an den Slicer, mit Kompatibilitätsprüfung vor dem Druck (genug Material?)
 - 🔔 **Warnung bei niedrigem Bestand** beim Start, mit Direktlink zum Nachkauf
+- 🛒 **Spule nachkaufen**: Stellio bietet zuerst den Shop des Herstellers der Marke an (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu …), danach allgemeine Shops – der Lagerbestand wird automatisch geprüft, sofern die Website das zulässt
 - 💨 **Spulentrocknung**: Trocknungsprotokoll, Status (trocken / muss getrocknet werden) je nach Material, empfohlene Temperatur und Dauer sowie Erinnerungen in den Benachrichtigungen
 - 📈 **Spulenübersicht**: Drucke, Gramm, Kosten und nicht erfasste Differenz im Datenblatt jeder Spule
 
@@ -115,6 +124,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 - 🟢 **MakerWorld** (zweistufiger Bambu-Lab-Login)
 - 🔵 **Thingiverse** (via API-Schlüssel)
 - 🟣 **Nexprint** (Modellbibliothek von Elegoo; Anmeldung mit E-Mail-Adresse und Passwort des Kontos, verschlüsselt gespeichert)
+- 🔷 **Creality Cloud** und **Snapmaker Space** (Anmeldung in den Einstellungen, Zugangsdaten verschlüsselt gespeichert; die Google-Anmeldung wird nicht unterstützt)
 - 📁 Direkter Download in Ihre konfigurierten Quellen
 - 🆕 **Erkennung neuer Versionen**: Stellio prüft täglich, ob heruntergeladene Modelle (Printables, MakerWorld, Thingiverse) aktualisiert wurden
 - 🛒 **Nützliche Links**: Shops, Hersteller, 3D-Modell-Seiten und Ressourcen in einklappbaren Abschnitten
@@ -126,6 +136,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 - 🛡️ **Integritätsprüfung** (beschädigte/fehlende Dateien)
 - 💰 **Druckkostenberechnung**: Material, Strom, Maschinenverschleiß (pro Stunde), Fixkosten, Marge in % und Stückzahl — Stückpreis und Gesamtpreis auf den Cent genau
 - 🧾 **PDF-Angebote**: aus der Kostenberechnung erzeugt, mit anpassbarem Kunden, Bezeichnung und Notizen; konfigurierbarer Angebotskopf (Name/Firma, Logo, Adresse, Telefon, E-Mail, Website, Steuernummer) und rechtliche Hinweise in der Fußzeile
+- 🗃️ **Angebotsverlauf**: Jedes erzeugte Angebot wird aufbewahrt (PDF-Kopie) und kann über das Widget „Angebote“ im Dashboard durchsucht, erneut heruntergeladen und gelöscht werden
 - 🌱 **Umweltschätzung**: CO₂-Fußabdruck Ihrer Drucke (Material + Strom)
 - 📸 **Foto-Galerie der Drucke** (erfolgreich/fehlgeschlagen)
 - 🕒 **Verlauf** mit Erfolgs-/Fehlerbewertung (fließt in die KI ein), Schaltflächen **„Datei anzeigen“** und **„Erneut drucken“** in jeder Zeile (mit Erkennung verschobener/gelöschter Dateien) sowie Filtern nach Plattform, Ergebnis (erfolgreich/fehlgeschlagen/teilweise/nicht bewertet) und Zeitraum
@@ -147,6 +158,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 
 ### 👥 Konten & Multi-Instanz
 - 🔐 **Lokale Konten** mit Wiederherstellungscode und Geheimfrage: 100 % lokales Zurücksetzen des Passworts, ohne E-Mail oder Internet
+- 🙋 **Sitzungsbestätigung**: Öffnet sich die App mit einer gespeicherten Sitzung, bittet Stellio um Bestätigung des Kontos (Ja / Nein); auf dem Handy werden die Zugangsdaten beim Zurückkehren in die App nicht erneut abgefragt, solange die Sitzung gültig ist
 - 👤 **Gastkonten mit Lesezugriff**: teilen Sie Bibliothek, Drucker und Bestand ohne jedes Risiko
 - 🔄 **Stellio-Instanzen**: andere Installationen im lokalen Netzwerk werden automatisch erkannt und mit einem Klick hinzugefügt (Sie müssen nur deren lokalen Schlüssel eingeben)
 - 📨 **Datei an eine andere Instanz senden**: Zielordner auf der Zielinstanz wählbar, die empfangene Datei erscheint sofort in deren Bibliothek
@@ -163,6 +175,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 ### 💾 Backup & Updates
 - 📦 Vollständiger Backup-Export/-Import (.zip)
 - 🔄 Automatische Updates von GitHub (`.zip`-Patch — gleicher Mechanismus unter Windows und Raspberry Pi/Linux)
+- 🧰 **Modulprüfung**: Beim ersten Start jeder Version werden fehlende Module (PDF-Angebote, Tabellenimport, Benachrichtigungen …) automatisch heruntergeladen
 - 🔁 Zuverlässiger Neustart nach einem Update oder nach dem Aktivieren des Debug-Modus, unter Windows und Raspberry Pi/Linux
 - 📋 Export des Diagnoseprotokolls (Geheimnisse maskiert)
 - 💬 **Vorschläge und Fehlermeldungen direkt aus der App**: Sende einen Vorschlag oder einen Fehler, ohne Stellio zu verlassen — es wird ein GitHub-Issue für dich erstellt (anonym, über eine dedizierte GitHub-App), mit Link zum Issue und einem Badge „Neue Antwort“, sobald du eine Antwort erhältst
