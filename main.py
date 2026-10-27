@@ -144,8 +144,6 @@ def _early_splash_run(q, ready, base_dir, data_dir):
     except Exception:
         pass
     finally:
-        # Tk exige que ses objets soient détruits ET libérés dans le thread qui les a créés,
-        # sinon crash « Tcl_AsyncDelete: async handler deleted by the wrong thread » à la sortie.
         try:
             if root is not None:
                 root.destroy()

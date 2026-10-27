@@ -200,16 +200,20 @@ jobs:
           # C'est un module SFX RAR : on l'extrait avec 7-Zip (preinstalle sur les runners GitHub) plutot que
           # de deviner ses switches silencieux internes.
           & "C:\Program Files\7-Zip\7z.exe" x unrarw64.exe -ounrar_extracted -y | Out-Null
-          # Verification : SHA-256 de l'UnRAR.exe extrait (version 7.22.0, signe Authenticode par win.rar GmbH / DigiCert,
-          # hash calcule sur le fichier fourni par l'auteur le 20/10/2026). L'URL de RARLAB n'a pas de numero de version :
-          # quand RARLAB publie une nouvelle version, ce controle echoue volontairement. Verifier alors le nouveau
-          # fichier (signature Authenticode, https://www.rarlab.com/rar_add.htm) puis mettre a jour la valeur.
-          $unrarSha = "ad9f3ae3210f987fed43fbc7dc343ee9e9ce6b03ce24c635bb8d3162f0b9308"
-          $unrarActual = (Get-FileHash -Algorithm SHA256 "unrar_extracted\UnRAR.exe").Hash.ToLower()
-          if ($unrarActual -ne $unrarSha) { throw "SHA-256 UnRAR.exe incorrect : attendu $unrarSha, obtenu $unrarActual. Build annule (nouvelle version de RARLAB ? verifier puis mettre a jour la valeur)." }
-          Write-Host "SHA-256 UnRAR.exe (Windows) verifie : $unrarActual"
-          $unrarSig = Get-AuthenticodeSignature "unrar_extracted\UnRAR.exe"
-          Write-Host "Signature Authenticode d'UnRAR.exe (information) : $($unrarSig.Status) - $($unrarSig.SignerCertificate.Subject)"
+          # Verification d'integrite : on ne epingle PLUS de SHA-256 (l'URL de RARLAB n'a pas de numero de version,
+          # donc le hash change a chaque nouvelle release et cassait le build). A la place on exige une signature
+          # Authenticode VALIDE (chaine de confiance + fichier non modifie) emise au nom de "win.rar GmbH".
+          # Un fichier altere ou fourni par un tiers echouerait ici ; une nouvelle version legitime passe sans intervention.
+          $unrarExe = "unrar_extracted\UnRAR.exe"
+          if (-not (Test-Path $unrarExe)) { throw "UnRAR.exe introuvable apres extraction du SFX RARLAB" }
+          $unrarSig = Get-AuthenticodeSignature $unrarExe
+          $unrarSigner = if ($unrarSig.SignerCertificate) { $unrarSig.SignerCertificate.Subject } else { "(aucun)" }
+          if ($unrarSig.Status -ne "Valid") { throw "Signature Authenticode d'UnRAR.exe invalide (statut : $($unrarSig.Status)). Build annule." }
+          if ($unrarSigner -notmatch "win\.rar GmbH") { throw "UnRAR.exe n'est pas signe par win.rar GmbH (signataire : $unrarSigner). Build annule." }
+          $unrarActual = (Get-FileHash -Algorithm SHA256 $unrarExe).Hash.ToLower()
+          $unrarVersion = (Get-Item $unrarExe).VersionInfo.FileVersion
+          Write-Host "UnRAR.exe verifie : signature Authenticode valide ($unrarSigner)"
+          Write-Host "UnRAR.exe version $unrarVersion - SHA-256 (information, non bloquant) : $unrarActual"
           Copy-Item "unrar_extracted\UnRAR.exe" "dist\Stellio\app\bin\UnRAR.exe" -Force
           if (-not (Test-Path "dist\Stellio\app\bin\UnRAR.exe")) { throw "UnRAR.exe manquant apres telechargement" }
 
