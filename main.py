@@ -35,7 +35,7 @@ def _early_splash_wanted():
     if __name__ not in ('__main__', 'stellio_main'):
         return False
     if sys.platform == 'darwin':
-        return False  # conflit Tk/Cocoa avec pywebview : pas de splash Tkinter sur macOS
+        return False  
     if os.environ.get('STELLIO_HEADLESS', '').strip().lower() in ('1', 'true', 'yes'):
         return False
     if sys.platform.startswith('linux') and not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):

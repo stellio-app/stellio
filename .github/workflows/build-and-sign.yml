@@ -1,4 +1,4 @@
-name: Build, sign and release Stellio
+name: Build,sign and release Stellio
 
 on:
   push:
