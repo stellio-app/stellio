@@ -1345,12 +1345,47 @@
                                 <div class="settings-row" style="align-items:flex-start;">
                                     <div>
                                         <label style="font-size:13px; font-weight:500;" data-i18n="settings.ai_enable">Activer les fonctionnalités IA</label>
-                                        <p class="settings-hint" style="margin-top:2px;" data-i18n="settings.ai_hint">Auto-tag, S.O.S print, recherche sémantique. 100% local via Ollama — aucune donnée n'est envoyée en ligne.</p>
+                                        <p id="ai-local-hint" class="settings-hint" style="margin-top:2px;" data-i18n="settings.ai_hint">Auto-tag, S.O.S print, recherche sémantique. 100% local via Ollama — aucune donnée n'est envoyée en ligne.</p>
                                     </div>
                                     <label class="nav-toggle-switch" style="margin-top:2px;">
                                         <input type="checkbox" id="ai-enabled-toggle" onchange="toggleAiEnabled(this.checked)">
                                         <span class="nav-toggle-slider"></span>
                                     </label>
+                                </div>
+                                <div id="ai-provider-server-block" style="display:none; flex-direction:column; gap:12px;">
+                                    <div>
+                                        <label style="font-size:13px; color:var(--text-secondary); font-weight:500;" data-i18n="settings.ai_provider_label">Fournisseur d'IA</label>
+                                        <select id="ai-provider-select" onchange="onAiProviderChange(this.value)"
+                                            style="width:100%; margin-top:6px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+                                            <option value="ollama" data-i18n="settings.ai_provider_ollama">Ollama (local, 100 % privé)</option>
+                                            <option value="anthropic" data-i18n="settings.ai_provider_anthropic">Claude (Anthropic) : en ligne</option>
+                                            <option value="openai" data-i18n="settings.ai_provider_openai">ChatGPT (OpenAI) : en ligne</option>
+                                            <option value="gemini" data-i18n="settings.ai_provider_gemini">Gemini (Google) : en ligne</option>
+                                        </select>
+                                    </div>
+                                    <div id="ai-cloud-block" style="display:none; flex-direction:column; gap:12px;">
+                                        <p class="settings-hint" style="margin:0; color:var(--warning);" data-i18n="settings.ai_cloud_warning">Les requêtes IA (noms de fichiers, étiquettes, descriptions, photos du S.O.S Print…) sont envoyées à ce fournisseur avec votre clé API et facturées selon son tarif. Pour rester 100 % local, choisissez Ollama.</p>
+                                        <div>
+                                            <label style="font-size:13px; color:var(--text-secondary); font-weight:500;" data-i18n="settings.ai_key_label">Clé API</label>
+                                            <div style="display:flex; gap:8px; margin-top:6px; flex-wrap:wrap;">
+                                                <input id="ai-key-input" type="password" autocomplete="new-password" spellcheck="false" data-i18n-placeholder="settings.ai_key_placeholder" placeholder="Collez votre clé API" style="flex:1; min-width:200px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+                                                <button class="btn btn-primary btn-sm" onclick="saveAiProviderKey()"><i class="fa-solid fa-key"></i> <span data-i18n="settings.ai_key_save">Enregistrer la clé</span></button>
+                                                <button id="ai-key-delete-btn" class="btn btn-ghost btn-sm" onclick="deleteAiProviderKey()" style="display:none;" data-i18n-title="settings.ai_key_delete" title="Supprimer la clé"><i class="fa-solid fa-trash"></i></button>
+                                            </div>
+                                            <p id="ai-key-status" class="settings-hint" style="margin:4px 0 0;"></p>
+                                            <a id="ai-key-get-link" href="#" target="_blank" rel="noopener" class="settings-hint" style="text-decoration:underline;" data-i18n="settings.ai_key_get">Obtenir une clé API</a>
+                                        </div>
+                                        <div>
+                                            <label style="font-size:13px; color:var(--text-secondary); font-weight:500;" data-i18n="settings.ai_model_label">Modèle</label>
+                                            <div style="display:flex; gap:8px; margin-top:6px; flex-wrap:wrap;">
+                                                <input id="ai-model-input" type="text" list="ai-model-list" onchange="saveAiProviderModel(this.value)" autocomplete="off" spellcheck="false" style="flex:1; min-width:200px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+                                                <datalist id="ai-model-list"></datalist>
+                                                <button class="btn btn-ghost btn-sm" onclick="listAiProviderModels()"><i class="fa-solid fa-list"></i> <span data-i18n="settings.ai_model_list_btn">Lister les modèles</span></button>
+                                                <button class="btn btn-ghost btn-sm" onclick="testAiProvider()"><i class="fa-solid fa-plug"></i> <span data-i18n="actions.test">Tester</span></button>
+                                            </div>
+                                        </div>
+                                        <div id="ai-cloud-status" style="display:none; padding:8px 12px; border-radius:var(--radius); font-size:12px;"></div>
+                                    </div>
                                 </div>
                                 <div id="ollama-config-block" style="display:flex; flex-direction:column; gap:12px;">
 
@@ -1500,6 +1535,42 @@
                                     </div>
                                     <p class="settings-hint" style="margin-top:4px;" data-i18n="settings.slicer_profiles_autodetect_hint">Stellio détecte et importe désormais automatiquement les nouveaux profils (tous slicers confondus) à chaque ouverture de cette page — ce bouton force juste une vérification immédiate. Aucune imprimante n'est assignée automatiquement (plusieurs imprimantes peuvent partager le même slicer) — assigne-les ensuite manuellement dans la liste ci-dessous.</p>
 
+                                    <div id="slicer-profiles-server-block" style="display:none;">
+                                    <details style="margin-top:12px;">
+                                        <summary style="cursor:pointer; font-size:13px; color:var(--text-secondary);" data-i18n="settings.slicer_profiles_howto_title">Comment importer mes profils ?</summary>
+                                        <div style="margin-top:8px; display:flex; flex-direction:column; gap:6px; font-size:12.5px; color:var(--text-muted); line-height:1.5;">
+                                            <p style="margin:0;" data-i18n="settings.slicer_profiles_howto_intro">Stellio ne se connecte pas aux comptes cloud des slicers (Orca Cloud, Bambu Cloud…) : exportez vos profils depuis le slicer, puis importez les fichiers ici. Les intitulés des menus peuvent varier selon la version.</p>
+                                            <ul style="margin:0; padding-left:18px; display:flex; flex-direction:column; gap:3px;">
+                                                <li data-i18n="settings.slicer_profiles_howto_orca">OrcaSlicer (profils synchronisés par Orca Cloud compris) : Fichier → Exporter → Exporter le lot de préréglages (.orca_printer, .orca_filament ou .zip).</li>
+                                                <li data-i18n="settings.slicer_profiles_howto_orca_cloud">Orca Cloud (site web) : ouvrez le profil, cliquez sur « Copy raw JSON », puis collez le texte dans le champ ci-dessous.</li>
+                                                <li data-i18n="settings.slicer_profiles_howto_bambu">Bambu Studio : Fichier → Exporter → Exporter le lot de préréglages (.bbscfg) ou les filaments (.bbsflmt).</li>
+                                                <li data-i18n="settings.slicer_profiles_howto_prusa">PrusaSlicer / SuperSlicer : Fichier → Exporter → Exporter le lot de configuration (.ini).</li>
+                                                <li data-i18n="settings.slicer_profiles_howto_cura">Cura : Préférences → Configurer Cura → Profils → Exporter (.curaprofile).</li>
+                                            </ul>
+                                            <p style="margin:0;" data-i18n="settings.slicer_profiles_howto_import">Cliquez ensuite sur « Importer un profil » et choisissez les fichiers (plusieurs à la fois, .zip accepté). L'import fonctionne depuis le navigateur de votre PC ou de votre téléphone, même quand Stellio tourne sur un Raspberry Pi ou dans un LXC.</p>
+                                            <p style="margin:0;" data-i18n="settings.slicer_profiles_howto_server">Sur un serveur sans slicer (Raspberry Pi, LXC, Docker), « Détecter automatiquement » ne trouve rien : c'est normal. Utilisez l'import, ou le dossier surveillé ci-dessous.</p>
+                                        </div>
+                                    </details>
+
+                                    <div style="margin-top:12px;">
+                                        <label style="font-size:13px; color:var(--text-secondary);" for="slicer-profiles-paste-json" data-i18n="settings.slicer_profiles_paste_title">Coller le JSON d'un profil (Orca Cloud)</label>
+                                        <textarea id="slicer-profiles-paste-json" rows="3" spellcheck="false" placeholder='{ "name": "…", "type": "process", … }' style="width:100%; margin-top:4px; font-family:monospace; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;"></textarea>
+                                        <button id="slicer-profiles-paste-btn" class="btn btn-ghost btn-sm" style="margin-top:6px;" onclick="importSlicerProfileJson()"><i class="fa-solid fa-paste"></i> <span data-i18n="settings.slicer_profiles_paste_btn">Importer ce JSON</span></button>
+                                    </div>
+
+                                    <div style="margin-top:12px;">
+                                        <label style="font-size:13px; color:var(--text-secondary);" data-i18n="settings.slicer_profiles_watch_label">Dossier de profils surveillé (facultatif)</label>
+                                        <div style="display:flex; gap:8px; margin-top:4px; flex-wrap:wrap;">
+                                            <input id="slicer-profiles-watch-dir" type="text" placeholder="/home/stellio/profils" data-i18n-placeholder="settings.slicer_profiles_watch_placeholder" autocomplete="off" spellcheck="false"
+                                                style="flex:1; min-width:220px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+                                            <button id="slicer-profiles-watch-save-btn" class="btn btn-ghost btn-sm" onclick="saveSlicerProfilesWatchDir()">
+                                                <i class="fa-solid fa-folder-open"></i> <span data-i18n="settings.slicer_profiles_watch_save">Enregistrer et analyser</span>
+                                            </button>
+                                        </div>
+                                        <p class="settings-hint" style="margin-top:4px;" data-i18n="settings.slicer_profiles_watch_hint">Chemin d'un dossier du serveur où vous déposez ou synchronisez vos fichiers de profils (Syncthing, partage réseau, scp…). Stellio le relit, sous-dossiers compris, importe les nouveaux profils et met à jour ceux qui changent. Lecture seule : vos fichiers ne sont jamais modifiés.</p>
+                                    </div>
+                                    </div>
+
                                     <div class="settings-row" style="margin-top:14px; border-top:1px solid var(--border); padding-top:12px;">
                                         <label data-i18n="settings.slicer_profiles_filter_label">Filtrer par imprimante</label>
                                         <select id="slicer-profiles-filter" class="settings-select" onchange="filterSlicerProfiles(this.value)">
@@ -1581,6 +1652,26 @@
                                             <span data-i18n="settings.tigertag_autodetect_btn">Détecter TigerTag Studio sur ce PC</span>
                                         </button>
                                         <p class="settings-hint" style="margin-top:8px;" data-i18n="settings.tigertag_autodetect_hint">Si TigerTag Studio est installé sur ce PC et déjà connecté avec Google, Stellio récupère la session automatiquement — sans repasser par Google ici.</p>
+                                        <div id="tigertag-server-block" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+                                            <p class="settings-hint" style="margin:0 0 8px;" data-i18n="settings.tigertag_login_hint">Connexion officielle TigerTag par e-mail et mot de passe. Compte créé avec Google ? Définissez d'abord un mot de passe via « Mot de passe oublié » dans l'application TigerTag. Votre mot de passe n'est pas conservé (Stellio ne garde qu'un jeton de session chiffré) ; connectez-vous à Stellio en HTTPS ou via un VPN pour qu'il ne circule pas en clair sur le réseau.</p>
+                                            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                                                <input id="tigertag-login-email" type="email" autocomplete="off" spellcheck="false" data-i18n-placeholder="settings.tigertag_login_email" placeholder="E-mail TigerTag" style="flex:1; min-width:200px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+                                                <input id="tigertag-login-password" type="password" autocomplete="new-password" data-i18n-placeholder="settings.tigertag_login_password" placeholder="Mot de passe" style="flex:1; min-width:160px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+                                                <button id="tigertag-login-btn" class="btn btn-primary btn-sm" onclick="tigerTagPasswordLogin()"><i class="fa-solid fa-right-to-bracket"></i> <span data-i18n="settings.tigertag_login_btn">Se connecter</span></button>
+                                            </div>
+                                            <details>
+                                                <summary style="cursor:pointer; font-size:13px; color:var(--text-secondary);" data-i18n="settings.tigertag_login_folder_title">Autre méthode : copier le dossier de TigerTag Studio</summary>
+                                                <p class="settings-hint" style="margin:0 0 8px;" data-i18n="settings.tigertag_server_hint">Sur un serveur (Raspberry Pi, LXC, Docker), TigerTag Studio n'est pas installé : la connexion Google se fait dans TigerTag Studio sur votre PC. Fermez-le, copiez son dossier de données sur le serveur (Windows : le dossier « TigerTag… » dans %APPDATA%, au minimum ses sous-dossiers « Local Storage » et « IndexedDB »), puis indiquez ci-dessous le chemin de la copie. Stellio n'y lit que le jeton de session, en lecture seule, et ne l'utilise que pour interroger TigerTag.</p>
+                                            <label style="font-size:13px; color:var(--text-secondary);" data-i18n="settings.tigertag_studio_dir_label">Dossier de session TigerTag Studio (copie du PC)</label>
+                                            <div style="display:flex; gap:8px; margin-top:4px; flex-wrap:wrap;">
+                                                <input id="tigertag-studio-dir" type="text" data-i18n-placeholder="settings.tigertag_studio_dir_placeholder" placeholder="/home/stellio/tigertag-session" autocomplete="off" spellcheck="false"
+                                                    style="flex:1; min-width:220px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+                                                <button id="tigertag-studio-dir-save-btn" class="btn btn-ghost btn-sm" onclick="saveTigerTagStudioDir()">
+                                                    <i class="fa-solid fa-folder-open"></i> <span data-i18n="settings.tigertag_studio_dir_save">Enregistrer et détecter</span>
+                                                </button>
+                                            </div>
+                                            </details>
+                                        </div>
                                         <p class="settings-hint" style="margin-top:6px;" data-i18n="settings.tigertag_unofficial_hint">Intégration non officielle (API TigerTag non documentée) — lecture seule, ne modifie jamais ton inventaire TigerTag.</p>
                                     </div>
 
@@ -2377,6 +2468,69 @@
 							<div class="input-group">
 								<label for="sosprint-description" data-i18n="sosprint.describe_problem">Décrivez le problème</label>
 								<textarea id="sosprint-description" rows="4" data-i18n-placeholder="sosprint.describe_placeholder" placeholder="ex : Mes couches se séparent en hauteur sur les pièces hautes, ou le plastique fait des fils entre les pièces..." maxlength="2000" required></textarea>
+							</div>
+
+							<div class="sosprint-settings" id="sosprint-settings">
+								<label class="sosprint-settings-title" for="sosprint-profile-select"><span data-i18n="sosprint.settings_title">Réglages utilisés pour cette impression</span> <span class="sosprint-optional-tag" data-i18n="sosprint.optional">(facultatif)</span></label>
+								<select id="sosprint-profile-select" class="sosprint-settings-select" onchange="onSosprintProfileChange(this.value)">
+									<option value="" data-i18n="sosprint.profile_unspecified">Non renseignés</option>
+									<option value="manual" data-i18n="sosprint.profile_manual">Réglages manuels</option>
+								</select>
+								<p class="sosprint-settings-hint" data-i18n="sosprint.settings_hint">Plus vous en indiquez, plus les solutions seront ciblées sur les bons réglages à modifier.</p>
+
+								<div id="sosprint-profile-modified" class="sosprint-profile-card" hidden>
+									<div class="sosprint-profile-question"><i class="fa-solid fa-circle-question"></i> <span data-i18n="sosprint.profile_modified_q">Avez-vous modifié des réglages par rapport à ce profil ?</span></div>
+									<div class="sosprint-choice-group" role="radiogroup">
+										<label class="sosprint-choice"><input type="radio" name="sosprint-profile-state" value="unchanged" onchange="onSosprintProfileStateChange()"><span data-i18n="sosprint.profile_unchanged">Non, profil utilisé tel quel</span></label>
+										<label class="sosprint-choice"><input type="radio" name="sosprint-profile-state" value="modified" onchange="onSosprintProfileStateChange()"><span data-i18n="sosprint.profile_modified">Oui, j'ai modifié des réglages</span></label>
+									</div>
+									<textarea id="sosprint-profile-changes" rows="2" maxlength="500" hidden data-i18n-placeholder="sosprint.profile_changes_placeholder" placeholder="Lesquels ? Corrigez aussi les valeurs ci-dessous."></textarea>
+								</div>
+
+								<div id="sosprint-settings-fields" class="sosprint-settings-fields" hidden>
+									<div class="sosprint-settings-grid">
+										<div class="sosprint-settings-field">
+											<label for="sosprint-set-nozzle_temp" data-i18n="sosprint.set_nozzle_temp">Température buse (°C)</label>
+											<input type="number" id="sosprint-set-nozzle_temp" inputmode="decimal" step="1" min="120" max="450">
+										</div>
+										<div class="sosprint-settings-field">
+											<label for="sosprint-set-bed_temp" data-i18n="sosprint.set_bed_temp">Température plateau (°C)</label>
+											<input type="number" id="sosprint-set-bed_temp" inputmode="decimal" step="1" min="0" max="150">
+										</div>
+										<div class="sosprint-settings-field">
+											<label for="sosprint-set-layer_height" data-i18n="sosprint.set_layer_height">Hauteur de couche (mm)</label>
+											<input type="number" id="sosprint-set-layer_height" inputmode="decimal" step="0.01" min="0.04" max="1.5">
+										</div>
+										<div class="sosprint-settings-field">
+											<label for="sosprint-set-print_speed" data-i18n="sosprint.set_print_speed">Vitesse d'impression (mm/s)</label>
+											<input type="number" id="sosprint-set-print_speed" inputmode="decimal" step="1" min="1" max="1000">
+										</div>
+										<div class="sosprint-settings-field">
+											<label for="sosprint-set-first_layer_speed" data-i18n="sosprint.set_first_layer_speed">Vitesse 1re couche (mm/s)</label>
+											<input type="number" id="sosprint-set-first_layer_speed" inputmode="decimal" step="1" min="1" max="500">
+										</div>
+										<div class="sosprint-settings-field">
+											<label for="sosprint-set-retraction_distance" data-i18n="sosprint.set_retraction_distance">Rétraction (mm)</label>
+											<input type="number" id="sosprint-set-retraction_distance" inputmode="decimal" step="0.1" min="0" max="20">
+										</div>
+										<div class="sosprint-settings-field">
+											<label for="sosprint-set-retraction_speed" data-i18n="sosprint.set_retraction_speed">Vitesse de rétraction (mm/s)</label>
+											<input type="number" id="sosprint-set-retraction_speed" inputmode="decimal" step="1" min="1" max="200">
+										</div>
+										<div class="sosprint-settings-field">
+											<label for="sosprint-set-fan_speed" data-i18n="sosprint.set_fan_speed">Ventilateur (%)</label>
+											<input type="number" id="sosprint-set-fan_speed" inputmode="decimal" step="1" min="0" max="100">
+										</div>
+										<div class="sosprint-settings-field">
+											<label for="sosprint-set-infill" data-i18n="sosprint.set_infill">Remplissage (%)</label>
+											<input type="number" id="sosprint-set-infill" inputmode="decimal" step="1" min="0" max="100">
+										</div>
+									</div>
+									<div class="sosprint-settings-notes">
+										<label for="sosprint-set-notes" data-i18n="sosprint.set_notes">Autres réglages ou remarques</label>
+										<textarea id="sosprint-set-notes" rows="2" maxlength="500" data-i18n-placeholder="sosprint.set_notes_placeholder" placeholder="ex : accélération 5000, Z-hop 0,4, bordure 5 mm, support arbre"></textarea>
+									</div>
+								</div>
 							</div>
 
 							<div class="input-group">

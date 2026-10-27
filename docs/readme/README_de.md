@@ -40,7 +40,7 @@
 
 Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart Ihnen dank **lokaler KI** (Ollama), **intelligenter Druckerverwaltung** und einer **auf Produktivität ausgelegten Oberfläche** wertvolle Zeit.
 
-> 💡 **Philosophie**: Ihre Daten bleiben bei Ihnen. Alles läuft lokal.
+> 💡 **Philosophie**: Ihre Daten bleiben bei Ihnen. Alles läuft lokal. Auf Raspberry Pi / Linux können Sie optional eine Online-KI mit Ihrem eigenen API-Schlüssel einbinden (siehe unten); standardmäßig verlässt nichts Ihren Rechner.
 
 ---
 
@@ -228,6 +228,14 @@ sudo journalctl -u stellio -f     # Logs live verfolgen
 >
 > 🎥 Gleiche Funktionen wie die Windows-Version, außer dem nativen Desktop-Fenster (ersetzt durch Browserzugriff) und der lokalen Ollama-KI, die ein einigermaßen leistungsfähiges Modell benötigt, um auf einem Pi gut zu laufen — weisen Sie `ollama_url` bei Bedarf in den Einstellungen auf einen entfernten Ollama-Server.
 
+### 🧰 Besonderheiten der Server-Edition (Raspberry Pi / Linux)
+
+> Die Windows-Version ist nicht betroffen: Diese Funktionen erscheinen nur auf Raspberry Pi, VM, LXC, Docker und Linux.
+
+- ☁️ **Online-KI (optional)**: Statt Ollama können Sie Claude (Anthropic), ChatGPT (OpenAI) oder Gemini (Google) mit Ihrem eigenen API-Schlüssel nutzen (Einstellungen → Künstliche Intelligenz). Der Schlüssel wird auf dem Server verschlüsselt und nie an den Browser zurückgesendet; Ollama bleibt die Standardwahl, 100 % lokal. Die Anfragen (Dateinamen, Tags, Beschreibungen, S.O.S-Print-Fotos) gehen an den gewählten Anbieter und werden über Ihren Schlüssel abgerechnet.
+- 📥 **Slicer-Profile**: Stellio sieht die Slicer auf Ihrem PC nicht und verbindet sich nicht mit den Slicer-Clouds (Orca Cloud, Bambu Cloud …). Exportieren Sie Ihre Profile im Slicer (OrcaSlicer: Datei → Exportieren → Preset-Bundle exportieren) und importieren Sie sie unter Einstellungen → Meine Slicer-Profile; für Orca Cloud können Sie auch das „Copy raw JSON“ eines Profils einfügen. Ein **überwachter Profilordner**, den Stellio automatisch neu einliest, ist ebenfalls möglich (Syncthing, Netzwerkfreigabe, scp …).
+- 🐯 **TigerTag**: offizielle Anmeldung mit E-Mail und Passwort unter Einstellungen → Filamentinventar → TigerTag (Ihr Passwort wird nicht gespeichert, nur ein verschlüsseltes Sitzungstoken). Konto mit Google erstellt? Legen Sie zuerst über „Passwort vergessen“ in der TigerTag-App ein Passwort fest. Ausweichmethode: den Datenordner von TigerTag Studio auf den Server kopieren (Windows: Ordner „TigerTag …“ in `%APPDATA%`, mindestens `Local Storage` und `IndexedDB`) und seinen Pfad angeben.
+
 ### Unterstützte Slicer
 
 Stellio erkennt automatisch:
@@ -347,7 +355,7 @@ Dieses Projekt steht unter der **GNU Affero General Public License v3.0** — si
 
 ## 🔒 Datenschutz
 
-Stellio ist local-first: Ihre Daten bleiben auf Ihrem Gerät, standardmäßig wird nichts an externe Server gesendet oder gesammelt. Details finden Sie in unserer [Datenschutzrichtlinie](../privacy/PRIVACY.md).
+Stellio ist local-first: Ihre Daten bleiben auf Ihrem Gerät, standardmäßig wird nichts an externe Server gesendet oder gesammelt. Details finden Sie in unserer [Datenschutzrichtlinie](../privacy/PRIVACY.md). Einzige Ausnahme, nur wenn Sie sie selbst aktivieren: Die Online-KI (Claude, ChatGPT, Gemini) der Server-Edition sendet Ihre KI-Anfragen an den gewählten Anbieter.
 
 ---
 

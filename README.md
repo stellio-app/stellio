@@ -40,7 +40,7 @@
 
 Whether you're a beginner maker or an experienced printer owner running multiple machines, Stellio saves you precious time thanks to **local AI** (Ollama), **smart printer management**, and an **interface built for productivity**.
 
-> 💡 **Philosophy**: Your data stays with you. Everything runs locally.
+> 💡 **Philosophy**: Your data stays with you. Everything runs locally. On Raspberry Pi / Linux you can optionally plug in an online AI with your own API key (see below); by default, nothing leaves your machine.
 
 ---
 
@@ -228,6 +228,14 @@ sudo journalctl -u stellio -f     # Follow logs live
 >
 > 🎥 Same features as the Windows version, except for the native desktop window (replaced by browser access) and the local Ollama AI, which needs a reasonably capable model to run well on a Pi — point `ollama_url` to a remote Ollama server in Settings if needed.
 
+### 🧰 Server edition specifics (Raspberry Pi / Linux)
+
+> The Windows version is not affected: these features only appear on Raspberry Pi, VM, LXC, Docker and Linux.
+
+- ☁️ **Online AI (optional)**: instead of Ollama, use Claude (Anthropic), ChatGPT (OpenAI) or Gemini (Google) with your own API key (Settings → Artificial Intelligence). The key is encrypted on the server and never sent back to the browser; Ollama remains the default, 100% local. Requests (file names, tags, descriptions, S.O.S Print photos) go to the provider you chose and are billed on your key.
+- 📥 **Slicer profiles**: Stellio cannot see the slicers on your PC and does not connect to slicer clouds (Orca Cloud, Bambu Cloud…). Export your profiles from the slicer (OrcaSlicer: File → Export → Export Preset Bundle), then import them from Settings → My slicer profiles; for Orca Cloud you can also paste a profile's “Copy raw JSON”. A **watched profiles folder** that Stellio rereads automatically is also possible (Syncthing, network share, scp…).
+- 🐯 **TigerTag**: official sign-in with e-mail and password in Settings → Filament inventory → TigerTag (your password is not kept, only an encrypted session token is). Account created with Google? First set a password with “Forgot password” in the TigerTag app. Fallback: copy the TigerTag Studio data folder to the server (Windows: the “TigerTag…” folder in `%APPDATA%`, at least `Local Storage` and `IndexedDB`) and set its path.
+
 ### Supported slicers
 
 Stellio automatically detects:
@@ -347,7 +355,7 @@ This project is licensed under the **GNU Affero General Public License v3.0** �
 
 ## 🔒 Privacy
 
-Stellio is local-first: your data stays on your machine, nothing is collected or sent to external servers by default. See our [Privacy Policy](docs/privacy/PRIVACY.md) for full details.
+Stellio is local-first: your data stays on your machine, nothing is collected or sent to external servers by default. See our [Privacy Policy](docs/privacy/PRIVACY.md) for full details. The only exception, and only if you turn it on yourself: the server edition's online AI (Claude, ChatGPT, Gemini) sends your AI requests to the provider you chose.
 
 ---
 

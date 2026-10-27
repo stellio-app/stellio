@@ -392,7 +392,7 @@ setupKeyboardShortcuts();
 });
 
 
-let stellioAppConfig = { allowed_source_types: ['folder', 'file', 'smb', 'nfs'], headless: false };
+let stellioAppConfig = { allowed_source_types: ['folder', 'file', 'smb', 'nfs'], headless: false, server_edition: false };
 
 async function loadAppConfig() {
     try {
@@ -400,9 +400,22 @@ async function loadAppConfig() {
         if (!res.ok) return;
         stellioAppConfig = await res.json();
         applyAllowedSourceTypes(stellioAppConfig.allowed_source_types || ['folder', 'file', 'smb', 'nfs']);
+        applyServerEditionUI();
     } catch (err) {
         console.error('[loadAppConfig] Erreur:', err);
     }
+}
+
+// Fonctions réservées à l'édition serveur (Linux : Raspberry Pi, VM, LXC, Docker). Sous Windows, ces blocs restent masqués.
+function applyServerEditionUI() {
+    const on = !!(stellioAppConfig && stellioAppConfig.server_edition);
+    const blocks = { 'slicer-profiles-server-block': 'block', 'ai-provider-server-block': 'flex', 'tigertag-server-block': 'block' };
+    Object.keys(blocks).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = on ? blocks[id] : 'none';
+    });
+    if (on && typeof loadAiProviderSettings === 'function') loadAiProviderSettings();
+    if (on && typeof loadTigerTagStudioDir === 'function') loadTigerTagStudioDir();
 }
 
 function applyAllowedSourceTypes(allowedTypes) {
@@ -8016,13 +8029,15 @@ container.appendChild(viewerRenderer.domElement);
 async function loadSlicerSettings(skipProfiles = false) {
 const select = document.getElementById('default-slicer-select');
 const preferredSelect = document.getElementById('preferred-slicer-select');
-if (select || preferredSelect) {
+const watchInput = document.getElementById('slicer-profiles-watch-dir');
+if (select || preferredSelect || watchInput) {
 try {
 const res = await fetch(`${API}/api/settings`);
 if (res.ok) {
 const data = await res.json();
 if (select && data.default_slicer) select.value = data.default_slicer;
 if (preferredSelect && data.preferred_slicer_id) preferredSelect.value = data.preferred_slicer_id;
+if (watchInput) watchInput.value = data.slicer_profiles_watch_dir || '';
 }
 } catch (err) { console.warn('[Slicer Settings] Échec'); }
 }
@@ -8423,8 +8438,10 @@ const res = await fetch(`${API}/api/slicer-profiles/auto-detect`, { method: 'POS
 let data = null;
 try { data = await res.json(); } catch (parseErr) {  }
 if (!res.ok) {
-    const msg = (data && data.error) ? data.error : `Erreur serveur (HTTP ${res.status})`;
-    showToast(msg, 'error');
+    const msg = (data && data.code === 'no_source')
+        ? _t3('settings.slicer_profiles_no_source', (data.error || 'Aucun dossier de slicer à analyser'))
+        : ((data && data.error) ? data.error : `Erreur serveur (HTTP ${res.status})`);
+    showToast(msg, (data && data.code === 'no_source') ? 'info' : 'error');
     console.warn('[SlicerProfiles] Auto-detect KO', res.status, data);
     return;
 }
@@ -8438,6 +8455,70 @@ showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error');
 console.warn('[SlicerProfiles] Auto-detect erreur réseau', err);
 } finally {
 if (btn) btn.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> <span data-i18n="settings.slicer_profiles_autodetect">${_t3('settings.slicer_profiles_autodetect', 'Détecter automatiquement')}</span>`;
+}
+}
+
+// Dossier de profils surveillé (utile sur un serveur sans slicer : Raspberry Pi, LXC, Docker)
+// Orca Cloud : « Copy raw JSON » d'un profil, collé ici (édition serveur)
+async function importSlicerProfileJson() {
+    const ta = document.getElementById('slicer-profiles-paste-json');
+    const btn = document.getElementById('slicer-profiles-paste-btn');
+    const text = (ta && ta.value || '').trim();
+    if (!text) return;
+    if (btn) btn.disabled = true;
+    try {
+        const res = await fetch(`${API}/api/slicer-profiles/import-json`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ json: text })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            showToast(_t3('settings.slicer_profiles_paste_invalid', 'JSON invalide ou profil non reconnu'), 'error');
+            return;
+        }
+        const name = (data.imported && data.imported[0] && data.imported[0].name) || '';
+        showToast(_t3('settings.slicer_profiles_paste_ok', 'Profil importé : {{name}}', { name }).replace('{{name}}', name), 'success');
+        if (ta) ta.value = '';
+        sosprintProfilesCache = null;
+        if (typeof loadSlicerProfiles === 'function') await loadSlicerProfiles();
+    } catch (e) {
+        showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+async function saveSlicerProfilesWatchDir() {
+const input = document.getElementById('slicer-profiles-watch-dir');
+if (!input) return;
+const value = input.value.trim();
+const btn = document.getElementById('slicer-profiles-watch-save-btn');
+if (btn) btn.disabled = true;
+try {
+const res = await fetch(`${API}/api/settings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slicer_profiles_watch_dir: value })
+});
+let data = null;
+try { data = await res.json(); } catch (parseErr) {  }
+if (!res.ok) {
+    showToast((data && data.code === 'watch_dir_not_found')
+        ? _t3('settings.slicer_profiles_watch_not_found', 'Dossier introuvable sur le serveur')
+        : ((data && data.error) || `Erreur serveur (HTTP ${res.status})`), 'error');
+    return;
+}
+input.value = (data && data.settings && data.settings.slicer_profiles_watch_dir) || '';
+if (!value) {
+    showToast(_t3('settings.slicer_profiles_watch_cleared', 'Dossier surveillé désactivé'), 'info');
+    return;
+}
+showToast(_t3('settings.slicer_profiles_watch_saved', 'Dossier surveillé enregistré'), 'success');
+await autoDetectSlicerProfiles();
+} catch (err) {
+showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error');
+} finally {
+if (btn) btn.disabled = false;
 }
 }
 
@@ -9037,6 +9118,11 @@ function applyAiEnabledUI(enabled) {
     if (configBlock) {
         configBlock.style.opacity = enabled ? '1' : '0.45';
         configBlock.style.pointerEvents = enabled ? 'auto' : 'none';
+    }
+    const cloudBlock = document.getElementById('ai-cloud-block');
+    if (cloudBlock) {
+        cloudBlock.style.opacity = enabled ? '1' : '0.45';
+        cloudBlock.style.pointerEvents = enabled ? 'auto' : 'none';
     }
 
     if (!enabled && typeof setSearchMode === 'function') {
@@ -9651,6 +9737,188 @@ function ollamaErrorMessage(data, res) {
     return I18N.t('settings.ollama_err_generic', { status: res.status });
 }
 
+// ── Fournisseurs d'IA en ligne (édition serveur uniquement) ──────────────────────────────────────────
+let aiProvidersInfo = null;
+
+function _aiProviderInfo(id) {
+    return ((aiProvidersInfo && aiProvidersInfo.providers) || []).find(p => p.id === id) || null;
+}
+
+async function loadAiProviderSettings() {
+    try {
+        const res = await fetch(`${API}/api/ai/providers`);
+        if (!res.ok) return;
+        aiProvidersInfo = await res.json();
+        const sel = document.getElementById('ai-provider-select');
+        if (sel) sel.value = aiProvidersInfo.provider || 'ollama';
+        refreshAiProviderUI();
+    } catch (e) { console.warn('[AI] Fournisseurs indisponibles'); }
+}
+
+function refreshAiProviderUI() {
+    const provider = document.getElementById('ai-provider-select')?.value || 'ollama';
+    const cloud = provider !== 'ollama';
+    const ollamaBlock = document.getElementById('ollama-config-block');
+    if (ollamaBlock) ollamaBlock.style.display = cloud ? 'none' : 'flex';
+    const cloudBlock = document.getElementById('ai-cloud-block');
+    if (cloudBlock) cloudBlock.style.display = cloud ? 'flex' : 'none';
+    const localHint = document.getElementById('ai-local-hint');
+    if (localHint) localHint.style.display = cloud ? 'none' : '';
+    if (!cloud) return;
+    const info = _aiProviderInfo(provider) || {};
+    const keyInput = document.getElementById('ai-key-input');
+    if (keyInput) keyInput.value = '';
+    const status = document.getElementById('ai-key-status');
+    if (status) {
+        status.textContent = info.configured
+            ? _t3('settings.ai_key_saved_hint', 'Clé enregistrée (se termine par {{last4}}) : chiffrée sur le serveur, jamais renvoyée au navigateur.', { last4: info.last4 || '' }).replace('{{last4}}', info.last4 || '')
+            : _t3('settings.ai_key_missing', 'Aucune clé enregistrée');
+        status.style.color = info.configured ? '#16a34a' : 'var(--text-muted)';
+    }
+    const delBtn = document.getElementById('ai-key-delete-btn');
+    if (delBtn) delBtn.style.display = info.configured ? '' : 'none';
+    const modelInput = document.getElementById('ai-model-input');
+    if (modelInput) { modelInput.value = info.model || ''; modelInput.placeholder = info.default_model || ''; }
+    const link = document.getElementById('ai-key-get-link');
+    if (link) link.href = info.key_url || '#';
+    const list = document.getElementById('ai-model-list');
+    if (list) list.innerHTML = '';
+    const st = document.getElementById('ai-cloud-status');
+    if (st) st.style.display = 'none';
+}
+
+async function onAiProviderChange(provider) {
+    const previous = (aiProvidersInfo && aiProvidersInfo.provider) || 'ollama';
+    const sel = document.getElementById('ai-provider-select');
+    if (provider !== 'ollama' && previous === 'ollama') {
+        const label = (_aiProviderInfo(provider) || {}).label || provider;
+        const ok = await showConfirmDialog(
+            _t3('settings.ai_cloud_confirm', "Les requêtes IA (noms de fichiers, étiquettes, descriptions, photos du S.O.S Print…) seront envoyées à {{provider}} avec votre clé API et facturées selon son tarif. Pour rester 100 % local, gardez Ollama. Continuer ?", { provider: label }).replace('{{provider}}', label),
+            {
+                title: _t3('settings.ai_cloud_confirm_title', 'Envoyer les requêtes IA en ligne ?'),
+                confirmLabel: _t3('settings.ai_cloud_confirm_ok', 'Utiliser ce fournisseur'),
+                cancelLabel: _t3('actions.cancel', 'Annuler')
+            }
+        );
+        if (!ok) { if (sel) sel.value = previous; return; }
+    }
+    try {
+        const res = await fetch(`${API}/api/settings`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ai_provider: provider })
+        });
+        if (!res.ok) throw new Error('save');
+        if (aiProvidersInfo) aiProvidersInfo.provider = provider;
+        refreshAiProviderUI();
+        showToast(_t3('settings.ai_provider_changed', 'Fournisseur d\'IA : {{provider}}', { provider: (_aiProviderInfo(provider) || {}).label || 'Ollama' }).replace('{{provider}}', (_aiProviderInfo(provider) || {}).label || 'Ollama'), 'success');
+    } catch (e) {
+        if (sel) sel.value = previous;
+        showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error');
+    }
+}
+
+async function saveAiProviderKey() {
+    const provider = document.getElementById('ai-provider-select')?.value;
+    const input = document.getElementById('ai-key-input');
+    const key = (input?.value || '').trim();
+    if (!provider || provider === 'ollama' || !key) return;
+    try {
+        const res = await fetch(`${API}/api/ai/provider-key`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider, key })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            showToast(data.code === 'invalid_key' ? _t3('settings.ai_key_invalid', 'Clé API invalide') : (data.error || 'Erreur'), 'error');
+            return;
+        }
+        if (input) input.value = '';
+        showToast(_t3('settings.ai_key_saved_toast', 'Clé API enregistrée'), 'success');
+        await loadAiProviderSettings();
+    } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+}
+
+async function deleteAiProviderKey() {
+    const provider = document.getElementById('ai-provider-select')?.value;
+    if (!provider || provider === 'ollama') return;
+    try {
+        const res = await fetch(`${API}/api/ai/provider-key/delete`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider })
+        });
+        if (!res.ok) throw new Error('delete');
+        showToast(_t3('settings.ai_key_deleted_toast', 'Clé API supprimée'), 'info');
+        await loadAiProviderSettings();
+    } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+}
+
+async function saveAiProviderModel(value) {
+    const provider = document.getElementById('ai-provider-select')?.value;
+    if (!provider || provider === 'ollama') return;
+    try {
+        const res = await fetch(`${API}/api/settings`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ['ai_model_' + provider]: (value || '').trim() })
+        });
+        if (!res.ok) { showToast(_t3('settings.ai_model_invalid', 'Nom de modèle invalide'), 'error'); return; }
+        await loadAiProviderSettings();
+    } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+}
+
+function _aiCloudStatus(kind, html) {
+    const st = document.getElementById('ai-cloud-status');
+    if (!st) return;
+    st.style.display = 'block';
+    const colors = { info: ['var(--bg-input)', 'var(--text-secondary)'], ok: ['#16a34a20', '#16a34a'], error: ['var(--danger)20', 'var(--danger)'] };
+    st.style.background = colors[kind][0];
+    st.style.color = colors[kind][1];
+    st.innerHTML = html;
+}
+
+async function listAiProviderModels() {
+    const provider = document.getElementById('ai-provider-select')?.value;
+    if (!provider || provider === 'ollama') return;
+    _aiCloudStatus('info', `<i class="fa-solid fa-circle-notch fa-spin"></i> ${escapeHtml(_t3('settings.ollama_connecting', 'Connexion…'))}`);
+    try {
+        const res = await fetch(`${API}/api/ai/cloud-models?provider=${encodeURIComponent(provider)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            _aiCloudStatus('error', `<i class="fa-solid fa-circle-xmark"></i> ${escapeHtml(data.code === 'no_key' ? _t3('settings.ai_need_key', "Enregistrez d'abord une clé API") : (data.error || 'Erreur'))}`);
+            return;
+        }
+        const list = document.getElementById('ai-model-list');
+        if (list) list.innerHTML = (data.models || []).map(m => `<option value="${escapeHtml(m)}"></option>`).join('');
+        const n = (data.models || []).length;
+        _aiCloudStatus('ok', `<i class="fa-solid fa-circle-check"></i> ${escapeHtml(_t3('settings.ai_models_loaded', '{{count}} modèle(s) disponible(s) : cliquez dans le champ pour choisir', { count: n }).replace('{{count}}', n))}`);
+    } catch (e) {
+        _aiCloudStatus('error', `<i class="fa-solid fa-circle-xmark"></i> ${escapeHtml(_t3('toast.connection_error', 'Erreur de connexion'))}`);
+    }
+}
+
+async function testAiProvider() {
+    const provider = document.getElementById('ai-provider-select')?.value;
+    if (!provider || provider === 'ollama') return;
+    _aiCloudStatus('info', `<i class="fa-solid fa-circle-notch fa-spin"></i> ${escapeHtml(_t3('settings.ollama_connecting', 'Connexion…'))}`);
+    try {
+        const res = await fetch(`${API}/api/ai/test`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            _aiCloudStatus('error', `<i class="fa-solid fa-circle-xmark"></i> ${escapeHtml(data.code === 'no_key' ? _t3('settings.ai_need_key', "Enregistrez d'abord une clé API") : (data.error || 'Erreur'))}`);
+            return;
+        }
+        if (data.ok) {
+            _aiCloudStatus('ok', `<i class="fa-solid fa-circle-check"></i> ${escapeHtml(_t3('settings.ai_test_ok', 'Connexion réussie : {{model}} répond en {{ms}} ms').replace('{{model}}', data.model).replace('{{ms}}', data.ms))}`);
+        } else {
+            _aiCloudStatus('error', `<i class="fa-solid fa-circle-xmark"></i> ${escapeHtml(_t3('settings.ai_test_fail', 'Échec du test : {{error}}').replace('{{error}}', data.error || ''))}`);
+        }
+    } catch (e) {
+        _aiCloudStatus('error', `<i class="fa-solid fa-circle-xmark"></i> ${escapeHtml(_t3('toast.connection_error', 'Erreur de connexion'))}`);
+    }
+}
+
 async function testOllamaConnection() {
     const urlInput = document.getElementById('ollama-url-input');
     const statusEl = document.getElementById('ollama-status');
@@ -9883,6 +10151,134 @@ function getSosprintFormValues() {
         material: document.querySelector('input[name="sosprint-material"]:checked')?.value || '',
         description: document.getElementById('sosprint-description')?.value.trim() || ''
     };
+}
+
+// Réglages d'impression (facultatifs) : le backend ne garde que les champs connus, bornés
+const SOSPRINT_SETTING_KEYS = ['nozzle_temp', 'bed_temp', 'layer_height', 'print_speed', 'first_layer_speed',
+    'retraction_distance', 'retraction_speed', 'fan_speed', 'infill'];
+
+// Réglages : « Non renseignés » (défaut) | « Réglages manuels » | un profil de slicer déjà importé.
+// Les champs numériques ne s'affichent qu'en saisie manuelle, ou quand le profil choisi a été modifié.
+function _sosprintSettingsMode() {
+    const v = document.getElementById('sosprint-profile-select')?.value || '';
+    return v === '' ? 'none' : (v === 'manual' ? 'manual' : 'profile');
+}
+
+function _sosprintProfileState() {
+    return document.querySelector('input[name="sosprint-profile-state"]:checked')?.value || '';
+}
+
+function updateSosprintSettingsVisibility() {
+    const mode = _sosprintSettingsMode();
+    const state = _sosprintProfileState();
+    const card = document.getElementById('sosprint-profile-modified');
+    if (card) card.hidden = mode !== 'profile';
+    const changes = document.getElementById('sosprint-profile-changes');
+    if (changes) changes.hidden = !(mode === 'profile' && state === 'modified');
+    const fields = document.getElementById('sosprint-settings-fields');
+    if (fields) fields.hidden = !(mode === 'manual' || (mode === 'profile' && state === 'modified'));
+    document.querySelectorAll('.sosprint-choice').forEach(l => {
+        l.classList.toggle('is-selected', !!l.querySelector('input:checked'));
+    });
+}
+
+function getSosprintPrintSettings() {
+    const mode = _sosprintSettingsMode();
+    if (mode === 'none') return {};
+    const out = {};
+    SOSPRINT_SETTING_KEYS.forEach(k => {
+        const v = document.getElementById('sosprint-set-' + k)?.value.trim();
+        if (v) out[k] = v;
+    });
+    const fieldsVisible = !document.getElementById('sosprint-settings-fields')?.hidden;
+    const notes = document.getElementById('sosprint-set-notes')?.value.trim();
+    if (notes && fieldsVisible) out.notes = notes;
+    if (mode === 'profile') {
+        const opt = document.getElementById('sosprint-profile-select').selectedOptions[0];
+        out.profile_name = (opt && opt.dataset.name) || (opt ? opt.textContent : '');
+        if (opt && opt.dataset.slicer) out.profile_slicer = opt.dataset.slicer;
+        const state = _sosprintProfileState();
+        if (state) out.profile_state = state;
+        const changes = document.getElementById('sosprint-profile-changes')?.value.trim();
+        if (state === 'modified' && changes) out.profile_changes = changes;
+    }
+    return out;
+}
+
+// Profils de slicer déjà importés (process / filament) : ils pré-remplissent les réglages, puis on demande s'ils ont été modifiés
+let sosprintProfilesCache = null;
+
+async function loadSosprintProfiles(force) {
+    const sel = document.getElementById('sosprint-profile-select');
+    if (!sel || (sosprintProfilesCache && !force)) return;
+    try {
+        const res = await fetch(`${API}/api/slicer-profiles`);
+        if (!res.ok) return;
+        const data = await res.json();
+        sosprintProfilesCache = (data.profiles || []).filter(p => p.profile_type === 'process' || p.profile_type === 'filament');
+        const current = sel.value;
+        const fixed = [...sel.options].filter(o => o.value === '' || o.value === 'manual').map(o => o.outerHTML).join('');
+        const groups = [['process', 'sosprint.profile_group_process', "Profils d'impression"], ['filament', 'sosprint.profile_group_filament', 'Profils de filament']];
+        sel.innerHTML = fixed + groups.map(([type, key, fallback]) => {
+            const items = sosprintProfilesCache.filter(p => p.profile_type === type)
+                .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+            if (!items.length) return '';
+            return `<optgroup label="${escapeHtml(_t3(key, fallback))}">` + items.map(p =>
+                `<option value="${escapeHtml(p.id)}" data-name="${escapeHtml(p.name)}" data-slicer="${escapeHtml(p.slicer || '')}">${escapeHtml(p.name)}${p.slicer ? ' (' + escapeHtml(p.slicer) + ')' : ''}</option>`
+            ).join('') + '</optgroup>';
+        }).join('');
+        if ([...sel.options].some(o => o.value === current)) sel.value = current;
+        updateSosprintSettingsVisibility();
+    } catch (e) { console.warn('[SOS] Profils de slicer indisponibles'); }
+}
+
+function onSosprintProfileChange(id) {
+    document.querySelectorAll('input[name="sosprint-profile-state"]').forEach(r => { r.checked = false; });
+    const profile = (sosprintProfilesCache || []).find(p => p.id === id);
+    if (profile) {
+        const map = { nozzle_temp: 'nozzle_temp', bed_temp: 'bed_temp', layer_height: 'layer_height', print_speed: 'print_speed', infill: 'infill_density' };
+        Object.entries(map).forEach(([field, key]) => {
+            const el = document.getElementById('sosprint-set-' + field);
+            if (el && profile[key] != null) el.value = profile[key];
+        });
+    }
+    updateSosprintSettingsVisibility();
+}
+
+function onSosprintProfileStateChange() {
+    updateSosprintSettingsVisibility();
+}
+
+async function setSosprintPrintSettings(settings) {
+    const data = settings || {};
+    SOSPRINT_SETTING_KEYS.forEach(k => {
+        const el = document.getElementById('sosprint-set-' + k);
+        if (el) el.value = data[k] != null ? data[k] : '';
+    });
+    const notesEl = document.getElementById('sosprint-set-notes');
+    if (notesEl) notesEl.value = data.notes || '';
+    const changes = document.getElementById('sosprint-profile-changes');
+    if (changes) changes.value = data.profile_changes || '';
+    document.querySelectorAll('input[name="sosprint-profile-state"]').forEach(r => { r.checked = (r.value === data.profile_state); });
+    const sel = document.getElementById('sosprint-profile-select');
+    if (!sel) return;
+    const hasValues = SOSPRINT_SETTING_KEYS.some(k => data[k] != null) || !!data.notes;
+    if (data.profile_name) {
+        await loadSosprintProfiles();
+        let opt = [...sel.options].find(o => o.dataset.name === data.profile_name);
+        if (!opt) {
+            opt = document.createElement('option');
+            opt.value = '__saved';
+            opt.dataset.name = data.profile_name;
+            opt.dataset.slicer = data.profile_slicer || '';
+            opt.textContent = `${data.profile_name} ${_t3('sosprint.profile_deleted', '(profil supprimé)')}`;
+            sel.appendChild(opt);
+        }
+        sel.value = opt.value;
+    } else {
+        sel.value = hasValues ? 'manual' : '';
+    }
+    updateSosprintSettingsVisibility();
 }
 
 function setSosprintPhoto(file) {
@@ -10383,6 +10779,7 @@ async function resumeSosprintConversation(convId) {
         if (materialInput) materialInput.checked = true;
         const descEl = document.getElementById('sosprint-description');
         if (descEl) descEl.value = conv.description || '';
+        setSosprintPrintSettings(conv.print_settings);
 
         const resultEl = document.getElementById('sosprint-result');
         if (resultEl) resultEl.style.display = 'none';
@@ -10497,7 +10894,7 @@ document.getElementById('sosprint-form')?.addEventListener('submit', async (e) =
         const res = await fetch(`${API}/api/ollama/sos-print/questions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ material, description, printer_id: printerId || null })
+            body: JSON.stringify({ material, description, printer_id: printerId || null, print_settings: getSosprintPrintSettings() })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -12627,6 +13024,77 @@ async function tigerTagAutoDetectStudio() {
 }
 window.tigerTagAutoDetectStudio = tigerTagAutoDetectStudio;
 
+// Connexion TigerTag par e-mail + mot de passe (méthode officielle, édition serveur). Le mot de passe n'est jamais conservé.
+async function tigerTagPasswordLogin() {
+    const emailEl = document.getElementById('tigertag-login-email');
+    const passEl = document.getElementById('tigertag-login-password');
+    const btn = document.getElementById('tigertag-login-btn');
+    const email = (emailEl && emailEl.value || '').trim();
+    const password = passEl ? passEl.value : '';
+    if (!email || !password) return;
+    if (btn) btn.disabled = true;
+    try {
+        const res = await fetch(`${API}/api/accounts/tigertag/login`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (passEl) passEl.value = '';
+        if (!res.ok || !data.connected) {
+            showToast(data.error || I18N.t('toast.login_failed'), 'error');
+            return;
+        }
+        if (emailEl) emailEl.value = '';
+        tigerTagOnConnected(data.email || email);
+    } catch (e) {
+        showToast(I18N.t('toast.network_error'), 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+window.tigerTagPasswordLogin = tigerTagPasswordLogin;
+
+// Dossier de session TigerTag Studio copié depuis le PC (édition serveur uniquement)
+async function loadTigerTagStudioDir() {
+    const input = document.getElementById('tigertag-studio-dir');
+    if (!input) return;
+    try {
+        const res = await fetch(`${API}/api/settings`);
+        if (res.ok) input.value = (await res.json()).tigertag_studio_dir || '';
+    } catch (e) {  }
+}
+
+async function saveTigerTagStudioDir() {
+    const input = document.getElementById('tigertag-studio-dir');
+    if (!input) return;
+    const value = input.value.trim();
+    const btn = document.getElementById('tigertag-studio-dir-save-btn');
+    if (btn) btn.disabled = true;
+    try {
+        const res = await fetch(`${API}/api/settings`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tigertag_studio_dir: value })
+        });
+        let data = null;
+        try { data = await res.json(); } catch (parseErr) {  }
+        if (!res.ok) {
+            showToast((data && data.code === 'dir_not_found')
+                ? _t3('settings.tigertag_studio_dir_not_found', 'Dossier introuvable sur le serveur')
+                : ((data && data.error) || `Erreur serveur (HTTP ${res.status})`), 'error');
+            return;
+        }
+        input.value = (data && data.settings && data.settings.tigertag_studio_dir) || '';
+        if (!value) return;
+        showToast(_t3('settings.tigertag_studio_dir_saved', 'Dossier enregistré'), 'success');
+        await tigerTagAutoDetectStudio();
+    } catch (err) {
+        showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+window.saveTigerTagStudioDir = saveTigerTagStudioDir;
+
 function tigerTagOnConnected(email) {
     updateAccountBadge('tigertag', true);
     const emailDisplay = document.getElementById('tigertag-email-display');
@@ -13152,6 +13620,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         if (page === 'history') { loadHistory(); loadDownloadHistory(); }
         if (page === 'gallery') loadGalleryPage();
         if (page === 'projects') loadProjects();
+        if (page === 'sosprint') loadSosprintProfiles(true);
         if (page === 'print-queue') loadPrintQueue();
         if (page === 'dashboard') loadDashboard();
         closeMobileSidebar();

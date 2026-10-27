@@ -1096,6 +1096,22 @@ def get_data_path():
     return str(data_dir)
 
 BASE_DIR = get_base_path()
+def _detect_server_edition():
+    """Édition « serveur » : Linux (Raspberry Pi, VM, LXC, Docker, poste Linux) ou mode headless explicite.
+    Windows et macOS (applications de bureau) gardent exactement leur comportement d'origine.
+    La variable STELLIO_SERVER_EDITION=1/0 permet de forcer le choix (tests)."""
+    forced = os.environ.get('STELLIO_SERVER_EDITION', '').strip().lower()
+    if forced in ('1', 'true', 'yes'):
+        return True
+    if forced in ('0', 'false', 'no'):
+        return False
+    if os.environ.get('STELLIO_HEADLESS', '').strip().lower() in ('1', 'true', 'yes'):
+        return True
+    return sys.platform.startswith('linux')
+
+
+IS_SERVER_EDITION = _detect_server_edition()
+
 DATA_DIR = get_data_path()
 
 _ALL_SOURCE_TYPES = {'folder', 'file', 'smb', 'nfs'}
@@ -2043,6 +2059,12 @@ def init_db():
     )""")
     c.execute("CREATE INDEX IF NOT EXISTS idx_sos_conv_user_status ON sos_print_conversations(user_id, status, updated_at)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_sos_msg_conv ON sos_print_messages(conversation_id, created_at)")
+    try:
+        sos_cols = [col[1] for col in c.execute("PRAGMA table_info(sos_print_conversations)").fetchall()]
+        if 'print_settings' not in sos_cols:
+            c.execute("ALTER TABLE sos_print_conversations ADD COLUMN print_settings TEXT DEFAULT ''")
+    except Exception as e:
+        app_logger.warning(f"[SosPrint] Migration print_settings impossible: {e}")
     conn.commit()
 
     try:
@@ -4211,6 +4233,7 @@ _VIEWER_BLOCKED_GET_PREFIXES = (
     '/api/logs', '/api/backup', '/api/debug', '/api/update', '/api/auth/guests',
     '/api/browse-folder', '/api/picker', '/api/sources/suggestions',
     '/api/printers/discover', '/api/spoolman/discover', '/api/slicers/discover',
+    '/api/ai/providers', '/api/ai/cloud-models',
 )
 _SECRET_KEY_HINTS = ('token', 'secret', 'password', 'passwd', 'api_key', 'apikey',
                      'access_code', 'cookie', 'credential', 'private', 'code',
@@ -6167,7 +6190,8 @@ def api_reset_with_recovery():
 def api_app_config():
     return jsonify({
         "allowed_source_types": sorted(ALLOWED_SOURCE_TYPES),
-        "headless": os.environ.get('STELLIO_HEADLESS', '').strip().lower() in ('1', 'true', 'yes')
+        "headless": os.environ.get('STELLIO_HEADLESS', '').strip().lower() in ('1', 'true', 'yes'),
+        "server_edition": IS_SERVER_EDITION
     })
 
 
@@ -17373,6 +17397,36 @@ def api_save_settings():
         data.pop('quote_logo', None)
         data.pop('quote_has_logo', None)
 
+        if not IS_SERVER_EDITION:
+            for _k in ['ai_provider', 'slicer_profiles_watch_dir', 'tigertag_studio_dir'] + [f'ai_model_{_p}' for _p in AI_CLOUD_PROVIDERS]:
+                data.pop(_k, None)
+
+        if 'ai_provider' in data and str(data.get('ai_provider') or '') not in AI_PROVIDER_IDS:
+            return jsonify({"error": "Fournisseur d'IA inconnu", "code": "unknown_provider"}), 400
+        for _pid in AI_CLOUD_PROVIDERS:
+            _mk = f'ai_model_{_pid}'
+            if _mk in data:
+                _mv = str(data.get(_mk) or '').strip()
+                if _mv and not AI_MODEL_NAME_RE.match(_mv):
+                    return jsonify({"error": "Nom de modèle invalide", "code": "invalid_model"}), 400
+                data[_mk] = _mv
+
+        if 'tigertag_studio_dir' in data:
+            tt_dir_value = str(data.get('tigertag_studio_dir') or '').strip()
+            if tt_dir_value:
+                tt_dir_value = os.path.abspath(os.path.expanduser(tt_dir_value))
+                if not os.path.isdir(tt_dir_value):
+                    return jsonify({"error": "Dossier introuvable sur le serveur", "code": "dir_not_found"}), 400
+            data['tigertag_studio_dir'] = tt_dir_value
+
+        if 'slicer_profiles_watch_dir' in data:
+            watch_dir_value = str(data.get('slicer_profiles_watch_dir') or '').strip()
+            if watch_dir_value:
+                watch_dir_value = os.path.abspath(os.path.expanduser(watch_dir_value))
+                if not os.path.isdir(watch_dir_value):
+                    return jsonify({"error": "Dossier introuvable sur le serveur", "code": "watch_dir_not_found"}), 400
+            data['slicer_profiles_watch_dir'] = watch_dir_value
+
         current_settings = load_settings() or {}
         previous_spoolman_url = (current_settings.get('spoolman_url') or '').strip()
 
@@ -17418,7 +17472,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.7.7"
+CURRENT_VERSION = "0.7.8"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -19103,6 +19157,340 @@ def _call_ollama(base_url: str, model: str, prompt: str, system: str = "",
         text = (r.json().get('response') or '').strip()
     return text
 
+# ---------------------------------------------------------------------------
+# Fournisseurs d'IA en ligne (facultatif) : Claude (Anthropic), ChatGPT (OpenAI), Gemini (Google).
+# Par défaut Stellio reste 100 % local (Ollama). Un fournisseur en ligne n'est utilisé que si l'utilisateur
+# l'a choisi et a enregistré sa propre clé API. La clé est stockée chiffrée (ai_secrets.json), n'est jamais
+# renvoyée au navigateur ni écrite dans les logs.
+# ---------------------------------------------------------------------------
+AI_PROVIDER_IDS = ('ollama', 'anthropic', 'openai', 'gemini')
+AI_CLOUD_PROVIDERS = {
+    'anthropic': {'label': 'Claude (Anthropic)', 'default_model': 'claude-haiku-5-5',
+                  'key_url': 'https://console.anthropic.com/settings/keys'},
+    'openai':    {'label': 'ChatGPT (OpenAI)', 'default_model': 'gpt-4o-mini',
+                  'key_url': 'https://platform.openai.com/api-keys'},
+    'gemini':    {'label': 'Gemini (Google)', 'default_model': 'gemini-2.5-flash',
+                  'key_url': 'https://aistudio.google.com/apikey'},
+}
+AI_CLOUD_TIMEOUT_SECONDS = 120
+AI_MODEL_NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,99}$')
+AI_KEY_RE = re.compile(r'^[\x21-\x7e]{8,400}$')
+AI_SECRETS_FILE = os.path.join(DATA_DIR, "ai_secrets.json")
+_ai_secrets_lock = threading.Lock()
+
+
+def _server_edition_only():
+    """Réponse 404 pour les fonctions réservées à l'édition serveur (Linux / headless)."""
+    if IS_SERVER_EDITION:
+        return None
+    return jsonify({"error": "Fonction réservée à l'édition serveur (Linux)", "code": "server_edition_only"}), 404
+
+
+class AIProviderError(RuntimeError):
+    def __init__(self, message, status=None):
+        super().__init__(message)
+        self.status = status
+
+
+def get_ai_provider() -> str:
+    if not IS_SERVER_EDITION:
+        return 'ollama'
+    try:
+        p = str((load_settings() or {}).get('ai_provider') or 'ollama').strip().lower()
+    except Exception:
+        return 'ollama'
+    return p if p in AI_PROVIDER_IDS else 'ollama'
+
+
+def _load_ai_secrets() -> dict:
+    try:
+        with open(AI_SECRETS_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except FileNotFoundError:
+        return {}
+    except Exception as e:
+        app_logger.warning(f"[AI] ai_secrets.json illisible: {e}")
+        return {}
+
+
+def _save_ai_secrets(data: dict):
+    tmp_path = AI_SECRETS_FILE + '.tmp'
+    with open(tmp_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f)
+    try:
+        os.chmod(tmp_path, 0o600)
+    except Exception:
+        pass
+    _atomic_replace(tmp_path, AI_SECRETS_FILE)
+
+
+def _get_ai_key(provider: str):
+    with _ai_secrets_lock:
+        entry = _load_ai_secrets().get(provider) or {}
+    return decrypt_password(entry.get('key')) if entry.get('key') else None
+
+
+def _get_ai_model(provider: str) -> str:
+    meta = AI_CLOUD_PROVIDERS[provider]
+    value = str((load_settings() or {}).get(f'ai_model_{provider}') or '').strip()
+    return value if value and AI_MODEL_NAME_RE.match(value) else meta['default_model']
+
+
+def _image_mime(b64: str) -> str:
+    head = (b64 or '')[:12]
+    if head.startswith('iVBOR'):
+        return 'image/png'
+    if head.startswith('UklGR'):
+        return 'image/webp'
+    if head.startswith('R0lGOD'):
+        return 'image/gif'
+    return 'image/jpeg'
+
+
+def _ai_http_error(label: str, resp) -> 'AIProviderError':
+    status = resp.status_code
+    detail = ''
+    try:
+        body = resp.json()
+        err = body.get('error') if isinstance(body, dict) else None
+        if isinstance(err, dict):
+            detail = str(err.get('message') or '')
+        elif isinstance(err, str):
+            detail = err
+    except Exception:
+        pass
+    detail = re.sub(r'\s+', ' ', detail).strip()[:300]
+    if status in (401, 403):
+        text = f"{label} a refusé la clé API : vérifiez-la dans Paramètres > IA."
+        detail = ''   # le message d'erreur peut citer une partie de la clé : on ne le répercute jamais
+    elif status == 429:
+        text = f"{label} : limite de requêtes ou crédit épuisé (HTTP 429)."
+    elif status == 404:
+        text = f"{label} : modèle introuvable (HTTP 404). Vérifiez le nom du modèle dans Paramètres > IA."
+    else:
+        text = f"{label} a répondu HTTP {status}."
+    if detail:
+        text += f" {detail}"
+    return AIProviderError(text, status)
+
+
+def _cloud_generate(provider, model, key, prompt, system="", temperature=0.2, num_predict=200,
+                    images=None, timeout=AI_CLOUD_TIMEOUT_SECONDS) -> str:
+    label = AI_CLOUD_PROVIDERS[provider]['label']
+    images = [i for i in (images or []) if isinstance(i, str) and i]
+    try:
+        if provider == 'anthropic':
+            content = [{'type': 'image', 'source': {'type': 'base64', 'media_type': _image_mime(i), 'data': i}} for i in images]
+            content.append({'type': 'text', 'text': prompt})
+            body = {'model': model, 'max_tokens': max(int(num_predict), 64), 'temperature': temperature,
+                    'messages': [{'role': 'user', 'content': content}]}
+            if system:
+                body['system'] = system
+            r = requests.post('https://api.anthropic.com/v1/messages', json=body, timeout=timeout,
+                              headers={'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'})
+            if not r.ok:
+                raise _ai_http_error(label, r)
+            blocks = r.json().get('content') or []
+            return ''.join(b.get('text', '') for b in blocks if isinstance(b, dict) and b.get('type') == 'text').strip()
+
+        if provider == 'openai':
+            msgs = [{'role': 'system', 'content': system}] if system else []
+            if images:
+                user_content = [{'type': 'text', 'text': prompt}] + [
+                    {'type': 'image_url', 'image_url': {'url': f"data:{_image_mime(i)};base64,{i}"}} for i in images]
+            else:
+                user_content = prompt
+            msgs.append({'role': 'user', 'content': user_content})
+            body = {'model': model, 'messages': msgs, 'temperature': temperature,
+                    'max_completion_tokens': max(int(num_predict) * 4, 512)}
+            headers = {'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'}
+            r = requests.post('https://api.openai.com/v1/chat/completions', json=body, headers=headers, timeout=timeout)
+            if r.status_code == 400 and 'temperature' in (r.text or '').lower():
+                body.pop('temperature', None)   # certains modèles n'acceptent que la température par défaut
+                r = requests.post('https://api.openai.com/v1/chat/completions', json=body, headers=headers, timeout=timeout)
+            if not r.ok:
+                raise _ai_http_error(label, r)
+            choices = r.json().get('choices') or []
+            return str(((choices[0] or {}).get('message') or {}).get('content') or '').strip() if choices else ''
+
+        if provider == 'gemini':
+            from urllib.parse import quote
+            parts = [{'inline_data': {'mime_type': _image_mime(i), 'data': i}} for i in images] + [{'text': prompt}]
+            body = {'contents': [{'role': 'user', 'parts': parts}],
+                    'generationConfig': {'temperature': temperature, 'maxOutputTokens': max(int(num_predict) * 4, 1024)}}
+            if system:
+                body['systemInstruction'] = {'parts': [{'text': system}]}
+            r = requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/{quote(model, safe='')}:generateContent",
+                              json=body, timeout=timeout,
+                              headers={'x-goog-api-key': key, 'Content-Type': 'application/json'})
+            if not r.ok:
+                raise _ai_http_error(label, r)
+            data = r.json()
+            block = (data.get('promptFeedback') or {}).get('blockReason')
+            if block:
+                raise AIProviderError(f"{label} a bloqué la requête ({block}).")
+            cands = data.get('candidates') or []
+            if not cands:
+                return ''
+            return ''.join(p.get('text', '') for p in ((cands[0].get('content') or {}).get('parts') or [])
+                           if isinstance(p, dict)).strip()
+    except requests.exceptions.Timeout:
+        raise AIProviderError(f"{label} met trop de temps à répondre (plus de {timeout} secondes).")
+    except requests.exceptions.RequestException as e:
+        raise AIProviderError(f"Impossible de joindre {label} : {type(e).__name__}.")
+    raise AIProviderError("Fournisseur d'IA inconnu.")
+
+
+def _call_cloud_ai(provider, prompt, system="", num_predict=200, temperature=0.2, images=None) -> tuple:
+    meta = AI_CLOUD_PROVIDERS[provider]
+    key = _get_ai_key(provider)
+    if not key:
+        raise RuntimeError(f"Aucune clé API {meta['label']} enregistrée : ajoutez-la dans Paramètres > IA.")
+    model = _get_ai_model(provider)
+    try:
+        text = _cloud_generate(provider, model, key, prompt, system, temperature, num_predict, images)
+        source = provider
+    except AIProviderError as e:
+        if images and e.status == 400:
+            app_logger.warning(f"[AI] ⚠️ {meta['label']} a refusé l'image ({model}) — nouvelle tentative en texte seul")
+            text = _cloud_generate(provider, model, key, prompt, system, temperature, num_predict, None)
+            source = f"{provider}_no_vision"
+        else:
+            app_logger.warning(f"[AI] ❌ {meta['label']} ({model}) : {e}")
+            raise RuntimeError(str(e))
+    if not text:
+        raise RuntimeError(f"{meta['label']} a répondu, mais sans contenu exploitable. Réessayez.")
+    app_logger.info(f"[AI] ✅ {meta['label']} ({model})")
+    return text, source
+
+
+@app.route('/api/ai/providers', methods=['GET'])
+@login_required
+def api_ai_providers():
+    blocked = _server_edition_only()
+    if blocked:
+        return blocked
+    secrets_ = _load_ai_secrets()
+    providers = [{'id': 'ollama', 'label': 'Ollama', 'local': True}]
+    for pid, meta in AI_CLOUD_PROVIDERS.items():
+        entry = secrets_.get(pid) or {}
+        providers.append({'id': pid, 'label': meta['label'], 'local': False,
+                          'configured': bool(entry.get('key')),
+                          'last4': str(entry.get('last4') or '') if entry.get('key') else '',
+                          'model': _get_ai_model(pid), 'default_model': meta['default_model'],
+                          'key_url': meta['key_url']})
+    return jsonify({'provider': get_ai_provider(), 'providers': providers}), 200
+
+
+@app.route('/api/ai/provider-key', methods=['POST'])
+@login_required
+def api_ai_provider_key_save():
+    blocked = _server_edition_only()
+    if blocked:
+        return blocked
+    data = request.get_json(silent=True) or {}
+    provider = str(data.get('provider') or '')
+    key = str(data.get('key') or '').strip()
+    if provider not in AI_CLOUD_PROVIDERS:
+        return jsonify({"error": "Fournisseur inconnu", "code": "unknown_provider"}), 400
+    if not AI_KEY_RE.match(key):
+        return jsonify({"error": "Clé API invalide (8 à 400 caractères, sans espace)", "code": "invalid_key"}), 400
+    encrypted = encrypt_password(key)
+    if not encrypted:
+        return jsonify({"error": "Impossible de chiffrer la clé API"}), 500
+    with _ai_secrets_lock:
+        secrets_ = _load_ai_secrets()
+        secrets_[provider] = {'key': encrypted, 'last4': key[-4:],
+                              'saved_at': datetime.datetime.now().isoformat(timespec='seconds')}
+        _save_ai_secrets(secrets_)
+    app_logger.info(f"[AI] Clé API enregistrée pour {AI_CLOUD_PROVIDERS[provider]['label']}")
+    return jsonify({"success": True, "configured": True, "last4": key[-4:]}), 200
+
+
+@app.route('/api/ai/provider-key/delete', methods=['POST'])
+@login_required
+def api_ai_provider_key_delete():
+    blocked = _server_edition_only()
+    if blocked:
+        return blocked
+    provider = str((request.get_json(silent=True) or {}).get('provider') or '')
+    if provider not in AI_CLOUD_PROVIDERS:
+        return jsonify({"error": "Fournisseur inconnu", "code": "unknown_provider"}), 400
+    with _ai_secrets_lock:
+        secrets_ = _load_ai_secrets()
+        secrets_.pop(provider, None)
+        _save_ai_secrets(secrets_)
+    app_logger.info(f"[AI] Clé API supprimée pour {AI_CLOUD_PROVIDERS[provider]['label']}")
+    return jsonify({"success": True, "configured": False}), 200
+
+
+@app.route('/api/ai/cloud-models', methods=['GET'])
+@login_required
+def api_ai_cloud_models():
+    blocked = _server_edition_only()
+    if blocked:
+        return blocked
+    provider = request.args.get('provider', '')
+    if provider not in AI_CLOUD_PROVIDERS:
+        return jsonify({"error": "Fournisseur inconnu", "code": "unknown_provider"}), 400
+    key = _get_ai_key(provider)
+    if not key:
+        return jsonify({"error": "Aucune clé API enregistrée", "code": "no_key"}), 400
+    label = AI_CLOUD_PROVIDERS[provider]['label']
+    try:
+        if provider == 'anthropic':
+            r = requests.get('https://api.anthropic.com/v1/models?limit=100', timeout=15,
+                             headers={'x-api-key': key, 'anthropic-version': '2023-06-01'})
+            if not r.ok:
+                raise _ai_http_error(label, r)
+            models = [m.get('id') for m in (r.json().get('data') or []) if isinstance(m, dict) and m.get('id')]
+        elif provider == 'openai':
+            r = requests.get('https://api.openai.com/v1/models', timeout=15, headers={'Authorization': f'Bearer {key}'})
+            if not r.ok:
+                raise _ai_http_error(label, r)
+            skip = ('embedding', 'whisper', 'tts', 'dall-e', 'moderation', 'transcribe', 'audio', 'realtime', 'image', 'search', 'instruct')
+            models = [m.get('id') for m in (r.json().get('data') or [])
+                      if isinstance(m, dict) and m.get('id')
+                      and re.match(r'^(gpt-|chatgpt-|o\d)', m['id']) and not any(x in m['id'] for x in skip)]
+        else:
+            r = requests.get('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', timeout=15,
+                             headers={'x-goog-api-key': key})
+            if not r.ok:
+                raise _ai_http_error(label, r)
+            models = [str(m.get('name', '')).replace('models/', '', 1) for m in (r.json().get('models') or [])
+                      if isinstance(m, dict) and 'generateContent' in (m.get('supportedGenerationMethods') or [])]
+            models = [m for m in models if m.startswith('gemini')]
+        models = sorted({m for m in models if m and AI_MODEL_NAME_RE.match(m)})
+        return jsonify({"models": models}), 200
+    except AIProviderError as e:
+        return jsonify({"error": str(e), "code": "provider_error"}), 502
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": f"Impossible de joindre {label} : {type(e).__name__}.", "code": "unreachable"}), 502
+
+
+@app.route('/api/ai/test', methods=['POST'])
+@login_required
+def api_ai_test():
+    blocked = _server_edition_only()
+    if blocked:
+        return blocked
+    provider = str((request.get_json(silent=True) or {}).get('provider') or '')
+    if provider not in AI_CLOUD_PROVIDERS:
+        return jsonify({"error": "Fournisseur inconnu", "code": "unknown_provider"}), 400
+    key = _get_ai_key(provider)
+    if not key:
+        return jsonify({"error": "Aucune clé API enregistrée", "code": "no_key"}), 400
+    model = _get_ai_model(provider)
+    started = time.time()
+    try:
+        reply = _cloud_generate(provider, model, key, "Réponds uniquement par le mot OK.", "", 0, 16, None, timeout=45)
+    except AIProviderError as e:
+        return jsonify({"ok": False, "error": str(e), "provider": provider, "model": model}), 200
+    return jsonify({"ok": True, "provider": provider, "model": model,
+                    "ms": int((time.time() - started) * 1000), "reply": reply[:40]}), 200
+
+
 class AIDisabledError(RuntimeError):
     pass
 
@@ -19116,6 +19504,11 @@ def _call_ai(prompt: str, system: str = "",
              num_predict: int = 200, temperature: float = 0.2, images: list = None) -> tuple:
     if not is_ai_enabled():
         raise AIDisabledError("Les fonctionnalités IA sont désactivées dans les Paramètres.")
+
+    provider = get_ai_provider()
+    if provider != 'ollama':
+        return _call_cloud_ai(provider, prompt, system=system, num_predict=num_predict,
+                              temperature=temperature, images=images)
 
     settings = load_settings() or {}
     base_url = get_ollama_base_url()
@@ -19770,6 +20163,100 @@ def _sosprint_parse_eliminated(block: str) -> list:
         return []
     return [e.strip(' .') for e in first_line.split(',') if e.strip(' .')]
 
+# Réglages d'impression renseignés par l'utilisateur pour le S.O.S Print : valeurs bornées, champs connus uniquement
+SOSPRINT_SETTING_FIELDS = {
+    'nozzle_temp':         ('Nozzle temperature', '°C', 120, 450),
+    'bed_temp':            ('Bed temperature', '°C', 0, 150),
+    'layer_height':        ('Layer height', 'mm', 0.04, 1.5),
+    'print_speed':         ('Print speed', 'mm/s', 1, 1000),
+    'first_layer_speed':   ('First layer speed', 'mm/s', 1, 500),
+    'retraction_distance': ('Retraction distance', 'mm', 0, 20),
+    'retraction_speed':    ('Retraction speed', 'mm/s', 1, 200),
+    'fan_speed':           ('Cooling fan speed', '%', 0, 100),
+    'infill':              ('Infill density', '%', 0, 100),
+}
+
+
+def _sosprint_clean_settings(raw) -> dict:
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw) if raw.strip() else {}
+        except Exception:
+            return {}
+    if not isinstance(raw, dict):
+        return {}
+    out = {}
+    for key, (_label, _unit, low, high) in SOSPRINT_SETTING_FIELDS.items():
+        value = raw.get(key)
+        if value in (None, ''):
+            continue
+        try:
+            num = float(str(value).replace(',', '.'))
+        except (TypeError, ValueError):
+            continue
+        if not (low <= num <= high):      # écarte aussi NaN et l'infini
+            continue
+        out[key] = int(num) if num == int(num) else round(num, 3)
+    notes = re.sub(r'\s+', ' ', str(raw.get('notes') or '')).strip()[:500]
+    if notes:
+        out['notes'] = notes
+    profile_name = re.sub(r'\s+', ' ', str(raw.get('profile_name') or '')).strip()[:120]
+    if profile_name:
+        out['profile_name'] = profile_name
+        profile_slicer = re.sub(r'[^A-Za-z0-9 _.-]+', '', str(raw.get('profile_slicer') or '')).strip()[:40]
+        if profile_slicer:
+            out['profile_slicer'] = profile_slicer
+        state = str(raw.get('profile_state') or '').strip().lower()
+        if state in ('unchanged', 'modified'):
+            out['profile_state'] = state
+            changes = re.sub(r'\s+', ' ', str(raw.get('profile_changes') or '')).strip()[:500]
+            if state == 'modified' and changes:
+                out['profile_changes'] = changes
+    return out
+
+
+def _sosprint_settings_block(settings) -> str:
+    cleaned = _sosprint_clean_settings(settings)
+    if not cleaned:
+        return ''
+    parts = [f"{label}: {cleaned[key]} {unit}" for key, (label, unit, _lo, _hi) in SOSPRINT_SETTING_FIELDS.items() if key in cleaned]
+    block = ""
+    if cleaned.get('profile_name'):
+        slicer_txt = f" ({cleaned['profile_slicer']})" if cleaned.get('profile_slicer') else ""
+        block += f"The user printed with the slicer profile \"{cleaned['profile_name']}\"{slicer_txt}. "
+        state = cleaned.get('profile_state')
+        if state == 'unchanged':
+            block += "They confirm they used it unchanged, so the values below are the real print settings.\n"
+        elif state == 'modified':
+            block += "They changed some settings compared to this profile; the values below are the ones they entered and are the real print settings."
+            if cleaned.get('profile_changes'):
+                block += f" What they say they changed: \"{cleaned['profile_changes']}\"."
+            block += "\n"
+        else:
+            block += ("They did not say whether they changed anything compared to this profile: the values below come from the profile "
+                      "and may differ from what was really used; if it matters, you may ask once whether some settings were modified.\n")
+    block += "Print settings used when the print failed (entered by the user, treat them as facts): " + \
+            ("; ".join(parts) if parts else "none given besides the remarks below") + ".\n"
+    if cleaned.get('notes'):
+        block += f"Other settings or remarks from the user: \"{cleaned['notes']}\"\n"
+    block += (
+        "Use these values to target your answer: name the exact slicer setting to change and a concrete value "
+        "to try, relative to the current value (for example \"nozzle 215 °C → 205 °C\"); do not suggest changing "
+        "a setting that already looks appropriate for this material; do not ask about a setting already given.\n"
+    )
+    return block
+
+
+def _sosprint_conversation_settings_block(conversation_id) -> str:
+    try:
+        conv, _msgs = _sosprint_get_conversation(int(conversation_id), session['user_id'])
+        if conv and 'print_settings' in conv.keys():
+            return _sosprint_settings_block(conv['print_settings'])
+    except Exception:
+        pass
+    return ''
+
+
 @app.route('/api/ollama/sos-print/questions', methods=['POST'])
 @login_required
 def api_ollama_sos_print_questions():
@@ -19777,6 +20264,8 @@ def api_ollama_sos_print_questions():
     material    = (data.get('material') or 'PLA').strip()
     description = (data.get('description') or '').strip()[:600]
     printer_id  = data.get('printer_id') or None
+    print_settings = _sosprint_clean_settings(data.get('print_settings'))
+    settings_block = _sosprint_settings_block(print_settings)
     try:
         printer_id = int(printer_id) if printer_id else None
     except (TypeError, ValueError):
@@ -19796,6 +20285,7 @@ def api_ollama_sos_print_questions():
         f"FDM 3D printing expert conducting a diagnostic investigation, like a detective narrowing "
         f"down a list of suspects one clue at a time. Material: {material}. {ref_block}\n"
         f"Problem described by the user: \"{description}\"\n"
+        f"{settings_block}"
         f"{reference_block}"
         f"Step 1 — list 4 to 6 short plausible causes (hypotheses) for this problem, most likely "
         f"first, each as a very short label (3-6 words, no explanation). If a reference case above "
@@ -19804,7 +20294,7 @@ def api_ollama_sos_print_questions():
         f"most hypotheses above. Ask about something the user didn't already mention (e.g. "
         f"Z-offset, bed leveling, bed surface type, first layer speed, nozzle cleanliness, "
         f"enclosure, humidity storage, retraction settings, print speed, cooling, hotend "
-        f"cleaning history). Do not ask about anything already stated in the problem description.\n"
+        f"cleaning history). Do not ask about anything already stated in the problem description or in the print settings.\n"
         f"The question must be short and answerable in one line.\n"
         f"Strict format, nothing else:\n"
         f"CAUSES:\n"
@@ -19833,10 +20323,11 @@ def api_ollama_sos_print_questions():
         try:
             conn.execute(
                 """INSERT INTO sos_print_conversations
-                   (user_id, printer_id, material, description, title, status, candidate_causes)
-                   VALUES (?, ?, ?, ?, ?, 'open', ?)""",
+                   (user_id, printer_id, material, description, title, status, candidate_causes, print_settings)
+                   VALUES (?, ?, ?, ?, ?, 'open', ?, ?)""",
                 (session['user_id'], printer_id, material, description,
-                 description[:80], json.dumps(candidate_causes))
+                 description[:80], json.dumps(candidate_causes),
+                 json.dumps(print_settings) if print_settings else '')
             )
             conn.commit()
             conversation_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
@@ -19850,6 +20341,7 @@ def api_ollama_sos_print_questions():
             "candidate_causes": candidate_causes,
             "question": question,
             "reference_cases": reference_cases,
+            "print_settings": print_settings,
             "raw": raw_text,
             "source": source
         }), 200
@@ -19894,6 +20386,7 @@ def api_ollama_sos_print_next_question():
     lang      = get_user_lang()
     lang_name = LANG_NAMES.get(lang, lang)
     ref_block = _material_ref_block(material)
+    settings_block = _sosprint_conversation_settings_block(conversation_id) if conversation_id else ''
     causes_block = "\n".join(f"- {c}" for c in candidate_causes) if candidate_causes else "(none listed yet)"
 
     if force_conclusion:
@@ -19917,6 +20410,7 @@ def api_ollama_sos_print_next_question():
         f"FDM 3D printing expert continuing a step-by-step diagnostic investigation. "
         f"Material: {material}. {ref_block}\n"
         f"Problem described by the user: \"{description}\"\n"
+        f"{settings_block}"
         f"Current suspect list (hypotheses):\n{causes_block}\n"
         f"Questions already asked and answered so far:\n{qa_block}\n"
         f"{instruction}"
@@ -20127,6 +20621,9 @@ def api_ollama_sos_print():
     lang      = get_user_lang()
     lang_name = LANG_NAMES.get(lang, lang)
     ref_block = _material_ref_block(material)
+    settings_block = _sosprint_conversation_settings_block(conversation_id) if conversation_id else ''
+    fix_format = ("[Concrete fix: the exact setting to change, from its current value to the value to try]"
+                  if settings_block else "[Concrete fix]")
 
     qa_block = ""
     if answers:
@@ -20168,6 +20665,7 @@ def api_ollama_sos_print():
     prompt = (
         f"FDM 3D printing expert. Material: {material}. {ref_block}\n"
         f"Problem described by the user: \"{description}\"\n"
+        f"{settings_block}"
         f"{qa_block}"
         f"{investigation_block}"
         f"{reference_block}"
@@ -20175,16 +20673,16 @@ def api_ollama_sos_print():
         f"{photo_instruction}"
         f"Give the 3 most likely causes, ranked by likelihood, each with a concrete fix. "
         f"Strict format, nothing else, one cause per line:\n"
-        f"1. [Cause]: [Concrete fix]\n"
-        f"2. [Cause]: [Concrete fix]\n"
-        f"3. [Cause]: [Concrete fix]\n"
+        f"1. [Cause]: {fix_format}\n"
+        f"2. [Cause]: {fix_format}\n"
+        f"3. [Cause]: {fix_format}\n"
         f"IMPORTANT: Write your entire response in {lang_name}."
     )
     system = f"You are an expert in 3D printing failure diagnosis. Be concise and concrete. Always reply in {lang_name}."
 
     try:
         raw_text, source = _call_ai(
-            prompt, system=system, num_predict=400, temperature=0.2,
+            prompt, system=system, num_predict=500 if settings_block else 400, temperature=0.2,
             images=conversation_images or None
         )
         causes = []
@@ -20200,7 +20698,7 @@ def api_ollama_sos_print():
         if not causes:
             return jsonify({"error": "L'IA n'a retourné aucun diagnostic exploitable"}), 502
 
-        had_photo_final = bool(conversation_images) and source != 'ollama_no_vision'
+        had_photo_final = bool(conversation_images) and not str(source).endswith('_no_vision')
 
         try:
             conn = get_db()
@@ -20227,7 +20725,7 @@ def api_ollama_sos_print():
             "raw": raw_text,
             "source": source,
             "had_photo": had_photo_final,
-            "photo_ignored": bool(conversation_images) and source == 'ollama_no_vision',
+            "photo_ignored": bool(conversation_images) and str(source).endswith('_no_vision'),
             "recurring": len(past_diagnostics) >= 2,
             "recurring_history": past_diagnostics if len(past_diagnostics) >= 2 else [],
             "printer_name": printer_name,
@@ -20259,6 +20757,7 @@ def _sosprint_serialize_conversation(conv, messages=None):
         "eliminated_causes": _jl(conv["eliminated_causes"]),
         "last_causes": _jl(conv["last_causes"]),
         "resolution_note": conv["resolution_note"],
+        "print_settings": _sosprint_clean_settings(conv["print_settings"]) if "print_settings" in conv.keys() else {},
         "created_at": conv["created_at"],
         "updated_at": conv["updated_at"],
         "resolved_at": conv["resolved_at"],
@@ -20886,7 +21385,41 @@ def _remember_printer_alias(printer_id, user_id, names):
         app_logger.debug(f"[SlicerProfiles] Échec mémorisation alias imprimante: {e}")
 
 
-def _scan_dir_for_profiles(dir_path, already_imported, imported_out, slicer_hint=None, type_hint=None):
+SLICER_PROFILE_MAX_BYTES = 25 * 1024 * 1024
+SLICER_WATCH_DIR_MAX_DEPTH = 4
+SLICER_WATCH_DIR_MAX_DIRS = 400
+
+
+def _get_profiles_watch_dir():
+    """Dossier de profils surveillé (réglage `slicer_profiles_watch_dir`), ou '' s'il n'est pas défini / introuvable."""
+    if not IS_SERVER_EDITION:
+        return ''
+    try:
+        d = str((load_settings() or {}).get('slicer_profiles_watch_dir') or '').strip()
+    except Exception:
+        return ''
+    return d if d and os.path.isdir(d) else ''
+
+
+def _scan_watch_dir_for_profiles(root, already_imported, imported_out):
+    """Parcourt le dossier surveillé (sous-dossiers compris, profondeur et nombre de dossiers limités, liens
+    symboliques ignorés). Lecture seule : les fichiers ne sont jamais modifiés. Le nom du sous-dossier
+    (process / filament / machine…) sert d'indice de type, comme dans le dossier utilisateur d'OrcaSlicer."""
+    root = os.path.abspath(root)
+    visited = 0
+    for dirpath, dirnames, _files in os.walk(root, followlinks=False):
+        visited += 1
+        if visited > SLICER_WATCH_DIR_MAX_DIRS:
+            app_logger.warning(f"[SlicerProfiles] Dossier surveillé : limite de {SLICER_WATCH_DIR_MAX_DIRS} dossiers atteinte")
+            break
+        depth = os.path.relpath(dirpath, root).count(os.sep) + (0 if dirpath == root else 1)
+        dirnames[:] = [d for d in dirnames if not d.startswith('.')] if depth < SLICER_WATCH_DIR_MAX_DEPTH else []
+        _scan_dir_for_profiles(dirpath, already_imported, imported_out,
+                               type_hint=SLICER_SUBDIR_TYPE_HINTS.get(os.path.basename(dirpath).lower()),
+                               max_bytes=SLICER_PROFILE_MAX_BYTES)
+
+
+def _scan_dir_for_profiles(dir_path, already_imported, imported_out, slicer_hint=None, type_hint=None, max_bytes=None):
     if not dir_path or not os.path.isdir(dir_path):
         return
     try:
@@ -20904,6 +21437,9 @@ def _scan_dir_for_profiles(dir_path, already_imported, imported_out, slicer_hint
         fpath = os.path.join(dir_path, fname)
         try:
             if not os.path.isfile(fpath):
+                continue
+            if max_bytes and os.path.getsize(fpath) > max_bytes:
+                app_logger.debug(f"[SlicerProfiles] Ignoré (trop volumineux) {fpath}")
                 continue
             with open(fpath, 'rb') as f:
                 content = f.read()
@@ -21015,6 +21551,46 @@ def api_slicer_profiles_import():
         return jsonify({"error": "Aucun profil valide importé", "errors": errors}), 400
 
     return jsonify({"imported": imported, "errors": errors, "profiles": profiles}), 200
+
+
+@app.route('/api/slicer-profiles/import-json', methods=['POST'])
+@login_required
+def api_slicer_profiles_import_json():
+    """Édition serveur : importe un profil collé en texte (bouton « Copy raw JSON » du site Orca Cloud)."""
+    blocked = _server_edition_only()
+    if blocked:
+        return blocked
+    data = request.get_json(silent=True) or {}
+    text = str(data.get('json') or '').strip()
+    if not text or len(text) > 2_000_000:
+        return jsonify({"error": "JSON vide ou trop volumineux", "code": "invalid_json"}), 400
+    try:
+        raw = json.loads(text)
+    except ValueError:
+        return jsonify({"error": "JSON invalide", "code": "invalid_json"}), 400
+    if not isinstance(raw, dict):
+        return jsonify({"error": "Ce JSON n'est pas un profil", "code": "invalid_json"}), 400
+    raw_lower = {str(k).lower(): v for k, v in raw.items()}
+    profile_markers = ('layer_height', 'fill_density', 'sparse_infill_density', 'filament_type', 'nozzle_diameter',
+                       'nozzle_temperature', 'temperature', 'wall_loops', 'outer_wall_speed', 'perimeters',
+                       'bed_temperature', 'hot_plate_temp', 'support_enable', 'inherits')
+    if str(raw_lower.get('type') or '').lower() not in ('process', 'filament', 'machine', 'print') \
+            and not any(k in raw_lower for k in profile_markers):
+        return jsonify({"error": "Ce JSON ne ressemble pas à un profil de slicer", "code": "invalid_profile"}), 400
+    name = re.sub(r'\s+', ' ', str(raw.get('name') or '')).strip()[:120] or 'Orca Cloud profile'
+    filename = f"orca-cloud-{re.sub(r'[^A-Za-z0-9._-]+', '_', name)[:70]}.json"
+    try:
+        new_profiles = _parse_slicer_profile_file(filename, text.encode('utf-8'))
+    except Exception as e:
+        return jsonify({"error": f"Profil non reconnu : {e}", "code": "invalid_profile"}), 400
+    if not new_profiles:
+        return jsonify({"error": "Profil non reconnu", "code": "invalid_profile"}), 400
+    profiles = [p for p in load_slicer_profiles() if p.get('source_filename') != filename]
+    profiles.extend(new_profiles)
+    _apply_printer_autoguess(new_profiles, session['user_id'])
+    save_slicer_profiles(profiles)
+    app_logger.info(f"[SlicerProfiles] Profil collé importé ({len(new_profiles)})")
+    return jsonify({"imported": new_profiles, "profiles": profiles}), 200
 
 
 @app.route('/api/slicer-profiles/<profile_id>/printer', methods=['PATCH'])
@@ -21149,22 +21725,23 @@ def api_slicer_profiles_refresh():
 
 def _autodetect_new_slicer_profiles(profiles, user_id):
     appdata = os.environ.get('APPDATA')
-    if not appdata:
+    watch_dir = _get_profiles_watch_dir()
+    if not appdata and not watch_dir:
         return []  
 
     already_imported = {p.get('source_filename') for p in profiles}
     imported = []
 
-    for slicer, (base_rel, subdirs) in SLICER_AUTODETECT_DIRS.items():
+    for slicer, (base_rel, subdirs) in (SLICER_AUTODETECT_DIRS.items() if appdata else ()):
         base_path = os.path.join(appdata, base_rel)
         for sd in subdirs:
             _scan_dir_for_profiles(os.path.join(base_path, sd), already_imported, imported, slicer_hint=slicer,
                                     type_hint=SLICER_SUBDIR_TYPE_HINTS.get(sd))
 
-    for slicer, (base_rel, subdirs) in SLICER_VERSIONED_USER_DIRS.items():
+    for slicer, (base_rel, subdirs) in (SLICER_VERSIONED_USER_DIRS.items() if appdata else ()):
         _scan_versioned_user_dir(os.path.join(appdata, base_rel), subdirs, already_imported, imported, slicer_hint=slicer)
 
-    for slicer, folder_name in SLICER_CURA_FAMILY_DIRS.items():
+    for slicer, folder_name in (SLICER_CURA_FAMILY_DIRS.items() if appdata else ()):
         family_base = os.path.join(appdata, folder_name)
         if not os.path.isdir(family_base):
             continue
@@ -21180,7 +21757,11 @@ def _autodetect_new_slicer_profiles(profiles, user_id):
                                         type_hint='process')
                 _scan_dir_for_profiles(os.path.join(versioned, 'user'), already_imported, imported, slicer_hint=slicer)
 
-    _scan_creality_print_dir(os.path.join(appdata, 'Creality', 'Creality Print'), already_imported, imported)
+    if appdata:
+        _scan_creality_print_dir(os.path.join(appdata, 'Creality', 'Creality Print'), already_imported, imported)
+
+    if watch_dir:
+        _scan_watch_dir_for_profiles(watch_dir, already_imported, imported)
 
     seen_cura_keys = set()
     deduped = []
@@ -21244,9 +21825,9 @@ def _startup_sync_slicer_profiles():
 def api_slicer_profiles_autodetect():
     try:
         profiles = load_slicer_profiles()
+        if not os.environ.get('APPDATA') and not _get_profiles_watch_dir():
+            return jsonify({"error": "Aucun dossier de slicer à analyser : la détection automatique lit les dossiers du slicer sous Windows. Importez vos fichiers de profils ou indiquez un dossier de profils surveillé.", "code": "no_source"}), 400
         imported = _autodetect_new_slicer_profiles(profiles, session['user_id'])
-        if not os.environ.get('APPDATA'):
-            return jsonify({"error": "Dossier AppData introuvable (fonction disponible sous Windows uniquement)"}), 400
         return jsonify({"imported": imported, "count": len(imported), "profiles": profiles}), 200
     except Exception as e:
         app_logger.error(f"[SlicerProfiles] Auto-détection échouée: {e}", exc_info=True)
@@ -22519,6 +23100,130 @@ _TIGERTAG_STUDIO_TOKEN_LOOSE_RE = re.compile(r'refreshToken.{0,60}?([A-Za-z0-9_-
 _TIGERTAG_STUDIO_MAX_FILE_SIZE = 80 * 1024 * 1024  #
 
 
+TIGERTAG_STUDIO_EXTRA_ROOT_MAX_FILES = 20000
+
+# Connexion par e-mail + mot de passe (méthode documentée par TigerTag pour les intégrations tierces :
+# Firebase Auth « signInWithPassword »). Édition serveur uniquement. Le mot de passe n'est jamais stocké ni
+# journalisé : seul le jeton de rafraîchissement obtenu est conservé, chiffré, comme pour TigerTag Studio.
+TIGERTAG_FIREBASE_SIGNIN_URL = "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword"
+TIGERTAG_LOGIN_MAX_ATTEMPTS = 5
+TIGERTAG_LOGIN_WINDOW_SECONDS = 600
+_tigertag_login_attempts = {}
+_tigertag_login_attempts_lock = threading.Lock()
+_TIGERTAG_EMAIL_RE = re.compile(r'^[^@\s]{1,64}@[^@\s]{1,255}\.[^@\s]{2,}$')
+_TIGERTAG_LOGIN_ERRORS = {
+    'EMAIL_NOT_FOUND': ("Adresse e-mail inconnue chez TigerTag.", 'bad_credentials'),
+    'INVALID_PASSWORD': ("E-mail ou mot de passe incorrect.", 'bad_credentials'),
+    'INVALID_LOGIN_CREDENTIALS': ("E-mail ou mot de passe incorrect. Compte créé avec Google ? Définissez d'abord un mot de passe via « Mot de passe oublié » dans l'application TigerTag.", 'bad_credentials'),
+    'USER_DISABLED': ("Ce compte TigerTag est désactivé.", 'disabled'),
+    'TOO_MANY_ATTEMPTS_TRY_LATER': ("Trop de tentatives côté TigerTag : réessayez plus tard.", 'too_many_attempts'),
+}
+
+
+def _tigertag_login_throttled(user_id) -> bool:
+    now = time.time()
+    with _tigertag_login_attempts_lock:
+        attempts = [t for t in _tigertag_login_attempts.get(user_id, []) if now - t < TIGERTAG_LOGIN_WINDOW_SECONDS]
+        if len(attempts) >= TIGERTAG_LOGIN_MAX_ATTEMPTS:
+            _tigertag_login_attempts[user_id] = attempts
+            return True
+        attempts.append(now)
+        _tigertag_login_attempts[user_id] = attempts
+    return False
+
+
+@app.route('/api/accounts/tigertag/login', methods=['POST'])
+@login_required
+def tigertag_password_login():
+    blocked = _server_edition_only()
+    if blocked:
+        return blocked
+    data = request.get_json(silent=True) or {}
+    email = str(data.get('email') or '').strip().lower()
+    password = str(data.get('password') or '')
+    if not _TIGERTAG_EMAIL_RE.match(email) or not (6 <= len(password) <= 256):
+        return jsonify({"error": "Adresse e-mail ou mot de passe invalide.", "code": "invalid_input"}), 400
+    if _tigertag_login_throttled(session['user_id']):
+        return jsonify({"error": "Trop de tentatives : patientez quelques minutes.", "code": "too_many_attempts"}), 429
+    try:
+        _tigertag_ensure_firebase_config()
+        resp = requests.post(
+            f"{TIGERTAG_FIREBASE_SIGNIN_URL}?key={_tigertag_firebase_config['api_key']}",
+            json={"email": email, "password": password, "returnSecureToken": True}, timeout=15)
+    except requests.exceptions.RequestException:
+        return jsonify({"error": "Impossible de joindre le service d'authentification TigerTag.", "code": "unreachable"}), 502
+    finally:
+        password = ''
+    if not resp.ok:
+        reason = ''
+        try:
+            reason = str((resp.json().get('error') or {}).get('message') or '')
+        except Exception:
+            pass
+        reason = reason.split(' ')[0].split(':')[0]
+        message, code = _TIGERTAG_LOGIN_ERRORS.get(reason, (f"Connexion TigerTag refusée (HTTP {resp.status_code}).", 'rejected'))
+        app_logger.info(f"[TigerTag] Connexion e-mail refusée ({reason or resp.status_code})")
+        return jsonify({"error": message, "code": code}), 401
+    try:
+        body = resp.json()
+        id_token, refresh_token, firebase_uid = body['idToken'], body['refreshToken'], body.get('localId')
+        expires_at = time.time() + int(body.get('expiresIn') or 3600)
+    except (KeyError, ValueError, TypeError):
+        return jsonify({"error": "Réponse d'authentification TigerTag inattendue.", "code": "rejected"}), 502
+    try:
+        conn = get_db()
+        try:
+            conn.execute("""
+                INSERT INTO account_credentials
+                (user_id, platform, email, password_encrypted, api_key, last_login)
+                VALUES (?, 'tigertag', ?, NULL, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id, platform) DO UPDATE SET
+                    email = excluded.email,
+                    password_encrypted = NULL,
+                    api_key = excluded.api_key,
+                    last_login = CURRENT_TIMESTAMP
+            """, (session['user_id'], email, encrypt_password(refresh_token)))
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        app_logger.error(f"[TigerTag] Enregistrement de la session impossible: {e}")
+        return jsonify({"error": "Connexion réussie mais enregistrement impossible.", "code": "storage_error"}), 500
+    with _tigertag_token_cache_lock:
+        _tigertag_token_cache[session['user_id']] = {
+            'id_token': id_token, 'refresh_token': refresh_token,
+            'firebase_uid': firebase_uid, 'expires_at': expires_at,
+        }
+    with _tigertag_login_attempts_lock:
+        _tigertag_login_attempts.pop(session['user_id'], None)
+    app_logger.info("[TigerTag] Compte connecté par e-mail et mot de passe")
+    return jsonify({"connected": True, "email": email})
+
+
+def _tigertag_server_extra_roots():
+    """Édition serveur uniquement : dossier de session copié depuis le PC (réglage `tigertag_studio_dir`)
+    et dossiers de configuration Linux contenant « tiger » (TigerTag Studio installé sur la machine)."""
+    if not IS_SERVER_EDITION:
+        return []
+    roots = []
+    try:
+        custom = str((load_settings() or {}).get('tigertag_studio_dir') or '').strip()
+    except Exception:
+        custom = ''
+    if custom and os.path.isdir(custom):
+        roots.append(os.path.abspath(custom))
+    home = os.path.expanduser('~')
+    for base in (os.path.join(home, '.config'), os.path.join(home, '.local', 'share')):
+        try:
+            if os.path.isdir(base):
+                for name in os.listdir(base):
+                    if 'tiger' in name.lower():
+                        roots.append(os.path.join(base, name))
+        except OSError:
+            pass
+    return roots
+
+
 def _tigertag_studio_candidate_roots():
     localappdata = os.environ.get("LOCALAPPDATA")
 
@@ -22540,6 +23245,7 @@ def _tigertag_studio_candidate_roots():
                     roots.append(os.path.join(base, name))
         except OSError:
             pass
+    roots.extend(_tigertag_server_extra_roots())
     return roots
 
 
@@ -22561,9 +23267,14 @@ def _tigertag_studio_scan_tokens():
     files_skipped = 0
     strict_hits = 0
     loose_hits = 0
+    extra_roots = set(_tigertag_server_extra_roots())
     for root in roots:
         root_files = 0
+        root_limit = TIGERTAG_STUDIO_EXTRA_ROOT_MAX_FILES if root in extra_roots else None
         for dirpath, _dirnames, filenames in os.walk(root):
+            if root_limit and root_files >= root_limit:
+                app_logger.warning(f"[TigerTag] Détection auto : limite de {root_limit} fichiers atteinte dans {root}")
+                break
             for fn in filenames:
                 path = os.path.join(dirpath, fn)
                 try:
@@ -22617,6 +23328,12 @@ def tigertag_auto_detect_studio():
         return jsonify({"error": "Échec de la recherche locale"}), 500
 
     if not tokens:
+        if IS_SERVER_EDITION:
+            return jsonify({
+                "error": "Aucune session TigerTag Studio trouvée. Copie sur le serveur le dossier de données de TigerTag Studio "
+                         "(celui de ton PC, où tu t'es connecté avec Google), puis renseigne son chemin.",
+                "code": "no_session"
+            }), 404
         return jsonify({
             "error": "Aucune session TigerTag Studio trouvée sur ce PC. "
                      "Vérifie que TigerTag Studio est installé et que tu t'y es déjà connecté avec Google."

@@ -40,7 +40,7 @@
 
 无论您是新手创客还是管理多台打印机的资深用户，Stellio 都能借助**本地AI**（Ollama）、**智能打印机管理**以及**专为效率而设计的界面**，为您节省宝贵的时间。
 
-> 💡 **理念**：您的数据始终掌握在您手中。一切均在本地运行。
+> 💡 **理念**：您的数据始终掌握在您手中。一切均在本地运行。在树莓派 / Linux 上，您可以选择使用自己的 API 密钥接入在线 AI（见下文）；默认情况下，任何数据都不会离开您的设备。
 
 ---
 
@@ -228,6 +228,14 @@ sudo journalctl -u stellio -f     # 实时查看日志
 >
 > 🎥 除原生桌面窗口（替换为浏览器访问）以及本地 Ollama AI（需要性能较好的模型才能在 Pi 上顺畅运行，如有需要可在设置中将 `ollama_url` 指向远程 Ollama 服务器）外，其余功能与 Windows 版本相同。
 
+### 🧰 服务器版专属（树莓派 / Linux）
+
+> Windows 版不受影响：这些功能只会出现在树莓派、虚拟机、LXC、Docker 和 Linux 上。
+
+- ☁️ **在线 AI（可选）**：可用您自己的 API 密钥以 Claude（Anthropic）、ChatGPT（OpenAI）或 Gemini（Google）代替 Ollama（设置 → 人工智能）。密钥在服务器上加密存储，绝不会回传给浏览器；默认仍为 100% 本地的 Ollama。请求（文件名、标签、描述、S.O.S Print 照片）会发送给所选提供商，并按您的密钥计费。
+- 📥 **切片软件配置文件**：Stellio 看不到您电脑上的切片软件，也不会连接切片软件的云（Orca Cloud、Bambu Cloud 等）。请先在切片软件中导出配置文件（OrcaSlicer：文件 → 导出 → 导出预设包），再在 设置 → 我的切片软件配置文件 中导入；对于 Orca Cloud，也可以粘贴配置文件的“Copy raw JSON”。还可以指定一个 Stellio 会自动重新读取的**监视配置文件夹**（Syncthing、网络共享、scp 等）。
+- 🐯 **TigerTag**：在 设置 → 耗材库存 → TigerTag 中使用邮箱和密码官方登录（不会保存密码，只保存加密的会话令牌）。账户是用 Google 创建的？请先在 TigerTag 应用中通过“忘记密码”设置密码。备用方法：把 TigerTag Studio 的数据文件夹（Windows：`%APPDATA%` 中的“TigerTag…”文件夹，至少包含 `Local Storage` 和 `IndexedDB`）复制到服务器并填写其路径。
+
 ### 支持的切片软件
 
 Stellio 可自动检测：
@@ -347,7 +355,7 @@ stellio/
 
 ## 🔒 隐私
 
-Stellio 采用本地优先架构：您的数据保留在您的设备上，默认情况下不会向外部服务器收集或发送任何数据。完整详情请参阅我们的[隐私政策](../privacy/PRIVACY.md)。
+Stellio 采用本地优先架构：您的数据保留在您的设备上，默认情况下不会向外部服务器收集或发送任何数据。完整详情请参阅我们的[隐私政策](../privacy/PRIVACY.md)。唯一的例外（且仅在您自己启用时）：服务器版的在线 AI（Claude、ChatGPT、Gemini）会把您的 AI 请求发送给所选的提供商。
 
 ---
 

@@ -1,5 +1,106 @@
 [
   {
+    "version": "0.7.8",
+    "items": {
+      "fr": [
+        "Projets : un clic sur une miniature de la carte d'un projet ouvre la visionneuse 3D du fichier",
+        "Projets : nouveau bouton « Coût du projet » à côté du crayon : même calcul que le coût d'une pièce (estimation précise du slicer, bobine, électricité, usure, frais fixes, marge) cumulé sur tous les fichiers du projet avec leurs quantités, et export du devis en PDF",
+        "Boutiques : l'achat d'une bobine propose maintenant toujours la boutique du fabricant de la marque (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo, etc.), avec une recherche sans le nom de la marque et le stock trouvé quand le site peut être vérifié",
+        "Paramètres : ouvrir une section ne décale plus le contenu vers la gauche (la place de la barre de défilement est désormais toujours réservée)",
+        "Profils de slicer : nouvelle aide « Comment importer mes profils ? » (OrcaSlicer et Orca Cloud, Bambu Studio, PrusaSlicer, Cura) et nouveau « dossier de profils surveillé » pour les serveurs sans slicer (Raspberry Pi, LXC, Docker) ; sur ces serveurs, la détection automatique affiche désormais un message explicatif",
+        "Édition serveur (Raspberry Pi, VM, LXC, Linux) : possibilité d'utiliser Claude (Anthropic), ChatGPT (OpenAI) ou Gemini (Google) à la place d'Ollama, avec votre propre clé API (chiffrée sur le serveur, jamais renvoyée au navigateur) ; Ollama reste le choix par défaut, 100 % local. La version Windows n'est pas modifiée",
+        "Édition serveur : connexion TigerTag possible sans TigerTag Studio installé (la session Google est lue depuis une copie du dossier de données de TigerTag Studio de votre PC, dossier renseigné dans Paramètres) ; la version Windows n'est pas modifiée",
+        "S.O.S Print : possibilité de renseigner les réglages utilisés pour l'impression ratée (températures, vitesses, hauteur de couche, rétraction, ventilateur, remplissage, remarques) : les questions et les solutions ciblent alors les bons réglages à modifier, avec la valeur actuelle et la valeur à essayer",
+        "S.O.S Print : possibilité de choisir parmi les profils de slicer importés (les réglages se pré-remplissent) et de préciser si des réglages ont été modifiés par rapport au profil, pour des solutions encore mieux ciblées",
+        "Édition serveur : connexion TigerTag par e-mail et mot de passe (méthode officielle, le mot de passe n'est pas conservé ; compte Google : définir d'abord un mot de passe via « Mot de passe oublié ») et import d'un profil Orca Cloud en collant son « Copy raw JSON »"
+      ],
+      "en": [
+        "Projects: clicking a thumbnail on a project card opens the file's 3D viewer",
+        "Projects: new “Project cost” button next to the pencil: same calculation as the cost of a single part (precise slicer estimate, spool, electricity, wear, fixed fee, margin) added up over all the files of the project with their quantities, plus PDF quote export",
+        "Shops: buying a spool now always offers the manufacturer's own shop for its brand (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo, etc.), with a search that leaves out the brand name and the stock found when the site can be checked",
+        "Settings: opening a section no longer shifts the content to the left (room for the scrollbar is now always reserved)",
+        "Slicer profiles: new “How do I import my profiles?” help (OrcaSlicer and Orca Cloud, Bambu Studio, PrusaSlicer, Cura) and a new “watched profiles folder” for servers without a slicer (Raspberry Pi, LXC, Docker); on those servers, automatic detection now shows an explanatory message",
+        "Server edition (Raspberry Pi, VM, LXC, Linux): you can now use Claude (Anthropic), ChatGPT (OpenAI) or Gemini (Google) instead of Ollama, with your own API key (encrypted on the server, never sent back to the browser); Ollama remains the default, 100% local. The Windows version is unchanged",
+        "Server edition: TigerTag can now be connected without TigerTag Studio installed (the Google session is read from a copy of your PC's TigerTag Studio data folder, set in Settings); the Windows version is unchanged",
+        "S.O.S Print: you can now enter the settings used for the failed print (temperatures, speeds, layer height, retraction, fan, infill, remarks): the questions and solutions then target the right settings to change, with the current value and the value to try",
+        "S.O.S Print: you can now pick from your imported slicer profiles (settings are pre-filled) and say whether you changed settings compared to the profile, for even better targeted solutions",
+        "Server edition: TigerTag sign-in with e-mail and password (official method, the password is not kept; Google account: first set a password with “Forgot password”) and importing an Orca Cloud profile by pasting its “Copy raw JSON”"
+      ],
+      "de": [
+        "Projekte: Ein Klick auf eine Vorschau auf der Projektkarte öffnet die 3D-Ansicht der Datei",
+        "Projekte: Neue Schaltfläche „Projektkosten“ neben dem Stift: gleiche Berechnung wie die Kosten eines einzelnen Teils (genaue Slicer-Schätzung, Spule, Strom, Verschleiß, Fixkosten, Marge), summiert über alle Dateien des Projekts mit ihren Mengen, samt Export des Angebots als PDF",
+        "Shops: Beim Nachkauf einer Spule wird jetzt immer der Shop des Herstellers der Marke angeboten (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo usw.), mit einer Suche ohne Markennamen und dem gefundenen Lagerbestand, sofern die Seite geprüft werden kann",
+        "Einstellungen: Das Aufklappen eines Bereichs verschiebt den Inhalt nicht mehr nach links (der Platz für die Bildlaufleiste ist jetzt immer reserviert)",
+        "Slicer-Profile: neue Hilfe „Wie importiere ich meine Profile?“ (OrcaSlicer und Orca Cloud, Bambu Studio, PrusaSlicer, Cura) und neuer „überwachter Profilordner“ für Server ohne Slicer (Raspberry Pi, LXC, Docker); auf solchen Servern zeigt die automatische Erkennung jetzt eine erklärende Meldung",
+        "Server-Edition (Raspberry Pi, VM, LXC, Linux): Statt Ollama können Sie jetzt Claude (Anthropic), ChatGPT (OpenAI) oder Gemini (Google) mit Ihrem eigenen API-Schlüssel nutzen (auf dem Server verschlüsselt, nie an den Browser zurückgesendet); Ollama bleibt die Standardwahl, 100 % lokal. Die Windows-Version bleibt unverändert",
+        "Server-Edition: TigerTag lässt sich jetzt ohne installiertes TigerTag Studio verbinden (die Google-Sitzung wird aus einer Kopie des TigerTag-Studio-Datenordners Ihres PCs gelesen, in den Einstellungen angegeben); die Windows-Version bleibt unverändert",
+        "S.O.S Print: Sie können jetzt die Einstellungen des fehlgeschlagenen Drucks angeben (Temperaturen, Geschwindigkeiten, Schichthöhe, Retraction, Lüfter, Füllung, Anmerkungen): Fragen und Lösungen beziehen sich dann auf die richtigen Einstellungen, mit aktuellem Wert und Wert zum Ausprobieren",
+        "S.O.S Print: Sie können jetzt aus Ihren importierten Slicer-Profilen wählen (die Einstellungen werden vorausgefüllt) und angeben, ob Sie gegenüber dem Profil etwas geändert haben – für noch gezieltere Lösungen",
+        "Server-Edition: TigerTag-Anmeldung mit E-Mail und Passwort (offizielle Methode, das Passwort wird nicht gespeichert; Google-Konto: zuerst über „Passwort vergessen“ ein Passwort festlegen) und Import eines Orca-Cloud-Profils durch Einfügen seines „Copy raw JSON“"
+      ],
+      "es": [
+        "Proyectos: al hacer clic en una miniatura de la tarjeta de un proyecto se abre el visor 3D del archivo",
+        "Proyectos: nuevo botón «Coste del proyecto» junto al lápiz: mismo cálculo que el coste de una pieza (estimación precisa del slicer, bobina, electricidad, desgaste, gastos fijos, margen) sumado sobre todos los archivos del proyecto con sus cantidades, y exportación del presupuesto en PDF",
+        "Tiendas: al comprar una bobina ahora se ofrece siempre la tienda del fabricante de la marca (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo, etc.), con una búsqueda sin el nombre de la marca y el stock encontrado cuando se puede verificar el sitio",
+        "Ajustes: al desplegar una sección el contenido ya no se desplaza hacia la izquierda (el espacio de la barra de desplazamiento ahora está siempre reservado)",
+        "Perfiles de slicer: nueva ayuda «¿Cómo importo mis perfiles?» (OrcaSlicer y Orca Cloud, Bambu Studio, PrusaSlicer, Cura) y nueva «carpeta de perfiles vigilada» para servidores sin slicer (Raspberry Pi, LXC, Docker); en esos servidores, la detección automática ahora muestra un mensaje explicativo",
+        "Edición servidor (Raspberry Pi, VM, LXC, Linux): ahora puedes usar Claude (Anthropic), ChatGPT (OpenAI) o Gemini (Google) en lugar de Ollama, con tu propia clave API (cifrada en el servidor, nunca devuelta al navegador); Ollama sigue siendo la opción por defecto, 100 % local. La versión de Windows no cambia",
+        "Edición servidor: ahora se puede conectar TigerTag sin tener TigerTag Studio instalado (la sesión de Google se lee de una copia de la carpeta de datos de TigerTag Studio de tu PC, indicada en Ajustes); la versión de Windows no cambia",
+        "S.O.S Print: ahora puedes indicar los ajustes usados en la impresión fallida (temperaturas, velocidades, altura de capa, retracción, ventilador, relleno, observaciones): las preguntas y las soluciones se centran entonces en los ajustes correctos que hay que cambiar, con el valor actual y el valor que probar",
+        "S.O.S Print: ahora puedes elegir entre tus perfiles de laminador importados (los ajustes se rellenan solos) e indicar si cambiaste ajustes respecto al perfil, para soluciones aún más precisas",
+        "Edición servidor: inicio de sesión de TigerTag con correo y contraseña (método oficial, la contraseña no se conserva; cuenta de Google: define antes una contraseña con «Olvidé mi contraseña») e importación de un perfil de Orca Cloud pegando su «Copy raw JSON»"
+      ],
+      "it": [
+        "Progetti: un clic su una miniatura della scheda di un progetto apre il visualizzatore 3D del file",
+        "Progetti: nuovo pulsante «Costo del progetto» accanto alla matita: stesso calcolo del costo di un singolo pezzo (stima precisa dello slicer, bobina, elettricità, usura, costi fissi, margine) sommato su tutti i file del progetto con le loro quantità, ed esportazione del preventivo in PDF",
+        "Negozi: l'acquisto di una bobina ora propone sempre il negozio del produttore della marca (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo, ecc.), con una ricerca senza il nome della marca e la disponibilità trovata quando il sito può essere verificato",
+        "Impostazioni: aprire una sezione non sposta più il contenuto verso sinistra (lo spazio della barra di scorrimento è ora sempre riservato)",
+        "Profili dello slicer: nuovo aiuto «Come importo i miei profili?» (OrcaSlicer e Orca Cloud, Bambu Studio, PrusaSlicer, Cura) e nuova «cartella di profili monitorata» per i server senza slicer (Raspberry Pi, LXC, Docker); su questi server il rilevamento automatico ora mostra un messaggio esplicativo",
+        "Edizione server (Raspberry Pi, VM, LXC, Linux): ora puoi usare Claude (Anthropic), ChatGPT (OpenAI) o Gemini (Google) al posto di Ollama, con la tua chiave API (cifrata sul server, mai rinviata al browser); Ollama resta la scelta predefinita, 100 % locale. La versione per Windows non cambia",
+        "Edizione server: ora TigerTag si può collegare senza avere TigerTag Studio installato (la sessione Google viene letta da una copia della cartella dei dati di TigerTag Studio del tuo PC, indicata nelle Impostazioni); la versione per Windows non cambia",
+        "S.O.S Print: ora puoi indicare le impostazioni usate per la stampa fallita (temperature, velocità, altezza strato, retrazione, ventola, riempimento, note): domande e soluzioni sono quindi mirate alle impostazioni giuste da modificare, con il valore attuale e quello da provare",
+        "S.O.S Print: ora puoi scegliere tra i profili slicer importati (le impostazioni si precompilano) e indicare se hai modificato qualcosa rispetto al profilo, per soluzioni ancora più mirate",
+        "Edizione server: accesso a TigerTag con e-mail e password (metodo ufficiale, la password non viene conservata; account Google: imposta prima una password con «Password dimenticata») e importazione di un profilo Orca Cloud incollando il suo «Copy raw JSON»"
+      ],
+      "pt": [
+        "Projetos: clicar numa miniatura do cartão de um projeto abre o visualizador 3D do arquivo",
+        "Projetos: novo botão «Custo do projeto» ao lado do lápis: mesmo cálculo do custo de uma peça (estimativa precisa do slicer, bobina, eletricidade, desgaste, custos fixos, margem) somado em todos os arquivos do projeto com as suas quantidades, e exportação do orçamento em PDF",
+        "Lojas: a compra de uma bobina agora oferece sempre a loja do fabricante da marca (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo, etc.), com uma pesquisa sem o nome da marca e o estoque encontrado quando o site pode ser verificado",
+        "Configurações: expandir uma seção não desloca mais o conteúdo para a esquerda (o espaço da barra de rolagem agora fica sempre reservado)",
+        "Perfis de slicer: nova ajuda «Como importo meus perfis?» (OrcaSlicer e Orca Cloud, Bambu Studio, PrusaSlicer, Cura) e nova «pasta de perfis monitorada» para servidores sem slicer (Raspberry Pi, LXC, Docker); nesses servidores, a detecção automática agora mostra uma mensagem explicativa",
+        "Edição servidor (Raspberry Pi, VM, LXC, Linux): agora você pode usar Claude (Anthropic), ChatGPT (OpenAI) ou Gemini (Google) no lugar do Ollama, com a sua própria chave de API (criptografada no servidor, nunca devolvida ao navegador); o Ollama continua sendo a opção padrão, 100% local. A versão para Windows não muda",
+        "Edição servidor: agora é possível conectar o TigerTag sem ter o TigerTag Studio instalado (a sessão do Google é lida de uma cópia da pasta de dados do TigerTag Studio do seu PC, informada em Configurações); a versão para Windows não muda",
+        "S.O.S Print: agora você pode informar as configurações usadas na impressão que falhou (temperaturas, velocidades, altura da camada, retração, ventoinha, preenchimento, observações): as perguntas e as soluções passam a mirar as configurações certas a alterar, com o valor atual e o valor a testar",
+        "S.O.S Print: agora você pode escolher entre os perfis de fatiador importados (as configurações são preenchidas) e indicar se alterou algo em relação ao perfil, para soluções ainda mais direcionadas",
+        "Edição servidor: login do TigerTag com e-mail e senha (método oficial, a senha não é guardada; conta Google: defina antes uma senha com «Esqueci a senha») e importação de um perfil do Orca Cloud colando o seu «Copy raw JSON»"
+      ],
+      "ja": [
+        "プロジェクト：プロジェクトカードのサムネイルをクリックすると、そのファイルの3Dビューアーが開きます",
+        "プロジェクト：鉛筆アイコンの隣に新しい「プロジェクトのコスト」ボタンを追加。単品のコストと同じ計算（スライサーによる正確な見積もり、スプール、電気代、消耗、固定費、マージン）を、プロジェクト内の全ファイルの数量分で合計し、見積書をPDFで出力できます",
+        "ショップ：スプールの買い足し時に、そのブランドのメーカー公式ショップ（Arianeplast、Bambu Lab、Polymaker、eSUN、Sunlu、Elegoo など）が常に表示されるようになりました。ブランド名を除いた検索で、サイトを確認できる場合は在庫も表示します",
+        "設定：セクションを開いても内容が左にずれなくなりました（スクロールバーの領域を常に確保します）",
+        "スライサーのプロファイル：新しいヘルプ「プロファイルのインポート方法」（OrcaSlicer と Orca Cloud、Bambu Studio、PrusaSlicer、Cura）と、スライサーのないサーバー（Raspberry Pi、LXC、Docker）向けの新しい「監視するプロファイルフォルダー」を追加。これらのサーバーでは、自動検出が説明メッセージを表示するようになりました",
+        "サーバー版（Raspberry Pi、VM、LXC、Linux）：Ollama の代わりに Claude（Anthropic）、ChatGPT（OpenAI）、Gemini（Google）を、ご自身のAPIキー（サーバー上で暗号化され、ブラウザには送り返されません）で利用できるようになりました。既定は引き続き完全ローカルの Ollama です。Windows 版は変更ありません",
+        "サーバー版：TigerTag Studio をインストールしなくても TigerTag に接続できるようになりました（PC の TigerTag Studio のデータフォルダーのコピーから Google セッションを読み取ります。フォルダーは設定で指定）。Windows 版は変更ありません",
+        "S.O.S Print：失敗した印刷で使った設定（温度、速度、積層ピッチ、リトラクション、ファン、インフィル、メモ）を入力できるようになりました。質問と解決策が、変更すべき設定に的を絞り、現在の値と試すべき値を示します",
+        "S.O.S Print：インポート済みのスライサープロファイルから選べるようになり（設定が自動入力されます）、プロファイルから設定を変更したかどうかを指定できます。解決策がさらに的確になります",
+        "サーバー版：TigerTag にメールアドレスとパスワードでログインできるようになりました（公式の方法で、パスワードは保存されません。Google アカウントの場合は先に「パスワードを忘れた場合」でパスワードを設定）。Orca Cloud のプロファイルは「Copy raw JSON」を貼り付けてインポートできます"
+      ],
+      "zh": [
+        "项目：点击项目卡片上的缩略图即可打开该文件的 3D 查看器",
+        "项目：铅笔图标旁新增“项目成本”按钮：与单个零件成本相同的计算方式（切片软件精确估算、耗材盘、电费、损耗、固定费用、利润率），按各文件数量汇总整个项目，并可导出 PDF 报价单",
+        "商店：购买耗材盘时，现在总会提供该品牌厂商的官方商店（Arianeplast、Bambu Lab、Polymaker、eSUN、Sunlu、Elegoo 等），搜索时会省略品牌名，并在可核实该网站时显示找到的库存",
+        "设置：展开分区时内容不再向左偏移（现在始终为滚动条预留空间）",
+        "切片软件配置文件：新增“如何导入我的配置文件？”帮助（OrcaSlicer 和 Orca Cloud、Bambu Studio、PrusaSlicer、Cura），并为没有切片软件的服务器（树莓派、LXC、Docker）新增“监视的配置文件夹”；在这些服务器上，自动检测现在会显示说明信息",
+        "服务器版（树莓派、虚拟机、LXC、Linux）：现在可以使用您自己的 API 密钥（在服务器上加密存储，绝不会回传给浏览器），以 Claude（Anthropic）、ChatGPT（OpenAI）或 Gemini（Google）代替 Ollama；默认仍为 100% 本地的 Ollama。Windows 版保持不变",
+        "服务器版：无需安装 TigerTag Studio 即可连接 TigerTag（从您电脑上 TigerTag Studio 数据文件夹的副本读取 Google 会话，文件夹在“设置”中指定）；Windows 版保持不变",
+        "S.O.S Print：现在可以填写失败打印所用的设置（温度、速度、层高、回抽、风扇、填充、备注）：提问和解决方案会针对需要修改的正确设置，并给出当前值和建议尝试的值",
+        "S.O.S Print：现在可以从已导入的切片软件配置文件中选择（设置会自动填入），并说明是否修改过相对于该配置文件的设置，使解决方案更有针对性",
+        "服务器版：支持使用邮箱和密码登录 TigerTag（官方方式，不会保存密码；Google 账户请先通过“忘记密码”设置密码），并可粘贴 Orca Cloud 配置文件的“Copy raw JSON”来导入"
+      ]
+    }
+  },
+  {
     "version": "0.7.7",
     "items": {
       "fr": [
@@ -9,10 +110,7 @@
         "Recherche IA : vider le champ de recherche arrête immédiatement la recherche IA en cours (plus de « l'IA cherche » avec un champ vide ni de résultats tardifs qui remplacent la bibliothèque)",
         "L'application reste fluide pendant la génération des miniatures : celle-ci se met en pause dès que vous utilisez l'application et reprend quand vous ne faites plus rien",
         "Menu latéral : un séparateur distingue maintenant « Tableau de bord » du reste de la navigation",
-        "Connexion : quand l'application s'ouvre avec une session déjà enregistrée, un message demande « Est-ce bien <compte> ? » : Oui ouvre l'application, Non affiche l'écran d'authentification",
-        "Projets : un clic sur une miniature de la carte d'un projet ouvre la visionneuse 3D du fichier",
-        "Projets : nouveau bouton « Coût du projet » à côté du crayon : même calcul que le coût d'une pièce (estimation précise du slicer, bobine, électricité, usure, frais fixes, marge) cumulé sur tous les fichiers du projet avec leurs quantités, et export du devis en PDF",
-        "Boutiques : l'achat d'une bobine propose maintenant toujours la boutique du fabricant de la marque (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo, etc.), avec une recherche sans le nom de la marque et le stock trouvé quand le site peut être vérifié"
+        "Connexion : quand l'application s'ouvre avec une session déjà enregistrée, un message demande « Est-ce bien <compte> ? » : Oui ouvre l'application, Non affiche l'écran d'authentification"
       ],
       "en": [
         "Projects: the plates split from a multi-plate 3MF are now stored in a hidden folder: they no longer clutter the library or the sources, stay visible in the project and can be sent to the slicer from there",
@@ -21,10 +119,7 @@
         "AI search: clearing the search field now immediately stops the AI search in progress (no more “AI is searching” with an empty field, and no late results replacing the library)",
         "The app stays smooth while thumbnails are being generated: generation pauses as soon as you use the app and resumes when you stop",
         "Side menu: a separator now sets “Dashboard” apart from the rest of the navigation",
-        "Sign-in: when the app opens with a saved session, a prompt now asks “Is this <account>?”: Yes opens the app, No shows the sign-in screen",
-        "Projects: clicking a thumbnail on a project card opens the file's 3D viewer",
-        "Projects: new “Project cost” button next to the pencil: same calculation as the cost of a single part (precise slicer estimate, spool, electricity, wear, fixed fee, margin) added up over all the files of the project with their quantities, plus PDF quote export",
-        "Shops: buying a spool now always offers the manufacturer's own shop for its brand (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo, etc.), with a search that leaves out the brand name and the stock found when the site can be checked"
+        "Sign-in: when the app opens with a saved session, a prompt now asks “Is this <account>?”: Yes opens the app, No shows the sign-in screen"
       ],
       "de": [
         "Projekte: Die aus einer 3MF mit mehreren Platten abgetrennten Platten liegen jetzt in einem versteckten Ordner: Sie füllen weder die Bibliothek noch die Quellen, bleiben im Projekt sichtbar und können von dort an den Slicer gesendet werden",
@@ -33,10 +128,7 @@
         "KI-Suche: Beim Leeren des Suchfelds wird die laufende KI-Suche sofort beendet (kein „KI sucht“ mehr bei leerem Feld und keine verspäteten Ergebnisse, die die Bibliothek ersetzen)",
         "Die App bleibt während der Vorschaubild-Erzeugung flüssig: Die Erzeugung pausiert, sobald Sie die App benutzen, und läuft weiter, wenn Sie nichts mehr tun",
         "Seitenmenü: Ein Trennstrich setzt „Dashboard“ jetzt vom Rest der Navigation ab",
-        "Anmeldung: Wenn die App mit einer gespeicherten Sitzung startet, fragt ein Hinweis „Ist das <Konto>?“ – Ja öffnet die App, Nein zeigt den Anmeldebildschirm",
-        "Projekte: Ein Klick auf eine Vorschau auf der Projektkarte öffnet die 3D-Ansicht der Datei",
-        "Projekte: Neue Schaltfläche „Projektkosten“ neben dem Stift: gleiche Berechnung wie die Kosten eines einzelnen Teils (genaue Slicer-Schätzung, Spule, Strom, Verschleiß, Fixkosten, Marge), summiert über alle Dateien des Projekts mit ihren Mengen, samt Export des Angebots als PDF",
-        "Shops: Beim Nachkauf einer Spule wird jetzt immer der Shop des Herstellers der Marke angeboten (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo usw.), mit einer Suche ohne Markennamen und dem gefundenen Lagerbestand, sofern die Seite geprüft werden kann"
+        "Anmeldung: Wenn die App mit einer gespeicherten Sitzung startet, fragt ein Hinweis „Ist das <Konto>?“ – Ja öffnet die App, Nein zeigt den Anmeldebildschirm"
       ],
       "es": [
         "Proyectos: las placas separadas de un 3MF de varias placas se guardan ahora en una carpeta oculta: ya no saturan la biblioteca ni las fuentes, siguen visibles en el proyecto y se pueden enviar al slicer desde allí",
@@ -45,10 +137,7 @@
         "Búsqueda IA: vaciar el campo de búsqueda detiene al instante la búsqueda IA en curso (se acabó el « la IA busca » con el campo vacío y los resultados tardíos que reemplazaban la biblioteca)",
         "La aplicación se mantiene fluida durante la generación de miniaturas: esta se pausa en cuanto usas la aplicación y se reanuda cuando dejas de hacer algo",
         "Menú lateral: un separador distingue ahora « Panel » del resto de la navegación",
-        "Inicio de sesión: al abrir la aplicación con una sesión guardada, aparece un mensaje «¿Eres <cuenta>?»: Sí abre la aplicación, No muestra la pantalla de inicio de sesión",
-        "Proyectos: al hacer clic en una miniatura de la tarjeta de un proyecto se abre el visor 3D del archivo",
-        "Proyectos: nuevo botón «Coste del proyecto» junto al lápiz: mismo cálculo que el coste de una pieza (estimación precisa del slicer, bobina, electricidad, desgaste, gastos fijos, margen) sumado sobre todos los archivos del proyecto con sus cantidades, y exportación del presupuesto en PDF",
-        "Tiendas: al comprar una bobina ahora se ofrece siempre la tienda del fabricante de la marca (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo, etc.), con una búsqueda sin el nombre de la marca y el stock encontrado cuando se puede verificar el sitio"
+        "Inicio de sesión: al abrir la aplicación con una sesión guardada, aparece un mensaje «¿Eres <cuenta>?»: Sí abre la aplicación, No muestra la pantalla de inicio de sesión"
       ],
       "it": [
         "Progetti: i piatti separati da un 3MF con più piatti sono ora salvati in una cartella nascosta: non ingombrano più la libreria né le sorgenti, restano visibili nel progetto e si possono inviare allo slicer da lì",
@@ -57,10 +146,7 @@
         "Ricerca IA: svuotare il campo di ricerca interrompe subito la ricerca IA in corso (niente più « l'IA sta cercando » con il campo vuoto né risultati tardivi che sostituiscono la libreria)",
         "L'app resta fluida durante la generazione delle miniature: questa si mette in pausa appena usi l'app e riprende quando smetti di fare qualcosa",
         "Menu laterale: un separatore distingue ora « Dashboard » dal resto della navigazione",
-        "Accesso: quando l'app si apre con una sessione salvata, un messaggio chiede «Sei proprio <account>?»: Sì apre l'app, No mostra la schermata di accesso",
-        "Progetti: un clic su una miniatura della scheda di un progetto apre il visualizzatore 3D del file",
-        "Progetti: nuovo pulsante «Costo del progetto» accanto alla matita: stesso calcolo del costo di un singolo pezzo (stima precisa dello slicer, bobina, elettricità, usura, costi fissi, margine) sommato su tutti i file del progetto con le loro quantità, ed esportazione del preventivo in PDF",
-        "Negozi: l'acquisto di una bobina ora propone sempre il negozio del produttore della marca (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo, ecc.), con una ricerca senza il nome della marca e la disponibilità trovata quando il sito può essere verificato"
+        "Accesso: quando l'app si apre con una sessione salvata, un messaggio chiede «Sei proprio <account>?»: Sì apre l'app, No mostra la schermata di accesso"
       ],
       "pt": [
         "Projetos: as placas separadas de um 3MF com várias placas ficam agora em uma pasta oculta: não poluem mais a biblioteca nem as fontes, continuam visíveis no projeto e podem ser enviadas ao slicer a partir dele",
@@ -69,10 +155,7 @@
         "Pesquisa por IA: limpar o campo de pesquisa interrompe de imediato a pesquisa por IA em curso (acabou o « IA a pesquisar » com o campo vazio e os resultados tardios que substituíam a biblioteca)",
         "O aplicativo continua fluido durante a geração de miniaturas: ela é pausada assim que você usa o aplicativo e retomada quando você para",
         "Menu lateral: um separador distingue agora « Painel » do resto da navegação",
-        "Login: ao abrir o aplicativo com uma sessão salva, uma mensagem pergunta “Você é mesmo <conta>?”: Sim abre o aplicativo, Não mostra a tela de login",
-        "Projetos: clicar numa miniatura do cartão de um projeto abre o visualizador 3D do arquivo",
-        "Projetos: novo botão «Custo do projeto» ao lado do lápis: mesmo cálculo do custo de uma peça (estimativa precisa do slicer, bobina, eletricidade, desgaste, custos fixos, margem) somado em todos os arquivos do projeto com as suas quantidades, e exportação do orçamento em PDF",
-        "Lojas: a compra de uma bobina agora oferece sempre a loja do fabricante da marca (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu, Elegoo, etc.), com uma pesquisa sem o nome da marca e o estoque encontrado quando o site pode ser verificado"
+        "Login: ao abrir o aplicativo com uma sessão salva, uma mensagem pergunta “Você é mesmo <conta>?”: Sim abre o aplicativo, Não mostra a tela de login"
       ],
       "ja": [
         "プロジェクト：複数プレートの3MFから分割したプレートは非表示フォルダーに保存されるようになりました。ライブラリやソースには表示されませんが、プロジェクト内で確認でき、そこからスライサーへ送信できます",
@@ -81,10 +164,7 @@
         "AI検索：検索欄を空にすると、実行中のAI検索がすぐに停止します（欄が空なのに「AI検索中」と表示されたり、遅れて届いた結果でライブラリが置き換わったりしなくなりました）",
         "サムネイル生成中もアプリが快適に動作します。アプリを操作するとすぐに生成が一時停止し、操作をやめると再開します",
         "サイドメニュー：「ダッシュボード」とそれ以外のナビゲーションの間に区切り線を追加しました",
-        "ログイン：保存済みのセッションでアプリを開くと「<アカウント>さんですか？」と確認します。「はい」でアプリが開き、「いいえ」でログイン画面が表示されます",
-        "プロジェクト：プロジェクトカードのサムネイルをクリックすると、そのファイルの3Dビューアーが開きます",
-        "プロジェクト：鉛筆アイコンの隣に新しい「プロジェクトのコスト」ボタンを追加。単品のコストと同じ計算（スライサーによる正確な見積もり、スプール、電気代、消耗、固定費、マージン）を、プロジェクト内の全ファイルの数量分で合計し、見積書をPDFで出力できます",
-        "ショップ：スプールの買い足し時に、そのブランドのメーカー公式ショップ（Arianeplast、Bambu Lab、Polymaker、eSUN、Sunlu、Elegoo など）が常に表示されるようになりました。ブランド名を除いた検索で、サイトを確認できる場合は在庫も表示します"
+        "ログイン：保存済みのセッションでアプリを開くと「<アカウント>さんですか？」と確認します。「はい」でアプリが開き、「いいえ」でログイン画面が表示されます"
       ],
       "zh": [
         "项目：从多盘 3MF 拆分出的各盘文件现在存放在隐藏文件夹中：不再占用资料库和来源列表，在项目中仍可见，并可直接从项目发送到切片软件",
@@ -93,10 +173,7 @@
         "AI 搜索：清空搜索框会立即停止正在进行的 AI 搜索（搜索框为空时不再显示“AI 搜索中”，也不会再出现延迟返回的结果替换整个资料库）",
         "生成缩略图期间应用保持流畅：一旦您操作应用，生成会立即暂停，停止操作后自动恢复",
         "侧边菜单：在“仪表板”与其余导航之间新增分隔线",
-        "登录：使用已保存的会话打开应用时，会先询问“您是<账户>吗？”：选择“是”进入应用，选择“否”则显示登录界面",
-        "项目：点击项目卡片上的缩略图即可打开该文件的 3D 查看器",
-        "项目：铅笔图标旁新增“项目成本”按钮：与单个零件成本相同的计算方式（切片软件精确估算、耗材盘、电费、损耗、固定费用、利润率），按各文件数量汇总整个项目，并可导出 PDF 报价单",
-        "商店：购买耗材盘时，现在总会提供该品牌厂商的官方商店（Arianeplast、Bambu Lab、Polymaker、eSUN、Sunlu、Elegoo 等），搜索时会省略品牌名，并在可核实该网站时显示找到的库存"
+        "登录：使用已保存的会话打开应用时，会先询问“您是<账户>吗？”：选择“是”进入应用，选择“否”则显示登录界面"
       ]
     }
   },
