@@ -123,7 +123,7 @@ def _early_splash_run(q, ready, base_dir, data_dir):
         progress = ttk.Progressbar(root, style="Custom.Horizontal.TProgressbar", mode='indeterminate', length=400)
         progress.pack(pady=15)
         progress.start(20)
-        root.update()  # force l'affichage immédiat de la fenêtre
+        root.update()  
         ready.set()
 
         def poll():

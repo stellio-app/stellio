@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   # ──────────────────────────────────────────────────────────────────────
-  # 1. Détecte la version courante et decide si une release est necessaire
+  #  Détecte la version courante et decide si une release est necessaire
   # ──────────────────────────────────────────────────────────────────────
   check-version:
     runs-on: ubuntu-latest
