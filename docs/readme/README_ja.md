@@ -36,7 +36,7 @@
 
 ## 🎯 概要
 
-**Stellio** は、3Dライブラリ（STL、3MF、OBJ）を一元管理し、繰り返し作業を自動化して、3Dプリントのワークフローにシームレスに統合するモダンなデスクトップアプリです。
+**Stellio** は、3Dライブラリ（STL、3MF、OBJ、STEP、PLY、AMF）を一元管理し、繰り返し作業を自動化して、3Dプリントのワークフローにシームレスに統合するモダンなデスクトップアプリです。
 
 初心者メイカーでも、複数台のプリンターを運用する熟練ユーザーでも、**ローカルAI**（Ollama）、**スマートなプリンター管理**、そして**生産性を重視したインターフェース**により、Stellioは貴重な時間を節約します。
 
@@ -199,6 +199,8 @@
 2. `Stellio-Setup-<version>.exe` を実行
 3. 完了です！🎉
 
+> 💼 **ポータブル版（インストール不要）**：Releases から `Stellio-v<バージョン>-portable-win64.zip` をダウンロードし、好きな場所（ディスク、USBメモリ）に展開して `Stellio.exe` を起動します。データは実行ファイルの横の `data` フォルダーに保存されます（`portable.flag` ファイルは削除しないでください）。
+
 ### 🐧 Raspberry Pi / Linux
 
 **ヘッドレスサーバーモード**（GUIなし）で動作します：Stellioはバックグラウンドで動作し、Pi自体、またはローカルネットワーク上の任意のデバイスのブラウザからアクセスします。
@@ -244,6 +246,20 @@ Stellioは以下を自動検出します：
 - ✅ PrusaSlicer / SuperSlicer
 - ✅ Ultimaker Cura
 - ✅ Creality Print
+- ✅ Elegoo Slicer
+- ✅ Qidi Studio
+- ✅ Anycubic Slicer Next
+- ✅ Anycubic Slicer
+- ✅ Simplify3D
+- ✅ ideaMaker
+- ✅ FlashPrint
+- ✅ Lychee Slicer
+- ✅ CraftWare
+- ✅ MatterControl
+- ✅ MakerBot Print
+- ✅ Voxelizer
+- ✅ Slic3r
+- ✅ KISSlicer
 
 ### プリンター
 

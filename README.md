@@ -36,7 +36,7 @@
 
 ## 🎯 Overview
 
-**Stellio** is a modern desktop application that centralizes your entire 3D library (STL, 3MF, OBJ), automates repetitive tasks, and integrates seamlessly with your 3D printing workflow.
+**Stellio** is a modern desktop application that centralizes your entire 3D library (STL, 3MF, OBJ, STEP, PLY, AMF), automates repetitive tasks, and integrates seamlessly with your 3D printing workflow.
 
 Whether you're a beginner maker or an experienced printer owner running multiple machines, Stellio saves you precious time thanks to **local AI** (Ollama), **smart printer management**, and an **interface built for productivity**.
 
@@ -199,6 +199,8 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 2. Run `Stellio-Setup-<version>.exe`
 3. That's it! 🎉
 
+> 💼 **Portable version (no installation)**: download `Stellio-v<version>-portable-win64.zip` from the Releases, unzip it anywhere (disk, USB drive) and run `Stellio.exe`. Your data stays in the `data` folder next to the executable (keep the `portable.flag` file).
+
 ### 🐧 Raspberry Pi / Linux
 
 Runs in **headless server mode** (no graphical interface): Stellio runs in the background and is accessed from a browser, either on the Pi itself or from any device on the local network.
@@ -244,6 +246,20 @@ Stellio automatically detects:
 - ✅ PrusaSlicer / SuperSlicer
 - ✅ Ultimaker Cura
 - ✅ Creality Print
+- ✅ Elegoo Slicer
+- ✅ Qidi Studio
+- ✅ Anycubic Slicer Next
+- ✅ Anycubic Slicer
+- ✅ Simplify3D
+- ✅ ideaMaker
+- ✅ FlashPrint
+- ✅ Lychee Slicer
+- ✅ CraftWare
+- ✅ MatterControl
+- ✅ MakerBot Print
+- ✅ Voxelizer
+- ✅ Slic3r
+- ✅ KISSlicer
 
 ### Printers
 

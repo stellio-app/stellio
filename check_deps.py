@@ -57,6 +57,7 @@ REQUIRED_MODULES = [
     ("reportlab.platypus",                      "reportlab",              "SimpleDocTemplate",  None),
     ("openpyxl",                                "openpyxl",               "load_workbook",      None),
     ("xlrd",                                    "xlrd",                   "open_workbook",      None),
+    ("cascadio",                                "cascadio",               "step_to_glb",        None),
 ]
 
 TELEGRAM_MODULES = [

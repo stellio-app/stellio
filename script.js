@@ -406,6 +406,51 @@ async function loadAppConfig() {
     }
 }
 
+// Rechargement automatique du navigateur après une mise à jour / un redémarrage du serveur (édition serveur uniquement).
+// Le serveur renvoie un identifiant de démarrage (boot_id) : s'il change, l'interface affichée est périmée.
+let stellioBootId = null;
+let stellioBootWatchTimer = null;
+let stellioBootFastTimer = null;
+let stellioReloadScheduled = false;
+
+async function _fetchServerBootId() {
+    try {
+        const res = await fetch(`${API}/api/update/version`, { cache: 'no-store' });
+        if (!res.ok) return null;
+        return (await res.json()).boot_id || null;
+    } catch (e) { return null; }
+}
+
+async function _checkServerRestarted() {
+    if (stellioReloadScheduled || !stellioBootId) return;
+    const id = await _fetchServerBootId();
+    if (!id || id === stellioBootId) return;
+    stellioReloadScheduled = true;
+    clearInterval(stellioBootWatchTimer);
+    clearInterval(stellioBootFastTimer);
+    showToast(_t3('update.reloading', 'Stellio a été mis à jour : rechargement de la page…'), 'success');
+    setTimeout(() => location.reload(), 1500);
+}
+
+async function startServerRestartWatcher() {
+    if (stellioBootWatchTimer) return;
+    stellioBootId = await _fetchServerBootId();
+    if (!stellioBootId) return;
+    stellioBootWatchTimer = setInterval(() => { if (!document.hidden) _checkServerRestarted(); }, 15000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) _checkServerRestarted(); });
+}
+
+// Surveillance rapprochée juste après le lancement d'une installation (redémarrage attendu dans les secondes qui suivent)
+function watchServerRestartFast() {
+    if (!(stellioAppConfig && stellioAppConfig.server_edition)) return;
+    clearInterval(stellioBootFastTimer);
+    let n = 0;
+    stellioBootFastTimer = setInterval(() => {
+        if (++n > 90) { clearInterval(stellioBootFastTimer); return; }
+        _checkServerRestarted();
+    }, 2000);
+}
+
 // Fonctions réservées à l'édition serveur (Linux : Raspberry Pi, VM, LXC, Docker). Sous Windows, ces blocs restent masqués.
 function applyServerEditionUI() {
     const on = !!(stellioAppConfig && stellioAppConfig.server_edition);
@@ -415,6 +460,7 @@ function applyServerEditionUI() {
         if (el) el.style.display = on ? blocks[id] : 'none';
     });
     if (on && typeof loadAiProviderSettings === 'function') loadAiProviderSettings();
+    if (on) startServerRestartWatcher();
     if (on && typeof loadTigerTagStudioDir === 'function') loadTigerTagStudioDir();
 }
 
@@ -2718,7 +2764,7 @@ document.addEventListener('visibilitychange', _syncAppHeight);
 _syncAppHeight();
 
 // --- Tableau de bord ---
-const DASHBOARD_WIDGET_IDS = ['printers', 'stock', 'history', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'suggestions', 'backups', 'issues'];
+const DASHBOARD_WIDGET_IDS = ['printers', 'stock', 'history', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues'];
 let _dashboardEditMode = false;
 let _draggedDashboardWidget = null;
 
@@ -2750,6 +2796,7 @@ async function loadDashboard(force = false) {
     _loadDashboardUpdate();
     _loadDashboardInstances();
     _loadDashboardAccounts();
+    _loadDashboardSources();
     _loadDashboardSuggestions();
     _loadDashboardBackups();
     _loadDashboardIssues();
@@ -4322,6 +4369,61 @@ async function _loadDashboardHistory() {
     }
 }
 
+// --- Seuil de filament bas réglable (inventaire filament) ---
+let _lowStockThresholds = null;
+async function _ensureLowStockThresholds(force = false) {
+    if (_lowStockThresholds && !force) return _lowStockThresholds;
+    let pct = 15, g = 100;
+    try {
+        const res = await fetch(`${API}/api/settings`);
+        if (res.ok) {
+            const s = await res.json();
+            if (s.low_stock_threshold_percent != null) pct = Number(s.low_stock_threshold_percent);
+            if (s.low_stock_threshold_g != null) g = Number(s.low_stock_threshold_g);
+        }
+    } catch (e) { /* valeurs par défaut */ }
+    _lowStockThresholds = { pct: isFinite(pct) ? pct : 15, g: isFinite(g) ? g : 100 };
+    return _lowStockThresholds;
+}
+
+function _isLowStockUI(s) {
+    if (s.remaining_g == null) return false;
+    const t = _lowStockThresholds || { pct: 15, g: 100 };
+    if (s.capacity_g > 0) return (s.remaining_g / s.capacity_g) <= t.pct / 100;
+    return s.remaining_g < t.g;
+}
+
+async function loadLowStockSettings() {
+    const t = await _ensureLowStockThresholds(true);
+    const p = document.getElementById('lowstock-percent');
+    const g = document.getElementById('lowstock-grams');
+    if (p) p.value = t.pct;
+    if (g) g.value = t.g;
+}
+window.loadLowStockSettings = loadLowStockSettings;
+
+window.saveLowStockSettings = async function () {
+    const pct = parseFloat(document.getElementById('lowstock-percent')?.value);
+    const g = parseFloat(document.getElementById('lowstock-grams')?.value);
+    if (!isFinite(pct) || !isFinite(g) || pct < 0 || pct > 100 || g < 0 || g > 5000) {
+        showToast(_t2('lowstock.invalid', 'Valeur invalide (0 à 100 % et 0 à 5000 g)'), 'error');
+        return;
+    }
+    try {
+        const res = await fetch(`${API}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ low_stock_threshold_percent: pct, low_stock_threshold_g: g }),
+        });
+        if (!res.ok) throw new Error('http');
+        _lowStockThresholds = { pct, g };
+        showToast(_t2('lowstock.saved', 'Seuil de filament bas enregistré'), 'success');
+        _loadDashboardStock();
+    } catch (e) {
+        showToast(I18N.t('toast.connection_error'), 'error');
+    }
+};
+
 async function _loadDashboardStock() {
     const body = document.getElementById('dashboard-stock-body');
     if (!body) return;
@@ -4329,10 +4431,8 @@ async function _loadDashboardStock() {
         const res = await fetch(`${API}/api/filament/spools`);
         const data = await res.json();
         const slots = data.slots || [];
-        const low = slots.filter(s => {
-            if (s.remaining_g == null || !s.capacity_g) return false;
-            return (s.remaining_g / s.capacity_g) < 0.15 || s.remaining_g < 100;
-        });
+        await _ensureLowStockThresholds();
+        const low = slots.filter(_isLowStockUI);
         if (!low.length) {
             body.innerHTML = `<div class="dashboard-widget-empty dashboard-widget-empty--ok"><i class="fa-solid fa-circle-check"></i><p>${_t2('dashboard.stock_ok', 'Tous les stocks sont suffisants')}</p></div>`;
             return;
@@ -5376,6 +5476,7 @@ throw new Error(`${I18N.t('toast.server_error')}: ${res.status} - ${errorText.su
     if (!Array.isArray(data)) throw new Error(I18N.t('toast.parse_error'));
 
     allFiles = _dedupeFilesByPath(data);
+    loadSourceStatus();
     filteredFiles = rebuildFilteredFiles();
     applySorting();
     renderFiles();
@@ -5625,6 +5726,80 @@ thumbProgressInterval = setInterval(async () => {
 }
 
 
+// --- Disponibilité des sources (coche verte / croix rouge dans la bulle de survol et widget du tableau de bord) ---
+let _sourceAvailability = {};
+let _sourceStatusList = [];
+async function loadSourceStatus(force = false) {
+    try {
+        const res = await fetch(`${API}/api/sources/status${force ? '?force=1' : ''}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const list = data.sources || [];
+        const map = {};
+        list.forEach(s => { map[s.name] = !!s.available; });
+        const changed = JSON.stringify(map) !== JSON.stringify(_sourceAvailability);
+        _sourceAvailability = map;
+        _sourceStatusList = list;
+        if (changed) _refreshSourceBadges();
+    } catch (e) { /* statut indisponible : on garde l'affichage précédent */ }
+}
+window.loadSourceStatus = loadSourceStatus;
+
+function _sourceStateHtml(ok) {
+    return `<span class="meta-val ${ok ? 'meta-yes' : 'meta-no'}"><i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${ok ? _t2('card.source_available', 'Disponible') : _t2('card.source_unavailable', 'Indisponible')}</span>`;
+}
+
+function _refreshSourceBadges() {
+    document.querySelectorAll('.meta-source-row').forEach(row => {
+        const ok = _sourceAvailability[row.dataset.source] !== false;
+        const val = row.querySelector('.meta-val');
+        if (val) val.outerHTML = _sourceStateHtml(ok);
+        row.closest('.file-card')?.classList.toggle('source-offline', !ok);
+    });
+    if (typeof _renderDashboardSources === 'function') _renderDashboardSources();
+}
+
+async function _loadDashboardSources() {
+    const body = document.getElementById('dashboard-sources-body');
+    if (!body) return;
+    await loadSourceStatus(true);
+    _renderDashboardSources();
+}
+window._loadDashboardSources = _loadDashboardSources;
+
+function _renderDashboardSources() {
+    const body = document.getElementById('dashboard-sources-body');
+    if (!body) return;
+    const list = _sourceStatusList || [];
+    if (!list.length) {
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-hard-drive"></i><p>${escapeHtml(_t2('dashboard.sources_none', 'Aucune source configurée'))}</p></div>`;
+        return;
+    }
+    body.innerHTML = [...list].sort((a, b) => Number(a.available) - Number(b.available)).map(s => {
+        const ok = !!s.available;
+        const color = ok ? '#4ade80' : '#f87171';
+        const label = ok ? _t2('dashboard.sources_available', 'Disponible') : _t2('dashboard.sources_unavailable', 'Indisponible');
+        const icon = s.type === 'smb' ? 'fa-network-wired' : (s.type === 'file' ? 'fa-file' : 'fa-folder');
+        return `
+        <div class="dashboard-row" title="${escapeHtml(label)}">
+            <div class="dashboard-row-icon" style="background:${color}22;color:${color};"><i class="fa-solid ${icon}"></i></div>
+            <div class="dashboard-row-body">
+                <div class="dashboard-row-title">${escapeHtml(s.name)}</div>
+                <div class="dashboard-row-sub">${escapeHtml(label)}</div>
+            </div>
+            <i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-circle-xmark'}" style="color:${color};" aria-hidden="true"></i>
+        </div>`;
+    }).join('');
+}
+
+setInterval(() => {
+    if (document.hidden) return;
+    const w = document.getElementById('dashboard-sources-body');
+    const onDashboard = w && w.offsetParent !== null;
+    const onLibrary = document.getElementById('page-library')?.classList.contains('active');
+    if (onDashboard || onLibrary) loadSourceStatus(true);
+}, 30000);
+
 function renderFileCard(f, icons) {
 const ext = f.extension || '';
 const icon = icons[ext] || 'fa-file';
@@ -5656,7 +5831,7 @@ const _ps = f.print_status || 'never';
 const _sentToSlicer = _ps !== 'never';
 const _printedOk = _ps === 'success';
 const _yn = (ok) => `<span class="meta-val ${ok ? 'meta-yes' : 'meta-no'}"><i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${ok ? _t2('card.yes', 'Oui') : _t2('card.no', 'Non')}</span>`;
-const tooltipHtml = `<div class="file-metadata-tooltip" id="tooltip-${f.path.replace(/[^\w]/g, '-')}"><div class="meta-row"><i class="fa-solid fa-paper-plane"></i><span class="meta-label">${_t2('card.tooltip_sent_slicer', 'Envoyé au slicer')}</span>${_yn(_sentToSlicer)}</div><div class="meta-row"><i class="fa-solid fa-print"></i><span class="meta-label">${_t2('card.tooltip_printed', 'Imprimé')}</span>${_yn(_printedOk)}</div></div>`;
+const tooltipHtml = `<div class="file-metadata-tooltip" id="tooltip-${f.path.replace(/[^\w]/g, '-')}"><div class="meta-row"><i class="fa-solid fa-paper-plane"></i><span class="meta-label">${_t2('card.tooltip_sent_slicer', 'Envoyé au slicer')}</span>${_yn(_sentToSlicer)}</div><div class="meta-row"><i class="fa-solid fa-print"></i><span class="meta-label">${_t2('card.tooltip_printed', 'Imprimé')}</span>${_yn(_printedOk)}</div><div class="meta-row meta-source-row" data-source="${escapeHtml(f.source || '')}"><i class="fa-solid fa-hard-drive"></i><span class="meta-label">${_t2('card.tooltip_source', 'Source')}</span>${_sourceStateHtml(_sourceAvailability[f.source] !== false)}</div></div>`;
 const thumbContent = f.has_thumb
     ? `<img src="${thumbUrl}" data-loaded="pending" onload="this.dataset.loaded='true'; this.style.display='block'; this.nextElementSibling?.style.setProperty('display','none','important');" onerror="window.handleThumbnailError(this)" style="width:100%; height:100%; object-fit:cover; display:block;"><div class="file-loading" style="display:none; align-items:center; justify-content:center;"><i class="fa-solid ${icon} thumb-icon" style="font-size:48px; color:var(--text-muted);"></i></div>`
     : `<img src="" data-loaded="false" style="display:none; width:100%; height:100%; object-fit:cover;"><div class="file-loading thumb-pending" data-path="${escapeHtml(f.path)}"><div class="skeleton-thumb"><i class="fa-solid ${icon} skeleton-thumb-icon"></i></div></div>`;
@@ -5925,7 +6100,7 @@ grid.innerHTML = buildLibraryEmptyStateHTML();
 I18N.apply();
 return;
 }
-const icons = { '.stl': 'fa-cube', '.3mf': 'fa-file-lines', '.obj': 'fa-shapes' };
+const icons = { '.stl': 'fa-cube', '.3mf': 'fa-file-lines', '.obj': 'fa-shapes', '.step': 'fa-gear', '.stp': 'fa-gear', '.ply': 'fa-cubes', '.amf': 'fa-cubes-stacked' };
 const isFolderSort = currentSort.startsWith('folder');
 const isTagSort = currentSort.startsWith('tag');
 let lastGroup = '';
@@ -9037,6 +9212,7 @@ showToast(I18N.t('toast.network_error_backend'), 'error');
 }
 window.saveSpoolmanUrl = saveSpoolmanUrl;
 async function loadSpoolmanSettings() {
+    loadLowStockSettings();
 const configuredView = document.getElementById('spoolman-configured-view');
 const manualView = document.getElementById('spoolman-manual-view');
 const addressSpan = document.getElementById('spoolman-configured-address');
@@ -14804,7 +14980,7 @@ const outputFormat = document.getElementById('converter-output-format')?.value |
 const search = (document.getElementById('converter-search')?.value || '').toLowerCase().trim();
 return (converterAllFiles || []).filter(f => {
     const ext = (f.extension || '').toLowerCase();
-    if (!['.stl', '.3mf', '.obj'].includes(ext)) return false;
+    if (!['.stl', '.3mf', '.obj', '.step', '.stp', '.ply', '.amf'].includes(ext)) return false;
     if (inputFormat !== 'all' && ext !== inputFormat) return false;
     if (ext === '.' + outputFormat) return false;
     if (search && !f.name.toLowerCase().includes(search)) return false;
@@ -15427,7 +15603,7 @@ window.loadStats = async function () {
         }
 
         const fmtEl = document.getElementById('stat-formats');
-        const fmtColors = { '.stl':'#63b3ed', '.3mf':'#68d391', '.obj':'#f6ad55', '.zip':'#fc8181', '.rar':'#b794f4' };
+        const fmtColors = { '.stl':'#63b3ed', '.3mf':'#68d391', '.obj':'#f6ad55', '.step':'#f687b3', '.stp':'#f687b3', '.ply':'#4fd1c5', '.amf':'#faf089', '.zip':'#fc8181', '.rar':'#b794f4' };
         const total = data.total_files || 1;
         fmtEl.innerHTML = Object.entries(data.by_format)
             .sort((a,b) => b[1]-a[1])
@@ -15785,7 +15961,7 @@ window.loadHistory = async function (reset = true) {
             }
             const dayBody = dayEl.querySelector('.history-day-body');
             const timeStr = d.toLocaleTimeString(I18N.lang, { hour:'2-digit', minute:'2-digit' });
-            const extColor = { '.stl':'#63b3ed', '.3mf':'#68d391', '.obj':'#f6ad55' }[entry.file_ext] || '#a0aec0';
+            const extColor = { '.stl':'#63b3ed', '.3mf':'#68d391', '.obj':'#f6ad55', '.step':'#f687b3', '.stp':'#f687b3', '.ply':'#4fd1c5', '.amf':'#faf089' }[entry.file_ext] || '#a0aec0';
             const platformIcons = { 'Thingiverse': 'fa-cube', 'Printables': 'fa-print', 'MakerWorld': 'fa-globe' };
             const platformColors = { 'Thingiverse': '#0d9bf0', 'Printables': '#fa6831', 'MakerWorld': '#22c55e' };
             const platformBadge = entry.source_platform
@@ -16891,8 +17067,8 @@ function showLowStockToast(spools) {
     const count = spools.length;
     const DURATION_MS = 10000;
     const message = count > 1
-        ? _t3('spoolman.low_stock_summary_message_plural', 'Vous avez {{count}} bobines qui se trouvent sous les 100g, pensez à en racheter.', { count }).replace('{{count}}', count)
-        : _t3('spoolman.low_stock_summary_message_single', 'Vous avez 1 bobine qui se trouve sous les 100g, pensez à en racheter.', {});
+        ? _t3('spoolman.low_stock_summary_message_plural', 'Vous avez {{count}} bobines sous votre seuil de stock bas, pensez à en racheter.', { count }).replace('{{count}}', count)
+        : _t3('spoolman.low_stock_summary_message_single', 'Vous avez 1 bobine sous votre seuil de stock bas, pensez à en racheter.', {});
     const toast = document.createElement('div');
     toast.className = 'toast warning lowstock-toast';
     toast.innerHTML = `
@@ -17609,6 +17785,7 @@ body: JSON.stringify({ installer_path: downloadData.installer_path })
 if (installRes.ok) {
 btn.innerHTML = `<i class="fa-solid fa-rotate"></i> ${I18N.t('update.restarting')}`;
 showToast(I18N.t('toast.update_restarting'), 'success');
+watchServerRestartFast();
 }
 }, 1000);
 } else {

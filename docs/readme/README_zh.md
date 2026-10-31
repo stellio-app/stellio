@@ -199,6 +199,8 @@
 2. 运行 `Stellio-Setup-<version>.exe`
 3. 大功告成！🎉
 
+> 💼 **便携版（免安装）**：从 Releases 下载 `Stellio-v<版本>-portable-win64.zip`，解压到任意位置（硬盘、U 盘），然后运行 `Stellio.exe`。您的数据保存在可执行文件旁边的 `data` 文件夹中（请保留 `portable.flag` 文件）。
+
 ### 🐧 Raspberry Pi / Linux
 
 以**无图形界面的服务器模式**运行：Stellio 在后台运行，可通过浏览器访问，既可以在 Pi 本机访问，也可以在局域网内的任何设备上访问。

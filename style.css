@@ -2034,6 +2034,12 @@ body {
     font-size: 11px;
 }
 
+.meta-row + .meta-row { margin-top: 6px; }
+.meta-source-row .meta-val.meta-yes { color: #4ade80; }
+.meta-source-row .meta-val.meta-no { color: #f87171; }
+.file-card.source-offline .file-thumb img,
+.file-card.source-offline .dv-thumb img { filter: grayscale(0.6); opacity: .75; }
+
 
 .folder-block {
     grid-column: 1 / -1;

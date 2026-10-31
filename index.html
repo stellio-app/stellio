@@ -741,6 +741,17 @@
                                 </div>
                             </div>
 
+                            <div class="dashboard-widget" id="dashboard-widget-sources" data-widget-id="sources" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-hard-drive"></i> <span data-i18n="dashboard.sources_title">Sources</span></h3>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('sources')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-sources-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
                             <div class="dashboard-widget" id="dashboard-widget-suggestions" data-widget-id="suggestions" draggable="false">
                                 <div class="dashboard-widget-header">
                                     <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
@@ -1040,6 +1051,10 @@
                             <label class="checkbox-label"><input type="checkbox" value=".stl" checked class="filter-type"> STL</label>
                             <label class="checkbox-label"><input type="checkbox" value=".3mf" checked class="filter-type"> 3MF</label>
                             <label class="checkbox-label"><input type="checkbox" value=".obj" checked class="filter-type"> OBJ</label>
+                            <label class="checkbox-label"><input type="checkbox" value=".step" checked class="filter-type"> STEP</label>
+                            <label class="checkbox-label"><input type="checkbox" value=".stp" checked class="filter-type"> STP</label>
+                            <label class="checkbox-label"><input type="checkbox" value=".ply" checked class="filter-type"> PLY</label>
+                            <label class="checkbox-label"><input type="checkbox" value=".amf" checked class="filter-type"> AMF</label>
                         </div>
                         <div class="filter-group">
                             <h3><i class="fa-solid fa-hdd"></i> <span data-i18n="filters.source">Source</span></h3>
@@ -1697,6 +1712,23 @@
                                     </div>
                                     <p class="settings-hint" style="margin-top:8px;" data-i18n="settings.manual_inventory_hint">Si désactivé, vos bobines saisies manuellement sont ignorées partout dans Stellio (inventaire, compatibilité, alertes de stock) sans être supprimées.</p>
                                 </div>
+
+                                <div class="account-card" id="lowstock-settings" style="margin-top:12px;">
+                                    <div class="account-card-header">
+                                        <div style="display:flex;align-items:center;gap:10px;">
+                                            <div class="account-icon-badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                                            <div><div style="font-weight:600;font-size:13px;" data-i18n="lowstock.title">Seuil de filament bas</div></div>
+                                        </div>
+                                    </div>
+                                    <p class="settings-hint" style="margin-top:8px;" data-i18n="lowstock.desc">Une bobine est signalée comme basse quand son poids restant passe sous ce pourcentage de sa capacité.</p>
+                                    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:8px;">
+                                        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;"><span data-i18n="lowstock.percent">Seuil (% de la bobine)</span>
+                                            <input type="number" id="lowstock-percent" class="settings-input" min="0" max="100" step="1" style="width:76px;"></label>
+                                        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;"><span data-i18n="lowstock.grams">Seuil sans capacité connue (g)</span>
+                                            <input type="number" id="lowstock-grams" class="settings-input" min="0" max="5000" step="10" style="width:84px;"></label>
+                                        <button class="btn btn-primary btn-sm" onclick="saveLowStockSettings()"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="lowstock.save">Enregistrer</span></button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -2353,6 +2385,10 @@
 						<option value=".stl">STL</option>
 						<option value=".3mf">3MF</option>
 						<option value=".obj">OBJ</option>
+						<option value=".step">STEP</option>
+						<option value=".stp">STP</option>
+						<option value=".ply">PLY</option>
+						<option value=".amf">AMF</option>
 					  </select>
 					</div>
 					<div class="converter-toolbar-group">
@@ -3391,6 +3427,26 @@
                         <input type="checkbox" class="filter-type" value=".obj" checked>
                         <i class="fa-solid fa-shapes" style="color: var(--accent)"></i>
                         <span>OBJ</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="filter-type" value=".step" checked>
+                        <i class="fa-solid fa-gear" style="color: var(--accent)"></i>
+                        <span>STEP</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="filter-type" value=".stp" checked>
+                        <i class="fa-solid fa-gear" style="color: var(--accent)"></i>
+                        <span>STP</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="filter-type" value=".ply" checked>
+                        <i class="fa-solid fa-cubes" style="color: var(--accent)"></i>
+                        <span>PLY</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="filter-type" value=".amf" checked>
+                        <i class="fa-solid fa-cubes-stacked" style="color: var(--accent)"></i>
+                        <span>AMF</span>
                     </label>
                 </div>
 

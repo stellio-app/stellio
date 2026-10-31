@@ -1,5 +1,74 @@
 [
   {
+    "version": "0.7.9",
+    "items": {
+      "fr": [
+        "Nouveaux formats 3D : les fichiers STEP/STP (CAO), PLY et AMF sont maintenant pris en charge (bibliothèque, miniatures, visionneuse 3D, analyse, réparation, conversion) ; à l'envoi au slicer, ils sont convertis en STL si votre slicer ne sait pas les lire",
+        "Version Windows : Stellio n'est plus accessible depuis un navigateur du PC, une page explicative s'affiche à la place ; la fenêtre de l'application, le téléphone, l'APK et l'accès distant continuent de fonctionner",
+        "Paramètres → Inventaire filament : seuil de filament bas réglable (pourcentage de la bobine, et valeur en grammes quand la capacité est inconnue), utilisé par le widget Stock, les notifications et l'alerte au démarrage",
+        "Sources indisponibles : au survol d'une miniature, « Source disponible / indisponible » s'affiche avec une coche verte ou une croix rouge, à côté de « Envoyé au slicer » et « Imprimé »",
+        "Tableau de bord : nouveau widget « Sources » qui liste toutes vos sources avec leur état (disponible ou indisponible)",
+        "README : liste complète des slicers pris en charge (19 slicers) dans les 8 langues"
+      ],
+      "en": [
+        "New 3D formats: STEP/STP (CAD), PLY and AMF files are now supported (library, thumbnails, 3D viewer, analysis, repair, conversion); when sent to a slicer that cannot read them, they are converted to STL first",
+        "Windows version: Stellio can no longer be opened from a browser on the PC, an explanatory page is shown instead; the application window, phone, the APK and remote access keep working",
+        "Settings → Filament inventory: adjustable low-filament threshold (percentage of the spool, and a value in grams when the capacity is unknown), used by the Stock widget, notifications and the startup alert",
+        "Unavailable sources: hovering a thumbnail now shows “Source available / unavailable” with a green check or a red cross, next to “Sent to slicer” and “Printed”",
+        "Dashboard: new “Sources” widget listing all your sources with their status (available or unavailable)",
+        "README: complete list of supported slicers (19 slicers) in all 8 languages"
+      ],
+      "de": [
+        "Neue 3D-Formate: STEP/STP-(CAD-), PLY- und AMF-Dateien werden jetzt unterstützt (Bibliothek, Vorschaubilder, 3D-Ansicht, Analyse, Reparatur, Konvertierung); beim Senden an einen Slicer, der sie nicht lesen kann, werden sie zuerst in STL umgewandelt",
+        "Windows-Version: Stellio ist nicht mehr über einen Browser auf dem PC erreichbar, stattdessen erscheint eine Hinweisseite; App-Fenster, Smartphone, APK und Fernzugriff funktionieren weiterhin",
+        "Einstellungen → Filament-Inventar: einstellbare Schwelle für wenig Filament (Prozentsatz der Spule und Wert in Gramm bei unbekannter Kapazität), genutzt vom Bestands-Widget, von Benachrichtigungen und der Startwarnung",
+        "Nicht verfügbare Quellen: Beim Überfahren einer Vorschau erscheint „Quelle verfügbar / nicht verfügbar“ mit grünem Häkchen oder rotem Kreuz, neben „An Slicer gesendet“ und „Gedruckt“",
+        "Dashboard: neues Widget „Quellen“, das alle Ihre Quellen mit ihrem Status (verfügbar oder nicht verfügbar) auflistet",
+        "README: vollständige Liste der unterstützten Slicer (19 Slicer) in allen 8 Sprachen"
+      ],
+      "es": [
+        "Nuevos formatos 3D: ahora se admiten archivos STEP/STP (CAD), PLY y AMF (biblioteca, miniaturas, visor 3D, análisis, reparación, conversión); al enviarlos a un slicer que no puede leerlos se convierten antes a STL",
+        "Versión de Windows: Stellio ya no es accesible desde un navegador del PC y se muestra una página explicativa; la ventana de la aplicación, el móvil, el APK y el acceso remoto siguen funcionando",
+        "Ajustes → Inventario de filamento: umbral de filamento bajo ajustable (porcentaje de la bobina y valor en gramos cuando se desconoce la capacidad), usado por el widget de Stock, las notificaciones y el aviso al iniciar",
+        "Fuentes no disponibles: al pasar el ratón por una miniatura se muestra «Fuente disponible / no disponible» con una marca verde o una cruz roja, junto a «Enviado al slicer» e «Impreso»",
+        "Panel: nuevo widget «Fuentes» que enumera todas tus fuentes con su estado (disponible o no disponible)",
+        "README: lista completa de slicers compatibles (19 slicers) en los 8 idiomas"
+      ],
+      "pt": [
+        "Novos formatos 3D: agora há suporte a arquivos STEP/STP (CAD), PLY e AMF (biblioteca, miniaturas, visualizador 3D, análise, reparo, conversão); ao enviar para um slicer que não os lê, eles são convertidos antes em STL",
+        "Versão para Windows: o Stellio não é mais acessível a partir de um navegador no PC e uma página explicativa é exibida; a janela do aplicativo, o celular, o APK e o acesso remoto continuam funcionando",
+        "Configurações → Inventário de filamento: limite de filamento baixo ajustável (porcentagem da bobina e valor em gramas quando a capacidade é desconhecida), usado pelo widget Estoque, pelas notificações e pelo alerta ao iniciar",
+        "Origens indisponíveis: ao passar o mouse sobre uma miniatura, aparece «Origem disponível / indisponível» com um visto verde ou uma cruz vermelha, ao lado de «Enviado ao slicer» e «Impresso»",
+        "Painel: novo widget «Origens» que lista todas as suas origens com o estado (disponível ou indisponível)",
+        "README: lista completa dos slicers compatíveis (19 slicers) nos 8 idiomas"
+      ],
+      "it": [
+        "Nuovi formati 3D: ora sono supportati i file STEP/STP (CAD), PLY e AMF (libreria, miniature, visualizzatore 3D, analisi, riparazione, conversione); all'invio a uno slicer che non li legge vengono prima convertiti in STL",
+        "Versione Windows: Stellio non è più accessibile da un browser sul PC e viene mostrata una pagina esplicativa; la finestra dell'app, il telefono, l'APK e l'accesso remoto continuano a funzionare",
+        "Impostazioni → Inventario filamento: soglia di filamento basso regolabile (percentuale della bobina e valore in grammi quando la capacità è sconosciuta), usata dal widget Scorte, dalle notifiche e dall'avviso all'avvio",
+        "Origini non disponibili: passando sopra una miniatura compare «Origine disponibile / non disponibile» con un segno verde o una croce rossa, accanto a «Inviato allo slicer» e «Stampato»",
+        "Dashboard: nuovo widget «Origini» che elenca tutte le tue origini con il loro stato (disponibile o non disponibile)",
+        "README: elenco completo degli slicer supportati (19 slicer) in tutte e 8 le lingue"
+      ],
+      "zh": [
+        "新增3D格式：现已支持STEP/STP（CAD）、PLY和AMF文件（文件库、缩略图、3D查看器、分析、修复、转换）；发送到无法读取这些格式的切片软件时，会先转换为STL",
+        "Windows版：不再能通过电脑上的浏览器访问Stellio，而是显示一个说明页面；应用窗口、手机、APK和远程访问仍可正常使用",
+        "设置 → 耗材库存：可调整的耗材不足阈值（料盘百分比，容量未知时使用克数），用于库存小组件、通知和启动提醒",
+        "不可用的来源：鼠标悬停在缩略图上时，会在“已发送到切片软件”和“已打印”旁显示“来源可用/不可用”，带绿色对勾或红色叉号",
+        "仪表盘：新增“来源”小组件，列出您的所有来源及其状态（可用或不可用）",
+        "README：8种语言均已列出完整的受支持切片软件（19款）"
+      ],
+      "ja": [
+        "新しい3D形式：STEP/STP（CAD）、PLY、AMFファイルに対応しました（ライブラリ、サムネイル、3Dビューアー、解析、修復、変換）。読み込めないスライサーへ送る場合は、先にSTLへ変換します",
+        "Windows版：PCのブラウザーからStellioにアクセスできなくなり、代わりに説明ページが表示されます。アプリのウィンドウ、スマートフォン、APK、リモートアクセスは引き続き利用できます",
+        "設定 → フィラメント在庫：フィラメント残量低下のしきい値（スプールの割合、容量が不明な場合はグラム値）を設定できるようになりました。在庫ウィジェット、通知、起動時のアラートで使用されます",
+        "利用できないソース：サムネイルにカーソルを合わせると、「スライサーに送信済み」「印刷済み」の横に「ソース利用可能／利用不可」が緑のチェックまたは赤い×で表示されます",
+        "ダッシュボード：すべてのソースと状態（利用可能／利用不可）を一覧表示する新しい「ソース」ウィジェットを追加しました",
+        "README：対応スライサーの完全な一覧（19種類）を8言語すべてに掲載しました"
+      ]
+    }
+  },
+  {
     "version": "0.7.8",
     "items": {
       "fr": [
@@ -12,7 +81,9 @@
         "Édition serveur : connexion TigerTag possible sans TigerTag Studio installé (la session Google est lue depuis une copie du dossier de données de TigerTag Studio de votre PC, dossier renseigné dans Paramètres) ; la version Windows n'est pas modifiée",
         "S.O.S Print : possibilité de renseigner les réglages utilisés pour l'impression ratée (températures, vitesses, hauteur de couche, rétraction, ventilateur, remplissage, remarques) : les questions et les solutions ciblent alors les bons réglages à modifier, avec la valeur actuelle et la valeur à essayer",
         "S.O.S Print : possibilité de choisir parmi les profils de slicer importés (les réglages se pré-remplissent) et de préciser si des réglages ont été modifiés par rapport au profil, pour des solutions encore mieux ciblées",
-        "Édition serveur : connexion TigerTag par e-mail et mot de passe (méthode officielle, le mot de passe n'est pas conservé ; compte Google : définir d'abord un mot de passe via « Mot de passe oublié ») et import d'un profil Orca Cloud en collant son « Copy raw JSON »"
+        "Édition serveur : connexion TigerTag par e-mail et mot de passe (méthode officielle, le mot de passe n'est pas conservé ; compte Google : définir d'abord un mot de passe via « Mot de passe oublié ») et import d'un profil Orca Cloud en collant son « Copy raw JSON »",
+        "Édition serveur (Raspberry Pi, VM, LXC, Linux) : après une mise à jour, la page du navigateur se recharge toute seule (plus besoin de l'actualiser à la main) et l'interface n'est plus conservée en cache",
+        "Windows : nouvelle version portable (Stellio-vX.Y.Z-portable-win64.zip, sans installation) : décompressez et lancez Stellio.exe ; les données restent dans le dossier « data » à côté de l'exécutable"
       ],
       "en": [
         "Projects: clicking a thumbnail on a project card opens the file's 3D viewer",
@@ -24,7 +95,9 @@
         "Server edition: TigerTag can now be connected without TigerTag Studio installed (the Google session is read from a copy of your PC's TigerTag Studio data folder, set in Settings); the Windows version is unchanged",
         "S.O.S Print: you can now enter the settings used for the failed print (temperatures, speeds, layer height, retraction, fan, infill, remarks): the questions and solutions then target the right settings to change, with the current value and the value to try",
         "S.O.S Print: you can now pick from your imported slicer profiles (settings are pre-filled) and say whether you changed settings compared to the profile, for even better targeted solutions",
-        "Server edition: TigerTag sign-in with e-mail and password (official method, the password is not kept; Google account: first set a password with “Forgot password”) and importing an Orca Cloud profile by pasting its “Copy raw JSON”"
+        "Server edition: TigerTag sign-in with e-mail and password (official method, the password is not kept; Google account: first set a password with “Forgot password”) and importing an Orca Cloud profile by pasting its “Copy raw JSON”",
+        "Server edition (Raspberry Pi, VM, LXC, Linux): after an update, the browser page reloads by itself (no more manual refresh) and the interface is no longer kept in cache",
+        "Windows: new portable version (Stellio-vX.Y.Z-portable-win64.zip, no installation): unzip and run Stellio.exe; data stays in the “data” folder next to the executable"
       ],
       "de": [
         "Projekte: Ein Klick auf eine Vorschau auf der Projektkarte öffnet die 3D-Ansicht der Datei",
@@ -36,7 +109,9 @@
         "Server-Edition: TigerTag lässt sich jetzt ohne installiertes TigerTag Studio verbinden (die Google-Sitzung wird aus einer Kopie des TigerTag-Studio-Datenordners Ihres PCs gelesen, in den Einstellungen angegeben); die Windows-Version bleibt unverändert",
         "S.O.S Print: Sie können jetzt die Einstellungen des fehlgeschlagenen Drucks angeben (Temperaturen, Geschwindigkeiten, Schichthöhe, Retraction, Lüfter, Füllung, Anmerkungen): Fragen und Lösungen beziehen sich dann auf die richtigen Einstellungen, mit aktuellem Wert und Wert zum Ausprobieren",
         "S.O.S Print: Sie können jetzt aus Ihren importierten Slicer-Profilen wählen (die Einstellungen werden vorausgefüllt) und angeben, ob Sie gegenüber dem Profil etwas geändert haben – für noch gezieltere Lösungen",
-        "Server-Edition: TigerTag-Anmeldung mit E-Mail und Passwort (offizielle Methode, das Passwort wird nicht gespeichert; Google-Konto: zuerst über „Passwort vergessen“ ein Passwort festlegen) und Import eines Orca-Cloud-Profils durch Einfügen seines „Copy raw JSON“"
+        "Server-Edition: TigerTag-Anmeldung mit E-Mail und Passwort (offizielle Methode, das Passwort wird nicht gespeichert; Google-Konto: zuerst über „Passwort vergessen“ ein Passwort festlegen) und Import eines Orca-Cloud-Profils durch Einfügen seines „Copy raw JSON“",
+        "Server-Edition (Raspberry Pi, VM, LXC, Linux): Nach einem Update lädt sich die Browserseite von selbst neu (kein manuelles Aktualisieren mehr), und die Oberfläche wird nicht mehr im Cache behalten",
+        "Windows: neue portable Version (Stellio-vX.Y.Z-portable-win64.zip, ohne Installation): entpacken und Stellio.exe starten; die Daten bleiben im Ordner „data“ neben der Programmdatei"
       ],
       "es": [
         "Proyectos: al hacer clic en una miniatura de la tarjeta de un proyecto se abre el visor 3D del archivo",
@@ -48,7 +123,9 @@
         "Edición servidor: ahora se puede conectar TigerTag sin tener TigerTag Studio instalado (la sesión de Google se lee de una copia de la carpeta de datos de TigerTag Studio de tu PC, indicada en Ajustes); la versión de Windows no cambia",
         "S.O.S Print: ahora puedes indicar los ajustes usados en la impresión fallida (temperaturas, velocidades, altura de capa, retracción, ventilador, relleno, observaciones): las preguntas y las soluciones se centran entonces en los ajustes correctos que hay que cambiar, con el valor actual y el valor que probar",
         "S.O.S Print: ahora puedes elegir entre tus perfiles de laminador importados (los ajustes se rellenan solos) e indicar si cambiaste ajustes respecto al perfil, para soluciones aún más precisas",
-        "Edición servidor: inicio de sesión de TigerTag con correo y contraseña (método oficial, la contraseña no se conserva; cuenta de Google: define antes una contraseña con «Olvidé mi contraseña») e importación de un perfil de Orca Cloud pegando su «Copy raw JSON»"
+        "Edición servidor: inicio de sesión de TigerTag con correo y contraseña (método oficial, la contraseña no se conserva; cuenta de Google: define antes una contraseña con «Olvidé mi contraseña») e importación de un perfil de Orca Cloud pegando su «Copy raw JSON»",
+        "Edición servidor (Raspberry Pi, VM, LXC, Linux): tras una actualización, la página del navegador se recarga sola (ya no hace falta actualizarla a mano) y la interfaz ya no se conserva en caché",
+        "Windows: nueva versión portable (Stellio-vX.Y.Z-portable-win64.zip, sin instalación): descomprime y ejecuta Stellio.exe; los datos se quedan en la carpeta «data» junto al ejecutable"
       ],
       "it": [
         "Progetti: un clic su una miniatura della scheda di un progetto apre il visualizzatore 3D del file",
@@ -60,7 +137,9 @@
         "Edizione server: ora TigerTag si può collegare senza avere TigerTag Studio installato (la sessione Google viene letta da una copia della cartella dei dati di TigerTag Studio del tuo PC, indicata nelle Impostazioni); la versione per Windows non cambia",
         "S.O.S Print: ora puoi indicare le impostazioni usate per la stampa fallita (temperature, velocità, altezza strato, retrazione, ventola, riempimento, note): domande e soluzioni sono quindi mirate alle impostazioni giuste da modificare, con il valore attuale e quello da provare",
         "S.O.S Print: ora puoi scegliere tra i profili slicer importati (le impostazioni si precompilano) e indicare se hai modificato qualcosa rispetto al profilo, per soluzioni ancora più mirate",
-        "Edizione server: accesso a TigerTag con e-mail e password (metodo ufficiale, la password non viene conservata; account Google: imposta prima una password con «Password dimenticata») e importazione di un profilo Orca Cloud incollando il suo «Copy raw JSON»"
+        "Edizione server: accesso a TigerTag con e-mail e password (metodo ufficiale, la password non viene conservata; account Google: imposta prima una password con «Password dimenticata») e importazione di un profilo Orca Cloud incollando il suo «Copy raw JSON»",
+        "Edizione server (Raspberry Pi, VM, LXC, Linux): dopo un aggiornamento la pagina del browser si ricarica da sola (non serve più aggiornarla a mano) e l'interfaccia non viene più tenuta in cache",
+        "Windows: nuova versione portatile (Stellio-vX.Y.Z-portable-win64.zip, senza installazione): decomprimi e avvia Stellio.exe; i dati restano nella cartella «data» accanto all'eseguibile"
       ],
       "pt": [
         "Projetos: clicar numa miniatura do cartão de um projeto abre o visualizador 3D do arquivo",
@@ -72,7 +151,9 @@
         "Edição servidor: agora é possível conectar o TigerTag sem ter o TigerTag Studio instalado (a sessão do Google é lida de uma cópia da pasta de dados do TigerTag Studio do seu PC, informada em Configurações); a versão para Windows não muda",
         "S.O.S Print: agora você pode informar as configurações usadas na impressão que falhou (temperaturas, velocidades, altura da camada, retração, ventoinha, preenchimento, observações): as perguntas e as soluções passam a mirar as configurações certas a alterar, com o valor atual e o valor a testar",
         "S.O.S Print: agora você pode escolher entre os perfis de fatiador importados (as configurações são preenchidas) e indicar se alterou algo em relação ao perfil, para soluções ainda mais direcionadas",
-        "Edição servidor: login do TigerTag com e-mail e senha (método oficial, a senha não é guardada; conta Google: defina antes uma senha com «Esqueci a senha») e importação de um perfil do Orca Cloud colando o seu «Copy raw JSON»"
+        "Edição servidor: login do TigerTag com e-mail e senha (método oficial, a senha não é guardada; conta Google: defina antes uma senha com «Esqueci a senha») e importação de um perfil do Orca Cloud colando o seu «Copy raw JSON»",
+        "Edição servidor (Raspberry Pi, VM, LXC, Linux): após uma atualização, a página do navegador recarrega sozinha (sem precisar atualizar manualmente) e a interface deixa de ficar em cache",
+        "Windows: nova versão portátil (Stellio-vX.Y.Z-portable-win64.zip, sem instalação): descompacte e execute Stellio.exe; os dados ficam na pasta «data» ao lado do executável"
       ],
       "ja": [
         "プロジェクト：プロジェクトカードのサムネイルをクリックすると、そのファイルの3Dビューアーが開きます",
@@ -84,7 +165,9 @@
         "サーバー版：TigerTag Studio をインストールしなくても TigerTag に接続できるようになりました（PC の TigerTag Studio のデータフォルダーのコピーから Google セッションを読み取ります。フォルダーは設定で指定）。Windows 版は変更ありません",
         "S.O.S Print：失敗した印刷で使った設定（温度、速度、積層ピッチ、リトラクション、ファン、インフィル、メモ）を入力できるようになりました。質問と解決策が、変更すべき設定に的を絞り、現在の値と試すべき値を示します",
         "S.O.S Print：インポート済みのスライサープロファイルから選べるようになり（設定が自動入力されます）、プロファイルから設定を変更したかどうかを指定できます。解決策がさらに的確になります",
-        "サーバー版：TigerTag にメールアドレスとパスワードでログインできるようになりました（公式の方法で、パスワードは保存されません。Google アカウントの場合は先に「パスワードを忘れた場合」でパスワードを設定）。Orca Cloud のプロファイルは「Copy raw JSON」を貼り付けてインポートできます"
+        "サーバー版：TigerTag にメールアドレスとパスワードでログインできるようになりました（公式の方法で、パスワードは保存されません。Google アカウントの場合は先に「パスワードを忘れた場合」でパスワードを設定）。Orca Cloud のプロファイルは「Copy raw JSON」を貼り付けてインポートできます",
+        "サーバー版（Raspberry Pi、VM、LXC、Linux）：アップデート後、ブラウザのページが自動で再読み込みされるようになりました（手動での更新は不要）。画面もキャッシュに残らなくなりました",
+        "Windows：ポータブル版（Stellio-vX.Y.Z-portable-win64.zip、インストール不要）を追加。展開して Stellio.exe を起動するだけで、データは実行ファイルの横の「data」フォルダーに保存されます"
       ],
       "zh": [
         "项目：点击项目卡片上的缩略图即可打开该文件的 3D 查看器",
@@ -96,7 +179,9 @@
         "服务器版：无需安装 TigerTag Studio 即可连接 TigerTag（从您电脑上 TigerTag Studio 数据文件夹的副本读取 Google 会话，文件夹在“设置”中指定）；Windows 版保持不变",
         "S.O.S Print：现在可以填写失败打印所用的设置（温度、速度、层高、回抽、风扇、填充、备注）：提问和解决方案会针对需要修改的正确设置，并给出当前值和建议尝试的值",
         "S.O.S Print：现在可以从已导入的切片软件配置文件中选择（设置会自动填入），并说明是否修改过相对于该配置文件的设置，使解决方案更有针对性",
-        "服务器版：支持使用邮箱和密码登录 TigerTag（官方方式，不会保存密码；Google 账户请先通过“忘记密码”设置密码），并可粘贴 Orca Cloud 配置文件的“Copy raw JSON”来导入"
+        "服务器版：支持使用邮箱和密码登录 TigerTag（官方方式，不会保存密码；Google 账户请先通过“忘记密码”设置密码），并可粘贴 Orca Cloud 配置文件的“Copy raw JSON”来导入",
+        "服务器版（树莓派、虚拟机、LXC、Linux）：更新后浏览器页面会自动重新加载（无需再手动刷新），界面也不再被缓存",
+        "Windows：新增便携版（Stellio-vX.Y.Z-portable-win64.zip，免安装）：解压后运行 Stellio.exe 即可，数据保存在可执行文件旁边的“data”文件夹中"
       ]
     }
   },

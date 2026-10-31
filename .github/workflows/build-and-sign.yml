@@ -1,4 +1,4 @@
-name: Build,sign and release Stellio
+name: Build, sign and release Stellio
 
 on:
   push:
@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   # ──────────────────────────────────────────────────────────────────────
-  #  Détecte la version courante et decide si une release est necessaire
+  # 1. Détecte la version courante et decide si une release est necessaire
   # ──────────────────────────────────────────────────────────────────────
   check-version:
     runs-on: ubuntu-latest
@@ -192,30 +192,38 @@ jobs:
           Copy-Item "$binDir\*" "dist\Stellio\app\bin\" -Force
           if (-not (Test-Path "dist\Stellio\app\bin\ffmpeg.exe")) { throw "ffmpeg.exe manquant apres telechargement" }
 
-      - name: Download UnRAR (not committed to the repo, fetched fresh each build)
+      - name: Add UnRAR (bin/unrar.exe du depot si present, sinon telecharge ; signature Authenticode verifiee)
         shell: pwsh
         run: |
-          # unrarw64.exe est l'auto-extractible freeware officiel de RARLAB (URL stable, sans numero de version).
-          Invoke-WebRequest -Uri "https://www.rarlab.com/rar/unrarw64.exe" -OutFile unrarw64.exe
-          # C'est un module SFX RAR : on l'extrait avec 7-Zip (preinstalle sur les runners GitHub) plutot que
-          # de deviner ses switches silencieux internes.
-          & "C:\Program Files\7-Zip\7z.exe" x unrarw64.exe -ounrar_extracted -y | Out-Null
-          # Verification d'integrite : on ne epingle PLUS de SHA-256 (l'URL de RARLAB n'a pas de numero de version,
-          # donc le hash change a chaque nouvelle release et cassait le build). A la place on exige une signature
-          # Authenticode VALIDE (chaine de confiance + fichier non modifie) emise au nom de "win.rar GmbH".
-          # Un fichier altere ou fourni par un tiers echouerait ici ; une nouvelle version legitime passe sans intervention.
-          $unrarExe = "unrar_extracted\UnRAR.exe"
-          if (-not (Test-Path $unrarExe)) { throw "UnRAR.exe introuvable apres extraction du SFX RARLAB" }
-          $unrarSig = Get-AuthenticodeSignature $unrarExe
-          $unrarSigner = if ($unrarSig.SignerCertificate) { $unrarSig.SignerCertificate.Subject } else { "(aucun)" }
-          if ($unrarSig.Status -ne "Valid") { throw "Signature Authenticode d'UnRAR.exe invalide (statut : $($unrarSig.Status)). Build annule." }
-          if ($unrarSigner -notmatch "win\.rar GmbH") { throw "UnRAR.exe n'est pas signe par win.rar GmbH (signataire : $unrarSigner). Build annule." }
-          $unrarActual = (Get-FileHash -Algorithm SHA256 $unrarExe).Hash.ToLower()
-          $unrarVersion = (Get-Item $unrarExe).VersionInfo.FileVersion
-          Write-Host "UnRAR.exe verifie : signature Authenticode valide ($unrarSigner)"
-          Write-Host "UnRAR.exe version $unrarVersion - SHA-256 (information, non bloquant) : $unrarActual"
-          Copy-Item "unrar_extracted\UnRAR.exe" "dist\Stellio\app\bin\UnRAR.exe" -Force
-          if (-not (Test-Path "dist\Stellio\app\bin\UnRAR.exe")) { throw "UnRAR.exe manquant apres telechargement" }
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path "dist\Stellio\app\bin" | Out-Null
+
+          # Controle d'authenticite : l'UnRAR.exe officiel est signe par "win.rar GmbH". On verifie la signature
+          # (valable d'une version a l'autre) plutot qu'un SHA-256 fige : RARLAB remplace le fichier a la meme URL a
+          # chaque nouvelle version, ce qui faisait echouer le build. Un fichier modifie serait quand meme refuse.
+          function Assert-UnrarSigned([string]$Path) {
+            $sig = Get-AuthenticodeSignature $Path
+            Write-Host "Signature Authenticode de $Path : $($sig.Status) - $($sig.SignerCertificate.Subject)"
+            if ($sig.Status -ne 'Valid') { throw "Signature Authenticode d'UnRAR.exe invalide ($($sig.Status)) : fichier non officiel ou corrompu. Build annule." }
+            if ($sig.SignerCertificate.Subject -notmatch 'win\.rar GmbH') { throw "UnRAR.exe n'est pas signe par win.rar GmbH ($($sig.SignerCertificate.Subject)). Build annule." }
+            Write-Host "SHA-256 UnRAR.exe (information, pour la tracabilite) : $((Get-FileHash -Algorithm SHA256 $Path).Hash.ToLower())"
+          }
+
+          if (Test-Path "bin\unrar.exe") {
+            # Fichier versionne dans le depot : aucun telechargement, donc aucune panne liee a RARLAB.
+            Write-Host "UnRAR.exe du depot (bin\unrar.exe) utilise : pas de telechargement."
+            $unrarSource = "bin\unrar.exe"
+          } else {
+            # Repli : unrarw64.exe est l'auto-extractible freeware officiel de RARLAB (URL stable, sans numero de version).
+            Invoke-WebRequest -Uri "https://www.rarlab.com/rar/unrarw64.exe" -OutFile unrarw64.exe
+            # C'est un module SFX RAR : on l'extrait avec 7-Zip (preinstalle sur les runners GitHub).
+            & "C:\Program Files\7-Zip\7z.exe" x unrarw64.exe -ounrar_extracted -y | Out-Null
+            $unrarSource = "unrar_extracted\UnRAR.exe"
+          }
+          if (-not (Test-Path $unrarSource)) { throw "UnRAR.exe introuvable ($unrarSource)" }
+          Assert-UnrarSigned $unrarSource
+          Copy-Item $unrarSource "dist\Stellio\app\bin\UnRAR.exe" -Force
+          if (-not (Test-Path "dist\Stellio\app\bin\UnRAR.exe")) { throw "UnRAR.exe manquant apres copie" }
 
       - name: Create patch ZIP for auto-updater
         shell: pwsh
@@ -233,6 +241,46 @@ jobs:
           path: |
             Stellio-v${{ needs.check-version.outputs.version }}-patch.zip
             Stellio-v${{ needs.check-version.outputs.version }}-patch.zip.sha256
+
+      - name: Create portable ZIP (Windows, sans installation)
+        shell: pwsh
+        run: |
+          $ver = "${{ needs.check-version.outputs.version }}"
+          $stage = "portable-stage\Stellio"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item "dist\Stellio\*" $stage -Recurse -Force
+          # portable.flag active le mode portable : les donnees vont dans le dossier "data" a cote de Stellio.exe.
+          "Fichier de marquage du mode portable : ne pas supprimer." | Out-File -Encoding utf8 "$stage\portable.flag"
+          @'
+          STELLIO - VERSION PORTABLE (Windows 64 bits)
+          ============================================
+
+          Aucune installation : decompressez ce dossier ou vous voulez (disque, cle USB...) puis lancez Stellio.exe.
+
+          - Toutes vos donnees (reglages, base, journaux, profil du navigateur integre) sont dans le dossier "data",
+            a cote de Stellio.exe. Pour sauvegarder ou deplacer Stellio, copiez simplement tout le dossier.
+          - Ne supprimez pas le fichier "portable.flag" : c'est lui qui active le mode portable.
+          - Mises a jour : Stellio se met a jour comme la version installee ; le dossier "data" n'est pas touche.
+          - Pour reprendre les donnees d'une version installee : fermez Stellio, puis copiez le contenu de
+            %APPDATA%\Stellio dans le dossier "data".
+          - Windows SmartScreen peut afficher un avertissement au premier lancement si l'executable n'est pas signe.
+
+          English: no installation needed. Unzip anywhere (disk, USB drive) and run Stellio.exe. All data is kept in the
+          "data" folder next to Stellio.exe; keep "portable.flag" to stay in portable mode.
+          '@ | Out-File -Encoding utf8 "$stage\LISEZMOI-portable.txt"
+          $zipName = "Stellio-v$ver-portable-win64.zip"
+          Compress-Archive -Path "portable-stage\Stellio" -DestinationPath $zipName -Force
+          if (-not (Test-Path $zipName)) { throw "Echec de creation du ZIP portable." }
+          $hash = (Get-FileHash -Algorithm SHA256 $zipName).Hash.ToLower()
+          "$hash  $zipName" | Out-File -Encoding ascii "$zipName.sha256"
+
+      - name: Upload portable ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stellio-portable-zip
+          path: |
+            Stellio-v${{ needs.check-version.outputs.version }}-portable-win64.zip
+            Stellio-v${{ needs.check-version.outputs.version }}-portable-win64.zip.sha256
 
       - name: Install Inno Setup
         run: choco install innosetup -y
@@ -730,6 +778,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: stellio-patch-zip
+          path: release-files
+
+      - name: Download portable ZIP artifact (Windows)
+        uses: actions/download-artifact@v4
+        with:
+          name: stellio-portable-zip
           path: release-files
 
       - name: Download macOS .dmg artifacts (arm64 + x86_64)

@@ -12,10 +12,27 @@ if sys.platform.startswith('linux'):
     os.environ['PYRENDER_OFFSCREEN'] = '1'
 
 
+def _portable_data_dir():
+    """Mode portable (Windows) : si un fichier « portable.flag » se trouve à côté de Stellio.exe, toutes les données
+    (base, réglages, journaux, bibliothèques ajoutées, profil du navigateur intégré) restent dans le dossier « data »
+    à côté de l'exécutable : on peut copier le dossier sur une clé USB. Sans ce fichier, rien ne change."""
+    if os.name != 'nt':
+        return None
+    try:
+        base = os.path.dirname(os.path.abspath(sys.executable)) if getattr(sys, 'frozen', False) \
+            else os.path.dirname(os.path.abspath(__file__))
+    except Exception:
+        return None
+    return os.path.join(base, 'data') if os.path.isfile(os.path.join(base, 'portable.flag')) else None
+
+
 def _early_extra_libs_dir():
+    # Même logique que get_data_path() (défini plus bas), sans créer de dossier.
     env_override = os.environ.get('STELLIO_DATA_DIR')
     if env_override:
         base = env_override
+    elif _portable_data_dir():
+        base = _portable_data_dir()
     elif os.name == 'nt':
         base = os.path.join(os.environ.get('APPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Roaming')), 'Stellio')
     else:
@@ -25,6 +42,10 @@ def _early_extra_libs_dir():
 
 _EXTRA_LIBS_DIR = _early_extra_libs_dir()
 
+# ── Splash précoce ───────────────────────────────────────────────────────────
+# Affiché dès les premières millisecondes, AVANT la vérification des modules et les gros
+# imports (trimesh, numpy, pyrender...). Il tourne dans son propre thread : tous les objets Tk y
+# sont créés ET détruits, pendant que le reste du démarrage continue dans le thread principal.
 import threading as _early_threading
 import queue as _early_queue
 
@@ -35,7 +56,7 @@ def _early_splash_wanted():
     if __name__ not in ('__main__', 'stellio_main'):
         return False
     if sys.platform == 'darwin':
-        return False  
+        return False  # conflit Tk/Cocoa avec pywebview : pas de splash Tkinter sur macOS
     if os.environ.get('STELLIO_HEADLESS', '').strip().lower() in ('1', 'true', 'yes'):
         return False
     if sys.platform.startswith('linux') and not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
@@ -123,7 +144,7 @@ def _early_splash_run(q, ready, base_dir, data_dir):
         progress = ttk.Progressbar(root, style="Custom.Horizontal.TProgressbar", mode='indeterminate', length=400)
         progress.pack(pady=15)
         progress.start(20)
-        root.update()  
+        root.update()  # force l'affichage immédiat de la fenêtre
         ready.set()
 
         def poll():
@@ -144,6 +165,8 @@ def _early_splash_run(q, ready, base_dir, data_dir):
     except Exception:
         pass
     finally:
+        # Tk exige que ses objets soient détruits ET libérés dans le thread qui les a créés,
+        # sinon crash « Tcl_AsyncDelete: async handler deleted by the wrong thread » à la sortie.
         try:
             if root is not None:
                 root.destroy()
@@ -243,6 +266,7 @@ except ImportError:
         ("plyer",                                   "plyer",                  "notification",       None),
         ("openpyxl",                                "openpyxl",               "load_workbook",      None),
         ("xlrd",                                    "xlrd",                   "open_workbook",      None),
+        ("cascadio",                                "cascadio",               "step_to_glb",        None),
     ]
 
 
@@ -823,7 +847,7 @@ from PIL import Image, ImageDraw
 import base64
 from pathlib import Path
 from functools import wraps
-from flask import Flask, request, jsonify, session, send_file, Response
+from flask import Flask, request, jsonify, session, send_file, Response, make_response
 from werkzeug.utils import secure_filename
 import trimesh.transformations as tra
 import io
@@ -1080,6 +1104,8 @@ def get_data_path():
     env_override = os.environ.get('STELLIO_DATA_DIR')
     if env_override:
         data_dir = Path(env_override)
+    elif _portable_data_dir():
+        data_dir = Path(_portable_data_dir())
     elif os.name == 'nt':
         appdata = os.environ.get('APPDATA', str(Path.home() / 'AppData' / 'Roaming'))
         data_dir = Path(appdata) / 'Stellio'
@@ -4197,6 +4223,90 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 
+# --- Version Windows : accès réservé à la fenêtre de l'application (pas depuis un navigateur du PC) ---
+# Un jeton aléatoire est généré à chaque lancement ; seule la fenêtre pywebview l'ouvre (`?stellio_app=<jeton>`) et
+# reçoit ainsi un cookie de session. Un navigateur ouvert sur ce même PC (127.0.0.1, nom ou IP du PC) reçoit une page
+# d'explication. Les autres appareils (mobile, APK, tunnel Cloudflare) restent autorisés. Linux/Pi/macOS : inchangés.
+# Limite : c'est un garde-fou d'usage et non une barrière de sécurité (un en-tête X-Forwarded-For forgé le contourne).
+BLOCK_PC_BROWSER = sys.platform == 'win32' and not IS_SERVER_EDITION
+DESKTOP_APP_TOKEN = secrets.token_urlsafe(32)
+_LOCAL_IPS_CACHE = {'at': 0.0, 'ips': {'127.0.0.1', '::1'}}
+
+
+def _desktop_url(base_url):
+    """URL d'ouverture de la fenêtre de l'application (porte le jeton du lancement en cours)."""
+    if not BLOCK_PC_BROWSER:
+        return base_url
+    return f"{base_url}{'&' if '?' in base_url else '?'}stellio_app={DESKTOP_APP_TOKEN}"
+
+
+def _own_ip_addresses():
+    if time.time() - _LOCAL_IPS_CACHE['at'] < 60:
+        return _LOCAL_IPS_CACHE['ips']
+    ips = {'127.0.0.1', '::1', 'localhost'}
+    try:
+        host = socket.gethostname()
+        ips.update(socket.gethostbyname_ex(host)[2])
+        for info in socket.getaddrinfo(host, None):
+            ips.add(info[4][0])
+    except Exception:
+        pass
+    _LOCAL_IPS_CACHE.update(at=time.time(), ips=ips)
+    return ips
+
+
+_BROWSER_BLOCKED_TEXTS = {
+    'fr': ("Stellio n\u2019est pas accessible depuis le navigateur",
+           "Sur Windows, Stellio s\u2019utilise uniquement dans sa propre fen\u00eatre. Fermez cet onglet et ouvrez l\u2019application Stellio depuis le menu D\u00e9marrer ou le bureau. "
+           "Pour acc\u00e9der \u00e0 Stellio depuis un t\u00e9l\u00e9phone, utilisez le QR code de l\u2019application."),
+    'en': ("Stellio is not available from a browser",
+           "On Windows, Stellio only runs in its own window. Close this tab and open the Stellio application from the Start menu or your desktop. "
+           "To reach Stellio from a phone, use the QR code shown in the application."),
+}
+
+
+def _browser_blocked_response():
+    if request.path.startswith('/api/'):
+        return jsonify({"error": "Stellio n'est pas accessible depuis le navigateur", "code": "browser_blocked"}), 403
+    lang = 'fr' if (request.headers.get('Accept-Language', '').lower().startswith('fr')) else 'en'
+    title, body = _BROWSER_BLOCKED_TEXTS[lang]
+    html = (f'<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            f'<title>Stellio</title><style>body{{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;'
+            f'background:#1a1d23;color:#e8eaed;font-family:system-ui,Segoe UI,sans-serif}}'
+            f'.box{{max-width:480px;margin:24px;padding:32px;border:1px solid #3a3f4b;border-radius:16px;background:#22262e;text-align:center}}'
+            f'h1{{font-size:20px;margin:0 0 12px}}p{{line-height:1.55;color:#aab0bc;margin:0}}.ic{{font-size:40px;margin-bottom:12px}}</style></head>'
+            f'<body><div class="box"><div class="ic">\U0001F6AB</div><h1>{title}</h1><p>{body}</p></div></body></html>')
+    resp = make_response(html, 403)
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+
+@app.before_request
+def _desktop_only_guard():
+    if not BLOCK_PC_BROWSER:
+        return
+    supplied = request.args.get('stellio_app', '')
+    if supplied and secrets.compare_digest(supplied, DESKTOP_APP_TOKEN):
+        request.environ['stellio.set_app_cookie'] = True
+        return
+    cookie = request.cookies.get('stellio_app', '')
+    if cookie and secrets.compare_digest(cookie, DESKTOP_APP_TOKEN):
+        return
+    # Tunnel Cloudflare : cloudflared se connecte depuis 127.0.0.1 mais ajoute ces en-têtes pour les visiteurs distants
+    if request.headers.get('CF-Connecting-IP') or request.headers.get('X-Forwarded-For') or request.headers.get('CF-Ray'):
+        return
+    remote = (request.remote_addr or '').replace('::ffff:', '')
+    if remote in _own_ip_addresses():
+        return _browser_blocked_response()
+
+
+@app.after_request
+def _desktop_only_cookie(response):
+    if request.environ.get('stellio.set_app_cookie'):
+        response.set_cookie('stellio_app', DESKTOP_APP_TOKEN, httponly=True, samesite='Lax')
+    return response
+
+
 @app.before_request
 def _csrf_protect():
     if 'user_id' not in session:
@@ -4273,6 +4383,11 @@ def _set_security_headers(response):
     if csrf_token and request.cookies.get('stellio_csrf') != csrf_token:
         response.set_cookie('stellio_csrf', csrf_token, httponly=False,
                              samesite='Lax', max_age=60 * 60 * 24 * 30)
+    if IS_SERVER_EDITION and request.method == 'GET' and not request.path.startswith('/api/') \
+            and (request.path == '/' or request.path.lower().endswith(('.js', '.css', '.html', '.json'))):
+        # Après une mise à jour, le navigateur ne doit pas garder l'ancienne interface (cache heuristique) :
+        # « no-cache » = revalider à chaque chargement (réponse 304, très légère, si le fichier n'a pas changé).
+        response.headers.setdefault('Cache-Control', 'no-cache')
     response.headers.setdefault('X-Content-Type-Options', 'nosniff')
     response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
     response.headers.setdefault('Referrer-Policy', 'same-origin')
@@ -4300,8 +4415,143 @@ def _handle_internal_error(e):
     app_logger.error(f"[500] Erreur interne non gérée: {e}")
     return jsonify({"error": "Erreur interne du serveur"}), 500
 
-SUPPORTED_EXTENSIONS = {'.stl', '.3mf', '.obj'}
-SUPPORTED_3D_EXTS = {'.stl', '.obj', '.3mf', '.step', '.stp', '.iges', '.igs', '.amf'}
+SUPPORTED_EXTENSIONS = {'.stl', '.3mf', '.obj', '.ply', '.amf', '.step', '.stp'}
+SUPPORTED_3D_EXTS = {'.stl', '.obj', '.3mf', '.ply', '.step', '.stp', '.iges', '.igs', '.amf'}
+SUPPORTED_EXTENSIONS_TUPLE = tuple(sorted(SUPPORTED_EXTENSIONS))
+STEP_EXTENSIONS = ('.step', '.stp')
+
+
+def _step_to_trimesh(file_path):
+    """Convertit un fichier STEP/STP (CAO, surfaces exactes) en maillage triangulé.
+    Utilise `cascadio` (OpenCASCADE, module facultatif : réparé à la demande au premier besoin)."""
+    try:
+        import cascadio
+    except ImportError:
+        if not _ensure_optional_module('cascadio', 'cascadio'):
+            raise RuntimeError("Module 'cascadio' manquant : impossible de lire les fichiers STEP")
+        import cascadio
+    tmp_dir = tempfile.mkdtemp(prefix='stellio_step_')
+    try:
+        out_glb = os.path.join(tmp_dir, 'model.glb')
+        # tolérances en unités du modèle (mm) : maillage lisse, comme le font les slicers à l'import d'un STEP
+        cascadio.step_to_glb(file_path, out_glb, tol_linear=0.02, tol_angular=0.25, tol_relative=False)
+        if not os.path.exists(out_glb) or os.path.getsize(out_glb) == 0:
+            raise RuntimeError("Conversion STEP vide (fichier STEP invalide ou sans solide)")
+        scene = trimesh.load(out_glb, force='scene')
+        geoms = [g for g in scene.geometry.values() if hasattr(g, 'faces') and len(g.faces) > 0]
+        if not geoms:
+            raise RuntimeError("Le fichier STEP ne contient aucun solide exploitable")
+        try:
+            mesh = scene.to_geometry() if hasattr(scene, 'to_geometry') else scene.dump(concatenate=True)
+        except Exception:
+            mesh = trimesh.util.concatenate([g for g in scene.dump()])
+        # Le glTF intermédiaire est toujours exprimé en mètres (norme glTF) alors que les slicers et le reste de
+        # Stellio travaillent en millimètres : sans cette mise à l'échelle, une pièce de 20 mm mesurerait 0,02.
+        mesh.apply_scale(1000.0)
+        return mesh
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def _amf_to_trimesh(source):
+    """Lit un fichier AMF (XML, éventuellement compressé en ZIP) et renvoie un maillage trimesh.
+    `source` : chemin ou octets. Gère les objets multiples, les unités et les matrices de constellation."""
+    import xml.etree.ElementTree as ET
+    if isinstance(source, (bytes, bytearray)):
+        raw = bytes(source)
+    else:
+        with open(source, 'rb') as fh:
+            raw = fh.read()
+    if raw[:2] == b'PK':
+        with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+            names = [n for n in zf.namelist() if n.lower().endswith('.amf')]
+            if not names:
+                raise ValueError("Archive AMF sans fichier .amf")
+            raw = zf.read(names[0])
+    # Refuse les DTD/entités (XML bomb) : un AMF légitime n'en contient pas
+    head = raw[:4096].lower()
+    if b'<!doctype' in head or b'<!entity' in head:
+        raise ValueError("AMF refusé : déclaration DTD/entité interdite")
+    root = ET.fromstring(raw)
+    unit_factor = {'millimeter': 1.0, 'inch': 25.4, 'feet': 304.8, 'meter': 1000.0, 'micron': 0.001}.get(
+        (root.get('unit') or 'millimeter').strip().lower(), 1.0)
+
+    def _txt(el, tag, default=0.0):
+        child = el.find(tag)
+        try:
+            return float(child.text) if child is not None and child.text is not None else default
+        except ValueError:
+            return default
+
+    objects = {}
+    for obj in root.findall('object'):
+        verts_el = obj.find('mesh/vertices')
+        if verts_el is None:
+            continue
+        verts = [[_txt(v, 'coordinates/x'), _txt(v, 'coordinates/y'), _txt(v, 'coordinates/z')]
+                 for v in verts_el.findall('vertex')]
+        faces = []
+        for vol in obj.findall('mesh/volume'):
+            for tri in vol.findall('triangle'):
+                try:
+                    faces.append([int(tri.find('v1').text), int(tri.find('v2').text), int(tri.find('v3').text)])
+                except (AttributeError, TypeError, ValueError):
+                    continue
+        if verts and faces:
+            m = trimesh.Trimesh(vertices=np.array(verts, dtype=float) * unit_factor,
+                                faces=np.array(faces, dtype=np.int64), process=False)
+            objects[obj.get('id')] = m
+
+    if not objects:
+        raise ValueError("AMF sans maillage exploitable")
+
+    meshes = []
+    constellations = root.findall('constellation')
+    if constellations:
+        for inst in constellations[0].findall('instance'):
+            base = objects.get(inst.get('objectid'))
+            if base is None:
+                continue
+            m = base.copy()
+            dx, dy, dz = _txt(inst, 'deltax') * unit_factor, _txt(inst, 'deltay') * unit_factor, _txt(inst, 'deltaz') * unit_factor
+            rx, ry, rz = _txt(inst, 'rx'), _txt(inst, 'ry'), _txt(inst, 'rz')
+            if rx or ry or rz:
+                m.apply_transform(tra.euler_matrix(np.radians(rx), np.radians(ry), np.radians(rz), 'sxyz'))
+            m.apply_translation([dx, dy, dz])
+            meshes.append(m)
+    if not meshes:
+        meshes = list(objects.values())
+    return meshes[0] if len(meshes) == 1 else trimesh.util.concatenate(meshes)
+
+
+def load_model_mesh(source, ext=None):
+    """Chargeur unique pour les formats non 3MF : STL, OBJ, PLY, AMF, STEP/STP.
+    `source` : chemin (str) ou octets ; `ext` obligatoire pour des octets. Peut renvoyer une Scene (OBJ)."""
+    if ext is None and isinstance(source, str):
+        ext = os.path.splitext(source)[1]
+    ext = (ext or '').lower()
+    if not ext.startswith('.'):
+        ext = '.' + ext
+    is_bytes = isinstance(source, (bytes, bytearray))
+    if ext == '.amf':
+        return _amf_to_trimesh(source)
+    if ext in STEP_EXTENSIONS:
+        if is_bytes:
+            fd, tmp_path = tempfile.mkstemp(suffix=ext)
+            try:
+                with os.fdopen(fd, 'wb') as fh:
+                    fh.write(bytes(source))
+                return _step_to_trimesh(tmp_path)
+            finally:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+        return _step_to_trimesh(source)
+    kind = ext.lstrip('.')
+    if is_bytes:
+        return trimesh.load(io.BytesIO(bytes(source)), file_type=kind, force='mesh', process=(ext != '.obj'))
+    return trimesh.load(source, force='mesh', process=(ext != '.obj'))
 
 
 class UnsafeArchiveError(Exception):
@@ -4769,7 +5019,7 @@ def process_generation_queue():
                         for root, dirs, files in os.walk(source['path']):
                             dirs[:] = [d for d in dirs if d != PLATE_SPLIT_DIRNAME]
                             for f in sorted(files, key=str.lower):
-                                if f.lower().endswith(('.stl', '.obj', '.3mf')):
+                                if f.lower().endswith(SUPPORTED_EXTENSIONS_TUPLE):
                                     file_path = os.path.join(root, f).replace('\\', '/')
                                     if _is_ignored_recently(file_path):
                                         continue
@@ -5408,10 +5658,8 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
                     mesh = _build_multiplate_overview_mesh(file_to_load)
                 if mesh is None:
                     mesh = load_3mf_mesh(file_to_load)
-            elif ext == '.obj':
-                mesh = trimesh.load(file_to_load, force='mesh', process=False)
             else:
-                mesh = trimesh.load(file_to_load, force='mesh')
+                mesh = load_model_mesh(file_to_load, ext)
 
             if isinstance(mesh, trimesh.Scene):
                 geoms = [m for m in mesh.geometry.values()
@@ -5724,7 +5972,7 @@ def _generate_thumbnail_matplotlib(mesh, thumb_path, resolution=(768, 768)):
 
 def analyze_3d_file(file_path):
     try:
-        mesh = trimesh.load(file_path, force='mesh')
+        mesh = load_model_mesh(file_path)
         if isinstance(mesh, trimesh.Scene):
             geoms = [m for m in mesh.geometry.values() if hasattr(m, 'vertices') and len(m.vertices) > 0]
             if not geoms:
@@ -6197,6 +6445,61 @@ def api_get_sources():
     finally:
         conn.close()
     return jsonify([dict(s) for s in sources])
+
+_SOURCE_STATUS_CACHE = {}          # user_id -> (horodatage, résultat)
+_SOURCE_STATUS_TTL = 10.0
+_SOURCE_STATUS_TIMEOUT = 6.0
+
+
+def _check_one_source_available(source):
+    """True si la source répond (dossier/fichier présent, partage SMB joignable)."""
+    try:
+        stype = source['type']
+        if stype == 'smb':
+            unc_path = source['path'].replace('\\\\', '//').replace('\\', '/')
+            kwargs = {'connection_timeout': 4}
+            config = json.loads(source['config']) if source['config'] else {}
+            if config.get('username'):
+                kwargs['username'] = config['username']
+            if config.get('password'):
+                kwargs['password'] = config['password']
+            smbclient.stat(unc_path, **kwargs)
+            return True
+        return os.path.exists(source['path'])
+    except Exception:
+        return False
+
+
+@app.route('/api/sources/status', methods=['GET'])
+@login_required
+def api_sources_status():
+    """Disponibilité de chaque source (coche verte / croix rouge dans l'interface). Résultat mis en cache 10 s ;
+    chaque test a un délai maximal pour qu'un partage réseau éteint ne bloque jamais la réponse."""
+    user_id = session['user_id']
+    now = time.time()
+    cached = _SOURCE_STATUS_CACHE.get(user_id)
+    if cached and now - cached[0] < _SOURCE_STATUS_TTL and not request.args.get('force'):
+        return jsonify(cached[1])
+    conn = get_db()
+    try:
+        rows = [dict(r) for r in conn.execute("SELECT id, name, type, path, config FROM sources WHERE user_id = ?", (user_id,)).fetchall()]
+    finally:
+        conn.close()
+    results = {}
+    if rows:
+        pool = ThreadPoolExecutor(max_workers=min(8, len(rows)))
+        futures = {r['id']: pool.submit(_check_one_source_available, r) for r in rows}
+        deadline = time.time() + _SOURCE_STATUS_TIMEOUT
+        for r in rows:
+            try:
+                results[r['id']] = bool(futures[r['id']].result(timeout=max(0.1, deadline - time.time())))
+            except Exception:
+                results[r['id']] = False
+        pool.shutdown(wait=False)
+    payload = {"sources": [{"id": r['id'], "name": r['name'], "type": r['type'], "available": results.get(r['id'], False)} for r in rows]}
+    _SOURCE_STATUS_CACHE[user_id] = (now, payload)
+    return jsonify(payload)
+
 
 _SOURCE_SUGGEST_CAP = 200          
 _SOURCE_SUGGEST_MAX_DEPTH = 4
@@ -7301,11 +7604,11 @@ def api_file_mesh():
                 return send_file(buf, mimetype='application/octet-stream',
                                  download_name=os.path.basename(internal_path))
 
-            elif ext in ('.3mf', '.obj'):
+            elif ext in SUPPORTED_EXTENSIONS:
                 if ext == '.3mf':
                     mesh = load_3mf_mesh(raw_bytes, plate_index=plate_index)
                 else:
-                    mesh = trimesh.load(io.BytesIO(raw_bytes), file_type='obj', force='mesh')
+                    mesh = load_model_mesh(raw_bytes, ext)
 
                 if isinstance(mesh, trimesh.Scene):
                     geoms = [m for m in mesh.geometry.values()
@@ -7342,11 +7645,11 @@ def api_file_mesh():
         if ext == '.stl':
             return send_file(file_path, mimetype='application/octet-stream')
 
-        elif ext in ('.3mf', '.obj'):
+        elif ext in SUPPORTED_EXTENSIONS:
             if ext == '.3mf':
                 mesh = load_3mf_mesh(file_path, plate_index=plate_index)
             else:
-                mesh = trimesh.load(file_path, force='mesh')
+                mesh = load_model_mesh(file_path, ext)
 
             if isinstance(mesh, trimesh.Scene):
                 geoms = [m for m in mesh.geometry.values()
@@ -7874,7 +8177,7 @@ def pregenerate_thumbnails_on_startup(limit=90):
                     for f in sorted(files, key=str.lower):
                         if len(to_process) >= limit:
                             break
-                        if f.lower().endswith(('.stl', '.obj', '.3mf')):
+                        if f.lower().endswith(SUPPORTED_EXTENSIONS_TUPLE):
                             file_path = os.path.join(root, f).replace('\\', '/')
                             normalized_path = file_path
                             thumb_filename = hashlib.md5(normalized_path.encode()).hexdigest()
@@ -8337,7 +8640,7 @@ def api_assign_tags_bulk_add():
 
 def extract_archive_to_disk(file_path, source_name, extensions_3d=None):
     if extensions_3d is None:
-        extensions_3d = {'.stl', '.obj', '.3mf'}
+        extensions_3d = set(SUPPORTED_EXTENSIONS)
     ext = os.path.splitext(file_path)[1].lower()
     filename = os.path.basename(file_path)
     root = os.path.dirname(file_path)
@@ -8411,7 +8714,7 @@ def scan_local_folder(folder_path):
     if not os.path.exists(folder_path):
         return files
 
-    extensions_3d = {'.stl', '.obj', '.3mf'}
+    extensions_3d = set(SUPPORTED_EXTENSIONS)
     extensions_archive = {'.rar', '.tar.gz', '.tgz', '.zip', '.7z'}
 
     for root, dirs, filenames in os.walk(folder_path):
@@ -8488,7 +8791,7 @@ def scan_smb_folder_recursive(base_path, current_subdir, kwargs, source_name):
                 if (info.st_mode & 0o170000) == 0o040000:
                     if entry.lower() not in folders_to_skip:
                         files.extend(scan_smb_folder_recursive(base_path, entry_path, kwargs, source_name))
-                elif entry.lower().endswith(('.stl', '.obj', '.3mf')):
+                elif entry.lower().endswith(SUPPORTED_EXTENSIONS_TUPLE):
                     normalized_path = full_path.replace('\\', '/')
                     thumb_filename = hashlib.md5(normalized_path.encode()).hexdigest()
                     thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
@@ -10298,7 +10601,7 @@ def api_find_similar_duplicates():
             except Exception:
                 pass
 
-        GEO_EXTENSIONS = ('.stl', '.3mf', '.obj')
+        GEO_EXTENSIONS = ('.stl', '.3mf', '.obj', '.ply', '.amf')
         candidates = [f for f in all_files if os.path.splitext(f['name'])[1].lower() in GEO_EXTENSIONS]
 
         exact_groups = {}
@@ -11106,11 +11409,13 @@ def _export_reoriented_mesh(file_path, orientation_key):
     if not axis_deg:
         return None
     ext = os.path.splitext(file_path)[1].lower()
-    if ext not in ('.stl', '.obj', '.3mf', '.ply'):
+    if ext not in SUPPORTED_EXTENSIONS:
         return None
 
     try:
-        mesh = trimesh.load(file_path, force='mesh')
+        mesh = load_3mf_mesh(file_path) if ext == '.3mf' else load_model_mesh(file_path, ext)
+        if isinstance(mesh, trimesh.Scene):
+            mesh = trimesh.util.concatenate([g for g in mesh.geometry.values() if hasattr(g, 'vertices') and len(g.vertices) > 0])
         axis, degrees = axis_deg
         direction = [1, 0, 0] if axis == 'x' else [0, 1, 0]
         rot = tra.rotation_matrix(np.radians(degrees), direction)
@@ -11124,6 +11429,50 @@ def _export_reoriented_mesh(file_path, orientation_key):
     except Exception as e:
         app_logger.warning(f"[Slicer] Échec ré-orientation du mesh avant envoi: {e}")
         return None
+
+_SLICER_CAD_NATIVE_IDS = ('orcaslicer', 'bambustudio', 'qidistudio', 'prusaslicer', 'superslicer',
+                           'elegooslicer', 'anycubicslicernext', 'crealityprint')
+
+
+def _slicer_reads_cad_natively(slicer_name, slicer_path):
+    """Vrai si le slicer ouvre lui-même STEP et AMF (famille Orca/Bambu/Prusa et dérivés)."""
+    def _norm(s):
+        return re.sub(r'[\s_\-]|\.exe$', '', str(s or '').lower())
+    ident, base = _norm(slicer_name), _norm(os.path.basename(slicer_path or ''))
+    return any(k in ident or k in base for k in _SLICER_CAD_NATIVE_IDS)
+
+
+def _prepare_model_for_slicer(file_path, slicer_name, slicer_path, force=False):
+    """Renvoie le chemin d'un STL temporaire quand le slicer ne sait pas lire le format du fichier
+    (PLY pour tous ; STEP/AMF pour les slicers hors famille Orca/Prusa), sinon None (fichier ouvert tel quel).
+    Aucun slicer configuré (application par défaut du système) : seul le PLY est converti."""
+    ext = os.path.splitext(file_path)[1].lower()
+    if force:
+        needs_convert = ext in ('.ply', '.amf') or ext in STEP_EXTENSIONS
+    elif ext == '.ply':
+        needs_convert = True
+    elif ext in STEP_EXTENSIONS or ext == '.amf':
+        needs_convert = bool(slicer_path) and not _slicer_reads_cad_natively(slicer_name, slicer_path)
+    else:
+        needs_convert = False
+    if not needs_convert:
+        return None
+    try:
+        mesh = load_model_mesh(file_path, ext)
+        if isinstance(mesh, trimesh.Scene):
+            mesh = trimesh.util.concatenate([g for g in mesh.geometry.values() if hasattr(g, 'vertices') and len(g.vertices) > 0])
+        if mesh is None or mesh.is_empty:
+            return None
+        out_dir = get_slice_temp_dir()
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        out_path = os.path.join(out_dir, f"{base_name}_{secrets.token_hex(4)}.stl")
+        mesh.export(out_path, file_type='stl')
+        app_logger.info(f"[Slicer] {os.path.basename(file_path)} converti en STL avant ouverture (format non lu par le slicer)")
+        return out_path
+    except Exception as e:
+        app_logger.warning(f"[Slicer] Conversion en STL impossible pour {os.path.basename(file_path)}: {e}")
+        return None
+
 
 def _popen_kwargs_silent():
     kwargs = {}
@@ -11785,6 +12134,9 @@ def process_slice_estimate_queue():
                 else:
                     stl_for_slicer = file_path
 
+                # Le tranchage silencieux n'est garanti que pour STL/3MF/OBJ : STEP, PLY et AMF passent par un STL temporaire
+                stl_for_slicer = _prepare_model_for_slicer(stl_for_slicer, '', '', force=True) or stl_for_slicer
+
                 slicers = get_cached_installed_slicers()
                 if not slicers or not any(s.get('preslice_supported', True) for s in slicers):
                     with slice_estimate_lock:
@@ -12092,7 +12444,8 @@ def api_send_to_slicer():
 
         orientation_key = data.get('orientation') or 'default'
         reoriented_path = _export_reoriented_mesh(file_path, orientation_key)
-        path_to_open = reoriented_path or file_path
+        converted_path = None if reoriented_path else _prepare_model_for_slicer(file_path, slicer_name, slicer_path)
+        path_to_open = reoriented_path or converted_path or file_path
 
 
         applied_profile_ids = []
@@ -12243,11 +12596,12 @@ def api_slicer_send_batch():
                     cmd += ['--load', ini_path]
 
         app_logger.info(f"[Slicer] Lancement avec {len(file_paths)} fichiers...")
+        open_paths = [(_prepare_model_for_slicer(fp, slicer_name, slicer_path) or fp) for fp in file_paths]
         try:
-            subprocess.Popen(cmd + file_paths)
+            subprocess.Popen(cmd + open_paths)
         except Exception as e:
             app_logger.info(f"[Slicer] Erreur ouverture multiple: {e}")
-            subprocess.Popen(cmd + [file_paths[0]])
+            subprocess.Popen(cmd + [open_paths[0]])
 
         try:
             conn = get_db()
@@ -12310,7 +12664,7 @@ def api_pick_file():
         result = webview.windows[0].create_file_dialog(
             webview.OPEN_DIALOG,
             allow_multiple=True,
-            file_types=('Fichiers 3D (*.stl;*.3mf;*.obj)', 'STL (*.stl)', '3MF (*.3mf)', 'OBJ (*.obj)', 'Tous les fichiers (*.*)')
+            file_types=('Fichiers 3D (*.stl;*.3mf;*.obj;*.step;*.stp;*.ply;*.amf)', 'STL (*.stl)', '3MF (*.3mf)', 'OBJ (*.obj)', 'STEP (*.step;*.stp)', 'PLY (*.ply)', 'AMF (*.amf)', 'Tous les fichiers (*.*)')
         )
         files = result if result else []
 
@@ -13987,7 +14341,7 @@ def api_download_file():
                         with zipfile.ZipFile(dest_path, 'r') as zf:
                             for zname in zf.namelist():
                                 zext = os.path.splitext(zname)[1].lower()
-                                if zext in ('.stl', '.3mf', '.obj'):
+                                if zext in SUPPORTED_EXTENSIONS:
                                     safe_zname = re.sub(r'[<>:"/\\|?*]', '_', os.path.basename(zname))
                                     out_path = os.path.join(save_dir, safe_zname)
                                     with zf.open(zname) as zf_src, open(out_path, 'wb') as zf_dst:
@@ -15198,10 +15552,8 @@ def api_repair_file():
         ext = os.path.splitext(file_path)[1].lower()
         if ext == '.3mf':
             return load_3mf_mesh(file_path)
-        elif ext == '.obj':
-            return trimesh.load(file_path, force='mesh', process=False)
         else:
-            return trimesh.load(file_path, force='mesh')
+            return load_model_mesh(file_path, ext)
 
     try:
         ext = os.path.splitext(file_path)[1].lower()
@@ -15343,10 +15695,8 @@ def _load_mesh_for_conversion(file_path):
     ext = os.path.splitext(file_path)[1].lower().lstrip('.')
     if ext == '3mf':
         mesh = load_3mf_mesh(file_path)
-    elif ext == 'obj':
-        mesh = trimesh.load(file_path, force='mesh', process=False)
-    elif ext == 'stl':
-        mesh = trimesh.load(file_path, force='mesh')
+    elif f'.{ext}' in SUPPORTED_EXTENSIONS:
+        mesh = load_model_mesh(file_path, f'.{ext}')
     else:
         raise ValueError(f"Format d'entrée non supporté: .{ext}")
 
@@ -17352,6 +17702,8 @@ def api_get_settings():
         settings.setdefault('auto_scan_enabled', True)
         settings.setdefault('auto_scan_interval_minutes', 5)
         settings.setdefault('manual_inventory_enabled', True)
+        settings.setdefault('low_stock_threshold_percent', int(LOW_STOCK_RATIO * 100))
+        settings.setdefault('low_stock_threshold_g', LOW_STOCK_FLOOR_G)
         settings['launch_at_startup_supported'] = True
         settings['launch_at_startup'] = is_startup_enabled()
         settings['launch_minimized'] = is_startup_minimized() if settings['launch_at_startup'] else bool(settings.get('launch_minimized', False))
@@ -17403,6 +17755,16 @@ def api_save_settings():
                 if _mv and not AI_MODEL_NAME_RE.match(_mv):
                     return jsonify({"error": "Nom de modèle invalide", "code": "invalid_model"}), 400
                 data[_mk] = _mv
+
+        for _lk, _lmax in (('low_stock_threshold_percent', 100), ('low_stock_threshold_g', 5000)):
+            if _lk in data:
+                try:
+                    _lv = float(data.get(_lk))
+                except (TypeError, ValueError):
+                    return jsonify({"error": "Seuil de filament bas invalide", "code": "invalid_low_stock"}), 400
+                if _lv < 0 or _lv > _lmax:
+                    return jsonify({"error": "Seuil de filament bas hors limites", "code": "invalid_low_stock"}), 400
+                data[_lk] = int(_lv) if _lv == int(_lv) else round(_lv, 1)
 
         if 'tigertag_studio_dir' in data:
             tt_dir_value = str(data.get('tigertag_studio_dir') or '').strip()
@@ -17465,7 +17827,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.7.8"
+CURRENT_VERSION = "0.7.9"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -18108,11 +18470,15 @@ def api_check_update():
             'current_version': get_current_version()
         }), 200
 
+STELLIO_BOOT_ID = uuid.uuid4().hex   # change à chaque démarrage du serveur : le navigateur s'en sert pour se recharger après une mise à jour
+
+
 @app.route('/api/update/version', methods=['GET'])
 def api_get_version():
     return jsonify({
         'version': get_current_version(),
-        'app_name': 'Stellio'
+        'app_name': 'Stellio',
+        'boot_id': STELLIO_BOOT_ID
     }), 200
 
 @app.route('/api/update/download', methods=['POST'])
@@ -23514,12 +23880,27 @@ LOW_STOCK_RATIO = 0.15
 LOW_STOCK_FLOOR_G = 100  
 
 
+def _low_stock_thresholds():
+    """Seuils de « filament bas » réglés par l'utilisateur (inventaire filament) ; défauts : 15 % / 100 g."""
+    s = load_settings() or {}
+    try:
+        pct = float(s.get('low_stock_threshold_percent', LOW_STOCK_RATIO * 100))
+    except (TypeError, ValueError):
+        pct = LOW_STOCK_RATIO * 100
+    try:
+        grams = float(s.get('low_stock_threshold_g', LOW_STOCK_FLOOR_G))
+    except (TypeError, ValueError):
+        grams = float(LOW_STOCK_FLOOR_G)
+    return max(0.0, min(pct, 100.0)) / 100.0, max(0.0, grams)
+
+
 def _is_low_stock(remaining_g, capacity_g):
     if not isinstance(remaining_g, (int, float)):
         return False
+    ratio, floor_g = _low_stock_thresholds()
     if isinstance(capacity_g, (int, float)) and capacity_g > 0:
-        return (remaining_g / capacity_g) <= LOW_STOCK_RATIO
-    return remaining_g < LOW_STOCK_FLOOR_G
+        return (remaining_g / capacity_g) <= ratio
+    return remaining_g < floor_g
 
 
 def _spool_search_query(brand, material, color):
@@ -26868,7 +27249,7 @@ if __name__ in ('__main__', 'stellio_main'):
             server_ready = False
             for _ in range(30):
                 try:
-                    urllib.request.urlopen(SERVER_URL, timeout=1)
+                    urllib.request.urlopen(_desktop_url(SERVER_URL), timeout=1)
                     server_ready = True
                     break
                 except Exception:
@@ -27079,10 +27460,10 @@ if __name__ in ('__main__', 'stellio_main'):
                 js_api=StellioDesktopAPI()
             )
             try:
-                window = webview.create_window('Stellio', SERVER_URL, **_window_kwargs)
+                window = webview.create_window('Stellio', _desktop_url(SERVER_URL), **_window_kwargs)
             except TypeError as e:
                 app_logger.warning(f"[INFO] pywebview ne supporte pas drag_drop ({e}) — fenêtre lancée sans glisser-déposer natif. Mets à jour pywebview (pip install -U pywebview) pour l'activer.")
-                window = webview.create_window('Stellio', SERVER_URL, **_window_kwargs)
+                window = webview.create_window('Stellio', _desktop_url(SERVER_URL), **_window_kwargs)
             _app_window = window
 
             def _on_window_closing():
@@ -27135,13 +27516,16 @@ if __name__ in ('__main__', 'stellio_main'):
                 except Exception as ex:
                     app_logger.info(f"[DragDrop] Binding impossible: {ex}")
 
-            webview.start(_bind_drag_drop, window, debug=False, private_mode=False)
+            _webview_options = {'debug': False, 'private_mode': False}
+            if _portable_data_dir():
+                _webview_options['storage_path'] = os.path.join(DATA_DIR, 'webview')   # cookies / stockage local du mode portable
+            webview.start(_bind_drag_drop, window, **_webview_options)
             app_logger.info("[INFO] Stellio s'est arrêté.")
         except Exception as e:
             app_logger.info(f"[WARN] PyWebView échec ({type(e).__name__}: {e})")
             app_logger.info("[INFO] Ouverture de secours dans le navigateur par défaut...")
             import webbrowser
-            webbrowser.open(SERVER_URL)
+            webbrowser.open(_desktop_url(SERVER_URL))   # repli : la fenêtre n'a pas pu s'ouvrir, le navigateur reçoit le jeton
             try:
                 while True:
                     time.sleep(1)

@@ -36,7 +36,7 @@
 
 ## 🎯 Visão geral
 
-**Stellio** é um aplicativo de desktop moderno que centraliza toda a sua biblioteca 3D (STL, 3MF, OBJ), automatiza tarefas repetitivas e se integra perfeitamente ao seu fluxo de trabalho de impressão 3D.
+**Stellio** é um aplicativo de desktop moderno que centraliza toda a sua biblioteca 3D (STL, 3MF, OBJ, STEP, PLY, AMF), automatiza tarefas repetitivas e se integra perfeitamente ao seu fluxo de trabalho de impressão 3D.
 
 Seja você um maker iniciante ou um usuário experiente com várias máquinas, o Stellio economiza um tempo precioso graças à **IA local** (Ollama), a uma **gestão inteligente de impressoras** e a uma **interface pensada para produtividade**.
 
@@ -199,6 +199,8 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 2. Execute `Stellio-Setup-<version>.exe`
 3. Pronto! 🎉
 
+> 💼 **Versão portátil (sem instalação)**: baixe `Stellio-v<versão>-portable-win64.zip` nas Releases, descompacte onde quiser (disco, pendrive) e execute `Stellio.exe`. Seus dados ficam na pasta `data` ao lado do executável (mantenha o arquivo `portable.flag`).
+
 ### 🐧 Raspberry Pi / Linux
 
 Funciona em **modo servidor headless** (sem interface gráfica): o Stellio roda em segundo plano e é acessado por um navegador, seja no próprio Pi ou em qualquer dispositivo da rede local.
@@ -244,6 +246,20 @@ O Stellio detecta automaticamente:
 - ✅ PrusaSlicer / SuperSlicer
 - ✅ Ultimaker Cura
 - ✅ Creality Print
+- ✅ Elegoo Slicer
+- ✅ Qidi Studio
+- ✅ Anycubic Slicer Next
+- ✅ Anycubic Slicer
+- ✅ Simplify3D
+- ✅ ideaMaker
+- ✅ FlashPrint
+- ✅ Lychee Slicer
+- ✅ CraftWare
+- ✅ MatterControl
+- ✅ MakerBot Print
+- ✅ Voxelizer
+- ✅ Slic3r
+- ✅ KISSlicer
 
 ### Impressoras
 
