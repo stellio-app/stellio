@@ -138,6 +138,7 @@ jobs:
             --collect-all plyer `
             --collect-all openpyxl `
             --collect-all xlrd `
+            --collect-all cascadio `
             --collect-all pyaes `
             --copy-metadata imageio `
             --copy-metadata pyrender `
@@ -395,6 +396,7 @@ jobs:
             --collect-all plyer \
             --collect-all openpyxl \
             --collect-all xlrd \
+            --collect-all cascadio \
             --collect-all pyaes \
             --copy-metadata imageio \
             --copy-metadata pyrender \
@@ -662,6 +664,7 @@ jobs:
             --collect-all plyer \
             --collect-all openpyxl \
             --collect-all xlrd \
+            --collect-all cascadio \
             --collect-all pyaes \
             --copy-metadata imageio \
             --copy-metadata pyrender \
@@ -742,6 +745,14 @@ jobs:
           Categories=Utility;
           EOF
           cp AppDir/stellio.desktop AppDir/usr/share/applications/stellio.desktop
+          # AppRun : point d'entree obligatoire d'un AppDir (appimagetool refuse de construire sans lui)
+          cat > AppDir/AppRun <<'EOF'
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "$0")")"
+          export PATH="$HERE/usr/bin:$PATH"
+          exec "$HERE/usr/bin/Stellio" "$@"
+          EOF
+          chmod +x AppDir/AppRun
 
       - name: Download appimagetool and build the AppImage
         run: |
