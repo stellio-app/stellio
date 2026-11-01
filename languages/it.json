@@ -2150,5 +2150,10 @@
   "lowstock.restock": "Soglia di riordino (g, totale per filamento)",
   "nav.discord": "Discord",
   "about.partner_title": "Partnership",
-  "about.partner_desc": "Stellio è partner di integrazione di TigerTag, il sistema di identificazione NFC/RFID dei filamenti."
+  "about.partner_desc": "Stellio è partner di integrazione di TigerTag, il sistema di identificazione NFC/RFID dei filamenti.",
+  "dashboard.restock_flag": "Da ordinare",
+  "dashboard.restock_flag_hint": "Aggiungi questo filamento all'elenco «Da ordinare»",
+  "dashboard.restock_flag_on": "Aggiunto all'elenco «Da ordinare»",
+  "dashboard.restock_flag_off": "Rimosso dall'elenco «Da ordinare»",
+  "dashboard.restock_manual": "aggiunto a mano"
 }

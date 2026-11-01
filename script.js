@@ -4506,6 +4506,11 @@ async function _loadDashboardStock() {
         const slots = data.slots || [];
         await _ensureLowStockThresholds();
         const low = slots.filter(_isLowStockUI);
+        try {
+            const rr = await fetch(`${API}/api/filament/restock?all=1`);
+            _restockManualKeys = new Set(rr.ok ? ((await rr.json()).manual_keys || []) : []);
+        } catch (e) { _restockManualKeys = new Set(); }
+        _stockLowSlots = low;
         if (!low.length) {
             body.innerHTML = `<div class="dashboard-widget-empty dashboard-widget-empty--ok"><i class="fa-solid fa-circle-check"></i><p>${_t2('dashboard.stock_ok', 'Tous les stocks sont suffisants')}</p></div>`;
             return;
@@ -4520,13 +4525,17 @@ async function _loadDashboardStock() {
                 `low_stock_${s.source_type}_${s.source_id}`
             );
         });
-        body.innerHTML = low.map(s => `
+        body.innerHTML = low.map((s, i) => `
             <div class="dashboard-row">
                 <div class="dashboard-row-icon" style="background:${s.color_hex}22;color:${s.color_hex};"><i class="fa-solid fa-circle"></i></div>
                 <div class="dashboard-row-body">
                     <div class="dashboard-row-title">${escapeHtml(s.name)}</div>
                     <div class="dashboard-row-sub">${s.material || ''} — ${Math.round(s.remaining_g)}g ${_t2('dashboard.stock_remaining', 'restants')}</div>
                 </div>
+                <label class="stock-order-check" title="${escapeHtml(_t2('dashboard.restock_flag_hint', 'Ajouter ce filament à la liste « À commander »'))}">
+                    <input type="checkbox" ${_restockManualKeys.has(_restockKeyOf(s)) ? 'checked' : ''} onchange="toggleRestockFlag(${i}, this.checked)">
+                    <span>${escapeHtml(_t2('dashboard.restock_flag', 'À commander'))}</span>
+                </label>
             </div>
         `).join('');
     } catch (err) {
@@ -4537,6 +4546,30 @@ async function _loadDashboardStock() {
 
 // --- Rappel de réapprovisionnement : filaments dont le total restant passe sous le seuil ---
 let _restockItems = [];
+let _restockManualKeys = new Set();
+let _stockLowSlots = [];
+// Même clé que le serveur (_restock_key) : marque | MATIÈRE | couleur
+function _restockKeyOf(s) {
+    const mat = (s.source_type === 'tigertag' && /^\d+$/.test(String(s.material || '').trim())) ? '' : (s.material || '');
+    return `${String(s.vendor || '').trim().toLowerCase()}|${String(mat).trim().toUpperCase()}|${String(s.color_hex || '').trim().toLowerCase()}`;
+}
+window.toggleRestockFlag = async function (i, checked) {
+    const s = _stockLowSlots[i];
+    if (!s) return;
+    try {
+        const res = await fetch(`${API}/api/filament/restock/flag`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vendor: s.vendor || '', material: s.material || '', color_hex: s.color_hex || '', name: s.name || '', flagged: !!checked }),
+        });
+        if (!res.ok) throw new Error('http');
+        showToast(checked ? _t2('dashboard.restock_flag_on', 'Ajouté à la liste « À commander »') : _t2('dashboard.restock_flag_off', 'Retiré de la liste « À commander »'), 'success');
+        _loadDashboardStock();
+        _loadDashboardRestock();
+    } catch (e) {
+        showToast(I18N.t('toast.connection_error'), 'error');
+    }
+};
 async function _loadDashboardRestock() {
     const body = document.getElementById('dashboard-restock-body');
     if (!body) return;
@@ -4545,7 +4578,7 @@ async function _loadDashboardRestock() {
         if (!res.ok) throw new Error('http');
         const data = await res.json();
         _restockItems = data.items || [];
-        if (!data.threshold_g) {
+        if (!data.threshold_g && !_restockItems.length) {
             body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-bell-slash"></i><p>${escapeHtml(_t2('dashboard.restock_disabled', 'Rappel désactivé (seuil à 0 g)'))}</p></div>`;
             return;
         }
@@ -4553,7 +4586,7 @@ async function _loadDashboardRestock() {
             body.innerHTML = `<div class="dashboard-widget-empty dashboard-widget-empty--ok"><i class="fa-solid fa-circle-check"></i><p>${escapeHtml(_t2('dashboard.restock_ok', 'Rien à commander pour le moment'))}</p></div>`;
             return;
         }
-        _restockItems.forEach(it => {
+        _restockItems.filter(it => !it.manual).forEach(it => {
             createNotification(
                 'low_stock',
                 _t2('notif.restock_title', 'Filament à commander'),
@@ -4571,7 +4604,7 @@ async function _loadDashboardRestock() {
                 <div class="dashboard-row-icon" style="background:${escapeHtml(color)}22;color:${escapeHtml(color)};"><i class="fa-solid fa-circle"></i></div>
                 <div class="dashboard-row-body">
                     <div class="dashboard-row-title" title="${escapeHtml(_restockLabel(it))}">${escapeHtml(_restockLabel(it))}</div>
-                    <div class="dashboard-row-sub">${escapeHtml(left)} — ${escapeHtml(spools)}</div>
+                    <div class="dashboard-row-sub">${escapeHtml(left)} — ${escapeHtml(spools)}${it.manual ? ` — <i class="fa-solid fa-hand-pointer" aria-hidden="true"></i> ${escapeHtml(_t2('dashboard.restock_manual', 'ajouté à la main'))}` : ''}</div>
                 </div>
                 <button type="button" class="btn btn-primary btn-sm restock-btn" onclick="restockOrder(${i})" title="${escapeHtml(_t2('dashboard.restock_order_hint', 'Ouvrir les boutiques fournisseurs'))}"><i class="fa-solid fa-cart-shopping"></i> ${escapeHtml(_t2('dashboard.restock_order', 'Commander'))}</button>
                 <button type="button" class="btn btn-ghost btn-sm restock-btn" onclick="restockSnooze(${i})" title="${escapeHtml(_t2('dashboard.restock_done_hint', 'Déjà commandé : rappel reporté de 14 jours'))}"><i class="fa-solid fa-check"></i></button>

@@ -2150,5 +2150,10 @@
   "lowstock.restock": "補充しきい値（g、フィラメントごとの合計）",
   "nav.discord": "Discord",
   "about.partner_title": "パートナーシップ",
-  "about.partner_desc": "Stellio は NFC/RFID フィラメント識別システム TigerTag の連携パートナーです。"
+  "about.partner_desc": "Stellio は NFC/RFID フィラメント識別システム TigerTag の連携パートナーです。",
+  "dashboard.restock_flag": "発注が必要",
+  "dashboard.restock_flag_hint": "このフィラメントを「発注が必要」リストに追加",
+  "dashboard.restock_flag_on": "「発注が必要」リストに追加しました",
+  "dashboard.restock_flag_off": "「発注が必要」リストから削除しました",
+  "dashboard.restock_manual": "手動で追加"
 }

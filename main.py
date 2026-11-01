@@ -26166,10 +26166,10 @@ def api_filament_restock():
     """Filaments (marque + matière + couleur) dont le total restant, toutes bobines confondues,
     est sous le seuil de réapprovisionnement. 0 g = fonction désactivée."""
     threshold = _restock_threshold_g()
-    if threshold <= 0:
-        return jsonify({"threshold_g": 0, "items": []}), 200
     include_snoozed = request.args.get('all') == '1'
-    snoozed = (load_settings() or {}).get('restock_snoozed') or {}
+    _st = load_settings() or {}
+    snoozed = _st.get('restock_snoozed') or {}
+    manual = _st.get('restock_manual') if isinstance(_st.get('restock_manual'), dict) else {}
     now = time.time()
 
     groups = {}
@@ -26187,20 +26187,56 @@ def api_filament_restock():
         g['total_g'] += max(rem, 0.0)
         g['spool_count'] += 1
 
+    # Filaments cochés « à commander » à la main : listés même sans bobine ni stock bas
+    for mk, meta in manual.items():
+        if mk not in groups and isinstance(meta, dict):
+            groups[mk] = {'key': mk, 'name': meta.get('name') or '', 'vendor': meta.get('vendor') or '',
+                          'material': meta.get('material') or '', 'color_hex': meta.get('color_hex') or '#888888',
+                          'total_g': 0.0, 'spool_count': 0}
+
     items = []
     for g in groups.values():
-        if g['total_g'] > threshold:
+        is_manual = g['key'] in manual
+        if not is_manual and (threshold <= 0 or g['total_g'] > threshold):
             continue
         until = snoozed.get(g['key'])
         is_snoozed = bool(until) and float(until) > now
-        if is_snoozed and not include_snoozed:
+        if is_snoozed and not include_snoozed and not is_manual:
             continue
         g['total_g'] = round(g['total_g'], 1)
-        g['snoozed_until'] = float(until) if is_snoozed else None
+        g['snoozed_until'] = float(until) if (is_snoozed and not is_manual) else None
+        g['manual'] = is_manual
         g.update(_spool_buy_info(g['vendor'], g['material'], g['name']))
         items.append(g)
-    items.sort(key=lambda x: x['total_g'])
-    return jsonify({"threshold_g": threshold, "items": items}), 200
+    items.sort(key=lambda x: (not x['manual'], x['total_g']))
+    return jsonify({"threshold_g": threshold, "items": items, "manual_keys": list(manual.keys())}), 200
+
+
+@app.route('/api/filament/restock/flag', methods=['POST'])
+@login_required
+def api_filament_restock_flag():
+    """Coche / décoche « à commander » pour un filament (marque + matière + couleur) depuis le widget de stock faible."""
+    data = request.json or {}
+    vendor = str(data.get('vendor') or '')[:120]
+    material = str(data.get('material') or '')[:60]
+    color_hex = str(data.get('color_hex') or '')[:20]
+    name = str(data.get('name') or '')[:200]
+    key = _restock_key(vendor, material, color_hex)
+    if key == '||':
+        return jsonify({"error": "Filament non identifiable"}), 400
+    flagged = bool(data.get('flagged'))
+    settings = load_settings() or {}
+    manual = dict(settings.get('restock_manual') or {})
+    if flagged:
+        manual[key] = {'name': name, 'vendor': vendor, 'material': material, 'color_hex': color_hex, 'at': time.time()}
+        snoozed = dict(settings.get('restock_snoozed') or {})
+        if snoozed.pop(key, None) is not None:
+            settings['restock_snoozed'] = snoozed
+    else:
+        manual.pop(key, None)
+    settings['restock_manual'] = manual
+    save_settings(settings)
+    return jsonify({"key": key, "flagged": flagged}), 200
 
 
 @app.route('/api/filament/restock/snooze', methods=['POST'])
@@ -26222,6 +26258,10 @@ def api_filament_restock_snooze():
                if isinstance(v, (int, float)) and v > now}
     if days > 0:
         snoozed[key] = now + days * 86400
+        # « Commandé » : le filament coché à la main sort aussi de la liste
+        manual = dict(settings.get('restock_manual') or {})
+        if manual.pop(key, None) is not None:
+            settings['restock_manual'] = manual
     else:
         snoozed.pop(key, None)
     settings['restock_snoozed'] = snoozed

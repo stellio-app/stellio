@@ -2150,5 +2150,10 @@
   "lowstock.restock": "补货阈值（克，按每种耗材总量）",
   "nav.discord": "Discord",
   "about.partner_title": "合作伙伴",
-  "about.partner_desc": "Stellio 是 NFC/RFID 耗材识别系统 TigerTag 的集成合作伙伴。"
+  "about.partner_desc": "Stellio 是 NFC/RFID 耗材识别系统 TigerTag 的集成合作伙伴。",
+  "dashboard.restock_flag": "待订购",
+  "dashboard.restock_flag_hint": "将此耗材加入“待订购”列表",
+  "dashboard.restock_flag_on": "已加入“待订购”列表",
+  "dashboard.restock_flag_off": "已从“待订购”列表移除",
+  "dashboard.restock_manual": "手动添加"
 }
