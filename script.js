@@ -40,6 +40,25 @@
     } catch (e) { console.warn('[Guard] init impossible', e); }
 })();
 
+/* ===== Focus de la page au démarrage : défilement à la molette / au clavier sans devoir cliquer d'abord ===== */
+(function () {
+    function focusPage() {
+        try {
+            window.focus();
+            const a = document.activeElement;
+            if (a && a !== document.body && a.tagName !== 'HTML') return;   // un champ (ex. connexion) a déjà le focus
+            const m = document.querySelector('.main-content');
+            if (m) {
+                if (!m.hasAttribute('tabindex')) m.setAttribute('tabindex', '-1');
+                m.style.outline = 'none';
+                m.focus({ preventScroll: true });
+            }
+        } catch (e) { /* sans importance */ }
+    }
+    window.addEventListener('load', () => { setTimeout(focusPage, 300); setTimeout(focusPage, 1500); });
+    window.addEventListener('focus', () => setTimeout(focusPage, 50));
+})();
+
 const I18N = {
 _langCache: null,
 get lang() {
@@ -3723,17 +3742,23 @@ window.goToFileInLibrary = goToFileInLibrary;
 let _notifPollInterval = null;
 let _notifPanelOpen = false;
 
+let _lastNotifData = { notifications: [], unread_count: 0 };
 async function loadNotifications() {
     try {
-        const res = await fetch(`${API}/api/notifications?limit=30`);
+        let res = await fetch(`${API}/api/notifications?limit=30`);
+        if (!res.ok) { await new Promise(r => setTimeout(r, 800)); res = await fetch(`${API}/api/notifications?limit=30`); }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
+        if (!Array.isArray(data.notifications)) throw new Error('réponse invalide');
+        _lastNotifData = data;
         _updateNotifBadge(data.unread_count || 0);
         maybeFireBrowserNotifications(data.notifications || []);
         if (_notifPanelOpen) _renderNotifList(data.notifications || []);
         return data;
     } catch (err) {
+        // On garde la dernière liste connue plutôt que d'afficher « Aucune notification » alors que le badge en compte.
         console.error('[Notifications] Erreur chargement:', err);
-        return { notifications: [], unread_count: 0 };
+        return _lastNotifData;
     }
 }
 window.loadNotifications = loadNotifications;
@@ -5562,8 +5587,17 @@ if (res.ok) {
 showToast(_t3('toast.source_types_saved', 'Types de fichiers enregistrés — mise à jour de la bibliothèque…'), 'success');
 closeModal('modal-source-types');
 loadSources();
+loadFiles();   // masquage immédiat côté serveur ; le rescan ne sert qu'à réajouter des types réactivés
+(async () => {
+for (let i = 0; i < 40; i++) {
+await new Promise(r => setTimeout(r, 1500));
+try {
+const st = await (await fetch(`${API}/api/scan/status`)).json();
+if (!st.running && i >= 1) break;
+} catch (e) { break; }
+}
 loadFiles();
-setTimeout(() => loadFiles(), 4000);
+})();
 } else showToast(data.error || I18N.t('toast.error'), 'error');
 } catch (err) { showToast(I18N.t('toast.fetch_error'), 'error'); }
 };
@@ -8447,7 +8481,7 @@ function showSlicerAutoImportPopup(newlyImported) {
         <p style="color:var(--text-muted); margin:0 0 24px 0; line-height:1.4; font-size:12px; opacity:0.85;">${namesPreview}</p>
         <div style="display:flex; gap:10px; justify-content:center;">
             <button id="slicer-autoimport-dismiss" class="btn btn-ghost">${I18N.t('actions.close') || 'Fermer'}</button>
-            <button id="slicer-autoimport-view" class="btn btn-primary">${I18N.t('settings.slicer_autoimport_view') || 'Voir les profils'}</button>
+            <button id="slicer-autoimport-view" class="btn btn-primary">${I18N.t('settings.slicer_autoimport_view') || 'Importer les profils'}</button>
         </div>
     `;
     overlay.appendChild(popup);

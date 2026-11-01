@@ -1459,7 +1459,7 @@
   "settings.mobile_remote_access": "Acesso móvel",
   "settings.slicer_autoimport_message": "O Stellio detectou e importou automaticamente: {{list}}.",
   "settings.slicer_autoimport_title": "Perfis de fatiador importados",
-  "settings.slicer_autoimport_view": "Ver perfis",
+  "settings.slicer_autoimport_view": "Importar perfis",
   "settings.slicer_discover_message": "Fatiador(es) detectado(s) nesta máquina — configure suas preferências:",
   "settings.slicer_discover_title": "Fatiadores detectados",
   "settings.slicer_profiles_type_filament_plural": "Filamentos",

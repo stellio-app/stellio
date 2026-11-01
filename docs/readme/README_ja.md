@@ -439,7 +439,7 @@ Stellio は、NFC/RFID によるフィラメント識別システム [**TigerTag
 - 💡 **機能リクエスト**：[GitHub Discussions](https://github.com/stellio-app/stellio/discussions)
 - 📧 **メール**：contact@stellio-app.com
 - 🌐 **ウェブサイト**：[stellio-app.com](https://stellio-app.com)
-- 💬 **Discord**: [Discord コミュニティに参加](https://discord.gg/VOTRE-INVITATION)
+- 💬 **Discord**: [Discord コミュニティに参加](https://discord.gg/ySxpHvS6bd)
 
 ---
 
@@ -466,5 +466,5 @@ Stellioが役に立ったと感じたら、ぜひ：
   <a href="https://github.com/stellio-app/stellio">⭐ このリポジトリにスターをつける</a> •
   <a href="https://github.com/stellio-app/stellio/issues">🐛 バグを報告する</a> •
   <a href="https://github.com/stellio-app/stellio/discussions">💡 機能をリクエストする</a> •
-  <a href="https://discord.gg/VOTRE-INVITATION">💬 Discord に参加</a>
+  <a href="https://discord.gg/ySxpHvS6bd">💬 Discord に参加</a>
 </p>

@@ -6857,7 +6857,8 @@ def api_update_source(source_id):
             conn.execute("UPDATE sources SET config = ? WHERE id = ? AND user_id = ?",
                          (json.dumps(cfg), source_id, session['user_id']))
             conn.commit()
-            invalidate_cache()
+            # Le cache n'est PAS supprimé : _drop_disabled_type_files masque tout de suite les types
+            # désactivés à la lecture ; le rescan en arrière-plan ne sert qu'à (ré)ajouter ceux réactivés.
             all_sources = [dict(s) for s in conn.execute("SELECT * FROM sources WHERE user_id = ?", (session['user_id'],)).fetchall()]
         finally:
             conn.close()
@@ -9494,6 +9495,12 @@ def api_check_changes():
 def api_invalidate_cache_route():
     invalidate_cache()
     return jsonify({"message": "Cache vidé"}), 200
+
+@app.route('/api/scan/status', methods=['GET'])
+@login_required
+def api_scan_status():
+    return jsonify({"running": _background_scan_running.locked()})
+
 
 @app.route('/api/scan/delta', methods=['GET'])
 @login_required
@@ -15051,14 +15058,93 @@ def api_get_notifications():
         return jsonify({"notifications": [], "unread_count": 0}), 500
 
 
+_TOAST_AUMID = 'Stellio.App'
+
+
+def _register_toast_identity():
+    """Enregistre (HKCU, sans droits admin) le nom et l'icône affichés en haut des notifications Windows :
+    « Stellio » + logo au lieu de « Stellio.exe »."""
+    try:
+        import winreg
+        icon = os.path.join(BASE_DIR, 'assets', 'logo-stellio.png')
+        if not os.path.exists(icon):
+            icon = os.path.join(BASE_DIR, 'assets', 'logo-nom-stellio.png')
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, 'Software\\Classes\\AppUserModelId\\' + _TOAST_AUMID) as k:
+            winreg.SetValueEx(k, 'DisplayName', 0, winreg.REG_SZ, 'Stellio')
+            if os.path.exists(icon):
+                winreg.SetValueEx(k, 'IconUri', 0, winreg.REG_SZ, icon)
+        return True
+    except Exception as e:
+        app_logger.debug(f"[Notif] Enregistrement de l'identité du toast impossible: {e}")
+        return False
+
+
+def _send_windows_toast(title, message):
+    from xml.sax.saxutils import escape
+    if not _register_toast_identity():
+        return False
+    xml = ('<toast><visual><binding template="ToastGeneric"><text>%s</text><text>%s</text></binding></visual></toast>'
+           % (escape(title), escape(message)))
+    ps = (
+        "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null;"
+        "[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] > $null;"
+        "$x = New-Object Windows.Data.Xml.Dom.XmlDocument; $x.LoadXml($env:STELLIO_TOAST_XML);"
+        "$t = [Windows.UI.Notifications.ToastNotification]::new($x);"
+        "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('%s').Show($t)" % _TOAST_AUMID
+    )
+    env = dict(os.environ, STELLIO_TOAST_XML=xml)
+    r = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', ps],
+                       env=env, capture_output=True, timeout=20,
+                       creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    return r.returncode == 0
+
+
+_toast_queue = queue.Queue(maxsize=4)
+_toast_worker_started = False
+_toast_worker_lock = threading.Lock()
+
+
+def _toast_worker():
+    while True:
+        title, message = _toast_queue.get()
+        try:
+            _send_native_notification_now(title, message)
+        except Exception as e:
+            app_logger.debug(f"[Notif] Worker toast: {e}")
+        time.sleep(1.0)   # espace les toasts : pas de salve de 20 notifications d'un coup
+
+
 def _send_native_notification(title, message):
+    """Met la notification Windows en file d'attente (thread dédié) : ne bloque JAMAIS la requête HTTP.
+    La file est bornée : au-delà de 4 en attente, les suivantes restent visibles dans le centre de notifications de Stellio."""
+    global _toast_worker_started
     if os.name != 'nt':
         return
+    with _toast_worker_lock:
+        if not _toast_worker_started:
+            threading.Thread(target=_toast_worker, daemon=True, name='stellio-toast').start()
+            _toast_worker_started = True
+    try:
+        _toast_queue.put_nowait((title, message))
+    except queue.Full:
+        pass
+
+
+def _send_native_notification_now(title, message):
+    if os.name != 'nt':
+        return
+    title = str(title or 'Stellio')[:120]
+    message = (message or '')[:250]
+    try:
+        if _send_windows_toast(title, message):
+            return
+    except Exception as e:
+        app_logger.debug(f"[Notif] Toast Windows échoué, repli plyer: {e}")
     try:
         from plyer import notification as _plyer_notification
         _plyer_notification.notify(
             title=title,
-            message=(message or '')[:250],
+            message=message,
             app_name='Stellio',
             timeout=6,
         )
@@ -18048,7 +18134,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.8.0"
+CURRENT_VERSION = "0.8.1"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -27859,6 +27945,80 @@ if __name__ in ('__main__', 'stellio_main'):
                 window.events.closing += _on_window_closing
             except Exception as ex:
                 app_logger.info(f"[INFO] Binding closing event impossible: {ex}")
+
+            def _focus_webview_child(hwnd):
+                """Donne le focus clavier/molette au contenu web (sinon il faut cliquer dans la page avant de pouvoir défiler)."""
+                import ctypes
+                from ctypes import wintypes
+                user32 = ctypes.windll.user32
+                kernel32 = ctypes.windll.kernel32
+                found = []
+                CB = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+                def _enum(child, _lp):
+                    buf = ctypes.create_unicode_buffer(128)
+                    user32.GetClassNameW(child, buf, 128)
+                    if 'Chrome_RenderWidgetHostHWND' in buf.value or 'Chrome_WidgetWin' in buf.value:
+                        found.append(child)
+                        return False
+                    return True
+
+                user32.EnumChildWindows(hwnd, CB(_enum), 0)
+                if not found:
+                    return
+                ui_thread = user32.GetWindowThreadProcessId(hwnd, None)
+                cur = kernel32.GetCurrentThreadId()
+                attached = bool(ui_thread and ui_thread != cur and user32.AttachThreadInput(cur, ui_thread, True))
+                try:
+                    user32.SetFocus(found[0])
+                finally:
+                    if attached:
+                        user32.AttachThreadInput(cur, ui_thread, False)
+
+            _front_done = threading.Event()
+
+            def _bring_to_front():
+                """Au lancement, demande à Windows de mettre la fenêtre devant les autres.
+                Volontairement minimal (aucun attachement de file d'entrée, aucun appel pywebview
+                bloquant) : une fois, depuis un thread séparé, et sans jamais toucher au thread de l'interface."""
+                if os.name != 'nt' or _front_done.is_set():
+                    return
+                _front_done.set()
+                try:
+                    import ctypes
+                    from ctypes import wintypes
+                    user32 = ctypes.windll.user32
+                    user32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+                    user32.FindWindowW.restype = wintypes.HWND
+                    user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+                    user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+                    user32.IsIconic.argtypes = [wintypes.HWND]
+                    hwnd = None
+                    for _ in range(20):
+                        hwnd = user32.FindWindowW(None, 'Stellio')
+                        if hwnd:
+                            break
+                        time.sleep(0.15)
+                    if not hwnd:
+                        return
+                    time.sleep(0.4)
+                    if user32.IsIconic(hwnd):
+                        user32.ShowWindow(hwnd, 9)   # SW_RESTORE
+                    user32.keybd_event(0x12, 0, 0, 0)    # Alt appuyé/relâché : autorise SetForegroundWindow
+                    user32.keybd_event(0x12, 0, 2, 0)
+                    user32.SetForegroundWindow(hwnd)
+                    time.sleep(0.8)
+                    _focus_webview_child(hwnd)
+                except Exception as ex:
+                    app_logger.debug(f"[Window] Premier plan impossible: {ex}")
+
+            if not STELLIO_START_MINIMIZED:
+                def _front_on_shown():
+                    threading.Thread(target=_bring_to_front, daemon=True).start()
+                try:
+                    window.events.shown += _front_on_shown
+                except Exception as ex:
+                    app_logger.info(f"[INFO] Binding premier plan impossible: {ex}")
 
             if STELLIO_START_MINIMIZED:
                 def _minimize_on_shown():

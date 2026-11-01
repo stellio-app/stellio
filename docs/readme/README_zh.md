@@ -439,7 +439,7 @@ Stellio 是 NFC/RFID 耗材识别系统 [**TigerTag**](https://tigersystem.io) �
 - 💡 **功能建议**：[GitHub Discussions](https://github.com/stellio-app/stellio/discussions)
 - 📧 **邮箱**：contact@stellio-app.com
 - 🌐 **官网**：[stellio-app.com](https://stellio-app.com)
-- 💬 **Discord**: [加入 Discord 社区](https://discord.gg/VOTRE-INVITATION)
+- 💬 **Discord**: [加入 Discord 社区](https://discord.gg/ySxpHvS6bd)
 
 ---
 
@@ -466,5 +466,5 @@ Stellio 是 NFC/RFID 耗材识别系统 [**TigerTag**](https://tigersystem.io) �
   <a href="https://github.com/stellio-app/stellio">⭐ 为本仓库点星</a> •
   <a href="https://github.com/stellio-app/stellio/issues">🐛 报告问题</a> •
   <a href="https://github.com/stellio-app/stellio/discussions">💡 建议新功能</a> •
-  <a href="https://discord.gg/VOTRE-INVITATION">💬 加入 Discord</a>
+  <a href="https://discord.gg/ySxpHvS6bd">💬 加入 Discord</a>
 </p>

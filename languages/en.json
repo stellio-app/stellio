@@ -1459,7 +1459,7 @@
   "settings.mobile_remote_access": "Mobile access",
   "settings.slicer_autoimport_message": "Stellio automatically detected and imported: {{list}}.",
   "settings.slicer_autoimport_title": "Imported slicer profiles",
-  "settings.slicer_autoimport_view": "View profiles",
+  "settings.slicer_autoimport_view": "Import profiles",
   "settings.slicer_discover_message": "Slicer(s) detected on this machine — set your preferences:",
   "settings.slicer_discover_title": "Slicers detected",
   "settings.slicer_profiles_type_filament_plural": "Filaments",

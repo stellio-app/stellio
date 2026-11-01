@@ -1459,7 +1459,7 @@
   "settings.mobile_remote_access": "Acceso móvil",
   "settings.slicer_autoimport_message": "Stellio detectó e importó automáticamente: {{list}}.",
   "settings.slicer_autoimport_title": "Perfiles de laminador importados",
-  "settings.slicer_autoimport_view": "Ver perfiles",
+  "settings.slicer_autoimport_view": "Importar perfiles",
   "settings.slicer_discover_message": "Laminador(es) detectado(s) en esta máquina — configura tus preferencias:",
   "settings.slicer_discover_title": "Laminadores detectados",
   "settings.slicer_profiles_type_filament_plural": "Filamentos",

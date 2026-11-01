@@ -439,7 +439,7 @@ O Stellio é parceiro de integração da [**TigerTag**](https://tigersystem.io),
 - 💡 **Solicitar uma funcionalidade**: [GitHub Discussions](https://github.com/stellio-app/stellio/discussions)
 - 📧 **Email**: contact@stellio-app.com
 - 🌐 **Site**: [stellio-app.com](https://stellio-app.com)
-- 💬 **Discord**: [Entre na comunidade do Discord](https://discord.gg/VOTRE-INVITATION)
+- 💬 **Discord**: [Entre na comunidade do Discord](https://discord.gg/ySxpHvS6bd)
 
 ---
 
@@ -466,5 +466,5 @@ Se o Stellio é útil para você, considere:
   <a href="https://github.com/stellio-app/stellio">⭐ Dê uma estrela a este repositório</a> •
   <a href="https://github.com/stellio-app/stellio/issues">🐛 Reportar um bug</a> •
   <a href="https://github.com/stellio-app/stellio/discussions">💡 Solicitar uma funcionalidade</a> •
-  <a href="https://discord.gg/VOTRE-INVITATION">💬 Entrar no Discord</a>
+  <a href="https://discord.gg/ySxpHvS6bd">💬 Entrar no Discord</a>
 </p>

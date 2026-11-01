@@ -1464,7 +1464,7 @@
   "settings.slicer_discover_message": "Slicer(s) détecté(s) sur cette machine — configure tes préférences :",
   "settings.slicer_autoimport_title": "Profils slicer importés",
   "settings.slicer_autoimport_message": "Stellio a détecté et importé automatiquement : {{list}}.",
-  "settings.slicer_autoimport_view": "Voir les profils",
+  "settings.slicer_autoimport_view": "Importer les profils",
   "settings.slicer_profiles_type_printer_plural": "Imprimantes",
   "settings.slicer_profiles_type_filament_plural": "Filaments",
   "settings.slicer_profiles_type_process_plural": "Réglages",

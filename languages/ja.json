@@ -1459,7 +1459,7 @@
   "settings.mobile_remote_access": "モバイルアクセス",
   "settings.slicer_autoimport_message": "Stellioは次を自動的に検出してインポートしました：{{list}}。",
   "settings.slicer_autoimport_title": "インポートされたスライサープロファイル",
-  "settings.slicer_autoimport_view": "プロファイルを表示",
+  "settings.slicer_autoimport_view": "プロファイルをインポート",
   "settings.slicer_discover_message": "このマシンでスライサーが検出されました — 設定を行ってください：",
   "settings.slicer_discover_title": "検出されたスライサー",
   "settings.slicer_profiles_type_filament_plural": "フィラメント",

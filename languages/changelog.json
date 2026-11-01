@@ -1,5 +1,50 @@
 [
   {
+    "version": "0.8.1",
+    "items": {
+      "fr": [
+        "Types de fichiers masqués dans les paramètres des sources : le changement s'applique immédiatement dans la bibliothèque, sans attendre un nouveau scan",
+        "Notifications Windows : affichent maintenant « Stellio » avec l'icône Stellio en haut à gauche, au lieu de « Stellio.exe »",
+        "Lancement : la fenêtre de Stellio passe désormais au premier plan, même si un dossier de l'Explorateur est ouvert"
+      ],
+      "en": [
+        "File types hidden in the source settings: the change now applies immediately in the library, without waiting for a new scan",
+        "Windows notifications: now show “Stellio” with the Stellio icon at the top left, instead of “Stellio.exe”",
+        "Launch: the Stellio window now comes to the front, even when a File Explorer folder is open"
+      ],
+      "de": [
+        "In den Quelleneinstellungen ausgeblendete Dateitypen: Die Änderung wirkt sich sofort in der Bibliothek aus, ohne neuen Scan abzuwarten",
+        "Windows-Benachrichtigungen: zeigen jetzt „Stellio“ mit dem Stellio-Symbol oben links statt „Stellio.exe“",
+        "Start: Das Stellio-Fenster kommt jetzt in den Vordergrund, auch wenn ein Explorer-Ordner geöffnet ist"
+      ],
+      "es": [
+        "Tipos de archivo ocultos en los ajustes de las fuentes: el cambio se aplica al instante en la biblioteca, sin esperar a un nuevo escaneo",
+        "Notificaciones de Windows: ahora muestran «Stellio» con el icono de Stellio arriba a la izquierda, en lugar de «Stellio.exe»",
+        "Inicio: la ventana de Stellio pasa ahora al primer plano, incluso con una carpeta del Explorador abierta"
+      ],
+      "pt": [
+        "Tipos de ficheiro ocultos nas definições das fontes: a alteração aplica-se de imediato na biblioteca, sem esperar por uma nova análise",
+        "Notificações do Windows: mostram agora «Stellio» com o ícone do Stellio no canto superior esquerdo, em vez de «Stellio.exe»",
+        "Arranque: a janela do Stellio passa agora para o primeiro plano, mesmo com uma pasta do Explorador aberta"
+      ],
+      "it": [
+        "Tipi di file nascosti nelle impostazioni delle sorgenti: la modifica si applica subito nella libreria, senza attendere una nuova scansione",
+        "Notifiche di Windows: ora mostrano «Stellio» con l'icona di Stellio in alto a sinistra, invece di «Stellio.exe»",
+        "Avvio: la finestra di Stellio ora passa in primo piano, anche con una cartella di Esplora file aperta"
+      ],
+      "zh": [
+        "在来源设置中隐藏文件类型：更改会立即应用到文件库，无需等待重新扫描",
+        "Windows 通知：现在左上角显示 Stellio 图标和“Stellio”名称，而不是“Stellio.exe”",
+        "启动：即使打开了资源管理器文件夹，Stellio 窗口现在也会显示在最前面"
+      ],
+      "ja": [
+        "ソース設定で非表示にしたファイル形式：変更が再スキャンを待たずにライブラリへ即時反映されます",
+        "Windows通知：左上に Stellio アイコンと「Stellio」の名前を表示するようになりました（「Stellio.exe」ではなく）",
+        "起動時：エクスプローラーのフォルダーが開いていても、Stellio のウィンドウが最前面に表示されます"
+      ]
+    }
+  },
+  {
     "version": "0.8.0",
     "items": {
       "fr": [

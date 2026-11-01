@@ -1459,7 +1459,7 @@
   "settings.mobile_remote_access": "移动访问",
   "settings.slicer_autoimport_message": "Stellio 已自动检测并导入：{{list}}。",
   "settings.slicer_autoimport_title": "已导入的切片软件配置文件",
-  "settings.slicer_autoimport_view": "查看配置文件",
+  "settings.slicer_autoimport_view": "导入配置文件",
   "settings.slicer_discover_message": "在此设备上检测到切片软件 —— 请设置您的偏好：",
   "settings.slicer_discover_title": "检测到的切片软件",
   "settings.slicer_profiles_type_filament_plural": "耗材",
