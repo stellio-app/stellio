@@ -15115,8 +15115,6 @@ def _toast_worker():
 
 
 def _send_native_notification(title, message):
-    """Met la notification Windows en file d'attente (thread dédié) : ne bloque JAMAIS la requête HTTP.
-    La file est bornée : au-delà de 4 en attente, les suivantes restent visibles dans le centre de notifications de Stellio."""
     global _toast_worker_started
     if os.name != 'nt':
         return
