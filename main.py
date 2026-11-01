@@ -5115,7 +5115,9 @@ def _concatenate_filtering_outliers(geoms):
     kept = []
     for g, centroid, n_verts in info:
         dist_to_main = np.linalg.norm(centroid - main_centroid)
-        if dist_to_main <= ref_scale * 5:
+        # Seuil large : des petites pièces réparties sur un plateau peuvent être à plusieurs
+        # fois la taille de la pièce principale sans être « aberrantes » (plateau jusqu'à ~500 mm).
+        if dist_to_main <= max(ref_scale * 5, 600.0):
             kept.append(g)
 
     if not kept:
@@ -5316,7 +5318,7 @@ def _resolve_3mf_plate_mesh(source, wanted_ids):
                 found_build = True
                 for item in items:
                     item_id = item.get('objectid')
-                    if not item_id or item_id not in wanted_ids:
+                    if not item_id or (wanted_ids is not None and item_id not in wanted_ids):
                         continue
                     item_tf = _parse_transform(item.get('transform'))
                     target_file = model_path
@@ -5363,6 +5365,15 @@ def load_3mf_mesh(source, plate_index=None):
             return resolved_mesh
         app_logger.debug(f"[3MF] Résolution XML directe infructueuse pour {display_name}, repli sur trimesh")
 
+    else:
+        # Plateau unique : on reconstruit TOUTES les pièces de la section <build> (transformations,
+        # composants et fichiers d'objets externes inclus). trimesh et l'extraction « à plat » ne suivent
+        # pas toujours les objets stockés dans des .model séparés (Bambu / Orca) et n'en gardaient qu'un.
+        resolved_all = _resolve_3mf_plate_mesh(source, None)
+        if resolved_all is not None:
+            app_logger.info(f"[3MF] Toutes les pièces assemblées via <build> ({len(resolved_all.vertices)} sommets)")
+            return resolved_all
+
     try:
         if is_bytes:
             loaded = trimesh.load(io.BytesIO(source), file_type='3mf')
@@ -5397,6 +5408,7 @@ def load_3mf_mesh(source, plate_index=None):
             with zipfile.ZipFile(zip_source, 'r') as zf:
                 model_files = [n for n in zf.namelist() if n.lower().endswith('.model')]
                 model_files.sort(key=lambda n: (0 if '3D/' in n or '3d/' in n else 1, n))
+                all_meshes_data = []
                 for model_path in model_files:
                     try:
                         with zf.open(model_path) as xml_file:
@@ -5448,15 +5460,16 @@ def load_3mf_mesh(source, plate_index=None):
                                     if vertices and faces:
                                         meshes_data.append((np.array(vertices, dtype=np.float64),
                                                             np.array(faces,    dtype=np.int32)))
-                            if meshes_data:
-                                sub_meshes = [trimesh.Trimesh(vertices=v, faces=f, process=False)
-                                              for v, f in meshes_data]
-                                mesh = _concatenate_filtering_outliers(sub_meshes) if len(sub_meshes) > 1 else sub_meshes[0]
-                                if mesh is not None and not mesh.is_empty and len(mesh.vertices) > 0:
-                                    return mesh
+                            all_meshes_data.extend(meshes_data)
                     except Exception as e:
                         app_logger.debug(f"[3MF] Erreur parsing {model_path}: {e}")
                         continue
+                if all_meshes_data:
+                    sub_meshes = [trimesh.Trimesh(vertices=v, faces=f, process=False)
+                                  for v, f in all_meshes_data]
+                    mesh = _concatenate_filtering_outliers(sub_meshes) if len(sub_meshes) > 1 else sub_meshes[0]
+                    if mesh is not None and not mesh.is_empty and len(mesh.vertices) > 0:
+                        return mesh
         except Exception as e:
             app_logger.warning(f"[3MF] Erreur extraction XML {display_name}: {e}")
         return None

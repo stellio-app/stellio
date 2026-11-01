@@ -11,7 +11,10 @@
         "Détection non-manifold alignée sur les slicers : seuls les vrais trous (arêtes ouvertes) sont signalés, les normales inversées et les coques qui se touchent, corrigées silencieusement par votre slicer, ne déclenchent plus d'alerte",
         "Vérification d'intégrité et réparation : fin des « Délai dépassé » à répétition (délais proportionnels à la taille du fichier, décompte démarré à la lecture réelle, seconde tentative avec un délai triplé avant de signaler un fichier, moins de lectures en parallèle)",
         "Proxmox : nouveau script d'installation en une commande (stellio-lxc.sh) qui crée un conteneur LXC Debian 12, y installe Stellio avec son service systemd et affiche l'adresse d'accès ; dans ce conteneur, l'ajout de dossiers et fichiers locaux est masqué (sources réseau SMB et NFS uniquement, sauf dossier monté de l'hôte) ; méthode ajoutée aux README",
-        "Inventaire filament : nouveau widget « À commander » qui regroupe vos bobines par filament (marque, matière, couleur) et signale ceux dont le total restant passe sous un seuil de réapprovisionnement réglable (100 g par défaut, Paramètres → Inventaire filament) ; boutons « Commander » (boutiques des fournisseurs) et « Commandé » (rappel reporté de 14 jours), avec notification"
+        "Inventaire filament : nouveau widget « À commander » qui regroupe vos bobines par filament (marque, matière, couleur) et signale ceux dont le total restant passe sous un seuil de réapprovisionnement réglable (100 g par défaut, Paramètres → Inventaire filament) ; boutons « Commander » (boutiques des fournisseurs) et « Commandé » (rappel reporté de 14 jours), avec notification",
+        "Fenêtres : sélectionner du texte dans un champ (ex. renommer l'imprimante après la détection automatique) et relâcher la souris hors de la fenêtre ne la ferme plus",
+        "Communauté : bouton Discord dans le menu latéral (entre Liens utiles et GitHub) et section Partenariat TigerTag dans « À propos »",
+        "3MF : toutes les pièces d'un fichier sont désormais affichées dans l'aperçu et la miniature (une pièce éloignée des autres n'était plus ignorée à tort)"
       ],
       "en": [
         "History: all days are now collapsed by default and the history is split into one-week pages (Monday–Sunday), with “Older / Newer” navigation",
@@ -22,7 +25,10 @@
         "Non-manifold detection aligned with slicers: only real holes (open edges) are reported; flipped normals and touching shells, which your slicer fixes silently, no longer trigger a warning",
         "Integrity check and repair: no more repeated “Timed out” errors (timeouts scale with file size, the countdown starts at the actual read, a second attempt with a tripled timeout before reporting a file, fewer parallel reads)",
         "Proxmox: new one-command install script (stellio-lxc.sh) that creates a Debian 12 LXC container, installs Stellio with its systemd service and shows the access address; in this container, adding local folders and files is hidden (SMB and NFS network sources only, unless a host folder is mounted); method added to the READMEs",
-        "Filament inventory: new “To order” widget that groups your spools by filament (brand, material, color) and flags those whose total remaining weight falls below an adjustable restock threshold (100 g by default, Settings → Filament inventory); “Order” (supplier shops) and “Ordered” (reminder postponed by 14 days) buttons, with a notification"
+        "Filament inventory: new “To order” widget that groups your spools by filament (brand, material, color) and flags those whose total remaining weight falls below an adjustable restock threshold (100 g by default, Settings → Filament inventory); “Order” (supplier shops) and “Ordered” (reminder postponed by 14 days) buttons, with a notification",
+        "Windows: selecting text in a field (e.g. renaming the printer after auto-detection) and releasing the mouse outside the window no longer closes it",
+        "Community: Discord button in the sidebar (between Useful links and GitHub) and a TigerTag Partnership section in “About”",
+        "3MF: all parts of a file now appear in the preview and thumbnail (a part far from the others was wrongly dropped)"
       ],
       "de": [
         "Verlauf: Alle Tage sind jetzt standardmäßig eingeklappt und der Verlauf ist in Seiten zu je einer Woche (Montag–Sonntag) unterteilt, mit der Navigation „Älter / Neuer“",
@@ -33,7 +39,10 @@
         "Non-Manifold-Erkennung an Slicer angepasst: Nur echte Löcher (offene Kanten) werden gemeldet; umgedrehte Normalen und sich berührende Körper, die Ihr Slicer stillschweigend korrigiert, lösen keine Warnung mehr aus",
         "Integritätsprüfung und Reparatur: keine wiederholten „Zeitüberschreitung“-Fehler mehr (Zeitlimits wachsen mit der Dateigröße, der Countdown startet beim tatsächlichen Lesen, ein zweiter Versuch mit verdreifachtem Limit vor der Meldung, weniger parallele Lesevorgänge)",
         "Proxmox: neues Ein-Befehl-Installationsskript (stellio-lxc.sh), das einen Debian-12-LXC-Container erstellt, Stellio mit systemd-Dienst installiert und die Zugriffsadresse anzeigt; in diesem Container ist das Hinzufügen lokaler Ordner und Dateien ausgeblendet (nur SMB- und NFS-Netzwerkquellen, außer bei eingebundenem Host-Ordner); Methode in den READMEs ergänzt",
-        "Filament-Inventar: neues Widget „Nachbestellen“, das Ihre Spulen nach Filament (Marke, Material, Farbe) gruppiert und meldet, wenn die Gesamtrestmenge unter eine einstellbare Nachbestell-Schwelle fällt (Standard 100 g, Einstellungen → Filament-Inventar); Schaltflächen „Bestellen“ (Lieferanten-Shops) und „Bestellt“ (Erinnerung um 14 Tage verschoben), mit Benachrichtigung"
+        "Filament-Inventar: neues Widget „Nachbestellen“, das Ihre Spulen nach Filament (Marke, Material, Farbe) gruppiert und meldet, wenn die Gesamtrestmenge unter eine einstellbare Nachbestell-Schwelle fällt (Standard 100 g, Einstellungen → Filament-Inventar); Schaltflächen „Bestellen“ (Lieferanten-Shops) und „Bestellt“ (Erinnerung um 14 Tage verschoben), mit Benachrichtigung",
+        "Fenster: Text in einem Feld markieren (z. B. Drucker nach der automatischen Erkennung umbenennen) und die Maus außerhalb des Fensters loslassen schließt es nicht mehr",
+        "Community: Discord-Schaltfläche in der Seitenleiste (zwischen Nützliche Links und GitHub) und ein TigerTag-Partnerschaftsabschnitt unter „Über“",
+        "3MF: Alle Teile einer Datei erscheinen jetzt in Vorschau und Miniatur (ein weit entferntes Teil wurde fälschlich ausgeblendet)"
       ],
       "es": [
         "Historial: todos los días aparecen ahora plegados por defecto y el historial se divide en páginas de una semana (lunes–domingo), con navegación «Más antiguo / Más reciente»",
@@ -44,7 +53,10 @@
         "Detección non-manifold alineada con los slicers: solo se señalan los agujeros reales (aristas abiertas); las normales invertidas y los cuerpos que se tocan, que su slicer corrige en silencio, ya no provocan una alerta",
         "Verificación de integridad y reparación: se acabaron los «Tiempo de espera agotado» repetidos (los plazos dependen del tamaño del archivo, la cuenta atrás empieza en la lectura real, segundo intento con plazo triplicado antes de señalar un archivo, menos lecturas en paralelo)",
         "Proxmox: nuevo script de instalación con un solo comando (stellio-lxc.sh) que crea un contenedor LXC Debian 12, instala Stellio con su servicio systemd y muestra la dirección de acceso; en este contenedor se oculta la adición de carpetas y archivos locales (solo fuentes de red SMB y NFS, salvo carpeta montada del host); método añadido a los README",
-        "Inventario de filamento: nuevo widget «Por pedir» que agrupa tus bobinas por filamento (marca, material, color) y avisa cuando el total restante cae por debajo de un umbral de reposición ajustable (100 g por defecto, Ajustes → Inventario de filamento); botones «Pedir» (tiendas de proveedores) y «Pedido» (recordatorio aplazado 14 días), con notificación"
+        "Inventario de filamento: nuevo widget «Por pedir» que agrupa tus bobinas por filamento (marca, material, color) y avisa cuando el total restante cae por debajo de un umbral de reposición ajustable (100 g por defecto, Ajustes → Inventario de filamento); botones «Pedir» (tiendas de proveedores) y «Pedido» (recordatorio aplazado 14 días), con notificación",
+        "Ventanas: seleccionar texto en un campo (p. ej. renombrar la impresora tras la detección automática) y soltar el ratón fuera de la ventana ya no la cierra",
+        "Comunidad: botón de Discord en la barra lateral (entre Enlaces útiles y GitHub) y sección de colaboración con TigerTag en «Acerca de»",
+        "3MF: todas las piezas de un archivo aparecen ahora en la vista previa y la miniatura (una pieza alejada de las demás se descartaba por error)"
       ],
       "pt": [
         "Histórico: todos os dias agora ficam recolhidos por padrão e o histórico é dividido em páginas de uma semana (segunda–domingo), com navegação «Mais antigo / Mais recente»",
@@ -55,7 +67,10 @@
         "Detecção non-manifold alinhada aos slicers: só os furos reais (arestas abertas) são sinalizados; normais invertidas e corpos que se tocam, corrigidos em silêncio pelo seu slicer, não geram mais alerta",
         "Verificação de integridade e reparo: fim dos «Tempo esgotado» repetidos (os prazos acompanham o tamanho do arquivo, a contagem começa na leitura real, segunda tentativa com prazo triplicado antes de sinalizar um arquivo, menos leituras em paralelo)",
         "Proxmox: novo script de instalação com um único comando (stellio-lxc.sh) que cria um contêiner LXC Debian 12, instala o Stellio com seu serviço systemd e mostra o endereço de acesso; neste contêiner, a adição de pastas e arquivos locais fica oculta (apenas origens de rede SMB e NFS, salvo pasta montada do host); método adicionado aos README",
-        "Inventário de filamento: novo widget «A encomendar» que agrupa suas bobinas por filamento (marca, material, cor) e avisa quando o total restante fica abaixo de um limite de reabastecimento ajustável (100 g por padrão, Configurações → Inventário de filamento); botões «Encomendar» (lojas de fornecedores) e «Encomendado» (lembrete adiado por 14 dias), com notificação"
+        "Inventário de filamento: novo widget «A encomendar» que agrupa suas bobinas por filamento (marca, material, cor) e avisa quando o total restante fica abaixo de um limite de reabastecimento ajustável (100 g por padrão, Configurações → Inventário de filamento); botões «Encomendar» (lojas de fornecedores) e «Encomendado» (lembrete adiado por 14 dias), com notificação",
+        "Janelas: selecionar texto num campo (ex.: renomear a impressora após a deteção automática) e soltar o rato fora da janela já não a fecha",
+        "Comunidade: botão do Discord na barra lateral (entre Links úteis e GitHub) e secção de parceria com a TigerTag em «Sobre»",
+        "3MF: todas as peças de um ficheiro aparecem agora na pré-visualização e na miniatura (uma peça afastada das outras era descartada por engano)"
       ],
       "it": [
         "Cronologia: tutti i giorni sono ora compressi per impostazione predefinita e la cronologia è divisa in pagine di una settimana (lunedì–domenica), con navigazione «Più vecchio / Più recente»",
@@ -66,7 +81,10 @@
         "Rilevamento non-manifold allineato agli slicer: vengono segnalati solo i veri buchi (bordi aperti); normali invertite e corpi a contatto, corretti in silenzio dal tuo slicer, non generano più avvisi",
         "Verifica di integrità e riparazione: niente più «Tempo scaduto» ripetuti (i limiti seguono la dimensione del file, il conto alla rovescia parte dalla lettura effettiva, secondo tentativo con limite triplicato prima di segnalare un file, meno letture in parallelo)",
         "Proxmox: nuovo script di installazione con un solo comando (stellio-lxc.sh) che crea un container LXC Debian 12, vi installa Stellio con il servizio systemd e mostra l'indirizzo di accesso; in questo container l'aggiunta di cartelle e file locali è nascosta (solo origini di rete SMB e NFS, salvo cartella montata dell'host); metodo aggiunto ai README",
-        "Inventario filamento: nuovo widget «Da ordinare» che raggruppa le bobine per filamento (marca, materiale, colore) e segnala quelli il cui totale rimanente scende sotto una soglia di riordino regolabile (100 g di default, Impostazioni → Inventario filamento); pulsanti «Ordina» (negozi dei fornitori) e «Ordinato» (promemoria rinviato di 14 giorni), con notifica"
+        "Inventario filamento: nuovo widget «Da ordinare» che raggruppa le bobine per filamento (marca, materiale, colore) e segnala quelli il cui totale rimanente scende sotto una soglia di riordino regolabile (100 g di default, Impostazioni → Inventario filamento); pulsanti «Ordina» (negozi dei fornitori) e «Ordinato» (promemoria rinviato di 14 giorni), con notifica",
+        "Finestre: selezionare il testo in un campo (es. rinominare la stampante dopo il rilevamento automatico) e rilasciare il mouse fuori dalla finestra non la chiude più",
+        "Community: pulsante Discord nella barra laterale (tra Link utili e GitHub) e sezione partnership TigerTag in «Informazioni»",
+        "3MF: tutti i pezzi di un file compaiono ora nell'anteprima e nella miniatura (un pezzo lontano dagli altri veniva scartato per errore)"
       ],
       "zh": [
         "历史记录：所有日期现在默认折叠，历史记录按每周（周一至周日）分页，并提供“更早 / 更新”导航",
@@ -77,7 +95,10 @@
         "非流形检测与切片软件保持一致：只报告真正的孔洞（开放边）；法线反向和相互接触的壳体会被您的切片软件静默修正，不再触发警告",
         "完整性检查与修复：不再反复出现“超时”（超时时间随文件大小调整，从实际读取时开始计时，报告文件前会以三倍超时再试一次，并减少并行读取）",
         "Proxmox：新增一条命令安装脚本（stellio-lxc.sh），可创建 Debian 12 LXC 容器、安装 Stellio 及其 systemd 服务并显示访问地址；在此容器中会隐藏添加本地文件夹和文件的选项（仅提供 SMB 和 NFS 网络来源，挂载主机文件夹时除外）；方法已加入各 README",
-        "耗材库存：新增“待订购”小组件，按耗材（品牌、材料、颜色）汇总您的料盘，当总剩余量低于可调的补货阈值（默认 100 g，设置 → 耗材库存）时提醒；提供“订购”（供应商商店）和“已订购”（提醒推迟 14 天）按钮，并发送通知"
+        "耗材库存：新增“待订购”小组件，按耗材（品牌、材料、颜色）汇总您的料盘，当总剩余量低于可调的补货阈值（默认 100 g，设置 → 耗材库存）时提醒；提供“订购”（供应商商店）和“已订购”（提醒推迟 14 天）按钮，并发送通知",
+        "窗口：在输入框中选择文字（例如自动检测后重命名打印机）并在窗口外松开鼠标，不再关闭窗口",
+        "社区：侧边栏新增 Discord 按钮（位于“实用链接”和 GitHub 之间），并在“关于”中新增 TigerTag 合作伙伴板块",
+        "3MF：文件中的所有零件现在都会显示在预览和缩略图中（此前离其他零件较远的零件会被误丢弃）"
       ],
       "ja": [
         "履歴：すべての日がデフォルトで折りたたまれ、履歴は1週間（月曜〜日曜）ごとのページに分割され、「古い／新しい」で移動できます",
@@ -88,7 +109,10 @@
         "ノンマニフォールド検出をスライサーに合わせました：本当の穴（開いたエッジ）だけを報告し、スライサーが黙って修正する反転法線や接触したシェルでは警告が出なくなりました",
         "整合性チェックと修復：繰り返し表示されていた「タイムアウト」を解消しました（制限時間はファイルサイズに比例、実際の読み込み開始からカウント、報告前に3倍の制限時間で再試行、並列読み込みを削減）",
         "Proxmox：1コマンドで使えるインストールスクリプト（stellio-lxc.sh）を追加しました。Debian 12 の LXC コンテナを作成し、Stellio と systemd サービスをインストールしてアクセス先を表示します。このコンテナではローカルのフォルダー／ファイルの追加が非表示になり（ホストのフォルダをマウントした場合を除き SMB と NFS のネットワークソースのみ）、方法は README にも追記しました",
-        "フィラメント在庫：フィラメント（ブランド・素材・色）ごとにスプールをまとめ、合計残量が調整可能な補充しきい値（デフォルト 100 g、設定 → フィラメント在庫）を下回ると知らせる新しい「発注が必要」ウィジェットを追加しました。「注文する」（仕入先ショップ）と「注文済み」（リマインダーを14日延期）ボタンと通知付きです"
+        "フィラメント在庫：フィラメント（ブランド・素材・色）ごとにスプールをまとめ、合計残量が調整可能な補充しきい値（デフォルト 100 g、設定 → フィラメント在庫）を下回ると知らせる新しい「発注が必要」ウィジェットを追加しました。「注文する」（仕入先ショップ）と「注文済み」（リマインダーを14日延期）ボタンと通知付きです",
+        "ウィンドウ：入力欄でテキストを選択し（例：自動検出後のプリンター名変更）、ウィンドウの外でマウスを離しても閉じなくなりました",
+        "コミュニティ：サイドバーに Discord ボタン（便利なリンクと GitHub の間）を追加し、「バージョン情報」に TigerTag パートナーシップ欄を追加しました",
+        "3MF：ファイル内のすべてのパーツがプレビューとサムネイルに表示されるようになりました（他から離れたパーツが誤って除外されていました）"
       ]
     }
   },
