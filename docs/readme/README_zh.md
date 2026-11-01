@@ -36,7 +36,7 @@
 
 ## 🎯 概述
 
-**Stellio** 是一款现代化的桌面应用程序，可集中管理您的整个3D文件库（STL、3MF、OBJ），自动化重复性任务，并与您的3D打印工作流程无缝集成。
+**Stellio** 是一款现代化的桌面应用程序，可集中管理您的整个3D文件库（STL、3MF、OBJ、STEP、PLY、AMF），自动化重复性任务，并与您的3D打印工作流程无缝集成。
 
 无论您是新手创客还是管理多台打印机的资深用户，Stellio 都能借助**本地AI**（Ollama）、**智能打印机管理**以及**专为效率而设计的界面**，为您节省宝贵的时间。
 
@@ -186,8 +186,8 @@
 
 | | |
 |---|---|
-| ![文件库](../../library.png) *带缩略图的文件库* | ![打印机](../../monitoring.png) *打印机监控* |
-| ![切片软件](../../slicer.png) *AI配置推荐* | ![嵌套排版](../../nesting.png) *自动嵌套排版* |
+| ![文件库](../../images/library.png) *带缩略图的文件库* | ![打印机](../../images/monitoring.png) *打印机监控* |
+| ![切片软件](../../images/slicer.png) *AI配置推荐* | ![嵌套排版](../../images/nesting.png) *自动嵌套排版* |
 
 ---
 
@@ -230,6 +230,28 @@ sudo journalctl -u stellio -f     # 实时查看日志
 >
 > 🎥 除原生桌面窗口（替换为浏览器访问）以及本地 Ollama AI（需要性能较好的模型才能在 Pi 上顺畅运行，如有需要可在设置中将 `ollama_url` 指向远程 Ollama 服务器）外，其余功能与 Windows 版本相同。
 
+### 🖥️ Proxmox VE（一条命令创建 LXC 容器）
+
+在 **Proxmox VE** 服务器上，脚本会为您创建并配置好整个容器。打开 **Proxmox 主机的 Shell**（Datacenter → 您的节点 → Shell），粘贴：
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/stellio-app/stellio/main/stellio-lxc.sh)"
+```
+
+脚本提供默认或高级设置（CTID、CPU 核心、内存、磁盘、网桥、VLAN、DHCP 或静态 IP、存储、要挂载的主机文件夹），然后：
+- 创建一个**非特权 Debian 12** 容器（默认 2 核、2 GB 内存、8 GB 磁盘、开机自启）；
+- 使用 `install-pi.sh` 在其中安装 Stellio（依赖项、Python 环境、**systemd 服务**）；
+- 显示访问地址 `http://<容器IP>:5000` 和生成的 root 密码。
+
+> 🔒 **来源**：在此容器中，Stellio 会**隐藏添加本地文件夹和文件**的选项，只提供 **SMB** 和 **NFS** 网络来源。如果使用 `var_mount=/主机路径:/mnt/models` 挂载主机文件夹，则额外允许“本地文件夹”。该设置位于 `/etc/systemd/system/stellio.service.d/sources.conf`（变量 `STELLIO_ALLOWED_SOURCE_TYPES`）。
+
+```bash
+pct exec <CTID> -- update-stellio                 # 更新 Stellio（在 Proxmox 主机上执行）
+pct exec <CTID> -- journalctl -u stellio -f       # 实时查看日志
+```
+
+无菜单模式：所有选项都可以通过环境变量设置，例如 `var_mode=default var_cpu=4 var_ram=4096 var_disk=16 var_ip=192.168.1.50/24 var_gw=192.168.1.1`（完整列表见脚本开头）。
+
 ### 🧰 服务器版专属（树莓派 / Linux）
 
 > Windows 版不受影响：这些功能只会出现在树莓派、虚拟机、LXC、Docker 和 Linux 上。
@@ -246,6 +268,20 @@ Stellio 可自动检测：
 - ✅ PrusaSlicer / SuperSlicer
 - ✅ Ultimaker Cura
 - ✅ Creality Print
+- ✅ Elegoo Slicer
+- ✅ Qidi Studio
+- ✅ Anycubic Slicer Next
+- ✅ Anycubic Slicer
+- ✅ Simplify3D
+- ✅ ideaMaker
+- ✅ FlashPrint
+- ✅ Lychee Slicer
+- ✅ CraftWare
+- ✅ MatterControl
+- ✅ MakerBot Print
+- ✅ Voxelizer
+- ✅ Slic3r
+- ✅ KISSlicer
 
 ### 打印机
 
@@ -312,7 +348,8 @@ stellio/
 ├── apk/                # Android 配套应用安装包
 ├── docs/               # 文档、隐私政策、多语言 README
 ├── requirements.txt    # Python 依赖项
-└── install-pi.sh       # Raspberry Pi / Linux 安装脚本（systemd 服务）
+├── install-pi.sh       # Raspberry Pi / Linux 安装脚本（systemd 服务）
+└── stellio-lxc.sh      # Proxmox VE 的 LXC 安装脚本
 ```
 
 有想法？[提交一个 issue](https://github.com/stellio-app/stellio/issues)！
@@ -367,6 +404,17 @@ Stellio 采用本地优先架构：您的数据保留在您的设备上，默认
 
 ---
 
+## 🤝 合作伙伴
+
+Stellio 是 NFC/RFID 耗材识别系统 **TigerTag** 的集成合作伙伴：您的料盘可直接显示在 Stellio 的耗材库存中。
+
+- 🌐 [官方网站](https://tigersystem.io) — [tigertag.io](https://tigertag.io)
+- 🖥️ [Studio Manager（桌面应用）](https://github.com/TigerTag-Project/TigerTag-Studio-Manager)
+- 📘 [RFID 指南与文档](https://github.com/TigerTag-Project/TigerTag-RFID-Guide)
+- 📱 [iOS 应用](https://apps.apple.com/fr/app/tigertag-rfid-connect/id6745437963)
+
+---
+
 ## 🙏 致谢
 
 - [Ollama](https://ollama.com/) 提供本地AI支持
@@ -386,6 +434,7 @@ Stellio 采用本地优先架构：您的数据保留在您的设备上，默认
 - 💡 **功能建议**：[GitHub Discussions](https://github.com/stellio-app/stellio/discussions)
 - 📧 **邮箱**：contact@stellio-app.com
 - 🌐 **官网**：[stellio-app.com](https://stellio-app.com)
+- 💬 **Discord**: [加入 Discord 社区](https://discord.gg/VOTRE-INVITATION)
 
 ---
 
@@ -411,5 +460,6 @@ Stellio 采用本地优先架构：您的数据保留在您的设备上，默认
 <p align="center">
   <a href="https://github.com/stellio-app/stellio">⭐ 为本仓库点星</a> •
   <a href="https://github.com/stellio-app/stellio/issues">🐛 报告问题</a> •
-  <a href="https://github.com/stellio-app/stellio/discussions">💡 建议新功能</a>
+  <a href="https://github.com/stellio-app/stellio/discussions">💡 建议新功能</a> •
+  <a href="https://discord.gg/VOTRE-INVITATION">💬 加入 Discord</a>
 </p>

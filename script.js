@@ -1,3 +1,45 @@
+/* ===== Garde-fous anti-gel (0.8.0) =====
+   - setInterval : un tick asynchrone n'est pas relancé tant que le précédent n'est pas terminé
+     (sinon, après une veille ou un serveur bloqué, les requêtes s'empilent et saturent les 6 connexions du navigateur).
+   - fetch GET : délai maximal pour que rien ne reste suspendu indéfiniment. */
+(function () {
+    try {
+        const _origSetInterval = window.setInterval.bind(window);
+        window.setInterval = function (fn, ms, ...args) {
+            if (typeof fn !== 'function' || !(ms >= 1000)) return _origSetInterval(fn, ms, ...args);
+            let busy = false, since = 0;
+            return _origSetInterval(function () {
+                if (busy && Date.now() - since < 90000) return;
+                busy = true; since = Date.now();
+                let r;
+                try { r = fn.apply(this, arguments); }
+                catch (e) { busy = false; throw e; }
+                if (r && typeof r.then === 'function') r.then(() => { busy = false; }, () => { busy = false; });
+                else busy = false;
+                return r;
+            }, ms, ...args);
+        };
+
+        const _origFetch = window.fetch.bind(window);
+        const NO_TIMEOUT = /\/(stream|camera|snapshot|download|export|backup|events|sse|logs?|diagnostic|update|convert|integrity|repair|scan|slice|upload|import|share)/i;
+        window.fetch = function (input, init) {
+            try {
+                const url = typeof input === 'string' ? input : (input && input.url) || '';
+                const method = ((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+                if (method === 'GET' && !(init && init.signal) && !(input && input.signal) && !NO_TIMEOUT.test(url)) {
+                    const ctrl = new AbortController();
+                    const timer = setTimeout(() => ctrl.abort(), 120000);
+                    return _origFetch(input, { ...(init || {}), signal: ctrl.signal }).finally(() => clearTimeout(timer));
+                }
+            } catch (e) { /* on retombe sur le fetch natif */ }
+            return _origFetch(input, init);
+        };
+
+        // Retour de veille / reconnexion : on laisse les pollers repartir proprement
+        window.addEventListener('online', () => { try { document.dispatchEvent(new Event('visibilitychange')); } catch (e) {} });
+    } catch (e) { console.warn('[Guard] init impossible', e); }
+})();
+
 const I18N = {
 _langCache: null,
 get lang() {
@@ -2764,7 +2806,7 @@ document.addEventListener('visibilitychange', _syncAppHeight);
 _syncAppHeight();
 
 // --- Tableau de bord ---
-const DASHBOARD_WIDGET_IDS = ['printers', 'stock', 'history', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues'];
+const DASHBOARD_WIDGET_IDS = ['printers', 'stock', 'restock', 'history', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues'];
 let _dashboardEditMode = false;
 let _draggedDashboardWidget = null;
 
@@ -2782,6 +2824,7 @@ async function loadDashboard(force = false) {
     _loadDashboardPrinters();
     _loadDashboardHistory();
     _loadDashboardStock();
+    _loadDashboardRestock();
     _loadDashboardRecentFiles();
     _loadDashboardSos();
     _loadDashboardFavorites();
@@ -4373,16 +4416,17 @@ async function _loadDashboardHistory() {
 let _lowStockThresholds = null;
 async function _ensureLowStockThresholds(force = false) {
     if (_lowStockThresholds && !force) return _lowStockThresholds;
-    let pct = 15, g = 100;
+    let pct = 15, g = 100, restock = 100;
     try {
         const res = await fetch(`${API}/api/settings`);
         if (res.ok) {
             const s = await res.json();
+            if (s.restock_threshold_g != null && isFinite(Number(s.restock_threshold_g))) restock = Number(s.restock_threshold_g);
             if (s.low_stock_threshold_percent != null) pct = Number(s.low_stock_threshold_percent);
             if (s.low_stock_threshold_g != null) g = Number(s.low_stock_threshold_g);
         }
     } catch (e) { /* valeurs par défaut */ }
-    _lowStockThresholds = { pct: isFinite(pct) ? pct : 15, g: isFinite(g) ? g : 100 };
+    _lowStockThresholds = { pct: isFinite(pct) ? pct : 15, g: isFinite(g) ? g : 100, restock };
     return _lowStockThresholds;
 }
 
@@ -4399,13 +4443,16 @@ async function loadLowStockSettings() {
     const g = document.getElementById('lowstock-grams');
     if (p) p.value = t.pct;
     if (g) g.value = t.g;
+    const r = document.getElementById('restock-grams');
+    if (r) r.value = t.restock != null ? t.restock : 100;
 }
 window.loadLowStockSettings = loadLowStockSettings;
 
 window.saveLowStockSettings = async function () {
     const pct = parseFloat(document.getElementById('lowstock-percent')?.value);
     const g = parseFloat(document.getElementById('lowstock-grams')?.value);
-    if (!isFinite(pct) || !isFinite(g) || pct < 0 || pct > 100 || g < 0 || g > 5000) {
+    const restock = parseFloat(document.getElementById('restock-grams')?.value);
+    if (!isFinite(pct) || !isFinite(g) || pct < 0 || pct > 100 || g < 0 || g > 5000 || !isFinite(restock) || restock < 0 || restock > 20000) {
         showToast(_t2('lowstock.invalid', 'Valeur invalide (0 à 100 % et 0 à 5000 g)'), 'error');
         return;
     }
@@ -4413,12 +4460,13 @@ window.saveLowStockSettings = async function () {
         const res = await fetch(`${API}/api/settings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ low_stock_threshold_percent: pct, low_stock_threshold_g: g }),
+            body: JSON.stringify({ low_stock_threshold_percent: pct, low_stock_threshold_g: g, restock_threshold_g: restock }),
         });
         if (!res.ok) throw new Error('http');
-        _lowStockThresholds = { pct, g };
+        _lowStockThresholds = { pct, g, restock };
         showToast(_t2('lowstock.saved', 'Seuil de filament bas enregistré'), 'success');
         _loadDashboardStock();
+        _loadDashboardRestock();
     } catch (e) {
         showToast(I18N.t('toast.connection_error'), 'error');
     }
@@ -4461,6 +4509,83 @@ async function _loadDashboardStock() {
         body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
     }
 }
+
+// --- Rappel de réapprovisionnement : filaments dont le total restant passe sous le seuil ---
+let _restockItems = [];
+async function _loadDashboardRestock() {
+    const body = document.getElementById('dashboard-restock-body');
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/api/filament/restock`);
+        if (!res.ok) throw new Error('http');
+        const data = await res.json();
+        _restockItems = data.items || [];
+        if (!data.threshold_g) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-bell-slash"></i><p>${escapeHtml(_t2('dashboard.restock_disabled', 'Rappel désactivé (seuil à 0 g)'))}</p></div>`;
+            return;
+        }
+        if (!_restockItems.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty dashboard-widget-empty--ok"><i class="fa-solid fa-circle-check"></i><p>${escapeHtml(_t2('dashboard.restock_ok', 'Rien à commander pour le moment'))}</p></div>`;
+            return;
+        }
+        _restockItems.forEach(it => {
+            createNotification(
+                'low_stock',
+                _t2('notif.restock_title', 'Filament à commander'),
+                `${_restockLabel(it)} — ${Math.round(it.total_g)} g`,
+                'spoolman',
+                `restock_${it.key}`
+            );
+        });
+        body.innerHTML = _restockItems.map((it, i) => {
+            const color = it.color_hex || '#888888';
+            const spools = _t2('dashboard.restock_spools', '{{n}} bobine(s)').replace('{{n}}', it.spool_count);
+            const left = _t2('dashboard.restock_left', '{{g}} g restants').replace('{{g}}', Math.round(it.total_g));
+            return `
+            <div class="dashboard-row restock-row">
+                <div class="dashboard-row-icon" style="background:${escapeHtml(color)}22;color:${escapeHtml(color)};"><i class="fa-solid fa-circle"></i></div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title" title="${escapeHtml(_restockLabel(it))}">${escapeHtml(_restockLabel(it))}</div>
+                    <div class="dashboard-row-sub">${escapeHtml(left)} — ${escapeHtml(spools)}</div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm restock-btn" onclick="restockOrder(${i})" title="${escapeHtml(_t2('dashboard.restock_order_hint', 'Ouvrir les boutiques fournisseurs'))}"><i class="fa-solid fa-cart-shopping"></i> ${escapeHtml(_t2('dashboard.restock_order', 'Commander'))}</button>
+                <button type="button" class="btn btn-ghost btn-sm restock-btn" onclick="restockSnooze(${i})" title="${escapeHtml(_t2('dashboard.restock_done_hint', 'Déjà commandé : rappel reporté de 14 jours'))}"><i class="fa-solid fa-check"></i></button>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        console.error('[Dashboard] Erreur réappro:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+window._loadDashboardRestock = _loadDashboardRestock;
+
+function _restockLabel(it) {
+    const parts = [it.vendor, it.material].filter(Boolean).join(' ');
+    return [parts, it.name].filter(Boolean).join(' — ') || it.name || it.material || '?';
+}
+
+window.restockOrder = function (i) {
+    const it = _restockItems[i];
+    if (!it) return;
+    showLowStockShopPopup({ ...it, remaining_g: it.total_g });
+};
+
+window.restockSnooze = async function (i) {
+    const it = _restockItems[i];
+    if (!it) return;
+    try {
+        const res = await fetch(`${API}/api/filament/restock/snooze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: it.key, days: 14 }),
+        });
+        if (!res.ok) throw new Error('http');
+        showToast(_t2('dashboard.restock_snoozed', 'Rappel reporté de 14 jours'), 'success');
+        _loadDashboardRestock();
+    } catch (e) {
+        showToast(I18N.t('toast.connection_error'), 'error');
+    }
+};
 
 async function _loadDashboardRecentFiles() {
     const body = document.getElementById('dashboard-recent-body');
@@ -5395,16 +5520,53 @@ console.error('[loadSources]', err);
 document.getElementById('sources-list').innerHTML = `<div class="empty-state small"><p>${I18N.t('toast.connection_error')}</p></div>`;
 }
 }
+let _sourcesCache = [];
 function renderSources(sources) {
+_sourcesCache = sources || [];
 const container = document.getElementById('sources-list');
 if (!sources?.length) {
 container.innerHTML = `<div class="empty-state small"><p>${I18N.t('settings.no_sources')}</p></div>`;
 return;
 }
 const icons = { folder: 'fa-folder', file: 'fa-file', smb: 'fa-network-wired', nfs: 'fa-server' };
-container.innerHTML = sources.map(s => `<div class="source-item" data-id="${s.id}"><div class="source-info"><div class="source-icon"><i class="fa-solid ${icons[s.type] || 'fa-database'}"></i></div><div class="source-details"><div style="display: flex; align-items: center; gap: 8px;"><h4>${escapeHtml(s.name)}</h4><button class="btn btn-ghost btn-sm" onclick="editSourceName(${s.id}, '${escapeJs(s.name)}')" title="${I18N.t('modal.rename_source')}"><i class="fa-solid fa-pen"></i></button></div><p>${escapeHtml(s.path)}</p></div></div><button class="btn btn-ghost btn-sm" onclick="deleteSource(${s.id})" title="${I18N.t('actions.delete')}"><i class="fa-solid fa-trash"></i></button></div>`).join('');
+container.innerHTML = sources.map(s => `<div class="source-item" data-id="${s.id}"><div class="source-info"><div class="source-icon"><i class="fa-solid ${icons[s.type] || 'fa-database'}"></i></div><div class="source-details"><div style="display: flex; align-items: center; gap: 8px;"><h4>${escapeHtml(s.name)}</h4><button class="btn btn-ghost btn-sm" onclick="editSourceName(${s.id}, '${escapeJs(s.name)}')" title="${I18N.t('modal.rename_source')}"><i class="fa-solid fa-pen"></i></button>${s.type !== 'file' ? `<button class="btn btn-ghost btn-sm" onclick="openSourceTypes(${s.id})" title="${escapeHtml(_t3('modal.source_types_title', 'Types de fichiers affichés'))}"><i class="fa-solid fa-filter"></i></button>` : ''}</div><p>${escapeHtml(s.path)}</p></div></div><button class="btn btn-ghost btn-sm" onclick="deleteSource(${s.id})" title="${I18N.t('actions.delete')}"><i class="fa-solid fa-trash"></i></button></div>`).join('');
 I18N.apply();
 }
+window.openSourceTypes = (id) => {
+const s = _sourcesCache.find(x => x.id === id);
+if (!s) return;
+let cfg = {};
+try { cfg = s.config ? JSON.parse(s.config) : {}; } catch (e) {}
+const allowed = Array.isArray(cfg.extensions) && cfg.extensions.length ? new Set(cfg.extensions.map(e => String(e).toLowerCase().replace('.', ''))) : null;
+document.getElementById('source-types-id').value = id;
+document.getElementById('source-types-name').textContent = s.name;
+document.querySelectorAll('#source-types-list input[type=checkbox]').forEach(cb => {
+const v = cb.value === 'step' ? ['step', 'stp'] : [cb.value];
+cb.checked = !allowed || v.some(x => allowed.has(x));
+});
+openModal('modal-source-types');
+};
+window.toggleAllSourceTypes = () => {
+const boxes = [...document.querySelectorAll('#source-types-list input[type=checkbox]')];
+const all = boxes.every(b => b.checked);
+boxes.forEach(b => { b.checked = !all; });
+};
+window.saveSourceTypes = async () => {
+const id = document.getElementById('source-types-id').value;
+const chosen = [...document.querySelectorAll('#source-types-list input[type=checkbox]:checked')].map(b => b.value);
+if (!chosen.length) { showToast(_t3('toast.source_types_min', 'Choisissez au moins un type de fichier'), 'error'); return; }
+try {
+const res = await fetch(`${API}/api/sources/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ extensions: chosen }) });
+const data = await res.json().catch(() => ({}));
+if (res.ok) {
+showToast(_t3('toast.source_types_saved', 'Types de fichiers enregistrés — mise à jour de la bibliothèque…'), 'success');
+closeModal('modal-source-types');
+loadSources();
+loadFiles();
+setTimeout(() => loadFiles(), 4000);
+} else showToast(data.error || I18N.t('toast.error'), 'error');
+} catch (err) { showToast(I18N.t('toast.fetch_error'), 'error'); }
+};
 window.editSourceName = (id, currentName) => {
 document.getElementById('rename-source-id').value = id;
 document.getElementById('rename-source-name').value = currentName;
@@ -14585,8 +14747,15 @@ async function _confirmSendToSlicer(force) {
 }
 
 document.querySelectorAll('.modal').forEach(modal => {
+    // Ne ferme que si le clic a AUSSI commencé sur le fond : sélectionner du texte dans un champ
+    // et relâcher la souris en dehors de la fenêtre ne doit pas la fermer.
+    let pressedOnBackdrop = false;
+    modal.addEventListener('mousedown', (e) => { pressedOnBackdrop = (e.target === modal); });
+    modal.addEventListener('touchstart', (e) => { pressedOnBackdrop = (e.target === modal); }, { passive: true });
     modal.addEventListener('click', (e) => {
         if (e.target !== modal) return;
+        if (!pressedOnBackdrop) return;
+        pressedOnBackdrop = false;
         if (modal.id === 'modal-3d-viewer') close3DViewer();
         else modal.classList.add('hidden');
     });
@@ -14788,12 +14957,18 @@ let analyzed = 0;
 let found = 0;
 for (const f of unanalyzed) {
 try {
+const _ac = new AbortController();
+const _acTimer = setTimeout(() => _ac.abort(), 180000);
+let data;
+try {
 const analyzeRes = await fetch(`${API}/api/files/analyze`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ path: f.path })
+body: JSON.stringify({ path: f.path }),
+signal: _ac.signal
 });
-const data = await analyzeRes.json();
+data = await analyzeRes.json();
+} finally { clearTimeout(_acTimer); }
 analyzed++;
 if (analyzed % 5 === 0) {
 const progressEl = document.getElementById('repair-progress-text');
@@ -15686,7 +15861,9 @@ window.loadStats = async function () {
 
 
 let _historyOffset = 0;
-const _historyCollapsedDays = new Set();   // jours repliés dans l'historique (conservés entre deux rechargements)
+const _historyExpandedDays = new Set();    // jours dépliés par l'utilisateur (tous repliés par défaut)
+let _historyWeeks = [];                    // [{start:'YYYY-MM-DD' (lundi), count}] du plus récent au plus ancien
+let _historyWeekIdx = 0;
 let _historyEntries = [];
 const HISTORY_LIMIT = 30;
 
@@ -15900,28 +16077,73 @@ window.resetHistoryFilters = function () {
     loadHistory(true);
 };
 
+function _historyFilterParams() {
+    const params = new URLSearchParams();
+    const platform = document.getElementById('history-filter-platform')?.value;
+    const result = document.getElementById('history-filter-result')?.value;
+    const dateFrom = document.getElementById('history-filter-date-from')?.value;
+    const dateTo = document.getElementById('history-filter-date-to')?.value;
+    if (platform) params.set('platform', platform);
+    if (result) params.set('result', result);
+    if (dateFrom) params.set('date_from', dateFrom);
+    if (dateTo) params.set('date_to', dateTo);
+    return params;
+}
+
+function _historyWeekLabel(startStr) {
+    const [y, m, d] = startStr.split('-').map(Number);
+    const s = new Date(y, m - 1, d);
+    const e = new Date(y, m - 1, d + 6);
+    const opt = { day: 'numeric', month: 'short' };
+    const sameYear = s.getFullYear() === e.getFullYear();
+    const a = s.toLocaleDateString(I18N.lang, sameYear ? opt : { ...opt, year: 'numeric' });
+    const b = e.toLocaleDateString(I18N.lang, { ...opt, year: 'numeric' });
+    return `${a} – ${b}`;
+}
+
+function _renderHistoryPager() {
+    const pager = document.getElementById('history-pager');
+    if (!pager) return;
+    if (_historyWeeks.length <= 1) { pager.classList.add('hidden'); return; }
+    pager.classList.remove('hidden');
+    const w = _historyWeeks[_historyWeekIdx];
+    document.getElementById('history-pager-label').textContent = w ? _historyWeekLabel(w.start) : '';
+    document.getElementById('history-pager-info').textContent =
+        `${_t3('history.week', 'Semaine')} ${_historyWeekIdx + 1} / ${_historyWeeks.length}`;
+    // les semaines sont triées de la plus récente (0) à la plus ancienne
+    document.getElementById('history-pager-prev').disabled = _historyWeekIdx >= _historyWeeks.length - 1;
+    document.getElementById('history-pager-next').disabled = _historyWeekIdx <= 0;
+}
+
+window.historyGoToWeek = function (idx) {
+    if (idx < 0 || idx >= _historyWeeks.length) return;
+    _historyWeekIdx = idx;
+    loadHistory(false);
+};
+
 window.loadHistory = async function (reset = true) {
-    if (reset) {
-        _historyOffset = 0;
-        _historyEntries = [];
-        document.getElementById('history-list').innerHTML = '';
-        document.getElementById('history-list').classList.add('hidden');
-        document.getElementById('history-empty').classList.add('hidden');
-        document.getElementById('history-load-more').classList.add('hidden');
-    }
+    document.getElementById('history-list').innerHTML = '';
+    document.getElementById('history-list').classList.add('hidden');
+    document.getElementById('history-empty').classList.add('hidden');
+    document.getElementById('history-pager')?.classList.add('hidden');
+    _historyEntries = [];
     document.getElementById('history-loading')?.classList.remove('hidden');
     try {
-        const params = new URLSearchParams({ limit: HISTORY_LIMIT, offset: _historyOffset });
-        const platform = document.getElementById('history-filter-platform')?.value;
-        const result = document.getElementById('history-filter-result')?.value;
-        const dateFrom = document.getElementById('history-filter-date-from')?.value;
-        const dateTo = document.getElementById('history-filter-date-to')?.value;
-        if (platform) params.set('platform', platform);
-        if (result) params.set('result', result);
-        if (dateFrom) params.set('date_from', dateFrom);
-        if (dateTo) params.set('date_to', dateTo);
+        if (reset) {
+            // 1) liste des semaines disponibles (limit=1 : on ne veut que l'index)
+            const p0 = _historyFilterParams();
+            p0.set('limit', 1);
+            const r0 = await fetch(`${API}/api/print-history?${p0.toString()}`);
+            const d0 = await r0.json();
+            if (!r0.ok) { document.getElementById('history-loading')?.classList.add('hidden'); showToast(d0.error || I18N.t('toast.history_error'), 'error'); return; }
+            _historyWeeks = d0.weeks || [];
+            _historyWeekIdx = 0;
+        }
+        const wk = _historyWeeks[_historyWeekIdx];
+        const params = _historyFilterParams();
+        if (wk) params.set('week', wk.start); else params.set('limit', 1);
         const resetBtn = document.getElementById('history-filter-reset');
-        if (resetBtn) resetBtn.style.display = (platform || result || dateFrom || dateTo) ? '' : 'none';
+        if (resetBtn) resetBtn.style.display = (['platform','result','date_from','date_to'].some(k => params.get(k))) ? '' : 'none';
 
         const res  = await fetch(`${API}/api/print-history?${params.toString()}`);
         const data = await res.json();
@@ -15946,7 +16168,7 @@ window.loadHistory = async function (reset = true) {
             const dayKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             let dayEl = listEl.querySelector(`.history-day[data-day="${dayKey}"]`);
             if (!dayEl) {
-                const collapsed = _historyCollapsedDays.has(dayKey);
+                const collapsed = !_historyExpandedDays.has(dayKey);
                 listEl.insertAdjacentHTML('beforeend', `
                     <div class="history-day${collapsed ? ' collapsed' : ''}" data-day="${dayKey}">
                         <button type="button" class="history-date-sep history-date-toggle" aria-expanded="${collapsed ? 'false' : 'true'}"
@@ -15999,20 +16221,13 @@ window.loadHistory = async function (reset = true) {
                 </div>`);
             _refreshHistoryDay(dayEl);
         });
-        _historyOffset += data.history.length;
-        const moreBtn = document.getElementById('history-load-more');
-        if (_historyOffset < data.total) {
-            moreBtn.classList.remove('hidden');
-        } else {
-            moreBtn.classList.add('hidden');
-        }
+        _renderHistoryPager();
     } catch(e) {
         document.getElementById('history-loading')?.classList.add('hidden');
         showToast(I18N.t('toast.connection_error'), 'error');
     }
 };
 
-window.loadMoreHistory = function () { loadHistory(false); };
 
 function _refreshHistoryDay(dayEl) {
     if (!dayEl) return;
@@ -16027,7 +16242,7 @@ window.toggleHistoryDay = function (dayKey) {
     if (!dayEl) return;
     const collapsed = dayEl.classList.toggle('collapsed');
     dayEl.querySelector('.history-date-toggle')?.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-    if (collapsed) _historyCollapsedDays.add(dayKey); else _historyCollapsedDays.delete(dayKey);
+    if (collapsed) _historyExpandedDays.delete(dayKey); else _historyExpandedDays.add(dayKey);
 };
 
 async function _checkHistoryFileExists(filePath) {
@@ -16190,6 +16405,7 @@ window.deleteHistoryEntry = async function (id) {
             entryEl?.remove();
             _refreshHistoryDay(dayEl);
             showToast(I18N.t('history.entry_deleted'), 'success');
+            if (!document.querySelector('#history-list .history-entry')) loadHistory(true);
         }
     } catch { showToast(I18N.t('toast.error'), 'error'); }
 };
@@ -18141,7 +18357,7 @@ startThumbAutoRefresh();
         }
 
         const isVirtualEntry = filePath.includes('::');
-        ['ctx-rename-btn', 'ctx-move-btn', 'ctx-share-btn', 'ctx-regen-btn', 'ctx-openwith-btn', 'ctx-send-instance-btn'].forEach(id => {
+        ['ctx-rename-btn', 'ctx-move-btn', 'ctx-share-btn', 'ctx-regen-btn', 'ctx-repair-btn', 'ctx-openwith-btn', 'ctx-send-instance-btn'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.display = isVirtualEntry ? 'none' : '';
         });
@@ -18201,11 +18417,40 @@ startThumbAutoRefresh();
             closeModal('modal-file-actions');
             regenFileThumbnail(_ctxPath, _ctxName);
         });
+        document.getElementById('ctx-repair-btn')?.addEventListener('click', () => {
+            closeModal('modal-file-actions');
+            repairFileFromMenu(_ctxPath, _ctxName);
+        });
         document.getElementById('ctx-project-btn')?.addEventListener('click', () => {
             closeModal('modal-file-actions');
             openAddToProjectModal(_ctxPath, _ctxName);
         });
     });
+
+    window.repairFileFromMenu = async function (filePath, fileName) {
+        showToast(`${I18N.t('actions.repairing') || 'Réparation...'} ${fileName}`, 'info');
+        try {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 15 * 60 * 1000);
+            const res = await fetch(`${API}/api/files/repair`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: filePath }),
+                signal: ctrl.signal
+            });
+            clearTimeout(timer);
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.success) {
+                const partial = data.watertight === false;
+                showToast(data.message || (partial ? I18N.t('toast.repair_partial') : I18N.t('toast.repair_success')) || 'Fichier réparé', partial ? 'warning' : 'success');
+                if (typeof loadFiles === 'function') loadFiles();
+            } else {
+                showToast(data.error || I18N.t('toast.repair_failed') || 'Échec de la réparation', 'error');
+            }
+        } catch (err) {
+            showToast(I18N.t('toast.connection_error') || 'Erreur de connexion', 'error');
+        }
+    };
 
     let _splitPlatesPath = null;
 

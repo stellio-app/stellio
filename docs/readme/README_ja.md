@@ -186,8 +186,8 @@
 
 | | |
 |---|---|
-| ![ライブラリ](../../library.png) *サムネイル付きライブラリ* | ![プリンター](../../monitoring.png) *プリンター監視* |
-| ![スライサー](../../slicer.png) *AIによるプロファイル推奨* | ![ネスティング](../../nesting.png) *自動ネスティング* |
+| ![ライブラリ](../../images/library.png) *サムネイル付きライブラリ* | ![プリンター](../../images/monitoring.png) *プリンター監視* |
+| ![スライサー](../../images/slicer.png) *AIによるプロファイル推奨* | ![ネスティング](../../images/nesting.png) *自動ネスティング* |
 
 ---
 
@@ -229,6 +229,28 @@ sudo journalctl -u stellio -f     # ログをリアルタイムで確認
 > 💡 **Windowsと同じアップデート方式**：各リリースで公開される`.zip`パッチは両プラットフォームで同一です（純粋なソースコードで、コンパイル済みバイナリは含まれません）。Stellioが自動的に検出・適用し、サービスを再起動します — 手動での再インストールは不要です。
 >
 > 🎥 Windows版と同じ機能を利用できますが、ネイティブなデスクトップウィンドウ（ブラウザアクセスに置き換え）と、Pi上で快適に動作させるためにある程度の性能のモデルが必要なローカルOllama AIは例外です — 必要に応じて設定内で `ollama_url` をリモートのOllamaサーバーに向けてください。
+
+### 🖥️ Proxmox VE（1コマンドで LXC コンテナを作成）
+
+**Proxmox VE** サーバーでは、スクリプトがコンテナの作成と設定をすべて行います。**Proxmox ホストのシェル**（Datacenter → ノード → Shell）を開き、次を貼り付けます：
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/stellio-app/stellio/main/stellio-lxc.sh)"
+```
+
+スクリプトはデフォルト設定または詳細設定（CTID、コア数、RAM、ディスク、ブリッジ、VLAN、DHCP または固定 IP、ストレージ、マウントするホストのフォルダ）を提供し、その後：
+- **非特権 Debian 12** コンテナを作成します（デフォルトは 2 コア、RAM 2 GB、ディスク 8 GB、起動時に自動開始）。
+- `install-pi.sh` で Stellio をインストールします（依存関係、Python 環境、**systemd サービス**）。
+- アクセス先 `http://<コンテナのIP>:5000` と生成された root パスワードを表示します。
+
+> 🔒 **ソース**：このコンテナでは、Stellio の**ローカルのフォルダー／ファイルの追加は非表示**で、**SMB** と **NFS** のネットワークソースのみ選べます。`var_mount=/ホストのパス:/mnt/models` でホストのフォルダをマウントした場合は、「ローカルフォルダ」も許可されます。設定は `/etc/systemd/system/stellio.service.d/sources.conf`（変数 `STELLIO_ALLOWED_SOURCE_TYPES`）にあります。
+
+```bash
+pct exec <CTID> -- update-stellio                 # Stellio を更新（Proxmox ホストから）
+pct exec <CTID> -- journalctl -u stellio -f       # ログをリアルタイムで確認
+```
+
+メニューなしモード：すべてのオプションは環境変数で指定できます。例：`var_mode=default var_cpu=4 var_ram=4096 var_disk=16 var_ip=192.168.1.50/24 var_gw=192.168.1.1`（全一覧はスクリプト冒頭）。
 
 ### 🧰 サーバー版（Raspberry Pi / Linux）専用
 
@@ -326,7 +348,8 @@ stellio/
 ├── apk/                # Androidコンパニオンアプリのパッケージ
 ├── docs/               # ドキュメント、プライバシーポリシー、翻訳版README
 ├── requirements.txt    # Python依存関係
-└── install-pi.sh       # Raspberry Pi / Linux用インストールスクリプト（systemdサービス）
+├── install-pi.sh       # Raspberry Pi / Linux用インストールスクリプト（systemdサービス）
+└── stellio-lxc.sh      # Proxmox VE 用 LXC インストールスクリプト
 ```
 
 アイデアがありますか？[Issueを作成してください](https://github.com/stellio-app/stellio/issues)！
@@ -381,6 +404,17 @@ Stellioはローカルファースト設計です：データはお使いの端�
 
 ---
 
+## 🤝 パートナーシップ
+
+Stellio は、NFC/RFID によるフィラメント識別システム **TigerTag** の連携パートナーです。スプールを Stellio のフィラメント在庫にそのまま表示できます。
+
+- 🌐 [公式サイト](https://tigersystem.io) — [tigertag.io](https://tigertag.io)
+- 🖥️ [Studio Manager（デスクトップアプリ）](https://github.com/TigerTag-Project/TigerTag-Studio-Manager)
+- 📘 [RFID ガイドとドキュメント](https://github.com/TigerTag-Project/TigerTag-RFID-Guide)
+- 📱 [iOS アプリ](https://apps.apple.com/fr/app/tigertag-rfid-connect/id6745437963)
+
+---
+
 ## 🙏 謝辞
 
 - ローカルAIの[Ollama](https://ollama.com/)
@@ -400,6 +434,7 @@ Stellioはローカルファースト設計です：データはお使いの端�
 - 💡 **機能リクエスト**：[GitHub Discussions](https://github.com/stellio-app/stellio/discussions)
 - 📧 **メール**：contact@stellio-app.com
 - 🌐 **ウェブサイト**：[stellio-app.com](https://stellio-app.com)
+- 💬 **Discord**: [Discord コミュニティに参加](https://discord.gg/VOTRE-INVITATION)
 
 ---
 
@@ -425,5 +460,6 @@ Stellioが役に立ったと感じたら、ぜひ：
 <p align="center">
   <a href="https://github.com/stellio-app/stellio">⭐ このリポジトリにスターをつける</a> •
   <a href="https://github.com/stellio-app/stellio/issues">🐛 バグを報告する</a> •
-  <a href="https://github.com/stellio-app/stellio/discussions">💡 機能をリクエストする</a>
+  <a href="https://github.com/stellio-app/stellio/discussions">💡 機能をリクエストする</a> •
+  <a href="https://discord.gg/VOTRE-INVITATION">💬 Discord に参加</a>
 </p>

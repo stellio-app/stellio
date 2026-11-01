@@ -8569,6 +8569,16 @@ body.role-viewer .nav-btn[data-page="settings"] {
 }
 .history-day-body { display: flex; flex-direction: column; gap: 2px; }
 .history-day.collapsed .history-day-body { display: none; }
+.history-pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 0 6px; flex-wrap: wrap; }
+.history-pager-center { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.history-pager-label { font-weight: 600; font-size: 13px; color: var(--text-primary); }
+.history-pager-info { font-size: 11px; color: var(--text-secondary); }
+.history-pager .btn:disabled { opacity: 0.4; cursor: default; }
+.restock-row { gap: 8px; }
+.restock-row .restock-btn { flex-shrink: 0; white-space: nowrap; }
+.source-types-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
+.source-type-opt { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 13px; }
+.source-type-opt:hover { background: var(--bg-tertiary); }
 .history-header-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
 /* ===== Bilan : fréquence et navigation entre périodes ===== */

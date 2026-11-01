@@ -319,6 +319,10 @@
                         <i class="fa-solid fa-link"></i>
                         <span data-i18n="nav.partners">Liens utiles</span>
                     </button>
+ <!--                   <a class="nav-btn" id="nav-discord-link" href="https://discord.gg/VOTRE-INVITATION" target="_blank" rel="noopener noreferrer">
+                        <i class="fa-brands fa-discord"></i>
+                        <span data-i18n="nav.discord">Discord</span>
+-->                    </a>
                     <a class="nav-btn" data-nav-id="github" href="https://github.com/stellio-app/stellio" target="_blank" rel="noopener noreferrer">
                         <i class="fa-brands fa-github"></i>
                         <span data-i18n="nav.github">GitHub</span>
@@ -557,6 +561,17 @@
                                     <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('stock')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
                                 </div>
                                 <div class="dashboard-widget-body" id="dashboard-stock-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-restock" data-widget-id="restock" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-cart-shopping"></i> <span data-i18n="dashboard.restock_title">À commander</span></h3>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('restock')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-restock-body">
                                     <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
                                 </div>
                             </div>
@@ -1014,9 +1029,16 @@
                             <p data-i18n="history.empty">Aucun fichier envoyé au slicer pour l'instant.</p>
                         </div>
                         <div id="history-list" class="history-list hidden"></div>
-                        <div id="history-load-more" class="hidden" style="text-align:center; padding:16px;">
-                            <button class="btn btn-ghost btn-sm" onclick="loadMoreHistory()">
-                                <i class="fa-solid fa-chevron-down"></i> <span data-i18n="history.load_more">Charger plus</span>
+                        <div id="history-pager" class="history-pager hidden">
+                            <button id="history-pager-prev" class="btn btn-ghost btn-sm" onclick="historyGoToWeek(_historyWeekIdx + 1)" data-i18n-title="history.prev_week" title="Semaine précédente">
+                                <i class="fa-solid fa-chevron-left"></i> <span data-i18n="history.prev_week_short">Plus ancien</span>
+                            </button>
+                            <div class="history-pager-center">
+                                <span id="history-pager-label" class="history-pager-label"></span>
+                                <span id="history-pager-info" class="history-pager-info"></span>
+                            </div>
+                            <button id="history-pager-next" class="btn btn-ghost btn-sm" onclick="historyGoToWeek(_historyWeekIdx - 1)" data-i18n-title="history.next_week" title="Semaine suivante">
+                                <span data-i18n="history.next_week_short">Plus récent</span> <i class="fa-solid fa-chevron-right"></i>
                             </button>
                         </div>
                         <div class="download-history-section">
@@ -1619,7 +1641,26 @@
                             <div class="accord-body">
                                 <p class="settings-hint" style="margin-bottom:14px;" data-i18n="settings.filament_inventory_hint">Connectez vos sources d'inventaire filament (Spoolman, TigerTag...), ou gérez votre inventaire manuel.</p>
 
-                                <div class="account-card">
+                                <div class="account-card" id="lowstock-settings">
+                                    <div class="account-card-header">
+                                        <div style="display:flex;align-items:center;gap:10px;">
+                                            <div class="account-icon-badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                                            <div><div style="font-weight:600;font-size:13px;" data-i18n="lowstock.title">Seuil de filament bas</div></div>
+                                        </div>
+                                    </div>
+                                    <p class="settings-hint" style="margin-top:8px;" data-i18n="lowstock.desc">Une bobine est signalée comme basse quand son poids restant passe sous ce pourcentage de sa capacité.</p>
+                                    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:8px;">
+                                        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;"><span data-i18n="lowstock.percent">Seuil (% de la bobine)</span>
+                                            <input type="number" id="lowstock-percent" class="settings-input" min="0" max="100" step="1" style="width:76px;"></label>
+                                        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;"><span data-i18n="lowstock.grams">Seuil sans capacité connue (g)</span>
+                                            <input type="number" id="lowstock-grams" class="settings-input" min="0" max="5000" step="10" style="width:84px;"></label>
+                                        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;" title="0 = rappel désactivé"><span data-i18n="lowstock.restock">Seuil de réapprovisionnement (g, total par filament)</span>
+                                            <input type="number" id="restock-grams" class="settings-input" min="0" max="20000" step="10" style="width:84px;"></label>
+                                        <button class="btn btn-primary btn-sm" onclick="saveLowStockSettings()"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="lowstock.save">Enregistrer</span></button>
+                                    </div>
+                                </div>
+
+                                <div class="account-card" style="margin-top:12px;">
                                     <div class="account-card-header">
                                         <div style="display:flex;align-items:center;gap:10px;">
                                             <div class="account-icon-badge" style="background:rgba(0,130,200,0.15);color:#0082c8;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="22"/><line x1="2" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="22" y2="12"/></svg></div>
@@ -1711,23 +1752,6 @@
                                         </label>
                                     </div>
                                     <p class="settings-hint" style="margin-top:8px;" data-i18n="settings.manual_inventory_hint">Si désactivé, vos bobines saisies manuellement sont ignorées partout dans Stellio (inventaire, compatibilité, alertes de stock) sans être supprimées.</p>
-                                </div>
-
-                                <div class="account-card" id="lowstock-settings" style="margin-top:12px;">
-                                    <div class="account-card-header">
-                                        <div style="display:flex;align-items:center;gap:10px;">
-                                            <div class="account-icon-badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                                            <div><div style="font-weight:600;font-size:13px;" data-i18n="lowstock.title">Seuil de filament bas</div></div>
-                                        </div>
-                                    </div>
-                                    <p class="settings-hint" style="margin-top:8px;" data-i18n="lowstock.desc">Une bobine est signalée comme basse quand son poids restant passe sous ce pourcentage de sa capacité.</p>
-                                    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:8px;">
-                                        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;"><span data-i18n="lowstock.percent">Seuil (% de la bobine)</span>
-                                            <input type="number" id="lowstock-percent" class="settings-input" min="0" max="100" step="1" style="width:76px;"></label>
-                                        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;"><span data-i18n="lowstock.grams">Seuil sans capacité connue (g)</span>
-                                            <input type="number" id="lowstock-grams" class="settings-input" min="0" max="5000" step="10" style="width:84px;"></label>
-                                        <button class="btn btn-primary btn-sm" onclick="saveLowStockSettings()"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="lowstock.save">Enregistrer</span></button>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -3328,6 +3352,16 @@
                     </div>
                 </div>
                 <div class="about-section">
+                    <h4><i class="fa-solid fa-handshake"></i> <span data-i18n="about.partner_title">Partenariat</span></h4>
+                    <p class="about-legal" data-i18n="about.partner_desc">Stellio est partenaire d'intégration de TigerTag, le système d'identification NFC/RFID des filaments.</p>
+                    <div class="tech-tags">
+                        <a href="https://tigersystem.io" target="_blank" rel="noopener noreferrer"><span>tigersystem.io</span></a>
+                        <a href="https://tigertag.io" target="_blank" rel="noopener noreferrer"><span>tigertag.io</span></a>
+                        <a href="https://github.com/TigerTag-Project/TigerTag-Studio-Manager" target="_blank" rel="noopener noreferrer"><span>Studio Manager</span></a>
+                        <a href="https://github.com/TigerTag-Project/TigerTag-RFID-Guide" target="_blank" rel="noopener noreferrer"><span>RFID Guide</span></a>
+                    </div>
+                </div>
+                <div class="about-section">
                     <h4><i class="fa-solid fa-copyright"></i> <span data-i18n="about.license">Licence & Droits</span></h4>
                     <p class="about-legal" data-i18n="about.legal">© 2026 Stellio Project. Distribué sous licence GNU AGPL v3</p>
                 </div>
@@ -3368,6 +3402,35 @@
                     <div class="shortcut-row"><span data-i18n="shortcuts.show_help">Afficher cette aide</span><span class="shortcut-keys"><kbd>?</kbd></span></div>
                 </div>
                 <p class="shortcuts-note" data-i18n="shortcuts.note">Les raccourcis à touche unique (F, T, ?) sont désactivés lorsque vous écrivez dans un champ de texte.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-source-types" class="modal hidden">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-filter"></i> <span data-i18n="modal.source_types_title">Types de fichiers affichés</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-source-types')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="source-types-id">
+                <p class="form-hint" id="source-types-name" style="margin-bottom:6px;font-weight:600;"></p>
+                <p class="form-hint" data-i18n="modal.source_types_hint" style="margin-bottom:12px;">Choisissez les formats pris en charge à afficher pour cette source.</p>
+                <div id="source-types-list" class="source-types-list">
+                    <label class="source-type-opt"><input type="checkbox" value="stl"> <span>STL</span></label>
+                    <label class="source-type-opt"><input type="checkbox" value="3mf"> <span>3MF</span></label>
+                    <label class="source-type-opt"><input type="checkbox" value="obj"> <span>OBJ</span></label>
+                    <label class="source-type-opt"><input type="checkbox" value="ply"> <span>PLY</span></label>
+                    <label class="source-type-opt"><input type="checkbox" value="amf"> <span>AMF</span></label>
+                    <label class="source-type-opt"><input type="checkbox" value="step"> <span>STEP / STP</span></label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost" onclick="toggleAllSourceTypes()" data-i18n="modal.source_types_all">Tout cocher</button>
+                    <button type="button" class="btn btn-ghost" onclick="closeModal('modal-source-types')" data-i18n="actions.cancel">Annuler</button>
+                    <button type="button" class="btn btn-primary" onclick="saveSourceTypes()">
+                        <i class="fa-solid fa-check"></i> <span data-i18n="actions.save">Enregistrer</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -4085,6 +4148,11 @@
                 <button class="file-action-row" id="ctx-regen-btn">
                     <span class="file-action-icon"><i class="fa-solid fa-rotate"></i></span>
                     <span class="file-action-label" data-i18n="modal.regen_thumb">Régénérer la miniature</span>
+                    <i class="fa-solid fa-chevron-right file-action-arrow"></i>
+                </button>
+                <button class="file-action-row" id="ctx-repair-btn">
+                    <span class="file-action-icon"><i class="fa-solid fa-screwdriver-wrench"></i></span>
+                    <span class="file-action-label" data-i18n="modal.repair_file">Réparer le fichier</span>
                     <i class="fa-solid fa-chevron-right file-action-arrow"></i>
                 </button>
                 <button class="file-action-row" id="ctx-split-btn" style="display:none;">

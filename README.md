@@ -186,8 +186,8 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 
 | | |
 |---|---|
-| ![Library](library.png) *Library with thumbnails* | ![Printers](monitoring.png) *Printer monitoring* |
-| ![Slicer](slicer.png) *AI profile recommendation* | ![Nesting](nesting.png) *Automatic nesting* |
+| ![Library](images/library.png) *Library with thumbnails* | ![Printers](images/monitoring.png) *Printer monitoring* |
+| ![Slicer](images/slicer.png) *AI profile recommendation* | ![Nesting](images/nesting.png) *Automatic nesting* |
 
 ---
 
@@ -229,6 +229,28 @@ sudo journalctl -u stellio -f     # Follow logs live
 > 💡 **Same updates as on Windows**: the `.zip` patch published with each release is identical on both platforms (pure source code, nothing compiled). Stellio detects and applies it automatically, then restarts the service — no manual reinstall needed.
 >
 > 🎥 Same features as the Windows version, except for the native desktop window (replaced by browser access) and the local Ollama AI, which needs a reasonably capable model to run well on a Pi — point `ollama_url` to a remote Ollama server in Settings if needed.
+
+### 🖥️ Proxmox VE (one-command LXC container)
+
+On a **Proxmox VE** server, a script creates and configures the whole container for you. Open the **Proxmox host Shell** (Datacenter → your node → Shell) and paste:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/stellio-app/stellio/main/stellio-lxc.sh)"
+```
+
+The script offers default or advanced settings (CTID, cores, RAM, disk, bridge, VLAN, DHCP or static IP, storage, host folder to mount), then:
+- creates an **unprivileged Debian 12** container (2 cores, 2 GB RAM, 8 GB disk by default, start on boot);
+- installs Stellio in it with `install-pi.sh` (dependencies, Python environment, **systemd service**);
+- prints the access address `http://<container-ip>:5000` and the generated root password.
+
+> 🔒 **Sources**: in this container, adding **local folders and files is hidden** in Stellio; only the **SMB** and **NFS** network sources are offered. If you mount a host folder with `var_mount=/host/path:/mnt/models`, “Local folder” is allowed as well. The setting lives in `/etc/systemd/system/stellio.service.d/sources.conf` (`STELLIO_ALLOWED_SOURCE_TYPES` variable).
+
+```bash
+pct exec <CTID> -- update-stellio                 # Update Stellio (from the Proxmox host)
+pct exec <CTID> -- journalctl -u stellio -f       # Follow the logs
+```
+
+Non-interactive mode: every option can be set with environment variables, e.g. `var_mode=default var_cpu=4 var_ram=4096 var_disk=16 var_ip=192.168.1.50/24 var_gw=192.168.1.1` (full list at the top of the script).
 
 ### 🧰 Server edition specifics (Raspberry Pi / Linux)
 
@@ -326,7 +348,8 @@ stellio/
 ├── apk/                    # Android companion app package
 ├── docs/                   # Documentation, privacy policy, translated READMEs
 ├── requirements.txt        # Python dependencies
-└── install-pi.sh           # Raspberry Pi / Linux install script (systemd service)
+├── install-pi.sh           # Raspberry Pi / Linux install script (systemd service)
+└── stellio-lxc.sh          # LXC install script for Proxmox VE
 ```
 
 Got an idea? [Open an issue](https://github.com/stellio-app/stellio/issues)!
@@ -381,6 +404,17 @@ The Windows installer and the Linux AppImage published in [Releases](https://git
 
 ---
 
+## 🤝 Partnership
+
+Stellio is an official integration partner of **TigerTag**, the NFC/RFID filament identification system: scan your spools and see them directly in Stellio's filament inventory.
+
+- 🌐 [Official website](https://tigersystem.io) — [tigertag.io](https://tigertag.io)
+- 🖥️ [Studio Manager (desktop app)](https://github.com/TigerTag-Project/TigerTag-Studio-Manager)
+- 📘 [RFID guide & documentation](https://github.com/TigerTag-Project/TigerTag-RFID-Guide)
+- 📱 [iOS app](https://apps.apple.com/fr/app/tigertag-rfid-connect/id6745437963)
+
+---
+
 ## 🙏 Acknowledgments
 
 - [Ollama](https://ollama.com/) for local AI
@@ -400,6 +434,7 @@ The Windows installer and the Linux AppImage published in [Releases](https://git
 - 💡 **Feature request**: [GitHub Discussions](https://github.com/stellio-app/stellio/discussions)
 - 📧 **Email**: contact@stellio-app.com
 - 🌐 **Website**: [stellio-app.com](https://stellio-app.com)
+- 💬 **Discord**: [Join the Discord community](https://discord.gg/VOTRE-INVITATION)
 
 ---
 
@@ -425,5 +460,6 @@ If Stellio is useful to you, consider:
 <p align="center">
   <a href="https://github.com/stellio-app/stellio">⭐ Star this repo</a> •
   <a href="https://github.com/stellio-app/stellio/issues">🐛 Report a bug</a> •
-  <a href="https://github.com/stellio-app/stellio/discussions">💡 Request a feature</a>
+  <a href="https://github.com/stellio-app/stellio/discussions">💡 Request a feature</a> •
+  <a href="https://discord.gg/VOTRE-INVITATION">💬 Join the Discord</a>
 </p>

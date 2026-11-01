@@ -13,6 +13,9 @@ if sys.platform.startswith('linux'):
 
 
 def _portable_data_dir():
+    """Mode portable (Windows) : si un fichier « portable.flag » se trouve à côté de Stellio.exe, toutes les données
+    (base, réglages, journaux, bibliothèques ajoutées, profil du navigateur intégré) restent dans le dossier « data »
+    à côté de l'exécutable : on peut copier le dossier sur une clé USB. Sans ce fichier, rien ne change."""
     if os.name != 'nt':
         return None
     try:
@@ -24,6 +27,7 @@ def _portable_data_dir():
 
 
 def _early_extra_libs_dir():
+    # Même logique que get_data_path() (défini plus bas), sans créer de dossier.
     env_override = os.environ.get('STELLIO_DATA_DIR')
     if env_override:
         base = env_override
@@ -5012,10 +5016,12 @@ def process_generation_queue():
                     conn.close()
                 for source in sources:
                     if source['type'] == 'folder' and os.path.exists(source['path']):
+                        _src_exts = _source_allowed_exts(source)
+                        _src_tuple = tuple(sorted(_src_exts)) if _src_exts else SUPPORTED_EXTENSIONS_TUPLE
                         for root, dirs, files in os.walk(source['path']):
                             dirs[:] = [d for d in dirs if d != PLATE_SPLIT_DIRNAME]
                             for f in sorted(files, key=str.lower):
-                                if f.lower().endswith(SUPPORTED_EXTENSIONS_TUPLE):
+                                if f.lower().endswith(_src_tuple):
                                     file_path = os.path.join(root, f).replace('\\', '/')
                                     if _is_ignored_recently(file_path):
                                         continue
@@ -5410,11 +5416,17 @@ def load_3mf_mesh(source, plate_index=None):
                                         continue
                                     if filter_ids is not None and obj.get('id') not in filter_ids:
                                         continue
-                                    mesh_el = (obj.find('ns:mesh', ns) or obj.find('mesh'))
+                                    mesh_el = obj.find('ns:mesh', ns)
+                                    if mesh_el is None:
+                                        mesh_el = obj.find('mesh')
                                     if mesh_el is None:
                                         continue
-                                    verts_el = (mesh_el.find('ns:vertices', ns) or mesh_el.find('vertices'))
-                                    tris_el  = (mesh_el.find('ns:triangles', ns) or mesh_el.find('triangles'))
+                                    verts_el = mesh_el.find('ns:vertices', ns)
+                                    if verts_el is None:
+                                        verts_el = mesh_el.find('vertices')
+                                    tris_el = mesh_el.find('ns:triangles', ns)
+                                    if tris_el is None:
+                                        tris_el = mesh_el.find('triangles')
                                     if verts_el is None or tris_el is None:
                                         continue
                                     vertices = []
@@ -5966,6 +5978,47 @@ def _generate_thumbnail_matplotlib(mesh, thumb_path, resolution=(768, 768)):
             return False
 
 
+def _mesh_open_edge_count(mesh):
+    """Nombre d'arêtes réellement OUVERTES (partagées par une seule face) après un nettoyage léger
+    (fusion des sommets, retrait des faces dégénérées/dupliquées). 0 = rien que les slicers ne ferment pas
+    d'eux-mêmes. Renvoie None si le calcul est impossible (on retombe alors sur le test strict)."""
+    try:
+        if mesh.is_watertight:
+            return 0
+        m = mesh.copy()
+        m.merge_vertices()
+        try:
+            m.update_faces(m.nondegenerate_faces())
+        except Exception:
+            pass
+        try:
+            m.update_faces(m.unique_faces())
+        except Exception:
+            pass
+        m.remove_unreferenced_vertices()
+        if len(m.faces) == 0:
+            return 0
+        edges = m.edges_sorted
+        groups = trimesh.grouping.group_rows(edges, require_count=1)
+        return int(len(groups))
+    except Exception:
+        return None
+
+
+def mesh_really_needs_repair(mesh):
+    """Aligné sur le comportement des slicers : ils réorientent seuls les normales inversées et fusionnent
+    sans alerte les arêtes partagées par plus de 2 faces (coques qui se touchent). Seules les arêtes ouvertes
+    (vrais trous) comptent comme problème."""
+    open_edges = _mesh_open_edge_count(mesh)
+    if open_edges is None:
+        try:
+            winding_ok = bool(mesh.is_winding_consistent)
+        except Exception:
+            winding_ok = True
+        return not (mesh.is_watertight and winding_ok)
+    return open_edges > 0
+
+
 def analyze_3d_file(file_path):
     try:
         mesh = load_model_mesh(file_path)
@@ -6001,12 +6054,7 @@ def analyze_3d_file(file_path):
 
         already_handled = file_path.replace('\\', '/') in repair_ignored_cache
 
-        try:
-            winding_ok = bool(mesh.is_winding_consistent)
-        except Exception:
-            winding_ok = True
-
-        mesh_is_sane = mesh.is_watertight and winding_ok
+        mesh_is_sane = not mesh_really_needs_repair(mesh)
 
         return {
             'dimensions': {'x': round(dimensions[0], 1), 'y': round(dimensions[1], 1), 'z': round(dimensions[2], 1)},
@@ -6766,8 +6814,45 @@ def api_upload_dropped_files():
 @app.route('/api/sources/<int:source_id>', methods=['PUT'])
 @login_required
 def api_update_source(source_id):
-    data = request.json
-    new_name = data.get('name', '').strip()
+    data = request.json or {}
+
+    # Choix des types de fichiers affichés pour cette source (liste de clés de SOURCE_TYPE_GROUPS ; vide/absent = tous)
+    if 'extensions' in data:
+        groups = data.get('extensions')
+        if groups is not None and not isinstance(groups, list):
+            return jsonify({"error": "Paramètre 'extensions' invalide"}), 400
+        keys = [str(g).lower().lstrip('.') for g in (groups or [])]
+        keys = [('step' if k == 'stp' else k) for k in keys]
+        if any(k not in SOURCE_TYPE_GROUPS for k in keys):
+            return jsonify({"error": "Type de fichier inconnu"}), 400
+        keys = sorted(set(keys))
+        if groups is not None and len(groups) > 0 and not keys:
+            return jsonify({"error": "Choisissez au moins un type de fichier"}), 400
+        conn = get_db()
+        try:
+            row = conn.execute("SELECT * FROM sources WHERE id = ? AND user_id = ?", (source_id, session['user_id'])).fetchone()
+            if not row:
+                return jsonify({"error": "Source introuvable"}), 404
+            try:
+                cfg = json.loads(row['config']) if row['config'] else {}
+            except Exception:
+                cfg = {}
+            if keys and set(keys) != set(SOURCE_TYPE_GROUPS):
+                cfg['extensions'] = [e for k in keys for e in SOURCE_TYPE_GROUPS[k]]
+            else:
+                cfg.pop('extensions', None)
+            conn.execute("UPDATE sources SET config = ? WHERE id = ? AND user_id = ?",
+                         (json.dumps(cfg), source_id, session['user_id']))
+            conn.commit()
+            invalidate_cache()
+            all_sources = [dict(s) for s in conn.execute("SELECT * FROM sources WHERE user_id = ?", (session['user_id'],)).fetchall()]
+        finally:
+            conn.close()
+        threading.Thread(target=_do_background_scan, args=(all_sources, session['user_id']),
+                         kwargs={'blocking': True}, daemon=True).start()
+        return jsonify({"message": "Types de fichiers mis à jour"}), 200
+
+    new_name = (data.get('name') or '').strip()
     if not new_name:
         return jsonify({"error": "Nom requis"}), 400
 
@@ -6809,7 +6894,7 @@ def api_delete_source(source_id):
                 for source in sources:
                     try:
                         if source['type'] == 'folder':
-                            all_files.extend(scan_local_folder(source['path']))
+                            all_files.extend(_filter_files_for_source(source, scan_local_folder(source['path'])))
                         elif source['type'] == 'smb':
                             try:
                                 smbclient.reset_connection_cache()
@@ -6822,7 +6907,7 @@ def api_delete_source(source_id):
                                 kwargs['username'] = config['username']
                             if config.get('password'):
                                 kwargs['password'] = config['password']
-                            all_files.extend(scan_smb_folder_recursive(unc_path, '', kwargs, source['name']))
+                            all_files.extend(_filter_files_for_source(source, scan_smb_folder_recursive(unc_path, '', kwargs, source['name'])))
                     except Exception as e:
                         app_logger.warning(f"[DELETE] Erreur source {source.get('name')}: {e}")
                 save_file_cache(all_files, sources)
@@ -8168,12 +8253,14 @@ def pregenerate_thumbnails_on_startup(limit=90):
             break
         try:
             if source['type'] == 'folder' and os.path.exists(source['path']):
+                _src_exts = _source_allowed_exts(source)
+                _src_tuple = tuple(sorted(_src_exts)) if _src_exts else SUPPORTED_EXTENSIONS_TUPLE
                 for root, dirs, files in os.walk(source['path']):
                     dirs[:] = [d for d in dirs if d != PLATE_SPLIT_DIRNAME]
                     for f in sorted(files, key=str.lower):
                         if len(to_process) >= limit:
                             break
-                        if f.lower().endswith(SUPPORTED_EXTENSIONS_TUPLE):
+                        if f.lower().endswith(_src_tuple):
                             file_path = os.path.join(root, f).replace('\\', '/')
                             normalized_path = file_path
                             thumb_filename = hashlib.md5(normalized_path.encode()).hexdigest()
@@ -8937,6 +9024,57 @@ def _auto_tag_new_files(new_files, sources_list, user_id):
         conn.close()
 
 
+SOURCE_TYPE_GROUPS = {
+    'stl': ('.stl',), '3mf': ('.3mf',), 'obj': ('.obj',), 'ply': ('.ply',), 'amf': ('.amf',), 'step': ('.step', '.stp'),
+}
+
+
+def _source_allowed_exts(source):
+    """Extensions autorisées pour une source (config.extensions) ; None = tous les formats pris en charge."""
+    try:
+        raw = source['config'] if source['config'] else None
+        cfg = json.loads(raw) if isinstance(raw, str) else (raw or {})
+        exts = cfg.get('extensions')
+        if not isinstance(exts, list) or not exts:
+            return None
+        allowed = {('.' + str(e).lower().lstrip('.')) for e in exts}
+        allowed &= set(SUPPORTED_EXTENSIONS)
+        if not allowed or allowed >= set(SUPPORTED_EXTENSIONS):
+            return None
+        return allowed
+    except Exception:
+        return None
+
+
+def _filter_files_for_source(source, files):
+    allowed = _source_allowed_exts(source)
+    if allowed is None:
+        return files
+    return [f for f in files if (f.get('extension') or os.path.splitext(f.get('path', ''))[1]).lower() in allowed]
+
+
+def _drop_disabled_type_files(files, sources_list):
+    """Masque immédiatement (sans attendre un rescan) les fichiers dont le type est désactivé pour leur source."""
+    rules = []
+    for s in sources_list:
+        allowed = _source_allowed_exts(s)
+        if allowed is None:
+            continue
+        base = (s.get('path') or '').replace('\\', '/').rstrip('/')
+        if base:
+            rules.append((base.lower() + '/', allowed))
+    if not rules:
+        return files
+    out = []
+    for f in files:
+        p = (f.get('path') or '').replace('\\', '/').lower()
+        ext = (f.get('extension') or os.path.splitext(p)[1]).lower()
+        hidden = any(p.startswith(prefix) and ext not in allowed for prefix, allowed in rules)
+        if not hidden:
+            out.append(f)
+    return out
+
+
 def _do_background_scan(sources_list, user_id, blocking=False):
     if blocking:
         acquired = _background_scan_running.acquire(blocking=True, timeout=180)
@@ -8958,7 +9096,7 @@ def _do_background_scan(sources_list, user_id, blocking=False):
                         app_logger.warning(f"[SCAN] Source \"{source['name']}\" introuvable ({source['path']}) — ignorée pour ce scan")
                         unreachable_sources.append(source['name'])
                         continue
-                    all_files.extend(scan_local_folder(source['path']))
+                    all_files.extend(_filter_files_for_source(source, scan_local_folder(source['path'])))
                 elif source['type'] == 'smb':
                     try:
                         smbclient.reset_connection_cache()
@@ -8977,7 +9115,7 @@ def _do_background_scan(sources_list, user_id, blocking=False):
                         app_logger.warning(f"[SCAN] Source réseau \"{source['name']}\" injoignable ({unc_path}) — ignorée pour ce scan")
                         unreachable_sources.append(source['name'])
                         continue
-                    all_files.extend(scan_smb_folder_recursive(unc_path, '', kwargs, source['name']))
+                    all_files.extend(_filter_files_for_source(source, scan_smb_folder_recursive(unc_path, '', kwargs, source['name'])))
                 elif source['type'] == 'file':
                     if not os.path.exists(source['path']):
                         app_logger.warning(f"[SCAN] Fichier source \"{source['name']}\" introuvable — ignoré pour ce scan")
@@ -8992,7 +9130,7 @@ def _do_background_scan(sources_list, user_id, blocking=False):
                     if is_archive_src:
                         extracted_files = extract_archive_to_disk(source['path'], source['name'])
                         if extracted_files:
-                            all_files.extend(extracted_files)
+                            all_files.extend(_filter_files_for_source(source, extracted_files))
                             new_folder = (source['path'][:-7] if source['path'].lower().endswith('.tar.gz')
                                           else os.path.splitext(source['path'])[0])
                             try:
@@ -9173,6 +9311,7 @@ def api_get_files():
         cache_timestamp = cache_data.get('timestamp', 0) if cache_data else 0
 
         if cached_files is not None:
+            cached_files = _drop_disabled_type_files(cached_files, sources_list)
             app_logger.info(f"[FILES] Cache hit — {len(cached_files)} fichiers servis instantanément")
             try:
                 existing_thumbs = set(os.listdir(THUMBNAILS_DIR))
@@ -10532,7 +10671,7 @@ def api_find_duplicates():
         for source in sources:
             try:
                 if source['type'] == 'folder' and os.path.exists(source['path']):
-                    all_files.extend(scan_local_folder(source['path']))
+                    all_files.extend(_filter_files_for_source(source, scan_local_folder(source['path'])))
             except Exception:
                 pass
 
@@ -10593,7 +10732,7 @@ def api_find_similar_duplicates():
         for source in sources:
             try:
                 if source['type'] == 'folder' and os.path.exists(source['path']):
-                    all_files.extend(scan_local_folder(source['path']))
+                    all_files.extend(_filter_files_for_source(source, scan_local_folder(source['path'])))
             except Exception:
                 pass
 
@@ -10851,10 +10990,39 @@ def api_get_print_history():
         if date_to:
             where.append("date(sent_at) <= date(?)")
             params.append(date_to)
+        where_sql_all = " AND ".join(where)
+        params_all = list(params)
+
+        # Pagination par semaine : ?week=YYYY-MM-DD (lundi de la semaine) -> uniquement les entrées de ces 7 jours
+        week_filter = (request.args.get('week') or '').strip()
+        if week_filter:
+            try:
+                _wd = datetime.datetime.strptime(week_filter, '%Y-%m-%d')
+            except ValueError:
+                return jsonify({"error": "Paramètre 'week' invalide"}), 400
+            where.append("date(sent_at) >= date(?) AND date(sent_at) <= date(?, '+6 days')")
+            params.extend([_wd.strftime('%Y-%m-%d'), _wd.strftime('%Y-%m-%d')])
+            limit = 500
+            offset = 0
         where_sql = " AND ".join(where)
 
         conn = get_db()
         try:
+            day_rows = conn.execute(
+                f"SELECT date(sent_at) AS d, COUNT(*) AS n FROM print_history WHERE {where_sql_all} GROUP BY d ORDER BY d DESC",
+                params_all
+            ).fetchall()
+            weeks_map = {}
+            for _dr in day_rows:
+                if not _dr[0]:
+                    continue
+                try:
+                    _d = datetime.datetime.strptime(_dr[0], '%Y-%m-%d')
+                except ValueError:
+                    continue
+                _monday = (_d - datetime.timedelta(days=_d.weekday())).strftime('%Y-%m-%d')
+                weeks_map[_monday] = weeks_map.get(_monday, 0) + _dr[1]
+            weeks = [{"start": k, "count": v} for k, v in sorted(weeks_map.items(), reverse=True)]
             rows = conn.execute(
                 f"""SELECT id, file_path, file_name, file_size, file_ext, slicer, sent_at, source_platform,
                           result, failure_reason, rating_notes, slicer_profile_id, slicer_profile_name, rated_at,
@@ -10864,9 +11032,7 @@ def api_get_print_history():
                 (*params, limit, offset)
             ).fetchall()
 
-            total = conn.execute(
-                f"SELECT COUNT(*) FROM print_history WHERE {where_sql}", params
-            ).fetchone()[0]
+            total = sum(w["count"] for w in weeks)
 
             platforms = conn.execute(
                 "SELECT DISTINCT source_platform FROM print_history WHERE user_id=? AND source_platform IS NOT NULL AND source_platform != '' ORDER BY source_platform",
@@ -10880,6 +11046,7 @@ def api_get_print_history():
             "total": total,
             "limit": limit,
             "offset": offset,
+            "weeks": weeks,
             "available_platforms": [p[0] for p in platforms],
         }), 200
 
@@ -15554,7 +15721,8 @@ def api_repair_file():
     try:
         ext = os.path.splitext(file_path)[1].lower()
         load_timeout = get_integrity_timeout(file_path)
-        with ThreadPoolExecutor(max_workers=1) as _load_pool:
+        _load_pool = ThreadPoolExecutor(max_workers=1)
+        try:
             _load_future = _load_pool.submit(_load_mesh_to_repair)
             try:
                 mesh = _load_future.result(timeout=load_timeout)
@@ -15562,6 +15730,8 @@ def api_repair_file():
                 return jsonify({"error": f"Délai dépassé lors de la lecture du fichier (>{load_timeout:.0f}s). "
                                           f"Le fichier semble valide mais le partage réseau est trop lent — "
                                           f"réessayez, ou copiez-le en local avant de le réparer."}), 504
+        finally:
+            _load_pool.shutdown(wait=False)
 
         if isinstance(mesh, trimesh.Scene):
             geoms = [m for m in mesh.geometry.values() if hasattr(m, 'vertices') and len(m.vertices) > 0]
@@ -15832,10 +16002,11 @@ def api_convert_file_batch():
     return jsonify({"success": True, "results": results, "converted": succeeded, "total": len(results)})
 
 
-INTEGRITY_CHECK_BASE_TIMEOUT = 45
-INTEGRITY_CHECK_TIMEOUT_PER_MB = 1.0
-INTEGRITY_CHECK_TIMEOUT_MAX = 180
-INTEGRITY_CHECK_WORKERS = 4
+INTEGRITY_CHECK_BASE_TIMEOUT = 120
+INTEGRITY_CHECK_TIMEOUT_PER_MB = 3.0
+INTEGRITY_CHECK_TIMEOUT_MAX = 900
+INTEGRITY_CHECK_WORKERS = max(1, min(3, (os.cpu_count() or 2) // 2))
+INTEGRITY_CHECKSUM_MAX_MB = 64
 INTEGRITY_REPORT_FILE = os.path.join(DATA_DIR, "integrity_report.json")
 
 
@@ -15910,10 +16081,11 @@ def check_single_file_integrity(file_path):
             result['error'] = str(e)[:300]
             return result
 
-    try:
-        result['checksum'] = compute_file_checksum(file_path)
-    except Exception:
-        pass
+    if size <= INTEGRITY_CHECKSUM_MAX_MB * 1024 * 1024:
+        try:
+            result['checksum'] = compute_file_checksum(file_path)
+        except Exception:
+            pass
     return result
 
 
@@ -15945,14 +16117,21 @@ def _run_integrity_check(paths):
     executor = ThreadPoolExecutor(max_workers=INTEGRITY_CHECK_WORKERS)
     paths_iter = iter(paths)
     pending = {}
+    started_at = {}
+    retry_paths = []
+
+    def _timed_check(p):
+        # Le délai ne démarre qu'à la prise en charge réelle par un worker (pas pendant l'attente en file)
+        started_at[p] = time.time()
+        return check_single_file_integrity(p)
 
     def _submit_next():
         try:
             p = next(paths_iter)
         except StopIteration:
             return False
-        fut = executor.submit(check_single_file_integrity, p)
-        pending[fut] = (p, time.time() + get_integrity_timeout(p))
+        fut = executor.submit(_timed_check, p)
+        pending[fut] = p
         return True
 
     for _ in range(INTEGRITY_CHECK_WORKERS):
@@ -15962,18 +16141,24 @@ def _run_integrity_check(paths):
     while pending:
         done, _ = futures_wait(list(pending.keys()), timeout=1, return_when=FIRST_COMPLETED)
         now = time.time()
-        to_process = list(done) + [f for f, (p, deadline) in pending.items() if f not in done and now >= deadline]
+        to_process = list(done) + [
+            f for f, p in pending.items()
+            if f not in done and p in started_at and now >= started_at[p] + get_integrity_timeout(p)
+        ]
 
         for fut in to_process:
-            p, deadline = pending.pop(fut)
+            p = pending.pop(fut)
             if fut.done():
                 try:
                     result = fut.result()
                 except Exception as e:
                     result = {'path': p, 'status': 'corrupted', 'error': str(e)[:300]}
             else:
-                result = {'path': p, 'status': 'corrupted',
-                          'error': "Délai dépassé lors de la lecture (fichier probablement corrompu, trop volumineux ou partage réseau lent)"}
+                # Fichier lent : on ne le déclare pas corrompu, on le retente à la fin, seul, avec un délai triplé
+                retry_paths.append(p)
+                fut.cancel()
+                _submit_next()
+                continue
 
             with integrity_check_lock:
                 integrity_check_state['checked'] += 1
@@ -15991,6 +16176,32 @@ def _run_integrity_check(paths):
             _submit_next()
 
     executor.shutdown(wait=False)
+
+    # Seconde chance pour les fichiers lents : un seul à la fois (plus de contention CPU/disque), délai x3
+    for p in retry_paths:
+        retry_timeout = get_integrity_timeout(p) * 3
+        retry_pool = ThreadPoolExecutor(max_workers=1)
+        try:
+            fut = retry_pool.submit(check_single_file_integrity, p)
+            try:
+                result = fut.result(timeout=retry_timeout)
+            except FuturesTimeoutError:
+                result = {'path': p, 'status': 'corrupted',
+                          'error': f"Délai dépassé (>{retry_timeout:.0f}s) : fichier très volumineux ou partage réseau trop lent — le fichier n'est pas forcément corrompu"}
+            except Exception as e:
+                result = {'path': p, 'status': 'corrupted', 'error': str(e)[:300]}
+        finally:
+            retry_pool.shutdown(wait=False)
+        with integrity_check_lock:
+            integrity_check_state['checked'] += 1
+            status = result.get('status', 'corrupted')
+            if status == 'ok':
+                integrity_check_state['ok'] += 1
+            else:
+                integrity_check_state[status] = integrity_check_state.get(status, 0) + 1
+                integrity_check_state['problems'].append({
+                    'path': p, 'name': os.path.basename(p), 'status': status, 'error': result.get('error')
+                })
 
     with integrity_check_lock:
         integrity_check_state['running'] = False
@@ -17700,6 +17911,7 @@ def api_get_settings():
         settings.setdefault('manual_inventory_enabled', True)
         settings.setdefault('low_stock_threshold_percent', int(LOW_STOCK_RATIO * 100))
         settings.setdefault('low_stock_threshold_g', LOW_STOCK_FLOOR_G)
+        settings.setdefault('restock_threshold_g', RESTOCK_DEFAULT_G)
         settings['launch_at_startup_supported'] = True
         settings['launch_at_startup'] = is_startup_enabled()
         settings['launch_minimized'] = is_startup_minimized() if settings['launch_at_startup'] else bool(settings.get('launch_minimized', False))
@@ -17752,7 +17964,7 @@ def api_save_settings():
                     return jsonify({"error": "Nom de modèle invalide", "code": "invalid_model"}), 400
                 data[_mk] = _mv
 
-        for _lk, _lmax in (('low_stock_threshold_percent', 100), ('low_stock_threshold_g', 5000)):
+        for _lk, _lmax in (('low_stock_threshold_percent', 100), ('low_stock_threshold_g', 5000), ('restock_threshold_g', 20000)):
             if _lk in data:
                 try:
                     _lv = float(data.get(_lk))
@@ -17823,7 +18035,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.7.9"
+CURRENT_VERSION = "0.8.0"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -25795,6 +26007,129 @@ def api_filament_low_stock():
 
     return jsonify(low), 200
 
+RESTOCK_DEFAULT_G = 100
+RESTOCK_SNOOZE_DEFAULT_DAYS = 14
+
+
+def _restock_threshold_g():
+    try:
+        v = float((load_settings() or {}).get('restock_threshold_g', RESTOCK_DEFAULT_G))
+        return v if v >= 0 else RESTOCK_DEFAULT_G
+    except (TypeError, ValueError):
+        return RESTOCK_DEFAULT_G
+
+
+def _restock_key(vendor, material, color_hex):
+    return f"{(vendor or '').strip().lower()}|{(material or '').strip().upper()}|{(color_hex or '').strip().lower()}"
+
+
+def _restock_collect_spools(user_id):
+    """Toutes les bobines actives (manuel, Spoolman, TigerTag) sous une forme homogène."""
+    spools = []
+    try:
+        if (load_settings() or {}).get('manual_inventory_enabled', True):
+            conn = get_db()
+            try:
+                rows = conn.execute(
+                    "SELECT name, material, color_hex, remaining_g, vendor FROM manual_filament_spools WHERE user_id=? AND archived=0",
+                    (user_id,)
+                ).fetchall()
+            finally:
+                conn.close()
+            for r in rows:
+                spools.append({'name': r['name'], 'material': r['material'], 'color_hex': r['color_hex'],
+                               'remaining_g': r['remaining_g'], 'vendor': r['vendor']})
+    except Exception as e:
+        app_logger.warning(f"[Restock] Lecture bobines manuelles échouée: {e}")
+    try:
+        url = ((load_settings() or {}).get('spoolman_url') or '').rstrip('/')
+        if url:
+            sm, _err = _get_spoolman_slots(url)
+            for s in sm:
+                if not s.get('archived'):
+                    spools.append({'name': s.get('name'), 'material': s.get('material'), 'color_hex': s.get('color_hex'),
+                                   'remaining_g': s.get('remaining_g'), 'vendor': s.get('vendor')})
+    except Exception as e:
+        app_logger.warning(f"[Restock] Lecture Spoolman échouée: {e}")
+    try:
+        for s in _get_tigertag_slots(user_id):
+            mat = '' if str(s.get('material') or '').strip().isdigit() else s.get('material')
+            spools.append({'name': s.get('color_name') or s.get('name'), 'material': mat,
+                           'color_hex': s.get('color_hex'), 'remaining_g': s.get('remaining_g'), 'vendor': s.get('vendor')})
+    except Exception as e:
+        app_logger.warning(f"[Restock] Lecture TigerTag échouée: {e}")
+    return spools
+
+
+@app.route('/api/filament/restock', methods=['GET'])
+@login_required
+def api_filament_restock():
+    """Filaments (marque + matière + couleur) dont le total restant, toutes bobines confondues,
+    est sous le seuil de réapprovisionnement. 0 g = fonction désactivée."""
+    threshold = _restock_threshold_g()
+    if threshold <= 0:
+        return jsonify({"threshold_g": 0, "items": []}), 200
+    include_snoozed = request.args.get('all') == '1'
+    snoozed = (load_settings() or {}).get('restock_snoozed') or {}
+    now = time.time()
+
+    groups = {}
+    for s in _restock_collect_spools(session['user_id']):
+        try:
+            rem = float(s['remaining_g']) if s.get('remaining_g') is not None else None
+        except (TypeError, ValueError):
+            rem = None
+        if rem is None:
+            continue
+        key = _restock_key(s.get('vendor'), s.get('material'), s.get('color_hex'))
+        g = groups.setdefault(key, {'key': key, 'name': s.get('name') or '', 'vendor': s.get('vendor') or '',
+                                    'material': s.get('material') or '', 'color_hex': s.get('color_hex') or '#888888',
+                                    'total_g': 0.0, 'spool_count': 0})
+        g['total_g'] += max(rem, 0.0)
+        g['spool_count'] += 1
+
+    items = []
+    for g in groups.values():
+        if g['total_g'] > threshold:
+            continue
+        until = snoozed.get(g['key'])
+        is_snoozed = bool(until) and float(until) > now
+        if is_snoozed and not include_snoozed:
+            continue
+        g['total_g'] = round(g['total_g'], 1)
+        g['snoozed_until'] = float(until) if is_snoozed else None
+        g.update(_spool_buy_info(g['vendor'], g['material'], g['name']))
+        items.append(g)
+    items.sort(key=lambda x: x['total_g'])
+    return jsonify({"threshold_g": threshold, "items": items}), 200
+
+
+@app.route('/api/filament/restock/snooze', methods=['POST'])
+@login_required
+def api_filament_restock_snooze():
+    """Marque un filament comme « commandé » : le rappel est mis en veille N jours (0 = réactiver)."""
+    data = request.json or {}
+    key = str(data.get('key') or '').strip()
+    if not key or len(key) > 300:
+        return jsonify({"error": "Clé invalide"}), 400
+    try:
+        days = float(data.get('days', RESTOCK_SNOOZE_DEFAULT_DAYS))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Durée invalide"}), 400
+    days = max(0.0, min(days, 365.0))
+    settings = load_settings() or {}
+    now = time.time()
+    snoozed = {k: v for k, v in (settings.get('restock_snoozed') or {}).items()
+               if isinstance(v, (int, float)) and v > now}
+    if days > 0:
+        snoozed[key] = now + days * 86400
+    else:
+        snoozed.pop(key, None)
+    settings['restock_snoozed'] = snoozed
+    save_settings(settings)
+    return jsonify({"message": "Rappel mis à jour", "snoozed_until": snoozed.get(key)}), 200
+
+
 @app.route('/api/files/pre-print-check', methods=['POST'])
 @login_required
 def api_pre_print_check():
@@ -27234,10 +27569,46 @@ if __name__ in ('__main__', 'stellio_main'):
             if on_status:
                 on_status('server')
 
+            def _server_watchdog():
+                # Ping local toutes les 60 s. Si le serveur ne répond plus 3 fois de suite, on écrit la pile de tous
+                # les threads dans le journal pour identifier ce qui bloque (puis on continue de surveiller).
+                import traceback
+                time.sleep(90)
+                fails = 0
+                while True:
+                    try:
+                        urllib.request.urlopen(f"http://127.0.0.1:{SERVER_PORT}/api/ping", timeout=10).read()
+                        fails = 0
+                    except urllib.error.HTTPError:
+                        # Une réponse HTTP (même 403 : accès navigateur bloqué sur PC) prouve que le serveur répond
+                        fails = 0
+                    except Exception as e:
+                        fails += 1
+                        app_logger.warning(f"[WATCHDOG] Serveur local sans réponse ({fails}/3): {e}")
+                        if fails == 3:
+                            try:
+                                import io as _io
+                                buf = _io.StringIO()
+                                for tid, frame in sys._current_frames().items():
+                                    stack = ''.join(traceback.format_stack(frame))
+                                    if 'queue_cv.wait' in stack:
+                                        continue  # worker waitress inactif : sans intérêt
+                                    buf.write(f"\n--- Thread {tid} ---\n")
+                                    buf.write(stack)
+                                app_logger.warning("[WATCHDOG] Piles des threads:" + buf.getvalue()[:20000])
+                            except Exception:
+                                pass
+                    time.sleep(60)
+
+            threading.Thread(target=_server_watchdog, daemon=True).start()
+
             def run_server():
                 try:
                     from waitress import serve
-                    serve(app, host='0.0.0.0', port=SERVER_PORT, threads=16, channel_timeout=300)
+                    # asyncore_use_poll : évite la limite de 1024 descripteurs de select() sous Linux (gel après longue durée)
+                    # cleanup_interval/channel_timeout : ferment les connexions inactives (veille, onglets abandonnés)
+                    serve(app, host='0.0.0.0', port=SERVER_PORT, threads=32, channel_timeout=120,
+                          cleanup_interval=15, connection_limit=300, asyncore_use_poll=True)
                 except ImportError:
                     app.run(host='0.0.0.0', port=SERVER_PORT, debug=False)
             threading.Thread(target=run_server, daemon=True).start()
@@ -27452,7 +27823,7 @@ if __name__ in ('__main__', 'stellio_main'):
                 background_color='#1a1d23',
                 min_size=(1024, 768),
                 maximized=not STELLIO_START_MINIMIZED,
-                confirm_close=True,
+                confirm_close=False,
                 js_api=StellioDesktopAPI()
             )
             try:
