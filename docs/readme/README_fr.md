@@ -65,7 +65,7 @@ Que vous soyez un maker débutant ou un propriétaire expérimenté gérant plus
 - 🏷️ **Tags personnalisés** avec couleurs + auto-tagging par IA, et **tag en un clic sur plusieurs fichiers sélectionnés**
 - 🔍 **Recherche sémantique assistée par IA** ("je cherche un support pour...") avec **recherches récentes mémorisées**
 - ⭐ **Favoris** et filtres avancés (type, taille, poids, statut d'impression), avec une **alerte de réassort** quand le stock de filament est insuffisant pour vos favoris
-- 🧵 **Filtre « Stock de filament »** : ne garde que les fichiers imprimables avec les bobines que vous avez réellement (Spoolman, inventaire manuel, TigerTag), par matière
+- 🧵 **Filtre « Stock de filament »** : ne garde que les fichiers imprimables avec les bobines que vous avez réellement (Spoolman, inventaire manuel, [TigerTag](https://tigersystem.io)), par matière
 - 💾 **Filtres sauvegardés** : enregistrez une combinaison de filtres et réutilisez-la en un clic
 - 🔀 **Tri et recherche mémorisés** : le tri choisi (A → Z, dossier, taille, date, tag…) est retrouvé à la réouverture, et la recherche, les filtres actifs et les résultats de la recherche IA restent affichés quand la bibliothèque s'actualise automatiquement ; vider le champ de recherche arrête immédiatement la recherche IA en cours
 - 🖨️ **Filtres de statut d'impression** : « Envoyé au slicer », « Déjà imprimé (réussi ou raté) », « Déjà réussi » et « Déjà échoué »
@@ -111,7 +111,7 @@ Que vous soyez un maker débutant ou un propriétaire expérimenté gérant plus
 - 🔗 Intégration **Spoolman** (serveur de gestion de bobines), avec détection automatique sur votre réseau
 - 🟠 Support **AMS Bambu Lab** (lecture des slots)
 - 🟢 Support **CFS Creality**
-- 🐯 Intégration **TigerTag** (identification NFC/RFID des bobines) : connectez-vous pour voir vos bobines TigerTag dans l'inventaire, ou laissez Stellio récupérer automatiquement une session TigerTag Studio existante — en lecture seule, ne modifie jamais votre inventaire TigerTag
+- 🐯 Intégration [**TigerTag**](https://tigersystem.io) (identification NFC/RFID des bobines) : connectez-vous pour voir vos bobines TigerTag dans l'inventaire, ou laissez Stellio récupérer automatiquement une session TigerTag Studio existante — en lecture seule, ne modifie jamais votre inventaire TigerTag
 - ⚪ Bobines manuelles
 - 📉 Suivi automatique de la consommation lors de l'envoi au slicer, avec vérification de compatibilité avant impression (quantité suffisante ?)
 - 🔔 **Alertes de stock faible** au démarrage, avec un lien rapide pour racheter
@@ -258,7 +258,7 @@ Mode sans menu : toutes les options se règlent par variables d'environnement, p
 
 - ☁️ **IA en ligne (facultatif)** : à la place d'Ollama, utilisez Claude (Anthropic), ChatGPT (OpenAI) ou Gemini (Google) avec votre propre clé API (Paramètres → Intelligence artificielle). La clé est chiffrée sur le serveur et jamais renvoyée au navigateur ; Ollama reste le choix par défaut, 100 % local. Les requêtes (noms de fichiers, étiquettes, descriptions, photos du S.O.S Print) partent chez le fournisseur choisi et sont facturées sur votre clé.
 - 📥 **Profils de slicer** : Stellio ne voit pas les slicers de votre PC et ne se connecte pas aux clouds des slicers (Orca Cloud, Bambu Cloud…). Exportez vos profils depuis le slicer (OrcaSlicer : Fichier → Exporter → Exporter le lot de préréglages), puis importez-les depuis Paramètres → Mes profils de slicer ; pour Orca Cloud, vous pouvez aussi coller le « Copy raw JSON » d'un profil. Un **dossier de profils surveillé** que Stellio relit automatiquement est également possible (Syncthing, partage réseau, scp…).
-- 🐯 **TigerTag** : connexion officielle par e-mail et mot de passe dans Paramètres → Inventaire filament → TigerTag (votre mot de passe n'est pas conservé, seul un jeton de session chiffré l'est). Compte créé avec Google ? Définissez d'abord un mot de passe via « Mot de passe oublié » dans l'application TigerTag. Méthode de secours : copier sur le serveur le dossier de données de TigerTag Studio (Windows : dossier « TigerTag… » dans `%APPDATA%`, au minimum `Local Storage` et `IndexedDB`) et indiquer son chemin.
+- 🐯 [**TigerTag**](https://tigersystem.io) : connexion officielle par e-mail et mot de passe dans Paramètres → Inventaire filament → TigerTag (votre mot de passe n'est pas conservé, seul un jeton de session chiffré l'est). Compte créé avec Google ? Définissez d'abord un mot de passe via « Mot de passe oublié » dans l'application TigerTag. Méthode de secours : copier sur le serveur le dossier de données de TigerTag Studio (Windows : dossier « TigerTag… » dans `%APPDATA%`, au minimum `Local Storage` et `IndexedDB`) et indiquer son chemin.
 
 ### Slicers supportés
 
@@ -358,6 +358,7 @@ Une idée ? [Ouvrez une issue](https://github.com/stellio-app/stellio/issues) !
 
 ## 🤝 Contribuer
 
+
 Les contributions sont les bienvenues ! 🎉
 
 1. **Forkez** le projet
@@ -406,7 +407,11 @@ L'installeur Windows et l'AppImage Linux publiés dans les [Releases](https://gi
 
 ## 🤝 Partenariat
 
-Stellio est partenaire d'intégration de **TigerTag**, le système d'identification NFC/RFID des filaments : retrouvez vos bobines directement dans l'inventaire filament de Stellio.
+<p align="center">
+  <a href="https://tigersystem.io"><img src="../../images/tigertag-logo.png" alt="TigerTag" width="240"></a>
+</p>
+
+Stellio est partenaire d'intégration de [**TigerTag**](https://tigersystem.io), le système d'identification NFC/RFID des filaments : retrouvez vos bobines directement dans l'inventaire filament de Stellio.
 
 - 🌐 [Site officiel](https://tigersystem.io) — [tigertag.io](https://tigertag.io)
 - 🖥️ [Studio Manager (application de bureau)](https://github.com/TigerTag-Project/TigerTag-Studio-Manager)

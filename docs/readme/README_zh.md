@@ -65,7 +65,7 @@
 - 🏷️ **自定义标签**（带颜色）+ AI自动打标，并支持**一键为多个选中文件打标**
 - 🔍 **AI辅助的语义搜索**（例如"我在找一个用于……的支撑件"），并**记住最近的搜索**
 - ⭐ **收藏**与高级筛选（类型、大小、重量、打印状态），当耗材库存不足以打印您的收藏时会显示**补货提醒**
-- 🧵 **“耗材库存”筛选**：只保留用您实际拥有的卷轴（Spoolman、手动库存、TigerTag）即可打印的文件，按材料区分
+- 🧵 **“耗材库存”筛选**：只保留用您实际拥有的卷轴（Spoolman、手动库存、[TigerTag](https://tigersystem.io)）即可打印的文件，按材料区分
 - 💾 **已保存的筛选**：保存任意筛选组合，一键重复使用
 - 🔀 **记住排序与搜索**：所选排序方式（A → Z、文件夹、大小、日期、标签等）会在重新打开时恢复；资料库自动刷新时，搜索、已启用的筛选和 AI 搜索结果都会保留；清空搜索框会立即停止正在进行的 AI 搜索
 - 🖨️ **打印状态筛选**：“已发送到切片软件”、“已打印（成功或失败）”、“已成功”和“已失败”
@@ -111,7 +111,7 @@
 - 🔗 **Spoolman** 集成（卷轴管理服务器），支持在局域网中自动发现
 - 🟠 支持 **Bambu Lab AMS**（插槽读取）
 - 🟢 支持 **Creality CFS**
-- 🐯 **TigerTag** 集成（NFC/RFID 卷轴识别）：登录后可在库存中查看您的 TigerTag 卷轴，或让 Stellio 自动获取已有的 TigerTag Studio 会话 — 只读，绝不会修改您的 TigerTag 库存
+- 🐯 [**TigerTag**](https://tigersystem.io) 集成（NFC/RFID 卷轴识别）：登录后可在库存中查看您的 TigerTag 卷轴，或让 Stellio 自动获取已有的 TigerTag Studio 会话 — 只读，绝不会修改您的 TigerTag 库存
 - ⚪ 手动卷轴
 - 📉 发送到切片软件时自动跟踪耗材消耗，打印前进行兼容性检查（剩余材料是否足够？）
 - 🔔 启动时的**低库存提醒**，并提供快速购买链接
@@ -258,7 +258,7 @@ pct exec <CTID> -- journalctl -u stellio -f       # 实时查看日志
 
 - ☁️ **在线 AI（可选）**：可用您自己的 API 密钥以 Claude（Anthropic）、ChatGPT（OpenAI）或 Gemini（Google）代替 Ollama（设置 → 人工智能）。密钥在服务器上加密存储，绝不会回传给浏览器；默认仍为 100% 本地的 Ollama。请求（文件名、标签、描述、S.O.S Print 照片）会发送给所选提供商，并按您的密钥计费。
 - 📥 **切片软件配置文件**：Stellio 看不到您电脑上的切片软件，也不会连接切片软件的云（Orca Cloud、Bambu Cloud 等）。请先在切片软件中导出配置文件（OrcaSlicer：文件 → 导出 → 导出预设包），再在 设置 → 我的切片软件配置文件 中导入；对于 Orca Cloud，也可以粘贴配置文件的“Copy raw JSON”。还可以指定一个 Stellio 会自动重新读取的**监视配置文件夹**（Syncthing、网络共享、scp 等）。
-- 🐯 **TigerTag**：在 设置 → 耗材库存 → TigerTag 中使用邮箱和密码官方登录（不会保存密码，只保存加密的会话令牌）。账户是用 Google 创建的？请先在 TigerTag 应用中通过“忘记密码”设置密码。备用方法：把 TigerTag Studio 的数据文件夹（Windows：`%APPDATA%` 中的“TigerTag…”文件夹，至少包含 `Local Storage` 和 `IndexedDB`）复制到服务器并填写其路径。
+- 🐯 [**TigerTag**](https://tigersystem.io)：在 设置 → 耗材库存 → TigerTag 中使用邮箱和密码官方登录（不会保存密码，只保存加密的会话令牌）。账户是用 Google 创建的？请先在 TigerTag 应用中通过“忘记密码”设置密码。备用方法：把 TigerTag Studio 的数据文件夹（Windows：`%APPDATA%` 中的“TigerTag…”文件夹，至少包含 `Local Storage` 和 `IndexedDB`）复制到服务器并填写其路径。
 
 ### 支持的切片软件
 
@@ -358,6 +358,7 @@ stellio/
 
 ## 🤝 贡献
 
+
 欢迎贡献代码！🎉
 
 1. **Fork** 本项目
@@ -406,7 +407,11 @@ Stellio 采用本地优先架构：您的数据保留在您的设备上，默认
 
 ## 🤝 合作伙伴
 
-Stellio 是 NFC/RFID 耗材识别系统 **TigerTag** 的集成合作伙伴：您的料盘可直接显示在 Stellio 的耗材库存中。
+<p align="center">
+  <a href="https://tigersystem.io"><img src="../../images/tigertag-logo.png" alt="TigerTag" width="240"></a>
+</p>
+
+Stellio 是 NFC/RFID 耗材识别系统 [**TigerTag**](https://tigersystem.io) 的集成合作伙伴：您的料盘可直接显示在 Stellio 的耗材库存中。
 
 - 🌐 [官方网站](https://tigersystem.io) — [tigertag.io](https://tigertag.io)
 - 🖥️ [Studio Manager（桌面应用）](https://github.com/TigerTag-Project/TigerTag-Studio-Manager)

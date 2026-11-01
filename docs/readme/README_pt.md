@@ -65,7 +65,7 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 - 🏷️ **Tags personalizadas** com cores + marcação automática por IA, e **marcação com um clique de vários arquivos selecionados**
 - 🔍 **Busca semântica assistida por IA** ("estou procurando um suporte para...") com **buscas recentes memorizadas**
 - ⭐ **Favoritos** e filtros avançados (tipo, tamanho, peso, status de impressão), com um **aviso de reposição** quando o estoque de filamento não é suficiente para seus favoritos
-- 🧵 **Filtro «Estoque de filamento»**: mantém apenas os arquivos imprimíveis com os carretéis que você realmente tem (Spoolman, inventário manual, TigerTag), por material
+- 🧵 **Filtro «Estoque de filamento»**: mantém apenas os arquivos imprimíveis com os carretéis que você realmente tem (Spoolman, inventário manual, [TigerTag](https://tigersystem.io)), por material
 - 💾 **Filtros salvos**: salve qualquer combinação de filtros e reutilize-a com um clique
 - 🔀 **Ordenação e busca lembradas**: a ordenação escolhida (A → Z, pasta, tamanho, data, tag…) é restaurada ao reabrir o aplicativo, e a busca, os filtros ativos e os resultados da busca com IA permanecem quando a biblioteca é atualizada automaticamente; limpar o campo de busca interrompe imediatamente a busca com IA em andamento
 - 🖨️ **Filtros de status de impressão**: «Enviado ao slicer», «Já impresso (sucesso ou falha)», «Já bem-sucedido» e «Já falhou»
@@ -111,7 +111,7 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 - 🔗 Integração com **Spoolman** (servidor de gestão de carretéis), com detecção automática na sua rede
 - 🟠 Suporte a **AMS da Bambu Lab** (leitura dos slots)
 - 🟢 Suporte a **CFS da Creality**
-- 🐯 Integração com **TigerTag** (identificação NFC/RFID de carretéis): entre na sua conta para ver seus carretéis TigerTag no inventário, ou deixe o Stellio recuperar automaticamente uma sessão existente do TigerTag Studio — somente leitura, nunca modifica seu inventário TigerTag
+- 🐯 Integração com [**TigerTag**](https://tigersystem.io) (identificação NFC/RFID de carretéis): entre na sua conta para ver seus carretéis TigerTag no inventário, ou deixe o Stellio recuperar automaticamente uma sessão existente do TigerTag Studio — somente leitura, nunca modifica seu inventário TigerTag
 - ⚪ Carretéis manuais
 - 📉 Acompanhamento automático do consumo ao enviar para o slicer, com verificação de compatibilidade antes de imprimir (material suficiente?)
 - 🔔 **Alertas de estoque baixo** na inicialização, com um link rápido para comprar mais
@@ -258,7 +258,7 @@ Modo sem menu: todas as opções podem ser definidas por variáveis de ambiente,
 
 - ☁️ **IA online (opcional)**: no lugar do Ollama, use Claude (Anthropic), ChatGPT (OpenAI) ou Gemini (Google) com a sua própria chave de API (Configurações → Inteligência artificial). A chave é criptografada no servidor e nunca devolvida ao navegador; o Ollama continua sendo a opção padrão, 100% local. As solicitações (nomes de arquivos, tags, descrições, fotos do S.O.S Print) vão para o provedor escolhido e são cobradas na sua chave.
 - 📥 **Perfis do fatiador**: o Stellio não enxerga os fatiadores do seu PC nem se conecta às nuvens dos fatiadores (Orca Cloud, Bambu Cloud…). Exporte seus perfis do fatiador (OrcaSlicer: Arquivo → Exportar → Exportar pacote de predefinições) e importe-os em Configurações → Meus perfis de fatiador; no Orca Cloud você também pode colar o «Copy raw JSON» de um perfil. Também é possível uma **pasta de perfis monitorada** que o Stellio relê automaticamente (Syncthing, compartilhamento de rede, scp…).
-- 🐯 **TigerTag**: login oficial com e-mail e senha em Configurações → Inventário de filamento → TigerTag (a senha não é guardada, apenas um token de sessão criptografado). Conta criada com o Google? Defina primeiro uma senha com «Esqueci a senha» no aplicativo TigerTag. Alternativa: copiar para o servidor a pasta de dados do TigerTag Studio (Windows: pasta «TigerTag…» em `%APPDATA%`, pelo menos `Local Storage` e `IndexedDB`) e informar o caminho.
+- 🐯 [**TigerTag**](https://tigersystem.io): login oficial com e-mail e senha em Configurações → Inventário de filamento → TigerTag (a senha não é guardada, apenas um token de sessão criptografado). Conta criada com o Google? Defina primeiro uma senha com «Esqueci a senha» no aplicativo TigerTag. Alternativa: copiar para o servidor a pasta de dados do TigerTag Studio (Windows: pasta «TigerTag…» em `%APPDATA%`, pelo menos `Local Storage` e `IndexedDB`) e informar o caminho.
 
 ### Slicers compatíveis
 
@@ -358,6 +358,7 @@ Tem uma ideia? [Abra uma issue](https://github.com/stellio-app/stellio/issues)!
 
 ## 🤝 Como contribuir
 
+
 Contribuições são bem-vindas! 🎉
 
 1. Faça um **fork** do projeto
@@ -406,7 +407,11 @@ O instalador do Windows e o AppImage do Linux publicados nas [Releases](https://
 
 ## 🤝 Parceria
 
-O Stellio é parceiro de integração da **TigerTag**, o sistema de identificação NFC/RFID de filamentos: suas bobinas aparecem diretamente no inventário de filamento do Stellio.
+<p align="center">
+  <a href="https://tigersystem.io"><img src="../../images/tigertag-logo.png" alt="TigerTag" width="240"></a>
+</p>
+
+O Stellio é parceiro de integração da [**TigerTag**](https://tigersystem.io), o sistema de identificação NFC/RFID de filamentos: suas bobinas aparecem diretamente no inventário de filamento do Stellio.
 
 - 🌐 [Site oficial](https://tigersystem.io) — [tigertag.io](https://tigertag.io)
 - 🖥️ [Studio Manager (aplicativo de desktop)](https://github.com/TigerTag-Project/TigerTag-Studio-Manager)

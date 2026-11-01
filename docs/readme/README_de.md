@@ -65,7 +65,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 - 🏷️ **Individuelle Tags** mit Farben + automatisches Tagging per KI, sowie **Tagging mehrerer ausgewählter Dateien mit einem Klick**
 - 🔍 **KI-gestützte semantische Suche** ("ich suche eine Stütze für...") mit **gemerkten letzten Suchen**
 - ⭐ **Favoriten** und erweiterte Filter (Typ, Größe, Gewicht, Druckstatus), mit einer **Nachkauf-Warnung**, wenn der Filamentbestand für Ihre Favoriten nicht ausreicht
-- 🧵 **Filter „Filamentbestand“**: zeigt nur Dateien, die mit den tatsächlich vorhandenen Spulen druckbar sind (Spoolman, manuelles Inventar, TigerTag), nach Material
+- 🧵 **Filter „Filamentbestand“**: zeigt nur Dateien, die mit den tatsächlich vorhandenen Spulen druckbar sind (Spoolman, manuelles Inventar, [TigerTag](https://tigersystem.io)), nach Material
 - 💾 **Gespeicherte Filter**: Filterkombinationen speichern und mit einem Klick wiederverwenden
 - 🔀 **Gemerkte Sortierung und Suche**: Die gewählte Sortierung (A → Z, Ordner, Größe, Datum, Tag …) wird beim erneuten Öffnen wiederhergestellt; Suche, aktive Filter und Ergebnisse der KI-Suche bleiben bei der automatischen Aktualisierung der Bibliothek erhalten; ein leeres Suchfeld beendet die laufende KI-Suche sofort
 - 🖨️ **Druckstatus-Filter**: „An den Slicer gesendet“, „Bereits gedruckt (erfolgreich oder fehlgeschlagen)“, „Bereits erfolgreich“ und „Bereits fehlgeschlagen“
@@ -111,7 +111,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 - 🔗 **Spoolman**-Integration (Server zur Spulenverwaltung), mit automatischer Erkennung in Ihrem Netzwerk
 - 🟠 **Bambu Lab AMS**-Unterstützung (Slot-Auslesung)
 - 🟢 **Creality CFS**-Unterstützung
-- 🐯 **TigerTag**-Integration (NFC/RFID-Spulenerkennung): melden Sie sich an, um Ihre TigerTag-Spulen im Inventar zu sehen, oder lassen Sie Stellio eine bestehende TigerTag-Studio-Sitzung automatisch übernehmen — schreibgeschützt, ändert Ihr TigerTag-Inventar nie
+- 🐯 [**TigerTag**](https://tigersystem.io)-Integration (NFC/RFID-Spulenerkennung): melden Sie sich an, um Ihre TigerTag-Spulen im Inventar zu sehen, oder lassen Sie Stellio eine bestehende TigerTag-Studio-Sitzung automatisch übernehmen — schreibgeschützt, ändert Ihr TigerTag-Inventar nie
 - ⚪ Manuelle Spulen
 - 📉 Automatische Verbrauchsverfolgung beim Senden an den Slicer, mit Kompatibilitätsprüfung vor dem Druck (genug Material?)
 - 🔔 **Warnung bei niedrigem Bestand** beim Start, mit Direktlink zum Nachkauf
@@ -258,7 +258,7 @@ Nicht-interaktiver Modus: Alle Optionen lassen sich über Umgebungsvariablen set
 
 - ☁️ **Online-KI (optional)**: Statt Ollama können Sie Claude (Anthropic), ChatGPT (OpenAI) oder Gemini (Google) mit Ihrem eigenen API-Schlüssel nutzen (Einstellungen → Künstliche Intelligenz). Der Schlüssel wird auf dem Server verschlüsselt und nie an den Browser zurückgesendet; Ollama bleibt die Standardwahl, 100 % lokal. Die Anfragen (Dateinamen, Tags, Beschreibungen, S.O.S-Print-Fotos) gehen an den gewählten Anbieter und werden über Ihren Schlüssel abgerechnet.
 - 📥 **Slicer-Profile**: Stellio sieht die Slicer auf Ihrem PC nicht und verbindet sich nicht mit den Slicer-Clouds (Orca Cloud, Bambu Cloud …). Exportieren Sie Ihre Profile im Slicer (OrcaSlicer: Datei → Exportieren → Preset-Bundle exportieren) und importieren Sie sie unter Einstellungen → Meine Slicer-Profile; für Orca Cloud können Sie auch das „Copy raw JSON“ eines Profils einfügen. Ein **überwachter Profilordner**, den Stellio automatisch neu einliest, ist ebenfalls möglich (Syncthing, Netzwerkfreigabe, scp …).
-- 🐯 **TigerTag**: offizielle Anmeldung mit E-Mail und Passwort unter Einstellungen → Filamentinventar → TigerTag (Ihr Passwort wird nicht gespeichert, nur ein verschlüsseltes Sitzungstoken). Konto mit Google erstellt? Legen Sie zuerst über „Passwort vergessen“ in der TigerTag-App ein Passwort fest. Ausweichmethode: den Datenordner von TigerTag Studio auf den Server kopieren (Windows: Ordner „TigerTag …“ in `%APPDATA%`, mindestens `Local Storage` und `IndexedDB`) und seinen Pfad angeben.
+- 🐯 [**TigerTag**](https://tigersystem.io): offizielle Anmeldung mit E-Mail und Passwort unter Einstellungen → Filamentinventar → TigerTag (Ihr Passwort wird nicht gespeichert, nur ein verschlüsseltes Sitzungstoken). Konto mit Google erstellt? Legen Sie zuerst über „Passwort vergessen“ in der TigerTag-App ein Passwort fest. Ausweichmethode: den Datenordner von TigerTag Studio auf den Server kopieren (Windows: Ordner „TigerTag …“ in `%APPDATA%`, mindestens `Local Storage` und `IndexedDB`) und seinen Pfad angeben.
 
 ### Unterstützte Slicer
 
@@ -358,6 +358,7 @@ Eine Idee? [Erstellen Sie ein Issue](https://github.com/stellio-app/stellio/issu
 
 ## 🤝 Mitwirken
 
+
 Beiträge sind willkommen! 🎉
 
 1. **Forken** Sie das Projekt
@@ -406,7 +407,11 @@ Der unter [Releases](https://github.com/stellio-app/stellio/releases) veröffent
 
 ## 🤝 Partnerschaft
 
-Stellio ist Integrationspartner von **TigerTag**, dem NFC/RFID-System zur Filamenterkennung: Ihre Spulen erscheinen direkt im Filament-Inventar von Stellio.
+<p align="center">
+  <a href="https://tigersystem.io"><img src="../../images/tigertag-logo.png" alt="TigerTag" width="240"></a>
+</p>
+
+Stellio ist Integrationspartner von [**TigerTag**](https://tigersystem.io), dem NFC/RFID-System zur Filamenterkennung: Ihre Spulen erscheinen direkt im Filament-Inventar von Stellio.
 
 - 🌐 [Offizielle Website](https://tigersystem.io) — [tigertag.io](https://tigertag.io)
 - 🖥️ [Studio Manager (Desktop-App)](https://github.com/TigerTag-Project/TigerTag-Studio-Manager)

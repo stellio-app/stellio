@@ -65,7 +65,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 🏷️ **Custom tags** with colors + AI auto-tagging, and **one-click tagging of several selected files** at once
 - 🔍 **AI-assisted semantic search** ("I'm looking for a support for...") with **recent searches remembered**
 - ⭐ **Favorites** and advanced filters (type, size, weight, print status), with a **restock warning** when filament stock is insufficient for your favorites
-- 🧵 **"Filament stock" filter**: keeps only the files printable with the spools you actually have (Spoolman, manual inventory, TigerTag), by material
+- 🧵 **"Filament stock" filter**: keeps only the files printable with the spools you actually have (Spoolman, manual inventory, [TigerTag](https://tigersystem.io)), by material
 - 💾 **Saved filters**: save any combination of library filters and reuse it in one click
 - 🔀 **Remembered sort and search**: the chosen sort order (A → Z, folder, size, date, tag…) is restored when the app reopens, and the search, active filters and AI search results stay in place when the library refreshes automatically; clearing the search field immediately stops the AI search in progress
 - 🖨️ **Print status filters**: “Sent to slicer”, “Already printed (success or failed)”, “Already succeeded” and “Already failed”
@@ -111,7 +111,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 🔗 **Spoolman** integration (spool management server), with automatic detection on your network
 - 🟠 **Bambu Lab AMS** support (slot reading)
 - 🟢 **Creality CFS** support
-- 🐯 **TigerTag** integration (NFC/RFID spool identification): sign in to see your TigerTag spools in the inventory, or let Stellio pick up an existing TigerTag Studio session automatically — read-only, never modifies your TigerTag inventory
+- 🐯 [**TigerTag**](https://tigersystem.io) integration (NFC/RFID spool identification): sign in to see your TigerTag spools in the inventory, or let Stellio pick up an existing TigerTag Studio session automatically — read-only, never modifies your TigerTag inventory
 - ⚪ Manual spools
 - 📉 Automatic consumption tracking on send-to-slicer, with a compatibility check before printing (enough material left?)
 - 🔔 **Low-stock alerts** on startup, with a quick link to buy more
@@ -258,7 +258,7 @@ Non-interactive mode: every option can be set with environment variables, e.g. `
 
 - ☁️ **Online AI (optional)**: instead of Ollama, use Claude (Anthropic), ChatGPT (OpenAI) or Gemini (Google) with your own API key (Settings → Artificial Intelligence). The key is encrypted on the server and never sent back to the browser; Ollama remains the default, 100% local. Requests (file names, tags, descriptions, S.O.S Print photos) go to the provider you chose and are billed on your key.
 - 📥 **Slicer profiles**: Stellio cannot see the slicers on your PC and does not connect to slicer clouds (Orca Cloud, Bambu Cloud…). Export your profiles from the slicer (OrcaSlicer: File → Export → Export Preset Bundle), then import them from Settings → My slicer profiles; for Orca Cloud you can also paste a profile's “Copy raw JSON”. A **watched profiles folder** that Stellio rereads automatically is also possible (Syncthing, network share, scp…).
-- 🐯 **TigerTag**: official sign-in with e-mail and password in Settings → Filament inventory → TigerTag (your password is not kept, only an encrypted session token is). Account created with Google? First set a password with “Forgot password” in the TigerTag app. Fallback: copy the TigerTag Studio data folder to the server (Windows: the “TigerTag…” folder in `%APPDATA%`, at least `Local Storage` and `IndexedDB`) and set its path.
+- 🐯 [**TigerTag**](https://tigersystem.io): official sign-in with e-mail and password in Settings → Filament inventory → TigerTag (your password is not kept, only an encrypted session token is). Account created with Google? First set a password with “Forgot password” in the TigerTag app. Fallback: copy the TigerTag Studio data folder to the server (Windows: the “TigerTag…” folder in `%APPDATA%`, at least `Local Storage` and `IndexedDB`) and set its path.
 
 ### Supported slicers
 
@@ -358,6 +358,7 @@ Got an idea? [Open an issue](https://github.com/stellio-app/stellio/issues)!
 
 ## 🤝 Contributing
 
+
 Contributions are welcome! 🎉
 
 1. **Fork** the project
@@ -406,7 +407,11 @@ The Windows installer and the Linux AppImage published in [Releases](https://git
 
 ## 🤝 Partnership
 
-Stellio is an official integration partner of **TigerTag**, the NFC/RFID filament identification system: scan your spools and see them directly in Stellio's filament inventory.
+<p align="center">
+  <a href="https://tigersystem.io"><img src="images/tigertag-logo.png" alt="TigerTag" width="240"></a>
+</p>
+
+Stellio is an official integration partner of [**TigerTag**](https://tigersystem.io), the NFC/RFID filament identification system: scan your spools and see them directly in Stellio's filament inventory.
 
 - 🌐 [Official website](https://tigersystem.io) — [tigertag.io](https://tigertag.io)
 - 🖥️ [Studio Manager (desktop app)](https://github.com/TigerTag-Project/TigerTag-Studio-Manager)
