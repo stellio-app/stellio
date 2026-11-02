@@ -252,6 +252,10 @@ pct exec <CTID> -- journalctl -u stellio -f       # Seguire i log
 
 Modalità senza menu: tutte le opzioni si impostano con variabili d'ambiente, ad es. `var_mode=default var_cpu=4 var_ram=4096 var_disk=16 var_ip=192.168.1.50/24 var_gw=192.168.1.1` (elenco completo all'inizio dello script).
 
+💾 **Scelta dello storage**: selezionate «Impostazioni predefinite + scelta dello storage» nel primo menu (o `var_choose_storage=1`) per scegliere dove si trovano il disco del container (`var_storage`, es. `local-zfs`) e i modelli (`var_template_storage`, es. `local`). Lo script verifica che lo storage esista e abbia spazio libero sufficiente.
+
+🌍 **Lingua**: i testi dello script seguono la lingua di Proxmox (fr, en, de, es, pt, it, zh, ja); forzatela con `var_lang=it` (inglese predefinito).
+
 ### 🧰 Specifico dell'edizione server (Raspberry Pi / Linux)
 
 > La versione per Windows non è interessata: queste funzioni compaiono solo su Raspberry Pi, VM, LXC, Docker e Linux.

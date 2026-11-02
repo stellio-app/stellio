@@ -1137,6 +1137,17 @@
                                         <button class="btn btn-ghost btn-sm" id="custom-accent-reset-btn" data-i18n="settings.custom_accent_reset">Réinitialiser</button>
                                     </div>
                                 </div>
+                                <div class="settings-row" style="align-items:flex-start;">
+                                    <div>
+                                        <label data-i18n="settings.thumb_color_title">Couleur des miniatures</label>
+                                        <p class="settings-hint" style="margin-top:2px;" data-i18n="settings.thumb_color_hint">Couleur utilisée pour les miniatures des fichiers sans couleur définie (STL, OBJ…). Les 3MF gardent les couleurs de leur slicer.</p>
+                                    </div>
+                                    <div style="display:flex; gap:8px; align-items:center;">
+                                        <input type="color" id="thumb-color-input" value="#4ea1d3" style="width:44px; height:32px; padding:2px; border-radius:6px; background:var(--bg-input); border:1px solid var(--border); cursor:pointer;">
+                                        <button type="button" class="btn btn-ghost btn-sm" onclick="resetThumbColor()" data-i18n="settings.thumb_color_reset">Par défaut</button>
+                                        <button type="button" class="btn btn-primary btn-sm" onclick="applyThumbColor()" data-i18n="settings.thumb_color_apply">Appliquer</button>
+                                    </div>
+                                </div>
                                 <div class="settings-row">
                                     <label data-i18n="settings.language">Langue</label>
                                     <select id="language-selector" class="settings-select">
@@ -2765,7 +2776,7 @@
         </div>
 
         <div id="selection-action-bar" class="selection-action-bar" style="display:none;">
-            <span id="selection-count" data-i18n="common.file_count" data-i18n-params='{"count":0}'>0 fichier sélectionné</span>
+            <span id="selection-count">0</span>
             <button id="select-toggle-all" class="btn btn-sm" data-i18n-title="library.toggle_select_all" title="Tout sélectionner/désélectionner">
                 <i class="fa-solid fa-square"></i> <span data-i18n="actions.all">Tout</span>
             </button>

@@ -159,7 +159,7 @@ const targetProp = { 'i18n': 'textContent', 'i18n-placeholder': 'placeholder', '
 const applyAttr = (selector, attr, paramsAttr) => {
 scope.querySelectorAll(selector).forEach(el => {
 const key = el.getAttribute(`data-${attr}`);
-const params = this._parseParams(el.getAttribute(`data-${paramsAttr}`));
+const params = this._parseParams(el.getAttribute(`data-${paramsAttr}`) || el.getAttribute('data-i18n-params'));
 if (key) el[targetProp[attr] || attr.replace('i18n-', '').toLowerCase()] = this.t(key, params);
 });
 };
@@ -331,6 +331,10 @@ function _dedupeFilesByPath(list) {
         return true;
     });
 }
+let _thumbColorHex = '#4ea1d3';
+function _fileCountLabel(n) {
+    return String(I18N.tp('common.file_count', n, { count: n })).replace(/\{\{\s*count\s*\}\}/g, n);
+}
 let filteredFiles = [];
 
 // Liste affichée recalculée après un rechargement des fichiers. La version complète (qui tient compte de la recherche IA)
@@ -365,8 +369,13 @@ let noThumbFilterOnly = false;
 let failedThumbFilterOnly = false;
 let currentSearchQuery = '';
 
+function _typeFilterTotal() {
+    const n = new Set([...document.querySelectorAll('.filter-type')].map(cb => cb.value)).size;
+    return n || 7;
+}
+
 function hasActiveFilters() {
-    return (activeTypeFilters?.length > 0 && activeTypeFilters.length < 3) ||
+    return (activeTypeFilters?.length > 0 && activeTypeFilters.length < _typeFilterTotal()) ||
         !!currentSizeFilter || !!currentWeightFilter || !!printStatusFilter || !!stockFilter ||
         activeTagFilters.size > 0 || noThumbFilterOnly || failedThumbFilterOnly;
 }
@@ -2727,6 +2736,7 @@ if (!IS_VIEWER) {
     loadSpoolmanSettings();
     loadOllamaSettings();
     loadAutoScanSettings();
+    loadThumbColorSetting();
     loadManualInventorySettings();
     loadStartupSettings();
     loadPrintCostSettings();
@@ -2825,7 +2835,7 @@ document.addEventListener('visibilitychange', _syncAppHeight);
 _syncAppHeight();
 
 // --- Tableau de bord ---
-const DASHBOARD_WIDGET_IDS = ['printers', 'stock', 'restock', 'history', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues'];
+const DASHBOARD_WIDGET_IDS = ['printers', 'cameras', 'stock', 'restock', 'history', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues'];
 let _dashboardEditMode = false;
 let _draggedDashboardWidget = null;
 
@@ -4005,7 +4015,7 @@ function maybeFireBrowserNotifications(notifications) {
 }
 
 // --- Visite guidée ---
-const TOUR_DONE_KEY = 'stellio_tour_done_v1';
+const TOUR_DONE_KEY = 'stellio_tour_done_v2';
 
 function getTourSteps() {
     return [
@@ -4028,6 +4038,26 @@ function getTourSteps() {
             page: 'library', selector: '#library-search-wrap',
             title: _t2('tour.step2_title', 'Recherche intelligente'),
             desc: _t2('tour.step2_desc', "Cherchez par nom ou en langage naturel grâce à l'IA locale (\"un support pour...\") ; vos recherches récentes sont mémorisées."),
+        },
+        {
+            page: 'library', selector: '#files-grid .file-card[data-demo]', demo: 'card',
+            title: _t2('tour.step_rightclick_title', 'Clic droit : la fiche du fichier'),
+            desc: _t2('tour.step_rightclick_desc', "Faites un clic droit sur n'importe quel fichier pour ouvrir sa fiche détaillée. Essayez maintenant sur ce Benchy de démonstration (il n'est pas ajouté à votre bibliothèque), ou cliquez sur Suivant."),
+        },
+        {
+            page: 'library', selector: '#modal-file-info .file-info-layout', demo: 'modal',
+            title: _t2('tour.step_fileinfo_title', 'Dimensions, poids, temps et coût'),
+            desc: _t2('tour.step_fileinfo_desc', "La miniature à gauche, et à droite tout ce qu'il faut savoir : dimensions, consommation de filament, temps d'impression et coût estimatif. Tous vos fichiers sont analysés en arrière-plan, l'affichage est immédiat."),
+        },
+        {
+            page: 'library', selector: '#modal-file-info .file-info-controls', demo: 'modal',
+            title: _t2('tour.step_fileinfo_controls_title', 'Profil et taille'),
+            desc: _t2('tour.step_fileinfo_controls_desc', "Choisissez le profil du slicer et la taille en % : le poids, le temps et le coût sont recalculés. Un modèle à 200 % consomme bien plus qu'à 50 %."),
+        },
+        {
+            page: 'library', selector: '#file-info-slicer', demo: 'modal',
+            title: _t2('tour.step_fileinfo_actions_title', 'Envoyer, ouvrir, chiffrer'),
+            desc: _t2('tour.step_fileinfo_actions_desc', "Envoyez le fichier au slicer, ouvrez-le dans le viewer 3D ou affichez le détail du coût, directement depuis cette fiche."),
         },
         {
             page: 'library', selector: '.nav-btn[data-page="print-queue"]',
@@ -4070,12 +4100,101 @@ window.startTour = function () {
     _showTourStepAt(0);
 };
 
+// --- Fichier de démonstration (jamais ajouté à la bibliothèque) ---
+const TOUR_DEMO_PATH = '__stellio_tour_demo__/3DBenchy_demo.stl';
+
+function _tourDemoThumb() {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b3a55"/><stop offset="1" stop-color="#151c2b"/></linearGradient></defs><rect width="400" height="400" fill="url(#g)"/><ellipse cx="200" cy="318" rx="150" ry="18" fill="#000" opacity=".28"/><path d="M52 238h296l-34 66c-6 12-18 18-31 18H117c-13 0-25-6-31-18z" fill="#c0392b"/><path d="M52 238h296l-6 12H58z" fill="#e8e8e8"/><rect x="132" y="170" width="132" height="68" rx="6" fill="#ecf0f1"/><rect x="150" y="124" width="96" height="50" rx="5" fill="#c0392b"/><rect x="146" y="190" width="30" height="26" rx="3" fill="#34495e"/><rect x="190" y="190" width="30" height="26" rx="3" fill="#34495e"/><rect x="232" y="190" width="22" height="26" rx="3" fill="#34495e"/><rect x="164" y="136" width="20" height="22" rx="3" fill="#34495e"/><rect x="204" y="136" width="20" height="22" rx="3" fill="#34495e"/><rect x="222" y="70" width="22" height="58" rx="3" fill="#7f8c8d"/><rect x="218" y="62" width="30" height="12" rx="3" fill="#c0392b"/><path d="M52 238l-26-30h40z" fill="#ecf0f1"/></svg>`;
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+function _tourDemoData() {
+    const name = '3DBenchy_demo.stl';
+    return {
+        thumb: _tourDemoThumb(),
+        file: { path: TOUR_DEMO_PATH, name, extension: '.stl', has_thumb: true, size: 11400000, mtime: Math.floor(Date.now() / 1000) - 86400, plate_count: 1, print_status: 'never', tags: [] },
+        meta: { dimensions: { x: 60, y: 31, z: 48 }, volume_cm3: 9.3, surface_cm2: 105, triangle_count: 225154,
+                weights: { pla: 9.8, petg: 10.0, abs: 8.2, tpu: 9.5, nylon: 9.0 }, estimated_time: { seconds: 4200 } },
+        cost: { material: 'pla', pricePerGram: 0.025, hasElec: true, elecPrice: 0.25, printerPower: 120, wearPerHour: 0.1, fixedFee: 0, marginPct: 0, printerId: null },
+        profiles: [
+            { id: 'demo-draft', name: 'Draft 0.28 mm', infill: 10, layer: 0.28, speed: 120, walls: 2 },
+            { id: 'demo-std', name: 'Standard 0.20 mm', infill: 15, layer: 0.2, speed: 80, walls: 3 },
+            { id: 'demo-fine', name: 'Quality 0.12 mm', infill: 20, layer: 0.12, speed: 60, walls: 3 },
+        ],
+    };
+}
+
+function _tourAddDemoCard() {
+    const grid = document.getElementById('files-grid');
+    if (!grid) return;
+    if (grid.querySelector('.file-card[data-demo]')) return;
+    const d = _tourDemoData();
+    const holder = document.createElement('div');
+    holder.innerHTML = renderFileCard(d.file, { '.stl': 'fa-cube' }).trim();
+    const card = holder.firstElementChild;
+    if (!card) return;
+    card.dataset.demo = '1';
+    card.removeAttribute('onclick');
+    card.style.cursor = 'context-menu';
+    card.querySelectorAll('.file-loading, .file-metadata-tooltip').forEach(el => el.remove());
+    const img = card.querySelector('img');
+    if (img) { img.removeAttribute('onload'); img.removeAttribute('onerror'); img.src = d.thumb; img.style.display = 'block'; }
+    grid.querySelector('.empty-state')?.classList.add('hidden');
+    grid.prepend(card);
+}
+
+function _tourRemoveDemo() {
+    document.querySelectorAll('#files-grid .file-card[data-demo]').forEach(el => el.remove());
+    document.querySelectorAll('#files-grid .empty-state.hidden').forEach(el => el.classList.remove('hidden'));
+    const m = document.getElementById('modal-file-info');
+    if (m && m.dataset.demo) { m.dataset.demo = ''; closeModal('modal-file-info'); }
+}
+
+async function _tourOpenDemoModal() {
+    const m = document.getElementById('modal-file-info');
+    if (m && !m.classList.contains('hidden') && m.dataset.demo) return;
+    await openFileInfoModal(TOUR_DEMO_PATH, { demo: _tourDemoData() });
+    const mm = document.getElementById('modal-file-info');
+    if (mm) mm.dataset.demo = '1';
+    // Clic droit réel sur la carte pendant l'étape correspondante : on enchaîne
+    const overlay = document.getElementById('tour-overlay');
+    if (overlay && !overlay.classList.contains('hidden') && getTourSteps()[_tourIndex]?.demo === 'card') {
+        setTimeout(() => _showTourStepAt(_tourIndex + 1), 250);
+    }
+}
+
+// Les boutons de la carte de démonstration ne doivent rien faire sur un fichier inexistant
+document.addEventListener('click', (e) => {
+    const card = e.target.closest && e.target.closest('.file-card[data-demo]');
+    if (!card) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    showToast(_t3('tour.demo_toast', 'Fichier de démonstration : ces boutons fonctionnent sur vos vrais fichiers.'), 'info');
+}, true);
+
 function _showTourStepAt(idx) {
     const steps = getTourSteps();
     if (idx < 0) { _tourIndex = 0; return; }
     if (idx >= steps.length) { endTour(); return; }
     _tourIndex = idx;
     const step = steps[idx];
+    let demoDelay = 0;
+    if (step.demo) {
+        if (step.page && document.querySelector('.page.active')?.id !== `page-${step.page}`) {
+            document.querySelector(`.nav-btn[data-page="${step.page}"]`)?.click();
+        }
+        if (step.demo === 'card') {
+            const m = document.getElementById('modal-file-info');
+            if (m && m.dataset.demo) { m.dataset.demo = ''; closeModal('modal-file-info'); }
+            _tourAddDemoCard();
+        } else {
+            _tourAddDemoCard();
+            const m = document.getElementById('modal-file-info');
+            if (!m || m.classList.contains('hidden') || !m.dataset.demo) { _tourOpenDemoModal(); demoDelay = 350; }
+        }
+    } else {
+        _tourRemoveDemo();
+    }
 
     const currentActivePage = document.querySelector('.page.active')?.id;
     const needsPageSwitch = step.page && currentActivePage !== `page-${step.page}`;
@@ -4083,7 +4202,7 @@ function _showTourStepAt(idx) {
         document.querySelector(`.nav-btn[data-page="${step.page}"]`)?.click();
     }
 
-    setTimeout(() => _positionTourStep(step, idx, steps.length), needsPageSwitch ? 220 : 30);
+    setTimeout(() => _positionTourStep(step, idx, steps.length), Math.max(demoDelay, needsPageSwitch ? 220 : 30));
 }
 
 function _isTourTargetVisible(el) {
@@ -4123,8 +4242,15 @@ function _positionTourStep(step, idx, total) {
     const tooltipHeight = tooltip.offsetHeight || 160;
     const spaceBelow = window.innerHeight - rect.bottom;
     let top = spaceBelow > tooltipHeight + 20 ? rect.bottom + 14 : rect.top - tooltipHeight - 14;
-    top = Math.max(12, Math.min(top, window.innerHeight - tooltipHeight - 12));
     let left = rect.left;
+    if (spaceBelow <= tooltipHeight + 20 && rect.top < tooltipHeight + 26) {
+        // Ni sous ni au-dessus : on place l'infobulle sur le côté (ou en bas de l'écran si la cible est très large)
+        const tw = tooltip.offsetWidth || 300;
+        if (window.innerWidth - rect.right > tw + 24) { left = rect.right + 14; top = rect.top; }
+        else if (rect.left > tw + 24) { left = rect.left - tw - 14; top = rect.top; }
+        else { top = window.innerHeight - tooltipHeight - 16; }
+    }
+    top = Math.max(12, Math.min(top, window.innerHeight - tooltipHeight - 12));
     left = Math.max(12, Math.min(left, window.innerWidth - tooltip.offsetWidth - 12));
     tooltip.style.top = `${top}px`;
     tooltip.style.left = `${left}px`;
@@ -4143,6 +4269,7 @@ window.skipTour = function () {
 };
 
 function endTour() {
+    _tourRemoveDemo();
     document.getElementById('tour-overlay')?.classList.add('hidden');
     localStorage.setItem(TOUR_DONE_KEY, '1');
 }
@@ -4377,6 +4504,7 @@ async function _loadDashboardPrinters() {
         }
         if (!printers.length) {
             body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-print"></i><p>${I18N.t('printers.none')}</p></div>`;
+            _renderDashboardCameras([]);
             return;
         }
         const statuses = await Promise.all(printers.slice(0, 8).map(async p => {
@@ -4389,6 +4517,7 @@ async function _loadDashboardPrinters() {
             }
         }));
         const active = statuses.filter(s => s.status && ['printing', 'paused'].includes(s.status.status));
+        _renderDashboardCameras(active);
         if (!active.length) {
             body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-mug-hot"></i><p>${_t2('dashboard.no_active_prints', 'Aucune impression en cours')}</p></div>`;
             return;
@@ -4408,6 +4537,74 @@ async function _loadDashboardPrinters() {
         body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
     }
 }
+
+// --- Widget caméras : flux vidéo des imprimantes qui impriment en ce moment ---
+let _dashCamKey = '';
+const _dashCamAvail = {};
+
+function _stopDashboardCameras() {
+    document.querySelectorAll('#dashboard-cameras-body img').forEach(img => { img.src = ''; });
+    _dashCamKey = '';
+    _dashboardLastLoad = 0;   // le prochain retour sur le tableau de bord relance les flux
+    const body = document.getElementById('dashboard-cameras-body');
+    if (body) body.innerHTML = '';
+}
+window._stopDashboardCameras = _stopDashboardCameras;
+
+async function _renderDashboardCameras(active) {
+    const widget = document.getElementById('dashboard-widget-cameras');
+    const body = document.getElementById('dashboard-cameras-body');
+    if (!widget || !body) return;
+    const list = (active || []).slice(0, 6);
+    const key = list.map(a => a.printer.id).join(',');
+    if (!list.length) {
+        _stopDashboardCameras();
+        widget.classList.remove('has-content');
+        return;
+    }
+    // Même liste d'imprimantes : on ne relance pas les flux, on met seulement la progression à jour
+    if (key === _dashCamKey) {
+        list.forEach(({ printer, status }) => {
+            const el = document.querySelector(`#dashboard-cameras-body [data-pid="${printer.id}"] .dashboard-camera-pct`);
+            if (el) el.textContent = `${Math.round(status.progress || 0)}%${status.status === 'paused' ? ' ⏸️' : ''}`;
+        });
+        return;
+    }
+    _dashCamKey = key;
+    const entries = await Promise.all(list.map(async ({ printer, status }) => {
+        let cam = _dashCamAvail[printer.id];
+        if (!cam) {
+            try {
+                const res = await fetch(`${API}/api/printers/${printer.id}/camera`);
+                cam = res.ok ? await res.json() : { available: false };
+            } catch { cam = { available: false }; }
+        }
+        return { printer, status, cam };
+    }));
+    if (_dashCamKey !== key) return;
+    const withCam = entries.filter(e => e.cam && e.cam.available && (e.cam.stream_url || e.cam.snapshot_url));
+    if (!withCam.length) {
+        body.innerHTML = '';
+        widget.classList.remove('has-content');
+        return;
+    }
+    withCam.forEach(e => { _dashCamAvail[e.printer.id] = e.cam; });
+    body.innerHTML = `<div class="dashboard-camera-grid">${withCam.map(({ printer, status, cam }) => `
+        <div class="dashboard-camera-tile" data-pid="${printer.id}" onclick="openPrinterMonitor(${printer.id})" title="${escapeHtml(printer.name)}">
+            <img src="${escapeHtml(cam.stream_url || cam.snapshot_url)}" alt="${escapeHtml(printer.name)}" loading="lazy"
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div class="dashboard-camera-off" style="display:none;"><i class="fa-solid fa-video-slash fa-lg"></i><span>${escapeHtml(_t2('dashboard.camera_unavailable', 'Caméra indisponible'))}</span></div>
+            <div class="dashboard-camera-caption"><span>${escapeHtml(printer.name)}</span><span class="dashboard-camera-pct">${Math.round(status.progress || 0)}%${status.status === 'paused' ? ' ⏸️' : ''}</span></div>
+        </div>`).join('')}</div>`;
+    widget.classList.add('has-content');
+}
+
+// Actualisation régulière des impressions en cours tant que le tableau de bord est affiché
+setInterval(() => {
+    if (document.hidden) return;
+    const w = document.getElementById('dashboard-printers-body');
+    if (w && w.offsetParent !== null) _loadDashboardPrinters();
+}, 20000);
 
 async function _loadDashboardHistory() {
     const body = document.getElementById('dashboard-history-body');
@@ -5198,32 +5395,16 @@ window.pickPhoto = pickPhoto;
 
 
 async function loadFileMetadata(filePath, callback) {
-if (analysisCache[filePath]) {
-callback(analysisCache[filePath]);
-return;
-}
+// Analyse rapide conservée côté serveur : instantanée si l'analyse de fond est déjà passée sur ce fichier
+const meta = await _fileInfoFetchMeta(filePath);
+if (meta) { callback(meta); return; }
 try {
-const res = await fetch(`${API}/api/files/analyze`, {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ path: filePath })
-});
-const data = await res.json();
-if (data.success) {
-if (Object.keys(analysisCache).length > 100) {
-delete analysisCache[Object.keys(analysisCache)[0]];
-}
-analysisCache[filePath] = data.metadata;
-callback(data.metadata);
-} else {
 await requestMetadataAnalysis(filePath, callback);
-}
 } catch (err) {
 console.error('[Metadata] Erreur:', err);
 callback(null);
 }
 }
-
 
 async function addSource(type, name, path, config) {
 try {
@@ -5688,6 +5869,17 @@ console.error(err);
 
 let scanPollingInterval = null;
 let scanBadgeElement = null;
+// À chaque actualisation de la bibliothèque : le serveur complète les analyses manquantes (au plus une demande par minute)
+let _analysisKickAt = 0;
+function _kickFileAnalysis() {
+    if (Date.now() - _analysisKickAt < 60000) return;
+    _analysisKickAt = Date.now();
+    fetch(`${API}/api/analysis/run`, { method: 'POST' })
+        .then(r => r.ok ? r.json() : null)
+        .then(p => { if (p && p.total) console.log(`[Analyse] ${p.done}/${p.total} fichier(s) analysé(s)`); })
+        .catch(() => {});
+}
+
 async function loadFiles() {
 const authScreen = document.getElementById('auth-screen');
 const appScreen = document.getElementById('app-screen');
@@ -5714,6 +5906,7 @@ throw new Error(`${I18N.t('toast.server_error')}: ${res.status} - ${errorText.su
     updateFooterCounts();
 
     console.log(`✅ ${allFiles.length} fichiers chargés depuis le cache`);
+    _kickFileAnalysis();
 
      if (!scanPollingInterval) {
         pollScanProgress();
@@ -5851,7 +6044,7 @@ const countEl = document.getElementById('file-count-display');
 const updateEl = document.getElementById('last-update');
 if (countEl) {
 const count = filteredFiles.length;
-countEl.textContent = `${I18N.tp('common.file_count', count, { count })}`;
+countEl.textContent = `${_fileCountLabel(count)}`;
 }
 if (updateEl) {
 updateEl.textContent = `${I18N.t('footer.updated')} ${new Date().toLocaleTimeString(I18N.lang, { hour: '2-digit', minute: '2-digit' })}`;
@@ -6029,6 +6222,302 @@ setInterval(() => {
     if (onDashboard || onLibrary) loadSourceStatus(true);
 }, 30000);
 
+// --- Clic droit sur une carte de fichier : fenêtre « détails du fichier » (miniature à gauche, tableau à droite) ---
+let _fileInfoToken = 0;
+
+document.addEventListener('contextmenu', (e) => {
+    if (typeof isSelectionMode !== 'undefined' && isSelectionMode) return;
+    const card = e.target.closest && e.target.closest('.file-card');
+    if (!card || !card.dataset.path) return;
+    if (e.target.closest('input, textarea, select')) return;
+    e.preventDefault();
+    if (card.dataset.demo) { _tourOpenDemoModal(); return; }
+    openFileInfoModal(card.dataset.path);
+}, true);
+
+const _fileInfoMetaPromises = new Map();
+function _fileInfoFetchMeta(path) {
+    if (typeof analysisCache !== 'undefined' && analysisCache[path]) return Promise.resolve(analysisCache[path]);
+    if (_fileInfoMetaPromises.has(path)) return _fileInfoMetaPromises.get(path);
+    const p = (async () => {
+        try {
+            const res = await fetch(`${API}/api/files/analyze`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path, fast: true })
+            });
+            const data = await res.json();
+            return data && data.success ? data.metadata : null;
+        } catch (e) { return null; }
+    })();
+    _fileInfoMetaPromises.set(path, p);
+    p.then(r => { if (!r) _fileInfoMetaPromises.delete(path); });
+    if (_fileInfoMetaPromises.size > 60) _fileInfoMetaPromises.delete(_fileInfoMetaPromises.keys().next().value);
+    return p;
+}
+
+let _fileInfoCostSettings = null;
+async function _fileInfoLoadCostSettings() {
+    try {
+        const res = await fetch(`${API}/api/settings`);
+        if (!res.ok) return null;
+        const s = await res.json();
+        const spools = Array.isArray(s.print_cost_spools) ? s.print_cost_spools : [];
+        const spool = spools.find(x => x.id === s.print_cost_default_spool_id) || spools[0] || null;
+        const price = spool ? Number(spool.price) || 0 : Number(s.print_cost_spool_price ?? 20);
+        const weight = spool ? Number(spool.weight) || 1000 : Number(s.print_cost_spool_weight ?? 1000);
+        const elecPrice = parseFloat(s.print_cost_elec_price);
+        return {
+            material: s.print_cost_material || 'pla',
+            printerId: s.print_cost_printer_id != null ? String(s.print_cost_printer_id) : '',
+            pricePerGram: weight > 0 ? price / weight : 0,
+            hasElec: Number.isFinite(elecPrice) && elecPrice > 0, elecPrice,
+            printerPower: Number(s.print_cost_printer_power) || 120,
+            wearPerHour: s.print_cost_wear_per_hour, fixedFee: s.print_cost_fixed_fee, marginPct: s.print_cost_margin_pct
+        };
+    } catch (e) { return null; }
+}
+
+window.openFileInfoModal = async function (path, opts) {
+    const demo = opts && opts.demo ? opts.demo : null;   // visite guidée : fichier fictif, aucune requête réseau
+    const file = demo ? demo.file : (typeof allFiles !== 'undefined' ? allFiles : []).find(f => f.path === path)
+        || (typeof filteredFiles !== 'undefined' ? filteredFiles : []).find(f => f.path === path) || { path, name: path.split(/[\\/]/).pop() };
+    let modal = document.getElementById('modal-file-info');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-file-info';
+        modal.className = 'modal hidden';
+        modal.innerHTML = `<div class="modal-content" style="max-width:1080px; width:94vw;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-circle-info"></i> <span id="file-info-title"></span></h3>
+                <button class="modal-close" onclick="closeModal('modal-file-info')">×</button>
+            </div>
+            <div class="modal-body" id="file-info-body"></div>
+        </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-file-info'); });
+    }
+    const token = ++_fileInfoToken;
+    const e = escapeHtml;
+    const name = file.name || path.split(/[\\/]/).pop();
+    document.getElementById('file-info-title').textContent = _t3('fileinfo.title', 'Détails du fichier');
+    const body = document.getElementById('file-info-body');
+    const thumbUrl = demo ? demo.thumb : `${API}/api/thumb?path=${encodeURIComponent(path)}${file.thumb_mtime ? '&t=' + file.thumb_mtime : ''}`;
+    const row = (label, value, cls = '') => `<tr class="${cls}"><th>${e(label)}</th><td>${value}</td></tr>`;
+    const ext = (file.extension || (name.includes('.') ? '.' + name.split('.').pop() : '')).replace('.', '').toUpperCase();
+    const yn = (ok) => `<span class="meta-val ${ok ? 'meta-yes' : 'meta-no'}"><i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${ok ? e(_t2('card.yes', 'Oui')) : e(_t2('card.no', 'Non'))}</span>`;
+    const ps = file.print_status || 'never';
+    const baseRows = [row(_t3('fileinfo.name', 'Nom'), e(name))];
+    if (ext) baseRows.push(row(_t3('fileinfo.format', 'Format'), e(ext) + (file.plate_count > 1 ? ` · ${file.plate_count} ${e(_t3('fileinfo.plates', 'plateaux'))}` : '')));
+    if (file.size) baseRows.push(row(_t3('fileinfo.file_size', 'Taille du fichier'), e(formatSize(file.size))));
+    if (file.mtime) baseRows.push(row(_t3('fileinfo.modified', 'Modifié le'), e(new Date(file.mtime * 1000).toLocaleString(I18N.lang, { dateStyle: 'medium', timeStyle: 'short' }))));
+    const tailRows = row(_t3('fileinfo.sent_slicer', 'Envoyé au slicer'), yn(ps !== 'never')) + row(_t3('fileinfo.printed', 'Imprimé'), yn(ps === 'success'));
+
+    let savedProfile = '__geo';
+    if (!demo) { try { savedProfile = localStorage.getItem('stellio_fileinfo_profile') || '__geo'; } catch (err) { /* stockage indisponible */ } }
+    const st = { meta: null, cost: null, scale: 100, profile: savedProfile, slicer: null, failReason: '', timer: null, poll: null };
+
+    body.innerHTML = `<div class="file-info-layout">
+        <div class="file-info-thumb">${file.has_thumb === false ? '<i class="fa-solid fa-cube fa-3x" style="color:var(--text-muted)"></i>' : `<img src="${thumbUrl}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('i'), {className:'fa-solid fa-cube fa-3x'}))">`}</div>
+        <div style="flex:1; min-width:0;">
+            <div class="file-info-controls">
+                <label>${e(_t3('fileinfo.profile', 'Profil du slicer'))}
+                    <select id="file-info-profile">
+                        <option value="__geo">${e(_t3('fileinfo.profile_geo', 'Estimation rapide (géométrique)'))}</option>
+                        <option value="">${e(_t3('fileinfo.profile_default', "Réglages par défaut de l'application"))}</option>
+                    </select>
+                </label>
+                <label>${e(_t3('fileinfo.scale', 'Taille'))} (%)
+                    <span class="file-info-scale">
+                        <input type="number" id="file-info-scale" min="10" max="1000" step="5" value="100">
+                        <button type="button" class="btn btn-ghost btn-sm" data-scale="50">50%</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-scale="100">100%</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-scale="150">150%</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-scale="200">200%</button>
+                    </span>
+                </label>
+            </div>
+            <table class="file-info-table"><tbody id="file-info-rows"></tbody></table>
+            <div id="file-info-status" style="margin-top:8px; font-size:12px; color:var(--text-muted); min-height:16px;"></div>
+            <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+                <button type="button" class="btn btn-primary btn-sm" id="file-info-slicer"><i class="fa-solid fa-paper-plane"></i> ${e(_t3('fileinfo.send_slicer', 'Envoyer au slicer'))}</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="file-info-open"><i class="fa-solid fa-cube"></i> ${e(_t3('fileinfo.open_viewer', 'Ouvrir dans le viewer'))}</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="file-info-cost"><i class="fa-solid fa-coins"></i> ${e(_t3('fileinfo.cost_details', 'Détail du coût'))}</button>
+            </div>
+        </div>
+    </div>`;
+    const $ = (id) => document.getElementById(id);
+    const demoNote = () => showToast(_t3('tour.demo_toast', 'Fichier de démonstration : ces boutons fonctionnent sur vos vrais fichiers.'), 'info');
+    $('file-info-open').addEventListener('click', () => { if (demo) return demoNote(); closeModal('modal-file-info'); open3DViewer(name, path, file.plate_count || 1); });
+    $('file-info-slicer').addEventListener('click', () => { if (demo) return demoNote(); closeModal('modal-file-info'); sendToSlicer(path, name, null, 'default'); });
+    $('file-info-cost').addEventListener('click', () => { if (demo) return demoNote(); closeModal('modal-file-info'); if (typeof openPrintCostModal === 'function') openPrintCostModal(path, name); });
+
+    const setStatus = (html) => { const el = $('file-info-status'); if (el) el.innerHTML = html; };
+
+    const renderRows = () => {
+        const rowsEl = $('file-info-rows');
+        if (!rowsEl || token !== _fileInfoToken) return;
+        const meta = st.meta;
+        let html = baseRows.join('');
+        if (!meta) {
+            html += row(_t3('fileinfo.analysis', 'Analyse'), `<span style="color:var(--text-muted)"><i class="fa-solid fa-spinner fa-spin"></i> ${e(_t3('fileinfo.loading', 'Analyse du fichier…'))}</span>`);
+            rowsEl.innerHTML = html + tailRows;
+            return;
+        }
+        const k = st.scale / 100;
+        const d = meta.dimensions || {};
+        const dim = (v) => (Math.round(Number(v) * k * 10) / 10);
+        html += row(_t3('fileinfo.dimensions', 'Dimensions'), `${dim(d.x)} × ${dim(d.y)} × ${dim(d.z)} mm`);
+        const material = (st.cost && st.cost.material) || 'pla';
+        const sl = st.slicer && st.slicer.status === 'done' ? st.slicer.data : null;
+        // Profil choisi sans slicer disponible : estimation d'après les réglages du profil (parois, remplissage, vitesse)
+        let prof = null;
+        if (!sl && st.slicer && st.profile && st.profile !== '__geo') {
+            const opt = [...($('file-info-profile')?.options || [])].find(o => o.value === st.profile);
+            const infill = opt ? parseFloat(opt.dataset.infill) : NaN;
+            if (opt && Number.isFinite(infill) && Number(meta.surface_cm2) > 0 && Number(meta.volume_cm3) > 0) {
+                prof = { name: opt.dataset.name || opt.textContent, infill, layer: parseFloat(opt.dataset.layer) || 0.2,
+                         speed: parseFloat(opt.dataset.speed) || 150, walls: parseInt(opt.dataset.walls, 10) || 2 };
+            }
+        }
+        let weightG, timeSec, source;
+        if (prof) {
+            const LINE_W = 0.42;                                  // largeur de ligne moyenne (mm)
+            const surfaceMm2 = Number(meta.surface_cm2) * 100 * k * k;
+            const volumeMm3 = Number(meta.volume_cm3) * 1000 * k * k * k;
+            const shell = Math.min(volumeMm3, surfaceMm2 * prof.walls * LINE_W);
+            const printed = shell + Math.max(0, volumeMm3 - shell) * Math.min(100, Math.max(0, prof.infill)) / 100;
+            const dens = { pla: 1.24, petg: 1.27, abs: 1.04, tpu: 1.21, nylon: 1.14 }[material] || 1.24;
+            weightG = printed / 1000 * dens;
+            const flow = prof.speed * prof.layer * LINE_W * 0.55;   // débit moyen réel (mm³/s), accélérations comprises
+            timeSec = flow > 0 ? printed / flow * 1.1 : 0;
+            source = `${e(_t3('fileinfo.source_profile', "Estimation d'après le profil"))} « ${e(prof.name)} » (${prof.infill}% · ${prof.walls} ${e(_t3('fileinfo.walls', 'parois'))})`;
+        } else if (sl && sl.weight_g != null) {
+            weightG = Number(sl.weight_g);
+            timeSec = Number(sl.time_seconds) || 0;
+            source = `${e(_t3('fileinfo.source_slicer', 'Slicer'))} : ${e(sl.slicer_name || 'slicer')}`;
+        } else {
+            weightG = (Number(meta.weights && meta.weights[material]) || 0) * k * k * k;
+            timeSec = ((meta.estimated_time && meta.estimated_time.seconds) || 0) * k * k * k;
+            source = e(_t3('fileinfo.source_geo', 'Estimation géométrique'));
+        }
+        const fmtTime = (sec) => { const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60); return h > 0 ? `${h} h ${String(m).padStart(2, '0')} min` : `${m} min`; };
+        html += row(_t3('fileinfo.weight', 'Poids / consommation de filament'), `${weightG.toFixed(1)} g <span style="color:var(--text-muted)">(${e(material.toUpperCase())})</span>`);
+        html += row(_t3('fileinfo.time', "Temps d'impression estimé"), `~${e(fmtTime(timeSec))}`);
+        html += row(_t3('fileinfo.estimate_source', "Source de l'estimation"), `<span style="color:var(--text-muted)">${source}</span>`);
+        if (meta.volume_cm3 != null) html += row(_t3('fileinfo.volume', 'Volume'), `${(Number(meta.volume_cm3) * k * k * k).toFixed(2)} cm³`);
+        if (meta.triangle_count != null) html += row(_t3('fileinfo.triangles', 'Triangles'), e(Number(meta.triangle_count).toLocaleString(I18N.lang)));
+        if (st.cost && typeof window._computeQuote === 'function') {
+            const c = st.cost;
+            const q = window._computeQuote({
+                weightG, timeHours: timeSec / 3600, pricePerGram: c.pricePerGram, hasElec: c.hasElec, elecPrice: c.elecPrice,
+                printerPower: c.printerPower, wearPerHour: c.wearPerHour, fixedFee: c.fixedFee, marginPct: c.marginPct, qty: 1
+            });
+            html += row(_t3('fileinfo.cost_material', 'Matériau'), e(formatCost(q.material)));
+            if (q.elec) html += row(_t3('fileinfo.cost_elec', 'Électricité'), e(formatCost(q.elec)));
+            if (q.wear) html += row(_t3('fileinfo.cost_wear', 'Usure machine'), e(formatCost(q.wear)));
+            if (q.fixed) html += row(_t3('fileinfo.cost_fixed', 'Frais fixes'), e(formatCost(q.fixed)));
+            if (q.margin) html += row(_t3('fileinfo.cost_margin', 'Marge'), e(formatCost(q.margin)));
+            html += row(_t3('fileinfo.cost', 'Coût estimatif'), e(formatCost(q.unit)), 'file-info-total');
+        }
+        rowsEl.innerHTML = html + tailRows;
+    };
+
+    // Estimation du slicer pour le profil et la taille choisis (la taille est appliquée à une copie du modèle)
+    const stopPoll = () => { if (st.poll) { clearTimeout(st.poll); st.poll = null; } };
+    const requestSlicerEstimate = async () => {
+        stopPoll();
+        st.slicer = null;
+        if (st.profile === '__geo') { setStatus(''); renderRows(); return; }
+        if (demo) { st.slicer = { status: 'unavailable' }; setStatus(''); renderRows(); return; }   // démo : estimation d'après le profil, sans slicer
+        setStatus(`<i class="fa-solid fa-spinner fa-spin"></i> ${e(_t3('fileinfo.slicing', 'Estimation du slicer en cours…'))}`);
+        renderRows();
+        const params = { path, scale: st.scale };
+        if (st.profile) params.profile_id = st.profile;
+        if (st.cost && st.cost.printerId) params.printer_id = st.cost.printerId;
+        if (st.cost && st.cost.material) params.material_type = st.cost.material;
+        const myKey = JSON.stringify(params);
+        const handle = (res) => {
+            if (token !== _fileInfoToken || JSON.stringify({ path, scale: st.scale, ...(st.profile ? { profile_id: st.profile } : {}), ...(st.cost && st.cost.printerId ? { printer_id: st.cost.printerId } : {}), ...(st.cost && st.cost.material ? { material_type: st.cost.material } : {}) }) !== myKey) return;
+            if (res && res.status === 'done') { st.slicer = res; setStatus(''); renderRows(); return; }
+            if (res && (res.status === 'unavailable' || res.status === 'error')) {
+                const reasons = {
+                    no_slicer: _t3('fileinfo.reason_no_slicer', "Aucun slicer n'est installé sur l'ordinateur qui fait tourner Stellio : estimation d'après les réglages du profil."),
+                    profile_slicer_unavailable: _t3('fileinfo.reason_profile_slicer', "Le slicer de ce profil n'est pas installé : estimation d'après les réglages du profil."),
+                    profile_unreadable: _t3('fileinfo.reason_profile_unreadable', "Le fichier de ce profil est introuvable : estimation géométrique affichée."),
+                    slice_failed: _t3('fileinfo.reason_slice_failed', "Le slicer n'a pas pu trancher ce fichier : estimation d'après les réglages du profil.")
+                };
+                st.slicer = { status: 'unavailable' };
+                setStatus(`<i class="fa-solid fa-circle-info"></i> ${e(reasons[res.reason] || _t3('fileinfo.slicer_failed', "Estimation du slicer indisponible : estimation géométrique affichée."))}`);
+                renderRows();
+                return;
+            }
+            st.poll = setTimeout(async () => {
+                try {
+                    const r = await fetch(`${API}/api/slicer/pre-slice-estimate?${new URLSearchParams(Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])))}`);
+                    handle(await r.json());
+                } catch (err) { handle({ status: 'error' }); }
+            }, 2500);
+        };
+        try {
+            const r = await fetch(`${API}/api/slicer/pre-slice-estimate`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(params)
+            });
+            handle(await r.json());
+        } catch (err) { handle({ status: 'error' }); }
+    };
+
+    const onScaleChange = (value, immediate) => {
+        let v = Math.round(Number(value));
+        if (!Number.isFinite(v)) return;
+        v = Math.min(1000, Math.max(10, v));
+        st.scale = v;
+        renderRows();
+        clearTimeout(st.timer);
+        st.timer = setTimeout(requestSlicerEstimate, immediate ? 0 : 700);
+    };
+    $('file-info-scale').addEventListener('input', (ev) => onScaleChange(ev.target.value, false));
+    body.querySelectorAll('[data-scale]').forEach(btn => btn.addEventListener('click', () => {
+        $('file-info-scale').value = btn.dataset.scale;
+        onScaleChange(btn.dataset.scale, true);
+    }));
+    $('file-info-profile').addEventListener('change', (ev) => {
+        st.profile = ev.target.value;
+        if (!demo) { try { localStorage.setItem('stellio_fileinfo_profile', st.profile); } catch (err) { /* stockage indisponible */ } }
+        requestSlicerEstimate();
+    });
+
+    renderRows();
+    openModal('modal-file-info');
+
+    // Profils du slicer disponibles (liste partagée avec les fenêtres de coût)
+    const profLoad = (async () => {
+        if (demo) {
+            const sel0 = $('file-info-profile');
+            if (sel0) sel0.insertAdjacentHTML('beforeend', demo.profiles.map(p => `<option value="${p.id}" data-name="${p.name}" data-infill="${p.infill}" data-layer="${p.layer}" data-speed="${p.speed}" data-walls="${p.walls}">${p.name} · ${p.infill}%</option>`).join(''));
+        } else {
+        await _loadProcessProfileSelect('file-info-profile', null, { allSlicers: true });
+        }
+        const sel = $('file-info-profile');
+        if (sel) {
+            const ok = [...sel.options].some(o => o.value === st.profile);
+            if (!ok) st.profile = '__geo';
+            sel.value = st.profile;
+        }
+    })();
+
+    const [meta, cost] = demo ? [demo.meta, demo.cost, await profLoad] : await Promise.all([_fileInfoFetchMeta(path), _fileInfoLoadCostSettings(), profLoad]);
+    if (token !== _fileInfoToken) return;
+    st.meta = meta;
+    st.cost = cost;
+    if (!meta) {
+        const rowsEl = $('file-info-rows');
+        if (rowsEl) rowsEl.innerHTML = baseRows.join('') + row(_t3('fileinfo.analysis', 'Analyse'), `<span style="color:var(--text-muted)">${e(_t3('fileinfo.unavailable', 'Informations indisponibles pour ce fichier'))}</span>`) + tailRows;
+        return;
+    }
+    renderRows();
+    if (st.profile !== '__geo') requestSlicerEstimate();
+};
+
 function renderFileCard(f, icons) {
 const ext = f.extension || '';
 const icon = icons[ext] || 'fa-file';
@@ -6147,7 +6636,7 @@ updateSelectionCount();
 function updateSelectionCount() {
 const countEl = document.getElementById('selection-count');
 if (countEl) {
-countEl.textContent = `${I18N.tp('common.file_count', selectedFiles.size, { count: selectedFiles.size })} ${I18N.t('actions.select').toLowerCase()}`;
+countEl.textContent = `${_fileCountLabel(selectedFiles.size)} ${I18N.t('actions.select').toLowerCase()}`;
 }
 }
 window.sendSelectedToSlicer = async function () {
@@ -6221,6 +6710,50 @@ console.error('[Batch Delete]', err);
 };
 
 
+function _pollRegeneratedThumbs(paths) {
+const pending = new Set(paths);
+let attempts = 0;
+const maxAttempts = Math.max(60, Math.ceil(paths.length * 1.5));
+const poll = setInterval(async () => {
+    attempts++;
+    if (pending.size === 0) { clearInterval(poll); return; }
+    try {
+        const check = await fetch(`${API}/api/thumb/check`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paths: [...pending].slice(0, 300) })
+        });
+        const checkData = await check.json();
+        (checkData.results || []).forEach(r => {
+            if (!r.ready) return;
+            pending.delete(r.path);
+            const card = document.querySelector(`.file-card[data-path="${CSS.escape(r.path)}"]`);
+            if (card) {
+                const img = card.querySelector('.file-thumb img, .dv-thumb img');
+                const loader = card.querySelector('.file-loading');
+                const newSrc = `${API}/api/thumb?path=${encodeURIComponent(r.path)}&t=${Date.now()}`;
+                const testImg = new Image();
+                testImg.onload = () => {
+                    if (img) { img.src = newSrc; img.style.display = 'block'; img.dataset.loaded = 'true'; }
+                    if (loader) loader.style.display = 'none';
+                };
+                testImg.onerror = () => { pending.add(r.path); };
+                testImg.src = newSrc;
+            }
+            const f = allFiles.find(file => file.path === r.path);
+            if (f) { f.has_thumb = true; f.thumb_mtime = r.thumb_mtime; }
+        });
+        if (pending.size === 0) {
+            clearInterval(poll);
+            showToast(I18N.t('toast.thumb_regenerated') || 'Miniatures régénérées', 'success');
+        } else if (attempts >= maxAttempts) {
+            clearInterval(poll);
+            showToast(`${I18N.t('toast.timeout_retry')} (${pending.size} restante(s))`, 'warning');
+        }
+    } catch { clearInterval(poll); }
+}, 2000);
+}
+
 window.regenSelectedThumbnails = async function () {
 if (selectedFiles.size === 0) {
 showToast(I18N.t('toast.no_selection'), 'warning');
@@ -6246,47 +6779,7 @@ const res = await fetch(`${API}/api/thumb/regen-batch`, {
 const data = await res.json();
 if (!res.ok) { showToast(data.error || I18N.t('toast.thumb_gen_error'), 'error'); return; }
 
-const pending = new Set(paths);
-let attempts = 0;
-const maxAttempts = 60;
-
-const poll = setInterval(async () => {
-    attempts++;
-    if (pending.size === 0) { clearInterval(poll); return; }
-    try {
-        const check = await fetch(`${API}/api/thumb/check`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paths: [...pending] })
-        });
-        const checkData = await check.json();
-        (checkData.results || []).forEach(r => {
-            if (!r.ready) return;
-            pending.delete(r.path);
-            const card = document.querySelector(`.file-card[data-path="${CSS.escape(r.path)}"]`);
-            if (card) {
-                const img = card.querySelector('.file-thumb img, .dv-thumb img');
-                const loader = card.querySelector('.file-loading');
-                const newSrc = `${API}/api/thumb?path=${encodeURIComponent(r.path)}&t=${Date.now()}`;
-                const testImg = new Image();
-                testImg.onload = () => {
-                    if (img) { img.src = newSrc; img.style.display = 'block'; img.dataset.loaded = 'true'; }
-                    if (loader) loader.style.display = 'none';
-                };
-                testImg.src = newSrc;
-            }
-            const f = allFiles.find(file => file.path === r.path);
-            if (f) { f.has_thumb = true; f.thumb_mtime = r.thumb_mtime; }
-        });
-        if (pending.size === 0) {
-            clearInterval(poll);
-            showToast(I18N.t('toast.thumb_regenerated') || 'Miniatures régénérées', 'success');
-        } else if (attempts >= maxAttempts) {
-            clearInterval(poll);
-            showToast(`${I18N.t('toast.timeout_retry')} (${pending.size} restante(s))`, 'warning');
-        }
-    } catch { clearInterval(poll); }
-}, 2000);
+_pollRegeneratedThumbs(paths);
 } catch (err) {
 showToast(I18N.t('toast.connection_error'), 'error');
 console.error('[Batch Thumb Regen]', err);
@@ -6856,7 +7349,7 @@ console.error('[Tags] Erreur:', err);
 function openBulkTagModal() {
     if (!selectedFiles.size) return;
     const countEl = document.getElementById('bulk-tag-count');
-    if (countEl) countEl.textContent = I18N.tp('common.file_count', selectedFiles.size, { count: selectedFiles.size });
+    if (countEl) countEl.textContent = _fileCountLabel(selectedFiles.size);
     const listEl = document.getElementById('bulk-tag-list');
     if (listEl) {
         listEl.innerHTML = allTags.length
@@ -6874,7 +7367,7 @@ window.openBulkTagModal = openBulkTagModal;
 function openBulkRenameModal() {
     if (!selectedFiles.size) return;
     const countEl = document.getElementById('bulk-rename-count');
-    if (countEl) countEl.textContent = I18N.tp('common.file_count', selectedFiles.size, { count: selectedFiles.size });
+    if (countEl) countEl.textContent = _fileCountLabel(selectedFiles.size);
     document.getElementById('bulk-rename-mode').value = 'find_replace';
     document.getElementById('bulk-rename-search').value = '';
     document.getElementById('bulk-rename-replace').value = '';
@@ -7082,32 +7575,46 @@ function updateThingiverseFooterStatus(connected, error = null) {
 }
 
 
-async function loadDownloadSources() {
-const select = document.getElementById('download-source');
-if (!select) return;
-select.innerHTML = `<option value=""> ${I18N.t('download.select_folder')}</option>`;
-try {
-const res = await fetch(`${API}/api/sources`);
-if (!res.ok) throw new Error(I18N.t('toast.load_source_error'));
-const sources = await res.json();
-const folderSources = sources.filter(s => s.type === 'folder' || s.type === 'smb' || s.type === 'nfs');
+let _downloadSourcesToken = 0;
+function _fillDownloadSources(select, sources) {
+    select.innerHTML = `<option value=""> ${I18N.t('download.select_folder')}</option>`;
+    const folderSources = (sources || []).filter(s => s.type === 'folder' || s.type === 'smb' || s.type === 'nfs');
     if (folderSources.length === 0) {
         select.innerHTML += `<option value="" disabled>${I18N.t('download.no_local_folders')}</option>`;
         return;
     }
-
     folderSources.forEach(source => {
         const option = document.createElement('option');
         option.value = source.id;
-        const icon = source.type === 'smb' ? '🌐' : (source.type === 'nfs' ? '️' : '📁');
+        const icon = source.type === 'smb' ? '🌐' : (source.type === 'nfs' ? '🗄️' : '📁');
         option.textContent = `${icon} ${source.name} (${source.path})`;
         option.dataset.sourceType = source.type;
         select.appendChild(option);
     });
-} catch  (err) {
-    console.error('[Download Sources]', err);
-    select.innerHTML += `<option value="" disabled>${I18N.t('download.load_error')}</option>`;
 }
+async function loadDownloadSources() {
+    const select = document.getElementById('download-source');
+    if (!select) return;
+    const token = ++_downloadSourcesToken;
+    const previous = select.value;
+    // affichage immédiat avec les sources déjà connues : la liste ne reste jamais vide pendant le chargement
+    if (Array.isArray(_sourcesCache) && _sourcesCache.length) _fillDownloadSources(select, _sourcesCache);
+    else select.innerHTML = `<option value=""> ${I18N.t('download.select_folder')}</option>`;
+    try {
+        const res = await fetch(`${API}/api/sources`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(I18N.t('toast.load_source_error'));
+        const sources = await res.json();
+        if (token !== _downloadSourcesToken) return;
+        _sourcesCache = sources || [];
+        _fillDownloadSources(select, sources);
+        if (previous && [...select.options].some(o => o.value === previous)) select.value = previous;
+    } catch (err) {
+        console.error('[Download Sources]', err);
+        if (token !== _downloadSourcesToken) return;
+        if (!(Array.isArray(_sourcesCache) && _sourcesCache.length)) {
+            select.innerHTML += `<option value="" disabled>${I18N.t('download.load_error')}</option>`;
+        }
+    }
 }
 function openDownloadModal() {
 loadDownloadSources();
@@ -7417,7 +7924,7 @@ showToast(I18N.t('toast.picker_unavailable'), 'warning');
 
 
 function _filterByAdvancedFilters(files) {
-if (activeTypeFilters?.length > 0 && activeTypeFilters.length < 3) files = files.filter(f => activeTypeFilters.includes(f.extension));
+if (activeTypeFilters?.length > 0 && activeTypeFilters.length < _typeFilterTotal()) files = files.filter(f => activeTypeFilters.includes(f.extension));
 if (currentSizeFilter) files = files.filter(f => { const mb = (f.size || 0) / (1024 * 1024); return mb >= (currentSizeFilter.min || 0) && mb <= (currentSizeFilter.max !== undefined ? currentSizeFilter.max : Infinity); });
 if (currentWeightFilter) files = files.filter(f => { if (f.weight_g === null || f.weight_g === undefined) return false; return f.weight_g >= (currentWeightFilter.min || 0) && f.weight_g <= (currentWeightFilter.max !== undefined ? currentWeightFilter.max : Infinity); });
 if (printStatusFilter) files = files.filter(f => {
@@ -7466,7 +7973,7 @@ icon.classList.add('fa-chevron-right');
 }
 }
 function openFiltersModal() {
-document.querySelectorAll('.filter-type').forEach(cb => { cb.checked = !activeTypeFilters || activeTypeFilters.length === 0 || activeTypeFilters.includes(cb.value); });
+document.querySelectorAll('#modal-filters .filter-type').forEach(cb => { cb.checked = !activeTypeFilters || activeTypeFilters.length === 0 || activeTypeFilters.includes(cb.value); });
 document.getElementById('size-min').value = currentSizeFilter?.min || '';
 document.getElementById('size-max').value = currentSizeFilter?.max || '';
 document.getElementById('weight-min').value = currentWeightFilter?.min || '';
@@ -7484,8 +7991,8 @@ renderSavedFiltersList();
 openModal('modal-filters');
 }
 async function applyFiltersFromModal() {
-const selectedTypes = [...document.querySelectorAll('.filter-type:checked')].map(cb => cb.value);
-activeTypeFilters = selectedTypes.length === 3 ? [] : selectedTypes;
+const selectedTypes = [...new Set([...document.querySelectorAll('#modal-filters .filter-type:checked')].map(cb => cb.value))];
+activeTypeFilters = selectedTypes.length >= _typeFilterTotal() ? [] : selectedTypes;
 noThumbFilterOnly = document.getElementById('filter-no-thumb')?.checked || false;
 failedThumbFilterOnly = document.getElementById('filter-thumb-failed')?.checked || false;
 const minVal = parseFloat(document.getElementById('size-min').value);
@@ -7520,7 +8027,7 @@ showToast(I18N.t('toast.filters_applied'), 'success');
 }
 }
 function resetFilters() {
-document.querySelectorAll('.filter-type').forEach(cb => cb.checked = true);
+document.querySelectorAll('#modal-filters .filter-type').forEach(cb => cb.checked = true);
 const noThumbCb = document.getElementById('filter-no-thumb');
 if (noThumbCb) noThumbCb.checked = false;
 noThumbFilterOnly = false;
@@ -7583,7 +8090,7 @@ window.saveCurrentFilterSet = function () {
     const name = prompt(_t2('filters.save_prompt', 'Nom de ce filtre :'));
     if (!name || !name.trim()) return;
     const state = {
-        types: [...document.querySelectorAll('.filter-type:checked')].map(cb => cb.value),
+        types: [...document.querySelectorAll('#modal-filters .filter-type:checked')].map(cb => cb.value),
         noThumb: document.getElementById('filter-no-thumb')?.checked || false,
         failedThumb: document.getElementById('filter-thumb-failed')?.checked || false,
         sizeMin: document.getElementById('size-min')?.value || '',
@@ -7606,7 +8113,7 @@ window.applySavedFilterSet = function (id) {
     const entry = list.find(f => f.id === id);
     if (!entry) return;
     const s = entry.state;
-    document.querySelectorAll('.filter-type').forEach(cb => { cb.checked = s.types.includes(cb.value); });
+    document.querySelectorAll('#modal-filters .filter-type').forEach(cb => { cb.checked = s.types.includes(cb.value); });
     const noThumbCb = document.getElementById('filter-no-thumb');
     if (noThumbCb) noThumbCb.checked = !!s.noThumb;
     const failedThumbCb = document.getElementById('filter-thumb-failed');
@@ -7787,6 +8294,10 @@ async function _loadProcessProfileSelect(selectId, printerId, opts = {}) {
             if (p.infill_density != null) bits.push(`${p.infill_density}%`);
             o.textContent = p.name + (bits.length ? ` — ${bits.join(' · ')}` : '') + (multiSlicer && p.slicer ? ` [${p.slicer}]` : '');
             o.dataset.name = p.name;
+            if (p.layer_height != null) o.dataset.layer = p.layer_height;
+            if (p.infill_density != null) o.dataset.infill = p.infill_density;
+            if (p.print_speed != null) o.dataset.speed = p.print_speed;
+            if (p.wall_count != null) o.dataset.walls = p.wall_count;
             o.setAttribute('data-dynamic', '1');
             sel.appendChild(o);
         });
@@ -7891,6 +8402,7 @@ let viewerCurrentPath = null;
 let viewerCurrentFileName = null;
 
 function open3DViewer(fileName, filePath, plateCount) {
+loadThumbColorSetting();
 document.getElementById('viewer-title').innerHTML = `<i class="fa-solid fa-cube"></i> ${fileName}`;
 openModal('modal-3d-viewer');
 viewerCurrentPath = filePath;
@@ -7937,6 +8449,8 @@ function goToPlate(delta) {
 }
 
 function close3DViewer() {
+viewer3DLoadToken++;
+if (viewer3DFetchCtrl) { try { viewer3DFetchCtrl.abort(); } catch (e) { /* déjà terminée */ } viewer3DFetchCtrl = null; }
 disposeViewer3D();
 closeModal('modal-3d-viewer');
 viewerCurrentPath = null;
@@ -7957,6 +8471,7 @@ const suggestionsPanel = document.getElementById('viewer-orientation-suggestions
 if (suggestionsPanel) { suggestionsPanel.style.display = 'none'; suggestionsPanel.innerHTML = ''; }
 }
 let viewer3DLoadToken = 0;
+let viewer3DFetchCtrl = null;
 
 function makeAxisLabelSprite(text, hexColor) {
     const canvas = document.createElement('canvas');
@@ -8035,6 +8550,8 @@ function setViewerOrientation(key) {
     const overhangColors = computeOverhangVertexColors(geometry);
     if (overhangColors) {
         geometry.setAttribute('color', overhangColors);
+        geometry.userData.overhangAttr = overhangColors;
+        _syncViewerColorAttr(geometry);
         if (!viewerMesh.userData.overhangMaterial || viewerMesh.userData.overhangMaterial === viewerMesh.userData.shadedMaterial) {
             viewerMesh.userData.overhangMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
         }
@@ -8250,7 +8767,16 @@ function toggleOverhangView() {
     if (legend) legend.style.display = viewerOverhangMode ? 'block' : 'none';
     if (viewerMesh && viewerMesh.userData) {
         viewerMesh.material = viewerOverhangMode ? viewerMesh.userData.overhangMaterial : viewerMesh.userData.shadedMaterial;
+        _syncViewerColorAttr(viewerMesh.geometry);
     }
+}
+
+// Modèle multicolore : l'attribut « color » porte soit les couleurs du slicer, soit la carte des surplombs
+function _syncViewerColorAttr(geometry) {
+    const u = geometry && geometry.userData;
+    if (!u || !u.multiColorAttr) return;
+    const a = viewerOverhangMode ? u.overhangAttr : u.multiColorAttr;
+    if (a) geometry.setAttribute('color', a);
 }
 
 
@@ -8275,6 +8801,9 @@ throw wrapped;
 }
 
 function load3DModel(filePath, plateIndex) {
+if (viewer3DFetchCtrl) { try { viewer3DFetchCtrl.abort(); } catch (e) { /* déjà terminée */ } }
+viewer3DFetchCtrl = new AbortController();
+const _fetchSignal = viewer3DFetchCtrl.signal;
 disposeViewer3D();
 const suggestionsPanel = document.getElementById('viewer-orientation-suggestions');
 if (suggestionsPanel) { suggestionsPanel.style.display = 'none'; suggestionsPanel.innerHTML = ''; }
@@ -8283,7 +8812,7 @@ const container = document.getElementById('viewer-canvas-container');
 container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin fa-2x"></i></div>`;
 let meshUrl = `${API}/api/file/mesh?path=${encodeURIComponent(filePath)}`;
 if (plateIndex) meshUrl += `&plate=${plateIndex}`;
-fetch(meshUrl)
+fetch(meshUrl, { signal: _fetchSignal })
 .then(res => {
 if (!res.ok) {
     return res.json()
@@ -8334,9 +8863,12 @@ container.appendChild(viewerRenderer.domElement);
         if (myToken !== viewer3DLoadToken) { URL.revokeObjectURL(url); return; }
 
 
+        // 3MF multicolore : le serveur envoie une couleur par face (STL colorisé) ; sinon couleur choisie dans Apparence
+        const _mcAttr = (geometry.hasColors && geometry.getAttribute('color')) ? geometry.getAttribute('color') : null;
+        if (_mcAttr) geometry.userData.multiColorAttr = new THREE.BufferAttribute(_mcAttr.array.slice(), 3);
         geometry.deleteAttribute('normal');
         geometry.computeVertexNormals();
-        const shadedMaterial = new THREE.MeshPhongMaterial({ color: 0x4ea1d3, specular: 0x111111, shininess: 120, flatShading: false, side: THREE.DoubleSide });
+        const shadedMaterial = new THREE.MeshPhongMaterial({ color: _mcAttr ? 0xffffff : new THREE.Color(_thumbColorHex), vertexColors: !!_mcAttr, specular: 0x111111, shininess: 120, flatShading: false, side: THREE.DoubleSide });
         geometry.computeBoundingBox();
         const center = new THREE.Vector3();
         geometry.boundingBox.getCenter(center);
@@ -8348,8 +8880,10 @@ container.appendChild(viewerRenderer.domElement);
         let overhangMaterial = shadedMaterial;
         if (overhangColors) {
             geometry.setAttribute('color', overhangColors);
+            geometry.userData.overhangAttr = overhangColors;
             overhangMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
         }
+        _syncViewerColorAttr(geometry);
 
         viewerMesh = new THREE.Mesh(geometry, viewerOverhangMode ? overhangMaterial : shadedMaterial);
         viewerMesh.userData.shadedMaterial = shadedMaterial;
@@ -8413,7 +8947,7 @@ container.appendChild(viewerRenderer.domElement);
     });
 })
 .catch(err => {
-    if (myToken !== viewer3DLoadToken) return;
+    if (myToken !== viewer3DLoadToken || (err && err.name === 'AbortError')) return;
     console.error('[3D Viewer]', err);
     if (err && err.message === 'WEBGL_CONTEXT_UNAVAILABLE') {
         const hint = I18N.t('viewer.webgl_unavailable_hint') || "Impossible d'initialiser l'affichage 3D sur cette machine (accélération graphique indisponible ou bloquée). Vérifie que l'accélération matérielle n'est pas désactivée, que les pilotes GPU sont à jour, ou qu'un antivirus (Avast, etc.) ne bloque pas le rendu graphique de l'application.";
@@ -8972,7 +9506,7 @@ showToast(I18N.t('toast.connection_error') || 'Erreur de connexion', 'error');
 function _t3(key, fallback, params) {
 try {
 const val = params ? I18N.t(key, params) : I18N.t(key);
-if (!val || val === key) return fallback;
+if (!val || val === key) return params ? I18N._interpolate(fallback, params) : fallback;
 return val;
 } catch (e) { return fallback; }
 }
@@ -9373,6 +9907,7 @@ loadSlicerSettings();
 loadSpoolmanSettings();
 loadOllamaSettings();
 loadAutoScanSettings();
+loadThumbColorSetting();
 loadManualInventorySettings();
 loadStartupSettings();
 loadPrintCostSettings();
@@ -9661,6 +10196,54 @@ async function loadAutoScanSettings() {
         if (input) input.value = data.auto_scan_interval_minutes || 5;
     } catch (e) { console.warn('[AutoScan] Réglages indisponibles'); }
 }
+
+async function loadThumbColorSetting() {
+    try {
+        const res = await fetch(`${API}/api/settings`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const input = document.getElementById('thumb-color-input');
+        if (/^#[0-9a-f]{6}$/i.test(data.thumb_color || '')) _thumbColorHex = data.thumb_color;
+        if (input) input.value = _thumbColorHex;
+    } catch (_) {}
+}
+
+function resetThumbColor() {
+    const input = document.getElementById('thumb-color-input');
+    if (input) input.value = '#4ea1d3';
+    applyThumbColor();
+}
+window.resetThumbColor = resetThumbColor;
+
+async function applyThumbColor() {
+    const input = document.getElementById('thumb-color-input');
+    if (!input) return;
+    try {
+        const res = await fetch(`${API}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ thumb_color: input.value })
+        });
+        if (!res.ok) { showToast(I18N.t('toast.network_error'), 'error'); return; }
+        _thumbColorHex = input.value;
+        const paths = (allFiles || []).map(f => f.path).filter(Boolean);
+        showToast(I18N.t('settings.thumb_color_applied'), 'success');
+        const queued = [];
+        for (let i = 0; i < paths.length; i += 200) {
+            const chunk = paths.slice(i, i + 200);
+            const r = await fetch(`${API}/api/thumb/regen-batch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paths: chunk, only_color_dependent: true })
+            });
+            if (r.ok) queued.push(...chunk);
+        }
+        if (queued.length) _pollRegeneratedThumbs(queued);
+    } catch (_) {
+        showToast(I18N.t('toast.network_error'), 'error');
+    }
+}
+window.applyThumbColor = applyThumbColor;
 
 window.manualInventoryEnabled = true;
 
@@ -14018,6 +14601,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         updateHeaderVisibilityForPage(page);
         if (page === 'library') loadFiles();
         if (page === 'printers') loadPrinters(); else stopAllPrinterCardCameras();
+        if (page !== 'dashboard') _stopDashboardCameras();
         if (page === 'settings') { loadSources(); loadRemoteInstances(); loadGuests(); loadPushSettings(); }
         else stopDiagnosticConsolePoll();
         if (page === 'spoolman') loadSpoolmanPage();
@@ -14923,12 +15507,12 @@ bar = document.createElement('div');
 bar.id = 'folder-selection-bar';
 bar.className = 'folder-selection-bar';
 bar.style.display = 'flex';
-bar.innerHTML = `<span id="folder-selection-count">${I18N.tp('common.file_count', count, { count })} ${I18N.t('actions.select').toLowerCase()}</span><select id="folder-batch-printer-select" class="settings-select" style="min-width:0; width:auto; max-width:150px; font-size:12px; padding:6px 8px;"><option value="" data-i18n="modal.ai_all_printers">Toutes les imprimantes</option></select><button onclick="sendFolderSelectionToSlicer()" class="btn btn-primary btn-sm"><i class="fa-solid fa-scissors"></i> ${I18N.t('actions.send_to_slicer')}</button><button onclick="clearFolderSelection()" class="btn btn-ghost btn-sm"><i class="fa-solid fa-times"></i> ${I18N.t('actions.cancel')}</button>`;
+bar.innerHTML = `<span id="folder-selection-count">${_fileCountLabel(count)} ${I18N.t('actions.select').toLowerCase()}</span><select id="folder-batch-printer-select" class="settings-select" style="min-width:0; width:auto; max-width:150px; font-size:12px; padding:6px 8px;"><option value="" data-i18n="modal.ai_all_printers">Toutes les imprimantes</option></select><button onclick="sendFolderSelectionToSlicer()" class="btn btn-primary btn-sm"><i class="fa-solid fa-scissors"></i> ${I18N.t('actions.send_to_slicer')}</button><button onclick="clearFolderSelection()" class="btn btn-ghost btn-sm"><i class="fa-solid fa-times"></i> ${I18N.t('actions.cancel')}</button>`;
 document.querySelector('.main-content').appendChild(bar);
 _populatePrinterSelects();
 } else {
 bar.style.display = 'flex';
-if (countEl) countEl.textContent = `${I18N.tp('common.file_count', count, { count })} ${I18N.t('actions.select').toLowerCase()}`;
+if (countEl) countEl.textContent = `${_fileCountLabel(count)} ${I18N.t('actions.select').toLowerCase()}`;
 }
 } else {
 if (bar) bar.style.display = 'none';
@@ -20021,8 +20605,42 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
     async function _downloadQuote() {
         return _exportQuote({
             quote: _lastQuote, fileName: _costCurrentFileName,
-            ids: { client: 'cost-quote-client', notes: 'cost-quote-notes', item: 'cost-quote-item-name', btn: 'cost-quote-btn' }
+            ids: { client: 'cost-quote-client', notes: 'cost-quote-notes', item: 'cost-quote-item-name', btn: 'cost-quote-btn', thumbs: 'cost-quote-thumbs' },
+            thumbPaths: [_costCurrentFilePath]
         });
+    }
+
+    // Miniatures des objets pour le devis : réduites (JPEG ≤ 320 px) puis envoyées avec la requête
+    function _quoteThumbsWanted(id) {
+        const el = id ? document.getElementById(id) : null;
+        return !!(el && el.checked);
+    }
+    function _quoteThumbsChecked(id) {
+        let on = false;
+        try { on = localStorage.getItem('stellio_quote_thumbs') === '1'; } catch (e) { /* stockage indisponible */ }
+        return `<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-primary); cursor:pointer;">
+            <input type="checkbox" id="${id}" ${on ? 'checked' : ''} onchange="try{localStorage.setItem('stellio_quote_thumbs', this.checked ? '1' : '0')}catch(e){}">
+            <span>${escapeHtml(_t3('cost.quote_show_thumbs', 'Afficher les miniatures des objets sur le devis'))}</span></label>`;
+    }
+    async function _quoteThumbDataUrls(paths) {
+        const out = [];
+        for (const p of (paths || []).slice(0, 12)) {
+            try {
+                const res = await fetch(`${API}/api/thumb?path=${encodeURIComponent(p)}`, { cache: 'no-store' });
+                if (!res.ok) continue;
+                const bmp = await createImageBitmap(await res.blob());
+                const k = Math.min(1, 320 / Math.max(bmp.width, bmp.height));
+                const cv = document.createElement('canvas');
+                cv.width = Math.max(1, Math.round(bmp.width * k));
+                cv.height = Math.max(1, Math.round(bmp.height * k));
+                const cx = cv.getContext('2d');
+                cx.fillStyle = '#ffffff';
+                cx.fillRect(0, 0, cv.width, cv.height);
+                cx.drawImage(bmp, 0, 0, cv.width, cv.height);
+                out.push(cv.toDataURL('image/jpeg', 0.86));
+            } catch (e) { /* miniature indisponible : ignorée */ }
+        }
+        return out;
     }
 
     // Génère le devis PDF (enregistrement natif ou téléchargement) ; commun au coût d'une pièce et au coût d'un projet.
@@ -20069,6 +20687,10 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             unit_value: q.unit,
             total_value: q.total
         };
+        if (opts.ids.thumbs && _quoteThumbsWanted(opts.ids.thumbs)) {
+            const paths = typeof opts.thumbPaths === 'function' ? opts.thumbPaths() : (opts.thumbPaths || []);
+            payload.thumbnails = await _quoteThumbDataUrls(paths);
+        }
         const init = {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -20502,6 +21124,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                         <label style="${labelStyle}">${I18N.t('cost.quote_notes')}</label>
                         <textarea id="pcost-quote-notes" rows="2" maxlength="500" style="${fieldStyle} resize:vertical;"></textarea>
                     </div>
+                    ${_quoteThumbsChecked('pcost-quote-thumbs')}
                     <p style="margin:0; font-size:12px; color:var(--text-muted);"><i class="fa-solid fa-circle-info"></i> ${I18N.t('cost.quote_header_hint')}</p>
                     <button type="button" class="btn btn-primary btn-sm" id="pcost-quote-btn"><i class="fa-solid fa-file-invoice"></i> ${I18N.t('cost.quote_generate')}</button>
                 </div>
@@ -20526,7 +21149,8 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             });
             document.getElementById('pcost-quote-btn')?.addEventListener('click', () => _exportQuote({
                 quote: _pc && _pc.quote, fileName: _pc && _pc.name, stripExt: false,
-                ids: { client: 'pcost-quote-client', notes: 'pcost-quote-notes', item: 'pcost-quote-item-name', btn: 'pcost-quote-btn' },
+                ids: { client: 'pcost-quote-client', notes: 'pcost-quote-notes', item: 'pcost-quote-item-name', btn: 'pcost-quote-btn', thumbs: 'pcost-quote-thumbs' },
+                thumbPaths: () => (_pc ? _pc.files.filter(f => f.ok !== false && f.path).map(f => f.path) : []),
                 extraDetails: ` · ${_pc.files.length} ${I18N.t('projects.parts')}`
             }));
 
@@ -20740,6 +21364,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                         <label style="${labelStyle}">${I18N.t('cost.quote_notes')}</label>
                         <textarea id="cost-quote-notes" rows="2" maxlength="500" style="${fieldStyle} resize:vertical;"></textarea>
                     </div>
+                    ${_quoteThumbsChecked('cost-quote-thumbs')}
                     <p style="margin:0; font-size:12px; color:var(--text-muted);"><i class="fa-solid fa-circle-info"></i> ${I18N.t('cost.quote_header_hint')}</p>
                     <button type="button" class="btn btn-primary btn-sm" id="cost-quote-btn"><i class="fa-solid fa-file-invoice"></i> ${I18N.t('cost.quote_generate')}</button>
                 </div>
@@ -21353,7 +21978,7 @@ window.openSelectionProjectModal = function () {
         modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-selection-project'); });
     }
     const count = selectedFiles.size;
-    document.getElementById('selection-project-title').textContent = I18N.tp('common.file_count', count, { count });
+    document.getElementById('selection-project-title').textContent = _fileCountLabel(count);
     document.getElementById('selection-project-body').innerHTML = `
         <button class="btn btn-primary" style="width:100%; margin-bottom:10px; justify-content:flex-start; gap:10px;" onclick="selectionOpenNewProject()">
             <i class="fa-solid fa-plus"></i> ${I18N.t('projects.create_with_selection') || 'Créer un nouveau projet avec ces fichiers'}

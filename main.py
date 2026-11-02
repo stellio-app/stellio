@@ -843,7 +843,7 @@ except ImportError:
     HAS_PYMESHFIX = False
 import numpy as np
 import smbclient
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageChops
 import base64
 from pathlib import Path
 from functools import wraps
@@ -1996,6 +1996,15 @@ def init_db():
         pdf_file TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id)
+    )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS file_analysis (
+        path_hash TEXT PRIMARY KEY,
+        path TEXT NOT NULL,
+        mtime REAL DEFAULT 0,
+        size INTEGER DEFAULT 0,
+        data TEXT DEFAULT '',
+        failed INTEGER DEFAULT 0,
+        updated_at REAL DEFAULT 0
     )""")
     c.execute("""CREATE TABLE IF NOT EXISTS spool_assignments (
         file_path TEXT NOT NULL,
@@ -4966,6 +4975,7 @@ def process_generation_queue():
                         processed_count += 1
                         consecutive_errors = 0
                         update_cache_thumb_status(file_path, True)
+                        _analysis_wake.set()   # miniature prête : le fichier est analysé ensuite, en fond
                         _thumb_session_note_result(os.path.basename(file_path), file_path, True)
                     else:
                         app_logger.info(f"[FALLBACK] Création miniature fallback pour {os.path.basename(file_path)}")
@@ -5064,6 +5074,8 @@ def process_generation_queue():
         threading.Thread(target=thumb_worker, args=(i,), daemon=True).start()
     threading.Thread(target=scan_and_metadata_worker, daemon=True).start()
     threading.Thread(target=thumbnail_coverage_supervisor, daemon=True).start()
+    threading.Thread(target=analysis_background_worker, daemon=True).start()
+    threading.Thread(target=thumb_render_migration_worker, daemon=True).start()
 
     app_logger.info(f"[BACKGROUND] File d'attente lazy active ({NUM_THUMB_WORKERS} workers en parallèle)")
 
@@ -5165,7 +5177,204 @@ def get_3mf_plate_count(source):
     return len(plates) if plates else 1
 
 
-def _resolve_3mf_plate_mesh(source, wanted_ids):
+def _hex_to_rgb(value):
+    try:
+        v = str(value).strip().lstrip('#')
+        if len(v) in (6, 8):
+            return (int(v[0:2], 16), int(v[2:4], 16), int(v[4:6], 16))
+    except Exception:
+        pass
+    return None
+
+
+def _decode_paint_state(code):
+    """État dominant d'un triangle peint (attribut paint_color de Bambu / mmu_segmentation de Prusa) :
+    0 = couleur de base, n = extrudeur n. Le texte est un arbre de subdivision en nibbles lus depuis la fin."""
+    try:
+        nibbles = [int(c, 16) for c in str(code).strip()][::-1]
+        if not nibbles:
+            return 0
+        pos = [0]
+        weights = {}
+
+        def walk(weight):
+            if pos[0] >= len(nibbles):
+                return
+            c = nibbles[pos[0]]
+            pos[0] += 1
+            splits = c & 0b11
+            if splits == 0:
+                state = c >> 2
+                if state == 3 and pos[0] < len(nibbles):
+                    state = nibbles[pos[0]] + 3
+                    pos[0] += 1
+                weights[state] = weights.get(state, 0.0) + weight
+            else:
+                n = splits + 1
+                for _ in range(n):
+                    walk(weight / n)
+
+        walk(1.0)
+        if not weights:
+            return 0
+        return max(weights.items(), key=lambda kv: kv[1])[0]
+    except Exception:
+        return 0
+
+
+def _read_3mf_color_context(zf):
+    """Couleurs de filaments et extrudeur par objet/pièce (Bambu Studio / Orca / PrusaSlicer)."""
+    ctx = {'filament': [], 'obj_ext': {}, 'part_ext': {}}
+    try:
+        names = zf.namelist()
+        proj = next((n for n in names if n.lower().endswith('project_settings.config')), None)
+        if proj:
+            try:
+                data = json.loads(zf.read(proj).decode('utf-8', 'ignore'))
+                cols = data.get('filament_colour') or data.get('extruder_colour') or []
+                ctx['filament'] = [c for c in (_hex_to_rgb(x) for x in cols)]
+            except Exception:
+                pass
+        if not ctx['filament']:
+            pe = next((n for n in names if n.lower().endswith('slic3r_pe.config')), None)
+            if pe:
+                txt = zf.read(pe).decode('utf-8', 'ignore')
+                m = re.search(r'filament_colour\s*=\s*"?([^"\n]+)"?', txt)
+                if m:
+                    ctx['filament'] = [_hex_to_rgb(x) for x in m.group(1).split(';')]
+        cfg = next((n for n in names if n.lower().endswith('model_settings.config')), None)
+        if cfg:
+            root = _safe_xml_parse(io.BytesIO(zf.read(cfg))).getroot()
+            for obj in root.iter('object'):
+                oid = obj.get('id')
+                oext = None
+                for md in obj.findall('metadata'):
+                    if md.get('key') == 'extruder':
+                        try:
+                            oext = int(md.get('value'))
+                        except Exception:
+                            pass
+                if oid and oext:
+                    ctx['obj_ext'][oid] = oext
+                for part in obj.findall('part'):
+                    pid = part.get('id')
+                    for md in part.findall('metadata'):
+                        if md.get('key') == 'extruder' and pid:
+                            try:
+                                ctx['part_ext'][pid] = int(md.get('value'))
+                            except Exception:
+                                pass
+    except Exception as e:
+        app_logger.debug(f"[3MF] Contexte couleurs illisible: {e}")
+    return ctx
+
+
+def _read_3mf_material_groups(root_el):
+    """Groupes de matériaux du standard 3MF : id -> liste de couleurs (basematerials / colorgroup)."""
+    groups = {}
+    try:
+        for el in root_el.iter():
+            tag = el.tag.split('}')[-1] if isinstance(el.tag, str) else ''
+            if tag in ('basematerials', 'colorgroup'):
+                gid = el.get('id')
+                cols = []
+                for ch in list(el):
+                    cols.append(_hex_to_rgb(ch.get('displaycolor') or ch.get('color') or ''))
+                if gid:
+                    groups[gid] = cols
+    except Exception:
+        pass
+    return groups
+
+
+def _export_colored_stl(mesh, face_rgb, default_rgb):
+    """STL binaire avec une couleur par face (en-tête COLOR= + 5 bits par canal), lu par STLLoader de three.js."""
+    verts = np.asarray(mesh.vertices, dtype=np.float32)
+    faces = np.asarray(mesh.faces)
+    n = len(faces)
+    rec = np.zeros(n, dtype=[('n', '<f4', 3), ('v', '<f4', 9), ('a', '<u2')])
+    rec['n'] = np.asarray(mesh.face_normals, dtype=np.float32)
+    rec['v'] = verts[faces].reshape(n, 9)
+    q = np.rint(np.asarray(face_rgb, dtype=np.float64) / 255.0 * 31.0).astype(np.uint16)
+    rec['a'] = (q[:, 0] & 31) | ((q[:, 1] & 31) << 5) | ((q[:, 2] & 31) << 10)  # bit 15 à 0 = couleur propre à la face
+    header = b'COLOR=' + bytes([default_rgb[0], default_rgb[1], default_rgb[2], 255])
+    header = header.ljust(80, b' ')
+    out = io.BytesIO()
+    out.write(header)
+    out.write(np.uint32(n).tobytes())
+    out.write(rec.tobytes())
+    out.seek(0)
+    return out
+
+
+_NUM_CHARS = b'0123456789+-.eE \r\n\t'
+_PAINT_NOISE_RE = re.compile(rb' paint_(?:supports|seam|fuzzy_skin)="[^"]*"')
+
+
+def _fast_parse_mesh_block(raw, start, end):
+    """Lecture rapide (sans ElementTree) du maillage d'un <object> d'un gros fichier .model :
+    vertices/triangles → tableaux numpy. Renvoie None si le format sort de l'ordinaire (attributs
+    supplémentaires, composants…) : l'appelant bascule alors sur la lecture XML classique."""
+    try:
+        head_end = raw.find(b'>', start, end)
+        head = raw[start:head_end]
+        if b' pid=' in head or b' pindex=' in head:
+            return None
+        vs = raw.find(b'<vertices>', start, end)
+        ve = raw.find(b'</vertices>', start, end)
+        ts = raw.find(b'<triangles>', start, end)
+        te = raw.find(b'</triangles>', start, end)
+        if min(vs, ve, ts, te) < 0 or raw.find(b'<components', start, end) >= 0:
+            return None
+        vtxt = raw[vs + 10:ve]
+        for a, b in ((b'<vertex x="', b' '), (b'" y="', b' '), (b'" z="', b' '), (b'"/>', b' ')):
+            vtxt = vtxt.replace(a, b)
+        if vtxt.translate(None, _NUM_CHARS):
+            return None
+        ttxt = raw[ts + 11:te]
+        if b' pid=' in ttxt or b' p1=' in ttxt:
+            return None  # matériaux par triangle : lecture XML complète
+        paint_states = None
+        for pkey in (b'paint_color="', b'mmu_segmentation="'):
+            if pkey in ttxt:
+                lines = [ln for ln in ttxt.split(b'\n') if ln.strip()]
+                states = np.zeros(len(lines), dtype=np.int16)
+                memo = {}
+                for i, ln in enumerate(lines):
+                    j = ln.find(pkey)
+                    if j >= 0:
+                        k = ln.find(b'"', j + len(pkey))
+                        code = ln[j + len(pkey):k]
+                        st = memo.get(code)
+                        if st is None:
+                            st = memo[code] = _decode_paint_state(code.decode('ascii', 'ignore'))
+                        states[i] = st
+                del lines
+                paint_states = states
+                ttxt = re.sub(rb' (?:paint_color|mmu_segmentation)="[^"]*"', b'', ttxt)
+                break
+        if b' paint_' in ttxt:
+            ttxt = _PAINT_NOISE_RE.sub(b'', ttxt)  # supports / coutures peints : sans effet sur la forme ni la couleur
+        for a, b in ((b'<triangle v1="', b' '), (b'" v2="', b' '), (b'" v3="', b' '), (b'"/>', b' ')):
+            ttxt = ttxt.replace(a, b)
+        if ttxt.translate(None, _NUM_CHARS):
+            return None
+        v = np.fromstring(vtxt, dtype=np.float64, sep=' ')
+        f = np.fromstring(ttxt, dtype=np.int64, sep=' ')
+        if len(v) == 0 or len(v) % 3 or len(f) == 0 or len(f) % 3:
+            return None
+        v = v.reshape(-1, 3)
+        f = f.reshape(-1, 3).astype(np.int32)
+        if f.max() >= len(v) or f.min() < 0:
+            return None
+        if paint_states is not None and len(paint_states) != len(f):
+            paint_states = None
+        return v, f, paint_states
+    except Exception:
+        return None
+
+
+def _resolve_3mf_plate_mesh(source, wanted_ids, want_colors=False, max_faces=None):
     try:
         is_bytes = isinstance(source, (bytes, bytearray))
         zip_source = io.BytesIO(source) if is_bytes else source
@@ -5221,6 +5430,9 @@ def _resolve_3mf_plate_mesh(source, wanted_ids):
 
             _tree_cache = {}
             _objs_cache = {}
+            color_ctx = _read_3mf_color_context(zf) if want_colors else None
+            _mat_cache = {}
+            _fast_cache = {}
 
             def _get_tree(model_path):
                 if model_path not in _tree_cache:
@@ -5229,6 +5441,15 @@ def _resolve_3mf_plate_mesh(source, wanted_ids):
                             _tree_cache[model_path] = _safe_xml_parse(xml_file).getroot()
                     except Exception:
                         _tree_cache[model_path] = None
+                        # Certains exports (Creality Print) utilisent le préfixe « p: » sans le déclarer : on le déclare et on réessaie
+                        try:
+                            if zf.getinfo(model_path).file_size < 4 * 1024 * 1024:
+                                raw_xml = zf.read(model_path).decode('utf-8', 'replace')
+                                if ' p:' in raw_xml and 'xmlns:p=' not in raw_xml:
+                                    raw_xml = raw_xml.replace('<model ', '<model xmlns:p="' + NS_PROD + '" ', 1)
+                                    _tree_cache[model_path] = _safe_xml_parse(io.BytesIO(raw_xml.encode('utf-8'))).getroot()
+                        except Exception:
+                            _tree_cache[model_path] = None
                 return _tree_cache[model_path]
 
             def _get_objects(model_path):
@@ -5243,10 +5464,54 @@ def _resolve_3mf_plate_mesh(source, wanted_ids):
                     _objs_cache[model_path] = objs
                 return _objs_cache[model_path]
 
-            def _resolve(model_path, oid, transform, depth=0):
+            def _materials(model_path):
+                if model_path not in _mat_cache:
+                    root_el = _get_tree(model_path)
+                    _mat_cache[model_path] = _read_3mf_material_groups(root_el) if root_el is not None else {}
+                return _mat_cache[model_path]
+
+            def _ext_color(ext):
+                fil = color_ctx['filament'] if color_ctx else []
+                if ext and 0 < ext <= len(fil):
+                    return fil[ext - 1]
+                return None
+
+            def _resolve(model_path, oid, transform, depth=0, ext_hint=None):
                 out = []
                 if depth > 8:
                     return out
+                if color_ctx is not None:
+                    ext_hint = color_ctx['part_ext'].get(oid) or color_ctx['obj_ext'].get(oid) or ext_hint
+                # Gros fichier d'objet (Bambu / Orca : plusieurs dizaines de Mo de XML) : lecture directe sans ElementTree
+                try:
+                    big = zf.getinfo(model_path).file_size > 4 * 1024 * 1024
+                except Exception:
+                    big = False
+                if big:
+                    key = (model_path, oid)
+                    if key not in _fast_cache:
+                        parsed = None
+                        raw = zf.read(model_path)
+                        pos = raw.find(b'<object id="' + oid.encode() + b'"')
+                        if pos >= 0:
+                            endpos = raw.find(b'</object>', pos)
+                            if endpos > 0:
+                                parsed = _fast_parse_mesh_block(raw, pos, endpos)
+                        del raw
+                        _fast_cache[key] = parsed
+                    parsed = _fast_cache[key]
+                    if parsed is not None:
+                        varr, farr, pstates = parsed
+                        if not np.allclose(transform, np.eye(4)):
+                            varr = (np.hstack([varr, np.ones((len(varr), 1))]) @ transform.T)[:, :3]
+                        base = _ext_color(ext_hint) if color_ctx is not None else None
+                        fcols = base if base is not None else None
+                        if color_ctx is not None and pstates is not None and color_ctx['filament']:
+                            dflt = base if base is not None else _thumb_base_rgb()
+                            palette = np.array([dflt] + [(c if c is not None else dflt) for c in color_ctx['filament']], dtype=np.uint8)
+                            fcols = palette[np.clip(pstates, 0, len(palette) - 1)]
+                        out.append((varr, farr, fcols))
+                        return out
                 objs = _get_objects(model_path)
                 if not objs or oid not in objs:
                     return out
@@ -5259,6 +5524,10 @@ def _resolve_3mf_plate_mesh(source, wanted_ids):
                     tris_el = _find(mesh_el, 'triangles')
                     if verts_el is not None and tris_el is not None:
                         vertices, faces = [], []
+                        face_cols = [] if color_ctx is not None else None
+                        mats = _materials(model_path) if color_ctx is not None else {}
+                        base_col = _ext_color(ext_hint) if color_ctx is not None else None
+                        obj_pid, obj_pidx = obj.get('pid'), obj.get('pindex')
                         for v in list(verts_el):
                             try:
                                 vertices.append([float(v.get('x', 0)),
@@ -5271,6 +5540,29 @@ def _resolve_3mf_plate_mesh(source, wanted_ids):
                                 faces.append([int(t.get('v1', 0)),
                                               int(t.get('v2', 0)),
                                               int(t.get('v3', 0))])
+                                if face_cols is not None:
+                                    col = None
+                                    paint = None
+                                    for k, val in t.attrib.items():
+                                        lk = k.split('}')[-1]
+                                        if lk in ('paint_color', 'mmu_segmentation'):
+                                            paint = val
+                                            break
+                                    if paint:
+                                        st = _decode_paint_state(paint)
+                                        if st > 0:
+                                            col = _ext_color(st)
+                                    if col is None:
+                                        pid = t.get('pid') or obj_pid
+                                        p1 = t.get('p1')
+                                        if p1 is None and t.get('pid') is None:
+                                            p1 = obj_pidx
+                                        if pid in mats and p1 is not None:
+                                            try:
+                                                col = mats[pid][int(p1)]
+                                            except Exception:
+                                                col = None
+                                    face_cols.append(col if col is not None else base_col)
                             except Exception:
                                 pass
                         if vertices and faces:
@@ -5278,7 +5570,7 @@ def _resolve_3mf_plate_mesh(source, wanted_ids):
                             farr = np.array(faces, dtype=np.int32)
                             if not np.allclose(transform, np.eye(4)):
                                 varr = (np.hstack([varr, np.ones((len(varr), 1))]) @ transform.T)[:, :3]
-                            out.append((varr, farr))
+                            out.append((varr, farr, face_cols if face_cols is not None and len(face_cols) == len(farr) else None))
 
                 components_el = _find(obj, 'components')
                 if components_el is not None:
@@ -5293,7 +5585,7 @@ def _resolve_3mf_plate_mesh(source, wanted_ids):
                             resolved_name = _resolve_part_name(comp_path_raw, model_path)
                             if resolved_name:
                                 target_file = resolved_name
-                        out.extend(_resolve(target_file, comp_id, transform @ comp_tf, depth + 1))
+                        out.extend(_resolve(target_file, comp_id, transform @ comp_tf, depth + 1, ext_hint))
                 return out
 
             preferred_root = next((n for n in model_files if n.lower() == '3d/3dmodel.model'), None)
@@ -5327,14 +5619,72 @@ def _resolve_3mf_plate_mesh(source, wanted_ids):
                         resolved_name = _resolve_part_name(item_path_raw, model_path)
                         if resolved_name:
                             target_file = resolved_name
-                    all_parts.extend(_resolve(target_file, item_id, item_tf))
+                    all_parts.extend(_resolve(target_file, item_id, item_tf, 0, None))
                 if found_build:
                     break
 
+            if all_parts and max_faces:
+                total_faces = sum(len(f) for _v, f, _c in all_parts)
+                if total_faces > max_faces:
+                    reduced = []
+                    for v, f, c in all_parts:
+                        if isinstance(c, list):
+                            # couleurs par face issues du chemin XML : tableau uint8 (couleur par défaut si absente)
+                            _dflt = _thumb_base_rgb()
+                            c = np.array([(x if x is not None else _dflt) for x in c], dtype=np.uint8) if len(c) == len(f) else None
+                        target = max(500, int(max_faces * len(f) / total_faces))
+                        if len(f) > target and (c is None or isinstance(c, (tuple, np.ndarray))):
+                            try:
+                                import fast_simplification
+                                tree = None
+                                if isinstance(c, np.ndarray):
+                                    from scipy.spatial import cKDTree  # transfert des couleurs peintes vers le maillage réduit
+                                    tree = cKDTree(np.asarray(v, dtype=np.float64)[f].mean(axis=1))
+                                v2, f2 = fast_simplification.simplify(
+                                    np.asarray(v, dtype=np.float32), np.asarray(f, dtype=np.int32),
+                                    target_reduction=1.0 - target / float(len(f)))
+                                if len(f2) > 0:
+                                    v2 = np.asarray(v2, dtype=np.float64)
+                                    f2 = np.asarray(f2, dtype=np.int32)
+                                    if tree is not None:
+                                        _d, idx = tree.query(v2[f2].mean(axis=1))
+                                        c = c[idx]
+                                    v, f = v2, f2
+                            except Exception as e:
+                                app_logger.info(f"[3MF] Réduction du maillage impossible: {e}")
+                        reduced.append((v, f, c))
+                    all_parts = reduced
             if all_parts:
-                sub_meshes = [trimesh.Trimesh(vertices=v, faces=f, process=False) for v, f in all_parts]
+                sub_meshes = [trimesh.Trimesh(vertices=v, faces=f, process=False) for v, f, _c in all_parts]
+                colored = False
+                if want_colors:
+                    default_rgb = _thumb_base_rgb()
+                    distinct = set()
+                    for sm, (_v, _f, cols) in zip(sub_meshes, all_parts):
+                        arr = np.empty((len(sm.faces), 4), dtype=np.uint8)
+                        arr[:, :3] = default_rgb
+                        arr[:, 3] = 255
+                        if isinstance(cols, tuple):
+                            arr[:, :3] = cols
+                            distinct.add(tuple(int(x) for x in cols))
+                        elif isinstance(cols, np.ndarray):
+                            arr[:, :3] = cols
+                            for u in np.unique(cols, axis=0):
+                                distinct.add(tuple(int(x) for x in u))
+                        elif cols is not None:
+                            for i, c in enumerate(cols):
+                                if c is not None:
+                                    arr[i, :3] = c
+                                    distinct.add(tuple(int(x) for x in c))
+                        sm.visual = trimesh.visual.ColorVisuals(mesh=sm, face_colors=arr)
+                    colored = len(distinct) >= 1
                 mesh = _concatenate_filtering_outliers(sub_meshes) if len(sub_meshes) > 1 else sub_meshes[0]
                 if mesh is not None and not mesh.is_empty and len(mesh.vertices) > 0:
+                    if want_colors and colored:
+                        try:
+                            mesh.metadata['stellio_face_rgb'] = np.asarray(mesh.visual.face_colors)[:, :3].copy()
+                        except Exception:
+                            pass
                     return mesh
         return None
     except Exception as e:
@@ -5342,7 +5692,7 @@ def _resolve_3mf_plate_mesh(source, wanted_ids):
         return None
 
 
-def load_3mf_mesh(source, plate_index=None):
+def load_3mf_mesh(source, plate_index=None, want_colors=False, max_faces=None):
     is_bytes = isinstance(source, (bytes, bytearray))
     display_name = "archive (mémoire)" if is_bytes else os.path.basename(source)
 
@@ -5359,7 +5709,7 @@ def load_3mf_mesh(source, plate_index=None):
             f"rendu du plateau '{selected_key}' uniquement ({len(plate_object_ids)} objet(s))"
         )
 
-        resolved_mesh = _resolve_3mf_plate_mesh(source, plate_object_ids)
+        resolved_mesh = _resolve_3mf_plate_mesh(source, plate_object_ids, want_colors, max_faces)
         if resolved_mesh is not None:
             app_logger.info(f"[3MF] Plateau isolé via résolution XML directe ({len(resolved_mesh.vertices)} sommets)")
             return resolved_mesh
@@ -5369,7 +5719,7 @@ def load_3mf_mesh(source, plate_index=None):
         # Plateau unique : on reconstruit TOUTES les pièces de la section <build> (transformations,
         # composants et fichiers d'objets externes inclus). trimesh et l'extraction « à plat » ne suivent
         # pas toujours les objets stockés dans des .model séparés (Bambu / Orca) et n'en gardaient qu'un.
-        resolved_all = _resolve_3mf_plate_mesh(source, None)
+        resolved_all = _resolve_3mf_plate_mesh(source, None, want_colors, max_faces)
         if resolved_all is not None:
             app_logger.info(f"[3MF] Toutes les pièces assemblées via <build> ({len(resolved_all.vertices)} sommets)")
             return resolved_all
@@ -5487,7 +5837,7 @@ def load_3mf_mesh(source, plate_index=None):
     return trimesh.Trimesh()
 
 
-def _build_multiplate_overview_mesh(source, max_plates=12):
+def _build_multiplate_overview_mesh(source, max_plates=12, want_colors=False, max_faces=None):
     try:
         display_name = "archive (mémoire)" if isinstance(source, (bytes, bytearray)) else os.path.basename(source)
 
@@ -5500,7 +5850,8 @@ def _build_multiplate_overview_mesh(source, max_plates=12):
         resolved = []
         for key in plate_keys_sorted:
             obj_ids = plates[key]
-            mesh = _resolve_3mf_plate_mesh(source, obj_ids)
+            mesh = _resolve_3mf_plate_mesh(source, obj_ids, want_colors,
+                                           max(2000, int(max_faces / len(plate_keys_sorted))) if max_faces else None)
             if mesh is not None and not mesh.is_empty and len(mesh.vertices) > 0:
                 resolved.append((key, mesh))
             else:
@@ -5520,6 +5871,7 @@ def _build_multiplate_overview_mesh(source, max_plates=12):
         grid_cols = max(1, int(math.ceil(math.sqrt(len(resolved)))))
 
         placed_meshes = []
+        rgb_parts = []
         for i, (key, mesh) in enumerate(resolved):
             row, col = divmod(i, grid_cols)
             bbox_center = mesh.bounds.mean(axis=0)
@@ -5527,8 +5879,16 @@ def _build_multiplate_overview_mesh(source, max_plates=12):
             m.apply_translation(-bbox_center)
             m.apply_translation([col * cell_size, -row * cell_size, 0])
             placed_meshes.append(m)
+            _prgb = mesh.metadata.get('stellio_face_rgb') if want_colors and hasattr(mesh, 'metadata') else None
+            rgb_parts.append(_prgb if _prgb is not None and len(_prgb) == len(mesh.faces)
+                             else np.tile(np.array(_thumb_base_rgb(), dtype=np.uint8), (len(mesh.faces), 1)))
 
         overview = trimesh.util.concatenate(placed_meshes)
+        if want_colors and any(
+                (mm.metadata.get('stellio_face_rgb') is not None) for _k, mm in resolved if hasattr(mm, 'metadata')):
+            _all_rgb = np.vstack(rgb_parts)
+            if len(_all_rgb) == len(overview.faces):
+                overview.metadata['stellio_face_rgb'] = _all_rgb
         app_logger.info(
             f"[3MF] Vue d'ensemble multi-plateaux : {len(resolved)}/{len(plates)} "
             f"plateau(x) assemblés côte à côte pour {display_name}"
@@ -5538,10 +5898,14 @@ def _build_multiplate_overview_mesh(source, max_plates=12):
         app_logger.debug(f"[3MF] _build_multiplate_overview_mesh échoué: {e}")
         return None
 
+THUMB_BG_RGB = (0x2a, 0x2e, 0x38)   # fond commun à toutes les miniatures (celui des 3MF)
+THUMB_BG_HEX = '#2a2e38'
+
+
 def create_fallback_thumbnail(thumb_path, resolution=(768, 768)):
     try:
         logo_path = os.path.join(BASE_DIR, 'assets', 'logo-nom-stellio.png')
-        img = Image.new('RGBA', resolution, (26, 29, 35, 255))
+        img = Image.new('RGBA', resolution, THUMB_BG_RGB + (255,))
         draw = ImageDraw.Draw(img)
         center = (resolution[0] // 2, resolution[1] // 2)
         radius = min(resolution) // 3
@@ -5567,7 +5931,7 @@ def create_fallback_thumbnail(thumb_path, resolution=(768, 768)):
 
         draw.rectangle([0, 0, resolution[0]-1, resolution[1]-1],
                        outline=(60, 65, 75, 255), width=2)
-        img_rgb = Image.new('RGB', resolution, (26, 29, 35))
+        img_rgb = Image.new('RGB', resolution, THUMB_BG_RGB)
         if img.mode == 'RGBA':
             img_rgb.paste(img, mask=img.split()[3])
         img_rgb.save(thumb_path, quality=90, optimize=True)
@@ -5593,6 +5957,57 @@ def _draw_fallback_cube(draw, center):
         (cube_center[0], cube_center[1] + cube_size//2),
         (cube_center[0] - cube_size//2, cube_center[1])
     ], fill=(78, 161, 211, 180), outline=(100, 180, 230, 255))
+
+THUMB_DEFAULT_COLOR = '#4ea1d3'
+VIEWER_MAX_FACES = 700000  # au-delà, les maillages 3MF envoyés au viewer sont réduits (par pièce)
+_pyrender_unavailable = False  # passe à True si OpenGL échoue : on évite de retenter (et de journaliser) à chaque fichier
+
+
+def _thumb_base_rgb():
+    """Couleur (r, g, b) des miniatures pour les modèles sans couleur propre (STL, etc.), réglable dans les paramètres."""
+    try:
+        v = str((load_settings() or {}).get('thumb_color') or THUMB_DEFAULT_COLOR).strip()
+        if re.fullmatch(r'#[0-9a-fA-F]{6}', v):
+            return int(v[1:3], 16), int(v[3:5], 16), int(v[5:7], 16)
+    except Exception:
+        pass
+    return 0x4e, 0xa1, 0xd3
+
+
+def _extract_3mf_embedded_preview(model_path):
+    """Image d'aperçu embarquée par le slicer dans un 3MF (couleurs et filaments réels), ou None.
+
+    Les aperçus vides (3MF jamais découpé : image transparente ou unie) sont ignorés pour laisser
+    la place au rendu 3D. Le résultat est posé sur le fond sombre des miniatures."""
+    try:
+        with zipfile.ZipFile(model_path, 'r') as z:
+            names = {n.lower(): n for n in z.namelist()}
+            for cand in ('metadata/plate_1.png', 'metadata/top_1.png', 'metadata/plate_no_light_1.png', 'metadata/thumbnail.png'):
+                if cand not in names:
+                    continue
+                try:
+                    img = Image.open(io.BytesIO(z.read(names[cand])))
+                    img.load()
+                    img = img.convert('RGBA')
+                    alpha = img.getchannel('A')
+                    visible = alpha.point(lambda a: 255 if a > 16 else 0)
+                    if visible.getbbox() is None:
+                        continue
+                    if visible.histogram()[255] < img.width * img.height * 0.005:
+                        continue
+                    rgb_ext = img.convert('RGB').getextrema()
+                    if all(lo == hi for lo, hi in rgb_ext) and alpha.getextrema()[0] == 255:
+                        continue
+                    img.thumbnail((768, 768))
+                    bg = Image.new('RGBA', img.size, THUMB_BG_RGB + (255,))
+                    bg.alpha_composite(img)
+                    return bg.convert('RGB')
+                except Exception:
+                    continue
+    except Exception as e:
+        app_logger.info(f"[THUMB] Aperçu embarqué inutilisable pour {os.path.basename(model_path)}: {e}")
+    return None
+
 
 def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(768, 768), timeout_s=None):
     if timeout_s is None:
@@ -5625,6 +6040,7 @@ def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(768, 768), tim
 
 
 def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768)):
+    global _pyrender_unavailable, _persistent_renderer, _persistent_renderer_size
     try:
         is_smb = stl_path.startswith('//') or stl_path.startswith('\\\\')
         is_virtual = is_virtual_archive_path(stl_path)
@@ -5675,10 +6091,17 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
 
             if ext == '.3mf':
                 mesh = None
+                if get_3mf_plate_count(file_to_load) <= 1:
+                    _emb = _extract_3mf_embedded_preview(file_to_load)
+                    if _emb is not None:
+                        _emb.save(thumb_path, 'WEBP', quality=85)
+                        if tmp_path and os.path.exists(tmp_path):
+                            os.unlink(tmp_path)
+                        return True
                 if get_3mf_plate_count(file_to_load) > 1:
-                    mesh = _build_multiplate_overview_mesh(file_to_load)
+                    mesh = _build_multiplate_overview_mesh(file_to_load, want_colors=True, max_faces=36000)
                 if mesh is None:
-                    mesh = load_3mf_mesh(file_to_load)
+                    mesh = load_3mf_mesh(file_to_load, want_colors=True, max_faces=36000)
             else:
                 mesh = load_model_mesh(file_to_load, ext)
 
@@ -5695,7 +6118,8 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
 
             MAX_RENDER_FACES = 60000
             faces_before = len(mesh.faces)
-            if faces_before > MAX_RENDER_FACES:
+            _has_face_colors = (hasattr(mesh, 'metadata') and mesh.metadata.get('stellio_face_rgb') is not None)
+            if faces_before > MAX_RENDER_FACES and not _has_face_colors:  # la décimation globale ferait perdre les couleurs par face
                 try:
                     import fast_simplification
                     mesh = mesh.simplify_quadric_decimation(face_count=MAX_RENDER_FACES)
@@ -5728,19 +6152,35 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
             except Exception:
                 pass
 
+            _face_rgb = mesh.metadata.get('stellio_face_rgb') if hasattr(mesh, 'metadata') else None
+            if _face_rgb is not None and len(_face_rgb) != len(mesh.faces):
+                _face_rgb = None
+            if _face_rgb is not None:
+                try:
+                    _rgba = np.empty((len(mesh.faces), 4), dtype=np.uint8)
+                    _rgba[:, :3] = _face_rgb
+                    _rgba[:, 3] = 255
+                    mesh.visual = trimesh.visual.ColorVisuals(mesh=mesh, face_colors=_rgba)
+                except Exception:
+                    _face_rgb = None
+
+            if _pyrender_unavailable or _face_rgb is not None:
+                # maillage multicolore : rendu CPU (couleur par face fiable, identique sur toutes les machines)
+                return _generate_thumbnail_raster(mesh, thumb_path, resolution, face_rgb=_face_rgb)
             try:
                 import pyrender
                 with pyrender_lock:
                     scene = pyrender.Scene(
-                        bg_color=[0x1a / 255.0, 0x1d / 255.0, 0x23 / 255.0, 1.0],
+                        bg_color=[c / 255.0 for c in THUMB_BG_RGB] + [1.0],
                         ambient_light=[0x40 / 255.0 * 1.3, 0x40 / 255.0 * 1.3, 0x40 / 255.0 * 1.3]
                     )
                     material = pyrender.MetallicRoughnessMaterial(
-                        baseColorFactor=[0x4e / 255.0, 0xa1 / 255.0, 0xd3 / 255.0, 1.0],
+                        baseColorFactor=([1.0, 1.0, 1.0, 1.0] if _face_rgb is not None
+                                         else [c / 255.0 for c in _thumb_base_rgb()] + [1.0]),
                         metallicFactor=0.0,
                         roughnessFactor=0.35
                     )
-                    render_mesh = pyrender.Mesh.from_trimesh(mesh, material=material, smooth=True)
+                    render_mesh = pyrender.Mesh.from_trimesh(mesh, material=material, smooth=(_face_rgb is None))
                     scene.add(render_mesh)
 
                     max_dim = np.linalg.norm(mesh.extents)
@@ -5776,7 +6216,6 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
 
                     ss = 1
                     render_w, render_h = resolution[0] * ss, resolution[1] * ss
-                    global _persistent_renderer, _persistent_renderer_size
                     if _persistent_renderer is None or _persistent_renderer_size != (render_w, render_h):
                         if _persistent_renderer is not None:
                             try:
@@ -5798,11 +6237,19 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
 
             except (AttributeError, Exception) as render_err:
                 err_str = str(render_err)
+                if 'GLError' in err_str or 'glGen' in err_str or 'OpenGL' in err_str or 'OSMesa' in err_str \
+                        or 'Win32Platform' in err_str or 'osmesa' in err_str.lower():
+                    # pas de contexte OpenGL exploitable (pilote, session distante…) : rendu CPU direct pour la suite
+                    if not _pyrender_unavailable:
+                        app_logger.info("[THUMBS] OpenGL indisponible : rendu CPU (z-buffer) utilisé pour les miniatures")
+                    _pyrender_unavailable = True
+                    _persistent_renderer = None
+                    return _generate_thumbnail_raster(mesh, thumb_path, resolution, face_rgb=_face_rgb)
                 if 'OSMesa' in err_str or 'Win32Platform' in err_str or 'osmesa' in err_str.lower():
                     app_logger.info(f"[FALLBACK] PyRender GPU non dispo → rendu CPU rapide pour {os.path.basename(stl_path)}")
-                    return _generate_thumbnail_raster(mesh, thumb_path, resolution)
+                    return _generate_thumbnail_raster(mesh, thumb_path, resolution, face_rgb=_face_rgb)
                 app_logger.warning(f"[ERROR] Rendu pyrender {os.path.basename(stl_path)}: {render_err}")
-                return _generate_thumbnail_raster(mesh, thumb_path, resolution)
+                return _generate_thumbnail_raster(mesh, thumb_path, resolution, face_rgb=_face_rgb)
 
         except Exception as load_err:
             app_logger.warning(f"[ERROR] Chargement mesh {os.path.basename(stl_path)}: {load_err}")
@@ -5814,15 +6261,21 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
         app_logger.error(f"[ERROR] generate_thumbnail_pyrender {os.path.basename(stl_path)}: {e}")
         return False
 
-def _generate_thumbnail_raster(mesh, thumb_path, resolution=(768, 768)):
+def _generate_thumbnail_raster(mesh, thumb_path, resolution=(768, 768), face_rgb=None):
     try:
         vertices = mesh.vertices
         faces = mesh.faces
         if len(vertices) == 0 or len(faces) == 0:
             return False
+        if face_rgb is not None and len(face_rgb) != len(faces):
+            face_rgb = None
 
-        MAX_RASTER_FACES = 40000
-        if len(faces) > MAX_RASTER_FACES:
+        MAX_RASTER_FACES = 70000 if face_rgb is not None else 40000
+        if face_rgb is not None and len(faces) > MAX_RASTER_FACES:
+            stride = (len(faces) // MAX_RASTER_FACES) + 1
+            faces = faces[::stride]
+            face_rgb = face_rgb[::stride]
+        elif len(faces) > MAX_RASTER_FACES:
             try:
                 import fast_simplification
                 mesh = mesh.simplify_quadric_decimation(face_count=MAX_RASTER_FACES)
@@ -5836,7 +6289,7 @@ def _generate_thumbnail_raster(mesh, thumb_path, resolution=(768, 768)):
                 stride = (len(faces) // MAX_RASTER_FACES) + 1
                 faces = faces[::stride]
 
-        ss = 3
+        ss = 2
         w, h = resolution[0] * ss, resolution[1] * ss
 
         camera_dir = np.array([1.0, 1.0, 1.0])
@@ -5858,64 +6311,75 @@ def _generate_thumbnail_raster(mesh, thumb_path, resolution=(768, 768)):
         px_all = (cam_x * scale) + w / 2.0
         py_all = (h / 2.0) - (cam_y * scale)
 
-        v0 = vertices[faces[:, 0]]
-        v1 = vertices[faces[:, 1]]
-        v2 = vertices[faces[:, 2]]
-        face_normals = np.cross(v1 - v0, v2 - v0)
-        n_len = np.linalg.norm(face_normals, axis=1, keepdims=True)
-        n_len[n_len == 0] = 1.0
-        face_normals = face_normals / n_len
-
-        face_height = (v0[:, 1] + v1[:, 1] + v2[:, 1]) / 3.0
-
-        view_dot = face_normals @ forward
-        visible_mask = view_dot < 0
-        if visible_mask.any() and visible_mask.sum() < len(faces):
-            faces = faces[visible_mask]
-            face_normals = face_normals[visible_mask]
-            face_height = face_height[visible_mask]
-
-        if len(faces) == 0:
-            return False
-
+        # Rasterisation avec tampon de profondeur (z-buffer) et normales lissées interpolées :
+        # rendu proche du viewer, sans les artefacts de l'ancien tri des faces (textes, reliefs fins).
         AMBIENT = 0x40 / 255.0 * 1.3
         KEY_INTENSITY = 0.7
         SPECULAR_COLOR, SHININESS = (0x11 / 255.0), 120.0
-        base_color = np.array([0x4e, 0xa1, 0xd3], dtype=np.float64)
+        base_color = np.array(_thumb_base_rgb(), dtype=np.float64)
 
-        vertex_normals = mesh.vertex_normals
-        smooth_normals = (
-            vertex_normals[faces[:, 0]] + vertex_normals[faces[:, 1]] + vertex_normals[faces[:, 2]]
-        )
-        sn_len = np.linalg.norm(smooth_normals, axis=1, keepdims=True)
-        sn_len[sn_len == 0] = 1.0
-        smooth_normals = smooth_normals / sn_len
+        F = np.asarray(faces)
+        _vv = np.asarray(vertices, dtype=np.float64)
+        fnormals = np.cross(_vv[F[:, 1]] - _vv[F[:, 0]], _vv[F[:, 2]] - _vv[F[:, 0]])
+        _fl = np.linalg.norm(fnormals, axis=1, keepdims=True)
+        _fl[_fl == 0] = 1.0
+        fnormals = fnormals / _fl
+        tx = px_all[F].astype(np.float64)
+        ty = py_all[F].astype(np.float64)
+        tz = cam_z[F].astype(np.float64)
 
-        n_dot_light = np.clip(-smooth_normals @ forward, 0.0, 1.0)
-        shade = AMBIENT + KEY_INTENSITY * n_dot_light
+        zbuf = np.full((h, w), np.inf, dtype=np.float32)
+        fid = np.full((h, w), -1, dtype=np.int32)
 
-        specular_term = SPECULAR_COLOR * np.power(n_dot_light, SHININESS)
-        face_colors = np.clip(
-            base_color[None, :] * shade[:, None] + specular_term[:, None] * 255.0,
-            0, 255
-        ).astype(np.uint8)
+        for i in range(len(F)):
+            x0, x1, x2 = tx[i]
+            y0, y1, y2 = ty[i]
+            den = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+            if abs(den) < 1e-9:
+                continue
+            xmin = max(int(min(x0, x1, x2)), 0)
+            xmax = min(int(max(x0, x1, x2)) + 1, w - 1)
+            ymin = max(int(min(y0, y1, y2)), 0)
+            ymax = min(int(max(y0, y1, y2)) + 1, h - 1)
+            if xmin > xmax or ymin > ymax:
+                continue
+            X = np.arange(xmin, xmax + 1, dtype=np.float64)[None, :] + 0.5
+            Y = np.arange(ymin, ymax + 1, dtype=np.float64)[:, None] + 0.5
+            l0 = ((y1 - y2) * (X - x2) + (x2 - x1) * (Y - y2)) / den
+            l1 = ((y2 - y0) * (X - x2) + (x0 - x2) * (Y - y2)) / den
+            l2 = 1.0 - l0 - l1
+            inside = (l0 >= -1e-6) & (l1 >= -1e-6) & (l2 >= -1e-6)
+            if not inside.any():
+                continue
+            z = l0 * tz[i, 0] + l1 * tz[i, 1] + l2 * tz[i, 2]
+            zs = zbuf[ymin:ymax + 1, xmin:xmax + 1]
+            win = inside & (z < zs)
+            if not win.any():
+                continue
+            zs[win] = z[win]
+            fid[ymin:ymax + 1, xmin:xmax + 1][win] = i
 
-        avg_z = cam_z[faces].mean(axis=1)
-        order = np.argsort(-avg_z)
-
-        tri_px = px_all[faces]
-        tri_py = py_all[faces]
-
-        img = Image.new('RGB', (w, h), (26, 29, 35))
-        draw = ImageDraw.Draw(img)
-        for idx in order:
-            poly = [
-                (float(tri_px[idx, 0]), float(tri_py[idx, 0])),
-                (float(tri_px[idx, 1]), float(tri_py[idx, 1])),
-                (float(tri_px[idx, 2]), float(tri_py[idx, 2])),
-            ]
-            color = tuple(int(c) for c in face_colors[idx])
-            draw.polygon(poly, fill=color, outline=color)
+        img_arr = np.empty((h, w, 3), dtype=np.uint8)
+        img_arr[:, :] = THUMB_BG_RGB
+        covered = fid >= 0
+        if covered.any():
+            # normales de faces (ombrage « plat » comme le viewer, qui recalcule les normales d'un STL non indexé)
+            nrm = fnormals[fid[covered]]
+            facing = np.sign(-(nrm @ forward))
+            facing[facing == 0] = 1.0
+            nrm = nrm * facing[:, None]  # maillages aux normales inversées : on éclaire la face visible
+            light_dir = -forward + 0.55 * up - 0.45 * right  # lumière légèrement décalée : volumes lisibles
+            light_dir /= np.linalg.norm(light_dir)
+            n_dot_light = np.clip(nrm @ light_dir, 0.0, 1.0)
+            shade = AMBIENT + KEY_INTENSITY * n_dot_light
+            spec = SPECULAR_COLOR * np.power(n_dot_light, SHININESS)
+            if face_rgb is not None:
+                base_px = np.asarray(face_rgb, dtype=np.float64)[fid[covered]]
+            else:
+                base_px = base_color[None, :]
+            col = np.clip(base_px * shade[:, None] + spec[:, None] * 255.0, 0, 255)
+            img_arr[covered] = col.astype(np.uint8)
+        img = Image.fromarray(img_arr, 'RGB')
 
         if ss != 1:
             img = img.resize(resolution, Image.Resampling.LANCZOS)
@@ -5935,8 +6399,8 @@ def _generate_thumbnail_matplotlib(mesh, thumb_path, resolution=(768, 768)):
             from mpl_toolkits.mplot3d.art3d import Poly3DCollection
             import numpy as np
 
-            fig = plt.figure(figsize=(resolution[0]/100, resolution[1]/100), dpi=100, facecolor='#1a1d23')
-            ax = fig.add_subplot(111, projection='3d', facecolor='#1a1d23')
+            fig = plt.figure(figsize=(resolution[0]/100, resolution[1]/100), dpi=100, facecolor=THUMB_BG_HEX)
+            ax = fig.add_subplot(111, projection='3d', facecolor=THUMB_BG_HEX)
 
             vertices = mesh.vertices
             faces = mesh.faces
@@ -5955,7 +6419,7 @@ def _generate_thumbnail_matplotlib(mesh, thumb_path, resolution=(768, 768)):
             except Exception:
                 face_normals = None
 
-            base_color = np.array([0.30, 0.63, 0.83])
+            base_color = np.array(_thumb_base_rgb(), dtype=np.float64) / 255.0
             if face_normals is not None and len(face_normals) == len(faces):
                 light_dir = np.array([0.4, 0.6, 0.7])
                 light_dir = light_dir / np.linalg.norm(light_dir)
@@ -5983,7 +6447,7 @@ def _generate_thumbnail_matplotlib(mesh, thumb_path, resolution=(768, 768)):
             ax.set_axis_off()
             ax.grid(False)
 
-            plt.savefig(thumb_path, bbox_inches='tight', pad_inches=0, facecolor='#1a1d23', dpi=100)
+            plt.savefig(thumb_path, bbox_inches='tight', pad_inches=0, facecolor=THUMB_BG_HEX, dpi=100)
             plt.close(fig)
             return True
         except Exception as e:
@@ -6032,9 +6496,197 @@ def mesh_really_needs_repair(mesh):
     return open_edges > 0
 
 
-def analyze_3d_file(file_path):
+# --- Analyse des fichiers 3D conservée en base (dimensions, poids, temps, volume…) ---
+# Le résultat est valable tant que le fichier ne change pas (date + taille) : il est servi instantanément,
+# et un travail de fond l'établit pour toute la bibliothèque sans gêner l'utilisateur.
+_analysis_wake = threading.Event()
+_analysis_progress = {'total': 0, 'done': 0, 'running': False}
+ANALYSIS_BG_MAX_BYTES = 60 * 1024 * 1024   # au-delà, analysé seulement à la demande (puis conservé)
+
+
+def _analysis_hash(path):
+    return hashlib.md5(path.replace('\\', '/').encode()).hexdigest()
+
+
+def _analysis_stat(path):
     try:
-        mesh = load_model_mesh(file_path)
+        st = os.stat(path)
+        return st.st_mtime, st.st_size
+    except OSError:
+        return None
+
+
+def analysis_db_get(path):
+    """Renvoie (metadata, failed) si une analyse à jour existe ; sinon (None, False)."""
+    stat = _analysis_stat(path)
+    if stat is None:
+        return None, False
+    try:
+        conn = get_db()
+        try:
+            row = conn.execute("SELECT mtime, size, data, failed FROM file_analysis WHERE path_hash = ?",
+                               (_analysis_hash(path),)).fetchone()
+        finally:
+            conn.close()
+        if not row or abs((row['mtime'] or 0) - stat[0]) > 0.001 or int(row['size'] or 0) != stat[1]:
+            return None, False
+        if row['failed']:
+            return None, True
+        return json.loads(row['data']), False
+    except Exception:
+        return None, False
+
+
+def analysis_db_put(path, metadata):
+    stat = _analysis_stat(path)
+    if stat is None:
+        return
+    try:
+        conn = get_db()
+        try:
+            conn.execute(
+                "INSERT OR REPLACE INTO file_analysis (path_hash, path, mtime, size, data, failed, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (_analysis_hash(path), path.replace('\\', '/'), stat[0], stat[1],
+                 json.dumps(metadata) if metadata else '', 0 if metadata else 1, time.time()))
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        app_logger.info(f"[ANALYSE] Enregistrement impossible: {e}")
+
+
+def analyze_3d_file_stored(path):
+    """Analyse (rapide) d'un fichier avec conservation en base ; None si l'analyse est impossible."""
+    meta, failed = analysis_db_get(path)
+    if meta is not None:
+        return meta
+    if failed:
+        return None
+    meta = analyze_3d_file(path, fast=True)
+    analysis_db_put(path, meta)
+    return meta
+
+
+def analysis_background_worker():
+    """Analyse en continu les fichiers de la bibliothèque encore inconnus, un à la fois, à faible priorité,
+    en s'arrêtant dès que l'utilisateur se sert de l'interface ou que des miniatures sont en cours de rendu."""
+    _lower_thread_priority()
+    time.sleep(45)
+    app_logger.info("[ANALYSE] Analyse de fond de la bibliothèque démarrée")
+    while True:
+        done = 0
+        total = 0
+        known = 0
+        _analysis_wake.clear()
+        try:
+            _analysis_progress['running'] = True
+            conn = get_db()
+            try:
+                sources = conn.execute("SELECT * FROM sources").fetchall()
+            finally:
+                conn.close()
+            exts = tuple(e for e in SUPPORTED_EXTENSIONS_TUPLE if e not in ('.step', '.stp'))
+            for source in sources:
+                if source['type'] != 'folder' or not source['path'] or not os.path.isdir(source['path']):
+                    continue
+                if str(source['path']).startswith(('//', '\\\\')):
+                    continue
+                for root, dirs, files in os.walk(source['path']):
+                    dirs[:] = [d for d in dirs if d != PLATE_SPLIT_DIRNAME]
+                    for fname in sorted(files, key=str.lower):
+                        if not fname.lower().endswith(exts):
+                            continue
+                        fpath = os.path.join(root, fname).replace('\\', '/')
+                        stat = _analysis_stat(fpath)
+                        if stat is None or stat[1] > ANALYSIS_BG_MAX_BYTES:
+                            continue
+                        total += 1
+                        meta, failed = analysis_db_get(fpath)
+                        if meta is not None or failed:
+                            known += 1
+                            continue
+                        # pas de calcul tant que l'utilisateur agit ou que des miniatures se génèrent
+                        while _user_is_active() or not thumb_generation_queue.empty():
+                            time.sleep(2)
+                        t0 = time.time()
+                        analyze_3d_file_stored(fpath)
+                        done += 1
+                        known += 1
+                        _analysis_progress.update({'total': total, 'done': known})
+                        # temps de repos au moins égal au temps de calcul : la machine reste disponible
+                        time.sleep(max(0.4, min(10.0, time.time() - t0)))
+            _analysis_progress.update({'total': total, 'done': known})
+            if done:
+                app_logger.info(f"[ANALYSE] {done} fichier(s) analysé(s) en arrière-plan ({known}/{total} au total)")
+        except Exception as e:
+            app_logger.info(f"[ANALYSE] Erreur analyse de fond: {e}")
+        _analysis_progress['running'] = False
+        # nouvelle passe sur demande (actualisation, nouveau fichier), sinon toutes les 10 minutes
+        _analysis_wake.wait(timeout=600 if not done else 60)
+        time.sleep(20)   # regroupe les réveils rapprochés (plusieurs miniatures terminées à la suite)
+
+
+# Version du rendu des miniatures : relève-la quand le rendu change pour que les anciennes soient refaites seules.
+THUMB_RENDER_VERSION = 3
+
+
+def thumb_render_migration_worker():
+    """Au premier lancement après un changement de rendu, replanifie (basse priorité) les miniatures 3MF
+    dessinées par Stellio ; celles issues de l'aperçu intégré du slicer ne changent pas."""
+    time.sleep(60)
+    try:
+        settings = load_settings() or {}
+        if int(settings.get('thumb_render_version') or 0) >= THUMB_RENDER_VERSION:
+            return
+        conn = get_db()
+        try:
+            sources = conn.execute("SELECT * FROM sources").fetchall()
+        finally:
+            conn.close()
+        queued = 0
+        for source in sources:
+            if source['type'] != 'folder' or not source['path'] or not os.path.isdir(source['path']):
+                continue
+            if str(source['path']).startswith(('//', '\\\\')):
+                continue
+            for root, dirs, files in os.walk(source['path']):
+                dirs[:] = [d for d in dirs if d != PLATE_SPLIT_DIRNAME]
+                for fname in files:
+                    if not fname.lower().endswith('.3mf'):
+                        continue
+                    fpath = os.path.join(root, fname).replace('\\', '/')
+                    try:
+                        if get_3mf_plate_count(fpath) <= 1 and _extract_3mf_embedded_preview(fpath) is not None:
+                            continue
+                    except Exception:
+                        pass
+                    thumb_path = os.path.join(THUMBNAILS_DIR, hashlib.md5(fpath.encode()).hexdigest() + '.webp')
+                    if os.path.exists(thumb_path):
+                        try:
+                            os.remove(thumb_path)
+                        except OSError:
+                            continue
+                    ignored_files_cache.pop(fpath, None)
+                    _release_thumb_inflight(fpath)
+                    if _queue_thumb_task(fpath, thumb_path, priority='low'):
+                        queued += 1
+                    time.sleep(0.05)
+        settings = load_settings() or {}
+        settings['thumb_render_version'] = THUMB_RENDER_VERSION
+        save_settings(settings)
+        app_logger.info(f"[THUMBS] Nouveau rendu des miniatures : {queued} fichier(s) 3MF replanifié(s)")
+    except Exception as e:
+        app_logger.info(f"[THUMBS] Migration du rendu impossible: {e}")
+
+
+def analyze_3d_file(file_path, fast=False):
+    try:
+        if file_path.lower().endswith('.3mf'):
+            # même lecteur que le viewer : objets stockés dans des fichiers séparés (Bambu, Creality…), gros fichiers, plateaux
+            mesh = load_3mf_mesh(file_path)
+        else:
+            mesh = load_model_mesh(file_path)
         if isinstance(mesh, trimesh.Scene):
             geoms = [m for m in mesh.geometry.values() if hasattr(m, 'vertices') and len(m.vertices) > 0]
             if not geoms:
@@ -6067,7 +6719,8 @@ def analyze_3d_file(file_path):
 
         already_handled = file_path.replace('\\', '/') in repair_ignored_cache
 
-        mesh_is_sane = not mesh_really_needs_repair(mesh)
+        # fast=True (fenêtre de détails) : on saute le contrôle d'intégrité du maillage, qui demande plusieurs secondes
+        mesh_is_sane = True if fast else not mesh_really_needs_repair(mesh)
 
         return {
             'dimensions': {'x': round(dimensions[0], 1), 'y': round(dimensions[1], 1), 'z': round(dimensions[2], 1)},
@@ -6136,7 +6789,23 @@ def api_analyze_file():
         return jsonify({"error": "Ce fichier n'appartient à aucune source configurée"}), 403
 
     normalized_path = file_path.replace('\\', '/')
-    cache_key = f"analysis_{hashlib.md5(normalized_path.encode()).hexdigest()}"
+    fast = bool(data.get('fast'))
+    if fast:
+        stored, failed_before = analysis_db_get(file_path)
+        if stored is not None:
+            return jsonify({"success": True, "metadata": stored, "cached": True})
+        if failed_before:
+            return jsonify({"error": "Impossible d'analyser le fichier"}), 500
+        stored = analyze_3d_file_stored(file_path)
+        if stored is None:
+            return jsonify({"error": "Impossible d'analyser le fichier"}), 500
+        return jsonify({"success": True, "metadata": stored, "cached": False})
+    full_key = f"analysis_{hashlib.md5(normalized_path.encode()).hexdigest()}"
+    cache_key = ("fast_" + full_key) if fast else full_key
+    try:
+        file_mtime = os.path.getmtime(file_path)
+    except OSError:
+        file_mtime = 0
 
     if os.path.exists(CACHE_FILE):
         try:
@@ -6148,12 +6817,16 @@ def api_analyze_file():
                 if cache[cache_key] == "FAILED":
                     if age < 600:
                         return jsonify({"error": "Impossible d'analyser le fichier"}), 500
-                elif age < 3600:
+                elif age < 3600 or (cache[ts_key] > file_mtime and age < 30 * 86400):
+                    # fichier inchangé depuis l'analyse : le résultat reste valable
                     return jsonify({"success": True, "metadata": cache[cache_key], "cached": True})
+            if fast and full_key in cache and f"{full_key}_ts" in cache and isinstance(cache[full_key], dict) \
+                    and cache[f"{full_key}_ts"] > file_mtime:
+                return jsonify({"success": True, "metadata": cache[full_key], "cached": True})
         except:
             pass
 
-    metadata = analyze_3d_file(file_path)
+    metadata = analyze_3d_file(file_path, fast=fast)
     if not metadata:
         try:
             with cache_file_lock:
@@ -7664,6 +8337,69 @@ def api_delete_account(platform):
     return jsonify({"message": "Compte supprimé"}), 200
 
 
+VIEWER_CACHE_VERSION = 3
+VIEWER_CACHE_MAX_BYTES = 1024 * 1024 * 1024
+
+
+def _viewer_cache_file(file_path, plate_index):
+    """Chemin du maillage 3MF déjà préparé pour le viewer (couleurs + réduction), ou None si indisponible."""
+    try:
+        st = os.stat(file_path)
+        color = '%02x%02x%02x' % _thumb_base_rgb()
+        key = f"{file_path}|{st.st_mtime_ns}|{st.st_size}|{plate_index or 0}|{color}|{VIEWER_MAX_FACES}|{VIEWER_CACHE_VERSION}"
+        d = os.path.join(DATA_DIR, 'viewer_mesh_cache')
+        os.makedirs(d, exist_ok=True)
+        return os.path.join(d, hashlib.md5(key.encode('utf-8')).hexdigest() + '.stl')
+    except Exception:
+        return None
+
+
+def _viewer_cache_store(path, data):
+    try:
+        tmp = path + '.tmp'
+        with open(tmp, 'wb') as f:
+            f.write(data)
+        os.replace(tmp, path)
+        d = os.path.dirname(path)
+        entries = []
+        total = 0
+        for n in os.listdir(d):
+            fp = os.path.join(d, n)
+            try:
+                st = os.stat(fp)
+            except OSError:
+                continue
+            entries.append((st.st_mtime, st.st_size, fp))
+            total += st.st_size
+        entries.sort()
+        while total > VIEWER_CACHE_MAX_BYTES and len(entries) > 1:
+            _mt, sz, fp = entries.pop(0)
+            try:
+                os.remove(fp)
+                total -= sz
+            except OSError:
+                pass
+    except Exception as e:
+        app_logger.debug(f"[Viewer] Cache du maillage non écrit: {e}")
+
+
+# Une seule construction lourde de maillage 3MF à la fois : évite que des requêtes abandonnées
+# (viewer fermé / autre fichier cliqué) ne s'empilent et saturent CPU et mémoire.
+_viewer_build_sem = threading.Semaphore(1)
+
+
+def _viewer_build_3mf(source, plate_index):
+    t0 = time.time()
+    with _viewer_build_sem:
+        waited = time.time() - t0
+        try:
+            return load_3mf_mesh(source, plate_index=plate_index, want_colors=True, max_faces=VIEWER_MAX_FACES)
+        finally:
+            import gc as _gc
+            _gc.collect()
+            app_logger.info(f"[Viewer] 3MF construit en {time.time() - t0 - waited:.1f}s (attente {waited:.1f}s)")
+
+
 @app.route('/api/file/mesh', methods=['GET'])
 @login_required
 def api_file_mesh():
@@ -7701,7 +8437,7 @@ def api_file_mesh():
 
             elif ext in SUPPORTED_EXTENSIONS:
                 if ext == '.3mf':
-                    mesh = load_3mf_mesh(raw_bytes, plate_index=plate_index)
+                    mesh = _viewer_build_3mf(raw_bytes, plate_index)
                 else:
                     mesh = load_model_mesh(raw_bytes, ext)
 
@@ -7715,6 +8451,10 @@ def api_file_mesh():
                 if mesh is None or mesh.is_empty or len(mesh.vertices) == 0:
                     return jsonify({"error": "Mesh vide ou invalide"}), 422
 
+                _rgb = getattr(mesh, 'metadata', {}).get('stellio_face_rgb') if hasattr(mesh, 'metadata') else None
+                if _rgb is not None and len(_rgb) == len(mesh.faces):
+                    return send_file(_export_colored_stl(mesh, _rgb, _thumb_base_rgb()), mimetype='application/octet-stream',
+                                     download_name=os.path.splitext(os.path.basename(internal_path))[0] + '.stl')
                 stl_buffer = io.BytesIO()
                 mesh.export(stl_buffer, file_type='stl')
                 stl_buffer.seek(0)
@@ -7736,13 +8476,24 @@ def api_file_mesh():
 
     ext = os.path.splitext(file_path)[1].lower()
 
+    _viewer_cache_path = None
+    if ext == '.3mf':
+        _viewer_cache_path = _viewer_cache_file(file_path, plate_index)
+        if _viewer_cache_path and os.path.isfile(_viewer_cache_path):
+            try:
+                os.utime(_viewer_cache_path, None)
+            except OSError:
+                pass
+            return send_file(_viewer_cache_path, mimetype='application/octet-stream',
+                             download_name=os.path.splitext(os.path.basename(file_path))[0] + '.stl')
+
     try:
         if ext == '.stl':
             return send_file(file_path, mimetype='application/octet-stream')
 
         elif ext in SUPPORTED_EXTENSIONS:
             if ext == '.3mf':
-                mesh = load_3mf_mesh(file_path, plate_index=plate_index)
+                mesh = _viewer_build_3mf(file_path, plate_index)
             else:
                 mesh = load_model_mesh(file_path, ext)
 
@@ -7756,9 +8507,16 @@ def api_file_mesh():
             if mesh is None or mesh.is_empty or len(mesh.vertices) == 0:
                 return jsonify({"error": "Mesh vide ou invalide"}), 422
 
-            stl_buffer = io.BytesIO()
-            mesh.export(stl_buffer, file_type='stl')
-            stl_buffer.seek(0)
+            _rgb = getattr(mesh, 'metadata', {}).get('stellio_face_rgb') if hasattr(mesh, 'metadata') else None
+            if _rgb is not None and len(_rgb) == len(mesh.faces):
+                stl_buffer = _export_colored_stl(mesh, _rgb, _thumb_base_rgb())
+            else:
+                stl_buffer = io.BytesIO()
+                mesh.export(stl_buffer, file_type='stl')
+                stl_buffer.seek(0)
+            if _viewer_cache_path:
+                _viewer_cache_store(_viewer_cache_path, stl_buffer.getvalue())
+                stl_buffer.seek(0)
             return send_file(stl_buffer, mimetype='application/octet-stream',
                              download_name=os.path.splitext(os.path.basename(file_path))[0] + '.stl')
 
@@ -8036,19 +8794,9 @@ def _write_thumb_from_3mf_preview(model_path):
     try:
         if _has_thumb_on_disk(model_path):
             return True
-        with zipfile.ZipFile(model_path, 'r') as z:
-            names = {n.lower(): n for n in z.namelist()}
-            data = None
-            for cand in ('metadata/plate_1.png', 'metadata/top_1.png', 'metadata/plate_no_light_1.png', 'metadata/thumbnail.png'):
-                if cand in names:
-                    data = z.read(names[cand])
-                    break
-        if not data:
+        img = _extract_3mf_embedded_preview(model_path)
+        if img is None:
             return False
-        img = Image.open(io.BytesIO(data))
-        img.load()
-        img = img.convert('RGBA')
-        img.thumbnail((768, 768))
         os.makedirs(THUMBNAILS_DIR, exist_ok=True)
         thumb_path = _thumb_base_path(model_path) + '.webp'
         tmp_path = thumb_path + '.tmp'
@@ -8539,9 +9287,18 @@ def api_regen_thumb_batch():
         return jsonify({"error": "Liste de chemins requise"}), 400
 
     queued = 0
+    only_color = bool(data.get('only_color_dependent'))
     for file_path in paths:
         if not file_path or not isinstance(file_path, str):
             continue
+
+        if only_color and file_path.lower().endswith('.3mf') and not is_virtual_archive_path(file_path) \
+                and not file_path.startswith(('//', '\\\\')):
+            try:
+                if get_3mf_plate_count(file_path) <= 1 and _extract_3mf_embedded_preview(file_path) is not None:
+                    continue  # aperçu du slicer : indépendant de la couleur choisie
+            except Exception:
+                pass
 
         normalized_path = file_path.replace('\\', '/')
         thumb_filename = hashlib.md5(normalized_path.encode()).hexdigest()
@@ -8560,6 +9317,14 @@ def api_regen_thumb_batch():
 
     app_logger.info(f"[REGEN-BATCH] {queued} miniature(s) replanifiée(s) pour régénération groupée")
     return jsonify({"success": True, "queued": queued})
+
+@app.route('/api/analysis/run', methods=['POST'])
+@login_required
+def api_analysis_run():
+    """Relance l'analyse de fond (fichiers ajoutés ou jamais analysés) et renvoie l'avancement connu."""
+    _analysis_wake.set()
+    return jsonify({"success": True, **_analysis_progress})
+
 
 @app.route('/api/files/analyze-now', methods=['POST'])
 @login_required
@@ -12320,6 +13085,30 @@ def process_slice_estimate_queue():
                 # Le tranchage silencieux n'est garanti que pour STL/3MF/OBJ : STEP, PLY et AMF passent par un STL temporaire
                 stl_for_slicer = _prepare_model_for_slicer(stl_for_slicer, '', '', force=True) or stl_for_slicer
 
+                # Taille demandée ≠ 100 % : le slicer tranche une copie mise à l'échelle (STL temporaire)
+                scale_pct = _clean_scale_pct(task.get('scale'))
+                if scale_pct != 100:
+                    src_for_scale = file_path if not is_virtual_archive_path(file_path) else stl_for_slicer
+                    if str(src_for_scale).lower().endswith('.3mf'):
+                        scaled = load_3mf_mesh(src_for_scale)
+                    else:
+                        scaled = load_model_mesh(src_for_scale)
+                    if isinstance(scaled, trimesh.Scene):
+                        scaled = trimesh.util.concatenate([g for g in scaled.geometry.values() if hasattr(g, 'faces')])
+                    scaled = scaled.copy()
+                    scaled.apply_scale(scale_pct / 100.0)
+                    scaled.apply_translation(-scaled.bounds.mean(axis=0) + [0, 0, 0])
+                    sfd, scaled_path = tempfile.mkstemp(suffix='.stl')
+                    os.close(sfd)
+                    scaled.export(scaled_path)
+                    if tmp_stl and os.path.exists(tmp_stl) and tmp_stl != scaled_path:
+                        try:
+                            os.remove(tmp_stl)
+                        except Exception:
+                            pass
+                    tmp_stl = scaled_path
+                    stl_for_slicer = scaled_path
+
                 slicers = get_cached_installed_slicers()
                 if not slicers or not any(s.get('preslice_supported', True) for s in slicers):
                     with slice_estimate_lock:
@@ -12399,11 +13188,20 @@ def find_slicer_by_name(slicer_name):
         return cura['path'] if cura else None
     return locate_slicer_by_id(slicer_id)
 
-def _slice_estimate_key(file_path, profile_id=None, printer_id=None, material_type=None):
+def _clean_scale_pct(value):
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return 100
+    return int(round(min(1000.0, max(10.0, v))))
+
+
+def _slice_estimate_key(file_path, profile_id=None, printer_id=None, material_type=None, scale=100):
     profile_id = (str(profile_id).strip() if profile_id else '')
-    if not profile_id:
+    scale = _clean_scale_pct(scale)
+    if not profile_id and scale == 100:
         return file_path
-    return f"{file_path}||{profile_id}|{printer_id or ''}|{(material_type or '').strip().lower()}"
+    return f"{file_path}||{profile_id}|{printer_id or ''}|{(material_type or '').strip().lower()}" + (f"|s{scale}" if scale != 100 else '')
 
 
 @app.route('/api/slicer/pre-slice-estimate', methods=['POST'])
@@ -12416,7 +13214,8 @@ def api_request_slice_estimate():
     profile_id = (str(data.get('profile_id') or '')).strip() or None
     printer_id = data.get('printer_id') or None
     material_type = (data.get('material_type') or '').strip() or None
-    key = _slice_estimate_key(file_path, profile_id, printer_id, material_type)
+    scale_pct = _clean_scale_pct(data.get('scale'))
+    key = _slice_estimate_key(file_path, profile_id, printer_id, material_type, scale_pct)
     _sync_slicer_profiles(session['user_id'])   
 
     with slice_estimate_lock:
@@ -12435,7 +13234,7 @@ def api_request_slice_estimate():
         if key not in slice_estimate_results or slice_estimate_results[key].get('status') == 'error':
             _slice_cache_set(key, {'status': 'pending'})
             slice_estimate_queue.put({'path': file_path, 'key': key, 'profile_id': profile_id,
-                                      'printer_id': printer_id, 'material_type': material_type})
+                                      'printer_id': printer_id, 'material_type': material_type, 'scale': scale_pct})
         result = slice_estimate_results[key]
 
     return jsonify(result), 202
@@ -12454,7 +13253,7 @@ def api_get_slice_estimate():
     if not file_path:
         return jsonify({"error": "Chemin requis"}), 400
     key = _slice_estimate_key(file_path, request.args.get('profile_id'), request.args.get('printer_id'),
-                              request.args.get('material_type'))
+                              request.args.get('material_type'), request.args.get('scale'))
     with slice_estimate_lock:
         result = slice_estimate_results.get(key, {'status': 'unknown'})
     return jsonify(result), 200
@@ -15115,6 +15914,8 @@ def _toast_worker():
 
 
 def _send_native_notification(title, message):
+    """Met la notification Windows en file d'attente (thread dédié) : ne bloque JAMAIS la requête HTTP.
+    La file est bornée : au-delà de 4 en attente, les suivantes restent visibles dans le centre de notifications de Stellio."""
     global _toast_worker_started
     if os.name != 'nt':
         return
@@ -17691,6 +18492,48 @@ def build_quote_pdf_bytes(data):
     flow += [client_box, Spacer(1, 18)]
 
     desc_cell = [Paragraph(p_text(s('item_desc', 200)), st_body), Paragraph(p_text(s('item_details', 200)), st_sub)]
+
+    # Miniatures des objets (optionnelles) : images JPEG/PNG envoyées par l'interface en data-URL
+    thumbs = []
+    raw_thumbs = data.get('thumbnails')
+    if isinstance(raw_thumbs, list):
+        import base64 as _b64
+        for item in raw_thumbs[:12]:
+            try:
+                head, _, b64 = str(item).partition(',')
+                if not head.startswith('data:image/') or len(b64) > 700000:
+                    continue
+                im = Image.open(io.BytesIO(_b64.b64decode(b64)))
+                im.load()
+                im = im.convert('RGB')
+                im.thumbnail((320, 320))
+                tb = io.BytesIO()
+                im.save(tb, 'JPEG', quality=88)
+                tb.seek(0)
+                thumbs.append((tb, im.size))
+            except Exception as thumb_err:
+                app_logger.info(f"[QUOTE] Miniature ignorée : {thumb_err}")
+    if thumbs:
+        cell_w = width * 0.48 - 8
+        per_row = 3 if len(thumbs) > 1 else 1
+        box = min(24 * mm, (cell_w - 4 * mm * (per_row - 1)) / per_row) if per_row > 1 else 34 * mm
+        rows, cur_row = [], []
+        for tb, (iw, ih) in thumbs:
+            sc = min(box / iw, box / ih)
+            cur_row.append(RLImage(tb, width=iw * sc, height=ih * sc))
+            if len(cur_row) == per_row:
+                rows.append(cur_row)
+                cur_row = []
+        if cur_row:
+            rows.append(cur_row + [''] * (per_row - len(cur_row)))
+        thumb_tbl = Table(rows, colWidths=[box + 4 * mm] * per_row)
+        thumb_tbl.hAlign = 'LEFT'
+        thumb_tbl.setStyle(TableStyle([
+            ('LEFTPADDING', (0, 0), (-1, -1), 0), ('RIGHTPADDING', (0, 0), (-1, -1), 4 * mm),
+            ('TOPPADDING', (0, 0), (-1, -1), 4), ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        desc_cell += [Spacer(1, 4), thumb_tbl]
     items = Table([
         [Paragraph(p_text(s('description_label', 40)).upper(), st_th), Paragraph(p_text(s('qty_label', 20)).upper(), st_th_r),
          Paragraph(p_text(s('unit_label', 40)).upper(), st_th_r), Paragraph(p_text(s('line_total_label', 40)).upper(), st_th_r)],
@@ -18009,6 +18852,7 @@ def api_get_settings():
         settings.setdefault('low_stock_threshold_percent', int(LOW_STOCK_RATIO * 100))
         settings.setdefault('low_stock_threshold_g', LOW_STOCK_FLOOR_G)
         settings.setdefault('restock_threshold_g', RESTOCK_DEFAULT_G)
+        settings.setdefault('thumb_color', THUMB_DEFAULT_COLOR)
         settings['launch_at_startup_supported'] = True
         settings['launch_at_startup'] = is_startup_enabled()
         settings['launch_minimized'] = is_startup_minimized() if settings['launch_at_startup'] else bool(settings.get('launch_minimized', False))
@@ -18060,6 +18904,12 @@ def api_save_settings():
                 if _mv and not AI_MODEL_NAME_RE.match(_mv):
                     return jsonify({"error": "Nom de modèle invalide", "code": "invalid_model"}), 400
                 data[_mk] = _mv
+
+        if 'thumb_color' in data:
+            _tc = str(data.get('thumb_color') or '').strip()
+            if not re.fullmatch(r'#[0-9a-fA-F]{6}', _tc):
+                return jsonify({"error": "Couleur de miniature invalide", "code": "invalid_thumb_color"}), 400
+            data['thumb_color'] = _tc.lower()
 
         for _lk, _lmax in (('low_stock_threshold_percent', 100), ('low_stock_threshold_g', 5000), ('restock_threshold_g', 20000)):
             if _lk in data:
@@ -18132,7 +18982,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.8.1"
+CURRENT_VERSION = "0.8.2"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 

@@ -252,6 +252,10 @@ pct exec <CTID> -- journalctl -u stellio -f       # ログをリアルタイム�
 
 メニューなしモード：すべてのオプションは環境変数で指定できます。例：`var_mode=default var_cpu=4 var_ram=4096 var_disk=16 var_ip=192.168.1.50/24 var_gw=192.168.1.1`（全一覧はスクリプト冒頭）。
 
+💾 **ストレージの選択**：最初のメニューで「デフォルト設定＋ストレージ選択」を選ぶ（または `var_choose_storage=1`）と、コンテナのディスク（`var_storage`、例：`local-zfs`）とテンプレート（`var_template_storage`、例：`local`）の保存先を選べます。スクリプトはストレージの存在と空き容量を確認します。
+
+🌍 **言語**：スクリプトの文言は Proxmox の言語に従います（fr, en, de, es, pt, it, zh, ja）。`var_lang=ja` で強制できます（既定は英語）。
+
 ### 🧰 サーバー版（Raspberry Pi / Linux）専用
 
 > Windows 版には影響しません。これらの機能は Raspberry Pi、VM、LXC、Docker、Linux でのみ表示されます。

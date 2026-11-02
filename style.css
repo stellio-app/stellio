@@ -2806,6 +2806,12 @@ body {
     padding-left: 12px;
 }
 
+/* Champ précédé d'une icône (ex. métadonnées : lien, auteur, licence) : on garde la place de l'icône */
+.modal-body .input-group > i + input,
+.modal-body .input-group > i + select {
+    padding-left: 40px;
+}
+
 .modal-footer {
     display: flex;
     justify-content: flex-end;
@@ -7448,7 +7454,7 @@ kbd {
 .tour-overlay {
     position: fixed;
     inset: 0;
-    z-index: 500;
+    z-index: 1500;
     pointer-events: none;
 }
 
@@ -7458,12 +7464,12 @@ kbd {
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.65);
     transition: top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease;
     pointer-events: none;
-    z-index: 501;
+    z-index: 1501;
 }
 
 .tour-tooltip {
     position: fixed;
-    z-index: 502;
+    z-index: 1502;
     width: 300px;
     max-width: calc(100vw - 32px);
     background: var(--bg-secondary);
@@ -8682,3 +8688,39 @@ body, .app-screen, .auth-screen {
 /* Case « À commander » dans le widget de stock faible */
 .stock-order-check { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary); cursor:pointer; white-space:nowrap; flex-shrink:0; user-select:none; }
 .stock-order-check input { accent-color: var(--accent); cursor:pointer; }
+
+/* Zone principale : focalisée par programme (défilement sans clic), sans cadre visible */
+.main-content:focus,
+.main-content:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Widget caméras : masqué tant qu'aucune impression n'est en cours */
+.dashboard-widget.dashboard-widget-auto-hidden { display: none; }
+.dashboard-widget.dashboard-widget-auto-hidden.has-content { display: flex; }
+.dashboard-grid.edit-mode .dashboard-widget.dashboard-widget-auto-hidden { display: flex; }
+.dashboard-camera-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.dashboard-camera-tile { position: relative; border-radius: var(--radius); overflow: hidden; background: #000; aspect-ratio: 16 / 9; cursor: pointer; border: 1px solid var(--border); }
+.dashboard-camera-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.dashboard-camera-tile .dashboard-camera-caption { position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 8px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.75)); }
+.dashboard-camera-tile .dashboard-camera-caption span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-camera-off { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--text-muted); font-size: 12px; }
+
+/* Fenêtre « détails du fichier » (appui long sur une miniature) */
+.file-info-layout { display: flex; gap: 18px; align-items: flex-start; }
+.file-info-thumb { flex: 0 0 52%; max-width: 560px; aspect-ratio: 1 / 1; border-radius: var(--radius); overflow: hidden; background: #2a2e38; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; }
+.file-info-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.file-info-table { flex: 1; min-width: 0; width: 100%; border-collapse: collapse; font-size: 13px; }
+.file-info-table th { text-align: left; font-weight: 500; color: var(--text-secondary); padding: 7px 10px 7px 0; white-space: nowrap; vertical-align: top; }
+.file-info-table td { padding: 7px 0; color: var(--text-primary); border-bottom: 1px solid var(--border); word-break: break-word; }
+.file-info-table tr:last-child td, .file-info-table tr:last-child th { border-bottom: none; }
+.file-info-table th { border-bottom: 1px solid var(--border); }
+.file-info-table tr.file-info-total td, .file-info-table tr.file-info-total th { font-weight: 700; color: var(--text-primary); }
+@media (max-width: 640px) { .file-info-layout { flex-direction: column; } .file-info-thumb { flex: none; width: 100%; max-width: none; } }
+.file-info-controls { display: flex; flex-wrap: wrap; gap: 12px 18px; margin-bottom: 12px; align-items: flex-end; }
+.file-info-controls label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); min-width: 0; }
+.file-info-controls select, .file-info-controls input[type=number] { padding: 7px 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-primary); font-size: 13px; max-width: 100%; }
+.file-info-controls select { min-width: 220px; }
+.file-info-scale { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.file-info-scale input { width: 84px; }

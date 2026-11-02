@@ -252,6 +252,10 @@ pct exec <CTID> -- journalctl -u stellio -f       # 实时查看日志
 
 无菜单模式：所有选项都可以通过环境变量设置，例如 `var_mode=default var_cpu=4 var_ram=4096 var_disk=16 var_ip=192.168.1.50/24 var_gw=192.168.1.1`（完整列表见脚本开头）。
 
+💾 **存储选择**：在第一个菜单中选择“默认设置 + 选择存储”（或设置 `var_choose_storage=1`），即可选择容器磁盘（`var_storage`，如 `local-zfs`）和模板（`var_template_storage`，如 `local`）的存放位置。脚本会检查存储是否存在以及剩余空间是否足够。
+
+🌍 **语言**：脚本文字跟随 Proxmox 语言（fr、en、de、es、pt、it、zh、ja）；可用 `var_lang=zh` 强制指定（默认英语）。
+
 ### 🧰 服务器版专属（树莓派 / Linux）
 
 > Windows 版不受影响：这些功能只会出现在树莓派、虚拟机、LXC、Docker 和 Linux 上。
