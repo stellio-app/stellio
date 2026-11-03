@@ -1761,6 +1761,9 @@
   "cost.fixed_fee_cost_label": "Fixkosten",
   "cost.fixed_fee_label": "Fixkosten",
   "cost.margin_label": "Marge (%)",
+  "cost.margin_settings_hint": "Preisaufschlag auf die Druckkosten im Kostenrechner und in Angeboten. Kann in jeder Berechnung auch einzeln angepasst werden.",
+  "history.sale_price": "Verkaufspreis",
+  "history.sale_price_title": "Verkaufspreis = Kosten + Aufschlag",
   "cost.margin_line_label": "Marge ({{pct}} %)",
   "cost.quantity_label": "Menge",
   "cost.quote_client": "Kunde",
@@ -2214,5 +2217,15 @@
   "tour.step_fileinfo_controls_desc": "Wählen Sie das Slicer-Profil und die Größe in %: Gewicht, Zeit und Kosten werden neu berechnet. Ein Modell mit 200 % verbraucht deutlich mehr als mit 50 %.",
   "tour.step_fileinfo_actions_title": "Senden, öffnen, kalkulieren",
   "tour.step_fileinfo_actions_desc": "Senden Sie die Datei an den Slicer, öffnen Sie sie im 3D-Viewer oder sehen Sie die Kostenaufstellung – direkt aus diesem Fenster.",
-  "tour.demo_toast": "Demo-Datei: Diese Schaltflächen funktionieren bei Ihren echten Dateien."
+  "tour.demo_toast": "Demo-Datei: Diese Schaltflächen funktionieren bei Ihren echten Dateien.",
+  "settings.thumb_perf_title": "Vorschau-Leistung",
+  "settings.thumb_perf_hint": "Anzahl der gleichzeitig erzeugten Vorschaubilder. Je weniger, desto flüssiger bleibt die App bei einer vollständigen Neuerzeugung (dauert aber länger).",
+  "settings.thumb_perf_auto": "Automatisch (je nach Rechner)",
+  "settings.thumb_perf_eco": "Sparsam (eins nach dem anderen)",
+  "settings.thumb_perf_normal": "Normal",
+  "settings.thumb_perf_fast": "Schnell (alle Kerne)",
+  "settings.thumb_perf_saved": "Vorschau-Leistung gespeichert",
+  "thumbs.progress": "Vorschaubilder",
+  "thumbs.pending": "ausstehend",
+  "thumbs.workers": "Gleichzeitige Renderings"
 }

@@ -553,6 +553,15 @@
                                 </div>
                             </div>
 
+                            <div class="dashboard-widget dashboard-widget-auto-hidden" id="dashboard-widget-cameras" data-widget-id="cameras" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-video"></i> <span data-i18n="dashboard.cameras_title">Caméras des impressions en cours</span></h3>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('cameras')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-cameras-body"></div>
+                            </div>
+
                             <div class="dashboard-widget" id="dashboard-widget-stock" data-widget-id="stock" draggable="false">
                                 <div class="dashboard-widget-header">
                                     <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
@@ -1147,6 +1156,18 @@
                                         <button type="button" class="btn btn-ghost btn-sm" onclick="resetThumbColor()" data-i18n="settings.thumb_color_reset">Par défaut</button>
                                         <button type="button" class="btn btn-primary btn-sm" onclick="applyThumbColor()" data-i18n="settings.thumb_color_apply">Appliquer</button>
                                     </div>
+                                </div>
+                                <div class="settings-row" style="align-items:flex-start;">
+                                    <div>
+                                        <label data-i18n="settings.thumb_perf_title">Performance des miniatures</label>
+                                        <p class="settings-hint" style="margin-top:2px;" data-i18n="settings.thumb_perf_hint">Nombre de miniatures dessinées en même temps. Moins il y en a, plus l'application reste fluide pendant une régénération complète (mais plus elle est longue).</p>
+                                    </div>
+                                    <select id="thumb-perf-select" class="settings-select" onchange="applyThumbPerf(this.value)">
+                                        <option value="auto" data-i18n="settings.thumb_perf_auto">Automatique (selon la machine)</option>
+                                        <option value="eco" data-i18n="settings.thumb_perf_eco">Économe (1 à la fois)</option>
+                                        <option value="normal" data-i18n="settings.thumb_perf_normal">Normal</option>
+                                        <option value="fast" data-i18n="settings.thumb_perf_fast">Rapide (tous les cœurs)</option>
+                                    </select>
                                 </div>
                                 <div class="settings-row">
                                     <label data-i18n="settings.language">Langue</label>

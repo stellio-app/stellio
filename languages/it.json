@@ -1761,6 +1761,9 @@
   "cost.fixed_fee_cost_label": "Costi fissi",
   "cost.fixed_fee_label": "Costi fissi",
   "cost.margin_label": "Margine (%)",
+  "cost.margin_settings_hint": "Margine di prezzo aggiunto al costo di stampa nel calcolatore dei costi e nei preventivi. Modificabile anche caso per caso in ogni calcolo.",
+  "history.sale_price": "Prezzo di vendita",
+  "history.sale_price_title": "Prezzo di vendita = costo + margine",
   "cost.margin_line_label": "Margine ({{pct}}%)",
   "cost.quantity_label": "Quantità",
   "cost.quote_client": "Cliente",
@@ -2214,5 +2217,15 @@
   "tour.step_fileinfo_controls_desc": "Scegli il profilo dello slicer e la dimensione in %: peso, tempo e costo vengono ricalcolati. Un modello al 200 % consuma molto più che al 50 %.",
   "tour.step_fileinfo_actions_title": "Invia, apri, preventiva",
   "tour.step_fileinfo_actions_desc": "Invia il file allo slicer, aprilo nel viewer 3D o consulta il dettaglio dei costi, direttamente da questa scheda.",
-  "tour.demo_toast": "File dimostrativo: questi pulsanti funzionano con i tuoi file reali."
+  "tour.demo_toast": "File dimostrativo: questi pulsanti funzionano con i tuoi file reali.",
+  "settings.thumb_perf_title": "Prestazioni delle miniature",
+  "settings.thumb_perf_hint": "Numero di miniature disegnate contemporaneamente. Meno sono, più l'app resta fluida durante una rigenerazione completa (ma richiede più tempo).",
+  "settings.thumb_perf_auto": "Automatico (in base al computer)",
+  "settings.thumb_perf_eco": "Economico (1 alla volta)",
+  "settings.thumb_perf_normal": "Normale",
+  "settings.thumb_perf_fast": "Veloce (tutti i core)",
+  "settings.thumb_perf_saved": "Prestazioni delle miniature salvate",
+  "thumbs.progress": "Miniature",
+  "thumbs.pending": "in attesa",
+  "thumbs.workers": "Render simultanei"
 }

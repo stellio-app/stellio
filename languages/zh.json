@@ -1761,6 +1761,9 @@
   "cost.fixed_fee_cost_label": "固定费用",
   "cost.fixed_fee_label": "固定费用",
   "cost.margin_label": "利润率 (%)",
+  "cost.margin_settings_hint": "在成本计算器和报价单中加到打印成本上的价格利润率。也可以在每次计算中单独修改。",
+  "history.sale_price": "售价",
+  "history.sale_price_title": "售价 = 成本 + 利润率",
   "cost.margin_line_label": "利润 ({{pct}}%)",
   "cost.quantity_label": "数量",
   "cost.quote_client": "客户",
@@ -2214,5 +2217,15 @@
   "tour.step_fileinfo_controls_desc": "选择切片软件配置和以 % 表示的尺寸：重量、时间和成本会自动重新计算。200% 的模型耗材远多于 50%。",
   "tour.step_fileinfo_actions_title": "发送、打开、计价",
   "tour.step_fileinfo_actions_desc": "可直接在此窗口中将文件发送到切片软件、在 3D 查看器中打开，或查看成本明细。",
-  "tour.demo_toast": "演示文件：这些按钮对您的真实文件有效。"
+  "tour.demo_toast": "演示文件：这些按钮对您的真实文件有效。",
+  "settings.thumb_perf_title": "缩略图性能",
+  "settings.thumb_perf_hint": "同时绘制的缩略图数量。数量越少，完整重新生成时应用越流畅（但耗时更长）。",
+  "settings.thumb_perf_auto": "自动（根据本机配置）",
+  "settings.thumb_perf_eco": "节能（一次一个）",
+  "settings.thumb_perf_normal": "普通",
+  "settings.thumb_perf_fast": "快速（使用所有核心）",
+  "settings.thumb_perf_saved": "缩略图性能已保存",
+  "thumbs.progress": "缩略图",
+  "thumbs.pending": "等待中",
+  "thumbs.workers": "同时渲染数"
 }

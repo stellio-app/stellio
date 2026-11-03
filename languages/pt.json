@@ -1761,6 +1761,9 @@
   "cost.fixed_fee_cost_label": "Custos fixos",
   "cost.fixed_fee_label": "Custos fixos",
   "cost.margin_label": "Margem (%)",
+  "cost.margin_settings_hint": "Margem de preço adicionada ao custo de impressão na calculadora de custos e nos orçamentos. Também pode ser alterada caso a caso em cada cálculo.",
+  "history.sale_price": "Preço de venda",
+  "history.sale_price_title": "Preço de venda = custo + margem",
   "cost.margin_line_label": "Margem ({{pct}}%)",
   "cost.quantity_label": "Quantidade",
   "cost.quote_client": "Cliente",
@@ -2214,5 +2217,15 @@
   "tour.step_fileinfo_controls_desc": "Escolha o perfil do slicer e o tamanho em %: o peso, o tempo e o custo são recalculados. Um modelo a 200 % consome muito mais do que a 50 %.",
   "tour.step_fileinfo_actions_title": "Enviar, abrir, orçamentar",
   "tour.step_fileinfo_actions_desc": "Envie o arquivo ao slicer, abra-o no visualizador 3D ou veja o detalhe do custo, diretamente desta ficha.",
-  "tour.demo_toast": "Arquivo de demonstração: estes botões funcionam com os seus arquivos reais."
+  "tour.demo_toast": "Arquivo de demonstração: estes botões funcionam com os seus arquivos reais.",
+  "settings.thumb_perf_title": "Desempenho das miniaturas",
+  "settings.thumb_perf_hint": "Número de miniaturas desenhadas ao mesmo tempo. Quanto menos, mais fluida fica a aplicação durante uma regeneração completa (mas demora mais).",
+  "settings.thumb_perf_auto": "Automático (conforme a máquina)",
+  "settings.thumb_perf_eco": "Económico (1 de cada vez)",
+  "settings.thumb_perf_normal": "Normal",
+  "settings.thumb_perf_fast": "Rápido (todos os núcleos)",
+  "settings.thumb_perf_saved": "Desempenho das miniaturas guardado",
+  "thumbs.progress": "Miniaturas",
+  "thumbs.pending": "pendentes",
+  "thumbs.workers": "Renders simultâneos"
 }

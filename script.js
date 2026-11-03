@@ -28,7 +28,7 @@
                 const method = ((init && init.method) || (input && input.method) || 'GET').toUpperCase();
                 if (method === 'GET' && !(init && init.signal) && !(input && input.signal) && !NO_TIMEOUT.test(url)) {
                     const ctrl = new AbortController();
-                    const timer = setTimeout(() => ctrl.abort(), 120000);
+                    const timer = setTimeout(() => ctrl.abort(), /\/api\/files(\?|$)/.test(url) ? 300000 : 120000);   // la liste des fichiers peut tarder pendant une grosse génération
                     return _origFetch(input, { ...(init || {}), signal: ctrl.signal }).finally(() => clearTimeout(timer));
                 }
             } catch (e) { /* on retombe sur le fetch natif */ }
@@ -2737,6 +2737,7 @@ if (!IS_VIEWER) {
     loadOllamaSettings();
     loadAutoScanSettings();
     loadThumbColorSetting();
+    loadThumbPerfSetting();
     loadManualInventorySettings();
     loadStartupSettings();
     loadPrintCostSettings();
@@ -5880,6 +5881,7 @@ function _kickFileAnalysis() {
         .catch(() => {});
 }
 
+let _loadFilesRetryTimer = null;
 async function loadFiles() {
 const authScreen = document.getElementById('auth-screen');
 const appScreen = document.getElementById('app-screen');
@@ -5907,6 +5909,7 @@ throw new Error(`${I18N.t('toast.server_error')}: ${res.status} - ${errorText.su
 
     console.log(`✅ ${allFiles.length} fichiers chargés depuis le cache`);
     _kickFileAnalysis();
+    if (!thumbProgressInterval && typeof startThumbProgressMonitor === 'function') startThumbProgressMonitor();
 
      if (!scanPollingInterval) {
         pollScanProgress();
@@ -5914,6 +5917,13 @@ throw new Error(`${I18N.t('toast.server_error')}: ${res.status} - ${errorText.su
 } catch (err) {
     if (err.message?.includes('401')) return;
     console.error('❌ [loadFiles]', err);
+    // Bibliothèque déjà affichée : on la garde (un rechargement raté pendant une génération ne doit pas la faire disparaître)
+    if (Array.isArray(allFiles) && allFiles.length > 0) {
+        if (!_loadFilesRetryTimer) {
+            _loadFilesRetryTimer = setTimeout(() => { _loadFilesRetryTimer = null; loadFiles(); }, 8000);
+        }
+        return;
+    }
     showToast(`${I18N.t('toast.error')}: ${err.message}`, 'error');
     document.getElementById('files-grid').innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p><button onclick="loadFiles()" class="btn btn-primary" style="margin-top:10px;"><i class="fa-solid fa-rotate-right"></i> ${I18N.t('toast.refreshing')}</button></div>`;
 }
@@ -6124,7 +6134,8 @@ thumbProgressInterval = setInterval(async () => {
 
             requestAnimationFrame(() => {
                 progressBar.style.width = `${data.progress}%`;
-                progressText.textContent = `${data.files_with_thumb}/${data.total} (${data.pending} en attente)`;
+                progressText.textContent = `${_t3('thumbs.progress', 'Miniatures')} : ${data.files_with_thumb}/${data.total}` + (data.pending ? ` · ${_t3('thumbs.pending', 'en attente')} : ${data.pending}` : '');
+                container.title = `${_t3('thumbs.workers', 'Rendus simultanés')} : ${data.workers || 1}`;
             });
 
             if (data.files_without_thumb === 0 && data.pending === 0) {
@@ -8403,6 +8414,7 @@ let viewerCurrentFileName = null;
 
 function open3DViewer(fileName, filePath, plateCount) {
 loadThumbColorSetting();
+loadThumbPerfSetting();
 document.getElementById('viewer-title').innerHTML = `<i class="fa-solid fa-cube"></i> ${fileName}`;
 openModal('modal-3d-viewer');
 viewerCurrentPath = filePath;
@@ -9908,6 +9920,7 @@ loadSpoolmanSettings();
 loadOllamaSettings();
 loadAutoScanSettings();
 loadThumbColorSetting();
+loadThumbPerfSetting();
 loadManualInventorySettings();
 loadStartupSettings();
 loadPrintCostSettings();
@@ -10208,6 +10221,28 @@ async function loadThumbColorSetting() {
     } catch (_) {}
 }
 
+async function loadThumbPerfSetting() {
+    try {
+        const res = await fetch(`${API}/api/settings`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const sel = document.getElementById('thumb-perf-select');
+        if (sel) sel.value = ['auto', 'eco', 'normal', 'fast'].includes(data.thumb_perf_mode) ? data.thumb_perf_mode : 'auto';
+    } catch (_) {}
+}
+
+window.applyThumbPerf = async function (mode) {
+    try {
+        const res = await fetch(`${API}/api/settings`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ thumb_perf_mode: mode })
+        });
+        if (!res.ok) { showToast(I18N.t('toast.network_error'), 'error'); return; }
+        showToast(_t3('settings.thumb_perf_saved', 'Performance des miniatures enregistrée'), 'success');
+        startThumbProgressMonitor();
+    } catch (_) { showToast(I18N.t('toast.network_error'), 'error'); }
+};
+
 function resetThumbColor() {
     const input = document.getElementById('thumb-color-input');
     if (input) input.value = '#4ea1d3';
@@ -10369,6 +10404,7 @@ let printCostSpools = [];
 let printCostDefaultSpoolId = null;
 let printCostPriceOverrides = {};
 let printCostCurrency = 'EUR';
+let printCostMarginPct = 0;
 
 function formatCost(value) {
     const amount = Number(value) || 0;
@@ -10499,6 +10535,9 @@ async function loadPrintCostSettings() {
         const printerPower = document.getElementById('settings-printer-power');
         if (elecPrice) elecPrice.value = data.print_cost_elec_price ?? '';
         if (printerPower) printerPower.value = data.print_cost_printer_power ?? 120;
+        printCostMarginPct = Math.max(0, parseFloat(data.print_cost_margin_pct) || 0);
+        const marginInput = document.getElementById('settings-margin-pct');
+        if (marginInput) marginInput.value = data.print_cost_margin_pct ?? '';
 
         const printerSel = document.getElementById('settings-printer-power-select');
         if (printerSel) {
@@ -10512,6 +10551,7 @@ async function loadPrintCostSettings() {
 
 async function savePrintCostSettings() {
     const elecPriceRaw = document.getElementById('settings-elec-price')?.value;
+    const marginRaw = document.getElementById('settings-margin-pct')?.value;
     const printerPower = parseFloat(document.getElementById('settings-printer-power')?.value);
     const printerSel = document.getElementById('settings-printer-power-select');
     const selectedPrinterId = printerSel && printerSel.value ? printerSel.value : null;
@@ -10535,6 +10575,7 @@ async function savePrintCostSettings() {
         print_cost_currency: currency,
         print_cost_elec_price: (elecPriceRaw === '' || elecPriceRaw == null) ? '' : parseFloat(elecPriceRaw),
         print_cost_printer_id: selectedPrinterId,
+        print_cost_margin_pct: (marginRaw === '' || marginRaw == null || !Number.isFinite(parseFloat(marginRaw))) ? '' : Math.min(1000, Math.max(0, parseFloat(marginRaw))),
     };
     if (Number.isFinite(printerPower)) payload.print_cost_printer_power = printerPower;
 
@@ -10557,6 +10598,7 @@ async function savePrintCostSettings() {
             printCostDefaultSpoolId = defaultId;
             printCostPriceOverrides = priceOverrides;
             printCostCurrency = currency;
+            printCostMarginPct = Math.max(0, parseFloat(payload.print_cost_margin_pct) || 0);
             renderSpoolsList();
             applyCurrencySymbols();
             if (selectedPrinterId) loadPrinters();
@@ -16533,8 +16575,11 @@ function _getRatingReasonLabels() {
 
 function _renderHistoryCostBadge(entry) {
     if (entry.total_cost != null) {
+        const sale = (printCostMarginPct > 0 && entry.result !== 'failed')
+            ? ` <span style="color:var(--text-muted);" title="${escapeHtml(_t3('history.sale_price_title', 'Prix de vente = coût + marge'))} (+${printCostMarginPct}%)">· ${escapeHtml(_t3('history.sale_price', 'Prix de vente'))} ${formatCost(entry.total_cost * (1 + printCostMarginPct / 100))}</span>`
+            : '';
         return `<span onclick="toggleCostEditor(${entry.id})" style="cursor:pointer;" title="${I18N.t('cost.click_to_edit') || 'Cliquer pour modifier'}">
-            <i class="fa-solid fa-coins"></i> ${formatCost(entry.total_cost)}
+            <i class="fa-solid fa-coins"></i> ${formatCost(entry.total_cost)}${sale}
         </span>`;
     }
     return `<span onclick="toggleCostEditor(${entry.id})" style="cursor:pointer; color:var(--text-muted);" title="${I18N.t('cost.click_to_add') || 'Renseigner le coût'}">

@@ -1761,6 +1761,9 @@
   "cost.fixed_fee_cost_label": "Fixed fee",
   "cost.fixed_fee_label": "Fixed fee",
   "cost.margin_label": "Margin (%)",
+  "cost.margin_settings_hint": "Pricing margin added to the print cost in the cost calculator and quotes. Can also be changed case by case in each calculation.",
+  "history.sale_price": "Sale price",
+  "history.sale_price_title": "Sale price = cost + margin",
   "cost.margin_line_label": "Margin ({{pct}}%)",
   "cost.quantity_label": "Quantity",
   "cost.quote_client": "Client",
@@ -2214,5 +2217,15 @@
   "tour.step_fileinfo_controls_desc": "Pick the slicer profile and the size in %: weight, time and cost are recalculated. A model at 200% uses far more than at 50%.",
   "tour.step_fileinfo_actions_title": "Send, open, price",
   "tour.step_fileinfo_actions_desc": "Send the file to your slicer, open it in the 3D viewer or see the cost breakdown, straight from this window.",
-  "tour.demo_toast": "Demo file: these buttons work on your real files."
+  "tour.demo_toast": "Demo file: these buttons work on your real files.",
+  "settings.thumb_perf_title": "Thumbnail performance",
+  "settings.thumb_perf_hint": "Number of thumbnails drawn at the same time. The fewer there are, the smoother the app stays during a full regeneration (but the longer it takes).",
+  "settings.thumb_perf_auto": "Automatic (based on this machine)",
+  "settings.thumb_perf_eco": "Eco (1 at a time)",
+  "settings.thumb_perf_normal": "Normal",
+  "settings.thumb_perf_fast": "Fast (all cores)",
+  "settings.thumb_perf_saved": "Thumbnail performance saved",
+  "thumbs.progress": "Thumbnails",
+  "thumbs.pending": "pending",
+  "thumbs.workers": "Simultaneous renders"
 }

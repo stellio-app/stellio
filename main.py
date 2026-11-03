@@ -843,10 +843,11 @@ except ImportError:
     HAS_PYMESHFIX = False
 import numpy as np
 import smbclient
-from PIL import Image, ImageDraw, ImageChops
+from PIL import Image, ImageDraw, ImageChops, ImageFilter
 import base64
 from pathlib import Path
 from functools import wraps
+import functools
 from flask import Flask, request, jsonify, session, send_file, Response, make_response
 from werkzeug.utils import secure_filename
 import trimesh.transformations as tra
@@ -977,6 +978,74 @@ def _release_persistent_renderer():
             _persistent_renderer = None
             _persistent_renderer_size = None
 NUM_THUMB_WORKERS = max(2, min(6, (os.cpu_count() or 4) - 1))
+
+# Lectures SMB pour les miniatures : au plus 2 copies simultanées (le NAS ne doit pas être saturé par la génération),
+# et un « disjoncteur » par serveur : un hôte qui ne répond pas est laissé tranquille quelques instants.
+_smb_thumb_sem = threading.Semaphore(2)
+_smb_host_down = {}
+SMB_HOST_PAUSE_S = 60
+SMB_COPY_CHUNK = 1024 * 1024
+
+
+def _smb_host_of(path):
+    return str(path).replace('\\', '/').lstrip('/').split('/')[0].lower()
+
+
+def _smb_host_is_paused(path):
+    return _smb_host_down.get(_smb_host_of(path), 0) > time.time()
+
+
+def _smb_host_mark_down(path, err=None):
+    """Met le serveur en pause, sauf si l'erreur ne dit rien sur sa disponibilité (fichier absent, fichier verrouillé)."""
+    if err is not None:
+        low = str(err).lower()
+        if isinstance(err, FileNotFoundError) or getattr(err, 'errno', None) == 2 \
+                or any(k in low for k in ('not_found', 'not found', 'no such file', '0xc0000034', '0xc000003a', '0xc0000043', 'sharing')):
+            return
+    _smb_host_down[_smb_host_of(path)] = time.time() + SMB_HOST_PAUSE_S
+
+# Nombre de rendus de miniatures réellement actifs en même temps (réglage « Performance des miniatures »).
+# auto : 1 sur une machine modeste (≤ 4 cœurs ou < 8 Go de RAM) ; sinon plein régime pour quelques miniatures,
+# et régime modéré dès qu'une grosse régénération est en file, pour que l'application reste fluide.
+THUMB_PERF_MODES = ('auto', 'eco', 'normal', 'fast')
+_thumb_perf_cache = {'t': 0.0, 'n': NUM_THUMB_WORKERS, 'mode': 'auto'}
+
+
+def _machine_is_modest():
+    cores = os.cpu_count() or 4
+    try:
+        import psutil
+        if psutil.virtual_memory().total < 8 * 1024 ** 3:
+            return True
+    except Exception:
+        pass
+    return cores <= 4
+
+
+def _thumb_allowed_workers():
+    now = time.time()
+    if now - _thumb_perf_cache['t'] < 3:
+        return _thumb_perf_cache['n']
+    try:
+        mode = str((load_settings() or {}).get('thumb_perf_mode') or 'auto')
+    except Exception:
+        mode = 'auto'
+    if mode not in THUMB_PERF_MODES:
+        mode = 'auto'
+    moderate = min(NUM_THUMB_WORKERS, max(2, (os.cpu_count() or 4) // 4))
+    if mode == 'eco':
+        n = 1
+    elif mode == 'normal':
+        n = moderate
+    elif mode == 'fast':
+        n = NUM_THUMB_WORKERS
+    else:
+        if _machine_is_modest():
+            n = 1
+        else:
+            n = moderate if thumb_generation_queue.qsize() > 50 else NUM_THUMB_WORKERS
+    _thumb_perf_cache.update({'t': now, 'n': max(1, n), 'mode': mode})
+    return _thumb_perf_cache['n']
 THUMB_GENERATION_TIMEOUT = 90
 THUMB_GENERATION_TIMEOUT_PER_MB = 5
 THUMB_GENERATION_TIMEOUT_MAX = 600
@@ -1039,6 +1108,179 @@ def get_thumb_timeout(file_path):
     if file_path.lower().endswith('.3mf'):
         timeout *= 1.6
     return min(timeout, THUMB_GENERATION_TIMEOUT_MAX)
+
+
+def _wv_dialog(wv, kind):
+    """Constante de boîte de dialogue pywebview : FileDialog.SAVE/OPEN/FOLDER (SAVE_DIALOG… sont obsolètes)."""
+    fd = getattr(wv, 'FileDialog', None)
+    return getattr(fd, kind, None) or getattr(wv, kind + '_DIALOG')
+
+
+def _wv_save_dialog(wv):
+    return _wv_dialog(wv, 'SAVE')
+
+
+_TRAY_LABELS = {
+    'fr': ("Ouvrir Stellio", "Quitter Stellio", "Stellio est en cours d'exécution"),
+    'en': ("Open Stellio", "Quit Stellio", "Stellio is running"),
+    'de': ("Stellio öffnen", "Stellio beenden", "Stellio läuft"),
+    'es': ("Abrir Stellio", "Salir de Stellio", "Stellio se está ejecutando"),
+    'pt': ("Abrir o Stellio", "Sair do Stellio", "O Stellio está em execução"),
+    'it': ("Apri Stellio", "Esci da Stellio", "Stellio è in esecuzione"),
+    'zh': ("打开 Stellio", "退出 Stellio", "Stellio 正在运行"),
+    'ja': ("Stellio を開く", "Stellio を終了", "Stellio は実行中です"),
+}
+_TRAY_STATE = {'started': False}
+
+
+def _start_tray_icon(on_open, on_quit):
+    """Icône Stellio dans la zone de notification de Windows (à côté de l'horloge) : montre que Stellio tourne,
+    clic = ouvrir, clic droit = Ouvrir / Quitter. Implémentée avec l'API Windows (aucune dépendance à installer)."""
+    if os.name != 'nt' or _TRAY_STATE['started']:
+        return
+    _TRAY_STATE['started'] = True
+
+    def _run():
+        try:
+            import ctypes
+            from ctypes import wintypes
+            user32, shell32, kernel32 = ctypes.windll.user32, ctypes.windll.shell32, ctypes.windll.kernel32
+            LRESULT = ctypes.c_ssize_t
+            WM_USER, WM_DESTROY, WM_NULL = 0x400, 0x2, 0x0
+            WM_TRAY = WM_USER + 20
+            WM_LBUTTONUP, WM_LBUTTONDBLCLK, WM_RBUTTONUP = 0x202, 0x203, 0x205
+            NIM_ADD, NIM_DELETE = 0, 2
+            NIF_MESSAGE, NIF_ICON, NIF_TIP = 0x1, 0x2, 0x4
+
+            try:
+                lang = {0x0C: 'fr', 0x09: 'en', 0x07: 'de', 0x0A: 'es', 0x16: 'pt', 0x10: 'it', 0x04: 'zh', 0x11: 'ja'}.get(
+                    kernel32.GetUserDefaultUILanguage() & 0xFF, 'en')
+            except Exception:
+                lang = 'en'
+            lbl_open, lbl_quit, lbl_tip = _TRAY_LABELS.get(lang, _TRAY_LABELS['en'])
+
+            class NOTIFYICONDATAW(ctypes.Structure):
+                _fields_ = [('cbSize', wintypes.DWORD), ('hWnd', wintypes.HWND), ('uID', wintypes.UINT),
+                            ('uFlags', wintypes.UINT), ('uCallbackMessage', wintypes.UINT), ('hIcon', wintypes.HICON),
+                            ('szTip', wintypes.WCHAR * 128)]
+
+            WNDPROC = ctypes.WINFUNCTYPE(LRESULT, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
+
+            class WNDCLASSW(ctypes.Structure):
+                _fields_ = [('style', wintypes.UINT), ('lpfnWndProc', WNDPROC), ('cbClsExtra', ctypes.c_int),
+                            ('cbWndExtra', ctypes.c_int), ('hInstance', wintypes.HINSTANCE), ('hIcon', wintypes.HICON),
+                            ('hCursor', wintypes.HANDLE), ('hbrBackground', wintypes.HBRUSH),
+                            ('lpszMenuName', wintypes.LPCWSTR), ('lpszClassName', wintypes.LPCWSTR)]
+
+            user32.DefWindowProcW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+            user32.DefWindowProcW.restype = LRESULT
+            user32.CreateWindowExW.argtypes = [wintypes.DWORD, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD,
+                                               ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wintypes.HWND,
+                                               wintypes.HMENU, wintypes.HINSTANCE, wintypes.LPVOID]
+            user32.CreateWindowExW.restype = wintypes.HWND
+            user32.RegisterClassW.argtypes = [ctypes.POINTER(WNDCLASSW)]
+            user32.AppendMenuW.argtypes = [wintypes.HMENU, wintypes.UINT, ctypes.c_size_t, wintypes.LPCWSTR]
+            user32.CreatePopupMenu.restype = wintypes.HMENU
+            user32.TrackPopupMenu.argtypes = [wintypes.HMENU, wintypes.UINT, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                              wintypes.HWND, ctypes.c_void_p]
+            user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+            user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+            user32.LoadImageW.argtypes = [wintypes.HINSTANCE, wintypes.LPCWSTR, wintypes.UINT, ctypes.c_int, ctypes.c_int, wintypes.UINT]
+            user32.LoadImageW.restype = wintypes.HANDLE
+            shell32.ExtractIconW.argtypes = [wintypes.HINSTANCE, wintypes.LPCWSTR, wintypes.UINT]
+            shell32.ExtractIconW.restype = wintypes.HICON
+            shell32.Shell_NotifyIconW.argtypes = [wintypes.DWORD, ctypes.POINTER(NOTIFYICONDATAW)]
+
+            kernel32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
+            kernel32.GetModuleHandleW.restype = wintypes.HINSTANCE
+            user32.LoadIconW.argtypes = [wintypes.HINSTANCE, ctypes.c_void_p]
+            user32.LoadIconW.restype = wintypes.HICON
+            user32.DestroyMenu.argtypes = [wintypes.HMENU]
+            user32.GetMessageW.argtypes = [ctypes.POINTER(wintypes.MSG), wintypes.HWND, wintypes.UINT, wintypes.UINT]
+            user32.RegisterWindowMessageW.argtypes = [wintypes.LPCWSTR]
+            hinst = kernel32.GetModuleHandleW(None)
+            hicon = None
+            try:
+                base = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
+                for cand in (os.path.join(base, 'assets', 'logo-nom-stellio.ico'),
+                             os.path.join(getattr(sys, '_MEIPASS', base), 'assets', 'logo-nom-stellio.ico')):
+                    if os.path.isfile(cand):
+                        hicon = user32.LoadImageW(None, cand, 1, 16, 16, 0x10)   # IMAGE_ICON, LR_LOADFROMFILE
+                        if hicon:
+                            break
+                if not hicon and getattr(sys, 'frozen', False):
+                    h = shell32.ExtractIconW(hinst, sys.executable, 0)           # icône intégrée à Stellio.exe
+                    hicon = h if h and h != 1 else None
+            except Exception:
+                hicon = None
+            if not hicon:
+                hicon = user32.LoadIconW(None, 32512)                            # IDI_APPLICATION
+
+            taskbar_created = user32.RegisterWindowMessageW('TaskbarCreated')
+            nid = NOTIFYICONDATAW()
+            nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
+            nid.uID = 1
+            nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP
+            nid.uCallbackMessage = WM_TRAY
+            nid.hIcon = hicon
+            nid.szTip = lbl_tip[:127]
+
+            def _safe(fn):
+                threading.Thread(target=lambda: fn(), daemon=True).start()
+
+            def _wndproc(hwnd, msg, wparam, lparam):
+                try:
+                    if msg == WM_TRAY:
+                        if lparam in (WM_LBUTTONUP, WM_LBUTTONDBLCLK):
+                            _safe(on_open)
+                        elif lparam == WM_RBUTTONUP:
+                            pt = wintypes.POINT()
+                            user32.GetCursorPos(ctypes.byref(pt))
+                            menu = user32.CreatePopupMenu()
+                            user32.AppendMenuW(menu, 0, 1, lbl_open)
+                            user32.AppendMenuW(menu, 0x800, 0, None)            # séparateur
+                            user32.AppendMenuW(menu, 0, 2, lbl_quit)
+                            user32.SetForegroundWindow(hwnd)
+                            cmd = user32.TrackPopupMenu(menu, 0x0100 | 0x0020, pt.x, pt.y, 0, hwnd, None)   # TPM_RETURNCMD | TPM_RIGHTBUTTON
+                            user32.PostMessageW(hwnd, WM_NULL, 0, 0)
+                            user32.DestroyMenu(menu)
+                            if cmd == 1:
+                                _safe(on_open)
+                            elif cmd == 2:
+                                shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid))
+                                _safe(on_quit)
+                        return 0
+                    if taskbar_created and msg == taskbar_created:               # l'explorateur a redémarré : on remet l'icône
+                        shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid))
+                        return 0
+                    if msg == WM_DESTROY:
+                        shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid))
+                        return 0
+                except Exception:
+                    pass
+                return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+
+            proc = WNDPROC(_wndproc)                                             # référence gardée vivante
+            wc = WNDCLASSW()
+            wc.lpfnWndProc = proc
+            wc.hInstance = hinst
+            wc.lpszClassName = 'StellioTrayWindow'
+            user32.RegisterClassW(ctypes.byref(wc))
+            hwnd = user32.CreateWindowExW(0, 'StellioTrayWindow', 'StellioTray', 0, 0, 0, 0, 0, None, None, hinst, None)
+            if not hwnd:
+                return
+            nid.hWnd = hwnd
+            if not shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid)):
+                app_logger.info("[Tray] Icône de notification non ajoutée")
+                return
+            msg = wintypes.MSG()
+            while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
+                user32.TranslateMessage(ctypes.byref(msg))
+                user32.DispatchMessageW(ctypes.byref(msg))
+        except Exception as ex:
+            app_logger.info(f"[Tray] Icône de zone de notification indisponible: {ex}")
+
+    threading.Thread(target=_run, name='stellio-tray', daemon=True).start()
 
 
 def _lower_thread_priority():
@@ -1275,6 +1517,9 @@ def setup_logging():
 
     werkzeug_log = logging.getLogger('werkzeug')
     werkzeug_log.setLevel(logging.DEBUG if debug_requested else logging.ERROR)
+    # smbprotocol signale chaque coupure de socket par le NAS (« treating as EOF ») alors qu'il se reconnecte seul :
+    # ces avertissements inondent la console sans rien changer au fonctionnement
+    logging.getLogger('smbprotocol').setLevel(logging.DEBUG if debug_requested else logging.ERROR)
 
     if debug_requested:
         logger.warning("🐞 [DEBUG] Session de debug active pour ce démarrage — logs au maximum. "
@@ -4708,6 +4953,30 @@ def load_file_cache():
 cache_file_lock = threading.Lock()
 
 
+_cache_last_good = {'data': None}
+
+
+def _read_cache_json_safe(attempts=6, delay=0.25):
+    """Lit le fichier cache sans jamais croiser une écriture en cours (verrou partagé avec les écritures).
+    Pendant une génération de miniatures le cache est réécrit toutes les quelques secondes : une lecture
+    non protégée tombait sur un fichier à moitié remplacé. En dernier recours, renvoie la dernière lecture
+    réussie plutôt que de déclencher un scan complet bloquant."""
+    if not os.path.exists(CACHE_FILE):
+        return None
+    for attempt in range(attempts):
+        try:
+            with cache_file_lock:
+                with open(CACHE_FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+            if isinstance(data, dict) and 'files' in data:
+                _cache_last_good['data'] = data
+                return data
+            return None
+        except (json.JSONDecodeError, PermissionError, OSError):
+            time.sleep(delay)
+    return _cache_last_good['data']
+
+
 def _atomic_replace(tmp_path, dest_path, retries=5, delay=0.08):
     last_err = None
     for attempt in range(retries):
@@ -4916,6 +5185,10 @@ def process_generation_queue():
             if _user_is_active() and _thumb_high_pending <= 0:
                 time.sleep(0.5)
                 continue
+            # au-delà du nombre de rendus autorisé, le worker attend (sauf demande prioritaire de l'utilisateur)
+            if worker_id >= _thumb_allowed_workers() and _thumb_high_pending <= 0:
+                time.sleep(1)
+                continue
             try:
                 item = thumb_generation_queue.get(timeout=1)
             except queue.Empty:
@@ -4945,13 +5218,18 @@ def process_generation_queue():
                 elif not is_smb:
                     file_accessible = os.path.exists(file_path)
                 else:
-                    try:
-                        smb_path = file_path.replace('\\\\', '//').replace('\\', '/')
-                        smbclient.stat(smb_path, connection_timeout=8)
-                        file_accessible = True
-                    except Exception as e:
+                    if _smb_host_is_paused(file_path):
                         file_accessible = False
-                        smb_error = e
+                        smb_error = 'serveur injoignable (en pause)'
+                    else:
+                        try:
+                            smb_path = file_path.replace('\\\\', '//').replace('\\', '/')
+                            smbclient.stat(smb_path, connection_timeout=8)
+                            file_accessible = True
+                        except Exception as e:
+                            file_accessible = False
+                            smb_error = e
+                            _smb_host_mark_down(file_path, e)
                 if not file_accessible:
                     app_logger.info(f"[SKIP] Fichier inaccessible: {file_path}" + (f" ({smb_error})" if smb_error else ""))
                     ignored_files_cache[file_path] = time.time()
@@ -5187,6 +5465,7 @@ def _hex_to_rgb(value):
     return None
 
 
+@functools.lru_cache(maxsize=8192)
 def _decode_paint_state(code):
     """État dominant d'un triangle peint (attribut paint_color de Bambu / mmu_segmentation de Prusa) :
     0 = couleur de base, n = extrudeur n. Le texte est un arbre de subdivision en nibbles lus depuis la fin."""
@@ -5194,27 +5473,26 @@ def _decode_paint_state(code):
         nibbles = [int(c, 16) for c in str(code).strip()][::-1]
         if not nibbles:
             return 0
-        pos = [0]
+        n_nib = len(nibbles)
+        pos = 0
         weights = {}
-
-        def walk(weight):
-            if pos[0] >= len(nibbles):
-                return
-            c = nibbles[pos[0]]
-            pos[0] += 1
-            splits = c & 0b11
+        stack = [1.0]   # parcours itératif (plus rapide que la récursion sur les arbres profonds)
+        while stack:
+            if pos >= n_nib:
+                break
+            weight = stack.pop()
+            c = nibbles[pos]
+            pos += 1
+            splits = c & 3
             if splits == 0:
                 state = c >> 2
-                if state == 3 and pos[0] < len(nibbles):
-                    state = nibbles[pos[0]] + 3
-                    pos[0] += 1
+                if state == 3 and pos < n_nib:
+                    state = nibbles[pos] + 3
+                    pos += 1
                 weights[state] = weights.get(state, 0.0) + weight
             else:
                 n = splits + 1
-                for _ in range(n):
-                    walk(weight / n)
-
-        walk(1.0)
+                stack.extend([weight / n] * n)
         if not weights:
             return 0
         return max(weights.items(), key=lambda kv: kv[1])[0]
@@ -5974,6 +6252,61 @@ def _thumb_base_rgb():
     return 0x4e, 0xa1, 0xd3
 
 
+def _clean_preview_background(img):
+    """Aperçu de slicer opaque : supprime un fond uni (blanc, gris…) relié aux bords de l'image et le rend transparent.
+    Renvoie (image, ok). ok=False : fond non uni (plateau quadrillé de PrusaSlicer, décor…) — l'aperçu ne convient pas."""
+    try:
+        from scipy import ndimage
+        rgba = np.asarray(img.convert('RGBA'), dtype=np.int16)
+        h, w = rgba.shape[:2]
+        alpha = rgba[:, :, 3]
+        if (alpha > 240).mean() < 0.97:
+            return img, True   # déjà détouré (fond transparent)
+        rgb = rgba[:, :, :3]
+        ring = np.concatenate([rgb[0, :], rgb[-1, :], rgb[:, 0], rgb[:, -1]])
+        ref = np.median(ring, axis=0)
+        near = (np.abs(ring - ref).max(axis=1) <= 18).mean()
+        if near < 0.9:
+            return img, False  # bords non unis : plateau, décor
+        bg = np.abs(rgb - ref).max(axis=2) <= 22
+        lab, n = ndimage.label(bg)
+        if n == 0:
+            return img, True
+        edge_labels = np.unique(np.concatenate([lab[0, :], lab[-1, :], lab[:, 0], lab[:, -1]]))
+        edge_labels = edge_labels[edge_labels > 0]
+        bgmask = np.isin(lab, edge_labels)
+        if bgmask.mean() > 0.97:
+            return img, False  # presque tout est « fond » : aperçu vide
+        # liseré : on grignote 1 pixel du bord de l'objet (reste de blanc), puis adoucit le contour
+        bgmask = ndimage.binary_dilation(bgmask, iterations=1)
+        a = Image.fromarray((~bgmask * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.8))
+        out = img.convert('RGBA')
+        out.putalpha(a)
+        return out, True
+    except Exception:
+        return img, True
+
+
+def _prusa_mono_filament_rgb(model_path):
+    """3MF PrusaSlicer à un seul filament : sa couleur (ex. orange), pour que le rendu 3D la reprenne. None sinon."""
+    try:
+        with zipfile.ZipFile(model_path, 'r') as z:
+            names = {n.lower(): n for n in z.namelist()}
+            cfg = names.get('metadata/slic3r_pe.config')
+            if not cfg:
+                return None
+            txt = z.read(cfg).decode('utf-8', 'ignore')
+            m = re.search(r'filament_colour\s*=\s*"?([^"\n]+)"?', txt)
+            if not m:
+                return None
+            cols = {c.strip().lower() for c in m.group(1).replace('"', '').split(';') if c.strip()}
+            if len(cols) != 1:
+                return None   # filaments de couleurs différentes : couleurs gérées par le chemin multicolore
+            return _hex_to_rgb(next(iter(cols)))   # un ou plusieurs filaments de même couleur : pièce monochrome
+    except Exception:
+        return None
+
+
 def _extract_3mf_embedded_preview(model_path):
     """Image d'aperçu embarquée par le slicer dans un 3MF (couleurs et filaments réels), ou None.
 
@@ -5982,6 +6315,8 @@ def _extract_3mf_embedded_preview(model_path):
     try:
         with zipfile.ZipFile(model_path, 'r') as z:
             names = {n.lower(): n for n in z.namelist()}
+            if any(n.endswith('slic3r_pe.config') for n in names):
+                return None   # PrusaSlicer : l'aperçu montre le plateau quadrillé → rendu 3D de la pièce (comme les STL)
             for cand in ('metadata/plate_1.png', 'metadata/top_1.png', 'metadata/plate_no_light_1.png', 'metadata/thumbnail.png'):
                 if cand not in names:
                     continue
@@ -5998,6 +6333,18 @@ def _extract_3mf_embedded_preview(model_path):
                     rgb_ext = img.convert('RGB').getextrema()
                     if all(lo == hi for lo, hi in rgb_ext) and alpha.getextrema()[0] == 255:
                         continue
+                    img, _usable = _clean_preview_background(img)
+                    if not _usable:
+                        continue   # plateau/décor dans l'aperçu : on laisse le rendu 3D (couleurs du fichier) prendre le relais
+                    box = img.getchannel('A').point(lambda a: 255 if a > 16 else 0).getbbox()
+                    if box is not None:
+                        # objet recentré dans un carré avec de la marge : les cartes n'affichent que la bande centrale
+                        # de la miniature (≈ 60 % de la hauteur), l'objet ne doit donc pas la déborder
+                        obj = img.crop(box)
+                        side = int(max(obj.width / 0.80, obj.height / 0.55, 64))
+                        canvas = Image.new('RGBA', (side, side), (0, 0, 0, 0))
+                        canvas.paste(obj, ((side - obj.width) // 2, (side - obj.height) // 2))
+                        img = canvas
                     img.thumbnail((768, 768))
                     bg = Image.new('RGBA', img.size, THUMB_BG_RGB + (255,))
                     bg.alpha_composite(img)
@@ -6006,6 +6353,60 @@ def _extract_3mf_embedded_preview(model_path):
                     continue
     except Exception as e:
         app_logger.info(f"[THUMB] Aperçu embarqué inutilisable pour {os.path.basename(model_path)}: {e}")
+    return None
+
+
+HUGE_3MF_MODEL_BYTES = 40 * 1024 * 1024   # au-delà, le maillage est trop lourd pour être rendu fidèlement
+
+
+def _extract_3mf_plate_montage(model_path, max_plates=4):
+    """Pour un 3MF énorme (dizaines de Mo de maillage) : montage des aperçus de plateaux embarqués par le slicer
+    (couleurs et formes exactes, instantané). None si le fichier n'est pas énorme ou n'a pas d'aperçus utilisables."""
+    try:
+        with zipfile.ZipFile(model_path, 'r') as z:
+            infos = z.infolist()
+            if sum(i.file_size for i in infos if i.filename.lower().endswith('.model')) < HUGE_3MF_MODEL_BYTES:
+                return None
+            found = {}
+            for i in infos:
+                m = re.fullmatch(r'metadata/plate_(\d+)\.png', i.filename.lower())
+                if m:
+                    found[int(m.group(1))] = i.filename
+            if not found:
+                return None
+            tiles = []
+            for n in sorted(found)[:max_plates]:
+                try:
+                    img = Image.open(io.BytesIO(z.read(found[n])))
+                    img.load()
+                    img = img.convert('RGBA')
+                    vis = img.getchannel('A').point(lambda a: 255 if a > 16 else 0)
+                    box = vis.getbbox()
+                    if box is None or vis.histogram()[255] < img.width * img.height * 0.005:
+                        continue   # aperçu vide (plateau jamais découpé)
+                    tiles.append(img.crop(box))
+                except Exception:
+                    continue
+            if not tiles:
+                return None
+            size = 768
+            bg = Image.new('RGBA', (size, size), THUMB_BG_RGB + (255,))
+            if len(tiles) == 1:
+                grid = (1, 1)
+            elif len(tiles) == 2:
+                grid = (2, 1)
+            else:
+                grid = (2, 2)
+            cw, ch = size // grid[0], size // grid[1]
+            pad = 14
+            for idx, tile in enumerate(tiles):
+                t = tile.copy()
+                t.thumbnail((cw - pad * 2, ch - pad * 2), Image.LANCZOS)
+                cx, cy = (idx % grid[0]) * cw, (idx // grid[0]) * ch
+                bg.alpha_composite(t, (cx + (cw - t.width) // 2, cy + (ch - t.height) // 2))
+            return bg.convert('RGB')
+    except Exception as e:
+        app_logger.info(f"[THUMB] Montage des aperçus impossible pour {os.path.basename(model_path)}: {e}")
     return None
 
 
@@ -6060,27 +6461,40 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
                 file_to_load = tmp_path
             elif is_smb:
                 smb_path = stl_path.replace('\\\\', '//').replace('\\', '/')
+                if _smb_host_is_paused(stl_path):
+                    app_logger.info(f"[SMB] Serveur en pause (injoignable), miniature différée : {os.path.basename(stl_path)}")
+                    return False
                 max_retries = 3
-                for attempt in range(max_retries):
-                    try:
-                        tmp_fd, tmp_path = tempfile.mkstemp(suffix=os.path.splitext(stl_path)[1])
-                        os.close(tmp_fd)
-                        with smbclient.open_file(smb_path, 'rb', share_access='r') as smb_file:
-                            with open(tmp_path, 'wb') as local_file:
-                                while True:
-                                    chunk = smb_file.read(8192)
-                                    if not chunk:
-                                        break
-                                    local_file.write(chunk)
-                        break
-                    except Exception as smb_err:
-                        if '0xc0000043' in str(smb_err) and attempt < max_retries - 1:
-                            time.sleep(1)
-                        if tmp_path and os.path.exists(tmp_path):
-                            os.unlink(tmp_path)
-                        tmp_path = None
-                        continue
-                    raise
+                copied = False
+                last_smb_err = None
+                with _smb_thumb_sem:
+                    for attempt in range(max_retries):
+                        try:
+                            tmp_fd, tmp_path = tempfile.mkstemp(suffix=os.path.splitext(stl_path)[1])
+                            os.close(tmp_fd)
+                            with smbclient.open_file(smb_path, 'rb', share_access='r') as smb_file:
+                                with open(tmp_path, 'wb') as local_file:
+                                    while True:
+                                        chunk = smb_file.read(SMB_COPY_CHUNK)
+                                        if not chunk:
+                                            break
+                                        local_file.write(chunk)
+                            copied = True
+                            break
+                        except Exception as smb_err:
+                            last_smb_err = smb_err
+                            if tmp_path and os.path.exists(tmp_path):
+                                try:
+                                    os.unlink(tmp_path)
+                                except OSError:
+                                    pass
+                            tmp_path = None
+                            if attempt < max_retries - 1:
+                                time.sleep(1.5 * (attempt + 1))
+                if not copied:
+                    _smb_host_mark_down(stl_path, last_smb_err)
+                    app_logger.warning(f"[SMB] Lecture impossible pour miniature ({os.path.basename(stl_path)}): {last_smb_err}")
+                    return False
                 file_to_load = tmp_path
             else:
                 if not os.path.exists(stl_path):
@@ -6098,10 +6512,23 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
                         if tmp_path and os.path.exists(tmp_path):
                             os.unlink(tmp_path)
                         return True
+                _montage = _extract_3mf_plate_montage(file_to_load) if get_3mf_plate_count(file_to_load) > 1 else None
+                if _montage is not None:
+                    _montage.save(thumb_path, 'WEBP', quality=85)
+                    if tmp_path and os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+                    return True
                 if get_3mf_plate_count(file_to_load) > 1:
                     mesh = _build_multiplate_overview_mesh(file_to_load, want_colors=True, max_faces=36000)
                 if mesh is None:
-                    mesh = load_3mf_mesh(file_to_load, want_colors=True, max_faces=36000)
+                    _prusa_rgb = _prusa_mono_filament_rgb(file_to_load) if get_3mf_plate_count(file_to_load) <= 1 else None
+                    if _prusa_rgb is not None:
+                        # pièce monochrome PrusaSlicer : même rendu que les STL (maillage complet), à la couleur du filament
+                        mesh = load_3mf_mesh(file_to_load, want_colors=False, max_faces=None)
+                        if mesh is not None and not isinstance(mesh, trimesh.Scene):
+                            mesh.metadata['stellio_base_rgb'] = tuple(int(x) for x in _prusa_rgb)
+                    if mesh is None:
+                        mesh = load_3mf_mesh(file_to_load, want_colors=True, max_faces=100000)
             else:
                 mesh = load_model_mesh(file_to_load, ext)
 
@@ -6116,13 +6543,23 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
                 return False
 
 
-            MAX_RENDER_FACES = 60000
+            # Réduction seulement pour les maillages vraiment énormes : en dessous, la décimation quadrique détruit
+            # les pièces fines et plates (flocons, ajourés, reliefs) alors que le rendu complet reste rapide.
+            _base_override = None
+            try:
+                _b = mesh.metadata.get('stellio_base_rgb') if hasattr(mesh, 'metadata') else None
+                if _b is not None:
+                    _base_override = tuple(int(x) for x in _b)
+            except Exception:
+                _base_override = None
+            MAX_RENDER_FACES = 400000
+            RENDER_TARGET_FACES = 300000
             faces_before = len(mesh.faces)
             _has_face_colors = (hasattr(mesh, 'metadata') and mesh.metadata.get('stellio_face_rgb') is not None)
             if faces_before > MAX_RENDER_FACES and not _has_face_colors:  # la décimation globale ferait perdre les couleurs par face
                 try:
                     import fast_simplification
-                    mesh = mesh.simplify_quadric_decimation(face_count=MAX_RENDER_FACES)
+                    mesh = mesh.simplify_quadric_decimation(face_count=RENDER_TARGET_FACES)
                     app_logger.info(
                         f"[RENDER] Mesh décimé {faces_before} → {len(mesh.faces)} faces "
                         f"({os.path.basename(stl_path)})"
@@ -6166,7 +6603,7 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
 
             if _pyrender_unavailable or _face_rgb is not None:
                 # maillage multicolore : rendu CPU (couleur par face fiable, identique sur toutes les machines)
-                return _generate_thumbnail_raster(mesh, thumb_path, resolution, face_rgb=_face_rgb)
+                return _generate_thumbnail_raster(mesh, thumb_path, resolution, face_rgb=_face_rgb, base_rgb=_base_override)
             try:
                 import pyrender
                 with pyrender_lock:
@@ -6176,7 +6613,7 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
                     )
                     material = pyrender.MetallicRoughnessMaterial(
                         baseColorFactor=([1.0, 1.0, 1.0, 1.0] if _face_rgb is not None
-                                         else [c / 255.0 for c in _thumb_base_rgb()] + [1.0]),
+                                         else [c / 255.0 for c in (_base_override or _thumb_base_rgb())] + [1.0]),
                         metallicFactor=0.0,
                         roughnessFactor=0.35
                     )
@@ -6244,12 +6681,12 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
                         app_logger.info("[THUMBS] OpenGL indisponible : rendu CPU (z-buffer) utilisé pour les miniatures")
                     _pyrender_unavailable = True
                     _persistent_renderer = None
-                    return _generate_thumbnail_raster(mesh, thumb_path, resolution, face_rgb=_face_rgb)
+                    return _generate_thumbnail_raster(mesh, thumb_path, resolution, face_rgb=_face_rgb, base_rgb=_base_override)
                 if 'OSMesa' in err_str or 'Win32Platform' in err_str or 'osmesa' in err_str.lower():
                     app_logger.info(f"[FALLBACK] PyRender GPU non dispo → rendu CPU rapide pour {os.path.basename(stl_path)}")
-                    return _generate_thumbnail_raster(mesh, thumb_path, resolution, face_rgb=_face_rgb)
+                    return _generate_thumbnail_raster(mesh, thumb_path, resolution, face_rgb=_face_rgb, base_rgb=_base_override)
                 app_logger.warning(f"[ERROR] Rendu pyrender {os.path.basename(stl_path)}: {render_err}")
-                return _generate_thumbnail_raster(mesh, thumb_path, resolution, face_rgb=_face_rgb)
+                return _generate_thumbnail_raster(mesh, thumb_path, resolution, face_rgb=_face_rgb, base_rgb=_base_override)
 
         except Exception as load_err:
             app_logger.warning(f"[ERROR] Chargement mesh {os.path.basename(stl_path)}: {load_err}")
@@ -6261,7 +6698,7 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
         app_logger.error(f"[ERROR] generate_thumbnail_pyrender {os.path.basename(stl_path)}: {e}")
         return False
 
-def _generate_thumbnail_raster(mesh, thumb_path, resolution=(768, 768), face_rgb=None):
+def _generate_thumbnail_raster(mesh, thumb_path, resolution=(768, 768), face_rgb=None, base_rgb=None):
     try:
         vertices = mesh.vertices
         faces = mesh.faces
@@ -6270,7 +6707,7 @@ def _generate_thumbnail_raster(mesh, thumb_path, resolution=(768, 768), face_rgb
         if face_rgb is not None and len(face_rgb) != len(faces):
             face_rgb = None
 
-        MAX_RASTER_FACES = 70000 if face_rgb is not None else 40000
+        MAX_RASTER_FACES = 110000 if face_rgb is not None else 350000
         if face_rgb is not None and len(faces) > MAX_RASTER_FACES:
             stride = (len(faces) // MAX_RASTER_FACES) + 1
             faces = faces[::stride]
@@ -6316,7 +6753,7 @@ def _generate_thumbnail_raster(mesh, thumb_path, resolution=(768, 768), face_rgb
         AMBIENT = 0x40 / 255.0 * 1.3
         KEY_INTENSITY = 0.7
         SPECULAR_COLOR, SHININESS = (0x11 / 255.0), 120.0
-        base_color = np.array(_thumb_base_rgb(), dtype=np.float64)
+        base_color = np.array(base_rgb or _thumb_base_rgb(), dtype=np.float64)
 
         F = np.asarray(faces)
         _vv = np.asarray(vertices, dtype=np.float64)
@@ -6580,10 +7017,17 @@ def analysis_background_worker():
         known = 0
         _analysis_wake.clear()
         try:
+            # Aucune passe tant que des miniatures se génèrent ou que l'utilisateur agit : le parcours de la bibliothèque
+            # ne doit jamais concurrencer l'interface (surtout juste après une régénération complète des miniatures)
+            while _user_is_active() or not thumb_generation_queue.empty():
+                time.sleep(5)
             _analysis_progress['running'] = True
             conn = get_db()
             try:
                 sources = conn.execute("SELECT * FROM sources").fetchall()
+                # état connu chargé d'un seul coup (au lieu d'une connexion par fichier)
+                known_rows = {r['path_hash']: (r['mtime'], r['size'], r['failed'])
+                              for r in conn.execute("SELECT path_hash, mtime, size, failed FROM file_analysis").fetchall()}
             finally:
                 conn.close()
             exts = tuple(e for e in SUPPORTED_EXTENSIONS_TUPLE if e not in ('.step', '.stp'))
@@ -6602,8 +7046,8 @@ def analysis_background_worker():
                         if stat is None or stat[1] > ANALYSIS_BG_MAX_BYTES:
                             continue
                         total += 1
-                        meta, failed = analysis_db_get(fpath)
-                        if meta is not None or failed:
+                        kr = known_rows.get(_analysis_hash(fpath))
+                        if kr and abs((kr[0] or 0) - stat[0]) <= 0.001 and int(kr[1] or 0) == stat[1]:
                             known += 1
                             continue
                         # pas de calcul tant que l'utilisateur agit ou que des miniatures se génèrent
@@ -6628,7 +7072,7 @@ def analysis_background_worker():
 
 
 # Version du rendu des miniatures : relève-la quand le rendu change pour que les anciennes soient refaites seules.
-THUMB_RENDER_VERSION = 3
+THUMB_RENDER_VERSION = 8   # 8 : 3MF PrusaSlicer rendus en 3D (maillage complet, couleur du filament) au lieu de l'aperçu à plateau ; 7 : détourage PrusaSlicer sans reboucher les ouvertures, objet centré avec marge ; 6 : plateau PrusaSlicer retiré par détourage de l'objet coloré ; 5 : aperçus de slicer à fond blanc détourés, plateau quadrillé écarté ; 4 : STL/3MF très détaillés sans décimation destructrice, aperçus de plateaux pour les 3MF énormes
 
 
 def thumb_render_migration_worker():
@@ -6637,7 +7081,8 @@ def thumb_render_migration_worker():
     time.sleep(60)
     try:
         settings = load_settings() or {}
-        if int(settings.get('thumb_render_version') or 0) >= THUMB_RENDER_VERSION:
+        _prev_ver = int(settings.get('thumb_render_version') or 0)
+        if _prev_ver >= THUMB_RENDER_VERSION:
             return
         conn = get_db()
         try:
@@ -6645,7 +7090,7 @@ def thumb_render_migration_worker():
         finally:
             conn.close()
         queued = 0
-        for source in sources:
+        for source in (sources if _prev_ver < 5 else []):   # passes des versions précédentes : déjà faites sinon
             if source['type'] != 'folder' or not source['path'] or not os.path.isdir(source['path']):
                 continue
             if str(source['path']).startswith(('//', '\\\\')):
@@ -6653,15 +7098,26 @@ def thumb_render_migration_worker():
             for root, dirs, files in os.walk(source['path']):
                 dirs[:] = [d for d in dirs if d != PLATE_SPLIT_DIRNAME]
                 for fname in files:
-                    if not fname.lower().endswith('.3mf'):
+                    _low = fname.lower()
+                    if not _low.endswith(('.3mf', '.stl')):
                         continue
                     fpath = os.path.join(root, fname).replace('\\', '/')
+                    if _low.endswith('.stl'):
+                        try:
+                            if os.path.getsize(fpath) < 3 * 1024 * 1024:
+                                continue   # moins de ~60 000 triangles : ancien rendu déjà fidèle
+                        except OSError:
+                            continue
+                    thumb_path = os.path.join(THUMBNAILS_DIR, hashlib.md5(fpath.encode()).hexdigest() + '.webp')
+                    if not os.path.exists(thumb_path):
+                        continue   # pas de miniature : elle sera dessinée avec le rendu actuel de toute façon
+                    while _user_is_active() or not thumb_generation_queue.empty():
+                        time.sleep(5)
                     try:
-                        if get_3mf_plate_count(fpath) <= 1 and _extract_3mf_embedded_preview(fpath) is not None:
+                        if _low.endswith('.3mf') and get_3mf_plate_count(fpath) <= 1 and _extract_3mf_embedded_preview(fpath) is not None:
                             continue
                     except Exception:
                         pass
-                    thumb_path = os.path.join(THUMBNAILS_DIR, hashlib.md5(fpath.encode()).hexdigest() + '.webp')
                     if os.path.exists(thumb_path):
                         try:
                             os.remove(thumb_path)
@@ -6672,10 +7128,60 @@ def thumb_render_migration_worker():
                     if _queue_thumb_task(fpath, thumb_path, priority='low'):
                         queued += 1
                     time.sleep(0.05)
+        # Miniatures 3MF (tous emplacements, réseau compris) dont le fond n'est pas celui des miniatures Stellio :
+        # fond blanc ou plateau d'un aperçu de slicer. Détectées d'après la miniature déjà enregistrée.
+        try:
+            cache = _read_cache_json_safe(attempts=2, delay=0.2) or {}
+            for entry in cache.get('files', []):
+                fpath = str(entry.get('path') or '').replace('\\', '/')
+                if not fpath.lower().endswith('.3mf') or '::' in fpath:
+                    continue
+                thumb_path = os.path.join(THUMBNAILS_DIR, hashlib.md5(fpath.encode()).hexdigest() + '.webp')
+                if not os.path.exists(thumb_path):
+                    continue
+                if _prev_ver >= 6:
+                    # v7 : refaire une fois les miniatures des 3MF PrusaSlicer (détourage amélioré)
+                    try:
+                        with zipfile.ZipFile(fpath, 'r') as _zp:
+                            if not any(n.lower().endswith('slic3r_pe.config') for n in _zp.namelist()):
+                                continue
+                        os.remove(thumb_path)
+                    except Exception:
+                        continue
+                    ignored_files_cache.pop(fpath, None)
+                    _release_thumb_inflight(fpath)
+                    if _queue_thumb_task(fpath, thumb_path, priority='low'):
+                        queued += 1
+                    time.sleep(0.02)
+                    continue
+                try:
+                    with Image.open(thumb_path) as im:
+                        im = im.convert('RGB')
+                        w, h = im.size
+                        corners = [im.getpixel(p) for p in ((2, 2), (w - 3, 2), (2, h - 3), (w - 3, h - 3))]
+                    corners_ok = all(max(abs(c[i] - THUMB_BG_RGB[i]) for i in range(3)) <= 10 for c in corners)
+                    if corners_ok:
+                        # plateau quadrillé d'un aperçu PrusaSlicer : large zone grise neutre qui n'est pas le fond Stellio
+                        arr = np.asarray(im.resize((96, 96)), dtype=np.float32) / 255.0
+                        mxv, mnv = arr.max(axis=2), arr.min(axis=2)
+                        bgd = np.abs(arr - np.array(THUMB_BG_RGB, dtype=np.float32) / 255.0).max(axis=2) > 0.06
+                        neutral = ((mxv - mnv) < 0.08) & (mxv > 0.15) & (mxv < 0.75) & bgd
+                        if neutral.mean() <= 0.25:
+                            continue
+                    os.remove(thumb_path)
+                except Exception:
+                    continue
+                ignored_files_cache.pop(fpath, None)
+                _release_thumb_inflight(fpath)
+                if _queue_thumb_task(fpath, thumb_path, priority='low'):
+                    queued += 1
+                time.sleep(0.01)
+        except Exception as e:
+            app_logger.info(f"[THUMBS] Contrôle des fonds de miniatures impossible: {e}")
         settings = load_settings() or {}
         settings['thumb_render_version'] = THUMB_RENDER_VERSION
         save_settings(settings)
-        app_logger.info(f"[THUMBS] Nouveau rendu des miniatures : {queued} fichier(s) 3MF replanifié(s)")
+        app_logger.info(f"[THUMBS] Nouveau rendu des miniatures : {queued} fichier(s) STL/3MF replanifié(s)")
     except Exception as e:
         app_logger.info(f"[THUMBS] Migration du rendu impossible: {e}")
 
@@ -9208,8 +9714,7 @@ def api_thumb_progress():
 
     if os.path.exists(CACHE_FILE):
         try:
-            with open(CACHE_FILE, 'r', encoding='utf-8') as f:
-                cache = json.load(f)
+            cache = _read_cache_json_safe(attempts=2, delay=0.1) or {}
             for file_entry in cache.get('files', []):
                 if file_entry.get('has_thumb'):
                     files_with_thumb += 1
@@ -9227,7 +9732,10 @@ def api_thumb_progress():
         'files_without_thumb': files_without_thumb,
         'total': total,
         'progress': round(progress, 1),
-        'is_generating': pending > 0 or is_generation_running
+        'is_generating': pending > 0 or is_generation_running,
+        'workers': _thumb_allowed_workers(),
+        'mode': _thumb_perf_cache['mode'],
+        'analysis': dict(_analysis_progress)
     })
 
 
@@ -10070,22 +10578,9 @@ def api_get_files():
         cache_data = None
 
         if os.path.exists(CACHE_FILE):
-            for attempt in range(2):
-                try:
-                    with open(CACHE_FILE, 'r', encoding='utf-8') as f:
-                        cache_data = json.load(f)
-                    if isinstance(cache_data, dict) and 'files' in cache_data:
-                        cached_files = cache_data['files']
-                    else:
-                        invalidate_cache()
-                        cache_data = None
-                    break
-                except json.JSONDecodeError:
-                    if attempt == 0:
-                        time.sleep(0.1)
-                        continue
-                    app_logger.info("[WARN] Lecture cache impossible dans api_get_files (fichier momentanément verrouillé ?)")
-                    cache_data = None
+            cache_data = _read_cache_json_safe()
+            if cache_data is not None:
+                cached_files = cache_data['files']
 
         cache_timestamp = cache_data.get('timestamp', 0) if cache_data else 0
 
@@ -12109,7 +12604,7 @@ def api_delete_print_photo(photo_id):
 def api_browse_folder():
     try:
         import webview
-        result = webview.windows[0].create_file_dialog(webview.FOLDER_DIALOG)
+        result = webview.windows[0].create_file_dialog(_wv_dialog(webview, 'FOLDER'))
         folder = result[0] if result else None
 
         if folder:
@@ -13627,7 +14122,7 @@ def api_slicer_send_batch():
 def api_pick_folder():
     try:
         import webview
-        result = webview.windows[0].create_file_dialog(webview.FOLDER_DIALOG)
+        result = webview.windows[0].create_file_dialog(_wv_dialog(webview, 'FOLDER'))
         folder = result[0] if result else None
 
         if folder:
@@ -13644,7 +14139,7 @@ def api_pick_file():
     try:
         import webview
         result = webview.windows[0].create_file_dialog(
-            webview.OPEN_DIALOG,
+            _wv_dialog(webview, 'OPEN'),
             allow_multiple=True,
             file_types=('Fichiers 3D (*.stl;*.3mf;*.obj;*.step;*.stp;*.ply;*.amf)', 'STL (*.stl)', '3MF (*.3mf)', 'OBJ (*.obj)', 'STEP (*.step;*.stp)', 'PLY (*.ply)', 'AMF (*.amf)', 'Tous les fichiers (*.*)')
         )
@@ -17254,7 +17749,7 @@ def api_backup_export_native():
     try:
         import webview
         result = webview.windows[0].create_file_dialog(
-            webview.SAVE_DIALOG,
+            _wv_save_dialog(webview),
             directory=str(Path.home() / 'Downloads'),
             save_filename=suggested_name,
             file_types=('Archive ZIP (*.zip)', 'Tous les fichiers (*.*)')
@@ -18201,7 +18696,7 @@ def api_export_logs_native():
         zip_bytes, filename = build_diagnostic_zip_bytes()
 
         result = webview.windows[0].create_file_dialog(
-            webview.SAVE_DIALOG,
+            _wv_save_dialog(webview),
             directory=str(Path.home() / 'Downloads'),
             save_filename=filename
         )
@@ -18674,7 +19169,7 @@ def api_quote_history_save_native(qid):
     try:
         import webview
         result = webview.windows[0].create_file_dialog(
-            webview.SAVE_DIALOG, directory=str(Path.home() / 'Documents'),
+            _wv_save_dialog(webview), directory=str(Path.home() / 'Documents'),
             save_filename=_safe_quote_pdf_filename(row['filename'] or row['number']),
             file_types=('Document PDF (*.pdf)',))
     except Exception as e:
@@ -18730,7 +19225,7 @@ def api_quote_export_native():
     try:
         import webview
         result = webview.windows[0].create_file_dialog(
-            webview.SAVE_DIALOG,
+            _wv_save_dialog(webview),
             directory=str(Path.home() / 'Documents'),
             save_filename=filename,
             file_types=('Document PDF (*.pdf)',)
@@ -18853,6 +19348,7 @@ def api_get_settings():
         settings.setdefault('low_stock_threshold_g', LOW_STOCK_FLOOR_G)
         settings.setdefault('restock_threshold_g', RESTOCK_DEFAULT_G)
         settings.setdefault('thumb_color', THUMB_DEFAULT_COLOR)
+        settings.setdefault('thumb_perf_mode', 'auto')
         settings['launch_at_startup_supported'] = True
         settings['launch_at_startup'] = is_startup_enabled()
         settings['launch_minimized'] = is_startup_minimized() if settings['launch_at_startup'] else bool(settings.get('launch_minimized', False))
@@ -18910,6 +19406,12 @@ def api_save_settings():
             if not re.fullmatch(r'#[0-9a-fA-F]{6}', _tc):
                 return jsonify({"error": "Couleur de miniature invalide", "code": "invalid_thumb_color"}), 400
             data['thumb_color'] = _tc.lower()
+
+        if 'thumb_perf_mode' in data:
+            if str(data.get('thumb_perf_mode') or '') not in THUMB_PERF_MODES:
+                return jsonify({"error": "Mode de performance invalide", "code": "invalid_thumb_perf"}), 400
+            data['thumb_perf_mode'] = str(data['thumb_perf_mode'])
+            _thumb_perf_cache['t'] = 0.0   # pris en compte immédiatement
 
         for _lk, _lmax in (('low_stock_threshold_percent', 100), ('low_stock_threshold_g', 5000), ('restock_threshold_g', 20000)):
             if _lk in data:
@@ -18982,7 +19484,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.8.2"
+CURRENT_VERSION = "0.8.3"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -25886,7 +26388,7 @@ def api_report_export_native():
     try:
         import webview
         result = webview.windows[0].create_file_dialog(
-            webview.SAVE_DIALOG, directory=str(Path.home() / 'Documents'),
+            _wv_save_dialog(webview), directory=str(Path.home() / 'Documents'),
             save_filename=filename, file_types=('Document PDF (*.pdf)',)
         )
     except Exception as e:
@@ -28740,6 +29242,27 @@ if __name__ in ('__main__', 'stellio_main'):
             if _EARLY_SPLASH is not None:
                 _EARLY_SPLASH.close(delay=1.5 if ready else 5)
         app_logger.info("[OK] Splash fermé, lancement de l'interface principale...")
+
+        def _tray_open():
+            w = _app_window
+            if w is not None:
+                try:
+                    w.show()
+                    w.restore()
+                    return
+                except Exception:
+                    pass
+            import webbrowser
+            webbrowser.open(_desktop_url(SERVER_URL))
+
+        def _tray_quit():
+            try:
+                _cleanup_before_exit()
+            except Exception:
+                pass
+            os._exit(0)
+
+        _start_tray_icon(_tray_open, _tray_quit)
         try:
             import webview
 
@@ -28754,7 +29277,7 @@ if __name__ in ('__main__', 'stellio_main'):
 
                     try:
                         result = webview.windows[0].create_file_dialog(
-                            webview.SAVE_DIALOG,
+                            _wv_save_dialog(webview),
                             directory=str(Path.home() / 'Downloads'),
                             save_filename=suggested_name,
                             file_types=('Archive ZIP (*.zip)', 'Tous les fichiers (*.*)')
@@ -28946,16 +29469,51 @@ if __name__ in ('__main__', 'stellio_main'):
 
             _webview_options = {'debug': False, 'private_mode': False}
             if _portable_data_dir():
-                _webview_options['storage_path'] = os.path.join(DATA_DIR, 'webview')   # cookies / stockage local du mode portable
+                _wv_storage = os.path.join(DATA_DIR, 'webview')   # cookies / stockage local du mode portable
+                try:
+                    os.makedirs(_wv_storage, exist_ok=True)
+                    _wv_probe = os.path.join(_wv_storage, '.write_test')
+                    with open(_wv_probe, 'w') as _f:
+                        _f.write('ok')
+                    os.remove(_wv_probe)
+                    _webview_options['storage_path'] = _wv_storage
+                except Exception as _ex:
+                    app_logger.warning(f"[Window] Dossier du navigateur intégré inutilisable ({_ex}) : dossier par défaut utilisé")
             webview.start(_bind_drag_drop, window, **_webview_options)
             app_logger.info("[INFO] Stellio s'est arrêté.")
         except Exception as e:
             app_logger.info(f"[WARN] PyWebView échec ({type(e).__name__}: {e})")
-            app_logger.info("[INFO] Ouverture de secours dans le navigateur par défaut...")
-            import webbrowser
-            webbrowser.open(_desktop_url(SERVER_URL))   # repli : la fenêtre n'a pas pu s'ouvrir, le navigateur reçoit le jeton
             try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                app_logger.info("\n[INFO] Arrêt propre.")
+                import traceback
+                app_logger.info("[WARN] Détail PyWebView :\n" + traceback.format_exc())
+            except Exception:
+                pass
+            _wv_recovered = False
+            try:
+                if _webview_options.get('storage_path'):
+                    # Mode portable : le dossier de données du navigateur intégré a pu poser problème
+                    # (dossier protégé, antivirus, chemin accentué…) : nouvel essai avec le dossier par défaut de Windows.
+                    app_logger.info("[Window] Nouvel essai avec le dossier par défaut du navigateur intégré...")
+                    _webview_options.pop('storage_path', None)
+                    try:
+                        webview.windows.clear()
+                    except Exception:
+                        pass
+                    window = webview.create_window('Stellio', _desktop_url(SERVER_URL), **_window_kwargs)
+                    _app_window = window
+                    window.events.closing += _on_window_closing
+                    _wv_recovered = True
+                    webview.start(_bind_drag_drop, window, **_webview_options)
+                    app_logger.info("[INFO] Stellio s'est arrêté.")
+            except Exception as e2:
+                _wv_recovered = False
+                app_logger.info(f"[WARN] Nouvel essai impossible ({type(e2).__name__}: {e2})")
+            if not _wv_recovered:
+                app_logger.info("[INFO] Ouverture de secours dans le navigateur par défaut...")
+                import webbrowser
+                webbrowser.open(_desktop_url(SERVER_URL))   # repli : la fenêtre n'a pas pu s'ouvrir, le navigateur reçoit le jeton
+                try:
+                    while True:
+                        time.sleep(1)
+                except KeyboardInterrupt:
+                    app_logger.info("\n[INFO] Arrêt propre.")

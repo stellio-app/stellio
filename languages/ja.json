@@ -1761,6 +1761,9 @@
   "cost.fixed_fee_cost_label": "固定費",
   "cost.fixed_fee_label": "固定費",
   "cost.margin_label": "利益率 (%)",
+  "cost.margin_settings_hint": "コスト計算機と見積もりで印刷コストに上乗せされる価格マージン。各計算ごとに個別に変更することもできます。",
+  "history.sale_price": "販売価格",
+  "history.sale_price_title": "販売価格 = コスト + マージン",
   "cost.margin_line_label": "利益 ({{pct}}%)",
   "cost.quantity_label": "数量",
   "cost.quote_client": "顧客",
@@ -2214,5 +2217,15 @@
   "tour.step_fileinfo_controls_desc": "スライサーのプロファイルと％単位のサイズを選ぶと、重量・時間・コストが再計算されます。200％のモデルは50％よりずっと多くフィラメントを使います。",
   "tour.step_fileinfo_actions_title": "送信・表示・見積もり",
   "tour.step_fileinfo_actions_desc": "このウィンドウから、スライサーへの送信、3D ビューアでの表示、コスト内訳の確認ができます。",
-  "tour.demo_toast": "デモ用ファイル：これらのボタンは実際のファイルで動作します。"
+  "tour.demo_toast": "デモ用ファイル：これらのボタンは実際のファイルで動作します。",
+  "settings.thumb_perf_title": "サムネイルのパフォーマンス",
+  "settings.thumb_perf_hint": "同時に描画するサムネイルの数。少ないほど、全件再生成中でもアプリが快適に動作します（ただし時間はかかります）。",
+  "settings.thumb_perf_auto": "自動（マシンに合わせる）",
+  "settings.thumb_perf_eco": "省電力（1 件ずつ）",
+  "settings.thumb_perf_normal": "標準",
+  "settings.thumb_perf_fast": "高速（全コア使用）",
+  "settings.thumb_perf_saved": "サムネイルのパフォーマンスを保存しました",
+  "thumbs.progress": "サムネイル",
+  "thumbs.pending": "待機中",
+  "thumbs.workers": "同時レンダリング数"
 }

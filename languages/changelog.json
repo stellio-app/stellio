@@ -1,5 +1,122 @@
 [
   {
+    "version": "0.8.3",
+    "items": {
+      "fr": [
+        "Paramètres : nouvelle option « Performance des miniatures » (Automatique / Économe / Normal / Rapide) pour choisir combien de miniatures sont dessinées en même temps ; en automatique, une machine modeste n'en dessine qu'une à la fois et une grosse régénération est étalée",
+        "Miniatures : l'indicateur de progression est traduit (« Miniatures : 120/800 · en attente : 680 »), indique le nombre de rendus simultanés et se relance à chaque actualisation",
+        "Miniatures 3MF multicolores : lecture des couleurs peintes plus rapide",
+        "Miniatures : les modèles très détaillés (flocons, pièces ajourées ou plates, jusqu'à 400 000 triangles) ne sont plus déformés en éclats ; les 3MF énormes (plusieurs dizaines de Mo de maillage) utilisent les aperçus de plateaux du slicer, instantanés et fidèles ; les miniatures concernées sont refaites automatiquement",
+        "Correction : pendant une génération de miniatures, la bibliothèque ne disparaît plus avec « Erreur de connexion » (lecture du cache protégée, liste conservée à l'écran, nouvelle tentative automatique)",
+        "Miniatures sur réseau (SMB) : copie 20× plus rapide par gros blocs, 2 lectures simultanées maximum pour ne pas saturer le NAS, pause automatique d'un serveur injoignable, et message d'erreur clair (au lieu de « expected str, bytes or os.PathLike object, not NoneType »)",
+        "Miniatures 3MF : le fond blanc des aperçus de slicer est supprimé (objet recadré sur le fond sombre) et les aperçus qui montrent le plateau quadrillé sont écartés au profit du rendu 3D aux couleurs du fichier ; les miniatures concernées, y compris sur le réseau, sont refaites automatiquement",
+        "Miniatures 3MF PrusaSlicer : l'aperçu du slicer montrant le plateau quadrillé n'est plus utilisé ; la pièce est rendue en 3D comme un STL (maillage complet, couleur du filament du fichier) ; les miniatures concernées sont refaites automatiquement",
+        "Miniatures 3MF PrusaSlicer : un fichier dont tous les filaments ont la même couleur est rendu en pièce unie (maillage complet) au lieu d'un rendu multicolore simplifié ; 3MF multicolores : davantage de triangles conservés. Console : avertissements réseau SMB inoffensifs masqués, constantes de dialogues pywebview mises à jour",
+        "Paramètres › Tarifs d'impression : la marge tarifaire (%) est de nouveau réglable une fois pour toutes ; elle sert de valeur par défaut au calculateur de coût et aux devis",
+        "Historique d'impression : le prix de vente (coût + marge) s'affiche à côté du coût quand une marge est réglée ; les statistiques et rapports restent calculés sur le coût de revient",
+        "Windows : une icône Stellio apparaît à côté de l'horloge tant que Stellio tourne (clic = ouvrir, clic droit = Ouvrir / Quitter) ; version portable : dossier du navigateur intégré vérifié avant l'ouverture et détail de l'erreur écrit dans les journaux si la fenêtre ne s'ouvre pas"
+      ],
+      "en": [
+        "Settings: new \"Thumbnail performance\" option (Automatic / Eco / Normal / Fast) to choose how many thumbnails are drawn at the same time; in automatic mode a modest machine draws only one at a time and a large regeneration is spread out",
+        "Thumbnails: the progress indicator is translated (\"Thumbnails: 120/800 · pending: 680\"), shows the number of simultaneous renders and restarts on every refresh",
+        "Multicolor 3MF thumbnails: faster reading of painted colors",
+        "Thumbnails: very detailed models (snowflakes, perforated or flat parts, up to 400,000 triangles) are no longer shredded into shards; huge 3MF files (tens of MB of mesh) use the slicer's plate previews, instant and faithful; affected thumbnails are regenerated automatically",
+        "Fix: during thumbnail generation, the library no longer disappears with \"Connection error\" (protected cache reading, list kept on screen, automatic retry)",
+        "Network (SMB) thumbnails: much faster copy using large blocks, at most 2 simultaneous reads so the NAS is not overloaded, automatic pause for an unreachable server, and a clear error message (instead of \"expected str, bytes or os.PathLike object, not NoneType\")",
+        "3MF thumbnails: the white background of slicer previews is removed (object cropped onto the dark background) and previews showing the grid bed are discarded in favor of the 3D render using the file's colors; affected thumbnails, including network ones, are regenerated automatically",
+        "PrusaSlicer 3MF thumbnails: the slicer preview showing the grid bed is no longer used; the part is rendered in 3D like an STL (full mesh, the file's filament color); affected thumbnails are regenerated automatically",
+        "PrusaSlicer 3MF thumbnails: a file whose filaments all share the same colour is now rendered as a single-colour part (full mesh) instead of a simplified multicolour render; multicolour 3MFs keep more triangles. Console: harmless SMB network warnings hidden, pywebview dialog constants updated",
+        "Settings › Print pricing: the pricing margin (%) can be set once again; it is the default value for the cost calculator and quotes",
+        "Print history: the sale price (cost + margin) is shown next to the cost when a margin is set; statistics and reports remain based on the actual cost",
+        "Windows: a Stellio icon appears next to the clock while Stellio is running (click = open, right-click = Open / Quit); portable version: the built-in browser folder is checked before opening and the error details are written to the logs if the window cannot open"
+      ],
+      "de": [
+        "Einstellungen: neue Option „Vorschau-Leistung“ (Automatisch / Sparsam / Normal / Schnell), um zu wählen, wie viele Vorschaubilder gleichzeitig erzeugt werden; im Automatikmodus erzeugt ein schwächerer Rechner nur eines nach dem anderen und eine große Neuerzeugung wird gestreckt",
+        "Vorschaubilder: Der Fortschrittsanzeiger ist übersetzt („Vorschaubilder: 120/800 · ausstehend: 680“), zeigt die Zahl gleichzeitiger Renderings und startet bei jeder Aktualisierung neu",
+        "Mehrfarbige 3MF-Vorschaubilder: schnelleres Einlesen der gemalten Farben",
+        "Vorschaubilder: sehr detaillierte Modelle (Schneeflocken, durchbrochene oder flache Teile, bis 400.000 Dreiecke) werden nicht mehr in Splitter zerlegt; riesige 3MF-Dateien (mehrere zehn MB Mesh) verwenden die Plattenvorschauen des Slicers, sofort und originalgetreu; betroffene Vorschaubilder werden automatisch neu erzeugt",
+        "Korrektur: Während der Vorschau-Erzeugung verschwindet die Bibliothek nicht mehr mit „Verbindungsfehler“ (geschütztes Lesen des Caches, Liste bleibt sichtbar, automatischer neuer Versuch)",
+        "Vorschaubilder im Netzwerk (SMB): deutlich schnelleres Kopieren in großen Blöcken, höchstens 2 gleichzeitige Lesevorgänge, damit das NAS nicht überlastet wird, automatische Pause bei nicht erreichbarem Server und eine klare Fehlermeldung (statt „expected str, bytes or os.PathLike object, not NoneType“)",
+        "3MF-Vorschaubilder: Der weiße Hintergrund von Slicer-Vorschauen wird entfernt (Objekt auf dunklem Hintergrund zugeschnitten), und Vorschauen mit sichtbarem Gitterbett werden zugunsten des 3D-Renderings in den Dateifarben verworfen; betroffene Vorschaubilder, auch im Netzwerk, werden automatisch neu erzeugt",
+        "PrusaSlicer-3MF-Vorschaubilder: Die Slicer-Vorschau mit dem Gitterbett wird nicht mehr verwendet; das Teil wird wie eine STL in 3D gerendert (volles Mesh, Filamentfarbe der Datei); betroffene Vorschaubilder werden automatisch neu erzeugt",
+        "PrusaSlicer-3MF-Miniaturen: Eine Datei, deren Filamente alle dieselbe Farbe haben, wird als einfarbiges Teil (volles Mesh) statt als vereinfachte Mehrfarbdarstellung gerendert; mehrfarbige 3MF behalten mehr Dreiecke. Konsole: harmlose SMB-Netzwerkwarnungen ausgeblendet, pywebview-Dialogkonstanten aktualisiert",
+        "Einstellungen › Druckpreise: Der Preisaufschlag (%) lässt sich wieder einmalig festlegen; er dient als Standardwert für Kostenrechner und Angebote",
+        "Druckverlauf: Der Verkaufspreis (Kosten + Aufschlag) wird neben den Kosten angezeigt, wenn ein Aufschlag festgelegt ist; Statistiken und Berichte basieren weiterhin auf den Selbstkosten",
+        "Windows: Solange Stellio läuft, erscheint ein Stellio-Symbol neben der Uhr (Klick = öffnen, Rechtsklick = Öffnen / Beenden); portable Version: Der Ordner des integrierten Browsers wird vor dem Öffnen geprüft, und bei Fehlern beim Öffnen des Fensters werden die Details ins Protokoll geschrieben"
+      ],
+      "es": [
+        "Ajustes: nueva opción «Rendimiento de las miniaturas» (Automático / Económico / Normal / Rápido) para elegir cuántas miniaturas se dibujan a la vez; en automático, un equipo modesto dibuja solo una a la vez y una regeneración grande se reparte en el tiempo",
+        "Miniaturas: el indicador de progreso está traducido («Miniaturas: 120/800 · pendientes: 680»), muestra el número de renders simultáneos y se reinicia en cada actualización",
+        "Miniaturas de 3MF multicolor: lectura más rápida de los colores pintados",
+        "Miniaturas: los modelos muy detallados (copos de nieve, piezas caladas o planas, hasta 400 000 triángulos) ya no se deforman en esquirlas; los 3MF enormes (decenas de MB de malla) usan las vistas previas de placas del slicer, instantáneas y fieles; las miniaturas afectadas se regeneran automáticamente",
+        "Corrección: durante la generación de miniaturas, la biblioteca ya no desaparece con «Error de conexión» (lectura protegida de la caché, lista conservada en pantalla, reintento automático)",
+        "Miniaturas en red (SMB): copia mucho más rápida en bloques grandes, máximo 2 lecturas simultáneas para no saturar el NAS, pausa automática de un servidor inaccesible y un mensaje de error claro (en lugar de «expected str, bytes or os.PathLike object, not NoneType»)",
+        "Miniaturas 3MF: se elimina el fondo blanco de las vistas previas del slicer (objeto recortado sobre el fondo oscuro) y se descartan las que muestran la cama cuadriculada en favor del render 3D con los colores del archivo; las miniaturas afectadas, también las de red, se regeneran automáticamente",
+        "Miniaturas 3MF de PrusaSlicer: ya no se usa la vista previa del slicer con la cama cuadriculada; la pieza se renderiza en 3D como un STL (malla completa, color del filamento del archivo); las miniaturas afectadas se regeneran automáticamente",
+        "Miniaturas 3MF de PrusaSlicer: un archivo cuyos filamentos tienen todos el mismo color se renderiza como pieza de un solo color (malla completa) en lugar de un render multicolor simplificado; los 3MF multicolor conservan más triángulos. Consola: avisos de red SMB inofensivos ocultados, constantes de diálogos de pywebview actualizadas",
+        "Ajustes › Tarifas de impresión: el margen de precio (%) vuelve a poder configurarse una sola vez; es el valor por defecto del calculador de costes y de los presupuestos",
+        "Historial de impresión: el precio de venta (coste + margen) se muestra junto al coste cuando hay un margen definido; las estadísticas y los informes siguen basándose en el coste real",
+        "Windows: aparece un icono de Stellio junto al reloj mientras Stellio está en ejecución (clic = abrir, clic derecho = Abrir / Salir); versión portable: se comprueba la carpeta del navegador integrado antes de abrir y el detalle del error se escribe en los registros si la ventana no se abre"
+      ],
+      "pt": [
+        "Definições: nova opção «Desempenho das miniaturas» (Automático / Económico / Normal / Rápido) para escolher quantas miniaturas são desenhadas ao mesmo tempo; em automático, uma máquina modesta desenha apenas uma de cada vez e uma regeneração grande é espalhada no tempo",
+        "Miniaturas: o indicador de progresso está traduzido («Miniaturas: 120/800 · pendentes: 680»), mostra o número de renders simultâneos e reinicia a cada atualização",
+        "Miniaturas de 3MF multicoloridos: leitura mais rápida das cores pintadas",
+        "Miniaturas: os modelos muito detalhados (flocos de neve, peças vazadas ou planas, até 400 000 triângulos) já não são deformados em estilhaços; os 3MF enormes (dezenas de MB de malha) usam as pré-visualizações de placas do slicer, instantâneas e fiéis; as miniaturas afetadas são regeneradas automaticamente",
+        "Correção: durante a geração de miniaturas, a biblioteca já não desaparece com «Erro de ligação» (leitura protegida da cache, lista mantida no ecrã, nova tentativa automática)",
+        "Miniaturas em rede (SMB): cópia muito mais rápida em blocos grandes, no máximo 2 leituras simultâneas para não saturar o NAS, pausa automática de um servidor inacessível e uma mensagem de erro clara (em vez de «expected str, bytes or os.PathLike object, not NoneType»)",
+        "Miniaturas 3MF: o fundo branco das pré-visualizações do slicer é removido (objeto recortado sobre o fundo escuro) e as que mostram a mesa quadriculada são descartadas em favor da renderização 3D com as cores do arquivo; as miniaturas afetadas, incluindo as de rede, são regeneradas automaticamente",
+        "Miniaturas 3MF do PrusaSlicer: a pré-visualização do slicer com a mesa quadriculada já não é usada; a peça é renderizada em 3D como um STL (malha completa, cor do filamento do arquivo); as miniaturas afetadas são regeneradas automaticamente",
+        "Miniaturas 3MF do PrusaSlicer: um arquivo cujos filamentos têm todos a mesma cor é renderizado como peça de cor única (malha completa) em vez de um render multicolorido simplificado; 3MF multicoloridos mantêm mais triângulos. Console: avisos de rede SMB inofensivos ocultados, constantes de diálogos do pywebview atualizadas",
+        "Definições › Tarifas de impressão: a margem de preço (%) volta a poder ser definida uma só vez; é o valor predefinido da calculadora de custos e dos orçamentos",
+        "Histórico de impressão: o preço de venda (custo + margem) é mostrado junto ao custo quando há uma margem definida; as estatísticas e os relatórios continuam baseados no custo real",
+        "Windows: um ícone do Stellio aparece junto ao relógio enquanto o Stellio está em execução (clique = abrir, clique direito = Abrir / Sair); versão portátil: a pasta do navegador integrado é verificada antes de abrir e o detalhe do erro é escrito nos registos se a janela não abrir"
+      ],
+      "it": [
+        "Impostazioni: nuova opzione «Prestazioni delle miniature» (Automatico / Economico / Normale / Veloce) per scegliere quante miniature vengono disegnate contemporaneamente; in automatico un computer modesto ne disegna una alla volta e una grande rigenerazione viene distribuita nel tempo",
+        "Miniature: l'indicatore di avanzamento è tradotto («Miniature: 120/800 · in attesa: 680»), mostra il numero di render simultanei e riparte a ogni aggiornamento",
+        "Miniature dei 3MF multicolore: lettura più rapida dei colori dipinti",
+        "Miniature: i modelli molto dettagliati (fiocchi di neve, pezzi forati o piatti, fino a 400 000 triangoli) non vengono più ridotti a schegge; i 3MF enormi (decine di MB di mesh) usano le anteprime dei piatti dello slicer, istantanee e fedeli; le miniature interessate vengono rigenerate automaticamente",
+        "Correzione: durante la generazione delle miniature, la libreria non scompare più con «Errore di connessione» (lettura protetta della cache, elenco mantenuto a schermo, nuovo tentativo automatico)",
+        "Miniature in rete (SMB): copia molto più veloce a blocchi grandi, al massimo 2 letture simultanee per non saturare il NAS, pausa automatica di un server irraggiungibile e un messaggio di errore chiaro (invece di «expected str, bytes or os.PathLike object, not NoneType»)",
+        "Miniature 3MF: lo sfondo bianco delle anteprime dello slicer viene rimosso (oggetto ritagliato sullo sfondo scuro) e le anteprime che mostrano il piatto a griglia vengono scartate a favore del rendering 3D con i colori del file; le miniature interessate, anche in rete, vengono rigenerate automaticamente",
+        "Miniature 3MF di PrusaSlicer: l'anteprima dello slicer con il piatto a griglia non viene più usata; il pezzo è reso in 3D come un STL (mesh completa, colore del filamento del file); le miniature interessate vengono rigenerate automaticamente",
+        "Miniature 3MF di PrusaSlicer: un file i cui filamenti hanno tutti lo stesso colore viene renderizzato come pezzo monocolore (mesh completa) invece di un render multicolore semplificato; i 3MF multicolore mantengono più triangoli. Console: avvisi di rete SMB innocui nascosti, costanti delle finestre di dialogo pywebview aggiornate",
+        "Impostazioni › Tariffe di stampa: il margine di prezzo (%) è di nuovo impostabile una volta per tutte; è il valore predefinito del calcolatore dei costi e dei preventivi",
+        "Cronologia di stampa: il prezzo di vendita (costo + margine) è mostrato accanto al costo quando è impostato un margine; statistiche e rapporti restano basati sul costo effettivo",
+        "Windows: un'icona di Stellio compare accanto all'orologio finché Stellio è in esecuzione (clic = apri, clic destro = Apri / Esci); versione portatile: la cartella del browser integrato viene verificata prima dell'apertura e i dettagli dell'errore vengono scritti nei log se la finestra non si apre"
+      ],
+      "zh": [
+        "设置：新增“缩略图性能”选项（自动 / 节能 / 普通 / 快速），可选择同时绘制多少张缩略图；自动模式下，配置较低的电脑一次只绘制一张，大规模重新生成会被分散进行",
+        "缩略图：进度指示器已翻译（“缩略图：120/800 · 等待中：680”），显示同时渲染的数量，并在每次刷新时重新启动",
+        "多色 3MF 缩略图：更快地读取涂色信息",
+        "缩略图：高细节模型（雪花、镂空或扁平零件，最多 40 万个三角形）不再被破坏成碎片；超大 3MF（数十 MB 网格）改用切片软件的盘面预览，即时且准确；受影响的缩略图会自动重新生成",
+        "修复：生成缩略图期间，文件库不再因“连接错误”而消失（缓存读取受保护、列表保留在屏幕上、自动重试）",
+        "网络（SMB）缩略图：以大块方式复制，速度大幅提升；同时最多 2 个读取，避免 NAS 过载；无法访问的服务器会自动暂停；错误信息更清晰（不再显示“expected str, bytes or os.PathLike object, not NoneType”）",
+        "3MF 缩略图：去除切片软件预览的白色背景（对象裁剪后置于深色背景上），并舍弃显示网格热床的预览，改用带文件颜色的 3D 渲染；受影响的缩略图（包括网络位置）会自动重新生成",
+        "PrusaSlicer 3MF 缩略图：不再使用带网格热床的切片软件预览；零件像 STL 一样以 3D 渲染（完整网格、文件中的耗材颜色）；受影响的缩略图会自动重新生成",
+        "PrusaSlicer 3MF 缩略图：所有耗材颜色相同的文件现在渲染为单色零件（完整网格），而不是简化的多色渲染；多色 3MF 保留更多三角面。控制台：隐藏无害的 SMB 网络警告，更新 pywebview 对话框常量",
+        "设置 › 打印价格：价格利润率（%）可再次一次性设置，作为成本计算器和报价单的默认值",
+        "打印历史：设置利润率后，成本旁会显示售价（成本 + 利润率）；统计和报告仍基于实际成本",
+        "Windows：Stellio 运行期间，时钟旁会显示 Stellio 图标（单击 = 打开，右键 = 打开 / 退出）；便携版：打开前检查内置浏览器文件夹，若窗口无法打开，会把错误详情写入日志"
+      ],
+      "ja": [
+        "設定：新しい「サムネイルのパフォーマンス」オプション（自動 / 省電力 / 標準 / 高速）で、同時に描画するサムネイル数を選べます。自動モードでは、性能の低いマシンは 1 枚ずつ描画し、大量の再生成は分散して実行されます",
+        "サムネイル：進捗表示を翻訳（「サムネイル：120/800 · 待機中：680」）し、同時レンダリング数を表示、更新のたびに再開するようになりました",
+        "マルチカラー 3MF サムネイル：塗装色の読み取りを高速化",
+        "サムネイル：高精細なモデル（雪の結晶、穴あきや薄い部品、最大 40 万三角形）が破片状に崩れなくなりました。巨大な 3MF（数十 MB のメッシュ）はスライサーのプレートプレビューを使用し、即時かつ正確に表示されます。該当するサムネイルは自動的に再生成されます",
+        "修正：サムネイル生成中に、ライブラリが「接続エラー」で消えなくなりました（キャッシュ読み取りの保護、一覧の保持、自動再試行）",
+        "ネットワーク（SMB）上のサムネイル：大きなブロックでのコピーで大幅に高速化し、NAS に負荷をかけないよう同時読み取りは最大 2 件、到達できないサーバーは自動的に一時停止、エラーメッセージも分かりやすくなりました（「expected str, bytes or os.PathLike object, not NoneType」は表示されません）",
+        "3MF サムネイル：スライサーのプレビューの白い背景を除去（オブジェクトを切り抜いて暗い背景に配置）し、格子状のベッドが写っているプレビューは破棄してファイルの色を使った 3D レンダリングに切り替えます。該当するサムネイルは（ネットワーク上も含め）自動的に再生成されます",
+        "PrusaSlicer の 3MF サムネイル：格子状のベッドが写るスライサーのプレビューは使わず、STL と同様に部品を 3D でレンダリングします（フルメッシュ、ファイルのフィラメント色）。該当するサムネイルは自動的に再生成されます",
+        "PrusaSlicer 3MF サムネイル：すべてのフィラメントが同じ色のファイルは、簡略化されたマルチカラー描画ではなく単色のパーツ（完全なメッシュ）として描画されます。マルチカラー 3MF はより多くの三角形を保持します。コンソール：無害な SMB ネットワーク警告を非表示にし、pywebview のダイアログ定数を更新",
+        "設定 › 印刷料金：価格マージン（%）を再び一括で設定できるようになりました。コスト計算機と見積もりの既定値になります",
+        "印刷履歴：マージンを設定すると、コストの横に販売価格（コスト + マージン）を表示します。統計とレポートは引き続き原価ベースです",
+        "Windows：Stellio の実行中は時計の横に Stellio アイコンが表示されます（クリック = 開く、右クリック = 開く / 終了）。ポータブル版：ウィンドウを開く前に内蔵ブラウザのフォルダーを確認し、開けない場合はエラーの詳細をログに記録します"
+      ]
+    }
+  },
+  {
     "version": "0.8.2",
     "items": {
       "fr": [
@@ -23,7 +140,8 @@
         "Viewer 3D : les 3MF Bambu et Creality (objets stockés dans des fichiers séparés) affichent tous leurs objets ; fermer le viewer annule le chargement en cours",
         "Correction : « Impossible d'analyser ce fichier » dans la fenêtre de coût pour certains 3MF",
         "Correction : les icônes des champs de la fenêtre Métadonnées ne chevauchent plus le texte",
-        "Visite guidée refaite : nouvelles étapes sur le clic droit et la fiche détaillée, avec un Benchy de démonstration non ajouté à la bibliothèque (elle se relance une fois pour tout le monde)"
+        "Visite guidée refaite : nouvelles étapes sur le clic droit et la fiche détaillée, avec un Benchy de démonstration non ajouté à la bibliothèque (elle se relance une fois pour tout le monde)",
+        "Régénération des miniatures plus fluide : l'analyse de fond et la migration du rendu attendent la fin des rendus et ne parcourent plus la bibliothèque pendant que l'application est utilisée"
       ],
       "en": [
         "Proxmox: the LXC install script lets you choose the container storage and the template storage (“Default settings + storage choice” menu, or var_storage / var_template_storage), with a check that it exists and has enough free space",
@@ -46,7 +164,8 @@
         "3D viewer: Bambu and Creality 3MF files (objects stored in separate files) now show all their objects; closing the viewer cancels the loading in progress",
         "Fix: \"Unable to analyze this file\" in the cost window for some 3MF files",
         "Fix: field icons in the Metadata window no longer overlap the text",
-        "Guided tour redone: new steps on right-click and the file details window, using a demo Benchy that is not added to the library (it replays once for everyone)"
+        "Guided tour redone: new steps on right-click and the file details window, using a demo Benchy that is not added to the library (it replays once for everyone)",
+        "Smoother thumbnail regeneration: the background analysis and render migration now wait for rendering to finish and no longer scan the library while the app is in use"
       ],
       "de": [
         "Proxmox: Das LXC-Installationsskript erlaubt die Wahl des Container- und des Vorlagen-Speichers (Menü „Standardeinstellungen + Speicherauswahl“ oder var_storage / var_template_storage), mit Prüfung auf Existenz und freien Platz",
@@ -69,7 +188,8 @@
         "3D-Viewer: Bambu- und Creality-3MF-Dateien (Objekte in separaten Dateien) zeigen jetzt alle Objekte; Schließen des Viewers bricht das laufende Laden ab",
         "Korrektur: „Datei kann nicht analysiert werden“ im Kostenfenster bei manchen 3MF-Dateien",
         "Korrektur: Die Symbole der Felder im Fenster Metadaten überlappen den Text nicht mehr",
-        "Geführte Tour überarbeitet: neue Schritte zu Rechtsklick und Dateidetails mit einem Demo-Benchy, der nicht zur Bibliothek hinzugefügt wird (läuft einmalig für alle erneut)"
+        "Geführte Tour überarbeitet: neue Schritte zu Rechtsklick und Dateidetails mit einem Demo-Benchy, der nicht zur Bibliothek hinzugefügt wird (läuft einmalig für alle erneut)",
+        "Flüssigere Vorschau-Neuerzeugung: Hintergrundanalyse und Render-Migration warten, bis das Rendern abgeschlossen ist, und durchsuchen die Bibliothek nicht mehr, während die App benutzt wird"
       ],
       "es": [
         "Proxmox: el script de instalación LXC permite elegir el almacenamiento del contenedor y el de las plantillas (menú «Ajustes por defecto + elección del almacenamiento», o var_storage / var_template_storage), con comprobación de existencia y espacio libre",
@@ -92,7 +212,8 @@
         "Visor 3D: los 3MF de Bambu y Creality (objetos en archivos separados) muestran todos sus objetos; cerrar el visor cancela la carga en curso",
         "Corrección: «No se puede analizar este archivo» en la ventana de coste con algunos 3MF",
         "Corrección: los iconos de los campos de la ventana Metadatos ya no se superponen al texto",
-        "Visita guiada renovada: nuevos pasos sobre el clic derecho y la ficha detallada, con un Benchy de demostración que no se añade a la biblioteca (se vuelve a mostrar una vez a todos)"
+        "Visita guiada renovada: nuevos pasos sobre el clic derecho y la ficha detallada, con un Benchy de demostración que no se añade a la biblioteca (se vuelve a mostrar una vez a todos)",
+        "Regeneración de miniaturas más fluida: el análisis en segundo plano y la migración del renderizado esperan a que terminen los renders y ya no recorren la biblioteca mientras se usa la aplicación"
       ],
       "pt": [
         "Proxmox: o script de instalação LXC permite escolher o armazenamento do contentor e dos modelos (menu «Definições por omissão + escolha do armazenamento», ou var_storage / var_template_storage), com verificação de existência e espaço livre",
@@ -115,7 +236,8 @@
         "Visualizador 3D: os 3MF da Bambu e da Creality (objetos em arquivos separados) mostram todos os seus objetos; fechar o visualizador cancela o carregamento em curso",
         "Correção: «Não foi possível analisar este arquivo» na janela de custo com alguns 3MF",
         "Correção: os ícones dos campos da janela Metadados já não se sobrepõem ao texto",
-        "Visita guiada refeita: novos passos sobre o clique direito e a ficha detalhada, com um Benchy de demonstração que não é adicionado à biblioteca (volta a aparecer uma vez para todos)"
+        "Visita guiada refeita: novos passos sobre o clique direito e a ficha detalhada, com um Benchy de demonstração que não é adicionado à biblioteca (volta a aparecer uma vez para todos)",
+        "Regeneração de miniaturas mais fluida: a análise em segundo plano e a migração da renderização esperam o fim dos renders e já não percorrem a biblioteca enquanto a aplicação é usada"
       ],
       "it": [
         "Proxmox: lo script di installazione LXC permette di scegliere lo storage del container e quello dei modelli (menu «Impostazioni predefinite + scelta dello storage», o var_storage / var_template_storage), con verifica di esistenza e spazio libero",
@@ -138,7 +260,8 @@
         "Viewer 3D: i 3MF di Bambu e Creality (oggetti in file separati) mostrano tutti i loro oggetti; chiudere il viewer annulla il caricamento in corso",
         "Correzione: «Impossibile analizzare questo file» nella finestra dei costi con alcuni 3MF",
         "Correzione: le icone dei campi della finestra Metadati non si sovrappongono più al testo",
-        "Tour guidato rifatto: nuovi passaggi su clic destro e scheda dettagliata, con un Benchy dimostrativo non aggiunto alla libreria (viene riproposto una volta a tutti)"
+        "Tour guidato rifatto: nuovi passaggi su clic destro e scheda dettagliata, con un Benchy dimostrativo non aggiunto alla libreria (viene riproposto una volta a tutti)",
+        "Rigenerazione delle miniature più fluida: l'analisi in background e la migrazione del rendering attendono la fine dei render e non scansionano più la libreria mentre l'app è in uso"
       ],
       "zh": [
         "Proxmox：LXC 安装脚本现在可以选择容器存储和模板存储（菜单“默认设置 + 选择存储”，或 var_storage / var_template_storage），并检查其是否存在及剩余空间",
@@ -161,7 +284,8 @@
         "3D 查看器：Bambu 和 Creality 的 3MF（对象存放在单独文件中）现在会显示所有对象；关闭查看器会取消正在进行的加载",
         "修复：部分 3MF 在成本窗口中提示“无法分析此文件”",
         "修复：元数据窗口中字段图标不再遮挡文字",
-        "重新设计的引导教程：新增右键和文件详情窗口的步骤，使用不会加入文件库的演示 Benchy（所有用户将重新看到一次）"
+        "重新设计的引导教程：新增右键和文件详情窗口的步骤，使用不会加入文件库的演示 Benchy（所有用户将重新看到一次）",
+        "缩略图重新生成更流畅：后台分析和渲染迁移会等待渲染完成，并且在使用应用时不再扫描文件库"
       ],
       "ja": [
         "Proxmox：LXC インストールスクリプトで、コンテナ用ストレージとテンプレート用ストレージを選択できるようになりました（メニュー「デフォルト設定＋ストレージ選択」または var_storage / var_template_storage）。存在と空き容量も確認します",
@@ -184,7 +308,8 @@
         "3D ビューア：Bambu と Creality の 3MF（別ファイルに保存されたオブジェクト）で全オブジェクトを表示。ビューアを閉じると読み込み中の処理をキャンセルします",
         "修正：一部の 3MF でコストウィンドウに「このファイルを解析できません」と表示される問題",
         "修正：メタデータウィンドウの入力欄のアイコンが文字に重ならないようにしました",
-        "ガイドツアーを刷新：右クリックとファイル詳細ウィンドウの新ステップを追加。ライブラリに追加されないデモ用 Benchy を使用（全員に一度だけ再表示されます）"
+        "ガイドツアーを刷新：右クリックとファイル詳細ウィンドウの新ステップを追加。ライブラリに追加されないデモ用 Benchy を使用（全員に一度だけ再表示されます）",
+        "サムネイルの再生成がより快適に：バックグラウンド解析とレンダリング移行は、レンダリング完了まで待機し、アプリ使用中はライブラリを走査しなくなりました"
       ]
     }
   },
