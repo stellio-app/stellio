@@ -1,5 +1,66 @@
 [
   {
+    "version": "0.8.4",
+    "items": {
+      "fr": [
+        "Ajout d'imprimante : la vérification de compatibilité est à jour (Bambu X2D/P2S/H2, Elegoo Centauri Carbon 1 et 2 et résines Saturn/Mars, FlashForge 5M/5M Pro/AD5X, Creality K1/K2/Ender-3 V3/Hi sont reconnues comme compatibles et sélectionnent le bon type)",
+        "Ajout d'imprimante : le libellé Bambu Lab du sélecteur de type liste toutes les familles prises en charge (X1, X2D, P1, P2S, A1, H2)",
+        "Bibliothèque : le badge « Nouveau » des fichiers récents est maintenant traduit dans toutes les langues",
+        "Documentation : les README (8 langues) montrent davantage de captures d'écran des fonctions clés et listent les marques et modèles d'imprimantes pris en charge",
+        "Inventaires (Spoolman / manuel / TigerTag) : chaque section est repliable comme dans les paramètres, l'état est mémorisé"
+      ],
+      "en": [
+        "Add printer: the compatibility check is up to date (Bambu X2D/P2S/H2, Elegoo Centauri Carbon 1 & 2 and Saturn/Mars resin, FlashForge 5M/5M Pro/AD5X, Creality K1/K2/Ender-3 V3/Hi are recognised as compatible and pick the right type)",
+        "Add printer: the Bambu Lab label in the type selector now lists every supported family (X1, X2D, P1, P2S, A1, H2)",
+        "Library: the “New” badge on recent files is now translated in every language",
+        "Documentation: the READMEs (8 languages) show more screenshots of key features and list the supported printer brands and models",
+        "Inventories (Spoolman / manual / TigerTag): each section can be collapsed like the Settings sections, state is remembered"
+      ],
+      "de": [
+        "Drucker hinzufügen: Die Kompatibilitätsprüfung ist aktuell (Bambu X2D/P2S/H2, Elegoo Centauri Carbon 1 und 2 sowie Saturn/Mars-Resin, FlashForge 5M/5M Pro/AD5X, Creality K1/K2/Ender-3 V3/Hi werden als kompatibel erkannt und wählen den passenden Typ)",
+        "Drucker hinzufügen: Die Bambu-Lab-Bezeichnung in der Typauswahl nennt jetzt alle unterstützten Familien (X1, X2D, P1, P2S, A1, H2)",
+        "Bibliothek: Das Label „Neu“ bei neuen Dateien ist jetzt in allen Sprachen übersetzt",
+        "Dokumentation: Die READMEs (8 Sprachen) zeigen mehr Screenshots der Kernfunktionen und listen die unterstützten Druckermarken und -modelle auf",
+        "Inventare (Spoolman / manuell / TigerTag): jeder Bereich lässt sich wie in den Einstellungen einklappen, der Zustand wird gespeichert"
+      ],
+      "es": [
+        "Añadir impresora: la comprobación de compatibilidad está actualizada (Bambu X2D/P2S/H2, Elegoo Centauri Carbon 1 y 2 y resinas Saturn/Mars, FlashForge 5M/5M Pro/AD5X, Creality K1/K2/Ender-3 V3/Hi se reconocen como compatibles y eligen el tipo correcto)",
+        "Añadir impresora: la etiqueta de Bambu Lab del selector de tipo enumera ahora todas las familias compatibles (X1, X2D, P1, P2S, A1, H2)",
+        "Biblioteca: la etiqueta «Nuevo» de los archivos recientes ahora está traducida a todos los idiomas",
+        "Documentación: los README (8 idiomas) muestran más capturas de las funciones clave y enumeran las marcas y modelos de impresoras compatibles",
+        "Inventarios (Spoolman / manual / TigerTag): cada sección se puede contraer como en Ajustes y se recuerda su estado"
+      ],
+      "pt": [
+        "Adicionar impressora: a verificação de compatibilidade está atualizada (Bambu X2D/P2S/H2, Elegoo Centauri Carbon 1 e 2 e resinas Saturn/Mars, FlashForge 5M/5M Pro/AD5X, Creality K1/K2/Ender-3 V3/Hi são reconhecidas como compatíveis e escolhem o tipo certo)",
+        "Adicionar impressora: o rótulo da Bambu Lab no seletor de tipo agora lista todas as famílias compatíveis (X1, X2D, P1, P2S, A1, H2)",
+        "Biblioteca: o selo «Novo» dos arquivos recentes agora está traduzido para todos os idiomas",
+        "Documentação: os README (8 idiomas) mostram mais capturas das funções principais e listam as marcas e modelos de impressoras compatíveis",
+        "Inventários (Spoolman / manual / TigerTag): cada secção pode ser recolhida como nas Definições e o estado é memorizado"
+      ],
+      "it": [
+        "Aggiunta stampante: il controllo di compatibilità è aggiornato (Bambu X2D/P2S/H2, Elegoo Centauri Carbon 1 e 2 e resina Saturn/Mars, FlashForge 5M/5M Pro/AD5X, Creality K1/K2/Ender-3 V3/Hi sono riconosciute come compatibili e scelgono il tipo giusto)",
+        "Aggiunta stampante: l'etichetta Bambu Lab nel selettore del tipo elenca ora tutte le famiglie supportate (X1, X2D, P1, P2S, A1, H2)",
+        "Libreria: il badge «Nuovo» dei file recenti è ora tradotto in tutte le lingue",
+        "Documentazione: i README (8 lingue) mostrano più screenshot delle funzioni chiave ed elencano marche e modelli di stampanti supportati",
+        "Inventari (Spoolman / manuale / TigerTag): ogni sezione si può comprimere come nelle Impostazioni e lo stato viene ricordato"
+      ],
+      "zh": [
+        "添加打印机：兼容性检查已更新（Bambu X2D/P2S/H2、Elegoo Centauri Carbon 1 和 2 及 Saturn/Mars 光固化、FlashForge 5M/5M Pro/AD5X、Creality K1/K2/Ender-3 V3/Hi 均被识别为兼容并自动选择正确类型）",
+        "添加打印机：类型选择器中的 Bambu Lab 标签现在列出所有受支持的系列（X1、X2D、P1、P2S、A1、H2）",
+        "文件库：近期文件的“新”标记现已翻译成所有语言",
+        "文档：README（8 种语言）新增更多关键功能截图，并列出支持的打印机品牌和型号",
+        "库存（Spoolman / 手动 / TigerTag）：每个分区都可像设置页一样折叠，并会记住状态"
+      ],
+      "ja": [
+        "プリンター追加：互換性チェックを更新しました（Bambu X2D/P2S/H2、Elegoo Centauri Carbon 1・2 と Saturn/Mars レジン、FlashForge 5M/5M Pro/AD5X、Creality K1/K2/Ender-3 V3/Hi を互換として認識し、正しいタイプを自動選択）",
+        "プリンター追加：タイプ選択の Bambu Lab 表記に、対応するすべてのシリーズ（X1、X2D、P1、P2S、A1、H2）を表示するようにしました",
+        "ライブラリ：新しいファイルの「新着」バッジをすべての言語に翻訳しました",
+        "ドキュメント：README（8言語）に主要機能のスクリーンショットを追加し、対応プリンターのブランドとモデルの一覧を掲載しました",
+        "在庫（Spoolman / 手動 / TigerTag）：設定のセクションと同様に各セクションを折りたたみ可能にし、状態を記憶します"
+      ]
+    }
+  },
+  {
     "version": "0.8.3",
     "items": {
       "fr": [

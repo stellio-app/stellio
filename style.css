@@ -8724,3 +8724,16 @@ body, .app-screen, .auth-screen {
 .file-info-controls select { min-width: 220px; }
 .file-info-scale { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .file-info-scale input { width: 84px; }
+
+
+/* Inventaires (Spoolman / manuel / TigerTag) : sections repliables comme les sections des paramètres */
+.inv-section .source-banner, .inv-section .tigertag-banner { cursor: pointer; }
+.inv-toggle {
+    flex: 0 0 auto; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 1px solid var(--border); border-radius: 8px; color: var(--text-muted); cursor: pointer;
+}
+.inv-toggle:hover { color: var(--text-primary); border-color: var(--accent, var(--border)); }
+.inv-toggle i { transition: transform .2s ease; }
+.inv-section.inv-collapsed .inv-toggle i { transform: rotate(-90deg); }
+.inv-section.inv-collapsed > :not(.source-banner):not(.tigertag-banner) { display: none !important; }
+@media (prefers-reduced-motion: reduce) { .inv-toggle i { transition: none; } }

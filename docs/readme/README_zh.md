@@ -57,11 +57,13 @@
 - 📺 **悬浮小组件**：在所有页面显示当前打印进度
 - 🧭 **交互式引导教程**：带您了解主要功能，可在设置中重新开始
 - ♿ **无障碍**：高对比度模式、减少动画、处处可见的键盘焦点指示
+- 🪟 **系统托盘图标（Windows）**：时钟旁的 Stellio 图标表明应用仍在运行（单击 = 打开，右键 = 打开 / 退出）
 
 ### 📚 文件库管理
 - 🗂️ **多种来源**：本地文件夹、单个文件、SMB/NFS 共享 — 电脑上检测到的3D文件夹会被推荐，并可一键添加
 - 🖼️ **自动生成3D缩略图**：通过 PyRender（高质量渲染）或 numpy CPU 光栅化器（回退方案），带加载效果和**悬停放大预览**
 - 🌀 **始终流畅**：使用应用时缩略图生成会自动暂停，停止操作后继续
+- ⚙️ **“缩略图性能”设置**（自动 / 节能 / 标准 / 快速），并提供已翻译的进度指示；细节极多的 STL 以及超大或多色 3MF 都能得到清晰的 3D 缩略图，PrusaSlicer 的 3MF 也像 STL 一样以 3D 渲染
 - 🏷️ **自定义标签**（带颜色）+ AI自动打标，并支持**一键为多个选中文件打标**
 - 🔍 **AI辅助的语义搜索**（例如"我在找一个用于……的支撑件"），并**记住最近的搜索**
 - ⭐ **收藏**与高级筛选（类型、大小、重量、打印状态），当耗材库存不足以打印您的收藏时会显示**补货提醒**
@@ -135,6 +137,7 @@
 - 🔄 **格式转换器**（STL ↔ 3MF ↔ OBJ）
 - 🛡️ **完整性检查**（损坏/缺失文件）
 - 💰 **打印成本计算**：材料、电费、机器损耗（按小时）、固定费用、利润率（%）和数量 — 单价与总价精确到分
+- 🏷️ **利润率与售价**：在 设置 → 打印价格 中一次性设置默认利润率（%）；历史记录会在成本旁显示售价（成本 + 利润率），统计仍按实际成本计算
 - 🧾 **PDF 报价单**：由成本计算生成，可自定义客户、品名和备注；可配置报价单抬头（姓名/公司、标志、地址、电话、邮箱、网站、税号）以及页脚的法律声明
 - 🗃️ **报价单历史**：每份生成的报价单都会保留（PDF 副本），可在仪表盘的“报价单”小组件中查看、重新下载和删除
 - 🌱 **环境影响估算**：您打印作业的 CO₂ 足迹（材料 + 电力）
@@ -186,8 +189,12 @@
 
 | | |
 |---|---|
-| ![文件库](../../images/library.png) *带缩略图的文件库* | ![打印机](../../images/monitoring.png) *打印机监控* |
-| ![切片软件](../../images/slicer.png) *AI配置推荐* | ![嵌套排版](../../images/nesting.png) *自动嵌套排版* |
+| ![可自定义的仪表盘](../../images/dashboard.png) *可自定义的仪表盘* | ![带标签和收藏的文件库](../../images/library-tags.png) *带标签和收藏的文件库* |
+| ![文件详情：重量、打印时间和成本](../../images/file-details.png) *文件详情：重量、打印时间和成本* | ![命令面板 (Ctrl+K)](../../images/command-palette.png) *命令面板 (Ctrl+K)* |
+| ![项目 / 装配体](../../images/projects.png) *项目 / 装配体* | ![耗材库存](../../images/filament-inventory.png) *耗材库存* |
+| ![文件库统计](../../images/statistics.png) *文件库统计* | ![打印价格：电费、损耗、利润率](../../images/print-pricing.png) *打印价格：电费、损耗、利润率* |
+| ![带缩略图的文件库](../../images/library.png) *带缩略图的文件库* | ![打印机监控](../../images/monitoring.png) *打印机监控* |
+| ![AI配置推荐](../../images/slicer.png) *AI配置推荐* | ![自动嵌套排版](../../images/nesting.png) *自动嵌套排版* |
 
 ---
 
@@ -287,16 +294,19 @@ Stellio 可自动检测：
 - ✅ Slic3r
 - ✅ KISSlicer
 
-### 打印机
+### 支持的打印机
 
-| 类型 | 协议 | 功能 |
+| 品牌 | 型号 | 连接与功能 |
 |---|---|---|
-| OctoPrint / PrusaLink | HTTP API | 监控、上传、摄像头 |
-| Klipper/Moonraker | HTTP API | 监控、上传、摄像头、精确打印时长 |
-| Bambu Lab | MQTT（云端 + 局域网） | 实时监控、AMS、摄像头（JPEG A1/P1，RTSPS X1/X2/H2）、SSDP自动发现 |
-| Creality | WebSocket | 监控、CFS、UDP自动发现 |
-| FlashForge | 私有协议 API | 监控、UDP自动发现 |
-| Elegoo | 基于 WebSocket 的 SDCP | 监控、UDP自动发现 |
+| **Bambu Lab** | X1 / X1C / X1E · X2D · P1P / P1S · P2S · A1 / A1 mini · H2D / H2S / H2C | MQTT（局域网 + 云端）：实时监控、AMS、摄像头、SSDP 自动发现 |
+| **Prusa** | MK4 · MK3.9 · MK3.5 · MINI+ · XL · CORE One | PrusaLink（HTTP）：监控、上传、摄像头 |
+| **Creality** | K1 / K2 系列 · Ender-3 V3 · Hi | WebSocket：监控、CFS、UDP 自动发现 |
+| **Elegoo** | Centauri Carbon 1 和 2 · 光固化 Saturn / Mars 系列 | SDCP（WebSocket）：监控、UDP 自动发现 |
+| **FlashForge** | Adventurer 5M / 5M Pro · AD5X | 专有 API：监控、UDP 自动发现 |
+| **Klipper / Moonraker** | 任何运行 Klipper 的机器（Voron 等） | HTTP：监控、上传、摄像头、精确打印时长 |
+| **OctoPrint** | 任何由 OctoPrint 控制的打印机 | HTTP：监控、上传、摄像头 |
+
+> 所列型号是 Stellio「添加打印机」表单中提供的型号。使用相同协议的其他型号通常也能工作，但并未全部测试——如果您的打印机能用或不能用，请[在 GitHub 上告诉我们](https://github.com/stellio-app/stellio/issues)。
 
 ---
 

@@ -1314,6 +1314,13 @@
                                         style="width:100px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
                                 </div>
 
+                                <div class="settings-row">
+                                    <label data-i18n="cost.margin_label">Marge (%)</label>
+                                    <input type="number" id="settings-margin-pct" min="0" max="1000" step="1" placeholder="ex: 30"
+                                        style="width:100px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+                                </div>
+                                <p class="settings-hint" style="margin:-6px 0 0;" data-i18n="cost.margin_settings_hint">Marge tarifaire ajoutée au coût d'impression dans le calculateur de coût et les devis. Modifiable aussi au cas par cas dans chaque calcul.</p>
+
                                 <button type="button" class="btn btn-primary btn-sm" style="align-self:flex-start;" onclick="savePrintCostSettings()">
                                     <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="actions.save">Enregistrer</span>
                                 </button>
@@ -2725,7 +2732,7 @@
 					</button>
 				</div>
 				<div id="page-spoolman" class="page">
-					<div id="spoolman-section" style="display:none; margin-top:24px;">
+					<div id="spoolman-section" class="inv-section" data-inv-key="spoolman" style="display:none; margin-top:24px;">
 						<div class="source-banner source-banner-spoolman">
 							<div class="source-banner-icon"><i class="fa-solid fa-circle-nodes"></i></div>
 							<div style="flex:1; min-width:0;">
@@ -2738,7 +2745,7 @@
 						</div>
 						<div id="spoolman-grid" class="grid-spoolman" style="margin-top:12px;"></div>
 					</div>
-					<div id="manual-section" style="display:none; margin-top:24px;">
+					<div id="manual-section" class="inv-section" data-inv-key="manual" style="display:none; margin-top:24px;">
 						<div class="source-banner source-banner-manual">
 							<div class="source-banner-icon"><i class="fa-solid fa-box-open"></i></div>
 							<div style="flex:1; min-width:0;">
@@ -2778,7 +2785,7 @@
 					</div>
 						<div id="manual-grid" class="grid-spoolman" style="margin-top:12px;"></div>
 					</div>
-					<div id="tigertag-section" style="display:none; margin-top:24px;">
+					<div id="tigertag-section" class="inv-section" data-inv-key="tigertag" style="display:none; margin-top:24px;">
 						<div class="tigertag-banner">
 							<img src="assets/tigertag-logo.svg" alt="TigerTag" class="tigertag-banner-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
 							<div class="tigertag-banner-fallback-icon"><i class="fa-solid fa-tag"></i></div>
@@ -3987,7 +3994,7 @@
 							<option value="octoprint">OctoPrint</option>
 							<option value="klipper">Klipper (Moonraker)</option>
 							<option value="prusalink">PrusaLink (Prusa MK4 / MK3.9 / MK3.5 / MINI+ / XL / CORE One)</option>
-							<option value="bambu">Bambu Lab (X1C / P1P / P1S / A1)</option>
+							<option value="bambu">Bambu Lab (X1 / X2D / P1 / P2S / A1 / H2)</option>
 							<option value="elegoo_sdcp" data-i18n="printers.elegoo_sdcp_model">Elegoo (résine Saturn/Mars, ou Centauri Carbon 1)</option>
 							<option value="elegoo_cc2">Elegoo Centauri Carbon 2</option>
 							<option value="creality">Creality (K1 / K2 / Ender-3 V3 / Hi)</option>

@@ -57,11 +57,13 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 - 📺 **Schwebendes Widget** mit dem Fortschritt des laufenden Drucks, auf jeder Seite sichtbar
 - 🧭 **Interaktive geführte Tour** zum Kennenlernen der wichtigsten Funktionen, in den Einstellungen erneut startbar
 - ♿ **Barrierefreiheit**: Hochkontrastmodus, reduzierte Animationen, überall sichtbare Tastaturfokus-Markierungen
+- 🪟 **Symbol im Infobereich (Windows)**: Ein Stellio-Symbol neben der Uhr zeigt, dass die App noch läuft (Klick = öffnen, Rechtsklick = Öffnen / Beenden)
 
 ### 📚 Bibliotheksverwaltung
 - 🗂️ **Mehrere Quellen**: lokale Ordner, einzelne Dateien, SMB/NFS-Freigaben — auf dem Computer erkannte 3D-Ordner werden vorgeschlagen und lassen sich mit einem Klick hinzufügen
 - 🖼️ **Automatische 3D-Vorschaubilder** via PyRender (hochwertiges Rendering) oder einen numpy-CPU-Rasterizer (Fallback), mit Lade-Effekt und **vergrößerter Vorschau beim Darüberfahren**
 - 🌀 **Immer flüssig**: Die Erzeugung der Vorschaubilder pausiert, sobald Sie die App benutzen, und läuft weiter, wenn Sie nichts mehr tun
+- ⚙️ **Einstellung „Vorschaubild-Leistung“** (Automatisch / Sparsam / Normal / Schnell) mit übersetzter Fortschrittsanzeige; sehr detaillierte STL-Dateien und riesige oder mehrfarbige 3MF-Dateien erhalten saubere 3D-Vorschaubilder, und PrusaSlicer-3MF-Dateien werden wie STL in 3D gerendert
 - 🏷️ **Individuelle Tags** mit Farben + automatisches Tagging per KI, sowie **Tagging mehrerer ausgewählter Dateien mit einem Klick**
 - 🔍 **KI-gestützte semantische Suche** ("ich suche eine Stütze für...") mit **gemerkten letzten Suchen**
 - ⭐ **Favoriten** und erweiterte Filter (Typ, Größe, Gewicht, Druckstatus), mit einer **Nachkauf-Warnung**, wenn der Filamentbestand für Ihre Favoriten nicht ausreicht
@@ -135,6 +137,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 - 🔄 **Formatkonverter** (STL ↔ 3MF ↔ OBJ)
 - 🛡️ **Integritätsprüfung** (beschädigte/fehlende Dateien)
 - 💰 **Druckkostenberechnung**: Material, Strom, Maschinenverschleiß (pro Stunde), Fixkosten, Marge in % und Stückzahl — Stückpreis und Gesamtpreis auf den Cent genau
+- 🏷️ **Aufschlag & Verkaufspreis**: Standardaufschlag (%) einmal unter Einstellungen → Druckpreise festlegen; der Verlauf zeigt den Verkaufspreis (Kosten + Aufschlag) neben den Kosten, die Statistiken nutzen weiterhin die tatsächlichen Kosten
 - 🧾 **PDF-Angebote**: aus der Kostenberechnung erzeugt, mit anpassbarem Kunden, Bezeichnung und Notizen; konfigurierbarer Angebotskopf (Name/Firma, Logo, Adresse, Telefon, E-Mail, Website, Steuernummer) und rechtliche Hinweise in der Fußzeile
 - 🗃️ **Angebotsverlauf**: Jedes erzeugte Angebot wird aufbewahrt (PDF-Kopie) und kann über das Widget „Angebote“ im Dashboard durchsucht, erneut heruntergeladen und gelöscht werden
 - 🌱 **Umweltschätzung**: CO₂-Fußabdruck Ihrer Drucke (Material + Strom)
@@ -186,8 +189,12 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 
 | | |
 |---|---|
-| ![Bibliothek](../../images/library.png) *Bibliothek mit Vorschaubildern* | ![Drucker](../../images/monitoring.png) *Drucker-Überwachung* |
-| ![Slicer](../../images/slicer.png) *KI-Profilempfehlung* | ![Nesting](../../images/nesting.png) *Automatisches Nesting* |
+| ![Anpassbares Dashboard](../../images/dashboard.png) *Anpassbares Dashboard* | ![Bibliothek mit Tags und Favoriten](../../images/library-tags.png) *Bibliothek mit Tags und Favoriten* |
+| ![Dateidetails: Gewicht, Druckzeit und Kosten](../../images/file-details.png) *Dateidetails: Gewicht, Druckzeit und Kosten* | ![Befehlspalette (Strg+K)](../../images/command-palette.png) *Befehlspalette (Strg+K)* |
+| ![Projekte / Baugruppen](../../images/projects.png) *Projekte / Baugruppen* | ![Filament-Inventar](../../images/filament-inventory.png) *Filament-Inventar* |
+| ![Bibliotheksstatistiken](../../images/statistics.png) *Bibliotheksstatistiken* | ![Druckpreise: Strom, Verschleiß, Aufschlag](../../images/print-pricing.png) *Druckpreise: Strom, Verschleiß, Aufschlag* |
+| ![Bibliothek mit Vorschaubildern](../../images/library.png) *Bibliothek mit Vorschaubildern* | ![Drucker-Überwachung](../../images/monitoring.png) *Drucker-Überwachung* |
+| ![KI-Profilempfehlung](../../images/slicer.png) *KI-Profilempfehlung* | ![Automatisches Nesting](../../images/nesting.png) *Automatisches Nesting* |
 
 ---
 
@@ -287,16 +294,19 @@ Stellio erkennt automatisch:
 - ✅ Slic3r
 - ✅ KISSlicer
 
-### Drucker
+### Unterstützte Drucker
 
-| Typ | Protokoll | Funktionen |
+| Marke | Modelle | Verbindung & Funktionen |
 |---|---|---|
-| OctoPrint / PrusaLink | HTTP-API | Überwachung, Upload, Kamera |
-| Klipper/Moonraker | HTTP-API | Überwachung, Upload, Kamera, exakte Stunden |
-| Bambu Lab | MQTT (Cloud + LAN) | Echtzeit-Überwachung, AMS, Kamera (JPEG A1/P1, RTSPS X1/X2/H2), SSDP-Autoerkennung |
-| Creality | WebSocket | Überwachung, CFS, UDP-Autoerkennung |
-| FlashForge | Proprietäre API | Überwachung, UDP-Autoerkennung |
-| Elegoo | SDCP über WebSocket | Überwachung, UDP-Autoerkennung |
+| **Bambu Lab** | X1 / X1C / X1E · X2D · P1P / P1S · P2S · A1 / A1 mini · H2D / H2S / H2C | MQTT (LAN + Cloud): Echtzeit-Überwachung, AMS, Kamera, SSDP-Erkennung |
+| **Prusa** | MK4 · MK3.9 · MK3.5 · MINI+ · XL · CORE One | PrusaLink (HTTP): Überwachung, Upload, Kamera |
+| **Creality** | K1- / K2-Serie · Ender-3 V3 · Hi | WebSocket: Überwachung, CFS, UDP-Erkennung |
+| **Elegoo** | Centauri Carbon 1 und 2 · Resin-Serien Saturn / Mars | SDCP über WebSocket: Überwachung, UDP-Erkennung |
+| **FlashForge** | Adventurer 5M / 5M Pro · AD5X | Proprietäre API: Überwachung, UDP-Erkennung |
+| **Klipper / Moonraker** | Jede Maschine mit Klipper (Voron…) | HTTP: Überwachung, Upload, Kamera, exakte Druckstunden |
+| **OctoPrint** | Jeder über OctoPrint gesteuerte Drucker | HTTP: Überwachung, Upload, Kamera |
+
+> Die aufgeführten Modelle sind diejenigen, die im Formular „Drucker hinzufügen“ von Stellio angeboten werden. Andere Modelle mit demselben Protokoll funktionieren meist ebenfalls, wurden aber nicht alle getestet — [sagen Sie uns auf GitHub](https://github.com/stellio-app/stellio/issues) Bescheid, ob Ihr Drucker funktioniert.
 
 ---
 

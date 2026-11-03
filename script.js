@@ -6548,7 +6548,7 @@ const extractEntryBtnHtml = inArchive
 const isSelected = selectedFiles.has(f.path);
 const NEW_THRESHOLD_S = 48 * 3600;
 const isNew = f.mtime && (Date.now() / 1000 - f.mtime) < NEW_THRESHOLD_S && !seenFilesSet.has(f.path);
-const newBadgeHtml = isNew ? `<span class="file-new-badge"><i class="fa-solid fa-sparkles"></i> Nouveau</span>` : '';
+const newBadgeHtml = isNew ? `<span class="file-new-badge"><i class="fa-solid fa-sparkles"></i> ${escapeHtml(_t3('card.new_badge', 'Nouveau'))}</span>` : '';
 const multiPlateLabel = I18N.t('card.multi_plate') || 'Plateau multiple';
 const multiPlateBadgeHtml = f.multi_plate
     ? `<span class="file-multiplate-badge" title="${multiPlateLabel}"><i class="fa-solid fa-table-cells"></i></span>`
@@ -16011,20 +16011,26 @@ const PRINTER_COMPATIBILITY = {
     'bambu': {
         status: 'compatible',
         type: 'bambu',
-        brands: ['bambu lab', 'bambu', 'x1', 'x1c', 'p1p', 'p1s', 'a1', 'a1 mini'],
+        brands: ['bambu lab', 'bambu', 'x1', 'x1c', 'x1e', 'x2d', 'p1p', 'p1s', 'p2s', 'a1', 'a1 mini', 'h2d', 'h2s', 'h2c'],
         note: 'printers.note_bambu'
     },
     'creality_k2': {
         status: 'compatible',
-        type: 'klipper',
+        type: 'creality',
         brands: ['k2', 'k2 pro', 'k2 plus', 'k2-plus', 'k2 se'],
         note: 'printers.note_creality_k2'
     },
     'creality_k1': {
-        status: 'partial',
-        type: 'klipper',
+        status: 'compatible',
+        type: 'creality',
         brands: ['k1', 'k1c', 'k1 max', 'k1-max', 'k1 se'],
         note: 'printers.note_creality_k1'
+    },
+    'creality_ender3v3_hi': {
+        status: 'compatible',
+        type: 'creality',
+        brands: ['ender-3 v3', 'ender 3 v3', 'ender3 v3', 'ender-3 v3 se', 'ender-3 v3 ke', 'ender-3 v3 plus', 'creality hi combo', 'hi combo'],
+        note: 'printers.note_creality_native'
     },
     'creality_classic': {
         status: 'partial',
@@ -16132,9 +16138,9 @@ const PRINTER_COMPATIBILITY = {
         note: 'printers.note_flashforge_legacy'
     },
     'flashforge_ad5m': {
-        status: 'incompatible',
-        type: null,
-        brands: ['adventurer 5m', 'ad5m', 'adventurer 5m pro'],
+        status: 'compatible',
+        type: 'flashforge',
+        brands: ['adventurer 5m', 'ad5m', 'adventurer 5m pro', '5m pro', 'ad5x', 'adventurer 5x', 'flashforge 5m', 'flashforge ad5x'],
         note: 'printers.note_flashforge_ad5m'
     },
     'ultimaker': {
@@ -16144,10 +16150,22 @@ const PRINTER_COMPATIBILITY = {
         note: 'printers.note_marlin_octoprint'
     },
     'elegoo_centauri': {
-        status: 'incompatible',
-        type: null,
-        brands: ['centauri', 'centauri carbon'],
+        status: 'compatible',
+        type: 'elegoo_sdcp',
+        brands: ['centauri', 'centauri carbon', 'centauri carbon 1', 'cc1'],
         note: 'printers.note_elegoo_centauri'
+    },
+    'elegoo_centauri_carbon_2': {
+        status: 'compatible',
+        type: 'elegoo_cc2',
+        brands: ['centauri carbon 2', 'centauri 2', 'cc2'],
+        note: 'printers.note_elegoo_cc2'
+    },
+    'elegoo_resin': {
+        status: 'compatible',
+        type: 'elegoo_sdcp',
+        brands: ['saturn', 'mars', 'jupiter'],
+        note: 'printers.note_elegoo_resin'
     },
     'elegoo_neptune': {
         status: 'partial',
@@ -16238,12 +16256,15 @@ function checkPrinterCompatibility(brandName) {
     for (const [key, data] of Object.entries(PRINTER_COMPATIBILITY)) {
         for (const b of data.brands) {
             const bl = b.toLowerCase();
-            if (brand === bl || brand.includes(bl) || bl.includes(brand)) {
+            const forward = brand === bl || brand.includes(bl);   // le texte saisi contient la marque/le modèle connu
+            if (forward || bl.includes(brand)) {
+                // une correspondance « saisie contient le modèle » passe avant la saisie partielle (ex. « Ender 3 » ≠ « Ender 3 V3 »)
+                const score = forward ? bl.length + 1000 : bl.length;
                 const match = { status: data.status, type: data.type, note: data.note, matchedBrand: key };
                 if (data.generic) {
-                    if (bl.length > bestGenericLen) { bestGenericLen = bl.length; bestGeneric = match; }
+                    if (score > bestGenericLen) { bestGenericLen = score; bestGeneric = match; }
                 } else {
-                    if (bl.length > bestSpecificLen) { bestSpecificLen = bl.length; bestSpecific = match; }
+                    if (score > bestSpecificLen) { bestSpecificLen = score; bestSpecific = match; }
                 }
             }
         }
@@ -22526,4 +22547,41 @@ window.copyRemoteUrl = function () {
         _originalApply(...args);
         patchMoreLabel();
     };
+})();
+
+// ── Inventaires repliables (Spoolman / manuel / TigerTag), état mémorisé ──
+(function initInventoryCollapse() {
+    const KEY = 'stellio_inv_collapsed';
+    const read = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (_) { return {}; } };
+    const write = (o) => { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (_) {} };
+    function setup() {
+        const state = read();
+        document.querySelectorAll('.inv-section').forEach(sec => {
+            const banner = sec.querySelector(':scope > .source-banner, :scope > .tigertag-banner');
+            if (!banner || banner.querySelector('.inv-toggle')) return;
+            const key = sec.dataset.invKey;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'inv-toggle';
+            btn.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
+            const apply = (collapsed) => {
+                sec.classList.toggle('inv-collapsed', collapsed);
+                btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                const label = (typeof _t3 === 'function') ? _t3(collapsed ? 'inventory.expand' : 'inventory.collapse', collapsed ? 'Déplier' : 'Replier') : '';
+                btn.title = label; btn.setAttribute('aria-label', label);
+            };
+            apply(!!state[key]);
+            const toggle = () => {
+                const now = !sec.classList.contains('inv-collapsed');
+                apply(now);
+                const st = read(); if (now) st[key] = true; else delete st[key]; write(st);
+            };
+            btn.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
+            banner.addEventListener('click', (e) => { if (!e.target.closest('button, a, input, select')) toggle(); });
+            banner.insertBefore(btn, banner.firstChild);
+        });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup); else setup();
+    document.addEventListener('i18n:ready', setup);
+    document.addEventListener('i18n:changed', () => { document.querySelectorAll('.inv-toggle').forEach(b => { const c = b.closest('.inv-section')?.classList.contains('inv-collapsed'); const l = _t3(c ? 'inventory.expand' : 'inventory.collapse', c ? 'Déplier' : 'Replier'); b.title = l; b.setAttribute('aria-label', l); }); });
 })();

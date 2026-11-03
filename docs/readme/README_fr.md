@@ -57,11 +57,13 @@ Que vous soyez un maker débutant ou un propriétaire expérimenté gérant plus
 - 📺 **Widget flottant** affichant la progression de l'impression en cours, visible sur toutes les pages
 - 🧭 **Visite guidée interactive** pour découvrir les fonctionnalités principales, relançable depuis les Paramètres
 - ♿ **Accessibilité** : mode contraste élevé, réduction des animations, indicateurs de focus clavier visibles partout
+- 🪟 **Icône dans la zone de notification (Windows)** : une icône Stellio à côté de l'horloge montre que l'application tourne toujours (clic = ouvrir, clic droit = Ouvrir / Quitter)
 
 ### 📚 Gestion de bibliothèque
 - 🗂️ **Sources multiples** : dossiers locaux, fichiers uniques, partages SMB/NFS — les dossiers 3D détectés sur l'ordinateur sont proposés et ajoutables en un clic
 - 🖼️ **Miniatures 3D automatiques** via PyRender (rendu haute qualité) ou un rasteriseur CPU numpy (solution de repli), avec effet de chargement et **aperçu agrandi au survol**
 - 🌀 **Toujours fluide** : la génération des miniatures se met en pause dès que vous utilisez l'application et reprend quand vous ne faites plus rien
+- ⚙️ **Réglage « Performance des miniatures »** (Automatique / Économe / Normal / Rapide) avec un indicateur de progression traduit ; les STL très détaillés et les 3MF énormes ou multicolores obtiennent des miniatures 3D propres, et les 3MF PrusaSlicer sont rendus en 3D comme les STL
 - 🏷️ **Tags personnalisés** avec couleurs + auto-tagging par IA, et **tag en un clic sur plusieurs fichiers sélectionnés**
 - 🔍 **Recherche sémantique assistée par IA** ("je cherche un support pour...") avec **recherches récentes mémorisées**
 - ⭐ **Favoris** et filtres avancés (type, taille, poids, statut d'impression), avec une **alerte de réassort** quand le stock de filament est insuffisant pour vos favoris
@@ -135,6 +137,7 @@ Que vous soyez un maker débutant ou un propriétaire expérimenté gérant plus
 - 🔄 **Convertisseur de format** (STL ↔ 3MF ↔ OBJ)
 - 🛡️ **Vérification d'intégrité** (fichiers corrompus/manquants)
 - 💰 **Calcul du coût d'impression** : matière, électricité, usure machine (par heure), frais fixes, marge en % et quantité — prix unitaire et total calculés au centime
+- 🏷️ **Marge et prix de vente** : réglez votre marge par défaut (%) une fois dans Paramètres → Tarifs d'impression ; l'historique affiche le prix de vente (coût + marge) à côté du coût, tandis que les statistiques restent calculées sur le coût réel
 - 🧾 **Devis PDF** : générés depuis le calcul de coût, avec client, désignation et notes personnalisables ; en-tête de devis configurable (nom/société, logo, adresse, téléphone, e-mail, site web, SIRET / N° TVA) et mentions légales en pied de page
 - 🗃️ **Historique des devis** : chaque devis généré est conservé (copie du PDF) et reste consultable, re-téléchargeable et supprimable depuis le widget « Devis » du tableau de bord
 - 🌱 **Estimation environnementale** : empreinte CO₂ de vos impressions (matière + électricité)
@@ -186,8 +189,12 @@ Que vous soyez un maker débutant ou un propriétaire expérimenté gérant plus
 
 | | |
 |---|---|
-| ![Bibliothèque](../../images/library.png) *Bibliothèque avec miniatures* | ![Imprimantes](../../images/monitoring.png) *Suivi d'imprimante* |
-| ![Slicer](../../images/slicer.png) *Recommandation de profil par IA* | ![Nesting](../../images/nesting.png) *Nesting automatique* |
+| ![Tableau de bord personnalisable](../../images/dashboard.png) *Tableau de bord personnalisable* | ![Bibliothèque avec tags et favoris](../../images/library-tags.png) *Bibliothèque avec tags et favoris* |
+| ![Détails du fichier : poids, durée et coût d'impression](../../images/file-details.png) *Détails du fichier : poids, durée et coût d'impression* | ![Palette de commandes (Ctrl+K)](../../images/command-palette.png) *Palette de commandes (Ctrl+K)* |
+| ![Projets / assemblages](../../images/projects.png) *Projets / assemblages* | ![Inventaire filament](../../images/filament-inventory.png) *Inventaire filament* |
+| ![Statistiques de la bibliothèque](../../images/statistics.png) *Statistiques de la bibliothèque* | ![Tarifs d'impression : électricité, usure, marge](../../images/print-pricing.png) *Tarifs d'impression : électricité, usure, marge* |
+| ![Bibliothèque avec miniatures](../../images/library.png) *Bibliothèque avec miniatures* | ![Suivi d'imprimante](../../images/monitoring.png) *Suivi d'imprimante* |
+| ![Recommandation de profil par IA](../../images/slicer.png) *Recommandation de profil par IA* | ![Nesting automatique](../../images/nesting.png) *Nesting automatique* |
 
 ---
 
@@ -287,16 +294,19 @@ Stellio détecte automatiquement :
 - ✅ Slic3r
 - ✅ KISSlicer
 
-### Imprimantes
+### Imprimantes prises en charge
 
-| Type | Protocole | Fonctionnalités |
+| Marque | Modèles | Connexion et fonctionnalités |
 |---|---|---|
-| OctoPrint / PrusaLink | API HTTP | Suivi, upload, caméra |
-| Klipper/Moonraker | API HTTP | Suivi, upload, caméra, heures exactes |
-| Bambu Lab | MQTT (cloud + LAN) | Suivi temps réel, AMS, caméra (JPEG A1/P1, RTSPS X1/X2/H2), détection SSDP |
-| Creality | WebSocket | Suivi, CFS, détection UDP |
-| FlashForge | API propriétaire | Suivi, détection UDP |
-| Elegoo | SDCP sur WebSocket | Suivi, détection UDP |
+| **Bambu Lab** | X1 / X1C / X1E · X2D · P1P / P1S · P2S · A1 / A1 mini · H2D / H2S / H2C | MQTT (LAN + cloud) : suivi temps réel, AMS, caméra, détection SSDP |
+| **Prusa** | MK4 · MK3.9 · MK3.5 · MINI+ · XL · CORE One | PrusaLink (HTTP) : suivi, envoi, caméra |
+| **Creality** | Série K1 / K2 · Ender-3 V3 · Hi | WebSocket : suivi, CFS, détection UDP |
+| **Elegoo** | Centauri Carbon 1 et 2 · résine Saturn / Mars | SDCP sur WebSocket : suivi, détection UDP |
+| **FlashForge** | Adventurer 5M / 5M Pro · AD5X | API propriétaire : suivi, détection UDP |
+| **Klipper / Moonraker** | Toute machine sous Klipper (Voron…) | HTTP : suivi, envoi, caméra, heures d'impression exactes |
+| **OctoPrint** | Toute imprimante pilotée par OctoPrint | HTTP : suivi, envoi, caméra |
+
+> Les modèles listés sont ceux proposés dans le formulaire « Ajouter une imprimante » de Stellio. D'autres modèles utilisant le même protocole fonctionnent en général aussi, mais tous n'ont pas été testés — [dites-nous sur GitHub](https://github.com/stellio-app/stellio/issues) si la vôtre fonctionne ou non.
 
 ---
 

@@ -57,11 +57,13 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 📺 **Floating widget** showing the progress of the current print, visible on every page
 - 🧭 **Interactive guided tour** to discover the main features, restartable from Settings
 - ♿ **Accessibility**: high-contrast mode, reduced motion, visible keyboard focus indicators everywhere
+- 🪟 **System tray icon (Windows)**: a Stellio icon next to the clock shows the app is still running (click to open, right-click for Open / Quit)
 
 ### 📚 Library management
 - 🗂️ **Multiple sources**: local folders, single files, SMB/NFS shares — 3D folders detected on your computer are suggested and can be added in one click
 - 🖼️ **Automatic 3D thumbnails** via PyRender (high-quality rendering) or a numpy CPU rasterizer (fallback), with loading-effect placeholders and an **enlarged preview on hover**
 - 🌀 **Always smooth**: thumbnail generation pauses as soon as you use the app and resumes when you stop
+- ⚙️ **Thumbnail performance setting** (Automatic / Eco / Normal / Fast) with a translated progress indicator; very detailed STL files and huge or multicolor 3MF files get clean 3D thumbnails, and PrusaSlicer 3MF files are rendered in 3D just like STL
 - 🏷️ **Custom tags** with colors + AI auto-tagging, and **one-click tagging of several selected files** at once
 - 🔍 **AI-assisted semantic search** ("I'm looking for a support for...") with **recent searches remembered**
 - ⭐ **Favorites** and advanced filters (type, size, weight, print status), with a **restock warning** when filament stock is insufficient for your favorites
@@ -135,6 +137,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 🔄 **Format converter** (STL ↔ 3MF ↔ OBJ)
 - 🛡️ **Integrity check** (corrupted/missing files)
 - 💰 **Print cost calculation**: material, electricity, machine wear (per hour), fixed fee, margin in % and quantity — unit price and total computed to the cent
+- 🏷️ **Margin & sale price**: set your default margin (%) once in Settings → Print pricing; the history shows the sale price (cost + margin) next to the cost, while statistics keep using the real cost
 - 🧾 **PDF quotes**: generated from the cost calculator with customizable client, item name and notes; configurable quote header (name/company, logo, address, phone, email, website, tax ID) and legal notices in the footer
 - 🗃️ **Quote history**: every generated quote is kept (PDF copy) and can be browsed, re-downloaded and deleted from the “Quotes” widget on the dashboard
 - 🌱 **Environmental estimate**: CO₂ footprint of your prints (material + electricity)
@@ -186,8 +189,12 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 
 | | |
 |---|---|
-| ![Library](images/library.png) *Library with thumbnails* | ![Printers](images/monitoring.png) *Printer monitoring* |
-| ![Slicer](images/slicer.png) *AI profile recommendation* | ![Nesting](images/nesting.png) *Automatic nesting* |
+| ![Customizable dashboard](images/dashboard.png) *Customizable dashboard* | ![Library with tags and favorites](images/library-tags.png) *Library with tags and favorites* |
+| ![File details: weight, print time and cost](images/file-details.png) *File details: weight, print time and cost* | ![Command palette (Ctrl+K)](images/command-palette.png) *Command palette (Ctrl+K)* |
+| ![Projects / assemblies](images/projects.png) *Projects / assemblies* | ![Filament inventory](images/filament-inventory.png) *Filament inventory* |
+| ![Library statistics](images/statistics.png) *Library statistics* | ![Print pricing: electricity, wear, margin](images/print-pricing.png) *Print pricing: electricity, wear, margin* |
+| ![Library with thumbnails](images/library.png) *Library with thumbnails* | ![Printer monitoring](images/monitoring.png) *Printer monitoring* |
+| ![AI profile recommendation](images/slicer.png) *AI profile recommendation* | ![Automatic nesting](images/nesting.png) *Automatic nesting* |
 
 ---
 
@@ -287,16 +294,19 @@ Stellio automatically detects:
 - ✅ Slic3r
 - ✅ KISSlicer
 
-### Printers
+### Supported printers
 
-| Type | Protocol | Features |
+| Brand | Models | Connection & features |
 |---|---|---|
-| OctoPrint / PrusaLink | HTTP API | Monitoring, upload, camera |
-| Klipper/Moonraker | HTTP API | Monitoring, upload, camera, exact hours |
-| Bambu Lab | MQTT (cloud + LAN) | Real-time monitoring, AMS, camera (JPEG A1/P1, RTSPS X1/X2/H2), SSDP auto-discovery |
-| Creality | WebSocket | Monitoring, CFS, UDP auto-discovery |
-| FlashForge | Proprietary API | Monitoring, UDP auto-discovery |
-| Elegoo | SDCP over WebSocket | Monitoring, UDP auto-discovery |
+| **Bambu Lab** | X1 / X1C / X1E · X2D · P1P / P1S · P2S · A1 / A1 mini · H2D / H2S / H2C | MQTT (LAN + cloud): real-time monitoring, AMS, camera, SSDP auto-discovery |
+| **Prusa** | MK4 · MK3.9 · MK3.5 · MINI+ · XL · CORE One | PrusaLink (HTTP): monitoring, upload, camera |
+| **Creality** | K1 / K2 series · Ender-3 V3 · Hi | WebSocket: monitoring, CFS, UDP auto-discovery |
+| **Elegoo** | Centauri Carbon 1 & 2 · Saturn / Mars resin series | SDCP over WebSocket: monitoring, UDP auto-discovery |
+| **FlashForge** | Adventurer 5M / 5M Pro · AD5X | Proprietary API: monitoring, UDP auto-discovery |
+| **Klipper / Moonraker** | Any machine running Klipper (Voron…) | HTTP: monitoring, upload, camera, exact print hours |
+| **OctoPrint** | Any printer driven by OctoPrint | HTTP: monitoring, upload, camera |
+
+> The models listed are those offered in Stellio's “Add a printer” form. Other models that speak the same protocol usually work too, but have not all been tested — [tell us on GitHub](https://github.com/stellio-app/stellio/issues) if yours works or not.
 
 ---
 

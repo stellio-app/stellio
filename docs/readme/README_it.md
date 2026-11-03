@@ -57,11 +57,13 @@ Che tu sia un maker alle prime armi o un utente esperto con più macchine, Stell
 - 📺 **Widget mobile** che mostra l'avanzamento della stampa in corso, visibile in tutte le pagine
 - 🧭 **Tour guidato interattivo** per scoprire le funzionalità principali, riavviabile dalle Impostazioni
 - ♿ **Accessibilità**: modalità ad alto contrasto, riduzione delle animazioni, indicatori di focus da tastiera visibili ovunque
+- 🪟 **Icona nell'area di notifica (Windows)**: un'icona di Stellio accanto all'orologio mostra che l'app è ancora in esecuzione (clic = apri, clic destro = Apri / Esci)
 
 ### 📚 Gestione della libreria
 - 🗂️ **Sorgenti multiple**: cartelle locali, singoli file, condivisioni SMB/NFS — le cartelle 3D rilevate sul computer vengono proposte e aggiungibili con un clic
 - 🖼️ **Miniature 3D automatiche** tramite PyRender (rendering di alta qualità) o un rasterizzatore CPU numpy (soluzione di riserva), con effetto di caricamento e **anteprima ingrandita al passaggio del mouse**
 - 🌀 **Sempre fluida**: la generazione delle miniature va in pausa appena usi l'app e riprende quando smetti
+- ⚙️ **Impostazione «Prestazioni miniature»** (Automatico / Economico / Normale / Veloce) con indicatore di avanzamento tradotto; gli STL molto dettagliati e i 3MF enormi o multicolore ottengono miniature 3D pulite, e i 3MF di PrusaSlicer vengono renderizzati in 3D come gli STL
 - 🏷️ **Tag personalizzati** con colori + tagging automatico via IA, e **tagging con un clic di più file selezionati**
 - 🔍 **Ricerca semantica assistita dall'IA** ("cerco un supporto per...") con **ricerche recenti memorizzate**
 - ⭐ **Preferiti** e filtri avanzati (tipo, dimensione, peso, stato di stampa), con un **avviso di rifornimento** quando le scorte di filamento non bastano per i tuoi preferiti
@@ -135,6 +137,7 @@ Che tu sia un maker alle prime armi o un utente esperto con più macchine, Stell
 - 🔄 **Convertitore di formato** (STL ↔ 3MF ↔ OBJ)
 - 🛡️ **Verifica dell'integrità** (file corrotti/mancanti)
 - 💰 **Calcolo del costo di stampa**: materiale, elettricità, usura della macchina (all'ora), costi fissi, margine in % e quantità — prezzo unitario e totale calcolati al centesimo
+- 🏷️ **Margine e prezzo di vendita**: imposta il margine predefinito (%) una volta in Impostazioni → Tariffe di stampa; la cronologia mostra il prezzo di vendita (costo + margine) accanto al costo, mentre le statistiche restano basate sul costo reale
 - 🧾 **Preventivi PDF**: generati dal calcolo dei costi, con cliente, descrizione e note personalizzabili; intestazione del preventivo configurabile (nome/azienda, logo, indirizzo, telefono, e-mail, sito web, partita IVA) e note legali a piè di pagina
 - 🗃️ **Cronologia dei preventivi**: ogni preventivo generato viene conservato (copia del PDF) e si può consultare, riscaricare ed eliminare dal widget «Preventivi» della dashboard
 - 🌱 **Stima ambientale**: impronta di CO₂ delle tue stampe (materiale + elettricità)
@@ -186,8 +189,12 @@ Che tu sia un maker alle prime armi o un utente esperto con più macchine, Stell
 
 | | |
 |---|---|
-| ![Libreria](../../images/library.png) *Libreria con miniature* | ![Stampanti](../../images/monitoring.png) *Monitoraggio stampanti* |
-| ![Slicer](../../images/slicer.png) *Raccomandazione profilo via IA* | ![Nesting](../../images/nesting.png) *Nesting automatico* |
+| ![Dashboard personalizzabile](../../images/dashboard.png) *Dashboard personalizzabile* | ![Libreria con tag e preferiti](../../images/library-tags.png) *Libreria con tag e preferiti* |
+| ![Dettagli del file: peso, tempo e costo di stampa](../../images/file-details.png) *Dettagli del file: peso, tempo e costo di stampa* | ![Palette dei comandi (Ctrl+K)](../../images/command-palette.png) *Palette dei comandi (Ctrl+K)* |
+| ![Progetti / assemblaggi](../../images/projects.png) *Progetti / assemblaggi* | ![Inventario filamento](../../images/filament-inventory.png) *Inventario filamento* |
+| ![Statistiche della libreria](../../images/statistics.png) *Statistiche della libreria* | ![Tariffe di stampa: elettricità, usura, margine](../../images/print-pricing.png) *Tariffe di stampa: elettricità, usura, margine* |
+| ![Libreria con miniature](../../images/library.png) *Libreria con miniature* | ![Monitoraggio stampanti](../../images/monitoring.png) *Monitoraggio stampanti* |
+| ![Raccomandazione profilo via IA](../../images/slicer.png) *Raccomandazione profilo via IA* | ![Nesting automatico](../../images/nesting.png) *Nesting automatico* |
 
 ---
 
@@ -287,16 +294,19 @@ Stellio rileva automaticamente:
 - ✅ Slic3r
 - ✅ KISSlicer
 
-### Stampanti
+### Stampanti supportate
 
-| Tipo | Protocollo | Funzionalità |
+| Marca | Modelli | Connessione e funzioni |
 |---|---|---|
-| OctoPrint / PrusaLink | API HTTP | Monitoraggio, upload, telecamera |
-| Klipper/Moonraker | API HTTP | Monitoraggio, upload, telecamera, ore esatte |
-| Bambu Lab | MQTT (cloud + LAN) | Monitoraggio in tempo reale, AMS, telecamera (JPEG A1/P1, RTSPS X1/X2/H2), rilevamento SSDP |
-| Creality | WebSocket | Monitoraggio, CFS, rilevamento UDP |
-| FlashForge | API proprietaria | Monitoraggio, rilevamento UDP |
-| Elegoo | SDCP su WebSocket | Monitoraggio, rilevamento UDP |
+| **Bambu Lab** | X1 / X1C / X1E · X2D · P1P / P1S · P2S · A1 / A1 mini · H2D / H2S / H2C | MQTT (LAN + cloud): monitoraggio in tempo reale, AMS, fotocamera, rilevamento SSDP |
+| **Prusa** | MK4 · MK3.9 · MK3.5 · MINI+ · XL · CORE One | PrusaLink (HTTP): monitoraggio, invio, fotocamera |
+| **Creality** | Serie K1 / K2 · Ender-3 V3 · Hi | WebSocket: monitoraggio, CFS, rilevamento UDP |
+| **Elegoo** | Centauri Carbon 1 e 2 · resina Saturn / Mars | SDCP su WebSocket: monitoraggio, rilevamento UDP |
+| **FlashForge** | Adventurer 5M / 5M Pro · AD5X | API proprietaria: monitoraggio, rilevamento UDP |
+| **Klipper / Moonraker** | Qualsiasi macchina con Klipper (Voron…) | HTTP: monitoraggio, invio, fotocamera, ore di stampa esatte |
+| **OctoPrint** | Qualsiasi stampante gestita da OctoPrint | HTTP: monitoraggio, invio, fotocamera |
+
+> I modelli elencati sono quelli proposti dal modulo «Aggiungi stampante» di Stellio. Altri modelli che usano lo stesso protocollo di solito funzionano, ma non sono stati tutti testati — [faccelo sapere su GitHub](https://github.com/stellio-app/stellio/issues) se la tua funziona o no.
 
 ---
 

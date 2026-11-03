@@ -57,11 +57,13 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 - 📺 **Widget flutuante** que mostra o progresso da impressão em andamento, visível em todas as páginas
 - 🧭 **Tour guiado interativo** para descobrir os principais recursos, reiniciável nas Configurações
 - ♿ **Acessibilidade**: modo de alto contraste, redução de animações, indicadores de foco do teclado visíveis em todo lugar
+- 🪟 **Ícone na bandeja do sistema (Windows)**: um ícone do Stellio ao lado do relógio mostra que o app continua em execução (clique = abrir, clique direito = Abrir / Sair)
 
 ### 📚 Gerenciamento de biblioteca
 - 🗂️ **Múltiplas fontes**: pastas locais, arquivos individuais, compartilhamentos SMB/NFS — as pastas 3D detectadas no computador são sugeridas e podem ser adicionadas com um clique
 - 🖼️ **Miniaturas 3D automáticas** via PyRender (renderização de alta qualidade) ou um rasterizador de CPU numpy (alternativa), com efeito de carregamento e **pré-visualização ampliada ao passar o mouse**
 - 🌀 **Sempre fluido**: a geração de miniaturas pausa assim que você usa o aplicativo e retoma quando você para
+- ⚙️ **Ajuste «Desempenho das miniaturas»** (Automático / Econômico / Normal / Rápido) com indicador de progresso traduzido; STL muito detalhados e 3MF enormes ou multicoloridos recebem miniaturas 3D limpas, e os 3MF do PrusaSlicer são renderizados em 3D como os STL
 - 🏷️ **Tags personalizadas** com cores + marcação automática por IA, e **marcação com um clique de vários arquivos selecionados**
 - 🔍 **Busca semântica assistida por IA** ("estou procurando um suporte para...") com **buscas recentes memorizadas**
 - ⭐ **Favoritos** e filtros avançados (tipo, tamanho, peso, status de impressão), com um **aviso de reposição** quando o estoque de filamento não é suficiente para seus favoritos
@@ -135,6 +137,7 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 - 🔄 **Conversor de formatos** (STL ↔ 3MF ↔ OBJ)
 - 🛡️ **Verificação de integridade** (arquivos corrompidos/ausentes)
 - 💰 **Cálculo de custo de impressão**: material, eletricidade, desgaste da máquina (por hora), custos fixos, margem em % e quantidade — preço unitário e total calculados ao centavo
+- 🏷️ **Margem e preço de venda**: defina sua margem padrão (%) uma vez em Configurações → Tarifas de impressão; o histórico mostra o preço de venda (custo + margem) ao lado do custo, enquanto as estatísticas continuam usando o custo real
 - 🧾 **Orçamentos em PDF**: gerados a partir do cálculo de custo, com cliente, designação e notas personalizáveis; cabeçalho do orçamento configurável (nome/empresa, logotipo, endereço, telefone, e-mail, site, CNPJ/NIF) e avisos legais no rodapé
 - 🗃️ **Histórico de orçamentos**: cada orçamento gerado é guardado (cópia do PDF) e pode ser consultado, baixado de novo e excluído a partir do widget «Orçamentos» do painel
 - 🌱 **Estimativa ambiental**: pegada de CO₂ das suas impressões (material + eletricidade)
@@ -186,8 +189,12 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 
 | | |
 |---|---|
-| ![Biblioteca](../../images/library.png) *Biblioteca com miniaturas* | ![Impressoras](../../images/monitoring.png) *Monitoramento de impressoras* |
-| ![Slicer](../../images/slicer.png) *Recomendação de perfil por IA* | ![Nesting](../../images/nesting.png) *Nesting automático* |
+| ![Painel personalizável](../../images/dashboard.png) *Painel personalizável* | ![Biblioteca com tags e favoritos](../../images/library-tags.png) *Biblioteca com tags e favoritos* |
+| ![Detalhes do arquivo: peso, tempo e custo de impressão](../../images/file-details.png) *Detalhes do arquivo: peso, tempo e custo de impressão* | ![Paleta de comandos (Ctrl+K)](../../images/command-palette.png) *Paleta de comandos (Ctrl+K)* |
+| ![Projetos / montagens](../../images/projects.png) *Projetos / montagens* | ![Inventário de filamento](../../images/filament-inventory.png) *Inventário de filamento* |
+| ![Estatísticas da biblioteca](../../images/statistics.png) *Estatísticas da biblioteca* | ![Tarifas de impressão: eletricidade, desgaste, margem](../../images/print-pricing.png) *Tarifas de impressão: eletricidade, desgaste, margem* |
+| ![Biblioteca com miniaturas](../../images/library.png) *Biblioteca com miniaturas* | ![Monitoramento de impressoras](../../images/monitoring.png) *Monitoramento de impressoras* |
+| ![Recomendação de perfil por IA](../../images/slicer.png) *Recomendação de perfil por IA* | ![Nesting automático](../../images/nesting.png) *Nesting automático* |
 
 ---
 
@@ -287,16 +294,19 @@ O Stellio detecta automaticamente:
 - ✅ Slic3r
 - ✅ KISSlicer
 
-### Impressoras
+### Impressoras compatíveis
 
-| Tipo | Protocolo | Funcionalidades |
+| Marca | Modelos | Conexão e recursos |
 |---|---|---|
-| OctoPrint / PrusaLink | API HTTP | Monitoramento, upload, câmera |
-| Klipper/Moonraker | API HTTP | Monitoramento, upload, câmera, horas exatas |
-| Bambu Lab | MQTT (nuvem + LAN) | Monitoramento em tempo real, AMS, câmera (JPEG A1/P1, RTSPS X1/X2/H2), detecção SSDP |
-| Creality | WebSocket | Monitoramento, CFS, detecção UDP |
-| FlashForge | API proprietária | Monitoramento, detecção UDP |
-| Elegoo | SDCP sobre WebSocket | Monitoramento, detecção UDP |
+| **Bambu Lab** | X1 / X1C / X1E · X2D · P1P / P1S · P2S · A1 / A1 mini · H2D / H2S / H2C | MQTT (LAN + nuvem): monitoramento em tempo real, AMS, câmera, detecção SSDP |
+| **Prusa** | MK4 · MK3.9 · MK3.5 · MINI+ · XL · CORE One | PrusaLink (HTTP): monitoramento, envio, câmera |
+| **Creality** | Série K1 / K2 · Ender-3 V3 · Hi | WebSocket: monitoramento, CFS, detecção UDP |
+| **Elegoo** | Centauri Carbon 1 e 2 · resina Saturn / Mars | SDCP sobre WebSocket: monitoramento, detecção UDP |
+| **FlashForge** | Adventurer 5M / 5M Pro · AD5X | API proprietária: monitoramento, detecção UDP |
+| **Klipper / Moonraker** | Qualquer máquina com Klipper (Voron…) | HTTP: monitoramento, envio, câmera, horas de impressão exatas |
+| **OctoPrint** | Qualquer impressora controlada pelo OctoPrint | HTTP: monitoramento, envio, câmera |
+
+> Os modelos listados são os oferecidos no formulário «Adicionar impressora» do Stellio. Outros modelos que usam o mesmo protocolo geralmente funcionam, mas nem todos foram testados — [conte-nos no GitHub](https://github.com/stellio-app/stellio/issues) se a sua funciona ou não.
 
 ---
 
