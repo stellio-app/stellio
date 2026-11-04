@@ -15097,7 +15097,6 @@ def _cookie_header_to_dict(header):
 
 
 def crealitycloud_get_model_files(page_url, cookie):
-    """Retourne [{'name', 'url', 'size'}] pour le profil d'impression indiqué dans l'URL (profileId=…)."""
     import uuid
     from urllib.parse import parse_qs
     ck_header = _clean_cookie_header(cookie)
