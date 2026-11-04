@@ -15084,10 +15084,6 @@ def model_page_get_files(page_url, label, cookie):
     return files
 
 
-# --- Creality Cloud : API de téléchargement 3MF (v0.7.5) ---
-# Le bouton « Télécharger 3MF » du site appelle POST /api/cxy/v3/model/3mfDownload avec {"id": <profileId>}
-# et reçoit une URL signée temporaire. Les en-têtes d'authentification reprennent les cookies de session
-# (model_token / model_user_id).
 CREALITY_3MF_API = "https://www.crealitycloud.com/api/cxy/v3/model/3mfDownload"
 
 
