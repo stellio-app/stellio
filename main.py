@@ -12306,7 +12306,9 @@ def api_get_print_history():
             rows = conn.execute(
                 f"""SELECT id, file_path, file_name, file_size, file_ext, slicer, sent_at, source_platform,
                           result, failure_reason, rating_notes, slicer_profile_id, slicer_profile_name, rated_at,
-                          material_cost, elec_cost, total_cost
+                          material_cost, elec_cost, total_cost,
+                          printer_id, estimated_seconds, actual_seconds, spool_weight_used_g, filament_material, filament_label,
+                          (SELECT p.name FROM printers p WHERE p.id = print_history.printer_id) AS printer_name
                    FROM print_history WHERE {where_sql}
                    ORDER BY sent_at DESC LIMIT ? OFFSET ?""",
                 (*params, limit, offset)
@@ -19484,7 +19486,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.8.4"
+CURRENT_VERSION = "0.8.5"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -27619,6 +27621,76 @@ def api_filament_restock_snooze():
     return jsonify({"message": "Rappel mis à jour", "snoozed_until": snoozed.get(key)}), 200
 
 
+def _bed_fit(dims, cfg):
+    """Compare les dimensions d'une pièce (dict x/y/z en mm) au volume d'une imprimante (config JSON).
+    Retourne None si le volume n'est pas renseigné, sinon (tient, bed_x, bed_y, bed_z).
+    Comparaison à plat, sans rotation en diagonale : XY triés pour accepter une pièce tournée de 90°."""
+    try:
+        bx = float(cfg.get('bed_x') or 0)
+        by = float(cfg.get('bed_y') or 0)
+        bz = float(cfg.get('bed_z') or 0)
+    except (TypeError, ValueError):
+        return None
+    if bx <= 0 or by <= 0:
+        return None
+    pxy = sorted([float(dims['x']), float(dims['y'])])
+    bxy = sorted([bx, by])
+    fits = pxy[0] <= bxy[0] and pxy[1] <= bxy[1] and (not bz or float(dims['z']) <= bz)
+    return fits, bx, by, bz
+
+
+def _append_bed_fit_warnings(warnings, user_id, printer_id, dims):
+    """Ajoute à la vérification avant impression : pièce trop grande (avec les autres imprimantes où elle tient),
+    pièce qui tient (confirmation), ou volume d'impression non renseigné."""
+    conn = get_db()
+    rows = conn.execute("SELECT id, name, config FROM printers WHERE user_id=?", (user_id,)).fetchall()
+    conn.close()
+    current, others = None, []
+    for r in rows:
+        try:
+            cfg = json.loads(r["config"]) if r["config"] else {}
+        except Exception:
+            cfg = {}
+        if str(r["id"]) == str(printer_id):
+            current = (r["name"], cfg)
+        else:
+            others.append((r["name"], cfg))
+    if current is None:
+        return
+    name, cfg = current
+    pdims = f"{dims['x']:g}×{dims['y']:g}×{dims['z']:g}"
+    res = _bed_fit(dims, cfg)
+    if res is None:
+        warnings.append({
+            "level": "info", "code": "bed_unknown",
+            "message": f"Volume d'impression non renseigné pour {name} : renseigne-le dans l'imprimante pour vérifier que la pièce tient.",
+            "params": {"printer": name}
+        })
+        return
+    fits, bx, by, bz = res
+    bed_txt = f"{bx:g}×{by:g}×{(f'{bz:g}' if bz else '?')}"
+    if fits:
+        warnings.append({
+            "level": "ok", "code": "bed_fits",
+            "message": f"La pièce ({pdims} mm) tient sur le plateau de {name} ({bed_txt} mm).",
+            "params": {"dims": pdims, "bed": bed_txt, "printer": name}
+        })
+        return
+    warnings.append({
+        "level": "error", "code": "oversized",
+        "message": f"Pièce ({pdims} mm) plus grande que le plateau ({bed_txt} mm).",
+        "params": {"dims": pdims, "bed": bed_txt}
+    })
+    alt = [n for n, c in others if (_bed_fit(dims, c) or (False,))[0]]
+    if alt:
+        names = ", ".join(alt[:4])
+        warnings.append({
+            "level": "info", "code": "oversized_alt",
+            "message": f"Elle tient sur : {names}.",
+            "params": {"printers": names}
+        })
+
+
 @app.route('/api/files/pre-print-check', methods=['POST'])
 @login_required
 def api_pre_print_check():
@@ -27644,26 +27716,9 @@ def api_pre_print_check():
 
     if analysis and analysis.get('dimensions') and printer_id:
         try:
-            conn = get_db()
-            printer = conn.execute("SELECT config FROM printers WHERE id=? AND user_id=?", (printer_id, user_id)).fetchone()
-            conn.close()
-            bed = json.loads(printer["config"]) if printer and printer["config"] else {}
-            # Taille du plateau non renseignée : pas de jugement possible, donc pas d'avertissement (évite les faux positifs)
-            if not (bed.get('bed_x') and bed.get('bed_y')):
-                raise ValueError('bed size not set')
-            bed_x = float(bed.get('bed_x'))
-            bed_y = float(bed.get('bed_y'))
-            bed_z = float(bed.get('bed_z') or 0)
-            dims = sorted([analysis['dimensions']['x'], analysis['dimensions']['y']])
-            bed_xy = sorted([bed_x, bed_y])
-            if dims[0] > bed_xy[0] or dims[1] > bed_xy[1] or (bed_z and analysis['dimensions']['z'] > bed_z):
-                warnings.append({
-                    "level": "error",
-                    "code": "oversized",
-                    "message": f"Pièce ({analysis['dimensions']['x']}×{analysis['dimensions']['y']}×{analysis['dimensions']['z']} mm) plus grande que le plateau ({bed_x:g}×{bed_y:g}×{(f'{bed_z:g}' if bed_z else '?')} mm)."
-                })
-        except Exception:
-            pass
+            _append_bed_fit_warnings(warnings, user_id, printer_id, analysis['dimensions'])
+        except Exception as e:
+            app_logger.info(f"[PrePrintCheck] Vérif plateau ignorée: {e}")
 
     try:
         required_g, _src = _get_required_weight_for_file(file_path)

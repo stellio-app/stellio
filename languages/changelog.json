@@ -1,5 +1,66 @@
 [
   {
+    "version": "0.8.5",
+    "items": {
+      "fr": [
+        "Tableau de bord : un clic sur « Mise à jour disponible » ouvre directement la fenêtre de mise à jour (au lieu des paramètres)",
+        "Envoi au slicer : la vérification avant impression indique maintenant si la pièce tient sur le plateau (et sur quelles autres imprimantes elle tient si elle est trop grande), ou signale que le volume d'impression n'est pas renseigné",
+        "Imprimantes : le volume d'impression est suggéré automatiquement d'après le modèle (Bambu, Creality, Prusa, Elegoo, FlashForge…), modifiable",
+        "Historique : nouveau bouton pour créer un rapport d'impression partageable (image PNG avec miniature, durée, filament, imprimante et coût en option) à télécharger ou copier",
+        "Nouveau « Mode atelier » : affichage plein écran des imprimantes (progression, temps restant, températures) pensé pour tablette et téléphone, écran maintenu allumé, accessible aussi via #workshop"
+      ],
+      "en": [
+        "Dashboard: clicking “Update available” now opens the update window directly (instead of Settings)",
+        "Send to slicer: the pre-print check now tells you if the part fits on the bed (and which other printers it fits on if it is too big), or flags that the build volume is not set",
+        "Printers: the build volume is now suggested automatically from the model (Bambu, Creality, Prusa, Elegoo, FlashForge…) and stays editable",
+        "History: new button to create a shareable print report (PNG image with thumbnail, duration, filament, printer and optional cost) to download or copy",
+        "New “Workshop mode”: full-screen printer display (progress, time left, temperatures) designed for tablets and phones, keeps the screen awake, also reachable via #workshop"
+      ],
+      "de": [
+        "Dashboard: Ein Klick auf „Update verfügbar“ öffnet jetzt direkt das Update-Fenster (statt der Einstellungen)",
+        "Senden an den Slicer: Die Prüfung vor dem Druck zeigt jetzt, ob das Teil aufs Druckbett passt (und auf welche anderen Drucker, falls es zu groß ist) oder weist auf einen nicht angegebenen Bauraum hin",
+        "Drucker: Der Bauraum wird automatisch aus dem Modell vorgeschlagen (Bambu, Creality, Prusa, Elegoo, FlashForge …) und bleibt änderbar",
+        "Verlauf: Neuer Button für einen teilbaren Druckbericht (PNG mit Vorschaubild, Dauer, Filament, Drucker und optional Kosten) zum Herunterladen oder Kopieren",
+        "Neuer „Werkstattmodus“: Vollbildanzeige der Drucker (Fortschritt, Restzeit, Temperaturen) für Tablet und Smartphone, hält den Bildschirm wach, auch über #workshop erreichbar"
+      ],
+      "es": [
+        "Panel: al hacer clic en «Actualización disponible» se abre directamente la ventana de actualización (en vez de Ajustes)",
+        "Envío al slicer: la comprobación previa indica ahora si la pieza cabe en la cama (y en qué otras impresoras cabe si es demasiado grande) o avisa de que no se ha indicado el volumen de impresión",
+        "Impresoras: el volumen de impresión se sugiere automáticamente según el modelo (Bambu, Creality, Prusa, Elegoo, FlashForge…) y sigue siendo editable",
+        "Historial: nuevo botón para crear un informe de impresión para compartir (imagen PNG con miniatura, duración, filamento, impresora y coste opcional) para descargar o copiar",
+        "Nuevo «Modo taller»: pantalla completa de las impresoras (progreso, tiempo restante, temperaturas) pensada para tableta y móvil, mantiene la pantalla encendida y también se abre con #workshop"
+      ],
+      "pt": [
+        "Painel: ao clicar em «Atualização disponível» abre-se diretamente a janela de atualização (em vez das Definições)",
+        "Envio para o slicer: a verificação antes da impressão indica agora se a peça cabe na mesa (e em que outras impressoras cabe, se for demasiado grande) ou avisa que o volume de impressão não está indicado",
+        "Impressoras: o volume de impressão é sugerido automaticamente com base no modelo (Bambu, Creality, Prusa, Elegoo, FlashForge…) e continua editável",
+        "Histórico: novo botão para criar um relatório de impressão partilhável (imagem PNG com miniatura, duração, filamento, impressora e custo opcional) para transferir ou copiar",
+        "Novo «Modo oficina»: ecrã completo das impressoras (progresso, tempo restante, temperaturas) pensado para tablet e telemóvel, mantém o ecrã ligado e abre também com #workshop"
+      ],
+      "it": [
+        "Dashboard: facendo clic su «Aggiornamento disponibile» si apre direttamente la finestra di aggiornamento (invece delle Impostazioni)",
+        "Invio allo slicer: il controllo prima della stampa indica ora se il pezzo sta sul piatto (e su quali altre stampanti sta, se è troppo grande) oppure segnala che il volume di stampa non è indicato",
+        "Stampanti: il volume di stampa viene suggerito automaticamente in base al modello (Bambu, Creality, Prusa, Elegoo, FlashForge…) e resta modificabile",
+        "Cronologia: nuovo pulsante per creare un rapporto di stampa condivisibile (immagine PNG con miniatura, durata, filamento, stampante e costo facoltativo) da scaricare o copiare",
+        "Nuova «Modalità officina»: visualizzazione a schermo intero delle stampanti (avanzamento, tempo rimanente, temperature) pensata per tablet e smartphone, mantiene lo schermo acceso e si apre anche con #workshop"
+      ],
+      "zh": [
+        "仪表板：点击“有可用更新”现在会直接打开更新窗口（而不是跳转到设置）",
+        "发送到切片软件：打印前检查现在会提示模型能否放入打印平台（过大时还会列出能放得下的其他打印机），或提醒尚未设置打印体积",
+        "打印机：会根据型号自动建议打印体积（Bambu、Creality、Prusa、Elegoo、FlashForge 等），仍可手动修改",
+        "历史记录：新增按钮，可生成便于分享的打印报告（PNG 图片，含缩略图、时长、耗材、打印机，成本可选），支持下载或复制",
+        "新增“工坊模式”：全屏显示打印机（进度、剩余时间、温度），适合平板和手机，保持屏幕常亮，也可通过 #workshop 打开"
+      ],
+      "ja": [
+        "ダッシュボード：「アップデートあり」をクリックすると、設定ではなくアップデートのウィンドウが直接開くようになりました",
+        "スライサーへ送信：印刷前チェックで、モデルがベッドに収まるか（大きすぎる場合は収まる他のプリンターも）表示し、造形サイズ未設定の場合も通知します",
+        "プリンター：モデルに合わせて造形サイズを自動で提案します（Bambu、Creality、Prusa、Elegoo、FlashForge など）。手動で変更もできます",
+        "履歴：共有用のプリントレポート（サムネイル、所要時間、フィラメント、プリンター、任意でコストを含む PNG 画像）を作成してダウンロード／コピーできるボタンを追加",
+        "新しい「ワークショップモード」：プリンターを全画面で表示（進捗・残り時間・温度）。タブレット／スマートフォン向けで画面を点灯したままにし、#workshop でも開けます"
+      ]
+    }
+  },
+  {
     "version": "0.8.4",
     "items": {
       "fr": [

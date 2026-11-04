@@ -3687,7 +3687,7 @@ function _renderDashboardUpdate(body, data) {
         return;
     }
     body.innerHTML = `
-        <div class="dashboard-row" onclick="document.querySelector('.nav-btn[data-page=&quot;settings&quot;]')?.click();" style="cursor:pointer;">
+        <div class="dashboard-row" onclick="window.UpdateManager ? window.UpdateManager.showUpdateModal(window._dashboardUpdateCache) : document.querySelector('.nav-btn[data-page=&quot;settings&quot;]')?.click();" style="cursor:pointer;">
             <div class="dashboard-row-icon" style="background:var(--accent)22;color:var(--accent);"><i class="fa-solid fa-arrow-up-right-dots"></i></div>
             <div class="dashboard-row-body">
                 <div class="dashboard-row-title">${_t2('dashboard.update_available', 'Mise à jour disponible')} — v${escapeHtml(data.version)}</div>
@@ -13112,11 +13112,12 @@ window.createGuest = createGuest;
 // Avertissements avant impression, fiabilité croisée, notifications push
 // ============================================================================
 function _prePrintWarningHtml(w) {
-    const level = w.level === 'error' ? 'error' : (w.level === 'info' ? 'info' : 'warning');
+    const level = w.level === 'error' ? 'error' : (w.level === 'info' ? 'info' : (w.level === 'ok' ? 'ok' : 'warning'));
     const styles = {
         error: ['rgba(220,53,69,0.12)', 'rgba(220,53,69,0.35)', '#fc8181', 'fa-circle-exclamation'],
         warning: ['rgba(245,166,35,0.12)', 'rgba(245,166,35,0.35)', '#f6ad55', 'fa-triangle-exclamation'],
-        info: ['rgba(78,161,211,0.12)', 'rgba(78,161,211,0.35)', '#63b3ed', 'fa-circle-info']
+        info: ['rgba(78,161,211,0.12)', 'rgba(78,161,211,0.35)', '#63b3ed', 'fa-circle-info'],
+        ok: ['rgba(72,187,120,0.12)', 'rgba(72,187,120,0.35)', '#68d391', 'fa-circle-check']
     };
     const [bg, border, color, icon] = styles[level];
     const text = (w.code && w.params) ? _tf('preprint.' + w.code, w.message, w.params) : w.message;
@@ -16446,6 +16447,8 @@ window.editPrinter = function(pid) {
     const flashforgeCodeField = document.getElementById('printer-flashforge-code');
     if (flashforgeCodeField) flashforgeCodeField.value = cfg.code || '';
     const bedXField = document.getElementById('printer-bed-x');
+    ['printer-bed-x','printer-bed-y','printer-bed-z'].forEach(i => { const e = document.getElementById(i); if (e) e.dataset.auto = '0'; });
+    const _bedHint = document.getElementById('printer-bed-suggest'); if (_bedHint) _bedHint.style.display = 'none';
     if (bedXField) bedXField.value = cfg.bed_x || '';
     const bedYField = document.getElementById('printer-bed-y');
     if (bedYField) bedYField.value = cfg.bed_y || '';
@@ -16928,6 +16931,9 @@ window.loadHistory = async function (reset = true) {
                     <div class="history-entry-rating">${_renderHistoryRatingBlock(entry)}</div>
                     <button class="history-entry-view" onclick="viewHistoryFile('${escapeJs(entry.file_path)}', '${escapeJs(entry.file_name)}')" title="${I18N.t('history.view_file') || 'Voir le fichier'}">
                         <i class="fa-solid fa-eye"></i>
+                    </button>
+                    <button class="history-entry-reprint" onclick="openPrintReport(${entry.id})" title="${escapeHtml(_t3('history.share_report', 'Créer un rapport à partager'))}">
+                        <i class="fa-solid fa-share-nodes"></i>
                     </button>
                     <button class="history-entry-reprint" onclick="reprintHistoryFile('${escapeJs(entry.file_path)}', '${escapeJs(entry.file_name)}')" title="${I18N.t('history.reprint_file') || 'Réimprimer ce fichier'}">
                         <i class="fa-solid fa-paper-plane"></i>
@@ -22585,3 +22591,341 @@ window.copyRemoteUrl = function () {
     document.addEventListener('i18n:ready', setup);
     document.addEventListener('i18n:changed', () => { document.querySelectorAll('.inv-toggle').forEach(b => { const c = b.closest('.inv-section')?.classList.contains('inv-collapsed'); const l = _t3(c ? 'inventory.expand' : 'inventory.collapse', c ? 'Déplier' : 'Replier'); b.title = l; b.setAttribute('aria-label', l); }); });
 })();
+
+
+// ── Volume d'impression : suggestion automatique d'après le modèle d'imprimante ─────────────────
+// Valeurs constructeur (mm). Le motif le plus long qui correspond l'emporte ; la valeur reste modifiable.
+const PRINTER_BED_SIZES = [
+    ['bambu a1 mini', 180, 180, 180], ['a1 mini', 180, 180, 180], ['a1_mini', 180, 180, 180],
+    ['a1', 256, 256, 256], ['p1p', 256, 256, 256], ['p1s', 256, 256, 256], ['p2s', 256, 256, 256],
+    ['x1e', 256, 256, 256], ['x1c', 256, 256, 256], ['x1', 256, 256, 256],
+    ['h2d', 350, 320, 325], ['h2s', 340, 320, 340],
+    ['k1 max', 300, 300, 300], ['k1-max', 300, 300, 300], ['k1c', 220, 220, 250], ['k1 se', 220, 220, 250], ['k1', 220, 220, 250],
+    ['k2 plus', 350, 350, 350], ['k2-plus', 350, 350, 350], ['k2 pro', 300, 300, 300],
+    ['ender-3 v3 ke', 220, 220, 240], ['ender 3 v3 ke', 220, 220, 240],
+    ['ender-3 v3', 220, 220, 250], ['ender 3 v3', 220, 220, 250], ['ender-3 s1', 220, 220, 270], ['ender 3 s1', 220, 220, 270],
+    ['prusa core one', 250, 220, 270], ['core one', 250, 220, 270], ['mk4s', 250, 210, 220], ['mk4', 250, 210, 220],
+    ['mk3s', 250, 210, 210], ['prusa mini', 180, 180, 180], ['prusa xl', 360, 360, 360],
+    ['centauri carbon', 256, 256, 256],
+    ['neptune 4 max', 420, 420, 480], ['neptune 4 plus', 320, 320, 385], ['neptune 4', 225, 225, 265],
+    ['adventurer 5m', 220, 220, 220], ['ad5x', 220, 220, 220]
+];
+function suggestBedSize(text) {
+    const t = String(text || '').toLowerCase().trim();
+    if (!t) return null;
+    let best = null;
+    for (const row of PRINTER_BED_SIZES) {
+        const re = new RegExp('(^|[^a-z0-9])' + row[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-z0-9])');
+        if (re.test(t) && (!best || row[0].length > best[0].length)) best = row;
+    }
+    return best ? { x: best[1], y: best[2], z: best[3] } : null;
+}
+function applyBedSizeSuggestion(text) {
+    const fx = document.getElementById('printer-bed-x'), fy = document.getElementById('printer-bed-y'), fz = document.getElementById('printer-bed-z');
+    const hint = document.getElementById('printer-bed-suggest');
+    if (!fx || !fy || !fz) return;
+    const empty = !fx.value && !fy.value && !fz.value;
+    if (!empty && fx.dataset.auto !== '1') return;      // ne jamais écraser une saisie manuelle
+    const s = suggestBedSize(text);
+    if (!s) return;
+    fx.value = s.x; fy.value = s.y; fz.value = s.z;
+    [fx, fy, fz].forEach(f => { f.dataset.auto = '1'; });
+    if (hint) hint.style.display = '';
+}
+document.addEventListener('DOMContentLoaded', () => {
+    ['printer-bed-x', 'printer-bed-y', 'printer-bed-z'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', () => {
+            ['printer-bed-x', 'printer-bed-y', 'printer-bed-z'].forEach(i => { const e = document.getElementById(i); if (e) e.dataset.auto = '0'; });
+            const hint = document.getElementById('printer-bed-suggest'); if (hint) hint.style.display = 'none';
+        });
+    });
+    const brand = document.getElementById('printer-brand');
+    let timer;
+    brand?.addEventListener('input', e => { clearTimeout(timer); timer = setTimeout(() => applyBedSizeSuggestion(e.target.value), 350); });
+    document.getElementById('printer-bambu-model')?.addEventListener('change', e => applyBedSizeSuggestion('bambu ' + String(e.target.value).replace(/_/g, ' ')));
+    document.getElementById('printer-name')?.addEventListener('input', e => { clearTimeout(timer); timer = setTimeout(() => applyBedSizeSuggestion(e.target.value), 500); });
+});
+
+
+// ── Rapport d'impression partageable (image PNG) ────────────────────────────────────────────────
+function _reportRoundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function _reportFit(ctx, text, maxW) {
+    let t = String(text);
+    if (ctx.measureText(t).width <= maxW) return t;
+    while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1);
+    return t + '…';
+}
+function _reportLoadImage(src) {
+    return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = src;
+    });
+}
+async function _renderPrintReportCanvas(entry, opts) {
+    const W = 1200, H = 630;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const css = getComputedStyle(document.documentElement);
+    const accent = (css.getPropertyValue('--accent') || '#4ea1d3').trim() || '#4ea1d3';
+    const font = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+
+    const bg = ctx.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, '#171a21'); bg.addColorStop(1, '#0f1217');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = accent; ctx.fillRect(0, 0, W, 8);
+
+    // Miniature
+    const px = 48, py = 56, pw = 460, ph = 460;
+    ctx.save(); _reportRoundRect(ctx, px, py, pw, ph, 24); ctx.clip();
+    ctx.fillStyle = '#1e2330'; ctx.fillRect(px, py, pw, ph);
+    const img = await _reportLoadImage(`${API}/api/thumb?path=${encodeURIComponent(entry.file_path)}`);
+    if (img && img.naturalWidth) {
+        const k = Math.min(pw / img.naturalWidth, ph / img.naturalHeight);
+        const dw = img.naturalWidth * k, dh = img.naturalHeight * k;
+        ctx.drawImage(img, px + (pw - dw) / 2, py + (ph - dh) / 2, dw, dh);
+    } else {
+        ctx.fillStyle = '#2a3142'; ctx.font = `bold 120px ${font}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText((entry.file_ext || '3D').replace('.', '').toUpperCase(), px + pw / 2, py + ph / 2);
+    }
+    ctx.restore();
+
+    // Titre
+    const tx = 548, maxW = W - tx - 48;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    const title = String(entry.file_name || '').replace(/\.[^.]+$/, '');
+    ctx.fillStyle = '#ffffff'; ctx.font = `bold 46px ${font}`;
+    ctx.fillText(_reportFit(ctx, title, maxW), tx, 108);
+
+    // Résultat
+    const resMap = {
+        success: [_t3('history.share_success', 'Impression réussie'), '#38c172'],
+        failed: [_t3('history.share_failed', 'Impression ratée'), '#e85d75'],
+        partial: [_t3('history.share_partial', 'Impression partielle'), '#f5a623']
+    };
+    const res = resMap[entry.result];
+    let y = 152;
+    if (res) {
+        ctx.font = `600 24px ${font}`;
+        const tw = ctx.measureText(res[0]).width + 36;
+        ctx.fillStyle = res[1] + '33'; _reportRoundRect(ctx, tx, y - 28, tw, 42, 21); ctx.fill();
+        ctx.fillStyle = res[1]; ctx.fillText(res[0], tx + 18, y + 2);
+    }
+
+    // Statistiques
+    const secs = entry.actual_seconds || entry.estimated_seconds;
+    const stats = [];
+    stats.push([_t3('history.share_date', 'Date'), new Date(entry.sent_at).toLocaleDateString(I18N.lang, { day: 'numeric', month: 'long', year: 'numeric' })]);
+    if (secs) stats.push([_t3('history.share_duration', 'Durée'), formatDuration(secs).replace(/ \d+s$/, '')]);
+    if (entry.spool_weight_used_g) {
+        const mat = entry.filament_material ? ` · ${entry.filament_material}` : '';
+        stats.push([_t3('history.share_filament', 'Filament'), `${Math.round(entry.spool_weight_used_g * 10) / 10} g${mat}`]);
+    } else if (entry.filament_material) {
+        stats.push([_t3('history.share_filament', 'Filament'), entry.filament_material]);
+    }
+    if (entry.printer_name) stats.push([_t3('history.share_printer', 'Imprimante'), entry.printer_name]);
+    if (entry.slicer) stats.push([_t3('history.share_slicer', 'Slicer'), entry.slicer]);
+    if (opts.showCost && entry.total_cost != null) {
+        let v = formatCost(entry.total_cost);
+        if (printCostMarginPct > 0 && entry.result !== 'failed') v = formatCost(entry.total_cost * (1 + printCostMarginPct / 100));
+        stats.push([_t3('history.share_cost', 'Coût'), v]);
+    }
+    // Grille : la date occupe les 2 colonnes, le reste se répartit sur 2 colonnes
+    const gap = 24, colW = (maxW - gap) / 2, rowH = 92, tileH = 78, top = 196;
+    let row = 0, col = 0;
+    stats.slice(0, 7).forEach((st, i) => {
+        const full = i === 0;
+        if (!full && col === 0 && i === 1) { row = 1; }
+        const cx = tx + (full ? 0 : col * (colW + gap)), cy = top + row * rowH, cw = full ? maxW : colW;
+        ctx.fillStyle = '#1e2330'; _reportRoundRect(ctx, cx, cy, cw, tileH, 16); ctx.fill();
+        ctx.fillStyle = '#8b95a8'; ctx.font = `500 19px ${font}`; ctx.fillText(st[0].toUpperCase(), cx + 22, cy + 30);
+        ctx.fillStyle = '#ffffff'; ctx.font = `bold 29px ${font}`; ctx.fillText(_reportFit(ctx, st[1], cw - 44), cx + 22, cy + 63);
+        if (full) { row = 1; col = 0; }
+        else if (col === 0) { col = 1; }
+        else { col = 0; row++; }
+    });
+
+    // Pied de page
+    ctx.fillStyle = '#8b95a8'; ctx.font = `500 22px ${font}`; ctx.textAlign = 'left';
+    ctx.fillText(_t3('history.share_footer', 'Imprimé avec Stellio'), 48, H - 40);
+    const logo = await _reportLoadImage('assets/logo-nom-stellio.png');
+    if (logo && logo.naturalWidth) {
+        const lh = 44, lw = logo.naturalWidth * (lh / logo.naturalHeight);
+        ctx.drawImage(logo, W - 48 - lw, H - 36 - lh + 8, lw, lh);
+    } else {
+        ctx.fillStyle = accent; ctx.font = `bold 26px ${font}`; ctx.textAlign = 'right';
+        ctx.fillText('Stellio', W - 48, H - 38);
+    }
+    return canvas;
+}
+
+window.openPrintReport = async function (entryId) {
+    const entry = (_historyEntries || []).find(e => e.id === entryId);
+    if (!entry) return;
+    document.getElementById('print-report-overlay')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'print-report-overlay';
+    overlay.className = 'print-report-overlay';
+    overlay.innerHTML = `
+        <div class="print-report-modal" role="dialog" aria-modal="true">
+            <div class="print-report-head">
+                <h3><i class="fa-solid fa-share-nodes"></i> ${escapeHtml(_t3('history.share_title', "Rapport d'impression"))}</h3>
+                <button type="button" class="print-report-close" aria-label="${escapeHtml(_t3('actions.close', 'Fermer'))}"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="print-report-preview" id="print-report-preview"><i class="fa-solid fa-spinner fa-spin"></i></div>
+            <div class="print-report-actions">
+                <label class="print-report-opt"><input type="checkbox" id="print-report-cost" ${entry.total_cost != null ? '' : 'disabled'}> ${escapeHtml(_t3('history.share_show_cost', 'Afficher le coût'))}</label>
+                <span style="flex:1"></span>
+                <button type="button" class="btn btn-ghost" id="print-report-copy"><i class="fa-solid fa-copy"></i> ${escapeHtml(_t3('history.share_copy', 'Copier'))}</button>
+                <button type="button" class="btn btn-primary" id="print-report-download"><i class="fa-solid fa-download"></i> ${escapeHtml(_t3('history.share_download', 'Télécharger'))}</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    overlay.querySelector('.print-report-close').addEventListener('click', close);
+    const onKey = e => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); } };
+    document.addEventListener('keydown', onKey);
+
+    let canvas = null;
+    const preview = overlay.querySelector('#print-report-preview');
+    const cost = overlay.querySelector('#print-report-cost');
+    const draw = async () => {
+        canvas = await _renderPrintReportCanvas(entry, { showCost: !!cost.checked });
+        canvas.className = 'print-report-canvas';
+        preview.innerHTML = ''; preview.appendChild(canvas);
+    };
+    cost.addEventListener('change', draw);
+    await draw();
+    const toBlob = () => new Promise(r => canvas.toBlob(r, 'image/png'));
+    overlay.querySelector('#print-report-download').addEventListener('click', async () => {
+        const blob = await toBlob(); if (!blob) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = String(entry.file_name || 'stellio').replace(/\.[^.]+$/, '').replace(/[^\w\-]+/g, '_') + '_rapport.png';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    });
+    overlay.querySelector('#print-report-copy').addEventListener('click', async () => {
+        try {
+            const blob = await toBlob();
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            showToast(_t3('history.share_copied', 'Image copiée dans le presse-papiers'), 'success');
+        } catch (e) {
+            showToast(_t3('history.share_copy_failed', 'Copie impossible ici : utilise « Télécharger »'), 'error');
+        }
+    });
+};
+
+
+// ── Mode atelier : suivi plein écran des imprimantes (tablette / téléphone / écran dans l'atelier) ──
+let _workshopTimer = null, _workshopClock = null, _workshopWake = null, _workshopBusy = false;
+function _workshopStatusInfo(st) {
+    const L = k => I18N.t('printers.status.' + k);
+    return ({
+        printing: [L('printing'), 'printing'], paused: [L('paused'), 'paused'], idle: [_t3('workshop.available', 'Disponible'), 'idle'],
+        complete: [L('complete'), 'idle'], error: [L('error'), 'error'], offline: [L('offline'), 'offline'], timeout: [L('timeout'), 'offline']
+    })[st] || [String(st || '—'), 'offline'];
+}
+function _workshopTileHtml(p, d) {
+    const [label, cls] = _workshopStatusInfo(d && d.status);
+    const active = d && ['printing', 'paused'].includes(d.status);
+    const prog = Math.max(0, Math.min(100, Math.round((d && d.progress) || 0)));
+    let thumb = '';
+    if (active && d.file) {
+        const lib = _findLibraryFileForPrintJob(d.file);
+        if (lib && lib.has_thumb) thumb = `${API}/api/thumb?path=${encodeURIComponent(lib.path)}${lib.thumb_mtime ? '&t=' + lib.thumb_mtime : ''}`;
+        else if (p.type === 'klipper') thumb = `${API}/api/printers/${p.id}/job-thumb?file=${encodeURIComponent(d.file)}`;
+    }
+    const file = active && d.file ? String(d.file).split(/[\\/]/).pop() : '';
+    const rem = active && d.time && d.time.remaining > 0 ? formatDuration(d.time.remaining).replace(/ \d+s$/, '') : '';
+    const ext = d && d.temps && d.temps.extruder ? Math.round(d.temps.extruder.current || 0) : null;
+    const bed = d && d.temps && d.temps.bed ? Math.round(d.temps.bed.current || 0) : null;
+    return `<div class="ws-tile ws-${cls}">
+        <div class="ws-tile-head"><span class="ws-name">${escapeHtml(p.name)}</span><span class="ws-pill">${escapeHtml(label)}</span></div>
+        ${active ? `
+        <div class="ws-main">
+            ${thumb ? `<img class="ws-thumb" src="${thumb}" alt="" onerror="this.remove()">` : ''}
+            <div class="ws-prog"><div class="ws-pct">${prog}<small>%</small></div>${rem ? `<div class="ws-rem"><i class="fa-regular fa-clock"></i> ${escapeHtml(rem)}</div>` : ''}</div>
+        </div>
+        <div class="ws-bar"><div style="width:${prog}%"></div></div>
+        <div class="ws-file" title="${escapeHtml(file)}">${escapeHtml(file)}</div>` : `
+        <div class="ws-ico"><i class="fa-solid ${cls === 'idle' ? 'fa-circle-check' : (cls === 'error' ? 'fa-triangle-exclamation' : 'fa-plug-circle-xmark')}"></i></div>`}
+        ${ext !== null ? `<div class="ws-temps"><span>🔥 ${ext}°C</span><span>🛏️ ${bed}°C</span></div>` : ''}
+    </div>`;
+}
+async function _workshopRefresh() {
+    if (_workshopBusy) return;
+    _workshopBusy = true;
+    try {
+        if (!printersList || !printersList.length) {
+            try { const r = await fetch(`${API}/api/printers`); if (r.ok) printersList = await r.json(); } catch (_) {}
+        }
+        const grid = document.getElementById('workshop-grid');
+        if (!grid) return;
+        if (!printersList.length) {
+            grid.innerHTML = `<div class="ws-empty"><i class="fa-solid fa-print"></i><p>${escapeHtml(I18N.t('printers.none'))}</p></div>`;
+            return;
+        }
+        const results = await Promise.all(printersList.map(p =>
+            fetch(`${API}/api/printers/${p.id}/status`).then(r => r.json()).catch(() => ({ status: 'offline' }))));
+        if (!document.getElementById('workshop-grid')) return;
+        grid.innerHTML = printersList.map((p, i) => _workshopTileHtml(p, results[i])).join('');
+        const n = results.filter(d => d && d.status === 'printing').length;
+        const cnt = document.getElementById('workshop-count');
+        if (cnt) cnt.textContent = n ? _t3('workshop.printing_count', '{{n}} en cours', { n }).replace('{{n}}', n) : _t3('workshop.nothing_running', 'Rien en cours');
+    } finally { _workshopBusy = false; }
+}
+function _workshopTick() {
+    const el = document.getElementById('workshop-clock');
+    if (el) el.textContent = new Date().toLocaleTimeString(I18N.lang, { hour: '2-digit', minute: '2-digit' });
+}
+async function _workshopKeepAwake() {
+    try { if ('wakeLock' in navigator) _workshopWake = await navigator.wakeLock.request('screen'); } catch (_) {}
+}
+window.openWorkshopMode = function () {
+    if (document.getElementById('workshop-overlay')) return;
+    const ov = document.createElement('div');
+    ov.id = 'workshop-overlay';
+    ov.className = 'workshop-overlay';
+    ov.innerHTML = `
+        <div class="ws-top">
+            <div class="ws-title"><i class="fa-solid fa-tablet-screen-button"></i> ${escapeHtml(_t3('nav.workshop', 'Mode atelier'))} <span id="workshop-count" class="ws-count"></span></div>
+            <div id="workshop-clock" class="ws-clock"></div>
+            <button type="button" class="ws-btn" id="workshop-fs" title="${escapeHtml(_t3('workshop.fullscreen', 'Plein écran'))}"><i class="fa-solid fa-expand"></i></button>
+            <button type="button" class="ws-btn" id="workshop-close" title="${escapeHtml(_t3('workshop.exit', 'Quitter'))}"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="workshop-grid" class="ws-grid"><div class="ws-empty"><i class="fa-solid fa-spinner fa-spin"></i></div></div>`;
+    document.body.appendChild(ov);
+    document.body.style.overflow = 'hidden';
+    const close = () => {
+        clearInterval(_workshopTimer); clearInterval(_workshopClock);
+        try { _workshopWake && _workshopWake.release(); } catch (_) {}
+        _workshopWake = null;
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        document.removeEventListener('keydown', onKey);
+        document.removeEventListener('visibilitychange', onVis);
+        document.body.style.overflow = '';
+        ov.remove();
+        if (location.hash === '#workshop') history.replaceState(null, '', location.pathname + location.search);
+    };
+    const onKey = e => { if (e.key === 'Escape') close(); };
+    const onVis = () => { if (!document.hidden) { _workshopKeepAwake(); _workshopRefresh(); } };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('visibilitychange', onVis);
+    ov.querySelector('#workshop-close').addEventListener('click', close);
+    ov.querySelector('#workshop-fs').addEventListener('click', () => {
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        else (ov.requestFullscreen ? ov.requestFullscreen() : Promise.reject()).catch(() => {});
+    });
+    _workshopTick(); _workshopClock = setInterval(_workshopTick, 15000);
+    _workshopRefresh(); _workshopTimer = setInterval(_workshopRefresh, 5000);
+    _workshopKeepAwake();
+};
+// Lien direct : http://…/#workshop ouvre le mode atelier (pratique pour un écran dédié dans l'atelier)
+window.addEventListener('load', () => { if (location.hash === '#workshop') setTimeout(() => window.openWorkshopMode(), 1200); });

@@ -306,6 +306,10 @@
                 </div>
                 </div>
                 <div class="nav-about-spacer">
+					<button class="nav-btn" id="nav-workshop-btn" onclick="openWorkshopMode()" data-i18n-title="workshop.hint" title="Affichage plein écran des imprimantes, pensé pour tablette et téléphone">
+						<i class="fa-solid fa-tablet-screen-button"></i>
+						<span data-i18n="nav.workshop">Mode atelier</span>
+					</button>
 					<button class="nav-btn hidden" id="pwa-install-btn" onclick="installStellioApp()" data-i18n-title="pwa.install_hint" title="Installer Stellio comme application sur cet appareil">
 						<i class="fa-solid fa-download"></i>
 						<span data-i18n="pwa.install">Installer l'application</span>
@@ -4108,6 +4112,7 @@
 							<input type="number" id="printer-bed-y" min="1" step="1" placeholder="Y (ex: 300)" autocomplete="off">
 							<input type="number" id="printer-bed-z" min="1" step="1" placeholder="Z (ex: 300)" autocomplete="off">
 						</div>
+						<small id="printer-bed-suggest" style="display:none;color:var(--accent);font-size:11px;" data-i18n="printers.bed_suggested">Valeurs suggérées d'après le modèle : vérifie-les et ajuste si besoin.</small>
 						<small style="color:var(--text-muted);font-size:11px;" data-i18n="printers.bed_size_hint">Largeur × profondeur × hauteur maximale d'impression. Sert à avertir quand une pièce est trop grande avant l'envoi au slicer.</small>
 					</div>
 				</form>
