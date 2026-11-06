@@ -2523,5 +2523,6 @@
   "slicer.batch_spool_need": "{{label}}: need {{required}} g, {{remaining}} g left",
   "commercial.title": "Costs, quotes and invoicing",
   "commercial.enable": "Enable cost, quote and invoicing features",
-  "commercial.hint": "When off, Stellio hides print costs (action menus, file details, projects, history, statistics), quotes and invoices, the customer book and the order queue. Your data is kept."
+  "commercial.hint": "When off, Stellio hides print costs (action menus, file details, projects, history, statistics), quotes and invoices, the customer book and the order queue. Your data is kept.",
+  "mqtt.app_title": "Stellio application"
 }

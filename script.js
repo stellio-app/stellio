@@ -4456,8 +4456,19 @@ window.openMqttEntitiesModal = async function () {
         if (!res.ok) throw new Error('http');
         const state = d.connected ? '● ' + _t3('mqtt.connected', 'Connecté au broker') : '○ ' + _t3('mqtt.disconnected', 'Non connecté');
         const note = d.discovery
-            ? _t3('mqtt.entities_discovery', "Ces entités apparaissent automatiquement dans Home Assistant (MQTT › Appareils). Une carte par imprimante.")
+            ? _t3('mqtt.entities_discovery', "Ces entités apparaissent automatiquement dans Home Assistant (MQTT › Appareils). Une carte par imprimante, plus une carte « Stellio » pour l'application.")
             : _t3('mqtt.entities_nodiscovery', "La découverte automatique est désactivée : crée toi-même les capteurs à partir des topics ci-dessous.");
+        const appBlock = d.app ? `
+            <div class="mqtt-ent-printer">
+                <div class="mqtt-ent-ptitle"><i class="fa-solid fa-star"></i> ${escapeHtml(_t3('mqtt.app_title', 'Application Stellio'))}</div>
+                <table class="mqtt-ent-table">
+                    ${d.app.entities.map(e => `<tr>
+                        <td>${escapeHtml(e.name)}<small>${escapeHtml(e.component)}.${escapeHtml(e.unique_id)}</small></td>
+                        <td class="mqtt-ent-val">${e.value === null || e.value === undefined || e.value === '' ? '—' : escapeHtml(String(e.value))}${e.unit && e.value !== null && e.value !== '' ? ' ' + escapeHtml(e.unit) : ''}</td>
+                    </tr>`).join('')}
+                </table>
+                <div class="mqtt-ent-topics"><code>${escapeHtml(d.app.state_topic)}</code></div>
+            </div>` : '';
         const printers = (d.printers || []).map(p => `
             <div class="mqtt-ent-printer">
                 <div class="mqtt-ent-ptitle"><i class="fa-solid fa-print"></i> ${escapeHtml(p.name)}</div>
@@ -4470,7 +4481,7 @@ window.openMqttEntitiesModal = async function () {
                 <div class="mqtt-ent-topics"><code>${escapeHtml(p.state_topic)}</code><code>${escapeHtml(p.event_topic)}</code></div>
             </div>`).join('') || `<p style="color:var(--text-muted);padding:20px;">${escapeHtml(_t3('mqtt.entities_none', 'Aucune imprimante.'))}</p>`;
         body.innerHTML = `<div class="mqtt-ent-head"><span>${escapeHtml(state)}</span><span>${escapeHtml(d.base)}/…</span></div>
-            <p class="settings-hint" style="margin:8px 0 12px;">${escapeHtml(note)}</p>${printers}`;
+            <p class="settings-hint" style="margin:8px 0 12px;">${escapeHtml(note)}</p>${appBlock}${printers}`;
     } catch (e) {
         body.innerHTML = `<p style="color:var(--danger);padding:20px;">${escapeHtml(I18N.t('toast.connection_error'))}</p>`;
     }

@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.8.9",
+    "items": {
+      "fr": [
+        "Nouveau : MQTT / Home Assistant crée aussi un appareil « Stellio » (en plus des imprimantes) avec une quarantaine de capteurs : nombre de fichiers (total, STL, 3MF, G-code, nouveaux du mois), taille de la bibliothèque, favoris, projets, sources, impressions (total, jour, 7 et 30 jours, échecs, taux de réussite, heures), imprimantes en ligne ou en cours, bobines, maintenances à faire, notifications non lues, coûts, devis en attente, factures impayées et en retard, clients, commandes, version, durée de fonctionnement et taille de la base. Les capteurs de coût, devis et commandes suivent l'interrupteur « Coûts, devis et facturation »",
+        "Nouveau : le MQTT / Home Assistant gagne de nouveaux capteurs. Par imprimante : température de la chambre, couche actuelle et totale, heures d'impression cumulées, jours avant la prochaine maintenance, alertes « bobine presque vide » et « dérive d'impression ». Appareil Stellio : mêmes alertes en binaire, une entité par bobine Spoolman, TigerTag ou manuelle (poids restant), prochaine livraison, pièces restantes à imprimer, marge prévue et réelle, date de la dernière sauvegarde, mise à jour disponible (vérifiée toutes les 6 h) et dernière version"
+      ],
+      "en": [
+        "New: MQTT / Home Assistant also creates a \"Stellio\" device (in addition to the printers) with about forty sensors: file counts (total, STL, 3MF, G-code, new this month), library size, favorites, projects, sources, prints (total, today, 7 and 30 days, failures, success rate, hours), printers online or printing, spools, maintenance due, unread notifications, costs, pending quotes, unpaid and overdue invoices, customers, orders, version, uptime and database size. Cost, quote and order sensors follow the \"Costs, quotes and invoicing\" switch",
+        "New: MQTT / Home Assistant gets more sensors. Per printer: chamber temperature, current and total layer, cumulated print hours, days until next maintenance, \"spool almost empty\" and \"print drift\" alerts. Stellio device: the same alerts as binary sensors, one entity per Spoolman, TigerTag or manual spool (remaining weight), next delivery, parts left to print, expected and actual margin, last backup date, update available (checked every 6 h) and latest version"
+      ],
+      "de": [
+        "Neu: MQTT / Home Assistant erstellt zusätzlich zu den Druckern ein Gerät „Stellio“ mit rund vierzig Sensoren: Dateianzahl (gesamt, STL, 3MF, G-Code, neu im Monat), Bibliotheksgröße, Favoriten, Projekte, Quellen, Drucke (gesamt, heute, 7 und 30 Tage, Fehlschläge, Erfolgsquote, Stunden), Drucker online oder im Druck, Spulen, fällige Wartungen, ungelesene Benachrichtigungen, Kosten, offene Angebote, unbezahlte und überfällige Rechnungen, Kunden, Aufträge, Version, Laufzeit und Datenbankgröße. Kosten-, Angebots- und Auftragssensoren folgen dem Schalter „Kosten, Angebote und Rechnungen“",
+        "Neu: MQTT / Home Assistant erhält weitere Sensoren. Pro Drucker: Kammertemperatur, aktuelle und gesamte Schicht, kumulierte Druckstunden, Tage bis zur nächsten Wartung, Warnungen „Spule fast leer“ und „Druckabweichung“. Gerät Stellio: dieselben Warnungen als Binärsensoren, eine Entität pro Spoolman-, TigerTag- oder manueller Spule (Restgewicht), nächste Lieferung, noch zu druckende Teile, geplante und tatsächliche Marge, Datum der letzten Sicherung, verfügbares Update (alle 6 h geprüft) und neueste Version"
+      ],
+      "es": [
+        "Nuevo: MQTT / Home Assistant crea también un dispositivo «Stellio» (además de las impresoras) con unos cuarenta sensores: número de archivos (total, STL, 3MF, G-code, nuevos del mes), tamaño de la biblioteca, favoritos, proyectos, fuentes, impresiones (total, hoy, 7 y 30 días, fallos, tasa de éxito, horas), impresoras en línea o imprimiendo, bobinas, mantenimientos pendientes, notificaciones sin leer, costes, presupuestos pendientes, facturas impagadas y vencidas, clientes, pedidos, versión, tiempo activo y tamaño de la base de datos. Los sensores de costes, presupuestos y pedidos siguen el interruptor «Costes, presupuestos y facturación»",
+        "Nuevo: MQTT / Home Assistant añade más sensores. Por impresora: temperatura de la cámara, capa actual y total, horas de impresión acumuladas, días hasta el próximo mantenimiento, alertas «bobina casi vacía» y «deriva de impresión». Dispositivo Stellio: las mismas alertas como sensores binarios, una entidad por bobina de Spoolman, TigerTag o manual (peso restante), próxima entrega, piezas pendientes de imprimir, margen previsto y real, fecha de la última copia de seguridad, actualización disponible (comprobada cada 6 h) y última versión"
+      ],
+      "pt": [
+        "Novo: MQTT / Home Assistant cria também um dispositivo «Stellio» (além das impressoras) com cerca de quarenta sensores: número de ficheiros (total, STL, 3MF, G-code, novos do mês), tamanho da biblioteca, favoritos, projetos, fontes, impressões (total, hoje, 7 e 30 dias, falhas, taxa de sucesso, horas), impressoras online ou a imprimir, bobinas, manutenções em falta, notificações por ler, custos, orçamentos pendentes, faturas por pagar e em atraso, clientes, encomendas, versão, tempo de atividade e tamanho da base de dados. Os sensores de custos, orçamentos e encomendas seguem o interruptor «Custos, orçamentos e faturação»",
+        "Novo: o MQTT / Home Assistant ganha mais sensores. Por impressora: temperatura da câmara, camada atual e total, horas de impressão acumuladas, dias até à próxima manutenção, alertas «bobina quase vazia» e «desvio de impressão». Dispositivo Stellio: os mesmos alertas como sensores binários, uma entidade por bobina Spoolman, TigerTag ou manual (peso restante), próxima entrega, peças por imprimir, margem prevista e real, data da última cópia de segurança, atualização disponível (verificada a cada 6 h) e última versão"
+      ],
+      "it": [
+        "Novità: MQTT / Home Assistant crea anche un dispositivo «Stellio» (oltre alle stampanti) con una quarantina di sensori: numero di file (totale, STL, 3MF, G-code, nuovi del mese), dimensione della libreria, preferiti, progetti, sorgenti, stampe (totale, oggi, 7 e 30 giorni, fallimenti, tasso di successo, ore), stampanti online o in stampa, bobine, manutenzioni da fare, notifiche non lette, costi, preventivi in attesa, fatture non pagate e scadute, clienti, ordini, versione, tempo di attività e dimensione del database. I sensori di costi, preventivi e ordini seguono l'interruttore «Costi, preventivi e fatturazione»",
+        "Novità: MQTT / Home Assistant aggiunge altri sensori. Per stampante: temperatura della camera, strato attuale e totale, ore di stampa cumulate, giorni alla prossima manutenzione, avvisi «bobina quasi vuota» e «deriva di stampa». Dispositivo Stellio: gli stessi avvisi come sensori binari, un'entità per ogni bobina Spoolman, TigerTag o manuale (peso residuo), prossima consegna, pezzi ancora da stampare, margine previsto e reale, data dell'ultimo backup, aggiornamento disponibile (verificato ogni 6 h) e ultima versione"
+      ],
+      "zh": [
+        "新增：MQTT / Home Assistant 除打印机外还会创建“Stellio”设备，含约四十个传感器：文件数量（总数、STL、3MF、G-code、本月新增）、库大小、收藏、项目、来源、打印（总数、今日、7 天和 30 天、失败、成功率、小时数）、在线或打印中的打印机、耗材盘、待维护、未读通知、成本、待回复报价、未付和逾期发票、客户、订单、版本、运行时长和数据库大小。成本、报价和订单传感器受“成本、报价与开票”开关控制",
+        "新增：MQTT / Home Assistant 增加更多传感器。每台打印机：腔体温度、当前层与总层数、累计打印小时数、距下次保养的天数、“耗材即将用完”和“打印偏差”警报。Stellio 设备：以上警报的二进制传感器、每个 Spoolman、TigerTag 或手动耗材盘一个实体（剩余重量）、下次交付日期、待打印件数、预计与实际利润、上次备份日期、可用更新（每 6 小时检查一次）及最新版本"
+      ],
+      "ja": [
+        "新機能：MQTT / Home Assistant にプリンターに加えて「Stellio」デバイスを作成し、約40個のセンサーを提供：ファイル数（合計、STL、3MF、G-code、今月の新規）、ライブラリサイズ、お気に入り、プロジェクト、ソース、印刷（合計、今日、7日・30日、失敗、成功率、時間）、オンライン／印刷中のプリンター、スプール、要メンテナンス、未読通知、コスト、未回答の見積、未払い・期限超過の請求書、顧客、注文、バージョン、稼働時間、データベースサイズ。コスト・見積・注文のセンサーは「コスト・見積・請求」スイッチに連動します",
+        "新機能：MQTT / Home Assistant にセンサーを追加。プリンターごと：チャンバー温度、現在・総レイヤー数、累計印刷時間、次のメンテナンスまでの日数、「スプール残量わずか」と「印刷ずれ」の警告。Stellio デバイス：同じ警告のバイナリセンサー、Spoolman・TigerTag・手動スプールごとのエンティティ（残量）、次の納期、残りの印刷部品数、予定・実際の利益、最終バックアップ日時、更新の有無（6 時間ごとに確認）と最新バージョン"
+      ]
+    }
+  },
+  {
     "version": "0.8.8",
     "items": {
       "fr": [

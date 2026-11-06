@@ -2523,5 +2523,6 @@
   "slicer.batch_spool_need": "{{label}}：需要 {{required}} 克，剩余 {{remaining}} 克",
   "commercial.title": "成本、报价与开票",
   "commercial.enable": "启用成本、报价和开票功能",
-  "commercial.hint": "关闭后，Stellio 会隐藏打印成本（操作菜单、文件详情、项目、历史、统计）、报价单和发票、客户簿以及订单队列。你的数据会保留。"
+  "commercial.hint": "关闭后，Stellio 会隐藏打印成本（操作菜单、文件详情、项目、历史、统计）、报价单和发票、客户簿以及订单队列。你的数据会保留。",
+  "mqtt.app_title": "Stellio 应用"
 }

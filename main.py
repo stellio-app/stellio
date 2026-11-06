@@ -20351,7 +20351,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.8.8"
+CURRENT_VERSION = "0.8.9"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -22397,6 +22397,12 @@ def _mqtt_state_payload(p, st):
         'extruder': (temps.get('extruder') or {}).get('current'),
         'bed': (temps.get('bed') or {}).get('current'),
         'chamber': (temps.get('chamber') or {}).get('current'),
+        'layer': int((st.get('layers') or {}).get('current') or 0) if active else 0,
+        'layers_total': int((st.get('layers') or {}).get('total') or 0) if active else 0,
+        'hours': round(float(p.get('total_print_hours') or 0), 1),
+        'maintenance_days': (_MQTT_APP_CACHE['data'].get('maint_by_printer') or {}).get(p.get('id')),
+        'spool_low': bool((_ws_state.get(p.get('id')) or {}).get('low')),
+        'drift': bool((_ws_state.get(p.get('id')) or {}).get('drift')),
     }
 
 
@@ -22414,6 +22420,13 @@ def _mqtt_discovery_configs(cfg, p):
         ('sensor', 'nozzle', {'name': 'Nozzle temperature', 'value_template': '{{ value_json.extruder }}', 'unit_of_measurement': '°C', 'device_class': 'temperature', 'state_class': 'measurement'}),
         ('sensor', 'bed', {'name': 'Bed temperature', 'value_template': '{{ value_json.bed }}', 'unit_of_measurement': '°C', 'device_class': 'temperature', 'state_class': 'measurement'}),
         ('binary_sensor', 'printing', {'name': 'Printing', 'value_template': "{{ 'ON' if value_json.status == 'printing' else 'OFF' }}", 'device_class': 'running'}),
+        ('sensor', 'chamber', {'name': 'Chamber temperature', 'value_template': '{{ value_json.chamber }}', 'unit_of_measurement': '°C', 'device_class': 'temperature', 'state_class': 'measurement'}),
+        ('sensor', 'layer', {'name': 'Current layer', 'value_template': '{{ value_json.layer }}', 'state_class': 'measurement', 'icon': 'mdi:layers'}),
+        ('sensor', 'layers_total', {'name': 'Total layers', 'value_template': '{{ value_json.layers_total }}', 'state_class': 'measurement', 'icon': 'mdi:layers-triple'}),
+        ('sensor', 'hours', {'name': 'Print hours', 'value_template': '{{ value_json.hours }}', 'unit_of_measurement': 'h', 'device_class': 'duration', 'state_class': 'total_increasing', 'icon': 'mdi:clock-outline'}),
+        ('sensor', 'maintenance_days', {'name': 'Next maintenance', 'value_template': "{{ 'unknown' if value_json.maintenance_days is none else value_json.maintenance_days }}", 'unit_of_measurement': 'd', 'icon': 'mdi:wrench-clock'}),
+        ('binary_sensor', 'spool_low', {'name': 'Spool almost empty', 'value_template': "{{ 'ON' if value_json.spool_low else 'OFF' }}", 'device_class': 'problem', 'icon': 'mdi:spool'}),
+        ('binary_sensor', 'drift', {'name': 'Print drift', 'value_template': "{{ 'ON' if value_json.drift else 'OFF' }}", 'device_class': 'problem', 'icon': 'mdi:alert-circle'}),
     ]
     out = []
     for comp, key, extra in ents:
@@ -22429,12 +22442,14 @@ def _mqtt_publish_all(client, cfg):
     finally:
         conn.close()
     seen = set()
+    states = []
     for row in rows:
         p = parse_printer_config(row)
         pid = p['id']
         seen.add(pid)
         st = _printer_status_cached(p, ttl=2.0)
         payload = _mqtt_state_payload(p, st)
+        states.append(payload['status'])
         if cfg['discovery'] and pid not in _MQTT_PUB['discovered']:
             for topic, conf in _mqtt_discovery_configs(cfg, p):
                 client.publish(topic, json.dumps(conf, ensure_ascii=False), qos=1, retain=True)
@@ -22449,11 +22464,361 @@ def _mqtt_publish_all(client, cfg):
         _MQTT_PUB['prev'][pid] = cur
         if payload['file']:
             _MQTT_PUB.setdefault('last_file', {})[pid] = payload['file']
+    try:
+        _mqtt_app_publish(client, cfg, states)
+    except Exception as e:
+        app_logger.info(f"[MQTT] Appareil Stellio: {e}")
     # imprimantes supprimées : on retire leurs entités de Home Assistant
     for pid in list(_MQTT_PUB['discovered'] - seen):
         for topic, _conf in _mqtt_discovery_configs(cfg, {'id': pid, 'name': '', 'type': ''}):
             client.publish(topic, '', qos=1, retain=True)
         _MQTT_PUB['discovered'].discard(pid)
+
+
+
+# ── Appareil « Stellio » : l'application elle-même (bibliothèque, impressions, atelier, commerce…) ──
+_APP_STARTED = time.time()
+_MQTT_APP_CACHE = {'t': 0.0, 'data': {}}
+_MQTT_APP_STATE_TOPIC = '{base}/app/state'
+
+# (composant, clé, nom, extras, réservé au commerce)
+_MQTT_APP_ENTITIES = [
+    ('sensor', 'files_total', 'Files', {'icon': 'mdi:file-multiple', 'state_class': 'measurement'}, False),
+    ('sensor', 'files_stl', 'STL files', {'icon': 'mdi:cube-outline', 'state_class': 'measurement'}, False),
+    ('sensor', 'files_3mf', '3MF files', {'icon': 'mdi:cube-scan', 'state_class': 'measurement'}, False),
+    ('sensor', 'files_gcode', 'G-code files', {'icon': 'mdi:code-braces', 'state_class': 'measurement'}, False),
+    ('sensor', 'files_other', 'Other files', {'icon': 'mdi:file-question-outline', 'state_class': 'measurement'}, False),
+    ('sensor', 'files_new_month', 'New files this month', {'icon': 'mdi:file-plus', 'state_class': 'measurement'}, False),
+    ('sensor', 'library_size', 'Library size', {'unit_of_measurement': 'GB', 'device_class': 'data_size', 'state_class': 'measurement', 'icon': 'mdi:harddisk'}, False),
+    ('sensor', 'sources', 'File sources', {'icon': 'mdi:folder-network', 'state_class': 'measurement'}, False),
+    ('sensor', 'favorites', 'Favorites', {'icon': 'mdi:star', 'state_class': 'measurement'}, False),
+    ('sensor', 'projects', 'Projects', {'icon': 'mdi:folder-star-multiple', 'state_class': 'measurement'}, False),
+    ('sensor', 'photos', 'Print photos', {'icon': 'mdi:image-multiple', 'state_class': 'measurement'}, False),
+    ('sensor', 'print_queue', 'Print queue', {'icon': 'mdi:format-list-numbered', 'state_class': 'measurement'}, False),
+    ('sensor', 'prints_total', 'Prints sent', {'icon': 'mdi:printer-3d', 'state_class': 'total_increasing'}, False),
+    ('sensor', 'prints_today', 'Prints today', {'icon': 'mdi:calendar-today', 'state_class': 'measurement'}, False),
+    ('sensor', 'prints_7d', 'Prints (7 days)', {'icon': 'mdi:calendar-week', 'state_class': 'measurement'}, False),
+    ('sensor', 'prints_30d', 'Prints (30 days)', {'icon': 'mdi:calendar-month', 'state_class': 'measurement'}, False),
+    ('sensor', 'prints_failed', 'Failed prints', {'icon': 'mdi:alert-octagon', 'state_class': 'total_increasing'}, False),
+    ('sensor', 'success_rate', 'Success rate', {'unit_of_measurement': '%', 'icon': 'mdi:check-decagram', 'state_class': 'measurement'}, False),
+    ('sensor', 'print_hours', 'Print hours', {'unit_of_measurement': 'h', 'icon': 'mdi:clock-outline', 'state_class': 'total_increasing'}, False),
+    ('sensor', 'printers_total', 'Printers', {'icon': 'mdi:printer-3d-nozzle', 'state_class': 'measurement'}, False),
+    ('sensor', 'printers_online', 'Printers online', {'icon': 'mdi:lan-connect', 'state_class': 'measurement'}, False),
+    ('sensor', 'printers_printing', 'Printers printing', {'icon': 'mdi:printer-3d', 'state_class': 'measurement'}, False),
+    ('sensor', 'spools', 'Manual spools', {'icon': 'mdi:circle-slice-8', 'state_class': 'measurement'}, False),
+    ('sensor', 'spools_remaining', 'Manual spools remaining', {'unit_of_measurement': 'kg', 'device_class': 'weight', 'icon': 'mdi:weight-kilogram', 'state_class': 'measurement'}, False),
+    ('sensor', 'maintenance_due', 'Maintenance due', {'icon': 'mdi:wrench-clock', 'state_class': 'measurement'}, False),
+    ('sensor', 'notifications', 'Unread notifications', {'icon': 'mdi:bell-badge', 'state_class': 'measurement'}, False),
+    ('sensor', 'spent_total', 'Print cost (total)', {'icon': 'mdi:cash', 'state_class': 'total_increasing'}, True),
+    ('sensor', 'spent_month', 'Print cost (this month)', {'icon': 'mdi:cash-clock', 'state_class': 'measurement'}, True),
+    ('sensor', 'quotes_pending', 'Quotes awaiting answer', {'icon': 'mdi:file-document-outline', 'state_class': 'measurement'}, True),
+    ('sensor', 'invoices_unpaid', 'Unpaid invoices', {'icon': 'mdi:file-document-alert', 'state_class': 'measurement'}, True),
+    ('sensor', 'invoices_unpaid_total', 'Unpaid amount', {'icon': 'mdi:cash-remove', 'state_class': 'measurement'}, True),
+    ('sensor', 'invoices_overdue', 'Overdue invoices', {'icon': 'mdi:calendar-alert', 'state_class': 'measurement'}, True),
+    ('sensor', 'clients', 'Customers', {'icon': 'mdi:account-group', 'state_class': 'measurement'}, True),
+    ('sensor', 'orders_open', 'Open orders', {'icon': 'mdi:clipboard-list', 'state_class': 'measurement'}, True),
+    ('sensor', 'orders_late', 'Late orders', {'icon': 'mdi:clipboard-alert', 'state_class': 'measurement'}, True),
+    ('binary_sensor', 'has_overdue', 'Overdue invoice', {'device_class': 'problem', 'icon': 'mdi:cash-clock', 'bool_of': 'invoices_overdue'}, True),
+    ('binary_sensor', 'has_maintenance', 'Maintenance needed', {'device_class': 'problem', 'icon': 'mdi:wrench', 'bool_of': 'maintenance_due'}, False),
+    ('sensor', 'orders_next_due', 'Next order delivery', {'device_class': 'date', 'icon': 'mdi:truck-delivery'}, True),
+    ('sensor', 'orders_pieces_left', 'Parts left to print', {'icon': 'mdi:cube-send', 'state_class': 'measurement'}, True),
+    ('sensor', 'margin_est', 'Expected order margin', {'icon': 'mdi:chart-line', 'state_class': 'measurement'}, True),
+    ('sensor', 'margin_real', 'Actual order margin', {'icon': 'mdi:chart-areaspline', 'state_class': 'measurement'}, True),
+    ('binary_sensor', 'alert_spool_low', 'Spool almost empty', {'device_class': 'problem', 'icon': 'mdi:spool', 'bool_of': 'alerts_spool_low'}, False),
+    ('binary_sensor', 'alert_drift', 'Print drift', {'device_class': 'problem', 'icon': 'mdi:alert-circle', 'bool_of': 'alerts_drift'}, False),
+    ('sensor', 'last_backup', 'Last backup', {'device_class': 'timestamp', 'icon': 'mdi:backup-restore', 'entity_category': 'diagnostic'}, False),
+    ('binary_sensor', 'update_available', 'Update available', {'device_class': 'update', 'icon': 'mdi:update', 'bool_of': 'update_flag', 'entity_category': 'diagnostic'}, False),
+    ('sensor', 'latest_version', 'Latest version', {'icon': 'mdi:tag-arrow-up', 'entity_category': 'diagnostic'}, False),
+    ('sensor', 'version', 'Version', {'icon': 'mdi:tag', 'entity_category': 'diagnostic'}, False),
+    ('sensor', 'uptime', 'Uptime', {'unit_of_measurement': 'h', 'device_class': 'duration', 'icon': 'mdi:timer-outline', 'entity_category': 'diagnostic'}, False),
+    ('sensor', 'db_size', 'Database size', {'unit_of_measurement': 'MB', 'device_class': 'data_size', 'icon': 'mdi:database', 'entity_category': 'diagnostic'}, False),
+    ('sensor', 'users', 'Accounts', {'icon': 'mdi:account', 'entity_category': 'diagnostic'}, False),
+]
+
+
+_MQTT_SPOOLS = {'t': 0.0, 'slots': []}
+_MQTT_UPDATE = {'t': 0.0, 'latest': '', 'avail': None, 'busy': False}
+
+
+def _mqtt_spool_key(slot):
+    return re.sub(r'\W+', '_', f"spool_{slot.get('source_type')}_{slot.get('source_id')}").strip('_')[:60]
+
+
+def _mqtt_spool_slots():
+    """Bobines Spoolman, TigerTag et manuelles (une entité chacune). Relues toutes les 5 min : Spoolman et TigerTag sont des appels réseau."""
+    if time.time() - _MQTT_SPOOLS['t'] < 300:
+        return _MQTT_SPOOLS['slots']
+    slots, ok = [], True
+    try:
+        conn = get_db()
+        try:
+            uids = [r['id'] for r in conn.execute("SELECT id FROM users").fetchall()]
+        finally:
+            conn.close()
+        url = str((load_settings() or {}).get('spoolman_url') or '').strip().rstrip('/')
+        if url:
+            sm, err = _get_spoolman_slots(url)
+            if err:
+                ok = False
+            slots.extend(sm)
+        for uid in uids:
+            slots.extend(_get_manual_filament_slots(uid))
+            slots.extend(_get_tigertag_slots(uid))
+    except Exception as e:
+        ok = False
+        app_logger.info(f"[MQTT] Bobines: {e}")
+    if ok or not _MQTT_SPOOLS['slots']:
+        seen, out = set(), []
+        for sl in slots:
+            if sl.get('source_type') not in ('spoolman', 'tigertag', 'manual'):
+                continue
+            k = _mqtt_spool_key(sl)
+            if k in seen:
+                continue
+            seen.add(k)
+            out.append({'key': k, 'name': str(sl.get('name') or k)[:60], 'material': str(sl.get('material') or ''),
+                        'remaining_g': sl.get('remaining_g')})
+        _MQTT_SPOOLS['slots'] = out
+    _MQTT_SPOOLS['t'] = time.time()
+    return _MQTT_SPOOLS['slots']
+
+
+def _mqtt_update_probe():
+    """Vérifie la dernière version publiée au plus toutes les 6 h, dans un fil à part (appel réseau)."""
+    if _MQTT_UPDATE['busy'] or time.time() - _MQTT_UPDATE['t'] < 6 * 3600:
+        return
+    _MQTT_UPDATE['busy'] = True
+
+    def _run():
+        try:
+            r = requests.get(GITHUB_API_URL, timeout=10, headers={'User-Agent': f'Stellio-App/{CURRENT_VERSION}'})
+            if r.status_code == 200:
+                latest = str(r.json().get('tag_name', '')).lstrip('vV')
+                _MQTT_UPDATE['latest'] = latest
+                _MQTT_UPDATE['avail'] = bool(latest) and version.parse(latest) > version.parse(get_current_version())
+        except Exception:
+            pass
+        finally:
+            _MQTT_UPDATE['t'] = time.time()
+            _MQTT_UPDATE['busy'] = False
+    threading.Thread(target=_run, daemon=True, name='stellio-mqtt-update').start()
+
+
+def _mqtt_last_backup_iso():
+    try:
+        folder = _auto_backup_folder(_load_auto_backup_config(), create=False)
+        best = 0.0
+        for n in os.listdir(folder):
+            if AUTO_BACKUP_NAME_RE.match(n):
+                best = max(best, os.stat(os.path.join(folder, n)).st_mtime)
+        return datetime.datetime.fromtimestamp(best).astimezone().isoformat(timespec='seconds') if best else None
+    except Exception:
+        return None
+
+
+def _mqtt_app_entities():
+    """Entités existantes : fixes (sans celles du commerce si désactivé) + une par bobine."""
+    commercial = (load_settings() or {}).get('commercial_enabled', True) is not False
+    ents = [e for e in _MQTT_APP_ENTITIES if commercial or not e[4]]
+    for sl in _mqtt_spool_slots():
+        label = sl['name'] + (f" ({sl['material']})" if sl['material'] else '')
+        ents.append(('sensor', sl['key'], f"Spool {label}", {'unit_of_measurement': 'g', 'device_class': 'weight', 'state_class': 'measurement',
+                                                           'icon': 'mdi:spool', 'spool': True}, False))
+    return ents
+
+
+def _mqtt_app_wanted():
+    return _mqtt_app_entities()
+
+
+def _mqtt_app_metrics(force=False):
+    """Instantané de l'application (mis en cache 60 s : on ne relit pas toute la base à chaque publication)."""
+    if not force and time.time() - _MQTT_APP_CACHE['t'] < 60 and _MQTT_APP_CACHE['data']:
+        return _MQTT_APP_CACHE['data']
+    m = {}
+    now = datetime.datetime.now()
+    fmt = lambda d: d.strftime('%Y-%m-%d %H:%M:%S')
+
+    def q1(conn, sql, args=(), default=0):
+        try:
+            r = conn.execute(sql, args).fetchone()
+            return (r[0] if r and r[0] is not None else default)
+        except Exception:
+            return default
+
+    try:
+        cached = load_file_cache() or []
+        m['files_total'] = len(cached)
+        counts = {'stl': 0, '3mf': 0, 'gcode': 0, 'other': 0}
+        month_ts = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).timestamp()
+        size = 0
+        new_month = 0
+        for f in cached:
+            ext = (f.get('extension') or '').lower().lstrip('.')
+            counts['gcode' if ext in ('gcode', 'bgcode', 'gco') else ext if ext in ('stl', '3mf') else 'other'] += 1
+            size += f.get('size', 0) or 0
+            if (f.get('mtime') or 0) >= month_ts:
+                new_month += 1
+        m.update(files_stl=counts['stl'], files_3mf=counts['3mf'], files_gcode=counts['gcode'], files_other=counts['other'],
+                 files_new_month=new_month, library_size=round(size / 1e9, 2))
+    except Exception:
+        pass
+    conn = get_db()
+    try:
+        today = fmt(now.replace(hour=0, minute=0, second=0, microsecond=0))
+        m['sources'] = q1(conn, "SELECT COUNT(*) FROM sources")
+        m['favorites'] = q1(conn, "SELECT COUNT(*) FROM favorites")
+        m['projects'] = q1(conn, "SELECT COUNT(*) FROM projects")
+        m['photos'] = q1(conn, "SELECT COUNT(*) FROM print_photos")
+        m['print_queue'] = q1(conn, "SELECT COUNT(*) FROM print_queue")
+        m['prints_total'] = q1(conn, "SELECT COUNT(*) FROM print_history")
+        m['prints_today'] = q1(conn, "SELECT COUNT(*) FROM print_history WHERE sent_at>=?", (today,))
+        m['prints_7d'] = q1(conn, "SELECT COUNT(*) FROM print_history WHERE sent_at>=?", (fmt(now - datetime.timedelta(days=7)),))
+        m['prints_30d'] = q1(conn, "SELECT COUNT(*) FROM print_history WHERE sent_at>=?", (fmt(now - datetime.timedelta(days=30)),))
+        ok = q1(conn, "SELECT COUNT(*) FROM print_history WHERE result='success'")
+        failed = q1(conn, "SELECT COUNT(*) FROM print_history WHERE result='failed'")
+        m['prints_failed'] = failed
+        m['success_rate'] = round(100 * ok / (ok + failed), 1) if (ok + failed) else None
+        m['print_hours'] = round(q1(conn, "SELECT COALESCE(SUM(actual_seconds),0) FROM print_history") / 3600, 1)
+        m['spools'] = q1(conn, "SELECT COUNT(*) FROM manual_filament_spools WHERE COALESCE(archived,0)=0")
+        m['spools_remaining'] = round(q1(conn, "SELECT COALESCE(SUM(remaining_g),0) FROM manual_filament_spools WHERE COALESCE(archived,0)=0") / 1000, 2)
+        m['notifications'] = q1(conn, "SELECT COUNT(*) FROM notifications WHERE is_read=0")
+        m['users'] = q1(conn, "SELECT COUNT(*) FROM users")
+        m['spent_total'] = round(q1(conn, "SELECT COALESCE(SUM(total_cost),0) FROM print_history WHERE total_cost IS NOT NULL"), 2)
+        m['spent_month'] = round(q1(conn, "SELECT COALESCE(SUM(total_cost),0) FROM print_history WHERE total_cost IS NOT NULL AND sent_at>=?",
+                                    (fmt(now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)),)), 2)
+        # commerce
+        todayd = datetime.date.today().isoformat()
+        try:
+            qrows = conn.execute("SELECT doc_type, status, due_date, total_value FROM quotes").fetchall()
+        except Exception:
+            qrows = []
+        pend = unpaid = overdue = 0
+        unpaid_total = 0.0
+        for r in qrows:
+            dt = r['doc_type'] or 'quote'
+            st = r['status'] or 'draft'
+            if dt == 'quote' and st in ('draft', 'sent'):
+                pend += 1
+            elif dt in ('invoice', 'deposit') and st != 'paid':
+                unpaid += 1
+                unpaid_total += float(r['total_value'] or 0)
+                if r['due_date'] and r['due_date'] < todayd:
+                    overdue += 1
+        m.update(quotes_pending=pend, invoices_unpaid=unpaid, invoices_unpaid_total=round(unpaid_total, 2), invoices_overdue=overdue)
+        m['clients'] = q1(conn, "SELECT COUNT(*) FROM clients")
+        m['orders_open'] = q1(conn, "SELECT COUNT(*) FROM print_jobs WHERE status IN ('queued','printing')")
+        m['orders_late'] = q1(conn, "SELECT COUNT(*) FROM print_jobs WHERE status IN ('queued','printing') AND due_date!='' AND due_date<?", (todayd,))
+        # maintenance
+        due = 0
+        try:
+            tasks = conn.execute("SELECT t.*, p.total_print_hours AS total FROM printer_maintenance_tasks t JOIN printers p ON p.id=t.printer_id").fetchall()
+            rates = {}
+            for t in tasks:
+                if t['printer_id'] not in rates:
+                    rates[t['printer_id']] = _printer_hours_per_day(conn, t['printer_id'])
+                if _maintenance_eta(t, t['total'] or 0, rates[t['printer_id']]) == 0.0:
+                    due += 1
+        except Exception:
+            pass
+        m['maintenance_due'] = due
+        eta_by = {}
+        try:
+            for t in tasks:
+                e = _maintenance_eta(t, t['total'] or 0, rates.get(t['printer_id']))
+                if e is not None:
+                    eta_by[t['printer_id']] = min(e, eta_by.get(t['printer_id'], e))
+        except Exception:
+            pass
+        m['maint_by_printer'] = {k: round(v, 1) for k, v in eta_by.items()}
+        # commandes
+        m['orders_next_due'] = q1(conn, "SELECT MIN(due_date) FROM print_jobs WHERE status IN ('queued','printing') AND due_date!=''", default=None)
+        m['orders_pieces_left'] = q1(conn, "SELECT COALESCE(SUM(MAX(quantity-qty_done,0)),0) FROM print_jobs WHERE status IN ('queued','printing')")
+        try:
+            totals = {r['id']: r['total_value'] or 0 for r in conn.execute("SELECT id, total_value FROM quotes").fetchall()}
+            est = real = 0.0
+            for r in conn.execute("SELECT * FROM print_jobs WHERE status!='cancelled'").fetchall():
+                mg = _job_margin(r, totals.get(r['quote_id'], 0))
+                if mg:
+                    est += mg['est_margin']
+                    if r['qty_done']:
+                        real += mg['real_margin']
+            m['margin_est'], m['margin_real'] = round(est, 2), round(real, 2)
+        except Exception:
+            m['margin_est'] = m['margin_real'] = None
+    finally:
+        conn.close()
+    try:
+        m['db_size'] = round(os.path.getsize(DB_PATH) / 1e6, 1)
+    except Exception:
+        m['db_size'] = None
+    m['last_backup'] = _mqtt_last_backup_iso()
+    _mqtt_update_probe()
+    m['version'] = CURRENT_VERSION
+    m['uptime'] = round((time.time() - _APP_STARTED) / 3600, 2)
+    _MQTT_APP_CACHE.update(t=time.time(), data=m)
+    return m
+
+
+def _mqtt_app_state(m, printers_state):
+    out = dict(m)
+    out['printers_total'] = len(printers_state)
+    out['printers_online'] = sum(1 for s in printers_state if s not in ('offline', 'error', 'timeout', None))
+    out['printers_printing'] = sum(1 for s in printers_state if s == 'printing')
+    out['alerts_spool_low'] = sum(1 for v in _ws_state.values() if v.get('low'))
+    out['alerts_drift'] = sum(1 for v in _ws_state.values() if v.get('drift'))
+    out['update_flag'] = 1 if _MQTT_UPDATE['avail'] else 0
+    out['latest_version'] = _MQTT_UPDATE['latest'] or None
+    out['spools_detail'] = {sl['key']: sl['remaining_g'] for sl in _mqtt_spool_slots()}
+    out.pop('maint_by_printer', None)
+    return out
+
+
+def _mqtt_app_discovery(cfg, ents=None):
+    base = cfg['base']
+    dev = {'identifiers': ['stellio_app'], 'name': 'Stellio', 'manufacturer': 'Stellio', 'model': 'Application', 'sw_version': CURRENT_VERSION}
+    common = {'state_topic': _MQTT_APP_STATE_TOPIC.format(base=base), 'device': dev, 'availability_topic': f"{base}/status",
+              'payload_available': 'online', 'payload_not_available': 'offline'}
+    out = []
+    for comp, key, name, extra, _commerce in (ents if ents is not None else _MQTT_APP_ENTITIES):
+        extra = dict(extra)
+        boolof = extra.pop('bool_of', None)
+        spool = extra.pop('spool', False)
+        conf = {**common, **extra, 'name': name, 'unique_id': f"stellio_app_{key}", 'object_id': f"stellio_app_{key}"}
+        if comp == 'binary_sensor':
+            conf['value_template'] = "{{ 'ON' if (value_json.%s | int(0)) > 0 else 'OFF' }}" % boolof
+        elif spool:
+            conf['value_template'] = "{%% set v = value_json.spools_detail.get('%s') %%}{{ 'unknown' if v is none else v }}" % key
+        else:
+            conf['value_template'] = "{{ 'unknown' if value_json.%s is none else value_json.%s }}" % (key, key)
+        out.append((f"{cfg['prefix']}/{comp}/stellio_app/{key}/config", key, conf))
+    return out
+
+
+def _mqtt_app_publish(client, cfg, printers_state, qos=0, wait=None):
+    """Publie l'appareil Stellio : configs de découverte (seulement si elles ont changé) puis l'état."""
+    ents = _mqtt_app_entities()
+    wanted = {e[1]: e[0] for e in ents}
+    prev = _MQTT_PUB.get('app_keys')
+    if cfg['discovery'] and prev != wanted:
+        for topic, key, conf in _mqtt_app_discovery(cfg, ents):
+            r = client.publish(topic, json.dumps(conf, ensure_ascii=False), qos=1, retain=True)
+            if wait is not None:
+                wait.append(r)
+        # entités disparues (commerce désactivé, bobine retirée) : on vide leur configuration retenue
+        gone = {k: c for k, c in (prev or {}).items() if k not in wanted}
+        if prev is None:
+            gone.update({e[1]: e[0] for e in _MQTT_APP_ENTITIES if e[1] not in wanted})
+        for key, comp in gone.items():
+            r = client.publish(f"{cfg['prefix']}/{comp}/stellio_app/{key}/config", '', qos=1, retain=True)
+            if wait is not None:
+                wait.append(r)
+        _MQTT_PUB['app_keys'] = wanted
+    state = _mqtt_app_state(_mqtt_app_metrics(), printers_state)
+    r = client.publish(_MQTT_APP_STATE_TOPIC.format(base=cfg['base']), json.dumps(state, ensure_ascii=False), qos=qos, retain=True)
+    if wait is not None:
+        wait.append(r)
+    return state
 
 
 def _mqtt_pub_disconnect():
@@ -22486,6 +22851,7 @@ def _mqtt_pub_tick():
             if _MQTT_PUB['client']:
                 _mqtt_pub_disconnect()
             _MQTT_PUB['discovered'] = set()
+            _MQTT_PUB['app_keys'] = None
             client = _mqtt_new_client(cfg, 'pub')
             client.will_set(f"{cfg['base']}/status", 'offline', qos=1, retain=True)
 
@@ -22494,6 +22860,7 @@ def _mqtt_pub_tick():
                     _MQTT_PUB['connected'] = True
                     _MQTT_PUB['error'] = ''
                     _MQTT_PUB['discovered'] = set()
+                    _MQTT_PUB['app_keys'] = None
                     c.publish(f"{cfg['base']}/status", 'online', qos=1, retain=True)
                 else:
                     _MQTT_PUB['connected'] = False
@@ -22571,7 +22938,10 @@ def api_mqtt_entities():
             payload = _mqtt_state_payload(p, {})
         values = {'status': payload['status'], 'progress': payload['progress'], 'remaining': round(payload['remaining'] / 60),
                   'file': payload['file'], 'nozzle': payload['extruder'], 'bed': payload['bed'],
-                  'printing': 'ON' if payload['status'] == 'printing' else 'OFF'}
+                  'printing': 'ON' if payload['status'] == 'printing' else 'OFF',
+                  'chamber': payload['chamber'], 'layer': payload['layer'], 'layers_total': payload['layers_total'],
+                  'hours': payload['hours'], 'maintenance_days': payload['maintenance_days'],
+                  'spool_low': 'ON' if payload['spool_low'] else 'OFF', 'drift': 'ON' if payload['drift'] else 'OFF'}
         ents = []
         for topic, conf in _mqtt_discovery_configs(cfg, p):
             key = conf['unique_id'].split('_', 2)[2]
@@ -22579,6 +22949,22 @@ def api_mqtt_entities():
                          "unit": conf.get('unit_of_measurement', ''), "value": values.get(key)})
         out["printers"].append({"id": p['id'], "name": p.get('name') or f"#{p['id']}", "state_topic": f"{cfg['base']}/printer/{p['id']}/state",
                                 "event_topic": f"{cfg['base']}/printer/{p['id']}/event", "entities": ents})
+    try:
+        pstates = [pr['entities'][0]['value'] for pr in out['printers'] if pr['entities']]
+        values = _mqtt_app_state(_mqtt_app_metrics(), pstates)
+        app_ents = []
+        for comp, key, name, extra, _c in _mqtt_app_entities():
+            if comp == 'binary_sensor':
+                val = 'ON' if (values.get(extra.get('bool_of')) or 0) > 0 else 'OFF'
+            elif extra.get('spool'):
+                val = values.get('spools_detail', {}).get(key)
+            else:
+                val = values.get(key)
+            app_ents.append({"key": key, "name": name, "component": comp, "unique_id": f"stellio_app_{key}",
+                             "unit": extra.get('unit_of_measurement', ''), "value": val})
+        out["app"] = {"name": "Stellio", "state_topic": _MQTT_APP_STATE_TOPIC.format(base=cfg['base']), "entities": app_ents}
+    except Exception as e:
+        app_logger.info(f"[MQTT] Entités Stellio: {e}")
     return jsonify(out)
 
 
@@ -22610,6 +22996,7 @@ def api_mqtt_test():
             # Le test publie réellement les entités (comme le ferait la publication normale),
             # pour qu'elles apparaissent tout de suite dans Home Assistant.
             infos = []
+            test_states = []
             conn = get_db()
             try:
                 rows = conn.execute("SELECT * FROM printers").fetchall()
@@ -22628,6 +23015,13 @@ def api_mqtt_test():
                         infos.append(client.publish(topic, json.dumps(conf, ensure_ascii=False), qos=1, retain=True))
                 infos.append(client.publish(f"{cfg['base']}/printer/{p['id']}/state", json.dumps(_mqtt_state_payload(p, st), ensure_ascii=False), qos=1, retain=True))
                 published += 1
+                test_states.append((st or {}).get('status'))
+            try:
+                _MQTT_PUB['app_keys'] = None
+                _mqtt_app_publish(client, cfg, test_states, qos=1, wait=infos)
+                published += 1
+            except Exception as e:
+                app_logger.info(f"[MQTT] Test appareil Stellio: {e}")
             for i in infos:
                 try:
                     i.wait_for_publish(3)
@@ -23350,6 +23744,7 @@ def _workshop_watch_once():
             continue
         st = status.get('status')
         stt = _ws_state.setdefault(pid, {'status': None, 'start': None, 'heat': None, 'prog': None, 'prog_ts': now, 'low': set()})
+        stt['drift'] = False
         if st in ('error', 'offline', 'timeout', None):
             stt['status'] = st
             continue
@@ -23404,6 +23799,7 @@ def _workshop_watch_once():
             if off:
                 stt['heat'] = stt['heat'] or now
                 if now - stt['heat'] >= _WS_DRIFT_SECONDS:
+                    stt['drift'] = True
                     _ws_alert(uid, 'print_drift', _server_t('notif.drift_temp_title', 'Dérive de température'),
                               f"{name} — {int(ext.get('current') or 0)}/{int(ext.get('target') or 0)} °C",
                               f"print_drift_temp_{pid}_{start}")
@@ -23412,6 +23808,7 @@ def _workshop_watch_once():
             if progress != stt['prog']:
                 stt['prog'], stt['prog_ts'] = progress, now
             elif 0 < progress < 100 and now - stt['prog_ts'] >= _WS_STALL_SECONDS:
+                stt['drift'] = True
                 _ws_alert(uid, 'print_drift', _server_t('notif.drift_stall_title', 'Impression bloquée ?'),
                           f"{name} — {int(progress)} %", f"print_drift_stall_{pid}_{start}")
 

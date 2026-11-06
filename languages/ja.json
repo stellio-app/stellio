@@ -2523,5 +2523,6 @@
   "slicer.batch_spool_need": "{{label}}：必要 {{required}} g、残り {{remaining}} g",
   "commercial.title": "コスト・見積・請求",
   "commercial.enable": "コスト・見積・請求機能を有効にする",
-  "commercial.hint": "オフにすると、印刷コスト（操作メニュー、ファイル詳細、プロジェクト、履歴、統計）、見積書・請求書、顧客リスト、注文キューが非表示になります。データは保持されます。"
+  "commercial.hint": "オフにすると、印刷コスト（操作メニュー、ファイル詳細、プロジェクト、履歴、統計）、見積書・請求書、顧客リスト、注文キューが非表示になります。データは保持されます。",
+  "mqtt.app_title": "Stellio アプリ"
 }

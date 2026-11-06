@@ -2523,5 +2523,6 @@
   "slicer.batch_spool_need": "{{label}}: necesarios {{required}} g, quedan {{remaining}} g",
   "commercial.title": "Costes, presupuestos y facturación",
   "commercial.enable": "Activar las funciones de coste, presupuestos y facturación",
-  "commercial.hint": "Desactivado, Stellio oculta el coste de impresión (menús de acciones, fichas, proyectos, historial, estadísticas), los presupuestos y facturas, la libreta de clientes y la cola de pedidos. Tus datos se conservan."
+  "commercial.hint": "Desactivado, Stellio oculta el coste de impresión (menús de acciones, fichas, proyectos, historial, estadísticas), los presupuestos y facturas, la libreta de clientes y la cola de pedidos. Tus datos se conservan.",
+  "mqtt.app_title": "Aplicación Stellio"
 }

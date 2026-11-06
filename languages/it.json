@@ -2523,5 +2523,6 @@
   "slicer.batch_spool_need": "{{label}}: servono {{required}} g, restano {{remaining}} g",
   "commercial.title": "Costi, preventivi e fatturazione",
   "commercial.enable": "Attiva le funzioni di costi, preventivi e fatturazione",
-  "commercial.hint": "Disattivato, Stellio nasconde il costo di stampa (menu azioni, schede, progetti, cronologia, statistiche), preventivi e fatture, la rubrica clienti e la coda ordini. I tuoi dati vengono conservati."
+  "commercial.hint": "Disattivato, Stellio nasconde il costo di stampa (menu azioni, schede, progetti, cronologia, statistiche), preventivi e fatture, la rubrica clienti e la coda ordini. I tuoi dati vengono conservati.",
+  "mqtt.app_title": "Applicazione Stellio"
 }

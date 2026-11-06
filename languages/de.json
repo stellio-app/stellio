@@ -2523,5 +2523,6 @@
   "slicer.batch_spool_need": "{{label}}: benötigt {{required}} g, übrig {{remaining}} g",
   "commercial.title": "Kosten, Angebote und Rechnungen",
   "commercial.enable": "Kosten-, Angebots- und Rechnungsfunktionen aktivieren",
-  "commercial.hint": "Deaktiviert blendet Stellio Druckkosten (Aktionsmenüs, Dateidetails, Projekte, Verlauf, Statistiken), Angebote und Rechnungen, das Kundenverzeichnis und die Auftragswarteschlange aus. Deine Daten bleiben erhalten."
+  "commercial.hint": "Deaktiviert blendet Stellio Druckkosten (Aktionsmenüs, Dateidetails, Projekte, Verlauf, Statistiken), Angebote und Rechnungen, das Kundenverzeichnis und die Auftragswarteschlange aus. Deine Daten bleiben erhalten.",
+  "mqtt.app_title": "Stellio-Anwendung"
 }

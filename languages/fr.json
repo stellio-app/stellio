@@ -2523,5 +2523,6 @@
   "slicer.batch_spool_need": "{{label}} : besoin {{required}} g, reste {{remaining}} g",
   "commercial.title": "Coûts, devis et facturation",
   "commercial.enable": "Activer les fonctions de coût, devis et facturation",
-  "commercial.hint": "Désactivé, Stellio masque le coût d'impression (menus d'actions, fiches, projets, historique, statistiques), les devis et factures, le carnet de clients et la file de commandes. Vos données sont conservées."
+  "commercial.hint": "Désactivé, Stellio masque le coût d'impression (menus d'actions, fiches, projets, historique, statistiques), les devis et factures, le carnet de clients et la file de commandes. Vos données sont conservées.",
+  "mqtt.app_title": "Application Stellio"
 }
