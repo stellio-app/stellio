@@ -673,7 +673,7 @@
                                 </div>
                             </div>
 
-                            <div class="dashboard-widget" id="dashboard-widget-quotes" data-widget-id="quotes" draggable="false">
+                            <div class="dashboard-widget commercial-only" id="dashboard-widget-quotes" data-widget-id="quotes" draggable="false">
                                 <div class="dashboard-widget-header">
                                     <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
                                     <h3><i class="fa-solid fa-file-invoice"></i> <span data-i18n="dashboard.quotes_title">Devis</span></h3>
@@ -1298,8 +1298,17 @@
                             </div>
                         </div>
 
-                        <div class="accord-section">
+                                                <div class="accord-section" id="commercial-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
+                                <span><i class="fa-solid fa-file-invoice-dollar"></i> <span data-i18n="commercial.title">Coûts, devis et facturation</span></span>
+                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                            </div>
+                            <div class="accord-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <label class="checkbox-label viewer-hide"><input type="checkbox" id="commercial-enabled" checked onchange="onCommercialToggle(this.checked)"> <strong data-i18n="commercial.enable">Activer les fonctions de coût, devis et facturation</strong></label>
+                                <p class="settings-hint" data-i18n="commercial.hint">Désactivé, Stellio masque le coût d'impression (menus d'actions, fiches, projets, historique, statistiques), les devis et factures, le carnet de clients et la file de commandes. Vos données sont conservées.</p>
+                                <div id="commercial-sub">
+<div class="accord-section" style="box-shadow:none; margin-top:10px;">
+                            <div class="accord-header" onclick="toggleAccord(this)" style="background:var(--bg-input);">
                                 <span><i class="fa-solid fa-coins"></i> <span data-i18n="settings.print_cost_title">Tarifs d'impression</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
                             </div>
@@ -1355,9 +1364,8 @@
                                 </button>
                             </div>
                         </div>
-
-                        <div class="accord-section">
-                            <div class="accord-header" onclick="toggleAccord(this)">
+<div class="accord-section" style="box-shadow:none; margin-top:10px;">
+                            <div class="accord-header" onclick="toggleAccord(this)" style="background:var(--bg-input);">
                                 <span><i class="fa-solid fa-file-invoice"></i> <span data-i18n="settings.quote_title">Devis : en-tête et mentions légales</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
                             </div>
@@ -1432,9 +1440,36 @@
                                 </button>
                             </div>
                         </div>
+<div class="accord-section viewer-hide" style="box-shadow:none; margin-top:10px;">
+                            <div class="accord-header" onclick="toggleAccord(this)" style="background:var(--bg-input);">
+                                <span><i class="fa-solid fa-envelope"></i> <span data-i18n="smtp.title">E-mail (SMTP)</span></span>
+                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                            </div>
+                            <div class="accord-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <p class="settings-hint" data-i18n="smtp.hint">Sert à envoyer les devis et factures par e-mail depuis l'historique.</p>
+                                <label class="spool-extra-field"><span data-i18n="smtp.host">Serveur SMTP</span><input type="text" id="smtp-host" class="settings-select" placeholder="smtp.example.com" autocomplete="off"></label>
+                                <label class="spool-extra-field"><span data-i18n="smtp.port">Port</span><input type="number" id="smtp-port" class="settings-select" placeholder="587" min="1" max="65535"></label>
+                                <label class="spool-extra-field"><span data-i18n="smtp.security">Chiffrement</span>
+                                    <select id="smtp-security" class="settings-select">
+                                        <option value="starttls" data-i18n="smtp.sec_starttls">STARTTLS (587)</option>
+                                        <option value="ssl" data-i18n="smtp.sec_ssl">SSL/TLS (465)</option>
+                                        <option value="none" data-i18n="smtp.sec_none">Aucun (25)</option>
+                                    </select></label>
+                                <label class="spool-extra-field"><span data-i18n="smtp.user">Utilisateur</span><input type="text" id="smtp-user" class="settings-select" autocomplete="off"></label>
+                                <label class="spool-extra-field"><span data-i18n="smtp.password">Mot de passe</span><input type="password" id="smtp-password" class="settings-select" autocomplete="new-password"></label>
+                                <label class="spool-extra-field"><span data-i18n="smtp.from">Adresse d'expédition</span><input type="text" id="smtp-from" class="settings-select" placeholder="contact@example.com" autocomplete="off"></label>
+                                <label class="spool-extra-field"><span data-i18n="smtp.from_name">Nom d'expéditeur (optionnel)</span><input type="text" id="smtp-from-name" class="settings-select" autocomplete="off"></label>
+                                <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
+                                    <button type="button" class="btn btn-ghost btn-sm" onclick="testSmtp()"><i class="fa-solid fa-paper-plane"></i> <span data-i18n="smtp.test">Envoyer un e-mail de test</span></button>
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="saveSmtpSettings()"><i class="fa-solid fa-check"></i> <span data-i18n="smtp.save">Enregistrer</span></button>
+                                </div>
+                            </div>
+                        </div>
+                                </div>
+                            </div>
+                        </div>
 
-
-                        <div class="accord-section" id="account-security-section">
+<div class="accord-section" id="account-security-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-shield-halved"></i> <span data-i18n="settings.security">Sécurité du compte</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
@@ -2050,6 +2085,9 @@
                                         <label class="checkbox-label"><input type="checkbox" data-push-type="print_failed" checked> <span data-i18n="push.type_print_failed">Échec d'impression</span></label>
                                         <label class="checkbox-label"><input type="checkbox" data-push-type="maintenance" checked> <span data-i18n="push.type_maintenance">Maintenance et séchage</span></label>
                                         <label class="checkbox-label"><input type="checkbox" data-push-type="low_stock" checked> <span data-i18n="push.type_low_stock">Stock bas et pièces</span></label>
+                                        <label class="checkbox-label"><input type="checkbox" data-push-type="payment_overdue" checked> <span data-i18n="push.type_payment_overdue">Factures en retard</span></label>
+                                        <label class="checkbox-label"><input type="checkbox" data-push-type="spool_low" checked> <span data-i18n="push.type_spool_low">Bobine presque vide</span></label>
+                                        <label class="checkbox-label"><input type="checkbox" data-push-type="print_drift" checked> <span data-i18n="push.type_print_drift">Dérive d'impression</span></label>
                                     </div>
                                 </div>
                                 <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
@@ -2079,11 +2117,27 @@
                                 <label class="spool-extra-field"><span data-i18n="mqtt.base">Préfixe des topics</span><input type="text" id="mqtt-base" class="settings-select" placeholder="stellio" autocomplete="off"></label>
                                 <label class="checkbox-label"><input type="checkbox" id="mqtt-tls"> <span data-i18n="mqtt.tls">Connexion chiffrée (TLS)</span></label>
                                 <label class="checkbox-label"><input type="checkbox" id="mqtt-tls-insecure"> <span data-i18n="mqtt.tls_insecure">Accepter un certificat auto-signé</span></label>
+                                <label class="spool-extra-field"><span data-i18n="mqtt.discovery_prefix">Préfixe de découverte Home Assistant</span><input type="text" id="mqtt-prefix" class="settings-select" placeholder="homeassistant" autocomplete="off"></label>
                                 <label class="checkbox-label"><input type="checkbox" id="mqtt-discovery" checked> <span data-i18n="mqtt.discovery">Découverte automatique Home Assistant</span></label>
                                 <div id="mqtt-status-line" class="settings-hint"></div>
                                 <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
                                     <button type="button" class="btn btn-ghost btn-sm" onclick="testMqtt()"><i class="fa-solid fa-plug"></i> <span data-i18n="mqtt.test">Tester la connexion</span></button>
                                     <button type="button" class="btn btn-primary btn-sm" onclick="saveMqttSettings()"><i class="fa-solid fa-check"></i> <span data-i18n="mqtt.save">Enregistrer</span></button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accord-section viewer-hide">
+                            <div class="accord-header" onclick="toggleAccord(this)">
+                                <span><i class="fa-solid fa-industry"></i> <span data-i18n="workshop.title">Atelier et alertes</span></span>
+                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                            </div>
+                            <div class="accord-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <p class="settings-hint" data-i18n="workshop.hint">Stellio surveille tes imprimantes en arrière-plan et te prévient (notification, et push si activé) avant que ça tourne mal.</p>
+                                <label class="spool-extra-field"><span data-i18n="workshop.spool_min">Alerte bobine presque vide sous (g, 0 = désactivé)</span><input type="number" id="alert-spool-min" class="settings-select" min="0" step="10" value="80"></label>
+                                <label class="checkbox-label"><input type="checkbox" id="alert-drift" checked> <span data-i18n="workshop.drift">Alerter si la température dérive ou si l'avancement est bloqué</span></label>
+                                <label class="checkbox-label"><input type="checkbox" id="workshop-auto-progress"> <span data-i18n="workshop.auto_progress">Faire avancer la file de commandes automatiquement (une impression terminée = 1 pièce de la plus ancienne commande de l'imprimante)</span></label>
+                                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="saveWorkshopSettings()"><i class="fa-solid fa-check"></i> <span data-i18n="smtp.save">Enregistrer</span></button>
                                 </div>
                             </div>
                         </div>
@@ -3192,7 +3246,10 @@
                 <div id="slicer-preprint-warnings" style="display:none; margin-bottom:15px; flex-direction:column; gap:6px;"></div>
                 <div id="slicer-calib-box" class="slicer-calib-box" style="display:none;"></div>
                 <div id="slicer-spool-box" style="display:none; margin-bottom:15px; padding:10px 12px; border-radius:var(--radius); background:var(--bg-input); border:1px solid var(--border); font-size:12px;">
-                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                    <label for="slicer-spool-select" style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:3px;" data-i18n="slicer.spool_label">Bobine utilisée</label>
+                    <select id="slicer-spool-select" class="settings-select" style="width:100%; max-width:none;" onchange="onSlicerSpoolChange()"></select>
+                    <div id="slicer-spool-hint" style="display:none; margin-top:6px; color:var(--danger, #e5484d);"></div>
+                    <label id="slicer-consume-row" style="display:none; align-items:center; gap:8px; cursor:pointer; margin-top:8px;">
                         <input type="checkbox" id="slicer-consume-spool-checkbox" checked>
                         <span id="slicer-spool-label"></span>
                     </label>
@@ -4256,7 +4313,7 @@
                     <span class="file-action-label" data-i18n="settings.remote_instances_send_action">Envoyer vers une instance Stellio</span>
                     <i class="fa-solid fa-chevron-right file-action-arrow"></i>
                 </button>
-                <button class="file-action-row" id="ctx-cost-btn">
+                <button class="file-action-row commercial-only" id="ctx-cost-btn">
                     <span class="file-action-icon"><i class="fa-solid fa-coins"></i></span>
                     <span class="file-action-label" data-i18n="modal.print_cost">Coût d'impression</span>
                     <i class="fa-solid fa-chevron-right file-action-arrow"></i>

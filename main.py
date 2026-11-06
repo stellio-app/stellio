@@ -13897,6 +13897,12 @@ def api_send_to_slicer():
         app_logger.warning(f"[SECURITY] Tentative d'ouverture slicer hors sources: {file_path}")
         return jsonify({"error": "Ce fichier n'appartient à aucune source configurée"}), 403
 
+    if not data.get('ignore_stock'):
+        _alerts = _check_restock_for_files([file_path], session['user_id'])
+        if _alerts:
+            return jsonify({"stock_insufficient": True, "alert": _alerts[0],
+                            "message": "Bobine insuffisante pour ce fichier."}), 409
+
     if not data.get('force'):
         try:
             conn_check = get_db()
@@ -14023,7 +14029,7 @@ def api_send_to_slicer():
             history_id = None
 
         return jsonify({"message": f"Envoyé via {detected_slicer}", "history_id": history_id,
-                         "stock_warning": (_check_restock_for_files([file_path], session['user_id']) or [None])[0]}), 200
+                         "stock_warning": None if data.get('ignore_stock') else (_check_restock_for_files([file_path], session['user_id']) or [None])[0]}), 200
 
     except Exception as e:
         app_logger.error(f"[API] Erreur non gérée: {e}")
@@ -14041,6 +14047,12 @@ def api_slicer_send_batch():
             if not _is_path_within_sources(fp, session['user_id']):
                 app_logger.warning(f"[SECURITY] Tentative d'ouverture slicer (batch) hors sources: {fp}")
                 return jsonify({"error": "Un ou plusieurs fichiers n'appartiennent à aucune source configurée"}), 403
+
+        if not data.get('ignore_stock'):
+            _alerts = _check_restock_for_files(file_paths, session['user_id'])
+            if _alerts:
+                return jsonify({"stock_insufficient": True, "alerts": _alerts, "alert": _alerts[0],
+                                "message": "Bobine insuffisante pour un ou plusieurs fichiers."}), 409
 
         if sys.platform == 'win32':
             file_paths = [p.replace('/', '\\') for p in file_paths]
@@ -14116,7 +14128,7 @@ def api_slicer_send_batch():
         return jsonify({
             "message": f"{len(file_paths)} fichiers ouverts dans le slicer",
             "count": len(file_paths),
-            "stock_warnings": _check_restock_for_files(file_paths, session['user_id'])
+            "stock_warnings": [] if data.get('ignore_stock') else _check_restock_for_files(file_paths, session['user_id'])
         }), 200
 
     except Exception as e:
@@ -16454,9 +16466,9 @@ def _send_native_notification_now(title, message):
         app_logger.debug(f"[Notif] Notification native ignorée: {e}")
 
 
-_PUSH_DEFAULT_TYPES = ['print_finished', 'print_failed', 'maintenance', 'low_stock']
+_PUSH_DEFAULT_TYPES = ['print_finished', 'print_failed', 'maintenance', 'low_stock', 'payment_overdue', 'spool_low', 'print_drift']
 _PUSH_TAGS = {'print_finished': ['white_check_mark'], 'print_failed': ['warning'],
-              'maintenance': ['wrench'], 'low_stock': ['package']}
+              'maintenance': ['wrench'], 'low_stock': ['package'], 'payment_overdue': ['moneybag'], 'spool_low': ['thread'], 'print_drift': ['rotating_light']}
 _server_lang_cache = {}
 
 
@@ -18991,7 +19003,8 @@ def build_quote_pdf_bytes(data, encrypt=True):
     client_box = Table([
         [Paragraph(p_text(s('to_label', 40)).upper(), st_label)],
         [Paragraph(p_text(s('client', 120)) or dash, st_body)],
-    ], colWidths=[width * 0.5])
+    ] + ([[Paragraph('<br/>'.join(p_text(x, 120) for x in str(data.get('client_details') or '').splitlines()[:6] if x.strip()), st_issuer)]]
+         if str(data.get('client_details') or '').strip() else []), colWidths=[width * 0.5])
     client_box.hAlign = 'LEFT'
     client_box.setStyle(TableStyle([
         ('LEFTPADDING', (0, 0), (-1, -1), 0), ('BOTTOMPADDING', (0, 0), (-1, 0), 2),
@@ -19063,7 +19076,17 @@ def build_quote_pdf_bytes(data, encrypt=True):
         sums.setStyle(TableStyle([('LEFTPADDING', (0, 0), (-1, -1), 4), ('RIGHTPADDING', (0, 0), (-1, -1), 4),
                                   ('TOPPADDING', (0, 0), (-1, -1), 3), ('BOTTOMPADDING', (0, 0), (-1, -1), 3)]))
         flow += [Spacer(1, 6), sums]
-    flow += [Paragraph(f"{p_text(s('total_label', 40))} : {p_text(s('grand_total', 30) or s('line_total', 30))}", st_total)]
+    if s('deposit', 30):
+        st_sum_l2 = ParagraphStyle('sl2', parent=st_body, alignment=2, textColor=grey)
+        sums2 = Table([[Paragraph(p_text(s('total_label', 40)), st_sum_l2), Paragraph(p_text(s('grand_total', 30) or s('line_total', 30)), st_num)],
+                       [Paragraph(p_text(s('deposit_label', 60)), st_sum_l2), Paragraph(p_text(s('deposit', 30)), st_num)]],
+                      colWidths=[width * 0.62, width * 0.38])
+        sums2.setStyle(TableStyle([('LEFTPADDING', (0, 0), (-1, -1), 4), ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                                   ('TOPPADDING', (0, 0), (-1, -1), 3), ('BOTTOMPADDING', (0, 0), (-1, -1), 3)]))
+        flow += [Spacer(1, 6), sums2,
+                 Paragraph(f"{p_text(s('net_label', 40))} : {p_text(s('net_total', 30))}", st_total)]
+    else:
+        flow += [Paragraph(f"{p_text(s('total_label', 40))} : {p_text(s('grand_total', 30) or s('line_total', 30))}", st_total)]
 
     payment = s('payment_terms', 300).strip()
     if payment:
@@ -19209,13 +19232,42 @@ def _ensure_quote_columns():
     try:
         cols = {r['name'] for r in conn.execute("PRAGMA table_info(quotes)").fetchall()}
         for name, ddl in (('doc_type', "TEXT DEFAULT 'quote'"), ('source_quote_id', 'INTEGER DEFAULT 0'),
-                          ('discount_value', 'REAL DEFAULT 0'), ('payload_file', "TEXT DEFAULT ''")):
+                          ('discount_value', 'REAL DEFAULT 0'), ('payload_file', "TEXT DEFAULT ''"),
+                          ('status', "TEXT DEFAULT ''"), ('due_date', "TEXT DEFAULT ''"), ('paid_at', "TEXT DEFAULT ''"),
+                          ('sent_at', "TEXT DEFAULT ''"), ('client_id', 'INTEGER DEFAULT 0')):
             if name not in cols:
                 conn.execute(f"ALTER TABLE quotes ADD COLUMN {name} {ddl}")
+        conn.execute("""CREATE TABLE IF NOT EXISTS clients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL DEFAULT '',
+            email TEXT DEFAULT '', phone TEXT DEFAULT '', address TEXT DEFAULT '', tax_id TEXT DEFAULT '',
+            notes TEXT DEFAULT '', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
         conn.commit()
     finally:
         conn.close()
     _QUOTE_COLS_DONE = True
+
+
+def _iso_date(v):
+    v = str(v or '').strip()[:10]
+    return v if re.match(r'^\d{4}-\d{2}-\d{2}$', v) else ''
+
+
+def _int_or0(v):
+    try:
+        return max(0, int(v))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _quote_eff_status(row):
+    """Statut affiché : brouillon / envoyé / accepté / refusé / payé / en retard (calculé d'après l'échéance)."""
+    dt = (row['doc_type'] or 'quote')
+    st = (row['status'] or 'draft')
+    if dt in ('invoice', 'deposit') and st != 'paid':
+        due = row['due_date'] or ''
+        if due and due < datetime.date.today().isoformat():
+            return 'overdue'
+    return st
 
 
 def _quote_payload_path(row):
@@ -19246,7 +19298,7 @@ def _quote_fields(data):
     except (TypeError, ValueError):
         discount_value = 0.0
     return (t('number', 40), t('client', 120), t('item_desc', 200), t('item_details', 200), t('qty', 20), t('unit_price', 40),
-            t('grand_total', 40) or t('line_total', 40), total_value, t('notes', 500), discount_value)
+            t('net_total', 40) or t('grand_total', 40) or t('line_total', 40), total_value, t('notes', 500), discount_value)
 
 
 def _record_quote(user_id, data, pdf_bytes, doc_type='quote', source_id=0):
@@ -19259,10 +19311,12 @@ def _record_quote(user_id, data, pdf_bytes, doc_type='quote', source_id=0):
         try:
             cur = conn.execute(
                 """INSERT INTO quotes (user_id, number, client, item_desc, item_details, qty, unit_price,
-                                       total, total_value, notes, filename, doc_type, source_quote_id, discount_value)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                       total, total_value, notes, filename, doc_type, source_quote_id, discount_value,
+                                       status, due_date, client_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?)""",
                 (user_id, number, client, desc, details, qty, unit_price, total, total_value, notes,
-                 _safe_quote_pdf_filename(data.get('filename')), doc_type, int(source_id or 0), discount)
+                 _safe_quote_pdf_filename(data.get('filename')), doc_type, int(source_id or 0), discount,
+                 _iso_date(data.get('due_iso')), _int_or0(data.get('client_id')))
             )
             qid = cur.lastrowid
             pdf_name, json_name = _write_quote_files(user_id, qid, data, pdf_bytes)
@@ -19289,7 +19343,10 @@ def api_quotes_list():
         rows = conn.execute(
             """SELECT q.id, q.number, q.client, q.item_desc, q.item_details, q.qty, q.unit_price, q.total, q.total_value, q.notes,
                       q.filename, q.created_at, (q.pdf_file != '') AS has_pdf, q.doc_type, q.source_quote_id, q.discount_value,
+                      q.status, q.due_date, q.paid_at, q.sent_at, q.client_id,
                       (SELECT i.id FROM quotes i WHERE i.source_quote_id = q.id AND i.doc_type = 'invoice' LIMIT 1) AS invoice_id,
+                      (SELECT COUNT(*) FROM quotes d WHERE d.source_quote_id = q.id AND d.doc_type = 'deposit') AS deposit_count,
+                      (SELECT COALESCE(SUM(-c.total_value), 0) FROM quotes c WHERE c.source_quote_id = q.id AND c.doc_type = 'credit') AS credited,
                       (SELECT s.number FROM quotes s WHERE s.id = q.source_quote_id) AS source_number
                FROM quotes q WHERE q.user_id = ? ORDER BY q.id DESC LIMIT ?""",
             (session['user_id'], limit)
@@ -19297,7 +19354,12 @@ def api_quotes_list():
         total = conn.execute("SELECT COUNT(*) FROM quotes WHERE user_id = ?", (session['user_id'],)).fetchone()[0]
     finally:
         conn.close()
-    return jsonify({"quotes": [dict(r) for r in rows], "total": total})
+    out = []
+    for r in rows:
+        d = dict(r)
+        d['status'] = _quote_eff_status(r)
+        out.append(d)
+    return jsonify({"quotes": out, "total": total})
 
 
 def _stored_quote(qid):
@@ -19340,6 +19402,17 @@ def api_quote_history_payload(qid):
     meta = {k: row[k] for k in ('id', 'number', 'client', 'item_desc', 'item_details', 'qty', 'unit_price', 'total', 'total_value',
                                  'notes', 'created_at', 'doc_type', 'discount_value')}
     meta['invoice'] = dict(inv) if inv else None
+    conn = get_db()
+    try:
+        dep = conn.execute("SELECT COALESCE(SUM(total_value),0) FROM quotes WHERE source_quote_id = ? AND doc_type = 'deposit' AND user_id = ?",
+                           (qid, session['user_id'])).fetchone()[0]
+        cre = conn.execute("SELECT COALESCE(SUM(-total_value),0) FROM quotes WHERE source_quote_id = ? AND doc_type = 'credit' AND user_id = ?",
+                           (qid, session['user_id'])).fetchone()[0]
+        cl = conn.execute("SELECT * FROM clients WHERE id = ? AND user_id = ?", (row['client_id'] or 0, session['user_id'])).fetchone()
+    finally:
+        conn.close()
+    meta.update({'status': _quote_eff_status(row), 'due_date': row['due_date'], 'paid_at': row['paid_at'], 'client_id': row['client_id'],
+                 'deposits_total': round(dep, 2), 'credited_total': round(cre, 2), 'client_record': dict(cl) if cl else None})
     return jsonify({"row": meta, "payload": payload})
 
 
@@ -19355,7 +19428,7 @@ def api_quote_history_update(qid):
         return jsonify({"success": False, "error": "not_a_quote"}), 400
     conn = get_db()
     try:
-        has_invoice = conn.execute("SELECT 1 FROM quotes WHERE source_quote_id = ? AND doc_type = 'invoice'", (qid,)).fetchone()
+        has_invoice = conn.execute("SELECT 1 FROM quotes WHERE source_quote_id = ? AND doc_type IN ('invoice','deposit')", (qid,)).fetchone()
     finally:
         conn.close()
     if has_invoice:
@@ -19376,9 +19449,9 @@ def api_quote_history_update(qid):
         conn = get_db()
         try:
             conn.execute("""UPDATE quotes SET client=?, item_desc=?, item_details=?, qty=?, unit_price=?, total=?, total_value=?,
-                            notes=?, discount_value=?, pdf_file=?, payload_file=? WHERE id=? AND user_id=?""",
+                            notes=?, discount_value=?, pdf_file=?, payload_file=?, client_id=? WHERE id=? AND user_id=?""",
                          (client, desc, details, qty, unit_price, total, total_value, notes, discount, pdf_name, json_name,
-                          qid, session['user_id']))
+                          _int_or0(data.get('client_id')), qid, session['user_id']))
             conn.commit()
         finally:
             conn.close()
@@ -19388,11 +19461,12 @@ def api_quote_history_update(qid):
     return jsonify({"success": True, "id": qid})
 
 
-def _next_invoice_number(conn, user_id, prefix):
+def _next_invoice_number(conn, user_id, prefix, types=('invoice', 'deposit')):
     year = datetime.datetime.now().year
     best = 0
-    for r in conn.execute("SELECT number FROM quotes WHERE user_id = ? AND doc_type = 'invoice' AND number LIKE ?",
-                          (user_id, f"%-{year}-%")).fetchall():
+    marks = ','.join('?' * len(types))
+    for r in conn.execute(f"SELECT number FROM quotes WHERE user_id = ? AND doc_type IN ({marks}) AND number LIKE ?",
+                          (user_id, *types, f"%-{year}-%")).fetchall():
         mt = re.search(r'-(\d+)$', r['number'] or '')
         if mt:
             best = max(best, int(mt.group(1)))
@@ -19422,6 +19496,7 @@ def api_quote_history_invoice(qid):
         conn.close()
     data['number'] = number
     data['ref_value'] = row['number']
+    data.setdefault('client_id', row['client_id'] or 0)
     slug = re.sub(r'[^A-Za-z0-9]+', '-', _unicodedata.normalize('NFD', str(data.get('client') or '')).encode('ascii', 'ignore').decode()).strip('-')[:40]
     file_prefix = re.sub(r'[^\w\- ]', '', str(data.get('filename_prefix') or 'Invoice'), flags=re.U)[:30] or 'Invoice'
     data['filename'] = _safe_quote_pdf_filename('-'.join(x for x in (file_prefix, slug, number) if x))
@@ -19437,6 +19512,479 @@ def api_quote_history_invoice(qid):
         return jsonify({"success": False, "error": "record_failed"}), 500
     app_logger.info(f"[QUOTE] 🧾 Facture {number} créée d'après le devis {row['number']}")
     return jsonify({"success": True, "id": new_id, "number": number})
+
+
+# --- v0.8.8 : suivi des paiements, avoirs / acomptes, carnet de clients, e-mail, export comptable ---
+_QUOTE_STATUSES = {'quote': ('draft', 'sent', 'accepted', 'refused'), 'invoice': ('draft', 'sent', 'paid'),
+                   'deposit': ('draft', 'sent', 'paid'), 'credit': ('draft', 'sent')}
+
+
+@app.route('/api/quotes/<int:qid>/status', methods=['POST'])
+@login_required
+def api_quote_set_status(qid):
+    _ensure_quote_columns()
+    row = _stored_quote(qid)
+    if not row:
+        return jsonify({"success": False, "error": "not_found"}), 404
+    data = request.get_json(silent=True) or {}
+    dt = row['doc_type'] or 'quote'
+    sets, args = [], []
+    if 'status' in data:
+        st = str(data.get('status') or '')
+        if st not in _QUOTE_STATUSES.get(dt, ()):
+            return jsonify({"success": False, "error": "bad_status"}), 400
+        today = datetime.date.today().isoformat()
+        sets.append('status=?'); args.append(st)
+        sets.append('paid_at=?'); args.append(today if st == 'paid' else '')
+        if st == 'sent' and not row['sent_at']:
+            sets.append('sent_at=?'); args.append(today)
+    if 'due_date' in data:
+        sets.append('due_date=?'); args.append(_iso_date(data.get('due_date')))
+    if not sets:
+        return jsonify({"success": False, "error": "nothing"}), 400
+    conn = get_db()
+    try:
+        conn.execute(f"UPDATE quotes SET {', '.join(sets)} WHERE id=? AND user_id=?", (*args, qid, session['user_id']))
+        conn.commit()
+    finally:
+        conn.close()
+    created = 0
+    if data.get('status') == 'accepted':
+        try:
+            created = _create_jobs_from_quote(session['user_id'], row)
+        except Exception as e:
+            app_logger.warning(f"[Atelier] Création de tâches impossible : {e}")
+    return jsonify({"success": True, "jobs_created": created})
+
+
+@app.route('/api/quotes/summary', methods=['GET'])
+@login_required
+def api_quotes_summary():
+    """Résumé pour le tableau de bord : factures en retard, montant à encaisser, devis en attente."""
+    _ensure_quote_columns()
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT * FROM quotes WHERE user_id = ? AND doc_type IN ('invoice','deposit','quote')", (session['user_id'],)).fetchall()
+    finally:
+        conn.close()
+    today = datetime.date.today()
+    overdue, unpaid, pending = [], 0.0, 0
+    for r in rows:
+        dt = r['doc_type'] or 'quote'
+        if dt == 'quote':
+            if (r['status'] or 'draft') == 'sent':
+                pending += 1
+            continue
+        if (r['status'] or 'draft') == 'paid':
+            continue
+        unpaid += float(r['total_value'] or 0)
+        if _quote_eff_status(r) == 'overdue':
+            try:
+                late = (today - datetime.date.fromisoformat(r['due_date'])).days
+            except Exception:
+                late = 0
+            overdue.append({"id": r['id'], "number": r['number'], "client": r['client'], "total": r['total'],
+                            "due_date": r['due_date'], "days_late": late})
+    overdue.sort(key=lambda x: -x['days_late'])
+    return jsonify({"overdue": overdue, "unpaid_total": round(unpaid, 2), "pending_quotes": pending})
+
+
+def _derive_document(qid, doc_type, number_types, default_prefix):
+    """Crée un document dérivé (facture d'acompte, avoir) à partir d'un document existant ; numéro attribué par le serveur."""
+    _ensure_quote_columns()
+    row = _stored_quote(qid)
+    if not row:
+        return jsonify({"success": False, "error": "not_found"}), 404
+    src_type = row['doc_type'] or 'quote'
+    data = request.get_json(silent=True) or {}
+    try:
+        amount = float(data.get('total_value') or 0)
+    except (TypeError, ValueError):
+        amount = 0.0
+    conn = get_db()
+    try:
+        if doc_type == 'deposit':
+            if src_type != 'quote':
+                return jsonify({"success": False, "error": "not_a_quote"}), 400
+            if conn.execute("SELECT 1 FROM quotes WHERE source_quote_id = ? AND doc_type = 'invoice'", (qid,)).fetchone():
+                return jsonify({"success": False, "error": "invoice_exists"}), 409
+            done = conn.execute("SELECT COALESCE(SUM(total_value),0) FROM quotes WHERE source_quote_id = ? AND doc_type = 'deposit'", (qid,)).fetchone()[0]
+            if amount <= 0 or done + amount > float(row['total_value'] or 0) + 0.005:
+                return jsonify({"success": False, "error": "amount_too_high", "remaining": round(float(row['total_value'] or 0) - done, 2)}), 400
+        else:  # avoir
+            if src_type not in ('invoice', 'deposit'):
+                return jsonify({"success": False, "error": "not_an_invoice"}), 400
+            amount = -abs(amount)
+            done = conn.execute("SELECT COALESCE(SUM(-total_value),0) FROM quotes WHERE source_quote_id = ? AND doc_type = 'credit'", (qid,)).fetchone()[0]
+            if amount == 0 or done + abs(amount) > float(row['total_value'] or 0) + 0.005:
+                return jsonify({"success": False, "error": "amount_too_high", "remaining": round(float(row['total_value'] or 0) - done, 2)}), 400
+            data['total_value'] = amount
+        prefix = re.sub(r'[^A-Za-z0-9]', '', str(data.get('number_prefix') or ''))[:6].upper() or default_prefix
+        number = _next_invoice_number(conn, session['user_id'], prefix, number_types)
+    finally:
+        conn.close()
+    data['number'] = number
+    data['ref_value'] = row['number']
+    data['client_id'] = row['client_id'] or data.get('client_id') or 0
+    slug = re.sub(r'[^A-Za-z0-9]+', '-', _unicodedata.normalize('NFD', str(data.get('client') or '')).encode('ascii', 'ignore').decode()).strip('-')[:40]
+    file_prefix = re.sub(r'[^\w\- ]', '', str(data.get('filename_prefix') or doc_type), flags=re.U)[:30] or doc_type
+    data['filename'] = _safe_quote_pdf_filename('-'.join(x for x in (file_prefix, slug, number) if x))
+    try:
+        pdf_bytes = _build_quote_pdf_with_repair(data)
+    except ImportError as e:
+        return jsonify({"success": False, "error": "missing_module", "module": getattr(e, 'name', None) or 'reportlab'}), 503
+    except Exception as e:
+        app_logger.error(f"[QUOTE] {doc_type} : échec PDF : {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    new_id = _record_quote(session['user_id'], data, pdf_bytes, doc_type=doc_type, source_id=qid)
+    if not new_id:
+        return jsonify({"success": False, "error": "record_failed"}), 500
+    app_logger.info(f"[QUOTE] Document {doc_type} {number} créé d'après {row['number']}")
+    return jsonify({"success": True, "id": new_id, "number": number})
+
+
+@app.route('/api/quotes/<int:qid>/deposit', methods=['POST'])
+@login_required
+def api_quote_deposit(qid):
+    return _derive_document(qid, 'deposit', ('invoice', 'deposit'), 'FAC')
+
+
+@app.route('/api/quotes/<int:qid>/credit', methods=['POST'])
+@login_required
+def api_quote_credit(qid):
+    return _derive_document(qid, 'credit', ('credit',), 'AV')
+
+
+# ---- Carnet de clients ----
+_CLIENT_FIELDS = (('name', 120), ('email', 120), ('phone', 40), ('address', 300), ('tax_id', 60), ('notes', 500))
+
+
+def _client_clean(data):
+    out = {}
+    for k, lim in _CLIENT_FIELDS:
+        out[k] = str(data.get(k) or '').strip()[:lim]
+    return out
+
+
+@app.route('/api/clients', methods=['GET'])
+@login_required
+def api_clients_list():
+    _ensure_quote_columns()
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT * FROM clients WHERE user_id = ? ORDER BY name COLLATE NOCASE", (session['user_id'],)).fetchall()
+        stats = {}
+        for r in conn.execute("""SELECT client_id, COUNT(*) AS n, COALESCE(SUM(CASE WHEN doc_type IN ('invoice','deposit','credit') THEN total_value ELSE 0 END),0) AS billed
+                                 FROM quotes WHERE user_id = ? AND client_id > 0 GROUP BY client_id""", (session['user_id'],)).fetchall():
+            stats[r['client_id']] = (r['n'], r['billed'])
+    finally:
+        conn.close()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d['docs'], d['billed'] = stats.get(r['id'], (0, 0))
+        out.append(d)
+    return jsonify({"clients": out})
+
+
+@app.route('/api/clients', methods=['POST'])
+@login_required
+def api_clients_create():
+    _ensure_quote_columns()
+    c = _client_clean(request.get_json(silent=True) or {})
+    if not c['name']:
+        return jsonify({"success": False, "error": "name_required"}), 400
+    conn = get_db()
+    try:
+        if conn.execute("SELECT 1 FROM clients WHERE user_id = ? AND lower(name) = lower(?)", (session['user_id'], c['name'])).fetchone():
+            return jsonify({"success": False, "error": "exists"}), 409
+        cur = conn.execute("INSERT INTO clients (user_id, name, email, phone, address, tax_id, notes) VALUES (?,?,?,?,?,?,?)",
+                           (session['user_id'], c['name'], c['email'], c['phone'], c['address'], c['tax_id'], c['notes']))
+        conn.commit()
+        return jsonify({"success": True, "id": cur.lastrowid})
+    finally:
+        conn.close()
+
+
+@app.route('/api/clients/<int:cid>', methods=['GET'])
+@login_required
+def api_client_detail(cid):
+    _ensure_quote_columns()
+    conn = get_db()
+    try:
+        cl = conn.execute("SELECT * FROM clients WHERE id = ? AND user_id = ?", (cid, session['user_id'])).fetchone()
+        if not cl:
+            return jsonify({"error": "not_found"}), 404
+        docs = conn.execute("""SELECT * FROM quotes WHERE user_id = ? AND (client_id = ? OR (client_id = 0 AND lower(client) = lower(?)))
+                               ORDER BY id DESC LIMIT 200""", (session['user_id'], cid, cl['name'])).fetchall()
+    finally:
+        conn.close()
+    history, billed, paid, outstanding = [], 0.0, 0.0, 0.0
+    for r in docs:
+        dt = r['doc_type'] or 'quote'
+        st = _quote_eff_status(r)
+        history.append({"id": r['id'], "number": r['number'], "doc_type": dt, "status": st, "total": r['total'],
+                        "created_at": r['created_at'], "due_date": r['due_date'], "item_desc": r['item_desc']})
+        if dt in ('invoice', 'deposit', 'credit'):
+            v = float(r['total_value'] or 0)
+            billed += v
+            if dt == 'credit':
+                continue
+            if (r['status'] or 'draft') == 'paid':
+                paid += v
+            else:
+                outstanding += v
+    return jsonify({"client": dict(cl), "history": history, "billed": round(billed, 2), "paid": round(paid, 2), "outstanding": round(outstanding, 2)})
+
+
+@app.route('/api/clients/<int:cid>', methods=['PUT'])
+@login_required
+def api_client_update(cid):
+    c = _client_clean(request.get_json(silent=True) or {})
+    if not c['name']:
+        return jsonify({"success": False, "error": "name_required"}), 400
+    conn = get_db()
+    try:
+        dup = conn.execute("SELECT 1 FROM clients WHERE user_id = ? AND lower(name) = lower(?) AND id != ?", (session['user_id'], c['name'], cid)).fetchone()
+        if dup:
+            return jsonify({"success": False, "error": "exists"}), 409
+        conn.execute("UPDATE clients SET name=?, email=?, phone=?, address=?, tax_id=?, notes=? WHERE id=? AND user_id=?",
+                     (c['name'], c['email'], c['phone'], c['address'], c['tax_id'], c['notes'], cid, session['user_id']))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"success": True})
+
+
+@app.route('/api/clients/<int:cid>', methods=['DELETE'])
+@login_required
+def api_client_delete(cid):
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM clients WHERE id = ? AND user_id = ?", (cid, session['user_id']))
+        conn.execute("UPDATE quotes SET client_id = 0 WHERE client_id = ? AND user_id = ?", (cid, session['user_id']))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"success": True})
+
+
+@app.route('/api/clients/import-from-quotes', methods=['POST'])
+@login_required
+def api_clients_import():
+    """Crée une fiche pour chaque nom de client déjà utilisé dans l'historique et rattache les documents."""
+    _ensure_quote_columns()
+    uid = session['user_id']
+    conn = get_db()
+    try:
+        names = [r[0] for r in conn.execute("SELECT DISTINCT trim(client) FROM quotes WHERE user_id = ? AND trim(client) != '' AND client_id = 0", (uid,)).fetchall()]
+        created = 0
+        for n in names:
+            ex = conn.execute("SELECT id FROM clients WHERE user_id = ? AND lower(name) = lower(?)", (uid, n)).fetchone()
+            if ex:
+                cid = ex['id']
+            else:
+                cid = conn.execute("INSERT INTO clients (user_id, name) VALUES (?, ?)", (uid, n[:120])).lastrowid
+                created += 1
+            conn.execute("UPDATE quotes SET client_id = ? WHERE user_id = ? AND client_id = 0 AND lower(trim(client)) = lower(?)", (cid, uid, n))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"success": True, "created": created})
+
+
+# ---- Export comptable (CSV) ----
+_CSV_HEAD = {
+    'fr': ['Numéro', 'Type', 'Date', 'Client', 'N° SIRET / TVA client', 'Désignation', 'Quantité', 'Sous-total', 'Remise', 'Total', 'Statut',
+           'Échéance', 'Date de paiement', 'Document d\'origine'],
+    'en': ['Number', 'Type', 'Date', 'Customer', 'Customer tax ID', 'Description', 'Quantity', 'Subtotal', 'Discount', 'Total', 'Status',
+           'Due date', 'Payment date', 'Source document']}
+_CSV_TYPES = {'fr': {'quote': 'Devis', 'invoice': 'Facture', 'deposit': 'Facture d\'acompte', 'credit': 'Avoir'},
+              'en': {'quote': 'Quote', 'invoice': 'Invoice', 'deposit': 'Deposit invoice', 'credit': 'Credit note'}}
+_CSV_STATUS = {'fr': {'draft': 'Brouillon', 'sent': 'Envoyé', 'accepted': 'Accepté', 'refused': 'Refusé', 'paid': 'Payé', 'overdue': 'En retard'},
+               'en': {'draft': 'Draft', 'sent': 'Sent', 'accepted': 'Accepted', 'refused': 'Refused', 'paid': 'Paid', 'overdue': 'Overdue'}}
+
+
+def _quotes_csv_bytes(user_id, date_from, date_to, types, lang):
+    import csv
+    lg = 'fr' if lang == 'fr' else 'en'
+    dec = ',' if lg == 'fr' else '.'
+    conn = get_db()
+    try:
+        rows = conn.execute("""SELECT q.*, s.number AS src_number, c.tax_id AS client_tax_id
+                               FROM quotes q LEFT JOIN quotes s ON s.id = q.source_quote_id
+                               LEFT JOIN clients c ON c.id = q.client_id
+                               WHERE q.user_id = ? ORDER BY q.created_at, q.id""", (user_id,)).fetchall()
+    finally:
+        conn.close()
+    buf = io.StringIO()
+    w = csv.writer(buf, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+    w.writerow(_CSV_HEAD[lg])
+
+    def num(v):
+        return f"{float(v or 0):.2f}".replace('.', dec)
+    for r in rows:
+        dt = r['doc_type'] or 'quote'
+        day = str(r['created_at'] or '')[:10]
+        if types and dt not in types:
+            continue
+        if (date_from and day < date_from) or (date_to and day > date_to):
+            continue
+        tv = float(r['total_value'] or 0)
+        disc = float(r['discount_value'] or 0)
+        w.writerow([r['number'], _CSV_TYPES[lg].get(dt, dt), day, r['client'], r['client_tax_id'] or '', r['item_desc'], r['qty'],
+                    num(tv + disc), num(disc), num(tv), _CSV_STATUS[lg].get(_quote_eff_status(r), ''), r['due_date'] or '',
+                    r['paid_at'] or '', r['src_number'] or ''])
+    return ('﻿' + buf.getvalue()).encode('utf-8')
+
+
+def _csv_args(src):
+    types = [t for t in str(src.get('types') or '').split(',') if t in ('quote', 'invoice', 'deposit', 'credit')]
+    return _iso_date(src.get('from')), _iso_date(src.get('to')), types, str(src.get('lang') or 'fr')[:2]
+
+
+@app.route('/api/quotes/export.csv', methods=['GET'])
+@login_required
+def api_quotes_export_csv():
+    _ensure_quote_columns()
+    f, t, types, lang = _csv_args(request.args)
+    data = _quotes_csv_bytes(session['user_id'], f, t, types, lang)
+    return Response(data, mimetype='text/csv; charset=utf-8',
+                    headers={'Content-Disposition': f'attachment; filename="stellio-export-{datetime.date.today().isoformat()}.csv"'})
+
+
+@app.route('/api/quotes/export-csv-native', methods=['POST'])
+@login_required
+def api_quotes_export_csv_native():
+    _ensure_quote_columns()
+    f, t, types, lang = _csv_args(request.get_json(silent=True) or {})
+    data = _quotes_csv_bytes(session['user_id'], f, t, types, lang)
+    try:
+        import webview
+        result = webview.windows[0].create_file_dialog(
+            _wv_save_dialog(webview), directory=str(Path.home() / 'Documents'),
+            save_filename=f"stellio-export-{datetime.date.today().isoformat()}.csv", file_types=('Fichier CSV (*.csv)',))
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    dest = result[0] if isinstance(result, (list, tuple)) and result else result
+    if not dest:
+        return jsonify({"success": False, "cancelled": True}), 200
+    dest = str(dest)
+    if not dest.lower().endswith('.csv'):
+        dest += '.csv'
+    try:
+        with open(dest, 'wb') as fh:
+            fh.write(data)
+        return jsonify({"success": True, "path": dest})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ---- E-mail (SMTP) ----
+def _smtp_cfg(override=None):
+    s = dict(load_settings() or {})
+    for k, v in (override or {}).items():
+        if str(k).startswith('smtp_'):
+            s[k] = v
+    host = str(s.get('smtp_host') or '').strip()
+    if not host:
+        return None
+    sec = str(s.get('smtp_security') or 'starttls')
+    try:
+        port = int(s.get('smtp_port') or (465 if sec == 'ssl' else 587 if sec == 'starttls' else 25))
+    except (TypeError, ValueError):
+        port = 587
+    user = str(s.get('smtp_user') or '').strip()
+    return {'host': host, 'port': port, 'user': user, 'password': str(s.get('smtp_password') or ''), 'security': sec,
+            'from': str(s.get('smtp_from') or user).strip(), 'from_name': str(s.get('smtp_from_name') or '').strip()}
+
+
+def _smtp_send(cfg, to, subject, body, attachment=None):
+    import smtplib
+    from email.message import EmailMessage
+    from email.utils import formataddr
+    if not cfg['from']:
+        raise ValueError('adresse expéditeur manquante')
+    msg = EmailMessage()
+    msg['From'] = formataddr((cfg['from_name'], cfg['from'])) if cfg['from_name'] else cfg['from']
+    msg['To'] = to
+    msg['Subject'] = subject
+    msg.set_content(body)
+    if attachment:
+        msg.add_attachment(attachment[1], maintype='application', subtype='pdf', filename=attachment[0])
+    ctx = ssl.create_default_context()
+    if cfg['security'] == 'ssl':
+        srv = smtplib.SMTP_SSL(cfg['host'], cfg['port'], timeout=20, context=ctx)
+    else:
+        srv = smtplib.SMTP(cfg['host'], cfg['port'], timeout=20)
+    try:
+        srv.ehlo()
+        if cfg['security'] == 'starttls':
+            srv.starttls(context=ctx)
+            srv.ehlo()
+        if cfg['user']:
+            srv.login(cfg['user'], cfg['password'])
+        srv.send_message(msg)
+    finally:
+        try:
+            srv.quit()
+        except Exception:
+            pass
+
+
+_EMAIL_RE = re.compile(r'^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$')
+
+
+@app.route('/api/smtp/test', methods=['POST'])
+@login_required
+def api_smtp_test():
+    body = request.get_json(silent=True) or {}
+    cfg = _smtp_cfg(body)
+    if not cfg:
+        return jsonify({"success": False, "error": "Serveur SMTP manquant"}), 200
+    to = str(body.get('to') or cfg['from']).strip()
+    if not _EMAIL_RE.match(to):
+        return jsonify({"success": False, "error": "Adresse de destination invalide"}), 200
+    try:
+        _smtp_send(cfg, to, 'Stellio - test e-mail', 'Ce message confirme que la configuration SMTP de Stellio fonctionne.')
+    except Exception as e:
+        return jsonify({"success": False, "error": f"{type(e).__name__}: {str(e)[:140]}"}), 200
+    return jsonify({"success": True, "to": to})
+
+
+@app.route('/api/quotes/<int:qid>/email', methods=['POST'])
+@login_required
+def api_quote_email(qid):
+    _ensure_quote_columns()
+    row = _stored_quote(qid)
+    path = _stored_quote_path(row) if row else None
+    if not path:
+        return jsonify({"success": False, "error": "PDF introuvable"}), 404
+    cfg = _smtp_cfg()
+    if not cfg:
+        return jsonify({"success": False, "error": "smtp_not_configured"}), 200
+    data = request.get_json(silent=True) or {}
+    to = str(data.get('to') or '').strip()
+    if not _EMAIL_RE.match(to):
+        return jsonify({"success": False, "error": "bad_recipient"}), 200
+    subject = str(data.get('subject') or row['number'])[:200]
+    message = str(data.get('message') or '')[:4000]
+    try:
+        with open(path, 'rb') as fh:
+            pdf = fh.read()
+        _smtp_send(cfg, to, subject, message, (_safe_quote_pdf_filename(row['filename'] or row['number']), pdf))
+    except Exception as e:
+        app_logger.warning(f"[SMTP] Envoi échoué : {type(e).__name__}: {str(e)[:120]}")
+        return jsonify({"success": False, "error": f"{type(e).__name__}: {str(e)[:140]}"}), 200
+    conn = get_db()
+    try:
+        conn.execute("UPDATE quotes SET status = CASE WHEN status IN ('', 'draft') THEN 'sent' ELSE status END, "
+                     "sent_at = CASE WHEN sent_at = '' THEN ? ELSE sent_at END WHERE id = ? AND user_id = ?",
+                     (datetime.date.today().isoformat(), qid, session['user_id']))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"success": True})
 
 
 @app.route('/api/quotes/<int:qid>/pdf', methods=['GET'])
@@ -19803,7 +20351,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.8.7"
+CURRENT_VERSION = "0.8.8"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -21817,7 +22365,8 @@ def _mqtt_pub_cfg(override=None):
         interval = 15
     return {'enabled': bool(s.get('mqtt_enabled')), 'host': host, 'port': port, 'user': str(s.get('mqtt_user') or ''),
             'password': str(s.get('mqtt_password') or ''), 'tls': tls, 'tls_insecure': bool(s.get('mqtt_tls_insecure')),
-            'base': base, 'discovery': s.get('mqtt_discovery', True) is not False, 'interval': interval}
+            'base': base, 'discovery': s.get('mqtt_discovery', True) is not False, 'interval': interval,
+            'prefix': re.sub(r'[^\w\-/]+', '_', str(s.get('mqtt_discovery_prefix') or HA_DISCOVERY_PREFIX).strip('/ ')) or HA_DISCOVERY_PREFIX}
 
 
 def _mqtt_new_client(cfg, tag):
@@ -21868,7 +22417,7 @@ def _mqtt_discovery_configs(cfg, p):
     ]
     out = []
     for comp, key, extra in ents:
-        topic = f"{HA_DISCOVERY_PREFIX}/{comp}/stellio_{pid}/{key}/config"
+        topic = f"{cfg['prefix']}/{comp}/stellio_{pid}/{key}/config"
         out.append((topic, {**common, **extra, 'unique_id': f"stellio_{pid}_{key}", 'object_id': f"stellio_{pid}_{key}"}))
     return out
 
@@ -21931,7 +22480,7 @@ def _mqtt_pub_tick():
                 _mqtt_pub_disconnect()
                 _MQTT_PUB['sig'] = None
         return
-    sig = (cfg['base'], cfg['host'], cfg['port'], cfg['user'], cfg['password'], cfg['tls'], cfg['tls_insecure'], cfg['discovery'])
+    sig = (cfg['base'], cfg['host'], cfg['port'], cfg['user'], cfg['password'], cfg['tls'], cfg['tls_insecure'], cfg['discovery'], cfg['prefix'])
     with _MQTT_PUB_LOCK:
         if _MQTT_PUB['client'] is None or _MQTT_PUB['sig'] != sig:
             if _MQTT_PUB['client']:
@@ -22052,10 +22601,38 @@ def api_mqtt_test():
         result['rc'] = rc
         done.set()
     client.on_connect = _on_connect
+    published = 0
     try:
         client.connect_async(cfg['host'], cfg['port'], keepalive=20)
         client.loop_start()
         ok = done.wait(7)
+        if ok and result['rc'] == 0:
+            # Le test publie réellement les entités (comme le ferait la publication normale),
+            # pour qu'elles apparaissent tout de suite dans Home Assistant.
+            infos = []
+            conn = get_db()
+            try:
+                rows = conn.execute("SELECT * FROM printers").fetchall()
+            finally:
+                conn.close()
+            if cfg['enabled']:
+                infos.append(client.publish(f"{cfg['base']}/status", 'online', qos=1, retain=True))
+            for row in rows:
+                p = parse_printer_config(row)
+                try:
+                    st = _printer_status_cached(p, ttl=5.0)
+                except Exception:
+                    st = {}
+                if cfg['discovery']:
+                    for topic, conf in _mqtt_discovery_configs(cfg, p):
+                        infos.append(client.publish(topic, json.dumps(conf, ensure_ascii=False), qos=1, retain=True))
+                infos.append(client.publish(f"{cfg['base']}/printer/{p['id']}/state", json.dumps(_mqtt_state_payload(p, st), ensure_ascii=False), qos=1, retain=True))
+                published += 1
+            for i in infos:
+                try:
+                    i.wait_for_publish(3)
+                except Exception:
+                    pass
     except Exception as e:
         return jsonify({"success": False, "error": f"{type(e).__name__}: {str(e)[:100]}"}), 200
     finally:
@@ -22068,7 +22645,7 @@ def api_mqtt_test():
         return jsonify({"success": False, "error": "Aucune réponse du broker (adresse, port ou pare-feu ?)"}), 200
     if result['rc'] != 0:
         return jsonify({"success": False, "error": {4: 'Identifiant ou mot de passe refusé', 5: 'Non autorisé'}.get(result['rc'], f"Connexion refusée (code {result['rc']})")}), 200
-    return jsonify({"success": True}), 200
+    return jsonify({"success": True, "printers": published, "discovery": cfg['discovery'], "prefix": cfg['prefix'], "enabled": cfg['enabled']}), 200
 
 
 @app.route('/api/printers/<int:pid>/camera', methods=['GET'])
@@ -22104,7 +22681,7 @@ def _fetch_moonraker_total_print_hours(printer):
     return None
 
 
-def _serialize_maintenance_task(task, printer_total_hours):
+def _serialize_maintenance_task(task, printer_total_hours, rate=None):
     hours_since = None
     days_since = None
     due = False
@@ -22135,6 +22712,7 @@ def _serialize_maintenance_task(task, printer_total_hours):
         "hours_since_reset": hours_since, "days_since_reset": days_since,
         "progress_ratio": round(min(progress_ratio, 2.0), 2) if progress_ratio is not None else None,
         "due": due, "last_reset_at": task['last_reset_at'],
+        "eta_days": _maintenance_eta(task, printer_total_hours, rate),
     }
 
 
@@ -22171,8 +22749,15 @@ def api_printer_maintenance_list(pid):
     conn.close()
 
     serialized = []
+    rate = None
+    try:
+        _c2 = get_db()
+        rate = _printer_hours_per_day(_c2, pid)
+        _c2.close()
+    except Exception:
+        rate = None
     for task_row in tasks:
-        item = _serialize_maintenance_task(task_row, total_hours)
+        item = _serialize_maintenance_task(task_row, total_hours, rate)
         part = parts_by_id.get(item.get('part_id'))
         if part:
             item["part_name"] = part['name']
@@ -22183,6 +22768,7 @@ def api_printer_maintenance_list(pid):
     return jsonify({
         "total_print_hours": round(total_hours, 1),
         "hours_source": hours_source,
+        "hours_per_day": round(rate, 2) if rate else None,
         "tasks": serialized
     }), 200
 
@@ -22394,6 +22980,477 @@ def api_printer_maintenance_due():
             due.append({"task_id": r['id'], "task_name": r['name'], "printer_id": r['printer_id'], "printer_name": r['printer_name']})
 
     return jsonify({"due": due}), 200
+
+
+
+# ───────────────────────── Atelier : commandes, alertes, maintenance prédictive ─────────────────────────
+
+_JOB_STATUSES = ('queued', 'printing', 'done', 'cancelled')
+
+
+def _ensure_workshop_tables():
+    conn = get_db()
+    try:
+        conn.execute("""CREATE TABLE IF NOT EXISTS print_jobs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            quote_id INTEGER DEFAULT 0,
+            client TEXT DEFAULT '',
+            part TEXT NOT NULL,
+            quantity INTEGER DEFAULT 1,
+            qty_done INTEGER DEFAULT 0,
+            material TEXT DEFAULT '',
+            printer_id INTEGER,
+            due_date TEXT DEFAULT '',
+            status TEXT DEFAULT 'queued',
+            notes TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            done_at TEXT DEFAULT ''
+        )""")
+        cols = {r['name'] for r in conn.execute("PRAGMA table_info(print_jobs)").fetchall()}
+        for name, ddl in (('scrap', 'INTEGER DEFAULT 0'), ('actual_hours', 'REAL DEFAULT 0'),
+                          ('actual_weight_g', 'REAL'), ('cost_model', "TEXT DEFAULT ''")):
+            if name not in cols:
+                conn.execute(f"ALTER TABLE print_jobs ADD COLUMN {name} {ddl}")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+_ensure_workshop_tables()
+
+
+def _least_loaded_printer(conn, user_id):
+    rows = conn.execute("SELECT id FROM printers WHERE user_id=? ORDER BY id", (user_id,)).fetchall()
+    if not rows:
+        return None
+    load = {r['id']: 0 for r in rows}
+    for r in conn.execute(
+            "SELECT printer_id, SUM(MAX(quantity-qty_done,0)) AS n FROM print_jobs "
+            "WHERE user_id=? AND status IN ('queued','printing') AND printer_id IS NOT NULL GROUP BY printer_id",
+            (user_id,)).fetchall():
+        if r['printer_id'] in load:
+            load[r['printer_id']] = r['n'] or 0
+    return min(load, key=lambda k: (load[k], k))
+
+
+def _num(v):
+    try:
+        f = float(v)
+        return f if f == f and abs(f) < 1e9 else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _job_margin(r, revenue):
+    """Marge prévue (devis) et marge réelle à ce jour : matière et temps selon ce qui a été réellement imprimé,
+    rebuts compris. Retourne None si la commande ne vient pas d'un devis chiffré."""
+    try:
+        m = json.loads(r['cost_model'] or '{}')
+    except Exception:
+        m = {}
+    if not m or not revenue or not (m.get('m') or m.get('e') or m.get('w') or m.get('f')):
+        return None
+    qty = max(1, r['quantity'] or 1)
+    done = min(r['qty_done'] or 0, qty)
+    scrap = r['scrap'] or 0
+    unit = m['m'] + m['e'] + m['w'] + m['f']
+    est_cost = unit * qty
+    time_cost = m['e'] + m['w']
+    w_act = r['actual_weight_g']
+    h_act = r['actual_hours'] or 0
+    mat_pieces = (w_act / m['weight_g']) if (w_act is not None and m['weight_g'] > 0) else done
+    time_pieces = (h_act / m['hours']) if (h_act > 0 and m['hours'] > 0) else done
+    real_cost = (mat_pieces + scrap) * m['m'] + (time_pieces + scrap) * time_cost + m['f'] * done
+    real_revenue = revenue * done / qty
+    return {
+        'revenue': round(revenue, 2), 'est_cost': round(est_cost, 2), 'est_margin': round(revenue - est_cost, 2),
+        'est_margin_pct': round(100 * (revenue - est_cost) / revenue, 1),
+        'real_cost': round(real_cost, 2), 'real_revenue': round(real_revenue, 2),
+        'real_margin': round(real_revenue - real_cost, 2),
+        'real_margin_pct': round(100 * (real_revenue - real_cost) / real_revenue, 1) if real_revenue else None,
+        'measured': bool(h_act > 0 or w_act is not None),
+    }
+
+
+def _create_jobs_from_quote(user_id, row):
+    """Un devis accepté crée une tâche d'impression (pièce, quantité, matière), assignée à l'imprimante la moins chargée.
+    Idempotent : rien n'est créé si le devis a déjà des tâches."""
+    if (row['doc_type'] or 'quote') != 'quote':
+        return 0
+    conn = get_db()
+    try:
+        if conn.execute("SELECT 1 FROM print_jobs WHERE user_id=? AND quote_id=?", (user_id, row['id'])).fetchone():
+            return 0
+        data = {}
+        try:
+            with open(_quote_payload_path(row), 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+        part = str(data.get('item_name') or data.get('item_desc') or row['item_desc'] or row['number'] or 'Pièce')[:200]
+        try:
+            qty = max(1, int(float(str(data.get('qty') or row['qty'] or 1).replace(',', '.'))))
+        except (TypeError, ValueError):
+            qty = 1
+        material = str(data.get('material') or '')[:40].upper()
+        due = _iso_date(data.get('delivery_iso')) or ''
+        model = data.get('cost_model') if isinstance(data.get('cost_model'), dict) else {}
+        model = {k: _num(model.get(k)) for k in ('m', 'e', 'w', 'f', 'weight_g', 'hours')}
+        conn.execute(
+            "INSERT INTO print_jobs (user_id, quote_id, client, part, quantity, material, printer_id, due_date, notes, cost_model) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (user_id, row['id'], str(row['client'] or '')[:120], part, qty, material,
+             _least_loaded_printer(conn, user_id), due, str(row['number'] or ''), json.dumps(model)))
+        conn.commit()
+        return 1
+    finally:
+        conn.close()
+
+
+def _job_dict(r, printer_names, revenue=0):
+    today = datetime.date.today().isoformat()
+    open_ = r['status'] in ('queued', 'printing')
+    return {
+        'scrap': r['scrap'] or 0, 'actual_hours': round(r['actual_hours'] or 0, 2), 'actual_weight_g': r['actual_weight_g'],
+        'margin': _job_margin(r, revenue),
+        'id': r['id'], 'quote_id': r['quote_id'], 'client': r['client'], 'part': r['part'],
+        'quantity': r['quantity'], 'qty_done': r['qty_done'], 'material': r['material'],
+        'printer_id': r['printer_id'], 'printer_name': printer_names.get(r['printer_id'], ''),
+        'due_date': r['due_date'], 'status': r['status'], 'notes': r['notes'],
+        'late': bool(open_ and r['due_date'] and r['due_date'] < today),
+        'created_at': r['created_at'], 'done_at': r['done_at'],
+    }
+
+
+@app.route('/api/orders', methods=['GET'])
+@login_required
+def api_orders_list():
+    conn = get_db()
+    try:
+        names = {p['id']: p['name'] for p in conn.execute("SELECT id, name FROM printers WHERE user_id=?", (session['user_id'],)).fetchall()}
+        totals = {q['id']: q['total_value'] or 0 for q in conn.execute("SELECT id, total_value FROM quotes WHERE user_id=?", (session['user_id'],)).fetchall()}
+        rows = conn.execute(
+            "SELECT * FROM print_jobs WHERE user_id=? ORDER BY CASE status WHEN 'printing' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END, "
+            "CASE WHEN due_date='' THEN 1 ELSE 0 END, due_date, id", (session['user_id'],)).fetchall()
+    finally:
+        conn.close()
+    jobs = [_job_dict(r, names, totals.get(r['quote_id'], 0)) for r in rows]
+    return jsonify({
+        'jobs': jobs,
+        'margin_real': round(sum(j['margin']['real_margin'] for j in jobs if j['margin'] and j['qty_done']), 2),
+        'margin_est': round(sum(j['margin']['est_margin'] for j in jobs if j['margin'] and j['status'] != 'cancelled'), 2),
+        'printers': [{'id': k, 'name': v} for k, v in names.items()],
+        'open': sum(1 for j in jobs if j['status'] in ('queued', 'printing')),
+        'late': sum(1 for j in jobs if j['late']),
+    })
+
+
+def _job_fields(data, partial=False):
+    out = {}
+    if 'part' in data or not partial:
+        part = str(data.get('part') or '').strip()[:200]
+        if not part and not partial:
+            return None
+        if part:
+            out['part'] = part
+    for k, lim in (('client', 120), ('material', 40), ('notes', 300)):
+        if k in data:
+            out[k] = str(data.get(k) or '').strip()[:lim]
+    if 'quantity' in data:
+        out['quantity'] = max(1, min(100000, _int_or0(data.get('quantity')) or 1))
+    if 'qty_done' in data:
+        out['qty_done'] = max(0, min(100000, _int_or0(data.get('qty_done'))))
+    if 'scrap' in data:
+        out['scrap'] = max(0, min(100000, _int_or0(data.get('scrap'))))
+    if 'actual_hours' in data:
+        out['actual_hours'] = max(0.0, min(100000.0, _num(data.get('actual_hours'))))
+    if 'actual_weight_g' in data:
+        out['actual_weight_g'] = None if data.get('actual_weight_g') in (None, '') else max(0.0, min(1e7, _num(data.get('actual_weight_g'))))
+    if 'due_date' in data:
+        out['due_date'] = _iso_date(data.get('due_date')) or ''
+    if 'printer_id' in data:
+        out['printer_id'] = _int_or0(data.get('printer_id')) or None
+    if 'status' in data and data.get('status') in _JOB_STATUSES:
+        out['status'] = data['status']
+    return out
+
+
+@app.route('/api/orders', methods=['POST'])
+@login_required
+def api_orders_create():
+    f = _job_fields(request.get_json(silent=True) or {})
+    if f is None:
+        return jsonify({'success': False, 'error': 'part_required'}), 400
+    conn = get_db()
+    try:
+        if f.get('printer_id') is None:
+            f['printer_id'] = _least_loaded_printer(conn, session['user_id'])
+        elif not conn.execute("SELECT 1 FROM printers WHERE id=? AND user_id=?", (f['printer_id'], session['user_id'])).fetchone():
+            f['printer_id'] = None
+        f.setdefault('quantity', 1)
+        cols = list(f.keys())
+        cur = conn.execute(
+            f"INSERT INTO print_jobs (user_id, {', '.join(cols)}) VALUES (?, {', '.join('?' * len(cols))})",
+            (session['user_id'], *[f[c] for c in cols]))
+        conn.commit()
+        return jsonify({'success': True, 'id': cur.lastrowid})
+    finally:
+        conn.close()
+
+
+@app.route('/api/orders/<int:jid>', methods=['PUT'])
+@login_required
+def api_orders_update(jid):
+    f = _job_fields(request.get_json(silent=True) or {}, partial=True)
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT * FROM print_jobs WHERE id=? AND user_id=?", (jid, session['user_id'])).fetchone()
+        if not row:
+            return jsonify({'success': False, 'error': 'not_found'}), 404
+        if 'printer_id' in f and f['printer_id'] and not conn.execute(
+                "SELECT 1 FROM printers WHERE id=? AND user_id=?", (f['printer_id'], session['user_id'])).fetchone():
+            f['printer_id'] = None
+        qty = f.get('quantity', row['quantity'])
+        done = min(f.get('qty_done', row['qty_done']), qty)
+        f['qty_done'] = done
+        status = f.get('status', row['status'])
+        if 'qty_done' in f and status in ('queued', 'printing'):
+            if done >= qty:
+                status = 'done'
+            elif done > 0:
+                status = 'printing'
+        if status == 'done' and done < qty and 'qty_done' not in (request.get_json(silent=True) or {}):
+            f['qty_done'] = done = qty
+        f['status'] = status
+        f['done_at'] = datetime.date.today().isoformat() if status == 'done' else ''
+        conn.execute(f"UPDATE print_jobs SET {', '.join(k + '=?' for k in f)} WHERE id=?", (*f.values(), jid))
+        conn.commit()
+        return jsonify({'success': True, 'status': status})
+    finally:
+        conn.close()
+
+
+@app.route('/api/orders/<int:jid>', methods=['DELETE'])
+@login_required
+def api_orders_delete(jid):
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM print_jobs WHERE id=? AND user_id=?", (jid, session['user_id']))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({'success': True})
+
+
+@app.route('/api/orders/from-quote/<int:qid>', methods=['POST'])
+@login_required
+def api_orders_from_quote(qid):
+    row = _stored_quote(qid)
+    if not row:
+        return jsonify({'success': False, 'error': 'not_found'}), 404
+    return jsonify({'success': True, 'created': _create_jobs_from_quote(session['user_id'], row)})
+
+
+# ── Maintenance prédictive : rythme réel d'impression par imprimante ──
+
+def _printer_hours_per_day(conn, pid, window_days=30):
+    try:
+        since = (datetime.datetime.now() - datetime.timedelta(days=window_days)).strftime('%Y-%m-%d %H:%M:%S')
+        r = conn.execute(
+            "SELECT COALESCE(SUM(actual_seconds),0) AS s, MIN(sent_at) AS first FROM print_history "
+            "WHERE printer_id=? AND actual_seconds>0 AND sent_at>=?", (pid, since)).fetchone()
+        if not r or not r['s']:
+            return None
+        span = window_days
+        try:
+            first = datetime.datetime.fromisoformat(str(r['first']).replace('Z', ''))
+            span = min(window_days, max(7.0, (datetime.datetime.now() - first).total_seconds() / 86400))
+        except Exception:
+            pass
+        return (r['s'] / 3600.0) / span
+    except Exception:
+        return None
+
+
+def _maintenance_eta(task, total_hours, rate):
+    """Jours restants avant échéance (None si inconnu) : min entre l'échéance en heures (au rythme réel) et celle en jours."""
+    etas = []
+    if task['interval_hours']:
+        left_h = task['interval_hours'] - (total_hours - (task['hours_at_last_reset'] or 0))
+        if left_h <= 0:
+            etas.append(0.0)
+        elif rate and rate > 0.05:
+            etas.append(left_h / rate)
+    if task['interval_days']:
+        try:
+            last = datetime.datetime.fromisoformat(task['last_reset_at'])
+            etas.append(max(0.0, task['interval_days'] - (datetime.datetime.now() - last).total_seconds() / 86400))
+        except Exception:
+            pass
+    return round(min(etas), 1) if etas else None
+
+
+# ── Alertes proactives : bobine presque vide, dérive d'impression ──
+
+_ws_state = {}
+_WS_DRIFT_DELTA_C = 15.0
+_WS_DRIFT_SECONDS = 120
+_WS_STALL_SECONDS = 15 * 60
+
+
+def _ws_alert(user_id, ntype, title, message, key, link='printers'):
+    if _insert_notification_once(user_id, ntype, title, message, link, key):
+        _send_native_notification(title, message)
+        _push_notify_async(ntype, title, message)
+
+
+def _ws_job_progress(p, st, status, hours=0.0):
+    """Option « avancement auto » : une impression terminée compte pour 1 pièce de la plus ancienne commande ouverte de l'imprimante."""
+    conn = get_db()
+    try:
+        job = conn.execute(
+            "SELECT * FROM print_jobs WHERE user_id=? AND printer_id=? AND status IN ('queued','printing') "
+            "ORDER BY CASE WHEN due_date='' THEN 1 ELSE 0 END, due_date, id LIMIT 1", (p['user_id'], p['id'])).fetchone()
+        if not job:
+            return
+        if st == 'start':
+            if job['status'] == 'queued':
+                conn.execute("UPDATE print_jobs SET status='printing' WHERE id=?", (job['id'],))
+        elif st == 'finish':
+            done = min(job['qty_done'] + 1, job['quantity'])
+            fin = done >= job['quantity']
+            conn.execute("UPDATE print_jobs SET qty_done=?, status=?, done_at=?, actual_hours=COALESCE(actual_hours,0)+? WHERE id=?",
+                         (done, 'done' if fin else 'printing', datetime.date.today().isoformat() if fin else '', max(0.0, hours), job['id']))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _workshop_watch_once():
+    cfg = load_settings() or {}
+    try:
+        min_g = float(cfg.get('alert_spool_min_g', 80) or 0)
+    except (TypeError, ValueError):
+        min_g = 80.0
+    drift_on = cfg.get('alert_drift_enabled', True) not in (False, 0, '0', 'false')
+    auto_prog = cfg.get('workshop_auto_progress') in (True, 1, '1', 'true')
+    conn = get_db()
+    try:
+        printers = conn.execute("SELECT * FROM printers").fetchall()
+    finally:
+        conn.close()
+    now = time.time()
+    today = datetime.date.today().isoformat()
+    for p in printers:
+        pid, uid, name = p['id'], p['user_id'], p['name']
+        try:
+            status = printer_hub.get_status(parse_printer_config(p)) or {}
+        except Exception:
+            continue
+        st = status.get('status')
+        stt = _ws_state.setdefault(pid, {'status': None, 'start': None, 'heat': None, 'prog': None, 'prog_ts': now, 'low': set()})
+        if st in ('error', 'offline', 'timeout', None):
+            stt['status'] = st
+            continue
+
+        # bobine presque vide (AMS / Spoolman)
+        if min_g > 0:
+            for tray in status.get('ams') or []:
+                rem = tray.get('remaining_g')
+                if rem is None or not tray.get('material'):
+                    continue
+                tid = str(tray.get('id', ''))
+                if rem < min_g:
+                    if (tid) not in stt['low']:
+                        stt['low'].add(tid)
+                        _ws_alert(uid, 'spool_low',
+                                  _server_t('notif.spool_low_title', 'Bobine presque vide'),
+                                  f"{name} — {tray.get('material')} ({tid}) : {int(rem)} g",
+                                  f"spool_low_{pid}_{tid}_{today}")
+                elif rem > min_g * 1.5:
+                    stt['low'].discard(tid)
+
+        # démarrage / fin d'impression (avancement auto des commandes)
+        if st == 'printing' and stt['status'] != 'printing':
+            stt['start'] = now
+            stt['prog'], stt['prog_ts'], stt['heat'] = None, now, None
+            if auto_prog:
+                _ws_job_progress(p, 'start', status)
+        elif st == 'idle' and stt['status'] == 'printing':
+            if auto_prog and stt.get('start') and now - stt['start'] > 120:
+                _ws_job_progress(p, 'finish', status, (now - stt['start']) / 3600.0)
+        stt['status'] = st
+
+        # dérive : température hors consigne, avancement bloqué
+        if st == 'printing' and drift_on:
+            start = int(stt.get('start') or now)
+            try:
+                progress = float(status.get('progress') or 0)
+            except (TypeError, ValueError):
+                progress = 0.0
+            temps = status.get('temps') or {}
+            ext = temps.get('extruder') or {}
+            bed = temps.get('bed') or {}
+            off = False
+            if progress >= 3:
+                for t_, lim in ((ext, _WS_DRIFT_DELTA_C), (bed, _WS_DRIFT_DELTA_C)):
+                    try:
+                        tg, cu = float(t_.get('target') or 0), float(t_.get('current') or 0)
+                    except (TypeError, ValueError):
+                        continue
+                    if tg > 0 and abs(cu - tg) > lim:
+                        off = True
+            if off:
+                stt['heat'] = stt['heat'] or now
+                if now - stt['heat'] >= _WS_DRIFT_SECONDS:
+                    _ws_alert(uid, 'print_drift', _server_t('notif.drift_temp_title', 'Dérive de température'),
+                              f"{name} — {int(ext.get('current') or 0)}/{int(ext.get('target') or 0)} °C",
+                              f"print_drift_temp_{pid}_{start}")
+            else:
+                stt['heat'] = None
+            if progress != stt['prog']:
+                stt['prog'], stt['prog_ts'] = progress, now
+            elif 0 < progress < 100 and now - stt['prog_ts'] >= _WS_STALL_SECONDS:
+                _ws_alert(uid, 'print_drift', _server_t('notif.drift_stall_title', 'Impression bloquée ?'),
+                          f"{name} — {int(progress)} %", f"print_drift_stall_{pid}_{start}")
+
+    _workshop_maintenance_check()
+
+
+def _workshop_maintenance_check():
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """SELECT t.*, p.name AS pname, p.total_print_hours AS total FROM printer_maintenance_tasks t
+               JOIN printers p ON p.id = t.printer_id""").fetchall()
+        rates = {}
+        for t in rows:
+            if t['printer_id'] not in rates:
+                rates[t['printer_id']] = _printer_hours_per_day(conn, t['printer_id'])
+    finally:
+        conn.close()
+    for t in rows:
+        eta = _maintenance_eta(t, t['total'] or 0, rates.get(t['printer_id']))
+        if eta is None:
+            continue
+        mark = str(t['last_reset_at'] or '')[:19]
+        if eta <= 0:
+            _ws_alert(t['user_id'], 'maintenance', _server_t('notif.maintenance_title', 'Maintenance à prévoir'),
+                      f"{t['pname']} — {t['name']}", f"maintenance_due_{t['id']}_{mark}")
+        elif eta <= 3:
+            _ws_alert(t['user_id'], 'maintenance', _server_t('notif.maintenance_soon_title', 'Maintenance bientôt due'),
+                      f"{t['pname']} — {t['name']} (~{max(1, round(eta))} j)", f"maintenance_soon_{t['id']}_{mark}")
+
+
+def _workshop_watch_loop():
+    time.sleep(45)
+    while True:
+        try:
+            _workshop_watch_once()
+        except Exception as e:
+            app_logger.debug(f"[Atelier] Surveillance: {e}")
+        time.sleep(30)
 
 
 def _cleanup_before_exit():
@@ -30496,6 +31553,7 @@ if __name__ in ('__main__', 'stellio_main'):
             threading.Thread(target=_auto_backup_scheduler, daemon=True).start()
             threading.Thread(target=_auto_scan_scheduler, daemon=True).start()
             threading.Thread(target=_push_watcher_loop, daemon=True).start()
+            threading.Thread(target=_workshop_watch_loop, daemon=True, name='stellio-workshop').start()
             if os.path.exists(CACHE_FILE):
                 try:
                     with open(CACHE_FILE, 'r', encoding='utf-8') as f: json.load(f)

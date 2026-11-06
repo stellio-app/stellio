@@ -1,5 +1,114 @@
 [
   {
+    "version": "0.8.8",
+    "items": {
+      "fr": [
+        "Nouveau : section « Coûts, devis et facturation » dans les paramètres, qui regroupe les tarifs d'impression, les devis et le SMTP, avec un interrupteur général : désactivé, tout ce qui touche au coût, aux devis, aux factures, aux clients et aux commandes est masqué (menus d'actions, fiches, projets, historique, statistiques, tableau de bord). Les données sont conservées",
+        "Nouveau : contrôle et choix de la bobine à l'envoi au slicer. La fenêtre d'envoi liste tout l'inventaire (Spoolman, TigerTag, manuel, AMS) avec la quantité restante et un voyant suffisant / insuffisant ; la bobine choisie est assignée au fichier, et si elle ne suffit pas l'envoi demande confirmation en indiquant ce qu'il manque ; l'envoi groupé permet aussi de choisir la bobine fichier par fichier, avec contrôle de la quantité cumulée",
+        "Nouveau : marge réelle sur les commandes. Chaque commande issue d'un devis compare la marge prévue à la marge réelle à ce jour (heures d'impression mesurées, pièces ratées comptées en rebut, matière), avec un total dans la file de commandes",
+        "Nouveau : file de commandes. Un devis passé en « accepté » crée automatiquement une tâche d'impression (pièce, quantité, matière) assignée à l'imprimante la moins chargée, avec date de livraison prévue, suivi des pièces imprimées et retards signalés ; option d'avancement automatique à chaque impression terminée",
+        "Nouveau : alertes proactives. Notification (et push) quand une bobine est presque vide (seuil réglable), quand la température dérive de la consigne ou quand l'avancement d'une impression est bloqué",
+        "Nouveau : maintenance prédictive. Chaque tâche affiche la date d'échéance estimée d'après ton rythme réel d'impression (heures par jour sur 30 jours) et une notification arrive 3 jours avant",
+        "Nouveau : suivi des paiements. Chaque devis et facture a un statut (brouillon, envoyé, accepté, payé, en retard), une échéance, et le tableau de bord signale les factures en retard avec le montant à encaisser (notification push « Factures en retard » en option)",
+        "Nouveau : carnet de clients. Fiches (coordonnées, SIRET, notes), historique et totaux facturé / encaissé / reste dû par client, import depuis l'historique des devis, auto-complétion et pré-remplissage des coordonnées dans les devis et factures",
+        "Nouveau : envoi des devis et factures par e-mail (serveur SMTP configurable dans les paramètres, e-mail de test) et export comptable CSV (période et types de documents au choix, compatible Excel)",
+        "Nouveau : factures d'acompte et avoirs. Une facture d'acompte (en % ou en montant) peut être émise d'après un devis ; la facture finale déduit les acomptes déjà facturés ; un avoir total ou partiel peut être émis sur toute facture (numérotation AV-AAAA-NNNN)",
+        "MQTT : le bouton Tester publie maintenant les entités vers Home Assistant, préfixe de découverte configurable et message si MQTT n'est pas activé/enregistré"
+      ],
+      "en": [
+        "New: \"Costs, quotes and invoicing\" section in settings grouping print pricing, quotes and SMTP, with a master switch: when off, everything about costs, quotes, invoices, customers and orders is hidden (action menus, file details, projects, history, statistics, dashboard). Data is kept",
+        "New: spool check and choice when sending to the slicer. The send window lists the whole inventory (Spoolman, TigerTag, manual, AMS) with remaining quantity and an enough / not enough indicator; the chosen spool is assigned to the file, and if it isn't enough the send asks for confirmation and shows what is missing; group sends also let you pick the spool file by file, with a check on the cumulative quantity",
+        "New: real margin on orders. Each order created from a quote compares the expected margin with the actual margin so far (measured print hours, failed parts counted as scrap, material), with a total in the order queue",
+        "New: order queue. A quote set to \"accepted\" automatically creates a print task (part, quantity, material) assigned to the least busy printer, with a planned delivery date, printed-part tracking and late flags; optional automatic progress on every finished print",
+        "New: proactive alerts. Notification (and push) when a spool is almost empty (adjustable threshold), when the temperature drifts from its target or when a print's progress is stuck",
+        "New: predictive maintenance. Each task shows its estimated due date based on your real printing pace (hours per day over 30 days), with a notification 3 days ahead",
+        "New: payment tracking. Every quote and invoice has a status (draft, sent, accepted, paid, overdue) and a due date; the dashboard flags overdue invoices with the amount left to collect (optional \"Overdue invoices\" push notification)",
+        "New: customer book. Customer records (contact details, tax ID, notes), history and invoiced / collected / outstanding totals per customer, import from the quote history, auto-complete and automatic contact details on quotes and invoices",
+        "New: send quotes and invoices by e-mail (SMTP server configurable in settings, test e-mail) and CSV accounting export (period and document types of your choice, Excel-friendly)",
+        "New: deposit invoices and credit notes. A deposit invoice (percentage or amount) can be issued from a quote; the final invoice deducts deposits already invoiced; a full or partial credit note can be issued on any invoice (numbering AV-YYYY-NNNN)",
+        "MQTT: the Test button now publishes the entities to Home Assistant, configurable discovery prefix and a hint when MQTT isn't enabled/saved"
+      ],
+      "de": [
+        "Neu: Bereich „Kosten, Angebote und Rechnungen“ in den Einstellungen, der Druckpreise, Angebote und SMTP bündelt, mit Hauptschalter: Deaktiviert werden alle Kosten-, Angebots-, Rechnungs-, Kunden- und Auftragsfunktionen ausgeblendet (Aktionsmenüs, Dateidetails, Projekte, Verlauf, Statistiken, Dashboard). Die Daten bleiben erhalten",
+        "Neu: Spulenprüfung und -auswahl beim Senden an den Slicer. Das Sendefenster listet das gesamte Inventar (Spoolman, TigerTag, manuell, AMS) mit Restmenge und Anzeige „reicht / reicht nicht“; die gewählte Spule wird der Datei zugewiesen, und reicht sie nicht, fragt der Versand mit Angabe der fehlenden Menge nach; auch beim Sammelversand lässt sich die Spule pro Datei wählen, mit Prüfung der Gesamtmenge",
+        "Neu: tatsächliche Marge bei Aufträgen. Jeder aus einem Angebot erzeugte Auftrag vergleicht die geplante mit der bisher tatsächlichen Marge (gemessene Druckstunden, misslungene Teile als Ausschuss, Material), mit Summe in der Warteschlange",
+        "Neu: Auftragswarteschlange. Ein auf „angenommen“ gesetztes Angebot erstellt automatisch eine Druckaufgabe (Teil, Menge, Material) für den am wenigsten ausgelasteten Drucker, mit geplantem Liefertermin, Zählung gedruckter Teile und Verspätungshinweisen; optional automatischer Fortschritt bei jedem fertigen Druck",
+        "Neu: proaktive Warnungen. Benachrichtigung (und Push), wenn eine Spule fast leer ist (einstellbare Schwelle), die Temperatur von der Solltemperatur abweicht oder der Druckfortschritt stockt",
+        "Neu: vorausschauende Wartung. Jede Aufgabe zeigt das geschätzte Fälligkeitsdatum anhand deines tatsächlichen Druckpensums (Stunden pro Tag über 30 Tage); 3 Tage vorher kommt eine Benachrichtigung",
+        "Neu: Zahlungsverfolgung. Jedes Angebot und jede Rechnung hat einen Status (Entwurf, gesendet, angenommen, bezahlt, überfällig) und ein Fälligkeitsdatum; das Dashboard zeigt überfällige Rechnungen mit dem offenen Betrag (optionale Push-Benachrichtigung „Überfällige Rechnungen“)",
+        "Neu: Kundenverzeichnis. Kundenkarten (Kontakt, Steuernummer, Notizen), Verlauf sowie Summen berechnet / eingegangen / offen pro Kunde, Import aus dem Angebotsverlauf, Autovervollständigung und automatische Kontaktdaten in Angeboten und Rechnungen",
+        "Neu: Versand von Angeboten und Rechnungen per E-Mail (SMTP-Server in den Einstellungen, Test-E-Mail) und CSV-Buchhaltungsexport (Zeitraum und Dokumenttypen wählbar, Excel-kompatibel)",
+        "Neu: Anzahlungsrechnungen und Gutschriften. Aus einem Angebot kann eine Anzahlungsrechnung (in % oder Betrag) erstellt werden; die Schlussrechnung zieht bereits berechnete Anzahlungen ab; auf jede Rechnung kann eine volle oder teilweise Gutschrift ausgestellt werden (Nummerierung GS-JJJJ-NNNN)",
+        "MQTT: Der Test-Button veröffentlicht jetzt die Entitäten an Home Assistant, konfigurierbares Discovery-Präfix und Hinweis, wenn MQTT nicht aktiviert/gespeichert ist"
+      ],
+      "es": [
+        "Nuevo: sección «Costes, presupuestos y facturación» en los ajustes, que agrupa tarifas de impresión, presupuestos y SMTP, con un interruptor general: desactivado, se oculta todo lo relativo a costes, presupuestos, facturas, clientes y pedidos (menús de acciones, fichas, proyectos, historial, estadísticas, panel). Los datos se conservan",
+        "Nuevo: control y elección de bobina al enviar al slicer. La ventana de envío lista todo el inventario (Spoolman, TigerTag, manual, AMS) con la cantidad restante y un indicador suficiente / insuficiente; la bobina elegida se asigna al archivo y, si no basta, el envío pide confirmación indicando lo que falta; el envío grupal también permite elegir la bobina archivo por archivo, con control de la cantidad acumulada",
+        "Nuevo: margen real en los pedidos. Cada pedido creado desde un presupuesto compara el margen previsto con el real hasta ahora (horas de impresión medidas, piezas fallidas como desecho, material), con un total en la cola de pedidos",
+        "Nuevo: cola de pedidos. Un presupuesto marcado como «aceptado» crea automáticamente una tarea de impresión (pieza, cantidad, material) asignada a la impresora menos ocupada, con fecha de entrega prevista, seguimiento de piezas impresas y avisos de retraso; avance automático opcional con cada impresión terminada",
+        "Nuevo: alertas proactivas. Notificación (y push) cuando una bobina está casi vacía (umbral ajustable), cuando la temperatura se desvía de la consigna o cuando el avance de una impresión se detiene",
+        "Nuevo: mantenimiento predictivo. Cada tarea muestra su fecha estimada según tu ritmo real de impresión (horas por día en 30 días) y llega una notificación 3 días antes",
+        "Nuevo: seguimiento de pagos. Cada presupuesto y factura tiene un estado (borrador, enviado, aceptado, pagado, vencido) y una fecha de vencimiento; el panel señala las facturas vencidas con el importe por cobrar (notificación push opcional «Facturas vencidas»)",
+        "Nuevo: libreta de clientes. Fichas (datos de contacto, NIF, notas), historial y totales facturado / cobrado / pendiente por cliente, importación desde el historial de presupuestos, autocompletado y datos del cliente en presupuestos y facturas",
+        "Nuevo: envío de presupuestos y facturas por correo (servidor SMTP configurable en ajustes, correo de prueba) y exportación contable CSV (periodo y tipos de documento a elegir, compatible con Excel)",
+        "Nuevo: facturas de anticipo y abonos. Se puede emitir una factura de anticipo (en % o importe) desde un presupuesto; la factura final descuenta los anticipos ya facturados; se puede emitir un abono total o parcial sobre cualquier factura (numeración AB-AAAA-NNNN)",
+        "MQTT: el botón de prueba ahora publica las entidades en Home Assistant, prefijo de descubrimiento configurable y aviso si MQTT no está activado/guardado"
+      ],
+      "pt": [
+        "Novo: secção «Custos, orçamentos e faturação» nas definições, que agrupa tarifas de impressão, orçamentos e SMTP, com um interruptor geral: desativado, oculta-se tudo o que diz respeito a custos, orçamentos, faturas, clientes e encomendas (menus de ações, fichas, projetos, histórico, estatísticas, painel). Os dados são mantidos",
+        "Novo: verificação e escolha da bobina ao enviar para o slicer. A janela de envio lista todo o inventário (Spoolman, TigerTag, manual, AMS) com a quantidade restante e um indicador suficiente / insuficiente; a bobina escolhida é atribuída ao ficheiro e, se não chegar, o envio pede confirmação indicando o que falta; o envio em grupo também permite escolher a bobina ficheiro a ficheiro, com verificação da quantidade acumulada",
+        "Novo: margem real nas encomendas. Cada encomenda criada a partir de um orçamento compara a margem prevista com a real até agora (horas de impressão medidas, peças falhadas como refugo, material), com um total na fila de encomendas",
+        "Novo: fila de encomendas. Um orçamento marcado como «aceite» cria automaticamente uma tarefa de impressão (peça, quantidade, material) atribuída à impressora menos ocupada, com data de entrega prevista, contagem de peças impressas e avisos de atraso; avanço automático opcional a cada impressão concluída",
+        "Novo: alertas proativos. Notificação (e push) quando uma bobina está quase vazia (limiar ajustável), quando a temperatura se desvia do alvo ou quando o progresso de uma impressão fica parado",
+        "Novo: manutenção preditiva. Cada tarefa mostra a data estimada com base no teu ritmo real de impressão (horas por dia em 30 dias) e chega uma notificação 3 dias antes",
+        "Novo: acompanhamento de pagamentos. Cada orçamento e fatura tem um estado (rascunho, enviado, aceite, pago, em atraso) e uma data de vencimento; o painel assinala as faturas em atraso com o valor a receber (notificação push opcional «Faturas em atraso»)",
+        "Novo: livro de clientes. Fichas (contactos, NIF, notas), histórico e totais faturado / recebido / em dívida por cliente, importação do histórico de orçamentos, preenchimento automático e dados do cliente nos orçamentos e faturas",
+        "Novo: envio de orçamentos e faturas por e-mail (servidor SMTP configurável nas definições, e-mail de teste) e exportação contabilística CSV (período e tipos de documento à escolha, compatível com Excel)",
+        "Novo: faturas de adiantamento e notas de crédito. Pode emitir-se uma fatura de adiantamento (em % ou valor) a partir de um orçamento; a fatura final deduz os adiantamentos já faturados; pode emitir-se uma nota de crédito total ou parcial sobre qualquer fatura (numeração NC-AAAA-NNNN)",
+        "MQTT: o botão de teste agora publica as entidades no Home Assistant, prefixo de descoberta configurável e aviso se o MQTT não estiver ativado/guardado"
+      ],
+      "it": [
+        "Novità: sezione «Costi, preventivi e fatturazione» nelle impostazioni, che raggruppa tariffe di stampa, preventivi e SMTP, con un interruttore generale: disattivato, tutto ciò che riguarda costi, preventivi, fatture, clienti e ordini viene nascosto (menu azioni, schede, progetti, cronologia, statistiche, dashboard). I dati vengono conservati",
+        "Novità: controllo e scelta della bobina all'invio allo slicer. La finestra di invio elenca tutto l'inventario (Spoolman, TigerTag, manuale, AMS) con la quantità residua e un indicatore sufficiente / insufficiente; la bobina scelta viene assegnata al file e, se non basta, l'invio chiede conferma indicando quanto manca; anche l'invio multiplo permette di scegliere la bobina file per file, con controllo della quantità cumulata",
+        "Novità: margine reale sugli ordini. Ogni ordine creato da un preventivo confronta il margine previsto con quello reale finora (ore di stampa misurate, pezzi falliti come scarto, materiale), con un totale nella coda ordini",
+        "Novità: coda ordini. Un preventivo impostato su «accettato» crea automaticamente un'attività di stampa (pezzo, quantità, materiale) assegnata alla stampante meno carica, con data di consegna prevista, conteggio dei pezzi stampati e segnalazione dei ritardi; avanzamento automatico opzionale a ogni stampa completata",
+        "Novità: avvisi proattivi. Notifica (e push) quando una bobina è quasi vuota (soglia regolabile), quando la temperatura devia dal valore impostato o quando l'avanzamento di una stampa si blocca",
+        "Novità: manutenzione predittiva. Ogni attività mostra la data stimata in base al tuo ritmo reale di stampa (ore al giorno su 30 giorni) e una notifica arriva 3 giorni prima",
+        "Novo: monitoraggio dei pagamenti. Ogni preventivo e fattura ha uno stato (bozza, inviato, accettato, pagato, scaduto) e una scadenza; la dashboard segnala le fatture scadute con l'importo da incassare (notifica push facoltativa «Fatture scadute»)",
+        "Novità: rubrica clienti. Schede (contatti, P. IVA, note), cronologia e totali fatturato / incassato / da incassare per cliente, importazione dalla cronologia dei preventivi, completamento automatico e dati del cliente nei preventivi e nelle fatture",
+        "Novità: invio di preventivi e fatture via e-mail (server SMTP configurabile nelle impostazioni, e-mail di prova) ed esportazione contabile CSV (periodo e tipi di documento a scelta, compatibile con Excel)",
+        "Novità: fatture di acconto e note di credito. Da un preventivo si può emettere una fattura di acconto (in % o importo); la fattura finale detrae gli acconti già fatturati; su ogni fattura si può emettere una nota di credito totale o parziale (numerazione NC-AAAA-NNNN)",
+        "MQTT: il pulsante di test ora pubblica le entità su Home Assistant, prefisso di discovery configurabile e avviso se MQTT non è attivato/salvato"
+      ],
+      "zh": [
+        "新增：设置中的“成本、报价与开票”分组，汇集打印价格、报价单和 SMTP，并带总开关：关闭后，所有与成本、报价、发票、客户和订单相关的内容都会隐藏（操作菜单、文件详情、项目、历史、统计、仪表盘），数据保留",
+        "新增：发送到切片软件时检查并选择耗材盘。发送窗口列出全部库存（Spoolman、TigerTag、手动、AMS）及剩余量和“足够/不足”指示；所选耗材盘会分配给该文件，若不足，发送前会提示缺少的克数并请求确认；批量发送时也可逐个文件选择耗材盘，并检查累计用量",
+        "新增：订单实际利润。由报价单生成的订单会对比预计利润与截至目前的实际利润（实测打印小时、失败件计为废品、材料），并在订单队列中显示合计",
+        "新增：订单队列。将报价单设为“已接受”会自动创建打印任务（零件、数量、材料），分配给最空闲的打印机，并带有计划交付日期、已打印件数跟踪和延误提示；可选每次打印完成后自动推进",
+        "新增：主动提醒。耗材盘即将用完（阈值可调）、温度偏离设定值或打印进度停滞时，发送通知（及推送）",
+        "新增：预测性维护。每个维护任务会根据你的实际打印节奏（30 天内每天的打印小时数）显示预计到期日，并提前 3 天通知",
+        "新增：付款跟踪。每份报价单和发票都有状态（草稿、已发送、已接受、已付款、已逾期）和到期日；仪表盘会提示逾期发票及待收金额（可选“逾期发票”推送通知）",
+        "新增：客户簿。客户档案（联系方式、税号、备注）、每位客户的开票 / 已收 / 未结金额与历史记录，可从报价历史导入，并在报价单和发票中自动补全客户信息",
+        "新增：通过邮件发送报价单和发票（在设置中配置 SMTP 服务器，支持测试邮件），以及 CSV 会计导出（可选时间范围和文档类型，兼容 Excel）",
+        "新增：预付款发票和贷项通知单。可根据报价单开具预付款发票（按百分比或金额）；最终发票自动扣除已开具的预付款；可对任何发票开具全额或部分贷项通知单（编号 CN-YYYY-NNNN）",
+        "MQTT：测试按钮现在会向 Home Assistant 发布实体，可配置发现前缀，未启用/未保存 MQTT 时给出提示"
+      ],
+      "ja": [
+        "新機能：設定に「コスト・見積・請求」セクションを追加し、印刷料金・見積書・SMTP をまとめ、全体スイッチを用意。オフにするとコスト・見積・請求書・顧客・注文に関するすべて（操作メニュー、ファイル詳細、プロジェクト、履歴、統計、ダッシュボード）が非表示になります（データは保持）",
+        "新機能：スライサー送信時のスプール確認と選択。送信ウィンドウに在庫全体（Spoolman、TigerTag、手動、AMS）を残量と「十分／不足」表示付きで一覧し、選んだスプールをファイルに割り当てます。不足の場合は不足量を示して確認を求めます。一括送信でもファイルごとにスプールを選べ、累計使用量も確認します",
+        "新機能：注文の実績利益。見積書から作成した注文で、予定利益と現時点の実績利益（実測の印刷時間、失敗品は廃棄として計上、材料）を比較し、注文キューに合計を表示",
+        "新機能：注文キュー。見積書を「承諾済み」にすると、最も空いているプリンターに割り当てられた印刷タスク（部品・数量・材料）が自動作成され、納期予定・印刷済み数の管理・遅延表示に対応。印刷完了ごとの自動進行（任意）も可能",
+        "新機能：先回りアラート。スプール残りわずか（しきい値は変更可）、温度が設定値からずれた場合、印刷の進行が止まった場合に通知（プッシュも）",
+        "新機能：予知保全。各タスクに、実際の印刷ペース（30日間の1日あたり時間）に基づく予定期限を表示し、3日前に通知",
+        "新機能：入金管理。見積書と請求書にステータス（下書き、送信済み、承諾済み、支払済み、期限超過）と支払期限を設定でき、ダッシュボードに期限超過の請求書と未回収額を表示（「期限超過の請求書」プッシュ通知は任意）",
+        "新機能：顧客リスト。顧客情報（連絡先、税番号、メモ）、顧客ごとの請求額・入金額・未払い残高と履歴、見積履歴からのインポート、見積書・請求書への自動補完",
+        "新機能：見積書・請求書のメール送信（設定でSMTPサーバーを構成、テストメールあり）と、CSV形式の会計エクスポート（期間と書類の種類を選択可、Excel対応）",
+        "新機能：前受金請求書とクレジットノート。見積書から前受金請求書（％または金額）を発行でき、最終請求書は請求済みの前受金を差し引きます。任意の請求書に全額または一部のクレジットノートを発行可能（番号 CN-YYYY-NNNN）",
+        "MQTT：テストボタンでエンティティをHome Assistantに公開、ディスカバリープレフィックスを設定可能、MQTTが未有効・未保存の場合は案内を表示"
+      ]
+    }
+  },
+  {
     "version": "0.8.7",
     "items": {
       "fr": [

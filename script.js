@@ -3374,27 +3374,46 @@ function _quoteDateLabel(q) {
     return isNaN(d) ? '' : d.toLocaleDateString(I18N.lang, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+const _overdueNotified = new Set();
 async function _loadDashboardQuotes() {
+    if (window.COMMERCIAL_OFF) return;
     const body = document.getElementById('dashboard-quotes-body');
     if (!body) return;
     try {
-        const res = await fetch(`${API}/api/quotes?limit=5`, { cache: 'no-store' });
+        const [res, sres] = await Promise.all([fetch(`${API}/api/quotes?limit=5`, { cache: 'no-store' }), fetch(`${API}/api/quotes/summary`, { cache: 'no-store' })]);
         const data = await res.json();
+        const sum = sres.ok ? await sres.json() : { overdue: [], unpaid_total: 0 };
+        _quoteClientsLoad();
         const quotes = Array.isArray(data.quotes) ? data.quotes : [];
         if (!res.ok || !quotes.length) {
             body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-file-invoice"></i><p>${escapeHtml(_t2('dashboard.quotes_empty', "Aucun devis créé pour l'instant"))}</p></div>`;
             return;
         }
-        body.innerHTML = quotes.map(q => `
+        let banner = '';
+        if (sum.overdue && sum.overdue.length) {
+            const tot = sum.overdue.length;
+            banner = `<div class="quote-overdue-banner" onclick="openQuoteHistoryModal()"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(_tf('dashboard.overdue_line', '{{n}} facture(s) en retard', { n: tot }))} — ${escapeHtml(sum.overdue.slice(0, 2).map(o => `${o.number} (${o.days_late} j)`).join(', '))}</div>`;
+            sum.overdue.forEach(o => {
+                if (_overdueNotified.has(o.id)) return;
+                _overdueNotified.add(o.id);
+                fetch(`${API}/api/notifications`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+                    type: 'payment_overdue', title: _t3('quotes.overdue_notif_title', 'Facture en retard'),
+                    message: _tf('quotes.overdue_notif_msg', '{{number}} — {{client}} ({{days}} j de retard)', { number: o.number, client: o.client || '—', days: o.days_late }),
+                    link_page: 'dashboard', dedup_key: `overdue_${o.id}` }) }).catch(() => {});
+            });
+        }
+        const unpaid = sum.unpaid_total > 0 ? `<div class="quote-unpaid-line">${escapeHtml(_tf('dashboard.unpaid_line', 'À encaisser : {{amount}}', { amount: formatCost(sum.unpaid_total) }))}</div>` : '';
+        body.innerHTML = banner + quotes.map(q => `
             <div class="dashboard-row" onclick="${q.has_pdf ? `openQuotePdf(${q.id})` : 'openQuoteHistoryModal()'}" style="cursor:pointer;">
                 <div class="dashboard-row-icon"><i class="fa-solid fa-file-invoice"></i></div>
                 <div class="dashboard-row-body">
-                    <div class="dashboard-row-title" title="${escapeHtml(q.number)}">${escapeHtml(q.client || q.number)}</div>
+                    <div class="dashboard-row-title" title="${escapeHtml(q.number)}">${q.doc_type && q.doc_type !== 'quote' ? `<span class="quote-type-badge inv">${escapeHtml(_quoteTypeLabel(q.doc_type))}</span> ` : ''}${escapeHtml(q.client || q.number)}</div>
                     <div class="dashboard-row-sub">${escapeHtml(q.item_desc || q.number)} — ${escapeHtml(_quoteDateLabel(q))}</div>
                 </div>
+                <span class="quote-status st-${q.status}">${escapeHtml(_quoteStatusLabel(q.status))}</span>
                 <div class="dashboard-row-meta">${escapeHtml(q.total)}</div>
             </div>
-        `).join('');
+        `).join('') + unpaid;
     } catch (err) {
         console.error('[Dashboard] Erreur devis:', err);
         body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
@@ -3520,13 +3539,14 @@ const _qfLabel = 'display:block; font-size:12px; color:var(--text-secondary); ma
 window.openQuoteEditModal = async function (id) {
     let info;
     try { info = await _quoteFetchPayload(id); } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); return; }
+    await _quoteClientsLoad();
     const row = info.row, old = info.payload || {};
-    if (row.invoice) { showToast(_t3('quotes.edit_blocked', 'Ce devis a déjà une facture : il ne peut plus être modifié.'), 'warning'); return; }
+    if (row.invoice || Number(row.deposits_total) > 0) { showToast(_t3('quotes.edit_blocked', 'Ce devis a déjà une facture : il ne peut plus être modifié.'), 'warning'); return; }
     const base = _quoteBaseValues(row, old);
     const cur = printCostCurrency === 'USD' ? '$' : '€';
     const body = `
         <div class="quote-form-grid">
-            <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(I18N.t('cost.quote_client'))}</label><input type="text" id="qe-client" maxlength="120" value="${escapeHtml(row.client || '')}" style="${_qfField}" autocomplete="off"></div>
+            <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(I18N.t('cost.quote_client'))}</label><input type="text" id="qe-client" list="quote-clients-list" maxlength="120" value="${escapeHtml(row.client || '')}" style="${_qfField}" autocomplete="off"></div>
             <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(I18N.t('cost.quote_description'))}</label><input type="text" id="qe-desc" maxlength="200" value="${escapeHtml(old.item_desc || row.item_desc || '')}" style="${_qfField}" autocomplete="off"></div>
             <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(_t3('quotes.field_details', 'Détails'))}</label><input type="text" id="qe-details" maxlength="200" value="${escapeHtml(old.item_details || row.item_details || '')}" style="${_qfField}" autocomplete="off"></div>
             <div><label style="${_qfLabel}">${escapeHtml(I18N.t('cost.quote_qty'))}</label><input type="number" id="qe-qty" min="1" max="100000" step="1" value="${base.qty}" style="${_qfField}"></div>
@@ -3560,6 +3580,7 @@ window.openQuoteEditModal = async function (id) {
         p.lang = old.lang || I18N.lang;
         p.date = old.date || _quoteLongDate(new Date(String(row.created_at || '').replace(' ', 'T')));
         p.client = val('qe-client').trim().slice(0, 120);
+        Object.assign(p, _quoteClientInfo(p.client));
         p.item_desc = val('qe-desc').trim().slice(0, 200);
         p.item_details = val('qe-details').trim().slice(0, 200);
         p.qty = String(qty);
@@ -3593,6 +3614,8 @@ window.openQuoteInvoiceModal = async function (id) {
     const base = _quoteBaseValues(row, old);
     const sub = Math.round(base.qty * base.unit * 100) / 100;
     const d0 = _quoteDiscountCalc(sub, base.dtype, base.dval);
+    const deposits = Math.min(Number(row.deposits_total) || 0, d0.total);
+    const net = Math.round((d0.total - deposits) * 100) / 100;
     const iso = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
     const today = new Date(), due = new Date(Date.now() + 30 * 86400000);
     const body = `
@@ -3600,7 +3623,9 @@ window.openQuoteInvoiceModal = async function (id) {
         <div class="quote-form-sum" style="margin:0 0 14px;">
             <div><span>${escapeHtml(_t3('quotes.invoice_for', 'Devis'))}</span><b>${escapeHtml(row.number)}</b></div>
             <div><span>${escapeHtml(I18N.t('cost.quote_client'))}</span><b>${escapeHtml(row.client || '—')}</b></div>
-            <div class="qf-total"><span>${escapeHtml(I18N.t('cost.quote_total'))}</span><b>${escapeHtml(formatCost(d0.total))}</b></div>
+            <div><span>${escapeHtml(I18N.t('cost.quote_total'))}</span><b>${escapeHtml(formatCost(d0.total))}</b></div>
+            ${deposits > 0 ? `<div><span>${escapeHtml(_t3('quotes.deposit_label', 'Acomptes déjà facturés'))}</span><b>-${escapeHtml(formatCost(deposits))}</b></div>` : ''}
+            <div class="qf-total"><span>${escapeHtml(deposits > 0 ? _t3('quotes.net_label', 'Reste à payer') : I18N.t('cost.quote_total'))}</span><b>${escapeHtml(formatCost(net))}</b></div>
         </div>
         <div class="quote-form-grid">
             <div><label style="${_qfLabel}">${escapeHtml(_t3('quotes.issue_date', "Date de la facture"))}</label><input type="date" id="qi-date" value="${iso(today)}" style="${_qfField}"></div>
@@ -3619,7 +3644,10 @@ window.openQuoteInvoiceModal = async function (id) {
         p.due_date = fmt(document.getElementById('qi-due').value);
         p.payment_terms = document.getElementById('qi-pay').value.trim().slice(0, 300);
         p.ref_label = _t3('quotes.ref_label', 'Réf. devis :');
+        p.due_iso = document.getElementById('qi-due').value;
         p.client = row.client || '';
+        p.client_id = row.client_id || 0;
+        p.client_details = _quoteClientDetails(row.client_record) || old.client_details || '';
         p.item_desc = old.item_desc || row.item_desc || '';
         p.item_details = old.item_details || row.item_details || '';
         p.qty = String(base.qty);
@@ -3628,6 +3656,14 @@ window.openQuoteInvoiceModal = async function (id) {
         p.notes = old.notes || row.notes || '';
         p.subtotal_label = _t3('quotes.subtotal', 'Sous-total');
         _quoteApplyTotals(p, sub, base.dtype, base.dval);
+        ['deposit', 'deposit_label', 'net_total', 'net_label'].forEach(k => { delete p[k]; });
+        if (deposits > 0) {
+            p.deposit_label = _t3('quotes.deposit_label', 'Acomptes déjà facturés');
+            p.deposit = '-' + formatCost(deposits);
+            p.net_label = _t3('quotes.net_label', 'Reste à payer');
+            p.net_total = formatCost(net);
+            p.total_value = net;
+        }
         btn.disabled = true;
         try {
             const res = await fetch(`${API}/api/quotes/${id}/invoice`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) });
@@ -3643,6 +3679,539 @@ window.openQuoteInvoiceModal = async function (id) {
     };
 };
 
+
+// ============================================================================
+// Gestion commerciale : statuts de paiement, avoirs / acomptes, clients, e-mail, export CSV
+// ============================================================================
+const _QUOTE_STATUS_BY_TYPE = { quote: ['draft', 'sent', 'accepted', 'refused'], invoice: ['draft', 'sent', 'paid'], deposit: ['draft', 'sent', 'paid'], credit: ['draft', 'sent'] };
+const _QUOTE_STATUS_FALLBACK = { draft: 'Brouillon', sent: 'Envoyé', accepted: 'Accepté', refused: 'Refusé', paid: 'Payé', overdue: 'En retard' };
+const _QUOTE_TYPE_FALLBACK = { quote: 'Devis', invoice: 'Facture', deposit: "Facture d'acompte", credit: 'Avoir' };
+function _quoteStatusLabel(s) { return _t3('quotes.st_' + s, _QUOTE_STATUS_FALLBACK[s] || s); }
+function _quoteTypeLabel(t) { return _t3('quotes.type_' + t, _QUOTE_TYPE_FALLBACK[t] || t); }
+function _isoOffset(days) {
+    const d = new Date(Date.now() + days * 86400000);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function _isoToLong(v) { const dt = new Date(v + 'T12:00:00'); return isNaN(dt) ? '' : _quoteLongDate(dt); }
+function _isoToShort(v) { const dt = new Date(v + 'T12:00:00'); return isNaN(dt) ? '' : dt.toLocaleDateString(I18N.lang, { day: 'numeric', month: 'short' }); }
+
+// ---- Carnet de clients (cache + liste d'auto-complétion) ----
+let _quoteClients = [];
+async function _quoteClientsLoad() {
+    try {
+        const res = await fetch(`${API}/api/clients`, { cache: 'no-store' });
+        if (!res.ok) return _quoteClients;
+        _quoteClients = (await res.json()).clients || [];
+    } catch (e) { /* silencieux */ }
+    let dl = document.getElementById('quote-clients-list');
+    if (!dl) { dl = document.createElement('datalist'); dl.id = 'quote-clients-list'; document.body.appendChild(dl); }
+    dl.innerHTML = _quoteClients.map(c => `<option value="${escapeHtml(c.name)}"></option>`).join('');
+    return _quoteClients;
+}
+window._quoteClientsLoad = _quoteClientsLoad;
+
+function _quoteClientDetails(c) {
+    if (!c) return '';
+    const lines = [];
+    if (c.address) lines.push(...String(c.address).split('\n').map(x => x.trim()).filter(Boolean));
+    if (c.tax_id) lines.push(`${I18N.t('settings.quote_tax_id_label')} : ${c.tax_id}`);
+    return lines.slice(0, 6).join('\n');
+}
+// Rattache un nom saisi à une fiche du carnet (sans distinction de casse).
+function _quoteClientInfo(name) {
+    const n = String(name || '').trim().toLowerCase();
+    const c = n ? _quoteClients.find(x => String(x.name).trim().toLowerCase() === n) : null;
+    return c ? { client_id: c.id, client_details: _quoteClientDetails(c) } : { client_id: 0, client_details: '' };
+}
+window._quoteClientInfo = _quoteClientInfo;
+
+async function _quotePost(url, body) {
+    const res = await fetch(`${API}${url}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+    const d = await res.json().catch(() => ({}));
+    return { ok: res.ok && d.success !== false, status: res.status, data: d };
+}
+
+async function _quoteRefreshViews() {
+    try { _renderQuoteHistory(); _loadDashboardQuotes(); } catch (e) { /* vue fermée */ }
+}
+
+// Changement de statut depuis la liste
+window.setQuoteStatus = async function (id, status) {
+    const r = await _quotePost(`/api/quotes/${id}/status`, { status });
+    if (!r.ok) showToast(_t3('toast.error', 'Erreur'), 'error');
+    else if (r.data.jobs_created) showToast(_t3('orders.created_toast', 'Commande ajoutée à la file d\'impression'), 'success');
+    _quoteRefreshViews();
+};
+
+// ---- Menu d'actions d'une ligne ----
+window._quoteRowsById = {};
+window.openQuoteRowMenu = function (id, ev) {
+    ev.stopPropagation();
+    document.getElementById('quote-row-menu')?.remove();
+    const q = window._quoteRowsById[id];
+    if (!q) return;
+    const items = [];
+    const typ = q.doc_type || 'quote';
+    const act = (icon, label, fn) => items.push(`<button type="button" onclick="document.getElementById('quote-row-menu')?.remove(); ${fn}"><i class="fa-solid ${icon}"></i> ${escapeHtml(label)}</button>`);
+    if (typ === 'quote') {
+        if (!q.invoice_id && !q.deposit_count) act('fa-pen', _t3('quotes.edit', 'Modifier ce devis'), `openQuoteEditModal(${id})`);
+        if (!q.invoice_id) {
+            act('fa-hand-holding-dollar', _t3('quotes.deposit_create', "Facture d'acompte"), `openQuoteDepositModal(${id})`);
+            act('fa-file-invoice-dollar', _t3('quotes.invoice_create', 'Créer la facture'), `openQuoteInvoiceModal(${id})`);
+        } else act('fa-file-circle-check', _t3('quotes.invoice_view', 'Voir la facture'), `openQuotePdf(${q.invoice_id})`);
+    } else if (typ === 'invoice' || typ === 'deposit') {
+        act('fa-rotate-left', _t3('quotes.credit_create', 'Émettre un avoir'), `openQuoteCreditModal(${id})`);
+    }
+    if (q.has_pdf) act('fa-envelope', _t3('quotes.email_btn', 'Envoyer par e-mail'), `openQuoteEmailModal(${id})`);
+    const menu = document.createElement('div');
+    menu.id = 'quote-row-menu'; menu.className = 'quote-row-menu';
+    menu.innerHTML = items.join('');
+    document.body.appendChild(menu);
+    const r = ev.currentTarget.getBoundingClientRect();
+    menu.style.top = Math.min(window.innerHeight - menu.offsetHeight - 8, r.bottom + 4) + 'px';
+    menu.style.left = Math.max(8, Math.min(window.innerWidth - menu.offsetWidth - 8, r.right - menu.offsetWidth)) + 'px';
+    setTimeout(() => document.addEventListener('click', function h() { menu.remove(); document.removeEventListener('click', h); }, { once: true }), 0);
+};
+
+// ---- Facture d'acompte ----
+window.openQuoteDepositModal = async function (id) {
+    let info;
+    try { info = await _quoteFetchPayload(id); } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); return; }
+    let settings = {};
+    try { settings = await (await fetch(`${API}/api/settings`)).json(); } catch (e) { /* défauts */ }
+    const row = info.row, old = info.payload || {};
+    if (row.invoice) { openQuotePdf(row.invoice.id); return; }
+    const total = Number(row.total_value) || 0;
+    const remaining = Math.max(0, Math.round((total - (Number(row.deposits_total) || 0)) * 100) / 100);
+    const cur = printCostCurrency === 'USD' ? '$' : '€';
+    const body = `
+        <p class="settings-hint" style="margin:0 0 12px;">${escapeHtml(_tf('quotes.deposit_help', "Reste à facturer en acompte : {{remaining}}. La facture finale déduira les acomptes déjà facturés.", { remaining: formatCost(remaining) }))}</p>
+        <div class="quote-form-grid">
+            <div><label style="${_qfLabel}">${escapeHtml(_t3('quotes.deposit_value', 'Acompte'))}</label><input type="number" id="qd-value" min="0" step="0.01" value="30" style="${_qfField}"></div>
+            <div><label style="${_qfLabel}">&nbsp;</label><select id="qd-type" style="${_qfField}"><option value="percent">%</option><option value="amount">${cur}</option></select></div>
+            <div><label style="${_qfLabel}">${escapeHtml(_t3('quotes.issue_date', 'Date de la facture'))}</label><input type="date" id="qd-date" value="${_isoOffset(0)}" style="${_qfField}"></div>
+            <div><label style="${_qfLabel}">${escapeHtml(_t3('quotes.due_date', "Date d'échéance"))}</label><input type="date" id="qd-due" value="${_isoOffset(15)}" style="${_qfField}"></div>
+            <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(_t3('quotes.payment_label', 'Conditions de paiement'))}</label><textarea id="qd-pay" rows="2" maxlength="300" style="${_qfField} resize:vertical;">${escapeHtml(settings.invoice_payment_terms || '')}</textarea></div>
+        </div>
+        <div class="quote-form-sum" id="qd-sum"></div>`;
+    const foot = `<button type="button" class="btn btn-ghost" id="qd-cancel">${escapeHtml(_t3('actions.cancel', 'Annuler'))}</button>
+        <button type="button" class="btn btn-primary" id="qd-create"><i class="fa-solid fa-hand-holding-dollar"></i> ${escapeHtml(_t3('quotes.invoice_create', 'Créer la facture'))}</button>`;
+    const ov = _quoteFormOverlay('quote-deposit-overlay', `<i class="fa-solid fa-hand-holding-dollar"></i> ${escapeHtml(_t3('quotes.deposit_modal_title', "Créer une facture d'acompte"))}`, body, foot);
+    const val = (i) => document.getElementById(i).value;
+    const amountNow = () => {
+        const v = Number(val('qd-value')) || 0;
+        const raw = val('qd-type') === 'percent' ? total * Math.min(v, 100) / 100 : v;
+        return Math.round(raw * 100) / 100;
+    };
+    const calc = () => {
+        const a = amountNow();
+        document.getElementById('qd-sum').innerHTML =
+            `<div><span>${escapeHtml(_t3('quotes.invoice_for', 'Devis'))} ${escapeHtml(row.number)}</span><b>${escapeHtml(formatCost(total))}</b></div>` +
+            `<div class="qf-total"><span>${escapeHtml(_t3('quotes.deposit_value', 'Acompte'))}</span><b>${escapeHtml(formatCost(a))}</b></div>`;
+        document.getElementById('qd-create').disabled = a <= 0 || a > remaining + 0.005;
+    };
+    ['qd-value', 'qd-type'].forEach(i => document.getElementById(i).addEventListener('input', calc));
+    calc();
+    document.getElementById('qd-cancel').onclick = ov._close;
+    document.getElementById('qd-create').onclick = async (ev) => {
+        const btn = ev.currentTarget, a = amountNow();
+        const pct = val('qd-type') === 'percent' ? String(Number(val('qd-value')) || 0) : '';
+        const item = old.item_desc || row.item_desc || '';
+        const p = { ...old, ..._quoteLabels('invoice') };
+        p.title = _quoteTypeLabel('deposit');
+        p.date = _isoToLong(val('qd-date')) || _quoteLongDate(new Date());
+        p.due_iso = val('qd-due'); p.due_date = _isoToLong(val('qd-due'));
+        p.payment_terms = val('qd-pay').trim().slice(0, 300);
+        p.client = row.client || '';
+        p.client_id = row.client_id || 0;
+        p.client_details = _quoteClientDetails(row.client_record) || old.client_details || '';
+        p.item_desc = pct ? _tf('quotes.deposit_desc', 'Acompte {{pct}} % — {{item}}', { pct, item }) : _tf('quotes.deposit_desc_flat', 'Acompte — {{item}}', { item });
+        p.item_details = `${_t3('quotes.invoice_for', 'Devis')} ${row.number}`;
+        p.qty = '1'; p.unit_value = a; p.unit_price = formatCost(a);
+        p.notes = ''; p.thumbnails = [];
+        _quoteApplyTotals(p, a, 'amount', 0);
+        ['deposit', 'deposit_label', 'net_total', 'net_label'].forEach(k => { delete p[k]; });
+        btn.disabled = true;
+        const r = await _quotePost(`/api/quotes/${id}/deposit`, p);
+        if (!r.ok) {
+            showToast(r.data.error === 'amount_too_high' ? _tf('quotes.deposit_too_high', 'Le montant dépasse le reste à facturer ({{remaining}}).', { remaining: formatCost(r.data.remaining || 0) }) : _t3('cost.quote_error', 'Erreur lors de la génération du devis'), 'error');
+            btn.disabled = false; return;
+        }
+        try { _quotePost('/api/settings', { invoice_payment_terms: p.payment_terms }); } catch (e) {}
+        ov._close();
+        showToast(_tf('quotes.deposit_created', "Facture d'acompte {{number}} créée", { number: r.data.number }), 'success');
+        _quoteRefreshViews();
+        openQuotePdf(r.data.id);
+    };
+};
+
+// ---- Avoir ----
+window.openQuoteCreditModal = async function (id) {
+    let info;
+    try { info = await _quoteFetchPayload(id); } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); return; }
+    const row = info.row, old = info.payload || {};
+    const total = Number(row.total_value) || 0;
+    const remaining = Math.max(0, Math.round((total - (Number(row.credited_total) || 0)) * 100) / 100);
+    if (remaining <= 0) { showToast(_t3('quotes.credit_none', 'Cette facture est déjà intégralement créditée.'), 'warning'); return; }
+    const body = `
+        <p class="settings-hint" style="margin:0 0 12px;">${escapeHtml(_tf('quotes.credit_help', 'Montant maximum : {{remaining}}.', { remaining: formatCost(remaining) }))}</p>
+        <div class="quote-form-grid">
+            <div><label style="${_qfLabel}">${escapeHtml(_t3('quotes.credit_amount', "Montant de l'avoir"))}</label><input type="number" id="qc-amount" min="0.01" step="0.01" max="${remaining}" value="${remaining.toFixed(2)}" style="${_qfField}"></div>
+            <div><label style="${_qfLabel}">${escapeHtml(_t3('quotes.issue_date', 'Date de la facture'))}</label><input type="date" id="qc-date" value="${_isoOffset(0)}" style="${_qfField}"></div>
+            <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(_t3('quotes.credit_reason', 'Motif (optionnel)'))}</label><input type="text" id="qc-reason" maxlength="200" style="${_qfField}" autocomplete="off"></div>
+        </div>`;
+    const foot = `<button type="button" class="btn btn-ghost" id="qc-cancel">${escapeHtml(_t3('actions.cancel', 'Annuler'))}</button>
+        <button type="button" class="btn btn-primary" id="qc-create"><i class="fa-solid fa-rotate-left"></i> ${escapeHtml(_t3('quotes.credit_create', 'Émettre un avoir'))}</button>`;
+    const ov = _quoteFormOverlay('quote-credit-overlay', `<i class="fa-solid fa-rotate-left"></i> ${escapeHtml(_t3('quotes.credit_modal_title', 'Émettre un avoir'))} — ${escapeHtml(row.number)}`, body, foot);
+    document.getElementById('qc-cancel').onclick = ov._close;
+    document.getElementById('qc-create').onclick = async (ev) => {
+        const btn = ev.currentTarget;
+        const a = Math.round((Number(document.getElementById('qc-amount').value) || 0) * 100) / 100;
+        if (a <= 0 || a > remaining + 0.005) { showToast(_tf('quotes.deposit_too_high', 'Le montant dépasse le reste à facturer ({{remaining}}).', { remaining: formatCost(remaining) }), 'warning'); return; }
+        const p = { ...old, ..._quoteLabels('invoice') };
+        p.title = _quoteTypeLabel('credit');
+        p.number_label = _t3('quotes.credit_number', 'Avoir n°');
+        p.number_prefix = _t3('quotes.credit_prefix', 'AV');
+        p.filename_prefix = _t3('quotes.credit_file_prefix', 'Avoir');
+        p.ref_label = _t3('quotes.ref_invoice_label', 'Réf. facture :');
+        p.date = _isoToLong(document.getElementById('qc-date').value) || _quoteLongDate(new Date());
+        p.due_iso = ''; p.due_date = ''; p.payment_terms = '';
+        p.client = row.client || ''; p.client_id = row.client_id || 0;
+        p.client_details = _quoteClientDetails(row.client_record) || old.client_details || '';
+        p.item_desc = _tf('quotes.credit_desc', 'Avoir sur la facture {{number}}', { number: row.number });
+        p.item_details = document.getElementById('qc-reason').value.trim().slice(0, 200);
+        p.qty = '1'; p.unit_value = -a; p.unit_price = formatCost(-a);
+        p.line_total = formatCost(-a); p.grand_total = formatCost(-a); p.total_value = -a;
+        p.discount = ''; p.discount_label = ''; p.discount_value = 0;
+        p.notes = ''; p.thumbnails = [];
+        ['deposit', 'deposit_label', 'net_total', 'net_label'].forEach(k => { delete p[k]; });
+        btn.disabled = true;
+        const r = await _quotePost(`/api/quotes/${id}/credit`, p);
+        if (!r.ok) {
+            showToast(r.data.error === 'amount_too_high' ? _tf('quotes.deposit_too_high', 'Le montant dépasse le reste à facturer ({{remaining}}).', { remaining: formatCost(r.data.remaining || 0) }) : _t3('cost.quote_error', 'Erreur lors de la génération du devis'), 'error');
+            btn.disabled = false; return;
+        }
+        ov._close();
+        showToast(_tf('quotes.credit_created', 'Avoir {{number}} créé', { number: r.data.number }), 'success');
+        _quoteRefreshViews();
+        openQuotePdf(r.data.id);
+    };
+};
+
+// ---- Envoi par e-mail ----
+window.openQuoteEmailModal = async function (id) {
+    let info;
+    try { info = await _quoteFetchPayload(id); } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); return; }
+    const row = info.row;
+    const docName = `${_quoteTypeLabel(row.doc_type || 'quote')} ${row.number}`;
+    const to = (row.client_record && row.client_record.email) || '';
+    const body = `
+        <div class="quote-form-grid">
+            <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(_t3('quotes.email_to', 'Destinataire'))}</label><input type="email" id="qm-to" value="${escapeHtml(to)}" style="${_qfField}" autocomplete="off"></div>
+            <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(_t3('quotes.email_subject', 'Objet'))}</label><input type="text" id="qm-subject" maxlength="200" value="${escapeHtml(docName)}" style="${_qfField}"></div>
+            <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(_t3('quotes.email_message', 'Message'))}</label><textarea id="qm-msg" rows="6" maxlength="4000" style="${_qfField} resize:vertical;">${escapeHtml(_tf('quotes.email_body', 'Bonjour,\n\nVeuillez trouver ci-joint : {{doc}}.\n\nCordialement', { doc: docName }))}</textarea></div>
+        </div>`;
+    const foot = `<button type="button" class="btn btn-ghost" id="qm-cancel">${escapeHtml(_t3('actions.cancel', 'Annuler'))}</button>
+        <button type="button" class="btn btn-primary" id="qm-send"><i class="fa-solid fa-paper-plane"></i> ${escapeHtml(_t3('quotes.email_send', 'Envoyer'))}</button>`;
+    const ov = _quoteFormOverlay('quote-email-overlay', `<i class="fa-solid fa-envelope"></i> ${escapeHtml(_t3('quotes.email_btn', 'Envoyer par e-mail'))}`, body, foot);
+    document.getElementById('qm-cancel').onclick = ov._close;
+    document.getElementById('qm-send').onclick = async (ev) => {
+        const btn = ev.currentTarget;
+        const toV = document.getElementById('qm-to').value.trim();
+        btn.disabled = true;
+        const r = await _quotePost(`/api/quotes/${id}/email`, { to: toV, subject: document.getElementById('qm-subject').value, message: document.getElementById('qm-msg').value });
+        btn.disabled = false;
+        if (r.ok) { ov._close(); showToast(_tf('quotes.email_sent', 'E-mail envoyé à {{to}}', { to: toV }), 'success'); _quoteRefreshViews(); return; }
+        const e = r.data.error;
+        showToast(e === 'smtp_not_configured' ? _t3('quotes.email_not_configured', 'Configure d\'abord le serveur SMTP dans Paramètres › E-mail.')
+            : e === 'bad_recipient' ? _t3('quotes.email_bad_recipient', 'Adresse e-mail invalide')
+            : _tf('quotes.email_fail', "Échec de l'envoi : {{error}}", { error: e || '' }), 'error');
+    };
+};
+
+// ---- Carnet de clients (fenêtre) ----
+window.openClientsModal = async function () {
+    let modal = document.getElementById('modal-clients');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-clients'; modal.className = 'modal hidden';
+        modal.innerHTML = `<div class="modal-content">
+            <div class="modal-header"><h3><i class="fa-solid fa-address-book"></i> ${escapeHtml(_t3('clients.title', 'Carnet de clients'))}</h3>
+            <button class="modal-close" onclick="closeModal('modal-clients')">×</button></div>
+            <div class="modal-body" id="clients-body"></div></div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-clients'); });
+    }
+    openModal('modal-clients');
+    await _clientsRenderList();
+};
+
+async function _clientsRenderList(filter) {
+    const body = document.getElementById('clients-body');
+    if (!body) return;
+    await _quoteClientsLoad();
+    const q = String(filter || '').trim().toLowerCase();
+    const list = _quoteClients.filter(c => !q || `${c.name} ${c.email} ${c.tax_id}`.toLowerCase().includes(q));
+    body.innerHTML = `
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+            <input type="text" id="clients-search" class="settings-select" style="flex:1; min-width:160px;" placeholder="${escapeHtml(_t3('clients.search', 'Rechercher un client'))}" value="${escapeHtml(filter || '')}" autocomplete="off">
+            <button type="button" class="btn btn-primary btn-sm" onclick="_clientsRenderForm(0)"><i class="fa-solid fa-plus"></i> ${escapeHtml(_t3('clients.new', 'Nouveau client'))}</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="_clientsImport()" title="${escapeHtml(_t3('clients.import', "Importer depuis l'historique des devis"))}"><i class="fa-solid fa-file-import"></i></button>
+        </div>
+        <div id="clients-list">${list.length ? list.map(c => `
+            <div class="quote-history-row" style="cursor:pointer;" onclick="_clientsRenderForm(${c.id})">
+                <div class="quote-history-main"><div class="quote-history-title">${escapeHtml(c.name)}</div>
+                <div class="quote-history-sub">${escapeHtml([c.email, c.phone].filter(Boolean).join(' · ') || _tf('clients.docs', '{{n}} document(s)', { n: c.docs }))}</div></div>
+                <div class="quote-history-total">${c.billed ? escapeHtml(formatCost(c.billed)) : ''}</div>
+            </div>`).join('') : `<div class="dashboard-widget-empty"><i class="fa-solid fa-address-book"></i><p>${escapeHtml(_t3('clients.empty', 'Aucun client pour le moment'))}</p></div>`}</div>`;
+    const s = document.getElementById('clients-search');
+    s.addEventListener('input', () => { clearTimeout(s._t); s._t = setTimeout(() => _clientsRenderList(s.value), 150); });
+}
+window._clientsRenderList = _clientsRenderList;
+
+window._clientsImport = async function () {
+    const r = await _quotePost('/api/clients/import-from-quotes', {});
+    if (r.ok) showToast(_tf('clients.imported', '{{n}} client(s) créé(s)', { n: r.data.created || 0 }), 'success');
+    _clientsRenderList();
+};
+
+window._clientsRenderForm = async function (cid) {
+    const body = document.getElementById('clients-body');
+    let c = { id: 0, name: '', email: '', phone: '', address: '', tax_id: '', notes: '' }, hist = [], tot = null;
+    if (cid) {
+        try {
+            const d = await (await fetch(`${API}/api/clients/${cid}`, { cache: 'no-store' })).json();
+            c = d.client; hist = d.history || []; tot = d;
+        } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); return; }
+    }
+    const f = (id, label, val, type) => `<div><label style="${_qfLabel}">${escapeHtml(label)}</label><input type="${type || 'text'}" id="cl-${id}" value="${escapeHtml(val || '')}" style="${_qfField}" autocomplete="off"></div>`;
+    body.innerHTML = `
+        <button type="button" class="btn btn-ghost btn-sm" onclick="_clientsRenderList()" style="margin-bottom:10px;"><i class="fa-solid fa-arrow-left"></i> ${escapeHtml(_t3('clients.back', 'Retour'))}</button>
+        <div class="quote-form-grid">
+            <div class="qf-wide">${f('name', _t3('clients.name', 'Nom / société'), c.name)}</div>
+            ${f('email', _t3('clients.email', 'E-mail'), c.email, 'email')}${f('phone', _t3('clients.phone', 'Téléphone'), c.phone)}
+            <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(_t3('clients.address', 'Adresse'))}</label><textarea id="cl-address" rows="3" maxlength="300" style="${_qfField} resize:vertical;">${escapeHtml(c.address || '')}</textarea></div>
+            <div class="qf-wide">${f('tax_id', I18N.t('settings.quote_tax_id_label'), c.tax_id)}</div>
+            <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(_t3('clients.notes', 'Notes'))}</label><textarea id="cl-notes" rows="2" maxlength="500" style="${_qfField} resize:vertical;">${escapeHtml(c.notes || '')}</textarea></div>
+        </div>
+        <div class="quote-form-foot">
+            ${cid ? `<button type="button" class="btn btn-ghost" id="cl-del" style="margin-right:auto; color:var(--danger,#e5484d);"><i class="fa-solid fa-trash"></i> ${escapeHtml(_t3('clients.delete', 'Supprimer'))}</button>` : ''}
+            <button type="button" class="btn btn-primary" id="cl-save"><i class="fa-solid fa-floppy-disk"></i> ${escapeHtml(_t3('clients.save', 'Enregistrer'))}</button>
+        </div>
+        ${cid ? `<h4 style="margin:18px 0 8px;">${escapeHtml(_t3('clients.history', 'Historique'))}</h4>
+        <div class="quote-form-sum" style="margin:0 0 10px;">
+            <div><span>${escapeHtml(_t3('clients.billed', 'Facturé'))}</span><b>${escapeHtml(formatCost(tot.billed))}</b></div>
+            <div><span>${escapeHtml(_t3('clients.paid', 'Encaissé'))}</span><b>${escapeHtml(formatCost(tot.paid))}</b></div>
+            <div><span>${escapeHtml(_t3('clients.outstanding', 'Reste dû'))}</span><b>${escapeHtml(formatCost(tot.outstanding))}</b></div>
+        </div>
+        ${hist.map(h => `<div class="quote-history-row" style="cursor:pointer;" onclick="openQuotePdf(${h.id})">
+            <div class="quote-history-main"><div class="quote-history-title"><span class="quote-type-badge ${h.doc_type === 'quote' ? '' : 'inv'}">${escapeHtml(_quoteTypeLabel(h.doc_type))}</span> ${escapeHtml(h.number)}</div>
+            <div class="quote-history-sub">${escapeHtml(h.item_desc || '')}</div></div>
+            <span class="quote-status st-${h.status}">${escapeHtml(_quoteStatusLabel(h.status))}</span>
+            <div class="quote-history-total">${escapeHtml(h.total)}</div></div>`).join('')}` : ''}`;
+    document.getElementById('cl-save').onclick = async () => {
+        const payload = {};
+        ['name', 'email', 'phone', 'address', 'tax_id', 'notes'].forEach(k => { payload[k] = document.getElementById('cl-' + k).value; });
+        if (!payload.name.trim()) { showToast(_t3('clients.name_required', 'Le nom est obligatoire'), 'warning'); return; }
+        const res = await fetch(`${API}/api/clients${cid ? '/' + cid : ''}`, { method: cid ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const d = await res.json().catch(() => ({}));
+        if (res.status === 409) { showToast(_t3('clients.exists', 'Un client porte déjà ce nom'), 'warning'); return; }
+        if (!res.ok || d.success === false) { showToast(_t3('toast.error', 'Erreur'), 'error'); return; }
+        showToast(_t3('clients.saved', 'Client enregistré'), 'success');
+        _clientsRenderList();
+    };
+    const del = document.getElementById('cl-del');
+    if (del) del.onclick = async () => {
+        const ok = await showConfirmDialog(_t3('clients.confirm_delete', 'Supprimer ce client ? Ses devis et factures sont conservés.'), { danger: true, confirmLabel: I18N.t('actions.delete') });
+        if (!ok) return;
+        await fetch(`${API}/api/clients/${cid}`, { method: 'DELETE' });
+        _clientsRenderList();
+    };
+};
+
+// ---- Export comptable ----
+window.openAccountingExportModal = function () {
+    const y = new Date().getFullYear();
+    const types = ['quote', 'invoice', 'deposit', 'credit'];
+    const body = `
+        <div class="quote-form-grid">
+            <div><label style="${_qfLabel}">${escapeHtml(_t3('export.from', 'Du'))}</label><input type="date" id="ex-from" value="${y}-01-01" style="${_qfField}"></div>
+            <div><label style="${_qfLabel}">${escapeHtml(_t3('export.to', 'Au'))}</label><input type="date" id="ex-to" value="${_isoOffset(0)}" style="${_qfField}"></div>
+            <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(_t3('export.types', 'Types de documents'))}</label>
+                <div style="display:flex; gap:14px; flex-wrap:wrap;">${types.map(t => `<label class="checkbox-label"><input type="checkbox" class="ex-type" value="${t}" ${t === 'quote' ? '' : 'checked'}> ${escapeHtml(_quoteTypeLabel(t))}</label>`).join('')}</div></div>
+        </div>`;
+    const foot = `<button type="button" class="btn btn-ghost" id="ex-cancel">${escapeHtml(_t3('actions.cancel', 'Annuler'))}</button>
+        <button type="button" class="btn btn-primary" id="ex-go"><i class="fa-solid fa-file-csv"></i> ${escapeHtml(_t3('export.go', 'Exporter'))}</button>`;
+    const ov = _quoteFormOverlay('quote-export-overlay', `<i class="fa-solid fa-file-csv"></i> ${escapeHtml(_t3('export.title', 'Export comptable (CSV)'))}`, body, foot);
+    document.getElementById('ex-cancel').onclick = ov._close;
+    document.getElementById('ex-go').onclick = async () => {
+        const args = { from: document.getElementById('ex-from').value, to: document.getElementById('ex-to').value, lang: I18N.lang,
+                       types: [...document.querySelectorAll('.ex-type:checked')].map(e => e.value).join(',') };
+        try {
+            const res = await fetch(`${API}/api/quotes/export-csv-native`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
+            const d = await res.json().catch(() => ({}));
+            if (res.ok && d.success) { ov._close(); showToast(_tf('export.saved', 'Export enregistré : {{path}}', { path: d.path }), 'success'); return; }
+            if (d.cancelled) return;
+        } catch (e) { /* repli navigateur */ }
+        const a = document.createElement('a');
+        a.href = `${API}/api/quotes/export.csv?` + new URLSearchParams(args).toString();
+        a.download = 'stellio-export.csv';
+        document.body.appendChild(a); a.click(); a.remove();
+        ov._close();
+    };
+};
+
+// ---- Paramètres : e-mail (SMTP) ----
+function _collectSmtpSettings() {
+    const port = parseInt(document.getElementById('smtp-port').value, 10);
+    return { smtp_host: document.getElementById('smtp-host').value.trim(), smtp_port: Number.isFinite(port) ? port : 0,
+             smtp_security: document.getElementById('smtp-security').value, smtp_user: document.getElementById('smtp-user').value.trim(),
+             smtp_password: document.getElementById('smtp-password').value, smtp_from: document.getElementById('smtp-from').value.trim(),
+             smtp_from_name: document.getElementById('smtp-from-name').value.trim() };
+}
+async function loadSmtpSettings() {
+    if (IS_VIEWER || !document.getElementById('smtp-host')) return;
+    try {
+        const s = await (await fetch(`${API}/api/settings`)).json();
+        document.getElementById('smtp-host').value = s.smtp_host || '';
+        document.getElementById('smtp-port').value = s.smtp_port || '';
+        document.getElementById('smtp-security').value = s.smtp_security || 'starttls';
+        document.getElementById('smtp-user').value = s.smtp_user || '';
+        document.getElementById('smtp-password').value = s.smtp_password || '';
+        document.getElementById('smtp-from').value = s.smtp_from || '';
+        document.getElementById('smtp-from-name').value = s.smtp_from_name || '';
+    } catch (e) { /* silencieux */ }
+}
+window.saveSmtpSettings = async function () {
+    const r = await _quotePost('/api/settings', _collectSmtpSettings());
+    showToast(r.ok ? _t3('smtp.saved', 'Paramètres e-mail enregistrés') : _t3('toast.error', 'Erreur'), r.ok ? 'success' : 'error');
+};
+window.testSmtp = async function () {
+    const r = await _quotePost('/api/smtp/test', _collectSmtpSettings());
+    if (r.data.success) showToast(_tf('smtp.test_ok', 'E-mail de test envoyé à {{to}}', { to: r.data.to }), 'success');
+    else showToast(_tf('smtp.test_fail', 'Échec : {{error}}', { error: r.data.error || '' }), 'error');
+};
+window.loadSmtpSettings = loadSmtpSettings;
+
+
+// ---- Atelier : file de commandes ----
+let _ordersData = { jobs: [], printers: [] };
+async function _ordersApi(method, url, body) {
+    const res = await fetch(`${API}${url}`, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    const d = await res.json().catch(() => ({}));
+    return { ok: res.ok && d.success !== false, data: d };
+}
+const _ORDER_STATUSES = ['queued', 'printing', 'done', 'cancelled'];
+function _orderStatusLabel(s) {
+    return _t3('orders.st_' + s, { queued: 'En attente', printing: 'En cours', done: 'Terminée', cancelled: 'Annulée' }[s] || s);
+}
+window.openOrdersModal = async function () {
+    let modal = document.getElementById('modal-orders');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-orders'; modal.className = 'modal hidden';
+        modal.innerHTML = `<div class="modal-content">
+            <div class="modal-header"><h3><i class="fa-solid fa-list-check"></i> ${escapeHtml(_t3('orders.title', 'File de commandes'))}</h3>
+            <button class="modal-close" onclick="closeModal('modal-orders')">×</button></div>
+            <div class="modal-body" id="orders-body"></div></div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-orders'); });
+    }
+    openModal('modal-orders');
+    await _ordersRender();
+};
+async function _ordersRender() {
+    const body = document.getElementById('orders-body');
+    if (!body) return;
+    try { _ordersData = await (await fetch(`${API}/api/orders`, { cache: 'no-store' })).json(); }
+    catch (e) { body.innerHTML = `<div class="dashboard-widget-empty"><p>${escapeHtml(_t3('toast.connection_error', 'Erreur de connexion'))}</p></div>`; return; }
+    const printers = _ordersData.printers || [];
+    const pOpts = (sel) => `<option value="">${escapeHtml(_t3('orders.no_printer', '— Imprimante —'))}</option>` +
+        printers.map(p => `<option value="${p.id}" ${String(p.id) === String(sel) ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('');
+    const rows = (_ordersData.jobs || []).map(j => {
+        const pct = j.quantity ? Math.round(100 * j.qty_done / j.quantity) : 0;
+        const closed = j.status === 'done' || j.status === 'cancelled';
+        return `<div class="order-row${closed ? ' order-closed' : ''}">
+            <div class="order-main">
+                <div class="quote-history-title">${escapeHtml(j.part)}</div>
+                <div class="quote-history-sub">${escapeHtml([j.client, j.material, j.notes].filter(Boolean).join(' · '))}</div>
+                <div class="order-bar"><span style="width:${pct}%"></span></div>
+                ${_orderMarginHtml(j)}
+            </div>
+            <div class="order-qty">${j.qty_done}/${j.quantity}</div>
+            <select class="settings-select order-printer" onchange="_orderSet(${j.id}, {printer_id: this.value})">${pOpts(j.printer_id)}</select>
+            <input type="date" class="settings-select order-due${j.late ? ' order-late' : ''}" value="${escapeHtml(j.due_date || '')}" onchange="_orderSet(${j.id}, {due_date: this.value})" title="${escapeHtml(_t3('orders.due', 'Livraison prévue'))}">
+            <select class="quote-status st-${j.status === 'done' ? 'paid' : j.status === 'printing' ? 'sent' : j.status === 'cancelled' ? 'refused' : 'accepted'}" onchange="_orderSet(${j.id}, {status: this.value})">
+                ${_ORDER_STATUSES.map(s => `<option value="${s}" ${s === j.status ? 'selected' : ''}>${escapeHtml(_orderStatusLabel(s))}</option>`).join('')}</select>
+            <div class="quote-history-actions">
+                ${j.margin ? `<button type="button" class="btn btn-ghost btn-sm" onclick="_orderSet(${j.id}, {scrap: ${(j.scrap || 0) + 1}})" title="${escapeHtml(_t3('orders.scrap_add', '+1 pièce ratée (rebut)'))}"><i class="fa-solid fa-triangle-exclamation"></i></button>` : ''}
+                ${closed ? '' : `<button type="button" class="btn btn-ghost btn-sm" onclick="_orderSet(${j.id}, {qty_done: ${j.qty_done + 1}})" title="${escapeHtml(_t3('orders.plus_one', '+1 pièce imprimée'))}"><i class="fa-solid fa-plus"></i></button>`}
+                <button type="button" class="btn btn-ghost btn-sm" onclick="_orderDelete(${j.id})" title="${escapeHtml(_t3('orders.delete', 'Supprimer'))}"><i class="fa-solid fa-trash"></i></button>
+            </div></div>`;
+    }).join('');
+    body.innerHTML = `
+        <div class="quote-form-sum" style="margin:0 0 12px;">${escapeHtml(_tf('orders.summary', '{{open}} en cours ou en attente, {{late}} en retard', { open: _ordersData.open || 0, late: _ordersData.late || 0 }))}${_ordersData.margin_est ? ` — ${escapeHtml(_tf('orders.margin_summary', 'marge prévue {{est}}, réelle à ce jour {{real}}', { est: formatCost(_ordersData.margin_est), real: formatCost(_ordersData.margin_real || 0) }))}` : ''}</div>
+        <div class="order-new">
+            <input type="text" id="ord-part" class="settings-select" style="flex:2; min-width:140px;" maxlength="200" placeholder="${escapeHtml(_t3('orders.part', 'Pièce'))}" autocomplete="off">
+            <input type="number" id="ord-qty" class="settings-select" style="width:70px;" min="1" value="1" title="${escapeHtml(_t3('orders.qty', 'Quantité'))}">
+            <input type="text" id="ord-mat" class="settings-select" style="width:90px;" maxlength="40" placeholder="${escapeHtml(_t3('orders.material', 'Matière'))}" autocomplete="off">
+            <select id="ord-printer" class="settings-select">${pOpts('')}</select>
+            <input type="date" id="ord-due" class="settings-select">
+            <button type="button" class="btn btn-primary btn-sm" onclick="_orderAdd()"><i class="fa-solid fa-plus"></i> ${escapeHtml(_t3('orders.add', 'Ajouter'))}</button>
+        </div>
+        <div>${rows || `<div class="dashboard-widget-empty"><i class="fa-solid fa-list-check"></i><p>${escapeHtml(_t3('orders.empty', 'Aucune commande. Un devis passé en « accepté » en crée une automatiquement.'))}</p></div>`}</div>`;
+}
+function _orderMarginHtml(j) {
+    const m = j.margin;
+    if (!m) return '';
+    const eur = (v) => formatCost(v);
+    const pct = (v) => v == null ? '' : ` (${v} %)`;
+    const real = j.qty_done || j.scrap
+        ? ` · <strong class="${m.real_margin < 0 ? 'margin-neg' : 'margin-pos'}">${escapeHtml(_t3('orders.margin_real', 'réelle à ce jour'))} ${escapeHtml(eur(m.real_margin))}${escapeHtml(pct(m.real_margin_pct))}</strong>` : '';
+    const scrap = j.scrap ? ` · ${escapeHtml(_tf('orders.scrap_n', '{{n}} rebut(s)', { n: j.scrap }))}` : '';
+    const hrs = j.actual_hours ? ` · ${escapeHtml(_tf('orders.hours_measured', '{{h}} h mesurées', { h: j.actual_hours }))}` : '';
+    return `<div class="order-margin">${escapeHtml(_t3('orders.margin_est', 'Marge prévue'))} ${escapeHtml(eur(m.est_margin))}${escapeHtml(pct(m.est_margin_pct))}${real}${scrap}${hrs}</div>`;
+}
+window._orderAdd = async function () {
+    const part = document.getElementById('ord-part').value.trim();
+    if (!part) return;
+    const r = await _ordersApi('POST', '/api/orders', {
+        part, quantity: document.getElementById('ord-qty').value, material: document.getElementById('ord-mat').value,
+        printer_id: document.getElementById('ord-printer').value, due_date: document.getElementById('ord-due').value });
+    if (!r.ok) showToast(_t3('toast.error', 'Erreur'), 'error');
+    _ordersRender();
+};
+window._orderSet = async function (id, patch) {
+    const r = await _ordersApi('PUT', `/api/orders/${id}`, patch);
+    if (!r.ok) showToast(_t3('toast.error', 'Erreur'), 'error');
+    _ordersRender();
+};
+window._orderDelete = async function (id) {
+    if (!await showConfirmDialog(_t3('orders.delete_confirm', 'Supprimer cette commande ?'), { danger: true })) return;
+    await _ordersApi('DELETE', `/api/orders/${id}`);
+    _ordersRender();
+};
+
+// ---- Réglages atelier / alertes ----
+async function loadWorkshopSettings() {
+    if (IS_VIEWER || !document.getElementById('alert-spool-min')) return;
+    try {
+        const s = await (await fetch(`${API}/api/settings`)).json();
+        document.getElementById('alert-spool-min').value = s.alert_spool_min_g ?? 80;
+        document.getElementById('alert-drift').checked = s.alert_drift_enabled !== false;
+        document.getElementById('workshop-auto-progress').checked = !!s.workshop_auto_progress;
+    } catch (e) { /* silencieux */ }
+}
+window.saveWorkshopSettings = async function () {
+    const g = parseFloat(document.getElementById('alert-spool-min').value);
+    const r = await _quotePost('/api/settings', {
+        alert_spool_min_g: Number.isFinite(g) && g >= 0 ? g : 80,
+        alert_drift_enabled: document.getElementById('alert-drift').checked,
+        workshop_auto_progress: document.getElementById('workshop-auto-progress').checked });
+    showToast(r.ok ? _t3('workshop.saved', 'Réglages enregistrés') : _t3('toast.error', 'Erreur'), r.ok ? 'success' : 'error');
+};
+window.loadWorkshopSettings = loadWorkshopSettings;
+
 async function _renderQuoteHistory() {
     const body = document.getElementById('quote-history-body');
     if (!body) return;
@@ -3654,25 +4223,29 @@ async function _renderQuoteHistory() {
             body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-file-invoice"></i><p>${escapeHtml(_t2('dashboard.quotes_empty', "Aucun devis créé pour l'instant"))}</p></div>`;
             return;
         }
+        window._quoteRowsById = {};
+        quotes.forEach(q => { window._quoteRowsById[q.id] = q; });
         body.innerHTML = quotes.map(q => {
-            const isInv = q.doc_type === 'invoice';
-            const badge = isInv ? `<span class="quote-type-badge inv">${escapeHtml(_t3('quotes.type_invoice', 'Facture'))}</span> ` : '';
-            const sub = isInv && q.source_number ? `${escapeHtml(_t3('quotes.ref_label', 'Réf. devis :'))} ${escapeHtml(q.source_number)} — ` : '';
+            const typ = q.doc_type || 'quote';
+            const badge = typ !== 'quote' ? `<span class="quote-type-badge inv">${escapeHtml(_quoteTypeLabel(typ))}</span> ` : '';
+            const sub = typ !== 'quote' && q.source_number ? `${escapeHtml(typ === 'credit' ? _t3('quotes.ref_invoice_label', 'Réf. facture :') : _t3('quotes.ref_label', 'Réf. devis :'))} ${escapeHtml(q.source_number)} — ` : '';
+            const due = (typ === 'invoice' || typ === 'deposit') && q.due_date && q.status !== 'paid' ? ` — ${escapeHtml(_tf('quotes.due_short', 'Éch. {{date}}', { date: _isoToShort(q.due_date) }))}` : '';
+            const opts = _QUOTE_STATUS_BY_TYPE[typ] || [];
+            const stSel = `<select class="quote-status st-${q.status}" onchange="setQuoteStatus(${q.id}, this.value)" onclick="event.stopPropagation()" aria-label="${escapeHtml(_t3('quotes.status', 'Statut'))}">` +
+                (q.status === 'overdue' ? `<option value="overdue" selected disabled>${escapeHtml(_quoteStatusLabel('overdue'))}</option>` : '') +
+                opts.map(s => `<option value="${s}" ${s === q.status ? 'selected' : ''}>${escapeHtml(_quoteStatusLabel(s))}</option>`).join('') + `</select>`;
             const actions = [];
-            if (!isInv && !q.invoice_id) {
-                actions.push(`<button type="button" class="btn btn-ghost btn-sm" onclick="openQuoteEditModal(${q.id})" title="${escapeHtml(_t3('quotes.edit', 'Modifier ce devis'))}"><i class="fa-solid fa-pen"></i></button>`);
-                actions.push(`<button type="button" class="btn btn-ghost btn-sm" onclick="openQuoteInvoiceModal(${q.id})" title="${escapeHtml(_t3('quotes.invoice_create', 'Créer la facture'))}"><i class="fa-solid fa-file-invoice-dollar"></i></button>`);
-            } else if (!isInv && q.invoice_id) {
-                actions.push(`<button type="button" class="btn btn-ghost btn-sm" onclick="openQuotePdf(${q.invoice_id})" title="${escapeHtml(_t3('quotes.invoice_view', 'Voir la facture'))}"><i class="fa-solid fa-file-circle-check"></i></button>`);
-            }
+            if (q.has_pdf) actions.push(`<button type="button" class="btn btn-ghost btn-sm" onclick="openQuoteEmailModal(${q.id})" title="${escapeHtml(_t3('quotes.email_btn', 'Envoyer par e-mail'))}"><i class="fa-solid fa-envelope"></i></button>`);
+            actions.push(`<button type="button" class="btn btn-ghost btn-sm" onclick="openQuoteRowMenu(${q.id}, event)" title="${escapeHtml(_t3('quotes.menu_more', "Plus d'actions"))}"><i class="fa-solid fa-ellipsis"></i></button>`);
             if (q.has_pdf) actions.push(`<button type="button" class="btn btn-ghost btn-sm" onclick="downloadStoredQuote(${q.id})" title="${escapeHtml(_t2('quotes.download', 'Télécharger le PDF'))}"><i class="fa-solid fa-file-pdf"></i></button>`);
             actions.push(`<button type="button" class="btn btn-ghost btn-sm" onclick="deleteStoredQuote(${q.id})" title="${escapeHtml(_t2('quotes.delete', 'Supprimer'))}"><i class="fa-solid fa-trash"></i></button>`);
             return `
             <div class="quote-history-row">
                 <div class="quote-history-main"${q.has_pdf ? ` onclick="openQuotePdf(${q.id})" style="cursor:pointer;"` : ''}>
                     <div class="quote-history-title">${badge}${escapeHtml(q.number)} · ${escapeHtml(q.client || _t2('quotes.no_client', 'Sans client'))}</div>
-                    <div class="quote-history-sub">${sub}${escapeHtml(q.item_desc)} — ${escapeHtml(_quoteDateLabel(q))}</div>
+                    <div class="quote-history-sub">${sub}${escapeHtml(q.item_desc)} — ${escapeHtml(_quoteDateLabel(q))}${due}</div>
                 </div>
+                ${stSel}
                 <div class="quote-history-total">${escapeHtml(q.total)}</div>
                 <div class="quote-history-actions">${actions.join('')}</div>
             </div>`;
@@ -3692,7 +4265,12 @@ window.openQuoteHistoryModal = async function () {
         modal.innerHTML = `<div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-file-invoice"></i> ${escapeHtml(_t2('quotes.history_title', 'Historique des devis'))}</h3>
-                <button class="modal-close" onclick="closeModal('modal-quote-history')">×</button>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="openOrdersModal()"><i class="fa-solid fa-list-check"></i> ${escapeHtml(_t3('orders.btn', 'Commandes'))}</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="openClientsModal()"><i class="fa-solid fa-address-book"></i> ${escapeHtml(_t3('quotes.clients_btn', 'Clients'))}</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="openAccountingExportModal()"><i class="fa-solid fa-file-csv"></i> ${escapeHtml(_t3('quotes.export_btn', 'Export comptable'))}</button>
+                    <button class="modal-close" onclick="closeModal('modal-quote-history')">×</button>
+                </div>
             </div>
             <div class="modal-body" id="quote-history-body"></div>
         </div>`;
@@ -6810,7 +7388,7 @@ window.openFileInfoModal = async function (path, opts) {
             <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
                 <button type="button" class="btn btn-primary btn-sm" id="file-info-slicer"><i class="fa-solid fa-paper-plane"></i> ${e(_t3('fileinfo.send_slicer', 'Envoyer au slicer'))}</button>
                 <button type="button" class="btn btn-ghost btn-sm" id="file-info-open"><i class="fa-solid fa-cube"></i> ${e(_t3('fileinfo.open_viewer', 'Ouvrir dans le viewer'))}</button>
-                <button type="button" class="btn btn-ghost btn-sm" id="file-info-cost"><i class="fa-solid fa-coins"></i> ${e(_t3('fileinfo.cost_details', 'Détail du coût'))}</button>
+                <button type="button" class="btn btn-ghost btn-sm commercial-only" id="file-info-cost"><i class="fa-solid fa-coins"></i> ${e(_t3('fileinfo.cost_details', 'Détail du coût'))}</button>
             </div>
         </div>
     </div>`;
@@ -7108,21 +7686,108 @@ if (countEl) {
 countEl.textContent = `${_fileCountLabel(selectedFiles.size)} ${I18N.t('actions.select').toLowerCase()}`;
 }
 }
+function _stockConfirmMessage(a) {
+    return _tf('slicer.stock_insufficient_confirm', 'Bobine « {{label}} » insuffisante : il manque {{missing}} g (besoin {{required}} g, reste {{remaining}} g). Lancer quand même ?',
+        { label: a.label, missing: a.missing_g, required: a.required_g, remaining: a.remaining_g });
+}
+// Envoi groupé : choix de la bobine fichier par fichier (ou une seule pour tous), contrôle de la quantité cumulée par bobine.
+async function _batchSpoolStep(paths) {
+    if (!paths || !paths.length || paths.length > 40) return true;
+    const results = await Promise.all(paths.map(p => fetch(`${API}/api/filament/compatibility?path=${encodeURIComponent(p)}`)
+        .then(r => r.ok ? r.json() : null).catch(() => null)));
+    const base = results.find(r => r && (r.slots || []).length);
+    if (!base) return true;
+    const slots = {};
+    base.slots.forEach(s => { slots[`${s.source_type}:${s.source_id}`] = s; });
+    const srcLabel = (t) => ({ bambu_ams: 'AMS', creality_cfs: 'CFS' })[t] || _sourceLabelFor(t);
+    const opt = (s, key) => {
+        const icon = '';
+        const rem = typeof s.remaining_g === 'number' ? `${Math.round(s.remaining_g)} g` : '—';
+        return `<option value="${escapeHtml(key)}">${escapeHtml(s.name || '—')}${s.material ? ` (${escapeHtml(s.material)})` : ''} — ${rem} · ${escapeHtml(srcLabel(s.source_type))}</option>`;
+    };
+    const options = `<option value="">${escapeHtml(_t3('slicer.spool_none', '— Aucune bobine —'))}</option>` + Object.entries(slots).map(([k, s]) => opt(s, k)).join('');
+    const rows = paths.map((p, i) => {
+        const r = results[i] || {};
+        const a = r.assigned ? `${r.assigned.source_type}:${r.assigned.source_id}` : '';
+        return { path: p, name: p.split(/[\\/]/).pop(), required: r.required_weight_g, orig: slots[a] ? a : '' };
+    });
+    return await new Promise(resolve => {
+        let modal = document.getElementById('modal-batch-spool');
+        if (modal) modal.remove();
+        modal = document.createElement('div');
+        modal.id = 'modal-batch-spool'; modal.className = 'modal hidden';
+        modal.innerHTML = `<div class="modal-content" style="max-width:640px;">
+            <div class="modal-header"><h3><i class="fa-solid fa-spool"></i> ${escapeHtml(_t3('slicer.batch_spool_title', 'Bobines des fichiers'))}</h3>
+            <button class="modal-close" id="bsp-x">×</button></div>
+            <div class="modal-body">
+                <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:3px;">${escapeHtml(_t3('slicer.batch_spool_all', 'Même bobine pour tous'))}</label>
+                <select id="bsp-all" class="settings-select" style="width:100%; max-width:none; margin-bottom:12px;"><option value="__keep">—</option>${options}</select>
+                <div id="bsp-rows">${rows.map((r, i) => `<div style="display:flex; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);">
+                    <div style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(r.path)}">${escapeHtml(r.name)}${r.required != null ? ` <span style="color:var(--text-muted);">· ${Math.round(r.required)} g</span>` : ''}</div>
+                    <select class="settings-select bsp-sel" data-i="${i}" style="width:55%; max-width:none;">${options}</select></div>`).join('')}</div>
+                <div id="bsp-hint" style="margin-top:10px; font-size:12px; color:var(--danger, #e5484d);"></div>
+                <div class="quote-form-foot"><button type="button" class="btn btn-ghost" id="bsp-cancel">${escapeHtml(_t3('actions.cancel', 'Annuler'))}</button>
+                <button type="button" class="btn btn-primary" id="bsp-ok"><i class="fa-solid fa-paper-plane"></i> ${escapeHtml(_t3('actions.send', 'Envoyer'))}</button></div>
+            </div></div>`;
+        document.body.appendChild(modal);
+        const sels = [...modal.querySelectorAll('.bsp-sel')];
+        sels.forEach((s, i) => { s.value = rows[i].orig; });
+        const hint = () => {
+            const need = {};
+            sels.forEach((s, i) => { if (s.value && rows[i].required != null) need[s.value] = (need[s.value] || 0) + rows[i].required; });
+            modal.querySelector('#bsp-hint').innerHTML = Object.entries(need).filter(([k, g]) => typeof slots[k].remaining_g === 'number' && slots[k].remaining_g < g)
+                .map(([k, g]) => '⚠ ' + escapeHtml(_tf('slicer.batch_spool_need', '{{label}} : besoin {{required}} g, reste {{remaining}} g', { label: slots[k].name || k, required: Math.round(g), remaining: Math.round(slots[k].remaining_g) }))).join('<br>');
+        };
+        sels.forEach(s => s.addEventListener('change', hint));
+        modal.querySelector('#bsp-all').addEventListener('change', (e) => {
+            if (e.target.value === '__keep') return;
+            sels.forEach(s => { s.value = e.target.value; }); hint();
+        });
+        const finish = (v) => { closeModal('modal-batch-spool'); setTimeout(() => modal.remove(), 300); resolve(v); };
+        modal.querySelector('#bsp-x').onclick = () => finish(false);
+        modal.querySelector('#bsp-cancel').onclick = () => finish(false);
+        modal.addEventListener('click', (e) => { if (e.target === modal) finish(false); });
+        modal.querySelector('#bsp-ok').onclick = async () => {
+            await Promise.all(sels.map((s, i) => {
+                if (s.value === rows[i].orig) return null;
+                const sl = slots[s.value];
+                const url = sl ? 'assign-filament' : 'unassign-filament';
+                const body = sl ? { path: rows[i].path, source_type: sl.source_type, source_id: sl.source_id, name: sl.name || '', material: sl.material || '',
+                    color_hex: sl.color_hex || '', spoolman_url: sl.spoolman_url || '', printer_id: sl.printer_id || null } : { path: rows[i].path };
+                return fetch(`${API}/api/files/${url}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null);
+            }));
+            finish(true);
+        };
+        openModal('modal-batch-spool'); hint();
+    });
+}
+// Envoi groupé au slicer : si la bobine assignée ne suffit pas, on demande confirmation avant de lancer.
+async function _slicerBatchPost(payload) {
+    if (!(await _batchSpoolStep(payload.files))) return null;
+    const post = async (extra) => {
+        const res = await fetch(`${API}/api/slicer/send-batch`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, ...extra }) });
+        return { res, data: await res.json().catch(() => ({})) };
+    };
+    let r = await post({});
+    if (r.res.status === 409 && r.data.stock_insufficient) {
+        const ok = await new Promise(resolve => showConfirmModal(_stockConfirmMessage(r.data.alert), () => resolve(true)));
+        if (!ok) return null;
+        r = await post({ ignore_stock: true });
+    }
+    return r;
+}
 window.sendSelectedToSlicer = async function () {
 if (selectedFiles.size === 0) {
 showToast(I18N.t('toast.no_selection'), 'warning');
 return;
 }
 try {
-const res = await fetch(`${API}/api/slicer/send-batch`, {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({
+const _r = await _slicerBatchPost({
     files: [...selectedFiles],
     printer_id: document.getElementById('batch-slicer-printer-select')?.value || null
-})
 });
-const data = await res.json();
+if (!_r) return;
+const { res, data } = _r;
 if (res.ok) {
 showToast(data.message || `${selectedFiles.size} ${I18N.t('toast.files_sent')}`, 'success');
 if (data.stock_warnings && data.stock_warnings.length) data.stock_warnings.forEach(_showStockWarningToast);
@@ -8735,7 +9400,7 @@ async function _loadSlicerQuickEstimate(filePath, fileName) {
         box.innerHTML = `
             <div class="slicer-quick-estimate-row">
                 ${parts.join('')}
-                <a href="#" onclick="event.preventDefault(); closeModal('modal-slicer'); openPrintCostModal('${escapeJs(filePath)}', '${escapeJs(fileName)}');">
+                <a href="#" class="commercial-only" onclick="event.preventDefault(); closeModal('modal-slicer'); openPrintCostModal('${escapeJs(filePath)}', '${escapeJs(fileName)}');">
                     <i class="fa-solid fa-calculator"></i> ${_t2('slicer.see_cost_detail', 'Voir le coût détaillé')}
                 </a>
             </div>
@@ -8810,21 +9475,72 @@ async function _loadProcessProfileSelect(selectId, printerId, opts = {}) {
     } catch (e) { /* liste vide : on reste sur « Automatique » */ }
 }
 
-async function _loadSlicerSpoolBox(path) {
-const box = document.getElementById('slicer-spool-box');
-const label = document.getElementById('slicer-spool-label');
-if (!box || !label) return;
-box.style.display = 'none';
-try {
-    const res = await fetch(`${API}/api/files/filament-assignment?path=${encodeURIComponent(path)}`);
-    const data = await res.json();
-    const a = data.assignment;
-    if (!a) return;
-    const badge = FILAMENT_SOURCE_BADGES[a.source_type] || '';
-    label.textContent = `${badge} ` + _t2('spoolman.consume_on_send', `Décomptera ${a.name || ('#' + a.source_id)}${a.material ? ' (' + a.material + ')' : ''} au lancement de l'impression`, { name: a.name || `#${a.source_id}`, material: a.material ? ` (${a.material})` : '' });
-    box.style.display = 'block';
-} catch (e) {  }
+let _slicerSpoolState = { path: '', slots: {}, required: null };
+function _slicerSpoolRefresh() {
+    const sel = document.getElementById('slicer-spool-select');
+    const hint = document.getElementById('slicer-spool-hint');
+    const row = document.getElementById('slicer-consume-row');
+    const label = document.getElementById('slicer-spool-label');
+    if (!sel || !hint || !row || !label) return;
+    const s = _slicerSpoolState.slots[sel.value];
+    hint.style.display = 'none';
+    row.style.display = s ? 'flex' : 'none';
+    if (!s) return;
+    const badge = FILAMENT_SOURCE_BADGES[s.source_type] || '';
+    label.textContent = `${badge} ` + _t2('spoolman.consume_on_send', `Décomptera ${s.name || ('#' + s.source_id)}${s.material ? ' (' + s.material + ')' : ''} au lancement de l'impression`, { name: s.name || `#${s.source_id}`, material: s.material ? ` (${s.material})` : '' });
+    const req = _slicerSpoolState.required;
+    if (s.compatible === false && typeof s.remaining_g === 'number' && req != null) {
+        hint.textContent = _tf('slicer.spool_short', 'Quantité insuffisante : il manque {{missing}} g (besoin {{required}} g, reste {{remaining}} g)',
+            { missing: Math.ceil(req - s.remaining_g), required: Math.round(req), remaining: Math.round(s.remaining_g) });
+        hint.style.display = 'block';
+    }
 }
+async function _loadSlicerSpoolBox(path) {
+    const box = document.getElementById('slicer-spool-box');
+    const sel = document.getElementById('slicer-spool-select');
+    if (!box || !sel) return;
+    box.style.display = 'none';
+    _slicerSpoolState = { path, slots: {}, required: null };
+    try {
+        const res = await fetch(`${API}/api/filament/compatibility?path=${encodeURIComponent(path)}`);
+        const data = await res.json();
+        const slots = data.slots || [];
+        if (!res.ok || !slots.length) return;
+        _slicerSpoolState.required = data.required_weight_g;
+        const opts = [`<option value="">${escapeHtml(_t3('slicer.spool_none', '— Aucune bobine —'))}</option>`];
+        slots.forEach(s => {
+            const key = `${s.source_type}:${s.source_id}`;
+            _slicerSpoolState.slots[key] = s;
+            const icon = s.compatible === true ? '🟢' : s.compatible === false ? '🔴' : '⚪';
+            const rem = typeof s.remaining_g === 'number' ? `${Math.round(s.remaining_g)} g` : '—';
+            const src = ({ bambu_ams: 'AMS', creality_cfs: 'CFS' })[s.source_type] || _sourceLabelFor(s.source_type);
+            opts.push(`<option value="${escapeHtml(key)}">${icon} ${escapeHtml(s.name || '—')}${s.material ? ` (${escapeHtml(s.material)})` : ''} — ${rem} · ${escapeHtml(src)}</option>`);
+        });
+        sel.innerHTML = opts.join('');
+        const a = data.assigned;
+        const akey = a ? `${a.source_type}:${a.source_id}` : '';
+        sel.value = _slicerSpoolState.slots[akey] ? akey : '';
+        box.style.display = 'block';
+        _slicerSpoolRefresh();
+    } catch (e) { /* pas de bobines : le bloc reste masqué */ }
+}
+// Choisir une bobine à l'envoi : elle est assignée au fichier (comme depuis la fiche coût), « aucune » retire l'assignation.
+window.onSlicerSpoolChange = async function () {
+    const sel = document.getElementById('slicer-spool-select');
+    const path = _slicerSpoolState.path;
+    if (!sel || !path) return;
+    const s = _slicerSpoolState.slots[sel.value];
+    try {
+        if (!s) {
+            await fetch(`${API}/api/files/unassign-filament`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) });
+        } else {
+            await fetch(`${API}/api/files/assign-filament`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+                path, source_type: s.source_type, source_id: s.source_id, name: s.name || '', material: s.material || '',
+                color_hex: s.color_hex || '', spoolman_url: s.spoolman_url || '', printer_id: s.printer_id || null }) });
+        }
+    } catch (e) { showToast(I18N.t('toast.server_error'), 'error'); }
+    _slicerSpoolRefresh();
+};
 
 
 let viewer3D = null, viewerControls = null, viewerScene = null, viewerCamera = null, viewerMesh = null, viewerRenderer = null;
@@ -10997,6 +11713,27 @@ function setDefaultSpool(id) {
 window.setDefaultSpool = setDefaultSpool;
 
 
+// Interrupteur général des fonctions de coût, devis et facturation : une classe sur <body> masque tout ce qui est marqué .commercial-only.
+function applyCommercialFlag(on) {
+    window.COMMERCIAL_OFF = !on;
+    document.body.classList.toggle('commercial-off', !on);
+    ['stat-total-cost', 'stat-avg-cost', 'stat-failed-cost'].forEach(id => document.getElementById(id)?.closest('.stats-kpi-card')?.classList.add('commercial-only'));
+    const cb = document.getElementById('commercial-enabled');
+    if (cb) cb.checked = !!on;
+    const sub = document.getElementById('commercial-sub');
+    if (sub) sub.style.display = on ? '' : 'none';
+}
+window.applyCommercialFlag = applyCommercialFlag;
+window.onCommercialToggle = async function (on) {
+    applyCommercialFlag(on);
+    try {
+        const r = await fetch(`${API}/api/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commercial_enabled: !!on }) });
+        if (!r.ok) throw new Error();
+        showToast(_t3('toast.settings_saved', 'Réglages enregistrés'), 'success');
+        if (on) { try { _loadDashboardQuotes(); } catch (e) { /* vue absente */ } }
+    } catch (e) { showToast(_t3('toast.error', 'Erreur'), 'error'); }
+};
+
 function onSettingsPrinterPowerSelectChange() {
     const sel = document.getElementById('settings-printer-power-select');
     const powerInput = document.getElementById('settings-printer-power');
@@ -11029,6 +11766,7 @@ async function loadPrintCostSettings() {
         if (elecPrice) elecPrice.value = data.print_cost_elec_price ?? '';
         if (printerPower) printerPower.value = data.print_cost_printer_power ?? 120;
         printCostMarginPct = Math.max(0, parseFloat(data.print_cost_margin_pct) || 0);
+        applyCommercialFlag(data.commercial_enabled !== false);
         const marginInput = document.getElementById('settings-margin-pct');
         if (marginInput) marginInput.value = data.print_cost_margin_pct ?? '';
 
@@ -13632,7 +14370,7 @@ const _PUSH_FIELDS = [
     ['push-telegram-chat', 'push_telegram_chat_id', ''], ['push-discord-url', 'push_discord_url', ''],
     ['push-webhook-url', 'push_webhook_url', '']
 ];
-const _PUSH_DEFAULT_TYPES_UI = ['print_finished', 'print_failed', 'maintenance', 'low_stock'];
+const _PUSH_DEFAULT_TYPES_UI = ['print_finished', 'print_failed', 'maintenance', 'low_stock', 'payment_overdue', 'spool_low', 'print_drift'];
 
 function _pushShowProviderFields() {
     const prov = document.getElementById('push-provider')?.value || 'ntfy';
@@ -13696,7 +14434,8 @@ function _collectMqttSettings() {
         mqtt_base: document.getElementById('mqtt-base').value.trim() || 'stellio',
         mqtt_tls: document.getElementById('mqtt-tls').checked,
         mqtt_tls_insecure: document.getElementById('mqtt-tls-insecure').checked,
-        mqtt_discovery: document.getElementById('mqtt-discovery').checked
+        mqtt_discovery: document.getElementById('mqtt-discovery').checked,
+        mqtt_discovery_prefix: document.getElementById('mqtt-prefix').value.trim() || 'homeassistant'
     };
 }
 
@@ -13715,6 +14454,7 @@ async function loadMqttSettings() {
         document.getElementById('mqtt-tls').checked = !!s.mqtt_tls;
         document.getElementById('mqtt-tls-insecure').checked = !!s.mqtt_tls_insecure;
         document.getElementById('mqtt-discovery').checked = s.mqtt_discovery !== false;
+        document.getElementById('mqtt-prefix').value = s.mqtt_discovery_prefix || 'homeassistant';
         refreshMqttStatus();
     } catch (e) { /* silencieux */ }
 }
@@ -13725,7 +14465,7 @@ async function refreshMqttStatus() {
     try {
         const d = await (await fetch(`${API}/api/mqtt/status`)).json();
         if (!d.available) el.textContent = _t3('mqtt.unavailable', "Le module MQTT n'est pas disponible");
-        else if (!d.enabled) el.textContent = '';
+        else if (!d.enabled) el.textContent = '○ ' + _t3('mqtt.disabled_hint', "MQTT est désactivé : active l'interrupteur puis clique sur Enregistrer.");
         else if (d.connected) el.textContent = '● ' + _t3('mqtt.connected', 'Connecté au broker');
         else el.textContent = '○ ' + _t3('mqtt.disconnected', 'Non connecté') + (d.error ? ` (${d.error})` : '');
     } catch (e) { el.textContent = ''; }
@@ -13743,7 +14483,15 @@ async function testMqtt() {
     try {
         const res = await fetch(`${API}/api/mqtt/test`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_collectMqttSettings()) });
         const data = await res.json().catch(() => ({}));
-        if (data.success) showToast(_t3('mqtt.test_ok', 'Connexion au broker réussie'), 'success');
+        if (data.success) {
+            let msg = _t3('mqtt.test_ok', 'Connexion au broker réussie');
+            if (!data.printers) msg += ' — ' + _t3('mqtt.test_no_printers', "aucune imprimante à publier : ajoute d'abord une imprimante");
+            else if (data.discovery) msg += ' — ' + _tf('mqtt.test_published', '{{n}} imprimante(s) publiée(s) vers Home Assistant (préfixe « {{prefix}} »)', { n: data.printers, prefix: data.prefix });
+            else msg += ' — ' + _t3('mqtt.test_no_discovery', 'découverte automatique désactivée');
+            if (!document.getElementById('mqtt-enabled').checked) msg += '. ' + _t3('mqtt.test_enable_hint', 'Active MQTT puis enregistre pour une publication continue.');
+            showToast(msg, 'success');
+            setTimeout(refreshMqttStatus, 1500);
+        }
         else showToast(_tf('mqtt.test_fail', 'Échec de la connexion : {{error}}', { error: data.error || _t3('toast.error', 'Erreur') }), 'error');
     } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
 }
@@ -15208,7 +15956,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         if (page === 'library') loadFiles();
         if (page === 'printers') loadPrinters(); else stopAllPrinterCardCameras();
         if (page !== 'dashboard') _stopDashboardCameras();
-        if (page === 'settings') { loadSources(); loadRemoteInstances(); loadGuests(); loadPushSettings(); loadMqttSettings(); balanceSettingsColumns(); }
+        if (page === 'settings') { loadSources(); loadRemoteInstances(); loadGuests(); loadPushSettings(); loadMqttSettings(); loadSmtpSettings(); loadWorkshopSettings(); balanceSettingsColumns(); }
         else stopDiagnosticConsolePoll();
         if (page === 'spoolman') loadSpoolmanPage();
         if (page === 'stats') loadStats();
@@ -15956,9 +16704,9 @@ document.getElementById('apply-filters')?.addEventListener('click', applyFilters
 
 document.getElementById('confirm-slicer')?.addEventListener('click', () => _confirmSendToSlicer(false));
 
-async function _confirmSendToSlicer(force) {
+async function _confirmSendToSlicer(force, ignoreStock) {
     if (!currentSlicerFile) return;
-    const consumeSpool = document.getElementById('slicer-spool-box')?.style.display !== 'none'
+    const consumeSpool = !!document.getElementById('slicer-spool-select')?.value
         && document.getElementById('slicer-consume-spool-checkbox')?.checked;
     try {
         const body = {
@@ -15968,6 +16716,7 @@ async function _confirmSendToSlicer(force) {
             printer_id: document.getElementById('slicer-ai-printer-select')?.value || null,
             material_type: document.getElementById('slicer-ai-material-select')?.value || null,
             force: !!force,
+            ignore_stock: !!ignoreStock,
         };
         const _processSel = document.getElementById('slicer-process-select');
         const _processId = _processSel?.value || '';
@@ -15982,12 +16731,16 @@ async function _confirmSendToSlicer(force) {
         const res = await fetch(`${API}/api/slicer/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const data = await res.json();
 
+        if (res.status === 409 && data.stock_insufficient) {
+            showConfirmModal(_stockConfirmMessage(data.alert), () => _confirmSendToSlicer(force, true));
+            return;
+        }
         if (res.status === 409 && data.duplicate_send) {
             const secondsAgo = data.seconds_ago;
             const timeLabel = secondsAgo != null ? `${secondsAgo}s` : '';
             showConfirmModal(
                 `${_t2('slicer.duplicate_send_confirm', 'Ce fichier a déjà été envoyé au slicer il y a')} ${timeLabel} ${_t2('slicer.duplicate_send_confirm_suffix', "— probablement depuis un autre appareil. L'envoyer quand même ?")}`,
-                () => _confirmSendToSlicer(true)
+                () => _confirmSendToSlicer(true, ignoreStock)
             );
             return;
         }
@@ -16139,8 +16892,9 @@ if (bar) bar.style.display = 'none';
 window.sendFolderSelectionToSlicer = async function () {
 if (selectedFolderFiles.size === 0) { showToast(I18N.t('toast.no_selection'), 'warning'); return; }
 try {
-const res = await fetch(`${API}/api/slicer/send-batch`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ files: [...selectedFolderFiles], printer_id: document.getElementById('folder-batch-printer-select')?.value || null }) });
-const data = await res.json();
+const _r = await _slicerBatchPost({ files: [...selectedFolderFiles], printer_id: document.getElementById('folder-batch-printer-select')?.value || null });
+if (!_r) return;
+const { res, data } = _r;
 if (res.ok) { showToast(`✅ ${data.message}`, 'success'); if (data.stock_warnings && data.stock_warnings.length) data.stock_warnings.forEach(_showStockWarningToast); clearFolderSelection(); }
 else { showToast(data.error || I18N.t('toast.send_error'), 'error'); }
 } catch (err) { showToast(I18N.t('toast.connection_error'), 'error'); }
@@ -17210,11 +17964,11 @@ function _renderHistoryCostBadge(entry) {
         const sale = (printCostMarginPct > 0 && entry.result !== 'failed')
             ? ` <span style="color:var(--text-muted);" title="${escapeHtml(_t3('history.sale_price_title', 'Prix de vente = coût + marge'))} (+${printCostMarginPct}%)">· ${escapeHtml(_t3('history.sale_price', 'Prix de vente'))} ${formatCost(entry.total_cost * (1 + printCostMarginPct / 100))}</span>`
             : '';
-        return `<span onclick="toggleCostEditor(${entry.id})" style="cursor:pointer;" title="${I18N.t('cost.click_to_edit') || 'Cliquer pour modifier'}">
+        return `<span class="commercial-only" onclick="toggleCostEditor(${entry.id})" style="cursor:pointer;" title="${I18N.t('cost.click_to_edit') || 'Cliquer pour modifier'}">
             <i class="fa-solid fa-coins"></i> ${formatCost(entry.total_cost)}${sale}
         </span>`;
     }
-    return `<span onclick="toggleCostEditor(${entry.id})" style="cursor:pointer; color:var(--text-muted);" title="${I18N.t('cost.click_to_add') || 'Renseigner le coût'}">
+    return `<span class="commercial-only" onclick="toggleCostEditor(${entry.id})" style="cursor:pointer; color:var(--text-muted);" title="${I18N.t('cost.click_to_add') || 'Renseigner le coût'}">
         <i class="fa-solid fa-circle-plus"></i> ${I18N.t('cost.add_cost') || 'Coût'}
     </span>`;
 }
@@ -18380,6 +19134,7 @@ async function loadMaintenanceTasks(pid) {
                 sourceEl.innerHTML = `<i class="fa-solid fa-circle-info"></i> ${_t3('printers.maintenance_source_estimated', 'estimation Stellio')}`;
             }
         }
+        window._maintenanceRate = data.hours_per_day || null;
         renderMaintenanceTasks(data.tasks || []);
         _refreshMaintenancePartSelect();
     } catch (err) {
@@ -18420,6 +19175,7 @@ function renderMaintenanceTasks(tasks) {
                     </div>
                 </div>
                 <div id="maintenance-task-info-${t.id}" style="font-size:11px; color:var(--text-muted); margin-top:4px;">${parts.join(' · ')}</div>
+                ${(!t.due && t.eta_days != null) ? `<div class="maint-eta${t.eta_days <= 7 ? ' soon' : ''}"><i class="fa-solid fa-hourglass-half"></i> ${escapeHtml(_tf('printers.maintenance_eta', 'Prévu dans ~{{n}} j', { n: Math.max(1, Math.round(t.eta_days)) }))}${window._maintenanceRate && t.interval_hours ? ` · ${escapeHtml(_tf('printers.maintenance_rate', 'rythme réel : {{h}} h/jour', { h: window._maintenanceRate }))}` : ''}</div>` : ''}
                 ${t.part_name ? `<div style="font-size:11px; margin-top:3px; color:${t.part_low ? 'var(--danger)' : 'var(--text-muted)'};"><i class="fa-solid fa-toolbox"></i> ${escapeHtml(t.part_name)} · ${escapeHtml(_tf('parts.stock_n', 'stock : {{n}}', { n: t.part_stock }))}${t.part_low ? ' ⚠' : ''}</div>` : ''}
                 <div class="progress-track" style="margin-top:6px;">
                     <div class="progress-bar" style="width:${Math.round(ratio*100)}%; background:${barColor};"></div>
@@ -20313,7 +21069,7 @@ startThumbAutoRefresh();
         const materialCost = q.material;
         const elecCost = q.elec;
         const total = q.cost;
-        _lastQuote = { ...q, material_key: material, weightG, timeFormatted };
+        _lastQuote = { ...q, material_key: material, weightG, timeFormatted, timeHours };
 
         const preciseBadgeHtml = {
             done: `<div style="display:flex; align-items:center; gap:6px; font-size:11px; color:#68d391; margin-bottom:10px;"><i class="fa-solid fa-circle-check"></i> ${I18N.t('cost.precise_via_slicer', { slicer: escapeHtml((_preciseEstimate?.slicer_name || '') + _costProfileSuffix()) })}</div>`,
@@ -21363,6 +22119,9 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             total_label: t('cost.quote_total'),
             item_desc: t('cost.quote_item_desc', { name: ctx.itemName }),
             item_details: t('cost.quote_item_details', { material: String(q.material_key || '').toUpperCase(), weight: q.weightG.toFixed(1) }) + (opts.extraDetails || ''),
+            item_name: ctx.itemName,
+            material: String(q.material_key || ''),
+            cost_model: { m: q.material, e: q.elec, w: q.wear, f: q.fixed, weight_g: q.weightG, hours: q.timeHours || 0 },
             qty: String(q.qty),
             unit_price: formatCost(q.unit),
             line_total: formatCost(q.total),
@@ -21377,6 +22136,8 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             terms: _t3('quotes.terms_default', '')
         };
         _quoteApplyTotals(payload, q.total, document.getElementById(opts.ids.discountType)?.value, document.getElementById(opts.ids.discount)?.value);
+        if (!_quoteClients.length) await _quoteClientsLoad();
+        Object.assign(payload, _quoteClientInfo(ctx.client));
         if (opts.ids.thumbs && _quoteThumbsWanted(opts.ids.thumbs)) {
             const paths = typeof opts.thumbPaths === 'function' ? opts.thumbPaths() : (opts.thumbPaths || []);
             payload.thumbnails = await _quoteThumbDataUrls(paths);
@@ -21608,7 +22369,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
         });
         const q = _computeQuote({ ...common, weightG: totalW, timeHours: totalS / 3600,
             fixedFee: val('pcost-fixed'), marginPct: val('pcost-margin'), qty: val('pcost-quantity') });
-        _pc.quote = { ...q, material_key: mat, weightG: totalW, timeFormatted: _pcDuration(totalS) };
+        _pc.quote = { ...q, material_key: mat, weightG: totalW, timeFormatted: _pcDuration(totalS), timeHours: totalS / 3600 };
 
         const badge = (icon, color, txt) => `<div style="display:flex; align-items:center; gap:6px; font-size:11px; color:${color}; margin-bottom:10px;"><i class="fa-solid ${icon}"></i> ${txt}</div>`;
         let preciseHtml = '';
@@ -21804,7 +22565,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                 <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:10px;">
                     <div>
                         <label style="${labelStyle}">${I18N.t('cost.quote_client')}</label>
-                        <input type="text" id="pcost-quote-client" maxlength="120" style="${fieldStyle}" autocomplete="off">
+                        <input type="text" id="pcost-quote-client" list="quote-clients-list" maxlength="120" style="${fieldStyle}" autocomplete="off">
                     </div>
                     <div>
                         <label style="${labelStyle}">${I18N.t('cost.quote_item_name')}</label>
@@ -22051,7 +22812,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                 <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:10px;">
                     <div>
                         <label style="${labelStyle}">${I18N.t('cost.quote_client')}</label>
-                        <input type="text" id="cost-quote-client" maxlength="120" style="${fieldStyle}" autocomplete="off">
+                        <input type="text" id="cost-quote-client" list="quote-clients-list" maxlength="120" style="${fieldStyle}" autocomplete="off">
                     </div>
                     <div>
                         <label style="${labelStyle}">${I18N.t('cost.quote_item_name')}</label>
@@ -22266,7 +23027,7 @@ function renderProjectCard(p) {
                 <span class="project-card-color" style="background:${p.color || '#4ea1d3'}"></span>
                 <h4 title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</h4>
                 <div class="project-card-actions">
-                    <button type="button" class="dv-btn" onclick="event.stopPropagation(); openProjectCostModal(${p.id})" title="${escapeHtml(I18N.t('projects.cost'))}"><i class="fa-solid fa-coins"></i></button>
+                    <button type="button" class="dv-btn commercial-only" onclick="event.stopPropagation(); openProjectCostModal(${p.id})" title="${escapeHtml(I18N.t('projects.cost'))}"><i class="fa-solid fa-coins"></i></button>
                     <button type="button" class="dv-btn" onclick="event.stopPropagation(); openProjectFormModal(${p.id})" title="${I18N.t('actions.rename')}"><i class="fa-solid fa-pencil"></i></button>
                     <button type="button" class="dv-btn" onclick="event.stopPropagation(); deleteProjectConfirm(${p.id}, '${escapeJs(p.name)}')" title="${I18N.t('modal.delete_file')}" style="color:var(--danger)"><i class="fa-solid fa-trash"></i></button>
                 </div>
@@ -23411,7 +24172,7 @@ window.openPrintReport = async function (entryId) {
             </div>
             <div class="print-report-preview" id="print-report-preview"><i class="fa-solid fa-spinner fa-spin"></i></div>
             <div class="print-report-actions">
-                <label class="print-report-opt"><input type="checkbox" id="print-report-cost" ${entry.total_cost != null ? '' : 'disabled'}> ${escapeHtml(_t3('history.share_show_cost', 'Afficher le coût'))}</label>
+                <label class="print-report-opt commercial-only"><input type="checkbox" id="print-report-cost" ${entry.total_cost != null ? '' : 'disabled'}> ${escapeHtml(_t3('history.share_show_cost', 'Afficher le coût'))}</label>
                 <span style="flex:1"></span>
                 <button type="button" class="btn btn-ghost" id="print-report-copy"><i class="fa-solid fa-copy"></i> ${escapeHtml(_t3('history.share_copy', 'Copier'))}</button>
                 <button type="button" class="btn btn-primary" id="print-report-download"><i class="fa-solid fa-download"></i> ${escapeHtml(_t3('history.share_download', 'Télécharger'))}</button>

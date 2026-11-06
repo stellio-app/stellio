@@ -8865,3 +8865,41 @@ body, .app-screen, .auth-screen {
 .quote-form-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 .quote-type-badge{display:inline-block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:1px 7px;border-radius:999px;background:var(--accent,#6c8cff);color:#fff;vertical-align:middle}
 @media (max-width:560px){.quote-form-grid{grid-template-columns:1fr}}
+
+/* Gestion commerciale : statuts, menu d'actions, relances */
+.quote-status{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid var(--border,#2a2f3a);background:var(--bg-input,transparent);color:var(--text-secondary,#9aa3b2);max-width:120px;flex:0 0 auto}
+select.quote-status{cursor:pointer;appearance:auto}
+.quote-status.st-paid,.quote-status.st-accepted{color:#2fbf71;border-color:#2fbf71}
+.quote-status.st-sent{color:#4d8dff;border-color:#4d8dff}
+.quote-status.st-overdue,.quote-status.st-refused{color:#e5484d;border-color:#e5484d}
+.quote-history-row{flex-wrap:wrap;gap:8px}
+.quote-history-actions{display:flex;gap:2px;flex-wrap:nowrap}
+.quote-row-menu{position:fixed;z-index:10050;min-width:210px;background:var(--bg-card,#1b1f2a);border:1px solid var(--border,#2a2f3a);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.35);padding:4px;display:flex;flex-direction:column}
+.quote-row-menu button{display:flex;align-items:center;gap:10px;padding:9px 12px;background:none;border:0;border-radius:8px;color:var(--text-primary,#e8ecf3);font-size:13px;text-align:left;cursor:pointer}
+.quote-row-menu button:hover{background:var(--bg-hover,rgba(255,255,255,.07))}
+.quote-row-menu button i{width:16px;text-align:center;color:var(--text-secondary,#9aa3b2)}
+.quote-overdue-banner{display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:8px 10px;border-radius:8px;background:rgba(229,72,77,.12);color:#e5484d;font-size:12.5px;font-weight:600;cursor:pointer}
+.quote-unpaid-line{margin-top:8px;font-size:12px;color:var(--text-secondary,#9aa3b2);text-align:right}
+#modal-quote-history .modal-content{max-width:760px;width:94vw}
+#modal-clients .modal-content{max-width:620px;width:94vw}
+
+/* Atelier : file de commandes */
+#modal-orders .modal-content { max-width: 980px; width: 96vw; }
+.order-new { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+.order-row { display: flex; gap: 8px; align-items: center; padding: 10px 4px; border-bottom: 1px solid var(--border, rgba(128,128,128,.25)); flex-wrap: wrap; }
+.order-row.order-closed { opacity: .55; }
+.order-main { flex: 1 1 200px; min-width: 160px; }
+.order-qty { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 44px; text-align: center; }
+.order-printer { width: 150px; }
+.order-due { width: 140px; }
+.order-due.order-late { border-color: var(--danger, #e5484d); color: var(--danger, #e5484d); }
+.order-bar { height: 4px; border-radius: 2px; background: rgba(128,128,128,.25); margin-top: 6px; overflow: hidden; }
+.order-bar span { display: block; height: 100%; background: var(--accent, #4ea1d3); }
+.maint-eta { font-size: 11px; color: var(--text-muted); }
+.maint-eta.soon { color: var(--warning, #d9a400); }
+.order-margin { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
+.order-margin .margin-pos { color: #38c172; }
+.order-margin .margin-neg { color: var(--danger, #e5484d); }
+
+/* Fonctions commerciales désactivées */
+body.commercial-off .commercial-only { display: none !important; }
