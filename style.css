@@ -8826,3 +8826,42 @@ body, .app-screen, .auth-screen {
 .sl-create input[type="text"] { flex: 1; min-width: 160px; }
 
 .print-report-modal input[type="text"], .print-report-modal input[type="number"] { background: var(--bg-input, #14171d); color: var(--text-primary, #e6e6e6); border: 1px solid var(--border, rgba(255,255,255,.14)); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+
+/* Collections intelligentes (bibliothèque) */
+.smart-collections{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.smart-collections:empty{display:none}
+.sc-chip{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;border:1px solid var(--border,#2a2f3a);background:var(--bg-card,transparent);color:var(--text-main,inherit);font-size:12.5px;cursor:pointer;transition:border-color .15s,background .15s}
+.sc-chip:hover{border-color:var(--accent,#6c8cff)}
+.sc-chip.active{background:var(--accent,#6c8cff);border-color:var(--accent,#6c8cff);color:#fff}
+.sc-chip .sc-count{opacity:.7;font-variant-numeric:tabular-nums;font-size:11.5px}
+.sc-chip.sc-saved{border-style:dashed}
+
+/* Aperçu PDF d'un devis */
+.quote-pdf-modal{width:min(920px,96vw);max-width:none;height:92vh;display:flex;flex-direction:column}
+.quote-pdf-body{flex:1;padding:0;min-height:0}
+.quote-pdf-frame{width:100%;height:100%;border:0;background:#fff;border-radius:0 0 8px 8px}
+.quote-pdf-hint{font-size:11.5px;color:var(--text-muted);padding:6px 14px;text-align:center}
+
+/* Entités MQTT / Home Assistant */
+.mqtt-ent-modal{max-width:620px}
+.mqtt-ent-head{display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-muted)}
+.mqtt-ent-printer{border:1px solid var(--border,#2a2f3a);border-radius:10px;padding:12px;margin-bottom:12px}
+.mqtt-ent-ptitle{font-weight:600;margin-bottom:8px}
+.mqtt-ent-table{width:100%;border-collapse:collapse;font-size:13px}
+.mqtt-ent-table td{padding:5px 0;border-top:1px solid var(--border,#2a2f3a);vertical-align:top}
+.mqtt-ent-table td small{display:block;color:var(--text-muted);font-size:10.5px;font-family:monospace}
+.mqtt-ent-val{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mqtt-ent-topics{display:flex;flex-direction:column;gap:3px;margin-top:8px}
+.mqtt-ent-topics code{font-size:11px;color:var(--text-muted);word-break:break-all}
+
+/* Devis : modification, facture, remise */
+.quote-form-modal{max-width:560px}
+.quote-form-body{padding:4px 2px 0}
+.quote-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+.quote-form-grid .qf-wide{grid-column:1 / -1}
+.quote-form-sum{display:flex;flex-direction:column;gap:4px;margin-top:12px;padding:10px 12px;border:1px solid var(--border,#2a2f3a);border-radius:10px;font-size:13px}
+.quote-form-sum > div{display:flex;justify-content:space-between}
+.quote-form-sum .qf-total{font-size:15px;font-weight:700;border-top:1px solid var(--border,#2a2f3a);padding-top:6px;margin-top:2px}
+.quote-form-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.quote-type-badge{display:inline-block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:1px 7px;border-radius:999px;background:var(--accent,#6c8cff);color:#fff;vertical-align:middle}
+@media (max-width:560px){.quote-form-grid{grid-template-columns:1fr}}

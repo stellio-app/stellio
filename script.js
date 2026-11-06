@@ -522,6 +522,30 @@ function watchServerRestartFast() {
     }, 2000);
 }
 
+// Équilibre les deux colonnes des paramètres : même nombre de sections visibles à gauche et à droite
+// (l'ordre de lecture est conservé : on déplace seulement les sections à la frontière).
+function balanceSettingsColumns() {
+    const grid = document.querySelector('.settings-grid');
+    if (!grid) return;
+    const cols = grid.querySelectorAll(':scope > .settings-col');
+    if (cols.length !== 2) return;
+    const [left, right] = cols;
+    const vis = (col) => [...col.querySelectorAll(':scope > .accord-section')].filter(s => getComputedStyle(s).display !== 'none');
+    for (let guard = 0; guard < 30; guard++) {
+        const l = vis(left), r = vis(right);
+        if (r.length - l.length >= 2) {
+            // première section visible de droite -> fin de la colonne gauche (les sections masquées qui la précèdent suivent)
+            const first = r[0];
+            while (first.previousElementSibling && first.previousElementSibling.classList.contains('accord-section') && getComputedStyle(first.previousElementSibling).display === 'none') {
+                left.appendChild(first.previousElementSibling);
+            }
+            left.appendChild(first);
+        } else if (l.length - r.length >= 2) {
+            right.insertBefore(l[l.length - 1], right.querySelector(':scope > .accord-section'));
+        } else break;
+    }
+}
+
 // Fonctions réservées à l'édition serveur (Linux : Raspberry Pi, VM, LXC, Docker). Sous Windows, ces blocs restent masqués.
 function applyServerEditionUI() {
     const on = !!(stellioAppConfig && stellioAppConfig.server_edition);
@@ -534,6 +558,8 @@ function applyServerEditionUI() {
     if (on) startServerRestartWatcher();
     if (on && typeof loadTigerTagStudioDir === 'function') loadTigerTagStudioDir();
     if (on && typeof loadMqttSettings === 'function') loadMqttSettings();
+    balanceSettingsColumns();
+    if (typeof _loadDashboardMqtt === 'function') _loadDashboardMqtt();
 }
 
 function applyAllowedSourceTypes(allowedTypes) {
@@ -2838,7 +2864,7 @@ document.addEventListener('visibilitychange', _syncAppHeight);
 _syncAppHeight();
 
 // --- Tableau de bord ---
-const DASHBOARD_WIDGET_IDS = ['printers', 'cameras', 'stock', 'restock', 'history', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues'];
+const DASHBOARD_WIDGET_IDS = ['printers', 'cameras', 'stock', 'restock', 'history', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'timelapses', 'mqtt', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues'];
 let _dashboardEditMode = false;
 let _draggedDashboardWidget = null;
 
@@ -2864,6 +2890,8 @@ async function loadDashboard(force = false) {
     _loadDashboardDoneProjects();
     _loadDashboardGallery();
     _loadDashboardQuotes();
+    _loadDashboardTimelapses();
+    _loadDashboardMqtt();
     _loadDashboardStats();
     _loadDashboardMaintenance();
     _loadDashboardQueue();
@@ -3358,7 +3386,7 @@ async function _loadDashboardQuotes() {
             return;
         }
         body.innerHTML = quotes.map(q => `
-            <div class="dashboard-row" onclick="openQuoteHistoryModal()" style="cursor:pointer;">
+            <div class="dashboard-row" onclick="${q.has_pdf ? `openQuotePdf(${q.id})` : 'openQuoteHistoryModal()'}" style="cursor:pointer;">
                 <div class="dashboard-row-icon"><i class="fa-solid fa-file-invoice"></i></div>
                 <div class="dashboard-row-body">
                     <div class="dashboard-row-title" title="${escapeHtml(q.number)}">${escapeHtml(q.client || q.number)}</div>
@@ -3374,6 +3402,247 @@ async function _loadDashboardQuotes() {
 }
 window._loadDashboardQuotes = _loadDashboardQuotes;
 
+
+// ============================================================================
+// Devis : remise, modification, facture définitive d'après un devis
+// ============================================================================
+function _quoteLabels(kind) {
+    const t = (k) => I18N.t(k);
+    const inv = kind === 'invoice';
+    return {
+        lang: I18N.lang,
+        title: inv ? _t3('quotes.invoice_title', 'Facture') : t('cost.quote_title'),
+        number_label: inv ? _t3('quotes.invoice_number', 'Facture n°') : t('cost.quote_number'),
+        to_label: t('cost.quote_to'),
+        tax_id_label: t('settings.quote_tax_id_label'),
+        description_label: t('cost.quote_description'),
+        qty_label: t('cost.quote_qty'),
+        unit_label: t('cost.quote_unit_price'),
+        line_total_label: t('cost.quote_line_total'),
+        total_label: t('cost.quote_total'),
+        subtotal_label: _t3('quotes.subtotal', 'Sous-total'),
+        due_label: _t3('quotes.due_label', 'Échéance :'),
+        ref_label: _t3('quotes.ref_label', 'Réf. devis :'),
+        payment_label: _t3('quotes.payment_label', 'Conditions de paiement'),
+        number_prefix: _t3('quotes.invoice_prefix', 'FAC'),
+        filename_prefix: _t3('quotes.invoice_file_prefix', 'Facture'),
+        signature_label: inv ? '' : _t3('quotes.sign_label', 'Signature du client'),
+        signature_mention: inv ? '' : _t3('quotes.sign_mention', "Bon pour accord : j'ai lu et j'accepte ce devis."),
+        signature_date: inv ? '' : _t3('quotes.sign_date', 'Date :'),
+        terms_title: inv ? '' : _t3('quotes.terms_title', 'Conditions générales de vente'),
+        terms: inv ? '' : _t3('quotes.terms_default', '')
+    };
+}
+
+function _quoteDiscountCalc(subtotal, type, value) {
+    const sub = Math.max(0, Number(subtotal) || 0);
+    let v = Math.max(0, Number(value) || 0);
+    let amount = type === 'percent' ? sub * Math.min(v, 100) / 100 : Math.min(v, sub);
+    amount = Math.round(amount * 100) / 100;
+    return { amount, total: Math.round((sub - amount) * 100) / 100 };
+}
+
+// Remplit dans `p` toutes les valeurs qui dépendent du sous-total et de la remise.
+function _quoteApplyTotals(p, subtotal, type, value) {
+    const d = _quoteDiscountCalc(subtotal, type, value);
+    const dtype = type === 'percent' ? 'percent' : 'amount';
+    p.line_total = formatCost(subtotal);
+    p.discount_type = dtype;
+    p.discount_input = Number(value) || 0;
+    p.discount_value = d.amount;
+    if (d.amount > 0) {
+        p.subtotal_label = p.subtotal_label || _t3('quotes.subtotal', 'Sous-total');
+        p.discount_label = dtype === 'percent'
+            ? _tf('quotes.discount_pct', 'Remise ({{pct}} %)', { pct: String(Number(value) || 0) })
+            : _t3('quotes.discount', 'Remise');
+        p.discount = '-' + formatCost(d.amount);
+    } else {
+        p.discount = '';
+        p.discount_label = '';
+    }
+    p.grand_total = formatCost(d.total);
+    p.total_value = d.total;
+    return d;
+}
+window._quoteApplyTotals = _quoteApplyTotals;
+
+function _quoteParseMoney(s) {
+    const n = parseFloat(String(s || '').replace(/\s/g, '').replace(',', '.').replace(/[^0-9.\-]/g, ''));
+    return Number.isFinite(n) ? n : 0;
+}
+
+function _quoteLongDate(d) {
+    return d.toLocaleDateString(I18N.lang, { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function _quoteFormOverlay(id, titleHtml, bodyHtml, footHtml) {
+    document.getElementById(id)?.remove();
+    const ov = document.createElement('div');
+    ov.id = id; ov.className = 'print-report-overlay';
+    ov.innerHTML = `
+        <div class="print-report-modal quote-form-modal" role="dialog" aria-modal="true">
+            <div class="print-report-head">
+                <h3>${titleHtml}</h3>
+                <button type="button" class="print-report-close" aria-label="${escapeHtml(_t3('actions.close', 'Fermer'))}"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="quote-form-body">${bodyHtml}</div>
+            <div class="quote-form-foot">${footHtml}</div>
+        </div>`;
+    document.body.appendChild(ov);
+    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = e => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    ov.querySelector('.print-report-close').addEventListener('click', close);
+    ov._close = close;
+    return ov;
+}
+
+async function _quoteFetchPayload(id) {
+    const res = await fetch(`${API}/api/quotes/${id}/payload`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('payload');
+    return res.json();
+}
+
+// Quantité, prix unitaire et remise d'un devis déjà enregistré (les anciens devis n'ont que les textes).
+function _quoteBaseValues(row, p) {
+    const qty = Math.max(1, parseInt(p.qty ?? row.qty, 10) || 1);
+    let unit = Number(p.unit_value);
+    if (!Number.isFinite(unit) || unit <= 0) {
+        const tv = Number(row.total_value) || 0;
+        unit = (Number(row.discount_value) ? 0 : tv / qty) || _quoteParseMoney(p.unit_price || row.unit_price);
+    }
+    return { qty, unit: Math.round(unit * 100) / 100, dtype: p.discount_type === 'percent' ? 'percent' : 'amount', dval: Number(p.discount_input) || 0 };
+}
+
+const _qfField = 'width:100%; padding:8px 10px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary);';
+const _qfLabel = 'display:block; font-size:12px; color:var(--text-secondary); margin-bottom:4px;';
+
+window.openQuoteEditModal = async function (id) {
+    let info;
+    try { info = await _quoteFetchPayload(id); } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); return; }
+    const row = info.row, old = info.payload || {};
+    if (row.invoice) { showToast(_t3('quotes.edit_blocked', 'Ce devis a déjà une facture : il ne peut plus être modifié.'), 'warning'); return; }
+    const base = _quoteBaseValues(row, old);
+    const cur = printCostCurrency === 'USD' ? '$' : '€';
+    const body = `
+        <div class="quote-form-grid">
+            <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(I18N.t('cost.quote_client'))}</label><input type="text" id="qe-client" maxlength="120" value="${escapeHtml(row.client || '')}" style="${_qfField}" autocomplete="off"></div>
+            <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(I18N.t('cost.quote_description'))}</label><input type="text" id="qe-desc" maxlength="200" value="${escapeHtml(old.item_desc || row.item_desc || '')}" style="${_qfField}" autocomplete="off"></div>
+            <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(_t3('quotes.field_details', 'Détails'))}</label><input type="text" id="qe-details" maxlength="200" value="${escapeHtml(old.item_details || row.item_details || '')}" style="${_qfField}" autocomplete="off"></div>
+            <div><label style="${_qfLabel}">${escapeHtml(I18N.t('cost.quote_qty'))}</label><input type="number" id="qe-qty" min="1" max="100000" step="1" value="${base.qty}" style="${_qfField}"></div>
+            <div><label style="${_qfLabel}">${escapeHtml(I18N.t('cost.quote_unit_price'))} (${cur})</label><input type="number" id="qe-unit" min="0" step="0.01" value="${base.unit.toFixed(2)}" style="${_qfField}"></div>
+            <div><label style="${_qfLabel}">${escapeHtml(_t3('quotes.discount', 'Remise'))}</label><input type="number" id="qe-discount" min="0" step="0.01" value="${base.dval || ''}" placeholder="0" style="${_qfField}"></div>
+            <div><label style="${_qfLabel}">&nbsp;</label><select id="qe-dtype" style="${_qfField}"><option value="percent" ${base.dtype === 'percent' ? 'selected' : ''}>%</option><option value="amount" ${base.dtype === 'amount' ? 'selected' : ''}>${cur}</option></select></div>
+            <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(I18N.t('cost.quote_notes'))}</label><textarea id="qe-notes" rows="3" maxlength="500" style="${_qfField} resize:vertical;">${escapeHtml(old.notes || row.notes || '')}</textarea></div>
+        </div>
+        <div class="quote-form-sum" id="qe-sum"></div>`;
+    const foot = `<button type="button" class="btn btn-ghost" id="qe-cancel">${escapeHtml(_t3('actions.cancel', 'Annuler'))}</button>
+        <button type="button" class="btn btn-primary" id="qe-save"><i class="fa-solid fa-floppy-disk"></i> ${escapeHtml(_t3('quotes.save_changes', 'Enregistrer les modifications'))}</button>`;
+    const ov = _quoteFormOverlay('quote-edit-overlay', `<i class="fa-solid fa-pen"></i> ${escapeHtml(_t3('quotes.edit_title', 'Modifier le devis'))} ${escapeHtml(row.number)}`, body, foot);
+    const val = (i) => document.getElementById(i).value;
+    const calc = () => {
+        const qty = Math.max(1, parseInt(val('qe-qty'), 10) || 1);
+        const sub = Math.round(qty * (Number(val('qe-unit')) || 0) * 100) / 100;
+        const d = _quoteDiscountCalc(sub, val('qe-dtype'), val('qe-discount'));
+        document.getElementById('qe-sum').innerHTML =
+            `<div><span>${escapeHtml(_t3('quotes.subtotal', 'Sous-total'))}</span><b>${escapeHtml(formatCost(sub))}</b></div>` +
+            (d.amount > 0 ? `<div><span>${escapeHtml(_t3('quotes.discount', 'Remise'))}</span><b>-${escapeHtml(formatCost(d.amount))}</b></div>` : '') +
+            `<div class="qf-total"><span>${escapeHtml(I18N.t('cost.quote_total'))}</span><b>${escapeHtml(formatCost(d.total))}</b></div>`;
+        return { qty, sub };
+    };
+    ['qe-qty', 'qe-unit', 'qe-discount', 'qe-dtype'].forEach(i => document.getElementById(i).addEventListener('input', calc));
+    calc();
+    document.getElementById('qe-cancel').onclick = ov._close;
+    document.getElementById('qe-save').onclick = async (ev) => {
+        const { qty, sub } = calc();
+        const unit = Number(val('qe-unit')) || 0;
+        const p = { ..._quoteLabels('quote'), ...old };           // les libellés d'origine (langue du devis) sont conservés
+        p.lang = old.lang || I18N.lang;
+        p.date = old.date || _quoteLongDate(new Date(String(row.created_at || '').replace(' ', 'T')));
+        p.client = val('qe-client').trim().slice(0, 120);
+        p.item_desc = val('qe-desc').trim().slice(0, 200);
+        p.item_details = val('qe-details').trim().slice(0, 200);
+        p.qty = String(qty);
+        p.unit_value = unit;
+        p.unit_price = formatCost(unit);
+        p.notes = val('qe-notes').trim().slice(0, 500);
+        _quoteApplyTotals(p, sub, val('qe-dtype'), val('qe-discount'));
+        ev.currentTarget.disabled = true;
+        try {
+            const res = await fetch(`${API}/api/quotes/${id}/update`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) });
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok || !d.success) {
+                showToast(d.error === 'invoice_exists' ? _t3('quotes.edit_blocked', 'Ce devis a déjà une facture : il ne peut plus être modifié.') : _t3('cost.quote_error', 'Erreur lors de la génération du devis'), 'error');
+                ev.currentTarget.disabled = false;
+                return;
+            }
+            ov._close();
+            showToast(_t3('quotes.saved', 'Devis modifié'), 'success');
+            try { _renderQuoteHistory(); _loadDashboardQuotes(); } catch (e) {}
+            openQuotePdf(id);
+        } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); ev.currentTarget.disabled = false; }
+    };
+};
+
+window.openQuoteInvoiceModal = async function (id) {
+    let info, settings = {};
+    try { info = await _quoteFetchPayload(id); } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); return; }
+    try { settings = await (await fetch(`${API}/api/settings`)).json(); } catch (e) { /* valeurs par défaut */ }
+    const row = info.row, old = info.payload || {};
+    if (row.invoice) { openQuotePdf(row.invoice.id); return; }
+    const base = _quoteBaseValues(row, old);
+    const sub = Math.round(base.qty * base.unit * 100) / 100;
+    const d0 = _quoteDiscountCalc(sub, base.dtype, base.dval);
+    const iso = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    const today = new Date(), due = new Date(Date.now() + 30 * 86400000);
+    const body = `
+        <p class="settings-hint" style="margin:0 0 12px;">${escapeHtml(_t3('quotes.invoice_help', "La facture reprend le contenu du devis. Elle reçoit un numéro définitif (séquentiel) et ne pourra plus être modifiée."))}</p>
+        <div class="quote-form-sum" style="margin:0 0 14px;">
+            <div><span>${escapeHtml(_t3('quotes.invoice_for', 'Devis'))}</span><b>${escapeHtml(row.number)}</b></div>
+            <div><span>${escapeHtml(I18N.t('cost.quote_client'))}</span><b>${escapeHtml(row.client || '—')}</b></div>
+            <div class="qf-total"><span>${escapeHtml(I18N.t('cost.quote_total'))}</span><b>${escapeHtml(formatCost(d0.total))}</b></div>
+        </div>
+        <div class="quote-form-grid">
+            <div><label style="${_qfLabel}">${escapeHtml(_t3('quotes.issue_date', "Date de la facture"))}</label><input type="date" id="qi-date" value="${iso(today)}" style="${_qfField}"></div>
+            <div><label style="${_qfLabel}">${escapeHtml(_t3('quotes.due_date', 'Date d\'échéance'))}</label><input type="date" id="qi-due" value="${iso(due)}" style="${_qfField}"></div>
+            <div class="qf-wide"><label style="${_qfLabel}">${escapeHtml(_t3('quotes.payment_label', 'Conditions de paiement'))}</label><textarea id="qi-pay" rows="3" maxlength="300" placeholder="${escapeHtml(_t3('quotes.payment_ph', 'Ex. : paiement par virement à 30 jours, IBAN…'))}" style="${_qfField} resize:vertical;">${escapeHtml(settings.invoice_payment_terms || '')}</textarea></div>
+        </div>`;
+    const foot = `<button type="button" class="btn btn-ghost" id="qi-cancel">${escapeHtml(_t3('actions.cancel', 'Annuler'))}</button>
+        <button type="button" class="btn btn-primary" id="qi-create"><i class="fa-solid fa-file-invoice-dollar"></i> ${escapeHtml(_t3('quotes.invoice_create', 'Créer la facture'))}</button>`;
+    const ov = _quoteFormOverlay('quote-invoice-overlay', `<i class="fa-solid fa-file-invoice-dollar"></i> ${escapeHtml(_t3('quotes.invoice_modal_title', 'Créer une facture'))}`, body, foot);
+    document.getElementById('qi-cancel').onclick = ov._close;
+    document.getElementById('qi-create').onclick = async (ev) => {
+        const btn = ev.currentTarget;
+        const fmt = (v) => { const dt = new Date(v + 'T12:00:00'); return isNaN(dt) ? '' : _quoteLongDate(dt); };
+        const p = { ...old, ..._quoteLabels('invoice') };
+        p.date = fmt(document.getElementById('qi-date').value) || _quoteLongDate(new Date());
+        p.due_date = fmt(document.getElementById('qi-due').value);
+        p.payment_terms = document.getElementById('qi-pay').value.trim().slice(0, 300);
+        p.ref_label = _t3('quotes.ref_label', 'Réf. devis :');
+        p.client = row.client || '';
+        p.item_desc = old.item_desc || row.item_desc || '';
+        p.item_details = old.item_details || row.item_details || '';
+        p.qty = String(base.qty);
+        p.unit_value = base.unit;
+        p.unit_price = formatCost(base.unit);
+        p.notes = old.notes || row.notes || '';
+        p.subtotal_label = _t3('quotes.subtotal', 'Sous-total');
+        _quoteApplyTotals(p, sub, base.dtype, base.dval);
+        btn.disabled = true;
+        try {
+            const res = await fetch(`${API}/api/quotes/${id}/invoice`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) });
+            const d = await res.json().catch(() => ({}));
+            if (res.status === 409 && d.id) { ov._close(); showToast(_tf('quotes.invoice_exists', 'La facture {{number}} existe déjà pour ce devis', { number: d.number }), 'info'); openQuotePdf(d.id); return; }
+            if (!res.ok || !d.success) { showToast(_t3('cost.quote_error', 'Erreur lors de la génération du devis'), 'error'); btn.disabled = false; return; }
+            try { fetch(`${API}/api/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoice_payment_terms: p.payment_terms }) }); } catch (e) {}
+            ov._close();
+            showToast(_tf('quotes.invoice_created', 'Facture {{number}} créée', { number: d.number }), 'success');
+            try { _renderQuoteHistory(); _loadDashboardQuotes(); } catch (e) {}
+            openQuotePdf(d.id);
+        } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); btn.disabled = false; }
+    };
+};
+
 async function _renderQuoteHistory() {
     const body = document.getElementById('quote-history-body');
     if (!body) return;
@@ -3385,19 +3654,29 @@ async function _renderQuoteHistory() {
             body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-file-invoice"></i><p>${escapeHtml(_t2('dashboard.quotes_empty', "Aucun devis créé pour l'instant"))}</p></div>`;
             return;
         }
-        body.innerHTML = quotes.map(q => `
+        body.innerHTML = quotes.map(q => {
+            const isInv = q.doc_type === 'invoice';
+            const badge = isInv ? `<span class="quote-type-badge inv">${escapeHtml(_t3('quotes.type_invoice', 'Facture'))}</span> ` : '';
+            const sub = isInv && q.source_number ? `${escapeHtml(_t3('quotes.ref_label', 'Réf. devis :'))} ${escapeHtml(q.source_number)} — ` : '';
+            const actions = [];
+            if (!isInv && !q.invoice_id) {
+                actions.push(`<button type="button" class="btn btn-ghost btn-sm" onclick="openQuoteEditModal(${q.id})" title="${escapeHtml(_t3('quotes.edit', 'Modifier ce devis'))}"><i class="fa-solid fa-pen"></i></button>`);
+                actions.push(`<button type="button" class="btn btn-ghost btn-sm" onclick="openQuoteInvoiceModal(${q.id})" title="${escapeHtml(_t3('quotes.invoice_create', 'Créer la facture'))}"><i class="fa-solid fa-file-invoice-dollar"></i></button>`);
+            } else if (!isInv && q.invoice_id) {
+                actions.push(`<button type="button" class="btn btn-ghost btn-sm" onclick="openQuotePdf(${q.invoice_id})" title="${escapeHtml(_t3('quotes.invoice_view', 'Voir la facture'))}"><i class="fa-solid fa-file-circle-check"></i></button>`);
+            }
+            if (q.has_pdf) actions.push(`<button type="button" class="btn btn-ghost btn-sm" onclick="downloadStoredQuote(${q.id})" title="${escapeHtml(_t2('quotes.download', 'Télécharger le PDF'))}"><i class="fa-solid fa-file-pdf"></i></button>`);
+            actions.push(`<button type="button" class="btn btn-ghost btn-sm" onclick="deleteStoredQuote(${q.id})" title="${escapeHtml(_t2('quotes.delete', 'Supprimer'))}"><i class="fa-solid fa-trash"></i></button>`);
+            return `
             <div class="quote-history-row">
-                <div class="quote-history-main">
-                    <div class="quote-history-title">${escapeHtml(q.number)} · ${escapeHtml(q.client || _t2('quotes.no_client', 'Sans client'))}</div>
-                    <div class="quote-history-sub">${escapeHtml(q.item_desc)} — ${escapeHtml(_quoteDateLabel(q))}</div>
+                <div class="quote-history-main"${q.has_pdf ? ` onclick="openQuotePdf(${q.id})" style="cursor:pointer;"` : ''}>
+                    <div class="quote-history-title">${badge}${escapeHtml(q.number)} · ${escapeHtml(q.client || _t2('quotes.no_client', 'Sans client'))}</div>
+                    <div class="quote-history-sub">${sub}${escapeHtml(q.item_desc)} — ${escapeHtml(_quoteDateLabel(q))}</div>
                 </div>
                 <div class="quote-history-total">${escapeHtml(q.total)}</div>
-                <div class="quote-history-actions">
-                    ${q.has_pdf ? `<button type="button" class="btn btn-ghost btn-sm" onclick="downloadStoredQuote(${q.id})" title="${escapeHtml(_t2('quotes.download', 'Télécharger le PDF'))}"><i class="fa-solid fa-file-pdf"></i></button>` : ''}
-                    <button type="button" class="btn btn-ghost btn-sm" onclick="deleteStoredQuote(${q.id})" title="${escapeHtml(_t2('quotes.delete', 'Supprimer ce devis'))}"><i class="fa-solid fa-trash"></i></button>
-                </div>
-            </div>
-        `).join('');
+                <div class="quote-history-actions">${actions.join('')}</div>
+            </div>`;
+        }).join('');
     } catch (err) {
         console.error('[Quotes] Historique:', err);
         body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
@@ -3422,6 +3701,31 @@ window.openQuoteHistoryModal = async function () {
     }
     openModal('modal-quote-history');
     await _renderQuoteHistory();
+};
+
+window.openQuotePdf = function (id) {
+    let modal = document.getElementById('modal-quote-pdf');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-quote-pdf';
+        modal.className = 'modal hidden';
+        modal.innerHTML = `<div class="modal-content quote-pdf-modal">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-file-pdf"></i> ${escapeHtml(_t2('quotes.preview_title', 'Devis'))}</h3>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button type="button" class="btn btn-ghost btn-sm" id="quote-pdf-download"><i class="fa-solid fa-download"></i> ${escapeHtml(_t2('quotes.download', 'Télécharger le PDF'))}</button>
+                    <button class="modal-close" onclick="closeModal('modal-quote-pdf')">×</button>
+                </div>
+            </div>
+            <div class="modal-body quote-pdf-body"><iframe id="quote-pdf-frame" class="quote-pdf-frame" title="PDF"></iframe></div>
+            <div class="quote-pdf-hint">${escapeHtml(_t2('quotes.preview_hint', "Si l'aperçu ne s'affiche pas sur ce système, utilise « Télécharger le PDF »."))}</div>
+        </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-quote-pdf'); });
+    }
+    document.getElementById('quote-pdf-download').onclick = () => downloadStoredQuote(id);
+    document.getElementById('quote-pdf-frame').src = `${API}/api/quotes/${id}/pdf?inline=1#toolbar=1&navpanes=0&view=FitH`;
+    openModal('modal-quote-pdf');
 };
 
 window.downloadStoredQuote = async function (id) {
@@ -3463,6 +3767,134 @@ window.deleteStoredQuote = async function (id) {
         _loadDashboardQuotes();
     } catch (err) {
         showToast(I18N.t('toast.connection_error'), 'error');
+    }
+};
+
+
+// ----------------------------------------------------------------------------
+// Widgets du tableau de bord : Timelapses et MQTT / Home Assistant
+// ----------------------------------------------------------------------------
+async function _loadDashboardTimelapses() {
+    const body = document.getElementById('dashboard-timelapses-body');
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/api/timelapses`, { cache: 'no-store' });
+        if (!res.ok) throw new Error('http');
+        const data = await res.json();
+        const list = (data.timelapses || []).slice(0, 4);
+        const rec = (data.recording || []).map(r => `
+            <div class="dashboard-row" style="cursor:pointer;" onclick="openTimelapseModal()">
+                <div class="dashboard-row-icon" style="background:#ef444422;color:#ef4444;"><i class="fa-solid fa-circle fa-beat-fade"></i></div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title">${escapeHtml(_t3('timelapse.recording', 'Enregistrement en cours'))}</div>
+                    <div class="dashboard-row-sub">${escapeHtml(r.printer_name || '')} — ${escapeHtml(_tf('dashboard.timelapse_frames', '{{n}} images', { n: r.frames || 0 }))}</div>
+                </div>
+            </div>`).join('');
+        if (!list.length && !rec) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-film"></i><p>${escapeHtml(_t3('timelapse.empty', "Aucun timelapse pour l'instant."))}</p></div>`;
+            return;
+        }
+        const fmtDur = (s) => { s = Math.round(s || 0); return s >= 60 ? `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s` : `${s} s`; };
+        body.innerHTML = rec + list.map(t => {
+            const d = new Date(String(t.started_at).replace(' ', 'T'));
+            return `
+            <div class="dashboard-row" style="cursor:pointer;" onclick="openTimelapseModal(${t.id})">
+                <div class="dashboard-row-icon"><i class="fa-solid fa-film"></i></div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title" title="${escapeHtml(t.file_name || '')}">${escapeHtml(String(t.file_name || '—').replace(/\.[^.]+$/, ''))}</div>
+                    <div class="dashboard-row-sub">${escapeHtml(t.printer_name || '')} — ${escapeHtml(isNaN(d) ? '' : d.toLocaleDateString(I18N.lang, { day: 'numeric', month: 'short' }))}</div>
+                </div>
+                <div class="dashboard-row-meta">${escapeHtml(fmtDur(t.duration_s))}</div>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+window._loadDashboardTimelapses = _loadDashboardTimelapses;
+
+async function _loadDashboardMqtt() {
+    const widget = document.getElementById('dashboard-widget-mqtt');
+    const body = document.getElementById('dashboard-mqtt-body');
+    if (!widget || !body) return;
+    // Réservé à l'édition serveur : le widget reste masqué ailleurs
+    if (!(typeof stellioAppConfig !== 'undefined' && stellioAppConfig && stellioAppConfig.server_edition)) { widget.style.display = 'none'; return; }
+    widget.style.display = '';
+    try {
+        const res = await fetch(`${API}/api/mqtt/status`, { cache: 'no-store' });
+        if (!res.ok) { widget.style.display = 'none'; return; }
+        const d = await res.json();
+        let color = '#94a3b8', icon = 'fa-circle-pause', title, sub = '', onclick = 'openMqttEntitiesModal()';
+        if (!d.available) { title = _t3('mqtt.unavailable', "Le module MQTT n'est pas disponible"); onclick = ''; }
+        else if (!d.enabled) {
+            title = _t3('dashboard.mqtt_disabled', "MQTT n'est pas activé");
+            sub = _t3('dashboard.mqtt_configure', 'Cliquer pour configurer');
+            onclick = "document.querySelector('.nav-btn[data-page=&quot;settings&quot;]')?.click()";
+        } else if (d.connected) {
+            color = '#4ade80'; icon = 'fa-circle-check';
+            title = _t3('mqtt.connected', 'Connecté au broker');
+            sub = `${d.host} — ${_tf('dashboard.mqtt_published', '{{n}} publications', { n: d.published || 0 })}`;
+        } else {
+            color = '#f87171'; icon = 'fa-triangle-exclamation';
+            title = _t3('mqtt.disconnected', 'Non connecté');
+            sub = d.error ? `${d.host} (${d.error})` : d.host;
+        }
+        body.innerHTML = `
+            <div class="dashboard-row" style="${onclick ? 'cursor:pointer;' : ''}" ${onclick ? `onclick="${onclick}"` : ''}>
+                <div class="dashboard-row-icon" style="background:${color}22;color:${color};"><i class="fa-solid ${icon}"></i></div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title">${escapeHtml(title)}</div>
+                    ${sub ? `<div class="dashboard-row-sub">${escapeHtml(sub)}</div>` : ''}
+                </div>
+            </div>`;
+    } catch (err) {
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+window._loadDashboardMqtt = _loadDashboardMqtt;
+
+window.openMqttEntitiesModal = async function () {
+    document.getElementById('mqtt-entities-overlay')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'mqtt-entities-overlay'; ov.className = 'print-report-overlay';
+    ov.innerHTML = `
+        <div class="print-report-modal mqtt-ent-modal" role="dialog" aria-modal="true">
+            <div class="print-report-head">
+                <h3><i class="fa-solid fa-house-signal"></i> ${escapeHtml(_t3('mqtt.entities_title', 'Entités visibles dans Home Assistant'))}</h3>
+                <button type="button" class="print-report-close" aria-label="${escapeHtml(_t3('actions.close', 'Fermer'))}"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="mqtt-ent-body"><div class="print-report-preview"><i class="fa-solid fa-spinner fa-spin"></i></div></div>
+        </div>`;
+    document.body.appendChild(ov);
+    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = e => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+    ov.querySelector('.print-report-close').addEventListener('click', close);
+    const body = document.getElementById('mqtt-ent-body');
+    try {
+        const res = await fetch(`${API}/api/mqtt/entities`, { cache: 'no-store' });
+        const d = await res.json();
+        if (!res.ok) throw new Error('http');
+        const state = d.connected ? '● ' + _t3('mqtt.connected', 'Connecté au broker') : '○ ' + _t3('mqtt.disconnected', 'Non connecté');
+        const note = d.discovery
+            ? _t3('mqtt.entities_discovery', "Ces entités apparaissent automatiquement dans Home Assistant (MQTT › Appareils). Une carte par imprimante.")
+            : _t3('mqtt.entities_nodiscovery', "La découverte automatique est désactivée : crée toi-même les capteurs à partir des topics ci-dessous.");
+        const printers = (d.printers || []).map(p => `
+            <div class="mqtt-ent-printer">
+                <div class="mqtt-ent-ptitle"><i class="fa-solid fa-print"></i> ${escapeHtml(p.name)}</div>
+                <table class="mqtt-ent-table">
+                    ${p.entities.map(e => `<tr>
+                        <td>${escapeHtml(e.name)}<small>${escapeHtml(e.component)}.${escapeHtml(e.unique_id)}</small></td>
+                        <td class="mqtt-ent-val">${e.value === null || e.value === undefined || e.value === '' ? '—' : escapeHtml(String(e.value))}${e.unit && e.value !== null && e.value !== '' ? ' ' + escapeHtml(e.unit) : ''}</td>
+                    </tr>`).join('')}
+                </table>
+                <div class="mqtt-ent-topics"><code>${escapeHtml(p.state_topic)}</code><code>${escapeHtml(p.event_topic)}</code></div>
+            </div>`).join('') || `<p style="color:var(--text-muted);padding:20px;">${escapeHtml(_t3('mqtt.entities_none', 'Aucune imprimante.'))}</p>`;
+        body.innerHTML = `<div class="mqtt-ent-head"><span>${escapeHtml(state)}</span><span>${escapeHtml(d.base)}/…</span></div>
+            <p class="settings-hint" style="margin:8px 0 12px;">${escapeHtml(note)}</p>${printers}`;
+    } catch (e) {
+        body.innerHTML = `<p style="color:var(--danger);padding:20px;">${escapeHtml(I18N.t('toast.connection_error'))}</p>`;
     }
 };
 
@@ -10709,6 +11141,7 @@ function _fillQuoteSettingsForm(data) {
     set('settings-quote-website', data.quote_website);
     set('settings-quote-tax-id', data.quote_tax_id);
     set('settings-quote-legal', data.quote_legal);
+    set('settings-quote-terms', data.quote_terms);
     _quoteLogoData = '';
     _quoteLogoRemoved = false;
     _quoteLogoOnServer = !!data.quote_has_logo;
@@ -10750,6 +11183,7 @@ function removeQuoteLogo() {
     _renderQuoteLogoPreview();
 }
 window.removeQuoteLogo = removeQuoteLogo;
+window.fillQuoteTermsDefault = function () { const el = document.getElementById('settings-quote-terms'); if (el) el.value = _t3('quotes.terms_default', ''); };
 
 async function saveQuoteSettings() {
     const val = (id, max) => (document.getElementById(id)?.value || '').trim().slice(0, max);
@@ -10761,6 +11195,7 @@ async function saveQuoteSettings() {
         quote_website: val('settings-quote-website', 120),
         quote_tax_id: val('settings-quote-tax-id', 80),
         quote_legal: val('settings-quote-legal', 1500),
+        quote_terms: (document.getElementById('settings-quote-terms')?.value || '').trim().slice(0, 6000),
     };
     try {
         // Le logo est envoyé à part (fichier côté serveur), pas dans les réglages
@@ -14773,7 +15208,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         if (page === 'library') loadFiles();
         if (page === 'printers') loadPrinters(); else stopAllPrinterCardCameras();
         if (page !== 'dashboard') _stopDashboardCameras();
-        if (page === 'settings') { loadSources(); loadRemoteInstances(); loadGuests(); loadPushSettings(); loadMqttSettings(); }
+        if (page === 'settings') { loadSources(); loadRemoteInstances(); loadGuests(); loadPushSettings(); loadMqttSettings(); balanceSettingsColumns(); }
         else stopDiagnosticConsolePoll();
         if (page === 'spoolman') loadSpoolmanPage();
         if (page === 'stats') loadStats();
@@ -17444,6 +17879,8 @@ function stopAllPrinterCardCameras() {
     document.querySelectorAll('.printer-card-camera').forEach(el => _stopPrinterCardCamera(el));
 }
 window.stopAllPrinterCardCameras = stopAllPrinterCardCameras;
+
+function _costElecLabel() { return String(I18N.t('cost.elec_price_label') || '').replace(/\s*[（(][^)）]*[)）]\s*$/, ''); }
 
 function getPrinterIcon(type) {
     if (type === 'klipper') return 'mdi-printer-3d-nozzle';
@@ -20851,7 +21288,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
     async function _downloadQuote() {
         return _exportQuote({
             quote: _lastQuote, fileName: _costCurrentFileName,
-            ids: { client: 'cost-quote-client', notes: 'cost-quote-notes', item: 'cost-quote-item-name', btn: 'cost-quote-btn', thumbs: 'cost-quote-thumbs' },
+            ids: { client: 'cost-quote-client', notes: 'cost-quote-notes', item: 'cost-quote-item-name', btn: 'cost-quote-btn', thumbs: 'cost-quote-thumbs', discount: 'cost-quote-discount', discountType: 'cost-quote-discount-type' },
             thumbPaths: [_costCurrentFilePath]
         });
     }
@@ -20931,8 +21368,15 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             line_total: formatCost(q.total),
             notes: ctx.notes,
             unit_value: q.unit,
-            total_value: q.total
+            total_value: q.total,
+            subtotal_label: _t3('quotes.subtotal', 'Sous-total'),
+            signature_label: _t3('quotes.sign_label', 'Signature du client'),
+            signature_mention: _t3('quotes.sign_mention', "Bon pour accord : j'ai lu et j'accepte ce devis."),
+            signature_date: _t3('quotes.sign_date', 'Date :'),
+            terms_title: _t3('quotes.terms_title', 'Conditions générales de vente'),
+            terms: _t3('quotes.terms_default', '')
         };
+        _quoteApplyTotals(payload, q.total, document.getElementById(opts.ids.discountType)?.value, document.getElementById(opts.ids.discount)?.value);
         if (opts.ids.thumbs && _quoteThumbsWanted(opts.ids.thumbs)) {
             const paths = typeof opts.thumbPaths === 'function' ? opts.thumbPaths() : (opts.thumbPaths || []);
             payload.thumbnails = await _quoteThumbDataUrls(paths);
@@ -21324,25 +21768,25 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                             ${spoolOptions.map(s => opt(s.id, `${s.name || ''}${s.price ? ` — ${formatCost(s.price)}` : ''}`, s.id === defaultSpool?.id, `data-price="${s.price}" data-weight="${s.weight}"`)).join('')}
                         </select>
                     </div>
-                    <div style="display:flex; gap:10px;">
+                    <div style="display:flex; gap:10px; align-items:flex-end;">
                         <div style="flex:1;"><label style="${labelStyle}">${I18N.t('cost.spool_price_label')} (${cur})</label>
                             <input type="number" id="pcost-spool-price" min="0" step="0.01" value="${spoolPrice}" style="${fieldStyle}"></div>
                         <div style="flex:1;"><label style="${labelStyle}">${I18N.t('cost.spool_weight_label')}</label>
                             <input type="number" id="pcost-spool-weight" min="1" step="1" value="${spoolWeight}" style="${fieldStyle}"></div>
                     </div>
-                    <div style="display:flex; gap:10px;">
-                        <div style="flex:1;"><label style="${labelStyle}">${I18N.t('cost.elec_price_label')} (${cur}/kWh) <span style="color:var(--text-muted);">${I18N.t('cost.optional_suffix')}</span></label>
+                    <div style="display:flex; gap:10px; align-items:flex-end;">
+                        <div style="flex:1;"><label style="${labelStyle}">${_costElecLabel()} (${cur}/kWh) <span style="color:var(--text-muted);">${I18N.t('cost.optional_suffix')}</span></label>
                             <input type="number" id="pcost-elec" min="0" step="0.001" value="${settings.print_cost_elec_price ?? ''}" placeholder="ex: 0.2062" style="${fieldStyle}"></div>
                         <div style="flex:1;"><label style="${labelStyle}">${I18N.t('cost.printer_power_label')}</label>
                             <input type="number" id="pcost-power" min="1" step="1" value="${matchedPrinter ? (matchedPrinter.power_w ?? 120) : (settings.print_cost_printer_power ?? 120)}" style="${fieldStyle}"></div>
                     </div>
-                    <div style="display:flex; gap:10px;">
+                    <div style="display:flex; gap:10px; align-items:flex-end;">
                         <div style="flex:1;"><label style="${labelStyle}">${I18N.t('cost.wear_label')} (${cur}/h) <span style="color:var(--text-muted);">${I18N.t('cost.optional_suffix')}</span></label>
                             <input type="number" id="pcost-wear" min="0" step="0.01" value="${settings.print_cost_wear_per_hour ?? ''}" placeholder="ex: 0.15" style="${fieldStyle}"></div>
                         <div style="flex:1;"><label style="${labelStyle}">${I18N.t('cost.fixed_fee_label')} (${cur}) <span style="color:var(--text-muted);">${escapeHtml(_t2('projects.cost_fixed_hint', '(une seule fois pour le projet)'))}</span></label>
                             <input type="number" id="pcost-fixed" min="0" step="0.01" value="${settings.print_cost_fixed_fee ?? ''}" placeholder="ex: 2" style="${fieldStyle}"></div>
                     </div>
-                    <div style="display:flex; gap:10px;">
+                    <div style="display:flex; gap:10px; align-items:flex-end;">
                         <div style="flex:1;"><label style="${labelStyle}">${I18N.t('cost.margin_label')} <span style="color:var(--text-muted);">${I18N.t('cost.optional_suffix')}</span></label>
                             <input type="number" id="pcost-margin" min="0" max="1000" step="1" value="${settings.print_cost_margin_pct ?? ''}" placeholder="ex: 30" style="${fieldStyle}"></div>
                         <div style="flex:1;"><label style="${labelStyle}">${escapeHtml(_t2('projects.cost_copies_label', 'Exemplaires du projet'))}</label>
@@ -21365,6 +21809,13 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                     <div>
                         <label style="${labelStyle}">${I18N.t('cost.quote_item_name')}</label>
                         <input type="text" id="pcost-quote-item-name" maxlength="120" value="${projectItemName}" style="${fieldStyle}" autocomplete="off">
+                    </div>
+                    <div>
+                        <label style="${labelStyle}">${_t3('quotes.discount', 'Remise')}</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="number" id="pcost-quote-discount" min="0" step="0.01" placeholder="0" style="${fieldStyle}">
+                            <select id="pcost-quote-discount-type" style="${fieldStyle} width:90px;"><option value="percent">%</option><option value="amount">${printCostCurrency === 'USD' ? '$' : '€'}</option></select>
+                        </div>
                     </div>
                     <div>
                         <label style="${labelStyle}">${I18N.t('cost.quote_notes')}</label>
@@ -21395,7 +21846,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             });
             document.getElementById('pcost-quote-btn')?.addEventListener('click', () => _exportQuote({
                 quote: _pc && _pc.quote, fileName: _pc && _pc.name, stripExt: false,
-                ids: { client: 'pcost-quote-client', notes: 'pcost-quote-notes', item: 'pcost-quote-item-name', btn: 'pcost-quote-btn', thumbs: 'pcost-quote-thumbs' },
+                ids: { client: 'pcost-quote-client', notes: 'pcost-quote-notes', item: 'pcost-quote-item-name', btn: 'pcost-quote-btn', thumbs: 'pcost-quote-thumbs', discount: 'pcost-quote-discount', discountType: 'pcost-quote-discount-type' },
                 thumbPaths: () => (_pc ? _pc.files.filter(f => f.ok !== false && f.path).map(f => f.path) : []),
                 extraDetails: ` · ${_pc.files.length} ${I18N.t('projects.parts')}`
             }));
@@ -21555,7 +22006,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                             ${spoolOptions.map(s => `<option value="${escapeHtml(String(s.id))}" data-price="${s.price}" data-weight="${s.weight}" ${s.id === (defaultSpool?.id) ? 'selected' : ''}>${escapeHtml((s.name || (I18N.t('cost.spool_default_name') || 'Bobine')) + (s.source_type ? ` — ${[(s.material || '').toUpperCase(), _sourceLabelFor(s.source_type)].filter(Boolean).join(' · ')}` : ''))}</option>`).join('')}
                         </select>
                     </div>
-                    <div style="display:flex; gap:10px;">
+                    <div style="display:flex; gap:10px; align-items:flex-end;">
                         <div style="flex:1;">
                             <label style="${labelStyle}">${I18N.t('cost.spool_price_label')} (<span class="currency-symbol">${printCostCurrency === 'USD' ? '$' : '€'}</span>)</label>
                             <input type="number" id="cost-spool-price" min="0" step="0.01" value="${spoolPrice}" style="${fieldStyle}">
@@ -21565,9 +22016,9 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                             <input type="number" id="cost-spool-weight" min="1" step="1" value="${spoolWeight}" style="${fieldStyle}">
                         </div>
                     </div>
-                    <div style="display:flex; gap:10px;">
+                    <div style="display:flex; gap:10px; align-items:flex-end;">
                         <div style="flex:1;">
-                            <label style="${labelStyle}">${I18N.t('cost.elec_price_label')} (<span class="currency-symbol">${printCostCurrency === 'USD' ? '$' : '€'}</span>/kWh) <span style="color:var(--text-muted);">${I18N.t('cost.optional_suffix')}</span></label>
+                            <label style="${labelStyle}">${_costElecLabel()} (<span class="currency-symbol">${printCostCurrency === 'USD' ? '$' : '€'}</span>/kWh) <span style="color:var(--text-muted);">${I18N.t('cost.optional_suffix')}</span></label>
                             <input type="number" id="cost-elec-price" min="0" step="0.001" value="${elecPrice}" placeholder="ex: 0.2062" style="${fieldStyle}">
                         </div>
                         <div style="flex:1;">
@@ -21575,7 +22026,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                             <input type="number" id="cost-printer-power" min="1" step="1" value="${printerPower}" style="${fieldStyle}">
                         </div>
                     </div>
-                    <div style="display:flex; gap:10px;">
+                    <div style="display:flex; gap:10px; align-items:flex-end;">
                         <div style="flex:1;">
                             <label style="${labelStyle}">${I18N.t('cost.wear_label')} (<span class="currency-symbol">${printCostCurrency === 'USD' ? '$' : '€'}</span>/h) <span style="color:var(--text-muted);">${I18N.t('cost.optional_suffix')}</span></label>
                             <input type="number" id="cost-wear-rate" min="0" step="0.01" value="${wearRate}" placeholder="ex: 0.15" style="${fieldStyle}">
@@ -21585,7 +22036,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                             <input type="number" id="cost-fixed-fee" min="0" step="0.01" value="${fixedFee}" placeholder="ex: 2" style="${fieldStyle}">
                         </div>
                     </div>
-                    <div style="display:flex; gap:10px;">
+                    <div style="display:flex; gap:10px; align-items:flex-end;">
                         <div style="flex:1;">
                             <label style="${labelStyle}">${I18N.t('cost.margin_label')} <span style="color:var(--text-muted);">${I18N.t('cost.optional_suffix')}</span></label>
                             <input type="number" id="cost-margin-pct" min="0" max="1000" step="1" value="${marginPct}" placeholder="ex: 30" style="${fieldStyle}">
@@ -21605,6 +22056,13 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                     <div>
                         <label style="${labelStyle}">${I18N.t('cost.quote_item_name')}</label>
                         <input type="text" id="cost-quote-item-name" maxlength="120" value="${escapeHtml(String(_costCurrentFileName || '').replace(/\.[^.]+$/, '')).replace(/\"/g, '&quot;')}" style="${fieldStyle}" autocomplete="off">
+                    </div>
+                    <div>
+                        <label style="${labelStyle}">${_t3('quotes.discount', 'Remise')}</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="number" id="cost-quote-discount" min="0" step="0.01" placeholder="0" style="${fieldStyle}">
+                            <select id="cost-quote-discount-type" style="${fieldStyle} width:90px;"><option value="percent">%</option><option value="amount">${printCostCurrency === 'USD' ? '$' : '€'}</option></select>
+                        </div>
                     </div>
                     <div>
                         <label style="${labelStyle}">${I18N.t('cost.quote_notes')}</label>
@@ -23109,7 +23567,7 @@ window.addEventListener('load', () => { if (location.hash === '#workshop') setTi
 
 // ── Timelapses : liste, lecture, téléchargement, suppression ────────────────────────────────────
 function _fmtBytes(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' Mo' : Math.max(1, Math.round(n / 1024)) + ' Ko'; }
-window.openTimelapseModal = async function () {
+window.openTimelapseModal = async function (selectedId) {
     document.getElementById('timelapse-overlay')?.remove();
     const ov = document.createElement('div');
     ov.id = 'timelapse-overlay'; ov.className = 'print-report-overlay';
@@ -23127,7 +23585,7 @@ window.openTimelapseModal = async function () {
     document.addEventListener('keydown', onKey);
     ov.addEventListener('click', e => { if (e.target === ov) close(); });
     ov.querySelector('.print-report-close').addEventListener('click', close);
-    await _renderTimelapseList();
+    await _renderTimelapseList(selectedId);
 };
 async function _renderTimelapseList(selectedId) {
     const body = document.getElementById('tl-body');

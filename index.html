@@ -685,6 +685,30 @@
                                 </div>
                             </div>
 
+                            <div class="dashboard-widget" id="dashboard-widget-timelapses" data-widget-id="timelapses" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-film"></i> <span data-i18n="dashboard.timelapses_title">Timelapses</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="openTimelapseModal(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('timelapses')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-timelapses-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-mqtt" data-widget-id="mqtt" draggable="false" style="display:none;">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-house-signal"></i> <span data-i18n="dashboard.mqtt_title">MQTT / Home Assistant</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="openMqttEntitiesModal(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('mqtt')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-mqtt-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
                             <div class="dashboard-widget" id="dashboard-widget-stats" data-widget-id="stats" draggable="false">
                                 <div class="dashboard-widget-header">
                                     <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
@@ -824,6 +848,7 @@
                 </div>
 
                 <div id="page-library" class="page">
+                    <div id="smart-collections" class="smart-collections"></div>
                     <div id="files-grid" class="files-grid gallery">
                         <div class="empty-state">
                             <i class="fa-solid fa-inbox"></i>
@@ -1393,6 +1418,15 @@
                                     <textarea id="settings-quote-legal" rows="4" maxlength="1500" data-i18n-placeholder="settings.quote_legal_placeholder" placeholder="Ex. : TVA non applicable, art. 293 B du CGI — Paiement à 30 jours — Devis valable 15 jours…" style="width:100%; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px; box-sizing:border-box; resize:vertical;"></textarea>
                                 </div>
 
+                                <div>
+                                    <label style="font-size:13px; color:var(--text-primary); display:block; margin-bottom:4px;" data-i18n="settings.quote_terms_label">Conditions générales de vente (page 2 du devis)</label>
+                                    <textarea id="settings-quote-terms" rows="6" maxlength="6000" style="width:100%; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px; box-sizing:border-box; resize:vertical;"></textarea>
+                                    <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
+                                        <button type="button" class="btn btn-ghost btn-sm" onclick="fillQuoteTermsDefault()" data-i18n="settings.quote_terms_default_btn">Texte par défaut</button>
+                                        <span class="settings-hint" style="margin:0;" data-i18n="settings.quote_terms_hint">Laisse vide pour utiliser le texte par défaut.</span>
+                                    </div>
+                                </div>
+
                                 <button type="button" class="btn btn-primary btn-sm" style="align-self:flex-start;" onclick="saveQuoteSettings()">
                                     <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="actions.save">Enregistrer</span>
                                 </button>
@@ -1699,6 +1733,8 @@
                                             <input type="number" id="lowstock-grams" class="settings-input" min="0" max="5000" step="10" style="width:84px;"></label>
                                         <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;" title="0 = rappel désactivé"><span data-i18n="lowstock.restock">Seuil de réapprovisionnement (g, total par filament)</span>
                                             <input type="number" id="restock-grams" class="settings-input" min="0" max="20000" step="10" style="width:84px;"></label>
+                                        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;" data-i18n-title="lowstock.forecast_hint" title="0 = prévision désactivée"><span data-i18n="lowstock.forecast_days">Prévenir quand il reste moins de (jours)</span>
+                                            <input type="number" id="restock-forecast-days" class="settings-input" min="0" max="180" step="1" style="width:76px;"></label>
                                         <button class="btn btn-primary btn-sm" onclick="saveLowStockSettings()"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="lowstock.save">Enregistrer</span></button>
                                     </div>
                                 </div>
@@ -2019,6 +2055,35 @@
                                 <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
                                     <button type="button" class="btn btn-ghost btn-sm" onclick="testPush()"><i class="fa-solid fa-paper-plane"></i> <span data-i18n="push.test">Envoyer un test</span></button>
                                     <button type="button" class="btn btn-primary btn-sm" onclick="savePushSettings()"><i class="fa-solid fa-check"></i> <span data-i18n="push.save">Enregistrer</span></button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accord-section viewer-hide" id="mqtt-server-block" style="display:none;">
+                            <div class="accord-header" onclick="toggleAccord(this)">
+                                <span><i class="fa-solid fa-house-signal"></i> <span data-i18n="mqtt.title">MQTT / Home Assistant</span></span>
+                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                            </div>
+                            <div class="accord-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <p class="settings-hint" data-i18n="mqtt.hint">Publie l'état de tes imprimantes sur ton broker MQTT. Home Assistant les détecte automatiquement.</p>
+                                <div class="settings-row" style="align-items:center;">
+                                    <label style="font-size:13px; font-weight:500;" data-i18n="mqtt.enable">Activer MQTT</label>
+                                    <label class="nav-toggle-switch">
+                                        <input type="checkbox" id="mqtt-enabled">
+                                        <span class="nav-toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <label class="spool-extra-field"><span data-i18n="mqtt.host">Adresse du broker</span><input type="text" id="mqtt-host" class="settings-select" placeholder="192.168.1.10" autocomplete="off"></label>
+                                <label class="spool-extra-field"><span data-i18n="mqtt.port">Port</span><input type="number" id="mqtt-port" class="settings-select" placeholder="1883" min="1" max="65535"></label>
+                                <label class="spool-extra-field"><span data-i18n="mqtt.user">Utilisateur (optionnel)</span><input type="text" id="mqtt-user" class="settings-select" autocomplete="off"></label>
+                                <label class="spool-extra-field"><span data-i18n="mqtt.password">Mot de passe (optionnel)</span><input type="password" id="mqtt-password" class="settings-select" autocomplete="new-password"></label>
+                                <label class="spool-extra-field"><span data-i18n="mqtt.base">Préfixe des topics</span><input type="text" id="mqtt-base" class="settings-select" placeholder="stellio" autocomplete="off"></label>
+                                <label class="checkbox-label"><input type="checkbox" id="mqtt-tls"> <span data-i18n="mqtt.tls">Connexion chiffrée (TLS)</span></label>
+                                <label class="checkbox-label"><input type="checkbox" id="mqtt-tls-insecure"> <span data-i18n="mqtt.tls_insecure">Accepter un certificat auto-signé</span></label>
+                                <label class="checkbox-label"><input type="checkbox" id="mqtt-discovery" checked> <span data-i18n="mqtt.discovery">Découverte automatique Home Assistant</span></label>
+                                <div id="mqtt-status-line" class="settings-hint"></div>
+                                <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
+                                    <button type="button" class="btn btn-ghost btn-sm" onclick="testMqtt()"><i class="fa-solid fa-plug"></i> <span data-i18n="mqtt.test">Tester la connexion</span></button>
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="saveMqttSettings()"><i class="fa-solid fa-check"></i> <span data-i18n="mqtt.save">Enregistrer</span></button>
                                 </div>
                             </div>
                         </div>
@@ -4002,6 +4067,7 @@
 							<option value="klipper">Klipper (Moonraker)</option>
 							<option value="prusalink">PrusaLink (Prusa MK4 / MK3.9 / MK3.5 / MINI+ / XL / CORE One)</option>
 							<option value="bambu">Bambu Lab (X1 / X2D / P1 / P2S / A1 / H2)</option>
+							<option value="bambuddy">Bambuddy (Bambu Lab via Bambuddy)</option>
 							<option value="elegoo_sdcp" data-i18n="printers.elegoo_sdcp_model">Elegoo (résine Saturn/Mars, ou Centauri Carbon 1)</option>
 							<option value="elegoo_cc2">Elegoo Centauri Carbon 2</option>
 							<option value="creality">Creality (K1 / K2 / Ender-3 V3 / Hi)</option>
@@ -4034,6 +4100,22 @@
 					<div class="input-group" id="group-port" style="display:none;">
 						<label data-i18n="printers.port_moonraker">Port Moonraker</label>
 						<input type="text" id="printer-port" placeholder="7125" value="7125">
+					</div>
+					<div id="group-bambuddy" style="display:none;">
+						<div style="background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:12px;">
+							<small style="color:var(--text-secondary); font-size:11px; line-height:1.5;" data-i18n="printers.bambuddy_hint">Indique l'adresse de ton serveur Bambuddy et une clé API (Bambuddy › Réglages › Clés API, droit « lecture » suffisant). Stellio affiche l'état et la caméra ; l'envoi de fichiers reste géré par Bambuddy.</small>
+						</div>
+						<div class="input-group">
+							<label data-i18n="printers.bambuddy_port">Port Bambuddy</label>
+							<input type="number" id="printer-bambuddy-port" placeholder="8000" value="8000" min="1" max="65535">
+						</div>
+						<div class="input-group">
+							<label data-i18n="printers.bambuddy_printer">Imprimante dans Bambuddy</label>
+							<div style="display:flex; gap:8px;">
+								<select id="printer-bambuddy-id" style="flex:1;"><option value="1">#1</option></select>
+								<button type="button" class="btn btn-ghost btn-sm" onclick="loadBambuddyPrinters()"><i class="fa-solid fa-rotate"></i> <span data-i18n="printers.bambuddy_load">Charger la liste</span></button>
+							</div>
+						</div>
 					</div>
 					<div id="group-bambu" style="display:none;">
 						<div style="background:var(--warning)15; border:1px solid var(--warning)40; border-radius:8px; padding:10px 12px; margin-bottom:12px; display:flex; gap:8px; align-items:flex-start;">

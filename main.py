@@ -3981,6 +3981,10 @@ class PrinterManager:
                 headers = {'X-Api-Key': api_key}
                 r = requests.get(url, headers=headers, timeout=5)
                 return r.status_code == 200
+            elif ptype == 'bambuddy':
+                cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
+                r = _bambuddy_get(ip, api_key, cfg, f"/printers/{_bambuddy_printer_id(cfg)}/status", timeout=5)
+                return r.status_code == 200
             elif ptype == 'klipper':
                 port = db_row['config'].get('port', '7125') if db_row['config'] else '7125'
                 url = f"http://{ip}:{port}/server/info"
@@ -4213,6 +4217,8 @@ class PrinterManager:
                     import traceback
                     traceback.print_exc()
                     return {**default_result, 'status': 'error'}
+            elif ptype == 'bambuddy':
+                return _bambuddy_status(db_row, default_result)
             elif ptype == 'bambu':
                 return self._get_bambu_status(db_row, default_result)
             elif ptype == 'elegoo_sdcp':
@@ -18822,7 +18828,7 @@ def api_quote_logo_delete():
     return jsonify({"success": True}), 200
 
 
-def _quote_pdf_encryption():
+def _quote_pdf_encryption(allow_annotate=False):
     try:
         from reportlab.lib.pdfencrypt import StandardEncryption
         from reportlab.pdfgen import canvas as _rl_canvas
@@ -18832,11 +18838,11 @@ def _quote_pdf_encryption():
 
     class _LockedEncryption(StandardEncryption):
         def permissionBits(self):
-            return super().permissionBits() & ~(256 | 1024)
+            return super().permissionBits() & ~(1024 | (0 if allow_annotate else 256))
 
     def make(strength):
         return _LockedEncryption('', ownerPassword=secrets.token_hex(16), canPrint=1, canModify=0,
-                                 canCopy=1, canAnnotate=0, strength=strength)
+                                 canCopy=0, canAnnotate=1 if allow_annotate else 0, strength=strength)
 
     strengths = (256, 128) if importlib.util.find_spec('pyaes') else (128,)
     for strength in strengths:
@@ -18850,7 +18856,7 @@ def _quote_pdf_encryption():
     return None
 
 
-def build_quote_pdf_bytes(data):
+def build_quote_pdf_bytes(data, encrypt=True):
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle
@@ -18938,7 +18944,7 @@ def build_quote_pdf_bytes(data):
     doc = BaseDocTemplate(
         buf, pagesize=A4, leftMargin=20 * mm, rightMargin=20 * mm, topMargin=top_margin, bottomMargin=bottom_margin,
         title=f"{s('title', 80)} {s('number', 40)}".strip(), author=company or 'Stellio',
-        encrypt=_quote_pdf_encryption()
+        encrypt=_quote_pdf_encryption(allow_annotate=bool(s('signature_label', 60))) if encrypt else None
     )
     frame = Frame(20 * mm, bottom_margin, width, A4[1] - top_margin - bottom_margin,
                   leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, id='quote')
@@ -18969,6 +18975,10 @@ def build_quote_pdf_bytes(data):
         Paragraph(f"{p_text(s('number_label', 40))} {p_text(s('number', 40))}", st_meta),
         Paragraph(p_text(s('date', 60)), st_meta),
     ]
+    if s('due_date', 60):
+        right.append(Paragraph(f"{p_text(s('due_label', 40))} {p_text(s('due_date', 60))}", st_meta))
+    if s('ref_value', 60):
+        right.append(Paragraph(f"{p_text(s('ref_label', 40))} {p_text(s('ref_value', 60))}", st_meta))
     header = Table([[left, right]], colWidths=[width * 0.58, width * 0.42])
     header.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -19044,7 +19054,23 @@ def build_quote_pdf_bytes(data):
         ('LEFTPADDING', (0, 0), (-1, -1), 4), ('RIGHTPADDING', (0, 0), (-1, -1), 4),
         ('TOPPADDING', (0, 0), (-1, -1), 8), ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
     ]))
-    flow += [items, Paragraph(f"{p_text(s('total_label', 40))} : {p_text(s('line_total', 30))}", st_total)]
+    flow += [items]
+    if s('discount', 30):
+        st_sum_l = ParagraphStyle('sl', parent=st_body, alignment=2, textColor=grey)
+        sums = Table([[Paragraph(p_text(s('subtotal_label', 40)), st_sum_l), Paragraph(p_text(s('line_total', 30)), st_num)],
+                      [Paragraph(p_text(s('discount_label', 60)), st_sum_l), Paragraph(p_text(s('discount', 30)), st_num)]],
+                     colWidths=[width * 0.62, width * 0.38])
+        sums.setStyle(TableStyle([('LEFTPADDING', (0, 0), (-1, -1), 4), ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                                  ('TOPPADDING', (0, 0), (-1, -1), 3), ('BOTTOMPADDING', (0, 0), (-1, -1), 3)]))
+        flow += [Spacer(1, 6), sums]
+    flow += [Paragraph(f"{p_text(s('total_label', 40))} : {p_text(s('grand_total', 30) or s('line_total', 30))}", st_total)]
+
+    payment = s('payment_terms', 300).strip()
+    if payment:
+        pay_box = Table([[Paragraph(f"<b>{p_text(s('payment_label', 60))}</b><br/>{p_text(payment, 300)}", st_notes)]], colWidths=[width])
+        pay_box.setStyle(TableStyle([('LINEABOVE', (0, 0), (-1, 0), 0.5, line), ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                                     ('TOPPADDING', (0, 0), (-1, -1), 10)]))
+        flow += [Spacer(1, 18), pay_box]
 
     notes = s('notes', 500).strip()
     if notes:
@@ -19055,17 +19081,107 @@ def build_quote_pdf_bytes(data):
         ]))
         flow += [Spacer(1, 22), notes_box]
 
+    sign_label = s('signature_label', 60).strip()
+    if sign_label:
+        from reportlab.platypus import KeepTogether
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.platypus.flowables import Flowable
+
+        class _CheckBox(Flowable):
+            def __init__(self, size=11):
+                Flowable.__init__(self); self.size = size; self.width = size; self.height = size
+            def draw(self):
+                self.canv.setLineWidth(0.8); self.canv.setStrokeColor(colors.HexColor('#333333'))
+                self.canv.rect(0, 0, self.size, self.size, stroke=1, fill=0)
+                try:  # case réellement cochable à l'écran
+                    ax, ay = self.canv.absolutePosition(0, 0)
+                    self.canv.acroForm.checkbox(name='approved', x=ax, y=ay, size=self.size, borderWidth=0, borderColor=None,
+                                                fillColor=None, textColor=colors.HexColor('#222222'), forceBorder=False, checked=False)
+                except Exception:
+                    pass
+
+
+        class _DateFields(Flowable):
+            """« Date : ../../.... » : seuls les points sont modifiables (champs de formulaire), le reste est figé."""
+            def __init__(self, label, fnt):
+                Flowable.__init__(self); self.label = label; self.fnt = fnt
+                self.width = 60 * mm; self.height = 7 * mm
+            def wrap(self, aw, ah):
+                return self.width, self.height
+            def draw(self):
+                c = self.canv
+                c.setFont(self.fnt, 9); c.setFillColor(colors.HexColor('#555555'))
+                x = pdfmetrics.stringWidth(self.label, self.fnt, 9) + 6
+                c.drawString(0, 2, self.label)
+                x_cur = x
+                for i, (nm, val, w) in enumerate((('date_day', '..', 6 * mm), ('date_month', '..', 6 * mm), ('date_year', '....', 11 * mm))):
+                    if i:
+                        c.setFont('Helvetica', 9); c.drawString(x_cur, 2, '/'); x_cur += 5
+                    try:
+                        ax, ay = c.absolutePosition(x_cur, -1.8)
+                        # Au clic les points disparaissent (script de focus), et reviennent si le champ reste vide.
+                        _orig_add = c._addAnnotation
+                        def _add_with_js(ann, _o=_orig_add, _v=val):
+                            try:
+                                from reportlab.pdfbase.pdfdoc import PDFDictionary, PDFName, PDFString
+                                def _act(js):
+                                    return PDFDictionary({'S': PDFName('JavaScript'), 'JS': PDFString(js)})
+                                ann.dict['AA'] = PDFDictionary({
+                                    'Fo': _act("if (event.target.value == '%s') event.target.value = '';" % _v),
+                                    'Bl': _act("if (event.target.value == '') event.target.value = '%s';" % _v)})
+                            except Exception:
+                                pass
+                            return _o(ann)
+                        c._addAnnotation = _add_with_js
+                        c.acroForm.textfield(name=nm, value=val, x=ax, y=ay, width=w, height=4.2 * mm, borderWidth=0,
+                                             fillColor=None, borderColor=None, textColor=colors.HexColor('#222222'),
+                                             fontName='Helvetica', fontSize=9, maxlen=len(val), forceBorder=False,
+                                             fieldFlags='')
+                    except Exception:
+                        c.setFont('Helvetica', 10); c.drawString(x_cur, 2, val)
+                    finally:
+                        c._addAnnotation = _orig_add
+                    x_cur += w
+
+        st_mention = ParagraphStyle('mn', fontName=font, fontSize=9.5, leading=13, textColor=colors.HexColor('#222222'))
+        st_sign_l = ParagraphStyle('sl', fontName=font, fontSize=9, leading=12, textColor=colors.HexColor('#555555'))
+        mention = Table([[_CheckBox(), Paragraph(p_text(s('signature_mention', 200)), st_mention)]], colWidths=[9 * mm, width * 0.5 - 9 * mm], hAlign='RIGHT')
+        mention.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'), ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                                     ('TOPPADDING', (0, 0), (-1, -1), 1), ('BOTTOMPADDING', (0, 0), (-1, -1), 1)]))
+        sign_box = Table([[_DateFields(s('signature_date', 30), font)], [Paragraph(p_text(sign_label), st_sign_l)], ['']],
+                         colWidths=[width * 0.5], rowHeights=[None, None, 22 * mm], hAlign='RIGHT')
+        sign_box.setStyle(TableStyle([('LINEBELOW', (0, 2), (0, 2), 0.5, line), ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                                      ('TOPPADDING', (0, 0), (-1, -1), 2), ('BOTTOMPADDING', (0, 0), (-1, -1), 2)]))
+        flow += [Spacer(1, 22), KeepTogether([mention, Spacer(1, 6), sign_box])]
+
+    terms_title = s('terms_title', 80).strip()
+    terms = (cfg('quote_terms', 6000) or str(data.get('terms') or '')[:6000]).strip()
+    if terms_title and terms:
+        from reportlab.platypus import PageBreak
+        st_t_title = ParagraphStyle('tt', fontName=bold, fontSize=15, leading=19, textColor=colors.HexColor('#1a1f2b'), spaceAfter=10)
+        st_t_body = ParagraphStyle('tb', fontName=font, fontSize=8.6, leading=11.6, textColor=colors.HexColor('#333333'), spaceAfter=5)
+        flow += [PageBreak(), Paragraph(p_text(terms_title, 80), st_t_title)]
+        for ln in terms.splitlines():
+            ln = ln.strip()
+            if not ln:
+                continue
+            head, sep, rest = ln.partition(' : ') if ' : ' in ln[:80] else ln.partition(': ') if ': ' in ln[:80] else (ln, '', '')
+            if sep and len(head) <= 70:
+                flow.append(Paragraph(f"<b>{p_text(head, 70)}</b> : {p_text(rest, 1500)}", st_t_body))
+            else:
+                flow.append(Paragraph(p_text(ln, 1500), st_t_body))
+
     doc.build(flow)
     return buf.getvalue()
 
 
-def _build_quote_pdf_with_repair(data):
+def _build_quote_pdf_with_repair(data, encrypt=True):
     """Génère le devis ; si reportlab manque (version empaquetée mise à jour par patch), tente une réparation puis réessaie."""
     try:
-        return build_quote_pdf_bytes(data)
+        return build_quote_pdf_bytes(data, encrypt=encrypt)
     except ImportError:
         if _ensure_optional_module('reportlab.platypus', 'reportlab'):
-            return build_quote_pdf_bytes(data)
+            return build_quote_pdf_bytes(data, encrypt=encrypt)
         raise
 
 
@@ -19081,42 +19197,89 @@ def _safe_quote_pdf_filename(name):
 QUOTES_DIR = os.path.join(DATA_DIR, 'quotes')
 
 
-def _record_quote(user_id, data, pdf_bytes):
-    """Enregistre un devis généré dans l'historique, avec une copie du PDF. Ne doit jamais faire échouer l'export."""
-    try:
-        os.makedirs(QUOTES_DIR, exist_ok=True)
+_QUOTE_COLS_DONE = False
 
-        def t(key, limit):
-            return str(data.get(key) or '')[:limit]
-        try:
-            total_value = float(data.get('total_value') or 0)
-        except (TypeError, ValueError):
-            total_value = 0.0
+
+def _ensure_quote_columns():
+    """Colonnes ajoutées en 0.8.7 : type de document (devis / facture), devis d'origine, remise, charge utile complète."""
+    global _QUOTE_COLS_DONE
+    if _QUOTE_COLS_DONE:
+        return
+    conn = get_db()
+    try:
+        cols = {r['name'] for r in conn.execute("PRAGMA table_info(quotes)").fetchall()}
+        for name, ddl in (('doc_type', "TEXT DEFAULT 'quote'"), ('source_quote_id', 'INTEGER DEFAULT 0'),
+                          ('discount_value', 'REAL DEFAULT 0'), ('payload_file', "TEXT DEFAULT ''")):
+            if name not in cols:
+                conn.execute(f"ALTER TABLE quotes ADD COLUMN {name} {ddl}")
+        conn.commit()
+    finally:
+        conn.close()
+    _QUOTE_COLS_DONE = True
+
+
+def _quote_payload_path(row):
+    name = os.path.basename((row['payload_file'] if 'payload_file' in row.keys() else '') or '')
+    return os.path.join(QUOTES_DIR, name) if name else ''
+
+
+def _write_quote_files(user_id, qid, data, pdf_bytes):
+    os.makedirs(QUOTES_DIR, exist_ok=True)
+    pdf_name = f"quote_{user_id}_{qid}.pdf"
+    json_name = f"quote_{user_id}_{qid}.json"
+    with open(os.path.join(QUOTES_DIR, pdf_name), 'wb') as f_pdf:
+        f_pdf.write(pdf_bytes)
+    with open(os.path.join(QUOTES_DIR, json_name), 'w', encoding='utf-8') as f_js:
+        json.dump(data, f_js, ensure_ascii=False)
+    return pdf_name, json_name
+
+
+def _quote_fields(data):
+    def t(key, limit):
+        return str(data.get(key) or '')[:limit]
+    try:
+        total_value = float(data.get('total_value') or 0)
+    except (TypeError, ValueError):
+        total_value = 0.0
+    try:
+        discount_value = float(data.get('discount_value') or 0)
+    except (TypeError, ValueError):
+        discount_value = 0.0
+    return (t('number', 40), t('client', 120), t('item_desc', 200), t('item_details', 200), t('qty', 20), t('unit_price', 40),
+            t('grand_total', 40) or t('line_total', 40), total_value, t('notes', 500), discount_value)
+
+
+def _record_quote(user_id, data, pdf_bytes, doc_type='quote', source_id=0):
+    """Enregistre un devis (ou une facture) dans l'historique, avec une copie du PDF et de ses données.
+    Ne doit jamais faire échouer l'export. Retourne l'id créé (ou None)."""
+    try:
+        _ensure_quote_columns()
+        number, client, desc, details, qty, unit_price, total, total_value, notes, discount = _quote_fields(data)
         conn = get_db()
         try:
             cur = conn.execute(
                 """INSERT INTO quotes (user_id, number, client, item_desc, item_details, qty, unit_price,
-                                       total, total_value, notes, filename)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (user_id, t('number', 40), t('client', 120), t('item_desc', 200), t('item_details', 200),
-                 t('qty', 20), t('unit_price', 40), t('line_total', 40), total_value, t('notes', 500),
-                 _safe_quote_pdf_filename(data.get('filename')))
+                                       total, total_value, notes, filename, doc_type, source_quote_id, discount_value)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (user_id, number, client, desc, details, qty, unit_price, total, total_value, notes,
+                 _safe_quote_pdf_filename(data.get('filename')), doc_type, int(source_id or 0), discount)
             )
             qid = cur.lastrowid
-            pdf_name = f"quote_{user_id}_{qid}.pdf"
-            with open(os.path.join(QUOTES_DIR, pdf_name), 'wb') as f_pdf:
-                f_pdf.write(pdf_bytes)
-            conn.execute("UPDATE quotes SET pdf_file = ? WHERE id = ?", (pdf_name, qid))
+            pdf_name, json_name = _write_quote_files(user_id, qid, data, pdf_bytes)
+            conn.execute("UPDATE quotes SET pdf_file = ?, payload_file = ? WHERE id = ?", (pdf_name, json_name, qid))
             conn.commit()
+            return qid
         finally:
             conn.close()
     except Exception as e:
         app_logger.warning(f"[QUOTE] Historique : enregistrement impossible : {e}")
+        return None
 
 
 @app.route('/api/quotes', methods=['GET'])
 @login_required
 def api_quotes_list():
+    _ensure_quote_columns()
     try:
         limit = max(1, min(int(request.args.get('limit', 200)), 500))
     except (TypeError, ValueError):
@@ -19124,9 +19287,11 @@ def api_quotes_list():
     conn = get_db()
     try:
         rows = conn.execute(
-            """SELECT id, number, client, item_desc, item_details, qty, unit_price, total, total_value, notes,
-                      filename, created_at, (pdf_file != '') AS has_pdf
-               FROM quotes WHERE user_id = ? ORDER BY id DESC LIMIT ?""",
+            """SELECT q.id, q.number, q.client, q.item_desc, q.item_details, q.qty, q.unit_price, q.total, q.total_value, q.notes,
+                      q.filename, q.created_at, (q.pdf_file != '') AS has_pdf, q.doc_type, q.source_quote_id, q.discount_value,
+                      (SELECT i.id FROM quotes i WHERE i.source_quote_id = q.id AND i.doc_type = 'invoice' LIMIT 1) AS invoice_id,
+                      (SELECT s.number FROM quotes s WHERE s.id = q.source_quote_id) AS source_number
+               FROM quotes q WHERE q.user_id = ? ORDER BY q.id DESC LIMIT ?""",
             (session['user_id'], limit)
         ).fetchall()
         total = conn.execute("SELECT COUNT(*) FROM quotes WHERE user_id = ?", (session['user_id'],)).fetchone()[0]
@@ -19150,6 +19315,130 @@ def _stored_quote_path(row):
     return path if path and os.path.isfile(path) else None
 
 
+@app.route('/api/quotes/<int:qid>/payload', methods=['GET'])
+@login_required
+def api_quote_history_payload(qid):
+    """Données complètes d'un devis/facture (pour le modifier ou en tirer une facture)."""
+    _ensure_quote_columns()
+    row = _stored_quote(qid)
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    payload = {}
+    path = _quote_payload_path(row)
+    if path and os.path.isfile(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                payload = json.load(f)
+        except Exception:
+            payload = {}
+    conn = get_db()
+    try:
+        inv = conn.execute("SELECT id, number FROM quotes WHERE source_quote_id = ? AND doc_type = 'invoice' AND user_id = ?",
+                           (qid, session['user_id'])).fetchone()
+    finally:
+        conn.close()
+    meta = {k: row[k] for k in ('id', 'number', 'client', 'item_desc', 'item_details', 'qty', 'unit_price', 'total', 'total_value',
+                                 'notes', 'created_at', 'doc_type', 'discount_value')}
+    meta['invoice'] = dict(inv) if inv else None
+    return jsonify({"row": meta, "payload": payload})
+
+
+@app.route('/api/quotes/<int:qid>/update', methods=['POST'])
+@login_required
+def api_quote_history_update(qid):
+    """Modifie un devis déjà généré : le PDF est régénéré et remplace l'ancien (même numéro)."""
+    _ensure_quote_columns()
+    row = _stored_quote(qid)
+    if not row:
+        return jsonify({"success": False, "error": "not_found"}), 404
+    if (row['doc_type'] or 'quote') != 'quote':
+        return jsonify({"success": False, "error": "not_a_quote"}), 400
+    conn = get_db()
+    try:
+        has_invoice = conn.execute("SELECT 1 FROM quotes WHERE source_quote_id = ? AND doc_type = 'invoice'", (qid,)).fetchone()
+    finally:
+        conn.close()
+    if has_invoice:
+        return jsonify({"success": False, "error": "invoice_exists"}), 409
+    data = request.get_json(silent=True) or {}
+    data['number'] = row['number']
+    data['filename'] = row['filename']
+    try:
+        pdf_bytes = _build_quote_pdf_with_repair(data)
+    except ImportError as e:
+        return jsonify({"success": False, "error": "missing_module", "module": getattr(e, 'name', None) or 'reportlab'}), 503
+    except Exception as e:
+        app_logger.error(f"[QUOTE] Modification : échec PDF : {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    try:
+        number, client, desc, details, qty, unit_price, total, total_value, notes, discount = _quote_fields(data)
+        pdf_name, json_name = _write_quote_files(session['user_id'], qid, data, pdf_bytes)
+        conn = get_db()
+        try:
+            conn.execute("""UPDATE quotes SET client=?, item_desc=?, item_details=?, qty=?, unit_price=?, total=?, total_value=?,
+                            notes=?, discount_value=?, pdf_file=?, payload_file=? WHERE id=? AND user_id=?""",
+                         (client, desc, details, qty, unit_price, total, total_value, notes, discount, pdf_name, json_name,
+                          qid, session['user_id']))
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        app_logger.error(f"[QUOTE] Modification : enregistrement impossible : {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    return jsonify({"success": True, "id": qid})
+
+
+def _next_invoice_number(conn, user_id, prefix):
+    year = datetime.datetime.now().year
+    best = 0
+    for r in conn.execute("SELECT number FROM quotes WHERE user_id = ? AND doc_type = 'invoice' AND number LIKE ?",
+                          (user_id, f"%-{year}-%")).fetchall():
+        mt = re.search(r'-(\d+)$', r['number'] or '')
+        if mt:
+            best = max(best, int(mt.group(1)))
+    return f"{prefix}-{year}-{best + 1:04d}"
+
+
+@app.route('/api/quotes/<int:qid>/invoice', methods=['POST'])
+@login_required
+def api_quote_history_invoice(qid):
+    """Crée la facture définitive d'un devis existant (numéro séquentiel attribué par le serveur)."""
+    _ensure_quote_columns()
+    row = _stored_quote(qid)
+    if not row:
+        return jsonify({"success": False, "error": "not_found"}), 404
+    if (row['doc_type'] or 'quote') != 'quote':
+        return jsonify({"success": False, "error": "not_a_quote"}), 400
+    data = request.get_json(silent=True) or {}
+    prefix = re.sub(r'[^A-Za-z0-9]', '', str(data.get('number_prefix') or ''))[:6].upper() or 'INV'
+    conn = get_db()
+    try:
+        existing = conn.execute("SELECT id, number FROM quotes WHERE source_quote_id = ? AND doc_type = 'invoice' AND user_id = ?",
+                                (qid, session['user_id'])).fetchone()
+        if existing:
+            return jsonify({"success": False, "error": "invoice_exists", "id": existing['id'], "number": existing['number']}), 409
+        number = _next_invoice_number(conn, session['user_id'], prefix)
+    finally:
+        conn.close()
+    data['number'] = number
+    data['ref_value'] = row['number']
+    slug = re.sub(r'[^A-Za-z0-9]+', '-', _unicodedata.normalize('NFD', str(data.get('client') or '')).encode('ascii', 'ignore').decode()).strip('-')[:40]
+    file_prefix = re.sub(r'[^\w\- ]', '', str(data.get('filename_prefix') or 'Invoice'), flags=re.U)[:30] or 'Invoice'
+    data['filename'] = _safe_quote_pdf_filename('-'.join(x for x in (file_prefix, slug, number) if x))
+    try:
+        pdf_bytes = _build_quote_pdf_with_repair(data)
+    except ImportError as e:
+        return jsonify({"success": False, "error": "missing_module", "module": getattr(e, 'name', None) or 'reportlab'}), 503
+    except Exception as e:
+        app_logger.error(f"[QUOTE] Facture : échec PDF : {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    new_id = _record_quote(session['user_id'], data, pdf_bytes, doc_type='invoice', source_id=qid)
+    if not new_id:
+        return jsonify({"success": False, "error": "record_failed"}), 500
+    app_logger.info(f"[QUOTE] 🧾 Facture {number} créée d'après le devis {row['number']}")
+    return jsonify({"success": True, "id": new_id, "number": number})
+
+
 @app.route('/api/quotes/<int:qid>/pdf', methods=['GET'])
 @login_required
 def api_quote_history_pdf(qid):
@@ -19157,8 +19446,34 @@ def api_quote_history_pdf(qid):
     path = _stored_quote_path(row) if row else None
     if not path:
         return jsonify({"error": "PDF introuvable"}), 404
-    return send_file(path, mimetype='application/pdf', as_attachment=True,
-                     download_name=_safe_quote_pdf_filename(row['filename'] or row['number']))
+    inline = request.args.get('inline') == '1'
+    name = _safe_quote_pdf_filename(row['filename'] or row['number'])
+    if inline:
+        # Les visionneuses intégrées (WebView, navigateurs mobiles) demandent un « code » pour tout PDF chiffré,
+        # même quand le mot de passe utilisateur est vide : l'aperçu est donc servi sans chiffrement.
+        # Le fichier téléchargé / enregistré reste verrouillé.
+        try:
+            pj = _quote_payload_path(row)
+            if pj and os.path.isfile(pj):
+                with open(pj, 'r', encoding='utf-8') as f:
+                    payload = json.load(f)
+                return send_file(io.BytesIO(_build_quote_pdf_with_repair(payload, encrypt=False)),
+                                 mimetype='application/pdf', as_attachment=False, download_name=name)
+        except Exception as e:
+            app_logger.warning(f"[QUOTE] Aperçu non chiffré indisponible, repli : {e}")
+        try:
+            from pypdf import PdfReader, PdfWriter
+            rd = PdfReader(str(path))
+            if rd.is_encrypted:
+                rd.decrypt('')
+            wr = PdfWriter()
+            for pg in rd.pages:
+                wr.add_page(pg)
+            out = io.BytesIO(); wr.write(out); out.seek(0)
+            return send_file(out, mimetype='application/pdf', as_attachment=False, download_name=name)
+        except Exception:
+            pass
+    return send_file(path, mimetype='application/pdf', as_attachment=not inline, download_name=name)
 
 
 @app.route('/api/quotes/<int:qid>/save-native', methods=['POST'])
@@ -19202,11 +19517,12 @@ def api_quote_history_delete(qid):
         conn.commit()
     finally:
         conn.close()
-    if path:
-        try:
-            os.remove(path)
-        except OSError:
-            pass
+    for p in (path, _quote_payload_path(row)):
+        if p and os.path.isfile(p):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
     return jsonify({"success": True})
 
 
@@ -19349,6 +19665,7 @@ def api_get_settings():
         settings.setdefault('low_stock_threshold_percent', int(LOW_STOCK_RATIO * 100))
         settings.setdefault('low_stock_threshold_g', LOW_STOCK_FLOOR_G)
         settings.setdefault('restock_threshold_g', RESTOCK_DEFAULT_G)
+        settings.setdefault('restock_forecast_days', RESTOCK_FORECAST_DEFAULT_DAYS)
         settings.setdefault('thumb_color', THUMB_DEFAULT_COLOR)
         settings.setdefault('thumb_perf_mode', 'auto')
         settings['launch_at_startup_supported'] = True
@@ -19415,7 +19732,7 @@ def api_save_settings():
             data['thumb_perf_mode'] = str(data['thumb_perf_mode'])
             _thumb_perf_cache['t'] = 0.0   # pris en compte immédiatement
 
-        for _lk, _lmax in (('low_stock_threshold_percent', 100), ('low_stock_threshold_g', 5000), ('restock_threshold_g', 20000)):
+        for _lk, _lmax in (('low_stock_threshold_percent', 100), ('low_stock_threshold_g', 5000), ('restock_threshold_g', 20000), ('restock_forecast_days', 180)):
             if _lk in data:
                 try:
                     _lv = float(data.get(_lk))
@@ -19486,7 +19803,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.8.6"
+CURRENT_VERSION = "0.8.7"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -20239,6 +20556,8 @@ def api_add_printer():
         serial = raw_config.get('serial', '')
         api_key = code
         raw_config = {'code': code, 'serial': serial, 'model': str(raw_config.get('model') or 'A1').upper()[:20]}
+    elif ptype == 'bambuddy':
+        raw_config = _bambuddy_clean_config(raw_config)
     elif ptype == 'elegoo_cc2':
         code = raw_config.get('code', '') or '123456'
         api_key = code
@@ -20575,6 +20894,8 @@ def api_edit_printer(pid):
             if code:
                 has_new_api_key = True
                 data['api_key'] = code
+        elif ptype == 'bambuddy':
+            raw_config = _bambuddy_clean_config(raw_config)
         elif ptype == 'elegoo_cc2':
             code = raw_config.get('code', '') or '123456'
             raw_config = {'code': code}
@@ -20637,6 +20958,177 @@ def api_delete_printer(pid):
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
     finally:
         conn.close()
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# v0.8.7 — Bambuddy (passerelle Bambu Lab auto-hébergée) : état, caméra, instantané
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+BAMBUDDY_DEFAULT_PORT = 8000
+_BAMBUDDY_ARCHIVE_NAMES = {}
+
+
+def _bambuddy_base(ip, cfg):
+    """URL de base de l'API Bambuddy : accepte « host », « host:port » ou une URL complète."""
+    raw = str(ip or '').strip().rstrip('/')
+    if not raw:
+        return ''
+    if not re.match(r'^https?://', raw, re.I):
+        scheme = 'https' if (cfg or {}).get('https') else 'http'
+        if ':' not in raw.split('/')[0]:
+            raw = f"{raw}:{(cfg or {}).get('port') or BAMBUDDY_DEFAULT_PORT}"
+        raw = f"{scheme}://{raw}"
+    raw = re.sub(r'/api/v1$', '', raw)
+    return f"{raw}/api/v1"
+
+
+def _bambuddy_get(ip, api_key, cfg, path, timeout=5, **kw):
+    base = _bambuddy_base(ip, cfg)
+    if not base:
+        raise ValueError('adresse manquante')
+    return requests.get(f"{base}{path}", headers={'X-API-Key': api_key or ''}, timeout=timeout, **kw)
+
+
+def _bambuddy_clean_config(raw):
+    raw = raw if isinstance(raw, dict) else {}
+    out = {}
+    try:
+        out['bambuddy_id'] = max(1, int(raw.get('bambuddy_id') or 1))
+    except (TypeError, ValueError):
+        out['bambuddy_id'] = 1
+    try:
+        port = int(raw.get('port') or BAMBUDDY_DEFAULT_PORT)
+        out['port'] = port if 1 <= port <= 65535 else BAMBUDDY_DEFAULT_PORT
+    except (TypeError, ValueError):
+        out['port'] = BAMBUDDY_DEFAULT_PORT
+    if raw.get('https'):
+        out['https'] = True
+    return out
+
+
+def _bambuddy_printer_id(cfg):
+    try:
+        return int((cfg or {}).get('bambuddy_id') or 1)
+    except (TypeError, ValueError):
+        return 1
+
+
+def _bambuddy_status(db_row, default_result):
+    cfg = db_row.get('config') if isinstance(db_row.get('config'), dict) else {}
+    ip, key = db_row['ip'], db_row['api_key']
+    bid = _bambuddy_printer_id(cfg)
+    r = _bambuddy_get(ip, key, cfg, f"/printers/{bid}/status", timeout=4)
+    if r.status_code in (401, 403):
+        return {**default_result, 'status': 'error'}
+    if r.status_code != 200:
+        return {**default_result, 'status': 'offline'}
+    d = r.json() or {}
+    if d.get('connected') is False:
+        return {**default_result, 'status': 'offline'}
+    state = str(d.get('state') or '').upper()
+    status = {'RUNNING': 'printing', 'PREPARE': 'printing', 'SLICING': 'printing', 'PAUSE': 'paused',
+              'FAILED': 'error', 'IDLE': 'idle', 'FINISH': 'idle'}.get(state, 'idle')
+    temps = d.get('temperatures') or {}
+
+    def _n(v):
+        try:
+            return round(float(v or 0), 1)
+        except (TypeError, ValueError):
+            return 0
+    progress = _n(d.get('progress'))
+    remaining = int(_n(d.get('remaining_time')) * 60) if status in ('printing', 'paused') else 0
+    elapsed = total = 0
+    if remaining and 0 < progress < 100:
+        total = int(remaining / (1 - progress / 100.0))
+        elapsed = max(0, total - remaining)
+    fname = ''
+    aid = d.get('current_archive_id')
+    if aid and status in ('printing', 'paused'):
+        fname = _BAMBUDDY_ARCHIVE_NAMES.get((ip, aid), '')
+        if not fname:
+            try:
+                ra = _bambuddy_get(ip, key, cfg, f"/archives/{aid}", timeout=3)
+                if ra.status_code == 200:
+                    ad = ra.json() or {}
+                    fname = str(ad.get('print_name') or ad.get('filename') or '')
+                    if fname:
+                        _BAMBUDDY_ARCHIVE_NAMES[(ip, aid)] = fname
+            except Exception:
+                pass
+    return {
+        'status': status, 'progress': progress if status in ('printing', 'paused') else 0, 'file': fname,
+        'temps': {'extruder': {'current': _n(temps.get('nozzle')), 'target': _n(temps.get('nozzle_target'))},
+                  'bed': {'current': _n(temps.get('bed')), 'target': _n(temps.get('bed_target'))},
+                  'chamber': {'current': _n(temps.get('chamber')), 'target': 0}},
+        'time': {'elapsed': elapsed, 'remaining': remaining, 'total': total},
+        'last_print': {'filename': '', 'duration': 0, 'finished_at': ''}
+    }
+
+
+@app.route('/api/bambuddy/printers', methods=['POST'])
+@login_required
+def api_bambuddy_printers():
+    """Liste les imprimantes connues d'un Bambuddy (pour choisir laquelle ajouter)."""
+    data = request.json or {}
+    ip, key = str(data.get('ip') or '').strip(), str(data.get('api_key') or '').strip()
+    cfg = data.get('config') if isinstance(data.get('config'), dict) else {}
+    if not ip:
+        return jsonify({"success": False, "error": "Adresse manquante"}), 200
+    if not key and data.get('printer_id'):
+        conn = get_db()
+        try:
+            row = conn.execute("SELECT api_key FROM printers WHERE id=? AND user_id=?", (data['printer_id'], session['user_id'])).fetchone()
+        finally:
+            conn.close()
+        if row and row['api_key']:
+            key = decrypt_account_secret(row['api_key'])
+    try:
+        r = _bambuddy_get(ip, key, cfg, '/printers', timeout=6)
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Bambuddy injoignable ({type(e).__name__})"}), 200
+    if r.status_code in (401, 403):
+        return jsonify({"success": False, "error": "Clé API refusée (droit « lecture » requis)"}), 200
+    if r.status_code != 200:
+        return jsonify({"success": False, "error": f"Réponse inattendue (HTTP {r.status_code})"}), 200
+    try:
+        items = [{"id": p.get('id'), "name": p.get('name') or f"#{p.get('id')}", "model": p.get('model') or '',
+                  "ip": p.get('ip_address') or ''} for p in (r.json() or []) if p.get('is_active', True)]
+    except Exception:
+        return jsonify({"success": False, "error": "Réponse illisible"}), 200
+    return jsonify({"success": True, "printers": items}), 200
+
+
+@app.route('/api/printers/<int:pid>/camera/bambuddy')
+@login_required
+def api_printer_camera_bambuddy(pid):
+    """Relais du flux MJPEG Bambuddy (la clé API reste côté serveur)."""
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT * FROM printers WHERE id=? AND user_id=?", (pid, session['user_id'])).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    p = parse_printer_config(row)
+    if p.get('type') != 'bambuddy':
+        return jsonify({"error": "Non Bambuddy"}), 400
+    cfg = p.get('config') or {}
+    try:
+        up = _bambuddy_get(p['ip'], p.get('api_key'), cfg, f"/printers/{_bambuddy_printer_id(cfg)}/camera/stream",
+                           timeout=(5, 30), stream=True, params={'fps': 10})
+    except Exception:
+        return jsonify({"error": "Caméra Bambuddy injoignable"}), 502
+    if up.status_code != 200:
+        up.close()
+        return jsonify({"error": f"Caméra indisponible (HTTP {up.status_code})"}), 502
+
+    def _gen():
+        try:
+            for chunk in up.iter_content(chunk_size=16384):
+                if chunk:
+                    yield chunk
+        finally:
+            up.close()
+    return Response(_gen(), mimetype=up.headers.get('Content-Type') or 'multipart/x-mixed-replace; boundary=frame')
+
 
 def _resolve_printer_camera(printer, pid, host_url=''):
     """Informations caméra d'une imprimante (flux, instantané) ; réutilisé par la route /camera et par le timelapse."""
@@ -20714,6 +21206,14 @@ def _resolve_printer_camera(printer, pid, host_url=''):
                     "snapshot_url": None,
                     "name": "Bambu Lab Camera"
                 })
+
+        elif ptype == 'bambuddy':
+            camera_info.update({
+                "available": True,
+                "stream_url": f"{host_url.rstrip('/')}/api/printers/{pid}/camera/bambuddy",
+                "snapshot_url": None,
+                "name": "Bambuddy Camera"
+            })
 
         elif ptype == 'creality':
             camera_info.update({
@@ -20873,6 +21373,12 @@ def _timelapse_grab_frame(printer):
                 gen.close()
             except Exception:
                 pass
+    if ptype == 'bambuddy':
+        try:
+            r = _bambuddy_get(ip, printer.get('api_key'), cfg, f"/printers/{_bambuddy_printer_id(cfg)}/camera/snapshot", timeout=8)
+            return _extract_jpeg(r.content) if r.status_code == 200 else None
+        except Exception:
+            return None
     cam = _resolve_printer_camera(printer, pid, '')
     if not cam.get('available'):
         return None
@@ -21279,6 +21785,290 @@ def _compute_quality_drift(user_id, recent_days=30, baseline_days=120):
     for o in out:
         o.pop('score', None)
     return out[:3]
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# v0.8.7 — Intégration MQTT / Home Assistant (publication d'état + découverte automatique)
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+_MQTT_PUB = {'client': None, 'sig': None, 'connected': False, 'error': '', 'discovered': set(),
+             'prev': {}, 'last_publish': 0.0, 'count': 0}
+_MQTT_PUB_LOCK = threading.Lock()
+HA_DISCOVERY_PREFIX = 'homeassistant'
+
+
+def _mqtt_pub_cfg(override=None):
+    s = dict(load_settings() or {})
+    if override:
+        for k, v in override.items():
+            if str(k).startswith('mqtt_'):
+                s[k] = v
+    host = str(s.get('mqtt_host') or '').strip()
+    if not host:
+        return None
+    tls = bool(s.get('mqtt_tls'))
+    try:
+        port = int(s.get('mqtt_port') or (8883 if tls else 1883))
+    except (TypeError, ValueError):
+        port = 8883 if tls else 1883
+    base = re.sub(r'[^\w\-/]+', '_', str(s.get('mqtt_base') or 'stellio').strip('/ ')) or 'stellio'
+    try:
+        interval = max(5, min(300, int(s.get('mqtt_interval') or 15)))
+    except (TypeError, ValueError):
+        interval = 15
+    return {'enabled': bool(s.get('mqtt_enabled')), 'host': host, 'port': port, 'user': str(s.get('mqtt_user') or ''),
+            'password': str(s.get('mqtt_password') or ''), 'tls': tls, 'tls_insecure': bool(s.get('mqtt_tls_insecure')),
+            'base': base, 'discovery': s.get('mqtt_discovery', True) is not False, 'interval': interval}
+
+
+def _mqtt_new_client(cfg, tag):
+    cid = f"stellio_{tag}_{uuid.uuid4().hex[:6]}"
+    try:
+        client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION1, client_id=cid, protocol=mqtt.MQTTv311, clean_session=True)
+    except TypeError:
+        client = mqtt.Client(client_id=cid, protocol=mqtt.MQTTv311, clean_session=True)
+    if cfg['user']:
+        client.username_pw_set(cfg['user'], cfg['password'])
+    if cfg['tls']:
+        client.tls_set(cert_reqs=ssl.CERT_NONE if cfg['tls_insecure'] else ssl.CERT_REQUIRED)
+        if cfg['tls_insecure']:
+            client.tls_insecure_set(True)
+    return client
+
+
+def _mqtt_state_payload(p, st):
+    t = st.get('time') or {}
+    temps = st.get('temps') or {}
+    active = st.get('status') in ('printing', 'paused')
+    return {
+        'name': p.get('name') or '', 'status': st.get('status') or 'offline',
+        'progress': round(float(st.get('progress') or 0), 1) if active else 0,
+        'file': os.path.basename(str(st.get('file') or '').replace('\\', '/')) if active else '',
+        'remaining': int(t.get('remaining') or 0) if active else 0,
+        'elapsed': int(t.get('elapsed') or 0) if active else 0,
+        'extruder': (temps.get('extruder') or {}).get('current'),
+        'bed': (temps.get('bed') or {}).get('current'),
+        'chamber': (temps.get('chamber') or {}).get('current'),
+    }
+
+
+def _mqtt_discovery_configs(cfg, p):
+    pid, base = p['id'], cfg['base']
+    state = f"{base}/printer/{pid}/state"
+    dev = {'identifiers': [f"stellio_{pid}"], 'name': p.get('name') or f"Imprimante {pid}", 'manufacturer': 'Stellio', 'model': str(p.get('type') or '')}
+    common = {'state_topic': state, 'device': dev, 'availability_topic': f"{base}/status",
+              'payload_available': 'online', 'payload_not_available': 'offline'}
+    ents = [
+        ('sensor', 'status', {'name': 'Status', 'value_template': '{{ value_json.status }}', 'icon': 'mdi:printer-3d'}),
+        ('sensor', 'progress', {'name': 'Progress', 'value_template': '{{ value_json.progress }}', 'unit_of_measurement': '%', 'state_class': 'measurement', 'icon': 'mdi:progress-clock'}),
+        ('sensor', 'remaining', {'name': 'Time remaining', 'value_template': '{{ (value_json.remaining | float(0) / 60) | round(0) }}', 'unit_of_measurement': 'min', 'icon': 'mdi:timer-sand'}),
+        ('sensor', 'file', {'name': 'File', 'value_template': '{{ value_json.file }}', 'icon': 'mdi:file-cad'}),
+        ('sensor', 'nozzle', {'name': 'Nozzle temperature', 'value_template': '{{ value_json.extruder }}', 'unit_of_measurement': '°C', 'device_class': 'temperature', 'state_class': 'measurement'}),
+        ('sensor', 'bed', {'name': 'Bed temperature', 'value_template': '{{ value_json.bed }}', 'unit_of_measurement': '°C', 'device_class': 'temperature', 'state_class': 'measurement'}),
+        ('binary_sensor', 'printing', {'name': 'Printing', 'value_template': "{{ 'ON' if value_json.status == 'printing' else 'OFF' }}", 'device_class': 'running'}),
+    ]
+    out = []
+    for comp, key, extra in ents:
+        topic = f"{HA_DISCOVERY_PREFIX}/{comp}/stellio_{pid}/{key}/config"
+        out.append((topic, {**common, **extra, 'unique_id': f"stellio_{pid}_{key}", 'object_id': f"stellio_{pid}_{key}"}))
+    return out
+
+
+def _mqtt_publish_all(client, cfg):
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT * FROM printers").fetchall()
+    finally:
+        conn.close()
+    seen = set()
+    for row in rows:
+        p = parse_printer_config(row)
+        pid = p['id']
+        seen.add(pid)
+        st = _printer_status_cached(p, ttl=2.0)
+        payload = _mqtt_state_payload(p, st)
+        if cfg['discovery'] and pid not in _MQTT_PUB['discovered']:
+            for topic, conf in _mqtt_discovery_configs(cfg, p):
+                client.publish(topic, json.dumps(conf, ensure_ascii=False), qos=1, retain=True)
+            _MQTT_PUB['discovered'].add(pid)
+        client.publish(f"{cfg['base']}/printer/{pid}/state", json.dumps(payload, ensure_ascii=False), qos=0, retain=True)
+        _MQTT_PUB['count'] += 1
+        prev = _MQTT_PUB['prev'].get(pid)
+        cur = payload['status']
+        if prev == 'printing' and cur in ('idle', 'complete', 'error'):
+            ev = 'print_failed' if cur == 'error' else 'print_finished'
+            client.publish(f"{cfg['base']}/printer/{pid}/event", json.dumps({'event': ev, 'printer': payload['name'], 'file': _MQTT_PUB.get('last_file', {}).get(pid, '')}, ensure_ascii=False), qos=1, retain=False)
+        _MQTT_PUB['prev'][pid] = cur
+        if payload['file']:
+            _MQTT_PUB.setdefault('last_file', {})[pid] = payload['file']
+    # imprimantes supprimées : on retire leurs entités de Home Assistant
+    for pid in list(_MQTT_PUB['discovered'] - seen):
+        for topic, _conf in _mqtt_discovery_configs(cfg, {'id': pid, 'name': '', 'type': ''}):
+            client.publish(topic, '', qos=1, retain=True)
+        _MQTT_PUB['discovered'].discard(pid)
+
+
+def _mqtt_pub_disconnect():
+    c = _MQTT_PUB.get('client')
+    _MQTT_PUB['client'] = None
+    _MQTT_PUB['connected'] = False
+    if c:
+        try:
+            c.publish(f"{(_MQTT_PUB.get('sig') or ('',))[0]}/status", 'offline', qos=1, retain=True)
+        except Exception:
+            pass
+        try:
+            c.loop_stop()
+            c.disconnect()
+        except Exception:
+            pass
+
+
+def _mqtt_pub_tick():
+    cfg = _mqtt_pub_cfg()
+    if not IS_SERVER_EDITION or not HAS_MQTT or not cfg or not cfg['enabled']:
+        if _MQTT_PUB['client']:
+            with _MQTT_PUB_LOCK:
+                _mqtt_pub_disconnect()
+                _MQTT_PUB['sig'] = None
+        return
+    sig = (cfg['base'], cfg['host'], cfg['port'], cfg['user'], cfg['password'], cfg['tls'], cfg['tls_insecure'], cfg['discovery'])
+    with _MQTT_PUB_LOCK:
+        if _MQTT_PUB['client'] is None or _MQTT_PUB['sig'] != sig:
+            if _MQTT_PUB['client']:
+                _mqtt_pub_disconnect()
+            _MQTT_PUB['discovered'] = set()
+            client = _mqtt_new_client(cfg, 'pub')
+            client.will_set(f"{cfg['base']}/status", 'offline', qos=1, retain=True)
+
+            def _on_connect(c, userdata, flags, rc, *a):
+                if rc == 0:
+                    _MQTT_PUB['connected'] = True
+                    _MQTT_PUB['error'] = ''
+                    _MQTT_PUB['discovered'] = set()
+                    c.publish(f"{cfg['base']}/status", 'online', qos=1, retain=True)
+                else:
+                    _MQTT_PUB['connected'] = False
+                    _MQTT_PUB['error'] = {4: 'identifiants refusés', 5: 'non autorisé'}.get(rc, f'code {rc}')
+
+            def _on_disconnect(c, userdata, rc, *a):
+                _MQTT_PUB['connected'] = False
+
+            client.on_connect = _on_connect
+            client.on_disconnect = _on_disconnect
+            try:
+                client.reconnect_delay_set(min_delay=2, max_delay=60)
+                client.connect_async(cfg['host'], cfg['port'], keepalive=60)
+                client.loop_start()
+                _MQTT_PUB['client'] = client
+                _MQTT_PUB['sig'] = sig
+            except Exception as e:
+                _MQTT_PUB['error'] = str(e)[:120]
+                return
+        client = _MQTT_PUB['client']
+    if client is not None and _MQTT_PUB['connected'] and time.time() - _MQTT_PUB['last_publish'] >= cfg['interval']:
+        _MQTT_PUB['last_publish'] = time.time()
+        _mqtt_publish_all(client, cfg)
+
+
+def _mqtt_pub_loop():
+    time.sleep(25)
+    while True:
+        try:
+            _mqtt_pub_tick()
+        except Exception as e:
+            _MQTT_PUB['error'] = str(e)[:120]
+            app_logger.info(f"[MQTT] Erreur boucle: {e}")
+        time.sleep(3)
+
+
+def _start_mqtt_publisher():
+    threading.Thread(target=_mqtt_pub_loop, daemon=True, name='stellio-mqtt-ha').start()
+
+
+@app.route('/api/mqtt/status', methods=['GET'])
+@login_required
+def api_mqtt_status():
+    blocked = _server_edition_only()
+    if blocked:
+        return blocked
+    cfg = _mqtt_pub_cfg()
+    return jsonify({"available": bool(HAS_MQTT), "enabled": bool(cfg and cfg['enabled']),
+                    "connected": bool(_MQTT_PUB['connected']), "error": _MQTT_PUB['error'],
+                    "published": _MQTT_PUB['count'], "host": (cfg or {}).get('host', ''), "discovery": bool(cfg and cfg['discovery'])})
+
+
+@app.route('/api/mqtt/entities', methods=['GET'])
+@login_required
+def api_mqtt_entities():
+    """Liste des entités publiées vers Home Assistant (avec leur valeur actuelle)."""
+    blocked = _server_edition_only()
+    if blocked:
+        return blocked
+    cfg = _mqtt_pub_cfg()
+    out = {"enabled": bool(cfg and cfg['enabled']), "connected": bool(_MQTT_PUB['connected']),
+           "discovery": bool(cfg and cfg['discovery']), "base": cfg['base'] if cfg else 'stellio', "printers": []}
+    if not cfg:
+        return jsonify(out)
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT * FROM printers").fetchall()
+    finally:
+        conn.close()
+    for row in rows:
+        p = parse_printer_config(row)
+        try:
+            payload = _mqtt_state_payload(p, _printer_status_cached(p, ttl=5.0))
+        except Exception:
+            payload = _mqtt_state_payload(p, {})
+        values = {'status': payload['status'], 'progress': payload['progress'], 'remaining': round(payload['remaining'] / 60),
+                  'file': payload['file'], 'nozzle': payload['extruder'], 'bed': payload['bed'],
+                  'printing': 'ON' if payload['status'] == 'printing' else 'OFF'}
+        ents = []
+        for topic, conf in _mqtt_discovery_configs(cfg, p):
+            key = conf['unique_id'].split('_', 2)[2]
+            ents.append({"key": key, "name": conf['name'], "component": topic.split('/')[1], "unique_id": conf['unique_id'],
+                         "unit": conf.get('unit_of_measurement', ''), "value": values.get(key)})
+        out["printers"].append({"id": p['id'], "name": p.get('name') or f"#{p['id']}", "state_topic": f"{cfg['base']}/printer/{p['id']}/state",
+                                "event_topic": f"{cfg['base']}/printer/{p['id']}/event", "entities": ents})
+    return jsonify(out)
+
+
+@app.route('/api/mqtt/test', methods=['POST'])
+@login_required
+def api_mqtt_test():
+    blocked = _server_edition_only()
+    if blocked:
+        return blocked
+    if not HAS_MQTT:
+        return jsonify({"success": False, "error": "paho-mqtt n'est pas installé"}), 200
+    cfg = _mqtt_pub_cfg(request.json or {})
+    if not cfg:
+        return jsonify({"success": False, "error": "Adresse du broker manquante"}), 200
+    result = {'rc': None}
+    done = threading.Event()
+    client = _mqtt_new_client(cfg, 'test')
+
+    def _on_connect(c, userdata, flags, rc, *a):
+        result['rc'] = rc
+        done.set()
+    client.on_connect = _on_connect
+    try:
+        client.connect_async(cfg['host'], cfg['port'], keepalive=20)
+        client.loop_start()
+        ok = done.wait(7)
+    except Exception as e:
+        return jsonify({"success": False, "error": f"{type(e).__name__}: {str(e)[:100]}"}), 200
+    finally:
+        try:
+            client.loop_stop()
+            client.disconnect()
+        except Exception:
+            pass
+    if not ok:
+        return jsonify({"success": False, "error": "Aucune réponse du broker (adresse, port ou pare-feu ?)"}), 200
+    if result['rc'] != 0:
+        return jsonify({"success": False, "error": {4: 'Identifiant ou mot de passe refusé', 5: 'Non autorisé'}.get(result['rc'], f"Connexion refusée (code {result['rc']})")}), 200
+    return jsonify({"success": True}), 200
 
 
 @app.route('/api/printers/<int:pid>/camera', methods=['GET'])
@@ -28016,14 +28806,15 @@ def _restock_collect_spools(user_id):
             conn = get_db()
             try:
                 rows = conn.execute(
-                    "SELECT name, material, color_hex, remaining_g, vendor FROM manual_filament_spools WHERE user_id=? AND archived=0",
+                    "SELECT id, name, material, color_hex, remaining_g, vendor FROM manual_filament_spools WHERE user_id=? AND archived=0",
                     (user_id,)
                 ).fetchall()
             finally:
                 conn.close()
             for r in rows:
                 spools.append({'name': r['name'], 'material': r['material'], 'color_hex': r['color_hex'],
-                               'remaining_g': r['remaining_g'], 'vendor': r['vendor']})
+                               'remaining_g': r['remaining_g'], 'vendor': r['vendor'],
+                               'source_type': 'manual', 'source_id': str(r['id'])})
     except Exception as e:
         app_logger.warning(f"[Restock] Lecture bobines manuelles échouée: {e}")
     try:
@@ -28033,17 +28824,68 @@ def _restock_collect_spools(user_id):
             for s in sm:
                 if not s.get('archived'):
                     spools.append({'name': s.get('name'), 'material': s.get('material'), 'color_hex': s.get('color_hex'),
-                                   'remaining_g': s.get('remaining_g'), 'vendor': s.get('vendor')})
+                                   'remaining_g': s.get('remaining_g'), 'vendor': s.get('vendor'),
+                                   'source_type': 'spoolman', 'source_id': str(s.get('source_id'))})
     except Exception as e:
         app_logger.warning(f"[Restock] Lecture Spoolman échouée: {e}")
     try:
         for s in _get_tigertag_slots(user_id):
             mat = '' if str(s.get('material') or '').strip().isdigit() else s.get('material')
             spools.append({'name': s.get('color_name') or s.get('name'), 'material': mat,
-                           'color_hex': s.get('color_hex'), 'remaining_g': s.get('remaining_g'), 'vendor': s.get('vendor')})
+                           'color_hex': s.get('color_hex'), 'remaining_g': s.get('remaining_g'), 'vendor': s.get('vendor'),
+                           'source_type': 'tigertag', 'source_id': str(s.get('source_id'))})
     except Exception as e:
         app_logger.warning(f"[Restock] Lecture TigerTag échouée: {e}")
     return spools
+
+
+RESTOCK_FORECAST_DEFAULT_DAYS = 14
+FORECAST_WINDOW_DAYS = 60
+
+
+def _restock_forecast_days():
+    try:
+        v = float((load_settings() or {}).get('restock_forecast_days', RESTOCK_FORECAST_DEFAULT_DAYS))
+        return v if v >= 0 else RESTOCK_FORECAST_DEFAULT_DAYS
+    except (TypeError, ValueError):
+        return RESTOCK_FORECAST_DEFAULT_DAYS
+
+
+def _forecast_daily_use(user_id, src_to_key):
+    """Consommation moyenne par jour (g) de chaque filament (clé marque|matière|couleur), d'après l'historique
+    des 60 derniers jours. Fenêtre = durée réellement observée (14 j minimum) pour ne pas gonfler le rythme."""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """SELECT spool_source_type AS t, spool_source_id AS i, SUM(spool_weight_used_g) AS g, MIN(sent_at) AS first
+               FROM print_history
+               WHERE user_id = ? AND spool_weight_used_g > 0 AND spool_source_type IS NOT NULL AND spool_source_type != ''
+                 AND sent_at >= datetime('now', ?)
+               GROUP BY spool_source_type, spool_source_id""",
+            (user_id, f'-{FORECAST_WINDOW_DAYS} days')).fetchall()
+    finally:
+        conn.close()
+    used, first = {}, {}
+    for r in rows:
+        key = src_to_key.get((r['t'], str(r['i'])))
+        if not key:
+            continue
+        used[key] = used.get(key, 0.0) + float(r['g'] or 0)
+        try:
+            d = datetime.datetime.strptime(str(r['first'])[:19], '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            continue
+        if key not in first or d < first[key]:
+            first[key] = d
+    out = {}
+    now = datetime.datetime.now()
+    for key, g in used.items():
+        if g < 20:       # trop peu de données pour une prévision fiable
+            continue
+        span = (now - first[key]).total_seconds() / 86400 if key in first else FORECAST_WINDOW_DAYS
+        window = max(14.0, min(float(FORECAST_WINDOW_DAYS), span))
+        out[key] = g / window
+    return out
 
 
 @app.route('/api/filament/restock', methods=['GET'])
@@ -28059,6 +28901,7 @@ def api_filament_restock():
     now = time.time()
 
     groups = {}
+    src_to_key = {}
     for s in _restock_collect_spools(session['user_id']):
         try:
             rem = float(s['remaining_g']) if s.get('remaining_g') is not None else None
@@ -28067,6 +28910,8 @@ def api_filament_restock():
         if rem is None:
             continue
         key = _restock_key(s.get('vendor'), s.get('material'), s.get('color_hex'))
+        if s.get('source_type') and s.get('source_id') not in (None, 'None'):
+            src_to_key[(s['source_type'], str(s['source_id']))] = key
         g = groups.setdefault(key, {'key': key, 'name': s.get('name') or '', 'vendor': s.get('vendor') or '',
                                     'material': s.get('material') or '', 'color_hex': s.get('color_hex') or '#888888',
                                     'total_g': 0.0, 'spool_count': 0})
@@ -28080,10 +28925,22 @@ def api_filament_restock():
                           'material': meta.get('material') or '', 'color_hex': meta.get('color_hex') or '#888888',
                           'total_g': 0.0, 'spool_count': 0}
 
+    forecast_days = _restock_forecast_days()
+    daily = {}
+    if forecast_days > 0:
+        try:
+            daily = _forecast_daily_use(session['user_id'], src_to_key)
+        except Exception as e:
+            app_logger.info(f"[Restock] Prévision ignorée: {e}")
+
     items = []
     for g in groups.values():
         is_manual = g['key'] in manual
-        if not is_manual and (threshold <= 0 or g['total_g'] > threshold):
+        days_left = None
+        if g['key'] in daily and daily[g['key']] > 0.05 and g['total_g'] > 0:
+            days_left = g['total_g'] / daily[g['key']]
+        by_forecast = forecast_days > 0 and days_left is not None and days_left <= forecast_days
+        if not is_manual and not by_forecast and (threshold <= 0 or g['total_g'] > threshold):
             continue
         until = snoozed.get(g['key'])
         is_snoozed = bool(until) and float(until) > now
@@ -28092,10 +28949,13 @@ def api_filament_restock():
         g['total_g'] = round(g['total_g'], 1)
         g['snoozed_until'] = float(until) if (is_snoozed and not is_manual) else None
         g['manual'] = is_manual
+        g['days_left'] = round(days_left, 1) if days_left is not None else None
+        g['daily_g'] = round(daily[g['key']], 1) if g['key'] in daily else None
+        g['by_forecast'] = bool(by_forecast)
         g.update(_spool_buy_info(g['vendor'], g['material'], g['name']))
         items.append(g)
-    items.sort(key=lambda x: (not x['manual'], x['total_g']))
-    return jsonify({"threshold_g": threshold, "items": items, "manual_keys": list(manual.keys())}), 200
+    items.sort(key=lambda x: (not x['manual'], x['days_left'] if x['days_left'] is not None else 9999, x['total_g']))
+    return jsonify({"threshold_g": threshold, "forecast_days": forecast_days, "items": items, "manual_keys": list(manual.keys())}), 200
 
 
 @app.route('/api/filament/restock/flag', methods=['POST'])
@@ -29631,6 +30491,7 @@ if __name__ in ('__main__', 'stellio_main'):
             process_generation_queue()
             process_slice_estimate_queue()
             _start_timelapse_worker()
+            _start_mqtt_publisher()
             threading.Thread(target=_startup_sync_slicer_profiles, daemon=True).start()
             threading.Thread(target=_auto_backup_scheduler, daemon=True).start()
             threading.Thread(target=_auto_scan_scheduler, daemon=True).start()
