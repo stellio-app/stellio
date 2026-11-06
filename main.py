@@ -15084,6 +15084,10 @@ def model_page_get_files(page_url, label, cookie):
     return files
 
 
+# --- Creality Cloud : API de téléchargement 3MF (v0.7.5) ---
+# Le bouton « Télécharger 3MF » du site appelle POST /api/cxy/v3/model/3mfDownload avec {"id": <profileId>}
+# et reçoit une URL signée temporaire. Les en-têtes d'authentification reprennent les cookies de session
+# (model_token / model_user_id).
 CREALITY_3MF_API = "https://www.crealitycloud.com/api/cxy/v3/model/3mfDownload"
 
 
@@ -15097,6 +15101,7 @@ def _cookie_header_to_dict(header):
 
 
 def crealitycloud_get_model_files(page_url, cookie):
+    """Retourne [{'name', 'url', 'size'}] pour le profil d'impression indiqué dans l'URL (profileId=…)."""
     import uuid
     from urllib.parse import parse_qs
     ck_header = _clean_cookie_header(cookie)
@@ -19481,7 +19486,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.8.5"
+CURRENT_VERSION = "0.8.6"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -19551,6 +19556,12 @@ def api_get_suggestions():
                 })
         finally:
             conn.close()
+
+        try:
+            for d in _compute_quality_drift(user_id):
+                suggestions.append({"type": "quality_drift", **d})
+        except Exception as e:
+            app_logger.info(f"[Suggestions] Dérive qualité ignorée: {e}")
 
         return jsonify({"suggestions": suggestions}), 200
     except Exception as e:
@@ -20208,6 +20219,8 @@ def _extract_bed_config(cfg):
             continue
         if 0 < v < 10000:
             out[k] = int(v) if v == int(v) else v
+    if cfg.get('timelapse'):
+        out['timelapse'] = True
     return out
 
 
@@ -20225,7 +20238,7 @@ def api_add_printer():
         code = raw_config.get('code', '')
         serial = raw_config.get('serial', '')
         api_key = code
-        raw_config = {'code': code, 'serial': serial}
+        raw_config = {'code': code, 'serial': serial, 'model': str(raw_config.get('model') or 'A1').upper()[:20]}
     elif ptype == 'elegoo_cc2':
         code = raw_config.get('code', '') or '123456'
         api_key = code
@@ -20558,7 +20571,7 @@ def api_edit_printer(pid):
         if ptype == 'bambu':
             code = raw_config.get('code', '')
             serial = raw_config.get('serial', '')
-            raw_config = {'code': code, 'serial': serial}
+            raw_config = {'code': code, 'serial': serial, 'model': str(raw_config.get('model') or 'A1').upper()[:20]}
             if code:
                 has_new_api_key = True
                 data['api_key'] = code
@@ -20625,22 +20638,8 @@ def api_delete_printer(pid):
     finally:
         conn.close()
 
-@app.route('/api/printers/<int:pid>/camera', methods=['GET'])
-@login_required
-def api_printer_camera(pid):
-    conn = get_db()
-    try:
-        p = conn.execute(
-            "SELECT * FROM printers WHERE id = ? AND user_id = ?",
-            (pid, session['user_id'])
-        ).fetchone()
-    finally:
-        conn.close()
-
-    if not p:
-        return jsonify({"available": False}), 404
-
-    printer = parse_printer_config(p)
+def _resolve_printer_camera(printer, pid, host_url=''):
+    """Informations caméra d'une imprimante (flux, instantané) ; réutilisé par la route /camera et par le timelapse."""
     ptype = printer['type']
     ip = printer['ip']
 
@@ -20711,7 +20710,7 @@ def api_printer_camera(pid):
             if access_code:
                 camera_info.update({
                     "available": True,
-                    "stream_url": f"{request.host_url.rstrip('/')}/api/printers/{pid}/camera/stream",
+                    "stream_url": f"{host_url.rstrip('/')}/api/printers/{pid}/camera/stream",
                     "snapshot_url": None,
                     "name": "Bambu Lab Camera"
                 })
@@ -20758,7 +20757,547 @@ def api_printer_camera(pid):
     except Exception as e:
         pass
 
-    return jsonify(camera_info)
+    return camera_info
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# v0.8.6 — Timelapse automatique, lien d'état partageable, alertes de dérive qualité
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+_V086_TABLES_READY = False
+_V086_LOCK = threading.Lock()
+
+
+def _ensure_v086_tables():
+    global _V086_TABLES_READY
+    if _V086_TABLES_READY:
+        return
+    with _V086_LOCK:
+        if _V086_TABLES_READY:
+            return
+        conn = get_db()
+        try:
+            conn.execute("""CREATE TABLE IF NOT EXISTS timelapses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                printer_id INTEGER,
+                printer_name TEXT DEFAULT '',
+                file_name TEXT DEFAULT '',
+                started_at TIMESTAMP,
+                ended_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                frames INTEGER DEFAULT 0,
+                duration_s REAL DEFAULT 0,
+                size INTEGER DEFAULT 0,
+                path TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )""")
+            conn.execute("""CREATE TABLE IF NOT EXISTS share_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token TEXT NOT NULL UNIQUE,
+                label TEXT DEFAULT '',
+                show_files INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_view_at TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )""")
+            conn.commit()
+        finally:
+            conn.close()
+        _V086_TABLES_READY = True
+
+
+# ── Statut des imprimantes avec cache court (partage, timelapse) ────────────────────────────
+_PRINTER_STATUS_CACHE = {}
+_PRINTER_STATUS_LOCK = threading.Lock()
+
+
+def _printer_status_cached(printer, ttl=5.0):
+    """Statut d'une imprimante (dict parse_printer_config) avec un cache de quelques secondes,
+    pour ne pas multiplier les requêtes quand plusieurs consommateurs (page partagée, timelapse) interrogent."""
+    pid = printer.get('id')
+    now = time.time()
+    with _PRINTER_STATUS_LOCK:
+        hit = _PRINTER_STATUS_CACHE.get(pid)
+        if hit and now - hit[0] < ttl:
+            return hit[1]
+    try:
+        status = printer_hub.get_status(printer) or {}
+    except Exception as e:
+        status = {'status': 'offline', 'error': str(e)}
+    with _PRINTER_STATUS_LOCK:
+        _PRINTER_STATUS_CACHE[pid] = (time.time(), status)
+    return status
+
+
+# ── Timelapse ───────────────────────────────────────────────────────────────────────────────
+TIMELAPSE_DIR = os.path.join(DATA_DIR, 'timelapse')
+TIMELAPSE_MAX_FRAMES = 6000
+TIMELAPSE_MIN_FRAMES = 10
+_TL_STATE = {}   # printer_id -> {dir, frames, started, file, last_capture, user_id, name}
+
+
+def _timelapse_interval():
+    try:
+        v = int((load_settings() or {}).get('timelapse_interval', 30))
+    except (TypeError, ValueError):
+        v = 30
+    return max(5, min(300, v))
+
+
+def _extract_jpeg(data):
+    if not data:
+        return None
+    s = data.find(b'\xff\xd8')
+    if s == -1:
+        return None
+    e = data.rfind(b'\xff\xd9')
+    return bytes(data[s:e + 2]) if e > s else None
+
+
+def _timelapse_grab_frame(printer):
+    """Une image JPEG de la caméra de l'imprimante (octets) ou None."""
+    pid = printer.get('id')
+    ptype = printer.get('type')
+    cfg = printer.get('config') or {}
+    ip = printer.get('ip')
+    if ptype == 'bambu':
+        code = cfg.get('code') or printer.get('api_key') or ''
+        if not code or not ip:
+            return None
+        model = (cfg.get('model') or 'A1').upper()
+        gen = _generate_bambu_rtsp_mjpeg_stream(ip, code) if model in BAMBU_RTSP_PORT322_MODELS else _generate_bambu_mjpeg_stream(ip, code)
+        try:
+            return _extract_jpeg(next(gen, None))
+        finally:
+            try:
+                gen.close()
+            except Exception:
+                pass
+    cam = _resolve_printer_camera(printer, pid, '')
+    if not cam.get('available'):
+        return None
+    snap = cam.get('snapshot_url')
+    if snap:
+        try:
+            r = requests.get(snap, timeout=6)
+            if r.status_code == 200:
+                jpg = _extract_jpeg(r.content)
+                if jpg:
+                    return jpg
+        except Exception:
+            pass
+    stream = cam.get('stream_url')
+    if stream and FFMPEG_TOOL:
+        try:
+            out = subprocess.run(
+                [FFMPEG_TOOL, '-loglevel', 'error', '-i', stream, '-frames:v', '1', '-f', 'image2pipe', '-vcodec', 'mjpeg', 'pipe:1'],
+                capture_output=True, timeout=20, **_popen_kwargs_silent())
+            return _extract_jpeg(out.stdout)
+        except Exception:
+            return None
+    return None
+
+
+def _timelapse_safe_name(text):
+    return re.sub(r'[^\w\-]+', '_', os.path.splitext(str(text or 'impression'))[0])[:60] or 'impression'
+
+
+def _timelapse_assemble(state):
+    """Assemble les images en MP4 puis supprime les images ; enregistre le résultat en base."""
+    frames_dir, n = state['dir'], state['frames']
+    try:
+        if n < TIMELAPSE_MIN_FRAMES or not FFMPEG_TOOL:
+            if n >= TIMELAPSE_MIN_FRAMES:
+                app_logger.warning("[Timelapse] ffmpeg introuvable : vidéo non générée")
+            return
+        out_dir = os.path.join(TIMELAPSE_DIR, str(state['printer_id']))
+        os.makedirs(out_dir, exist_ok=True)
+        stamp = datetime.datetime.fromtimestamp(state['started']).strftime('%Y%m%d_%H%M%S')
+        out_path = os.path.join(out_dir, f"{stamp}_{_timelapse_safe_name(state['file'])}.mp4")
+        cmd = [FFMPEG_TOOL, '-y', '-loglevel', 'error', '-framerate', '30', '-i', os.path.join(frames_dir, 'frame_%06d.jpg'),
+               '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+               '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out_path]
+        res = subprocess.run(cmd, capture_output=True, timeout=1800, **_popen_kwargs_silent())
+        if res.returncode != 0 or not os.path.isfile(out_path):
+            app_logger.warning(f"[Timelapse] Assemblage échoué: {(res.stderr or b'')[-300:]!r}")
+            return
+        _ensure_v086_tables()
+        conn = get_db()
+        try:
+            conn.execute(
+                "INSERT INTO timelapses (user_id, printer_id, printer_name, file_name, started_at, frames, duration_s, size, path) VALUES (?,?,?,?,?,?,?,?,?)",
+                (state['user_id'], state['printer_id'], state['name'], state['file'],
+                 datetime.datetime.fromtimestamp(state['started']).strftime('%Y-%m-%d %H:%M:%S'),
+                 n, n / 30.0, os.path.getsize(out_path), out_path))
+            conn.commit()
+        finally:
+            conn.close()
+        app_logger.info(f"[Timelapse] Vidéo créée : {out_path} ({n} images)")
+    except Exception as e:
+        app_logger.warning(f"[Timelapse] Erreur assemblage: {e}")
+    finally:
+        shutil.rmtree(frames_dir, ignore_errors=True)
+
+
+def _timelapse_tick():
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT * FROM printers").fetchall()
+    finally:
+        conn.close()
+    interval = _timelapse_interval()
+    now = time.time()
+    active_ids = set()
+    for row in rows:
+        printer = parse_printer_config(row)
+        if not (printer.get('config') or {}).get('timelapse'):
+            continue
+        pid = printer['id']
+        active_ids.add(pid)
+        st = _TL_STATE.get(pid)
+        if st and now - st['last_poll'] < (interval if st.get('printing') else 15):
+            continue
+        status = _printer_status_cached(printer, ttl=2.0)
+        phase = status.get('status')
+        if st:
+            st['last_poll'] = now
+        if phase in ('printing', 'paused'):
+            if not st:
+                d = os.path.join(TIMELAPSE_DIR, f"tmp_{pid}")
+                shutil.rmtree(d, ignore_errors=True)
+                os.makedirs(d, exist_ok=True)
+                st = _TL_STATE[pid] = {'dir': d, 'frames': 0, 'started': now, 'file': str(status.get('file') or ''),
+                                       'last_poll': 0, 'printing': True, 'user_id': printer.get('user_id'),
+                                       'printer_id': pid, 'name': printer.get('name') or ''}
+                app_logger.info(f"[Timelapse] Début de capture : {printer.get('name')}")
+            st['printing'] = True
+            if status.get('file'):
+                st['file'] = str(status.get('file'))
+            if phase == 'printing' and st['frames'] < TIMELAPSE_MAX_FRAMES and now - st['last_poll'] >= 0:
+                jpg = _timelapse_grab_frame(printer)
+                if jpg:
+                    st['frames'] += 1
+                    with open(os.path.join(st['dir'], f"frame_{st['frames']:06d}.jpg"), 'wb') as f:
+                        f.write(jpg)
+            st['last_poll'] = time.time()
+        elif st:
+            _TL_STATE.pop(pid, None)
+            threading.Thread(target=_timelapse_assemble, args=(st,), daemon=True, name='stellio-timelapse-encode').start()
+    # imprimante dont le timelapse a été désactivé pendant une capture : on assemble ce qu'on a
+    for pid in list(_TL_STATE.keys()):
+        if pid not in active_ids:
+            st = _TL_STATE.pop(pid)
+            threading.Thread(target=_timelapse_assemble, args=(st,), daemon=True).start()
+
+
+def _timelapse_loop():
+    os.makedirs(TIMELAPSE_DIR, exist_ok=True)
+    time.sleep(20)
+    while True:
+        try:
+            _timelapse_tick()
+        except Exception as e:
+            app_logger.info(f"[Timelapse] Erreur boucle: {e}")
+        time.sleep(3)
+
+
+def _start_timelapse_worker():
+    _ensure_v086_tables()
+    threading.Thread(target=_timelapse_loop, daemon=True, name='stellio-timelapse').start()
+
+
+@app.route('/api/timelapses', methods=['GET'])
+@login_required
+def api_list_timelapses():
+    _ensure_v086_tables()
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, printer_id, printer_name, file_name, started_at, ended_at, frames, duration_s, size FROM timelapses WHERE user_id=? ORDER BY id DESC LIMIT 200",
+            (session['user_id'],)).fetchall()
+    finally:
+        conn.close()
+    recording = [{"printer_id": v['printer_id'], "printer_name": v['name'], "file": v['file'], "frames": v['frames']}
+                 for v in list(_TL_STATE.values()) if v.get('user_id') == session['user_id']]
+    return jsonify({"timelapses": [dict(r) for r in rows], "recording": recording,
+                    "interval": _timelapse_interval(), "ffmpeg": bool(FFMPEG_TOOL)})
+
+
+def _timelapse_row(tid):
+    _ensure_v086_tables()
+    conn = get_db()
+    try:
+        return conn.execute("SELECT * FROM timelapses WHERE id=? AND user_id=?", (tid, session['user_id'])).fetchone()
+    finally:
+        conn.close()
+
+
+@app.route('/api/timelapses/<int:tid>/video', methods=['GET'])
+@login_required
+def api_timelapse_video(tid):
+    row = _timelapse_row(tid)
+    if not row or not os.path.isfile(row['path']):
+        return jsonify({"error": "Introuvable"}), 404
+    return send_file(row['path'], mimetype='video/mp4', conditional=True,
+                     as_attachment=request.args.get('download') == '1',
+                     download_name=os.path.basename(row['path']))
+
+
+@app.route('/api/timelapses/<int:tid>', methods=['DELETE'])
+@login_required
+def api_delete_timelapse(tid):
+    row = _timelapse_row(tid)
+    if not row:
+        return jsonify({"error": "Introuvable"}), 404
+    try:
+        if os.path.isfile(row['path']):
+            os.remove(row['path'])
+    except Exception as e:
+        app_logger.info(f"[Timelapse] Suppression fichier impossible: {e}")
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM timelapses WHERE id=? AND user_id=?", (tid, session['user_id']))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"message": "Supprimé"})
+
+
+@app.route('/api/timelapse/settings', methods=['PUT'])
+@login_required
+def api_timelapse_settings():
+    data = request.json or {}
+    try:
+        iv = max(5, min(300, int(data.get('interval', 30))))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Intervalle invalide"}), 400
+    settings = load_settings() or {}
+    settings['timelapse_interval'] = iv
+    save_settings(settings)
+    return jsonify({"interval": iv})
+
+
+# ── Lien d'état partageable (lecture seule, sans compte) ────────────────────────────────────
+STATUS_MAX_LINKS = 10
+
+
+@app.route('/api/status-links', methods=['GET'])
+@login_required
+def api_list_status_links():
+    _ensure_v086_tables()
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT id, token, label, show_files, created_at, last_view_at FROM share_links WHERE user_id=? ORDER BY id DESC",
+                            (session['user_id'],)).fetchall()
+    finally:
+        conn.close()
+    remote_state = get_remote_state()
+    if remote_state.get('status') == 'ready' and remote_state.get('url'):
+        base_url, remote = remote_state['url'].rstrip('/'), True
+    else:
+        base_url, remote = f"http://{get_local_ip()}:{SERVER_PORT}", False
+    return jsonify({"links": [{**dict(r), "url": f"{base_url}/status/{r['token']}"} for r in rows], "remote": remote})
+
+
+@app.route('/api/status-links', methods=['POST'])
+@login_required
+def api_create_status_link():
+    _ensure_v086_tables()
+    data = request.json or {}
+    label = str(data.get('label') or '').strip()[:60]
+    show_files = 1 if data.get('show_files') else 0
+    conn = get_db()
+    try:
+        n = conn.execute("SELECT COUNT(*) FROM share_links WHERE user_id=?", (session['user_id'],)).fetchone()[0]
+        if n >= STATUS_MAX_LINKS:
+            return jsonify({"error": f"Maximum {STATUS_MAX_LINKS} liens"}), 400
+        token = secrets.token_urlsafe(24)
+        conn.execute("INSERT INTO share_links (user_id, token, label, show_files) VALUES (?,?,?,?)",
+                     (session['user_id'], token, label, show_files))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"token": token}), 200
+
+
+@app.route('/api/status-links/<int:lid>', methods=['DELETE'])
+@login_required
+def api_delete_status_link(lid):
+    _ensure_v086_tables()
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM share_links WHERE id=? AND user_id=?", (lid, session['user_id']))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"message": "Lien révoqué"})
+
+
+def _status_link_by_token(token):
+    _ensure_v086_tables()
+    if not token or len(token) > 80:
+        return None
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT * FROM share_links WHERE token=?", (token,)).fetchone()
+        if row:
+            conn.execute("UPDATE share_links SET last_view_at=CURRENT_TIMESTAMP WHERE id=?", (row['id'],))
+            conn.commit()
+        return row
+    finally:
+        conn.close()
+
+
+@app.route('/status/<token>/data', methods=['GET'])
+def api_status_share_data(token):
+    link = _status_link_by_token(token)
+    if not link:
+        return jsonify({"error": "Lien invalide"}), 404
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT * FROM printers WHERE user_id=? ORDER BY id", (link['user_id'],)).fetchall()
+    finally:
+        conn.close()
+    out = []
+    for row in rows:
+        p = parse_printer_config(row)
+        st = _printer_status_cached(p)
+        active = st.get('status') in ('printing', 'paused')
+        t = st.get('time') or {}
+        temps = st.get('temps') or {}
+        item = {
+            "name": p.get('name') or '', "status": st.get('status') or 'offline',
+            "progress": round(float(st.get('progress') or 0), 1) if active else 0,
+            "remaining": t.get('remaining') if active else None,
+            "extruder": (temps.get('extruder') or {}).get('current'),
+            "bed": (temps.get('bed') or {}).get('current'),
+        }
+        if link['show_files'] and active and st.get('file'):
+            item["file"] = os.path.basename(str(st.get('file')).replace('\\', '/'))
+        out.append(item)
+    resp = jsonify({"label": link['label'] or '', "printers": out, "now": int(time.time())})
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+
+_STATUS_SHARE_PAGE = r"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>Stellio</title><style>
+*{box-sizing:border-box}body{margin:0;background:#0b0e13;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:18px 20px 30px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:18px}h1{font-size:20px;margin:0;flex:1}.clock{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.tile{background:#151a23;border:2px solid #232a38;border-radius:20px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.printing{border-color:#4ea1d3}.paused{border-color:#f5a623}.error{border-color:#e85d75}.offline{opacity:.5}
+.head{display:flex;justify-content:space-between;gap:10px;align-items:center}.name{font-size:20px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill{font-size:13px;font-weight:600;padding:4px 11px;border-radius:999px;background:#232a38;color:#cbd5e1;white-space:nowrap}
+.printing .pill{background:rgba(78,161,211,.2);color:#4ea1d3}.paused .pill{background:rgba(245,166,35,.2);color:#f5a623}.idle .pill{background:rgba(56,193,114,.18);color:#38c172}.error .pill{background:rgba(232,93,117,.2);color:#e85d75}
+.pct{font-size:60px;font-weight:800;line-height:1}.pct small{font-size:24px;color:#8b95a8}.rem{font-size:20px;color:#cbd5e1}
+.bar{height:12px;background:#232a38;border-radius:8px;overflow:hidden}.bar div{height:100%;background:#4ea1d3;border-radius:8px;transition:width .6s}
+.paused .bar div{background:#f5a623}.file{font-size:14px;color:#8b95a8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.temps{display:flex;gap:18px;font-size:16px;color:#cbd5e1}
+.msg{text-align:center;color:#8b95a8;padding:50px 10px}footer{margin-top:22px;text-align:center;color:#5b6577;font-size:12px}
+</style></head><body><header><h1 id="t">Stellio</h1><div class="clock" id="c"></div></header><div class="grid" id="g"><div class="msg">…</div></div>
+<footer id="f"></footer><script>
+const L={fr:{printing:'Impression',paused:'En pause',idle:'Disponible',complete:'Terminée',error:'Erreur',offline:'Hors ligne',none:'Aucune imprimante',err:'Lien invalide ou révoqué',foot:'Affichage en lecture seule'},
+en:{printing:'Printing',paused:'Paused',idle:'Available',complete:'Done',error:'Error',offline:'Offline',none:'No printer',err:'Invalid or revoked link',foot:'Read-only view'},
+de:{printing:'Druckt',paused:'Pausiert',idle:'Verfügbar',complete:'Fertig',error:'Fehler',offline:'Offline',none:'Kein Drucker',err:'Ungültiger oder widerrufener Link',foot:'Nur-Lese-Ansicht'},
+es:{printing:'Imprimiendo',paused:'En pausa',idle:'Disponible',complete:'Terminada',error:'Error',offline:'Sin conexión',none:'Sin impresoras',err:'Enlace no válido o revocado',foot:'Vista de solo lectura'},
+pt:{printing:'A imprimir',paused:'Em pausa',idle:'Disponível',complete:'Concluída',error:'Erro',offline:'Offline',none:'Sem impressoras',err:'Ligação inválida ou revogada',foot:'Vista só de leitura'},
+it:{printing:'In stampa',paused:'In pausa',idle:'Disponibile',complete:'Completata',error:'Errore',offline:'Offline',none:'Nessuna stampante',err:'Link non valido o revocato',foot:'Vista in sola lettura'},
+zh:{printing:'打印中',paused:'已暂停',idle:'空闲',complete:'已完成',error:'错误',offline:'离线',none:'没有打印机',err:'链接无效或已撤销',foot:'只读视图'},
+ja:{printing:'印刷中',paused:'一時停止',idle:'待機中',complete:'完了',error:'エラー',offline:'オフライン',none:'プリンターなし',err:'リンクが無効か取り消されました',foot:'閲覧専用'}};
+const lg=(navigator.language||'fr').slice(0,2),T=L[lg]||L.en,$=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function dur(s){if(!s||s<=0)return'';const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?h+'h '+String(m).padStart(2,'0')+'m':m+'m'}
+async function load(){try{const r=await fetch(location.pathname.replace(/\/$/,'')+'/data',{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();
+$('t').textContent=d.label||'Stellio';$('f').textContent=T.foot+' · Stellio';
+$('g').innerHTML=d.printers.length?d.printers.map(p=>{const st=['printing','paused','idle','complete','error'].includes(p.status)?p.status:'offline';const act=st==='printing'||st==='paused';
+return '<div class="tile '+st+'"><div class="head"><span class="name">'+esc(p.name)+'</span><span class="pill">'+T[st]+'</span></div>'+
+(act?'<div class="pct">'+Math.round(p.progress)+'<small>%</small></div>'+(p.remaining>0?'<div class="rem">⏱ '+dur(p.remaining)+'</div>':'')+'<div class="bar"><div style="width:'+Math.round(p.progress)+'%"></div></div>'+(p.file?'<div class="file">'+esc(p.file)+'</div>':''):'')+
+(p.extruder!=null?'<div class="temps"><span>🔥 '+Math.round(p.extruder)+'°C</span><span>🛏️ '+Math.round(p.bed||0)+'°C</span></div>':'')+'</div>'}).join(''):'<div class="msg">'+T.none+'</div>'}
+catch(e){$('g').innerHTML='<div class="msg">'+T.err+'</div>'}}
+setInterval(()=>{$('c').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})},10000);$('c').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+load();setInterval(load,6000);
+</script></body></html>"""
+
+
+@app.route('/status/<token>', methods=['GET'])
+def status_share_page(token):
+    if not _status_link_by_token(token):
+        return Response("Lien invalide ou révoqué", status=404, mimetype='text/plain; charset=utf-8')
+    resp = Response(_STATUS_SHARE_PAGE, mimetype='text/html')
+    resp.headers['Cache-Control'] = 'no-store'
+    resp.headers['X-Robots-Tag'] = 'noindex, nofollow'
+    resp.headers['Referrer-Policy'] = 'no-referrer'
+    return resp
+
+
+# ── Alertes de dérive de qualité ────────────────────────────────────────────────────────────
+def _compute_quality_drift(user_id, recent_days=30, baseline_days=120):
+    """Compare le taux d'échec des 30 derniers jours à celui de la période précédente,
+    par imprimante, matériau et profil de réglages. Retourne les dérives les plus marquées."""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """SELECT printer_id, filament_material, slicer_profile_name, result,
+                      (julianday('now') - julianday(sent_at)) AS age
+               FROM print_history
+               WHERE user_id = ? AND result IN ('success','failed','partial')
+                 AND sent_at >= datetime('now', ?)""",
+            (user_id, f'-{baseline_days} days')).fetchall()
+        names = {r['id']: r['name'] for r in conn.execute("SELECT id, name FROM printers WHERE user_id=?", (user_id,)).fetchall()}
+    finally:
+        conn.close()
+    groups = {}
+    for r in rows:
+        keys = []
+        if r['printer_id'] in names:
+            keys.append(('printer', names[r['printer_id']]))
+        if r['filament_material']:
+            keys.append(('material', str(r['filament_material']).strip()))
+        if r['slicer_profile_name']:
+            keys.append(('profile', str(r['slicer_profile_name']).strip()))
+        for k in keys:
+            g = groups.setdefault(k, {'rn': 0, 'rf': 0, 'bn': 0, 'bf': 0})
+            bucket = 'r' if (r['age'] or 0) <= recent_days else 'b'
+            g[bucket + 'n'] += 1
+            if r['result'] == 'failed':
+                g[bucket + 'f'] += 1
+    out = []
+    for (dim, name), g in groups.items():
+        if g['rn'] < 4:
+            continue
+        rr = g['rf'] / g['rn']
+        if g['bn'] >= 4:
+            br = g['bf'] / g['bn']
+            if rr >= 0.3 and rr - br >= 0.2:
+                out.append({"dimension": dim, "name": name, "recent_rate": round(rr * 100), "recent_n": g['rn'],
+                            "base_rate": round(br * 100), "base_n": g['bn'], "score": rr - br})
+        elif g['rn'] >= 5 and rr >= 0.5:
+            out.append({"dimension": dim, "name": name, "recent_rate": round(rr * 100), "recent_n": g['rn'],
+                        "base_rate": None, "base_n": g['bn'], "score": rr - 0.2})
+    out.sort(key=lambda x: x['score'], reverse=True)
+    for o in out:
+        o.pop('score', None)
+    return out[:3]
+
+
+@app.route('/api/printers/<int:pid>/camera', methods=['GET'])
+@login_required
+def api_printer_camera(pid):
+    conn = get_db()
+    try:
+        p = conn.execute(
+            "SELECT * FROM printers WHERE id = ? AND user_id = ?",
+            (pid, session['user_id'])
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not p:
+        return jsonify({"available": False}), 404
+
+    printer = parse_printer_config(p)
+    return jsonify(_resolve_printer_camera(printer, pid, request.host_url))
 
 
 def _fetch_moonraker_total_print_hours(printer):
@@ -29091,6 +29630,7 @@ if __name__ in ('__main__', 'stellio_main'):
                 on_status('database')
             process_generation_queue()
             process_slice_estimate_queue()
+            _start_timelapse_worker()
             threading.Thread(target=_startup_sync_slicer_profiles, daemon=True).start()
             threading.Thread(target=_auto_backup_scheduler, daemon=True).start()
             threading.Thread(target=_auto_scan_scheduler, daemon=True).start()

@@ -1,5 +1,58 @@
 [
   {
+    "version": "0.8.6",
+    "items": {
+      "fr": [
+        "Nouveau : timelapse automatique. Active-le dans la fiche d'une imprimante : Stellio prend des photos avec sa caméra pendant l'impression et crée une vidéo MP4 à la fin (liste, lecture, téléchargement et suppression depuis la page Imprimantes ; intervalle réglable, ffmpeg requis)",
+        "Nouveau : liens de partage en lecture seule. Depuis le mode atelier, crée un lien secret vers une page sans compte qui montre l'état des imprimantes (progression, temps restant, températures, noms de fichiers en option), révocable à tout moment",
+        "Nouveau : alertes de dérive de qualité. Le tableau de bord signale quand le taux d'échec d'une imprimante, d'un matériau ou d'un profil augmente nettement sur les 30 derniers jours",
+        "Correction : le modèle Bambu Lab choisi à l'ajout d'une imprimante est maintenant bien enregistré (la caméra des X1/X2/P2/H2 utilisait le mode de l'A1 par erreur)"
+      ],
+      "en": [
+        "New: automatic timelapse. Turn it on in a printer's settings: Stellio takes photos with its camera while printing and builds an MP4 video at the end (list, playback, download and delete from the Printers page; adjustable interval, ffmpeg required)",
+        "New: read-only share links. From workshop mode, create a secret link to a no-account page showing the printers' status (progress, time left, temperatures, optional file names), revocable at any time",
+        "New: quality drift alerts. The dashboard flags when the failure rate of a printer, material or profile rises noticeably over the last 30 days",
+        "Fix: the Bambu Lab model chosen when adding a printer is now saved correctly (X1/X2/P2/H2 cameras were wrongly using the A1 mode)"
+      ],
+      "de": [
+        "Neu: automatischer Zeitraffer. In den Druckereinstellungen aktivieren: Stellio macht während des Drucks Fotos mit der Druckerkamera und erstellt am Ende ein MP4-Video (Liste, Wiedergabe, Download und Löschen auf der Druckerseite; einstellbares Intervall, ffmpeg erforderlich)",
+        "Neu: schreibgeschützte Freigabelinks. Im Werkstattmodus einen geheimen Link zu einer Seite ohne Konto erstellen, die den Druckerstatus zeigt (Fortschritt, Restzeit, Temperaturen, optional Dateinamen); jederzeit widerrufbar",
+        "Neu: Warnungen bei Qualitätsverschlechterung. Das Dashboard meldet, wenn die Fehlerquote eines Druckers, Materials oder Profils in den letzten 30 Tagen deutlich steigt",
+        "Fix: Das beim Hinzufügen gewählte Bambu-Lab-Modell wird jetzt korrekt gespeichert (Kameras von X1/X2/P2/H2 nutzten fälschlich den A1-Modus)"
+      ],
+      "es": [
+        "Novedad: timelapse automático. Actívalo en los ajustes de una impresora: Stellio toma fotos con su cámara durante la impresión y crea un vídeo MP4 al final (lista, reproducción, descarga y eliminación desde la página Impresoras; intervalo ajustable, requiere ffmpeg)",
+        "Novedad: enlaces para compartir en solo lectura. Desde el modo taller, crea un enlace secreto a una página sin cuenta que muestra el estado de las impresoras (progreso, tiempo restante, temperaturas, nombres de archivo opcionales), revocable en cualquier momento",
+        "Novedad: alertas de deriva de calidad. El panel avisa cuando la tasa de fallos de una impresora, material o perfil aumenta claramente en los últimos 30 días",
+        "Corrección: el modelo Bambu Lab elegido al añadir una impresora ahora se guarda correctamente (la cámara de X1/X2/P2/H2 usaba por error el modo del A1)"
+      ],
+      "pt": [
+        "Novo: timelapse automático. Ativa-o nas definições de uma impressora: o Stellio tira fotos com a câmara durante a impressão e cria um vídeo MP4 no fim (lista, reprodução, transferência e eliminação a partir da página Impressoras; intervalo ajustável, requer ffmpeg)",
+        "Novo: ligações de partilha só de leitura. No modo oficina, cria uma ligação secreta para uma página sem conta que mostra o estado das impressoras (progresso, tempo restante, temperaturas, nomes de ficheiros opcionais), revogável a qualquer momento",
+        "Novo: alertas de desvio de qualidade. O painel assinala quando a taxa de falhas de uma impressora, material ou perfil aumenta claramente nos últimos 30 dias",
+        "Correção: o modelo Bambu Lab escolhido ao adicionar uma impressora é agora guardado corretamente (a câmara das X1/X2/P2/H2 usava por engano o modo da A1)"
+      ],
+      "it": [
+        "Novità: timelapse automatico. Attivalo nelle impostazioni di una stampante: Stellio scatta foto con la sua fotocamera durante la stampa e crea un video MP4 alla fine (elenco, riproduzione, download ed eliminazione dalla pagina Stampanti; intervallo regolabile, richiede ffmpeg)",
+        "Novità: link di condivisione in sola lettura. Dalla modalità officina, crea un link segreto a una pagina senza account che mostra lo stato delle stampanti (avanzamento, tempo rimanente, temperature, nomi dei file facoltativi), revocabile in qualsiasi momento",
+        "Novità: avvisi di deriva della qualità. La dashboard segnala quando il tasso di fallimento di una stampante, materiale o profilo aumenta nettamente negli ultimi 30 giorni",
+        "Correzione: il modello Bambu Lab scelto all'aggiunta di una stampante ora viene salvato correttamente (la fotocamera di X1/X2/P2/H2 usava per errore la modalità dell'A1)"
+      ],
+      "zh": [
+        "新功能：自动延时摄影。在打印机设置中开启后，打印期间 Stellio 会用打印机摄像头拍照，并在结束时生成 MP4 视频（可在“打印机”页面查看、播放、下载和删除；间隔可调，需要 ffmpeg）",
+        "新功能：只读分享链接。在工坊模式中创建保密链接，打开无需账号的页面即可查看打印机状态（进度、剩余时间、温度，可选显示文件名），可随时撤销",
+        "新功能：质量漂移提醒。当某台打印机、某种材料或某个配置在最近 30 天的失败率明显上升时，仪表板会提示",
+        "修复：添加打印机时选择的 Bambu Lab 型号现在能正确保存（此前 X1/X2/P2/H2 的摄像头被错误地按 A1 模式处理）"
+      ],
+      "ja": [
+        "新機能：自動タイムラプス。プリンター設定で有効にすると、印刷中にカメラで撮影し、終了時に MP4 動画を作成します（プリンターページで一覧・再生・ダウンロード・削除。間隔は変更可能、ffmpeg が必要）",
+        "新機能：閲覧専用の共有リンク。ワークショップモードから秘密のリンクを作成すると、アカウント不要のページでプリンターの状態（進捗・残り時間・温度、ファイル名は任意）を確認できます。いつでも無効化できます",
+        "新機能：品質低下アラート。プリンター・素材・プロファイルの失敗率が直近30日で大きく上昇すると、ダッシュボードで知らせます",
+        "修正：プリンター追加時に選んだ Bambu Lab のモデルが正しく保存されるようになりました（X1/X2/P2/H2 のカメラが誤って A1 のモードを使っていました）"
+      ]
+    }
+  },
+  {
     "version": "0.8.5",
     "items": {
       "fr": [

@@ -8799,3 +8799,30 @@ body, .app-screen, .auth-screen {
 }
 
 @media (max-width: 480px) { .ws-clock { display: none; } }
+
+
+/* Timelapses */
+.tl-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 14px; }
+.tl-player video { width: 100%; max-height: 52vh; background: #000; border-radius: 12px; display: block; }
+.tl-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.tl-list { display: flex; flex-direction: column; gap: 6px; max-height: 52vh; overflow-y: auto; }
+.tl-item { padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border-color, rgba(255,255,255,.1)); cursor: pointer; }
+.tl-item:hover { background: rgba(255,255,255,.05); }
+.tl-item.active { border-color: var(--accent); background: rgba(78,161,211,.12); }
+.tl-item-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-item-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.tl-settings { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; font-size: 13px; color: var(--text-muted); }
+.tl-rec { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 10px; color: #e85d75; }
+.tl-dot { width: 9px; height: 9px; border-radius: 50%; background: #e85d75; animation: tlpulse 1.2s infinite; }
+@keyframes tlpulse { 50% { opacity: .3; } }
+.tl-warn { background: rgba(245,166,35,.12); border: 1px solid rgba(245,166,35,.35); color: #f6ad55; padding: 8px 12px; border-radius: 10px; font-size: 12px; margin-bottom: 10px; }
+@media (max-width: 720px) { .tl-layout { grid-template-columns: 1fr; } }
+
+/* Liens d'état */
+.sl-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border-color, rgba(255,255,255,.1)); border-radius: 10px; margin-bottom: 6px; }
+.sl-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.sl-info span { font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sl-create { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.sl-create input[type="text"] { flex: 1; min-width: 160px; }
+
+.print-report-modal input[type="text"], .print-report-modal input[type="number"] { background: var(--bg-input, #14171d); color: var(--text-primary, #e6e6e6); border: 1px solid var(--border, rgba(255,255,255,.14)); border-radius: 8px; padding: 8px 10px; font-size: 13px; }

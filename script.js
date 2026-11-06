@@ -368,6 +368,7 @@ let stockPrintableMap = null;
 let noThumbFilterOnly = false;
 let failedThumbFilterOnly = false;
 let currentSearchQuery = '';
+let activeSmartCollection = '';
 
 function _typeFilterTotal() {
     const n = new Set([...document.querySelectorAll('.filter-type')].map(cb => cb.value)).size;
@@ -377,7 +378,7 @@ function _typeFilterTotal() {
 function hasActiveFilters() {
     return (activeTypeFilters?.length > 0 && activeTypeFilters.length < _typeFilterTotal()) ||
         !!currentSizeFilter || !!currentWeightFilter || !!printStatusFilter || !!stockFilter ||
-        activeTagFilters.size > 0 || noThumbFilterOnly || failedThumbFilterOnly;
+        activeTagFilters.size > 0 || noThumbFilterOnly || failedThumbFilterOnly || !!activeSmartCollection;
 }
 
 function clearSearchAndFilters() {
@@ -524,7 +525,7 @@ function watchServerRestartFast() {
 // Fonctions réservées à l'édition serveur (Linux : Raspberry Pi, VM, LXC, Docker). Sous Windows, ces blocs restent masqués.
 function applyServerEditionUI() {
     const on = !!(stellioAppConfig && stellioAppConfig.server_edition);
-    const blocks = { 'slicer-profiles-server-block': 'block', 'ai-provider-server-block': 'flex', 'tigertag-server-block': 'block' };
+    const blocks = { 'slicer-profiles-server-block': 'block', 'ai-provider-server-block': 'flex', 'tigertag-server-block': 'block', 'mqtt-server-block': 'block' };
     Object.keys(blocks).forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = on ? blocks[id] : 'none';
@@ -532,6 +533,7 @@ function applyServerEditionUI() {
     if (on && typeof loadAiProviderSettings === 'function') loadAiProviderSettings();
     if (on) startServerRestartWatcher();
     if (on && typeof loadTigerTagStudioDir === 'function') loadTigerTagStudioDir();
+    if (on && typeof loadMqttSettings === 'function') loadMqttSettings();
 }
 
 function applyAllowedSourceTypes(allowedTypes) {
@@ -3729,6 +3731,21 @@ async function _loadDashboardSuggestions() {
                     </div>
                 </div>`;
             }
+            if (s.type === 'quality_drift') {
+                const dimLabel = { printer: _t3('drift.dim_printer', 'Imprimante'), material: _t3('drift.dim_material', 'Matériau'), profile: _t3('drift.dim_profile', 'Profil') }[s.dimension] || '';
+                const txt = s.base_rate == null
+                    ? _t3('dashboard.suggestion_drift_new', '{{rate}} % d\'échecs sur {{n}} impressions récentes — à vérifier ?', { rate: s.recent_rate, n: s.recent_n })
+                    : _t3('dashboard.suggestion_drift', 'Échecs en hausse : {{rate}} % ces 30 derniers jours (contre {{base}} % avant)', { rate: s.recent_rate, base: s.base_rate });
+                const nav = s.dimension === 'printer' ? 'printers' : 'history';
+                return `
+                <div class="dashboard-row" onclick="document.querySelector('.nav-btn[data-page=&quot;${nav}&quot;]')?.click();" style="cursor:pointer;">
+                    <div class="dashboard-row-icon" style="color:var(--danger);"><i class="fa-solid fa-chart-line"></i></div>
+                    <div class="dashboard-row-body">
+                        <div class="dashboard-row-title" title="${escapeHtml(s.name)}">${escapeHtml(dimLabel)} · ${escapeHtml(s.name)}</div>
+                        <div class="dashboard-row-sub">${txt}</div>
+                    </div>
+                </div>`;
+            }
             return '';
         }).join('');
     } catch (err) {
@@ -4639,17 +4656,18 @@ async function _loadDashboardHistory() {
 let _lowStockThresholds = null;
 async function _ensureLowStockThresholds(force = false) {
     if (_lowStockThresholds && !force) return _lowStockThresholds;
-    let pct = 15, g = 100, restock = 100;
+    let pct = 15, g = 100, restock = 100, fdays = 14;
     try {
         const res = await fetch(`${API}/api/settings`);
         if (res.ok) {
             const s = await res.json();
             if (s.restock_threshold_g != null && isFinite(Number(s.restock_threshold_g))) restock = Number(s.restock_threshold_g);
+            if (s.restock_forecast_days != null && isFinite(Number(s.restock_forecast_days))) fdays = Number(s.restock_forecast_days);
             if (s.low_stock_threshold_percent != null) pct = Number(s.low_stock_threshold_percent);
             if (s.low_stock_threshold_g != null) g = Number(s.low_stock_threshold_g);
         }
     } catch (e) { /* valeurs par défaut */ }
-    _lowStockThresholds = { pct: isFinite(pct) ? pct : 15, g: isFinite(g) ? g : 100, restock };
+    _lowStockThresholds = { pct: isFinite(pct) ? pct : 15, g: isFinite(g) ? g : 100, restock, fdays };
     return _lowStockThresholds;
 }
 
@@ -4668,6 +4686,8 @@ async function loadLowStockSettings() {
     if (g) g.value = t.g;
     const r = document.getElementById('restock-grams');
     if (r) r.value = t.restock != null ? t.restock : 100;
+    const fd = document.getElementById('restock-forecast-days');
+    if (fd) fd.value = t.fdays != null ? t.fdays : 14;
 }
 window.loadLowStockSettings = loadLowStockSettings;
 
@@ -4675,6 +4695,11 @@ window.saveLowStockSettings = async function () {
     const pct = parseFloat(document.getElementById('lowstock-percent')?.value);
     const g = parseFloat(document.getElementById('lowstock-grams')?.value);
     const restock = parseFloat(document.getElementById('restock-grams')?.value);
+    const fdays = parseFloat(document.getElementById('restock-forecast-days')?.value);
+    if (!isFinite(fdays) || fdays < 0 || fdays > 180) {
+        showToast(_t2('lowstock.invalid', 'Valeur invalide (0 à 100 % et 0 à 5000 g)'), 'error');
+        return;
+    }
     if (!isFinite(pct) || !isFinite(g) || pct < 0 || pct > 100 || g < 0 || g > 5000 || !isFinite(restock) || restock < 0 || restock > 20000) {
         showToast(_t2('lowstock.invalid', 'Valeur invalide (0 à 100 % et 0 à 5000 g)'), 'error');
         return;
@@ -4683,10 +4708,10 @@ window.saveLowStockSettings = async function () {
         const res = await fetch(`${API}/api/settings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ low_stock_threshold_percent: pct, low_stock_threshold_g: g, restock_threshold_g: restock }),
+            body: JSON.stringify({ low_stock_threshold_percent: pct, low_stock_threshold_g: g, restock_threshold_g: restock, restock_forecast_days: fdays }),
         });
         if (!res.ok) throw new Error('http');
-        _lowStockThresholds = { pct, g, restock };
+        _lowStockThresholds = { pct, g, restock, fdays };
         showToast(_t2('lowstock.saved', 'Seuil de filament bas enregistré'), 'success');
         _loadDashboardStock();
         _loadDashboardRestock();
@@ -4788,7 +4813,7 @@ async function _loadDashboardRestock() {
             createNotification(
                 'low_stock',
                 _t2('notif.restock_title', 'Filament à commander'),
-                `${_restockLabel(it)} — ${Math.round(it.total_g)} g`,
+                `${_restockLabel(it)} — ${Math.round(it.total_g)} g` + (it.by_forecast && it.days_left != null ? ` (≈ ${Math.max(1, Math.round(it.days_left))} ${_t2('dashboard.restock_days_short', 'j')})` : ''),
                 'spoolman',
                 `restock_${it.key}`
             );
@@ -4796,7 +4821,8 @@ async function _loadDashboardRestock() {
         body.innerHTML = _restockItems.map((it, i) => {
             const color = it.color_hex || '#888888';
             const spools = _t2('dashboard.restock_spools', '{{n}} bobine(s)').replace('{{n}}', it.spool_count);
-            const left = _t2('dashboard.restock_left', '{{g}} g restants').replace('{{g}}', Math.round(it.total_g));
+            let left = _t2('dashboard.restock_left', '{{g}} g restants').replace('{{g}}', Math.round(it.total_g));
+            if (it.days_left != null) left += ` · ≈ ${_t2('dashboard.restock_days_left', '{{n}} j au rythme actuel').replace('{{n}}', Math.max(1, Math.round(it.days_left)))}`;
             return `
             <div class="dashboard-row restock-row">
                 <div class="dashboard-row-icon" style="background:${escapeHtml(color)}22;color:${escapeHtml(color)};"><i class="fa-solid fa-circle"></i></div>
@@ -6828,6 +6854,7 @@ function buildLibraryEmptyStateHTML() {
 
 function renderFiles(chunkSize = 50) {
 const grid = document.getElementById('files-grid');
+renderSmartCollections();
 if (!filteredFiles?.length) {
 grid.innerHTML = buildLibraryEmptyStateHTML();
 I18N.apply();
@@ -7946,6 +7973,7 @@ if (printStatusFilter) files = files.filter(f => {
 });
 if (stockFilter && stockPrintableMap) files = files.filter(f => !!stockPrintableMap[(f.path || '').replace(/\\/g, '/')]);
 if (activeTagFilters.size > 0) files = files.filter(f => { const fileTags = new Set((f.tags || []).map(t => t.name.toLowerCase())); for (const tag of activeTagFilters) { if (!fileTags.has(tag.toLowerCase())) return false; } return true; });
+if (activeSmartCollection) { const sc = SMART_COLLECTIONS.find(c => c.id === activeSmartCollection); if (sc) files = files.filter(sc.test); }
 if (noThumbFilterOnly) files = files.filter(f => !f.has_thumb);
 if (failedThumbFilterOnly) files = files.filter(f => !!f.thumb_fallback);
 return files;
@@ -8060,10 +8088,43 @@ activeTypeFilters = [];
 currentSizeFilter = null;
 currentWeightFilter = null;
 activeTagFilters.clear();
+activeSmartCollection = '';
 closeModal('modal-filters');
 applyFilters();
 showToast(I18N.t('toast.filters_reset'), 'info');
 }
+
+
+// ============================================================================
+// Collections intelligentes : pastilles au-dessus de la bibliothèque, compteurs en direct
+// ============================================================================
+const SMART_COLLECTIONS = [
+    { id: 'recent', icon: 'fa-clock', key: 'collections.recent', fb: 'Ajoutés cette semaine', test: f => f.mtime && (Date.now() / 1000 - f.mtime) < 7 * 86400 },
+    { id: 'never', icon: 'fa-hourglass-start', key: 'collections.never', fb: 'Jamais imprimés', test: f => (f.print_status || 'never') === 'never' },
+    { id: 'success', icon: 'fa-circle-check', key: 'collections.success', fb: 'Déjà réussis', test: f => f.print_status === 'success' },
+    { id: 'failed', icon: 'fa-triangle-exclamation', key: 'collections.failed', fb: 'À retenter (échecs)', test: f => f.print_status === 'failed' },
+    { id: 'light', icon: 'fa-feather', key: 'collections.light', fb: 'Rapides à tirer (≤ 20 g)', test: f => f.weight_g != null && f.weight_g <= 20 },
+    { id: 'heavy', icon: 'fa-weight-hanging', key: 'collections.heavy', fb: 'Gros projets (≥ 150 g)', test: f => f.weight_g != null && f.weight_g >= 150 },
+];
+
+function renderSmartCollections() {
+    const el = document.getElementById('smart-collections');
+    if (!el) return;
+    if (!allFiles?.length) { el.innerHTML = ''; return; }
+    const chips = SMART_COLLECTIONS.map(c => {
+        const n = allFiles.reduce((acc, f) => acc + (c.test(f) ? 1 : 0), 0);
+        if (!n && activeSmartCollection !== c.id) return '';
+        return `<button type="button" class="sc-chip${activeSmartCollection === c.id ? ' active' : ''}" onclick="toggleSmartCollection('${c.id}')"><i class="fa-solid ${c.icon}"></i> ${escapeHtml(_t3(c.key, c.fb))} <span class="sc-count">${n}</span></button>`;
+    }).join('');
+    const saved = (typeof _loadSavedFilters === 'function' ? _loadSavedFilters() : []).map(f =>
+        `<button type="button" class="sc-chip sc-saved" onclick="applySavedFilterSet('${f.id}')"><i class="fa-solid fa-bookmark"></i> ${escapeHtml(f.name)}</button>`).join('');
+    el.innerHTML = chips + saved;
+}
+
+window.toggleSmartCollection = function (id) {
+    activeSmartCollection = activeSmartCollection === id ? '' : id;
+    applyFilters();
+};
 
 // --- Filtres sauvegardés ---
 const SAVED_FILTERS_KEY = 'stellio-saved-filters';
@@ -13186,6 +13247,73 @@ async function testPush() {
 }
 
 
+// ----------------------------------------------------------------------------
+// Paramètres : MQTT / Home Assistant
+// ----------------------------------------------------------------------------
+function _collectMqttSettings() {
+    const port = parseInt(document.getElementById('mqtt-port').value, 10);
+    return {
+        mqtt_enabled: document.getElementById('mqtt-enabled').checked,
+        mqtt_host: document.getElementById('mqtt-host').value.trim(),
+        mqtt_port: Number.isFinite(port) ? port : 0,
+        mqtt_user: document.getElementById('mqtt-user').value.trim(),
+        mqtt_password: document.getElementById('mqtt-password').value,
+        mqtt_base: document.getElementById('mqtt-base').value.trim() || 'stellio',
+        mqtt_tls: document.getElementById('mqtt-tls').checked,
+        mqtt_tls_insecure: document.getElementById('mqtt-tls-insecure').checked,
+        mqtt_discovery: document.getElementById('mqtt-discovery').checked
+    };
+}
+
+async function loadMqttSettings() {
+    if (IS_VIEWER || !(stellioAppConfig && stellioAppConfig.server_edition) || !document.getElementById('mqtt-host')) return;
+    try {
+        const res = await fetch(`${API}/api/settings`);
+        if (!res.ok) return;
+        const s = await res.json();
+        document.getElementById('mqtt-enabled').checked = !!s.mqtt_enabled;
+        document.getElementById('mqtt-host').value = s.mqtt_host || '';
+        document.getElementById('mqtt-port').value = s.mqtt_port || '';
+        document.getElementById('mqtt-user').value = s.mqtt_user || '';
+        document.getElementById('mqtt-password').value = s.mqtt_password || '';
+        document.getElementById('mqtt-base').value = s.mqtt_base || 'stellio';
+        document.getElementById('mqtt-tls').checked = !!s.mqtt_tls;
+        document.getElementById('mqtt-tls-insecure').checked = !!s.mqtt_tls_insecure;
+        document.getElementById('mqtt-discovery').checked = s.mqtt_discovery !== false;
+        refreshMqttStatus();
+    } catch (e) { /* silencieux */ }
+}
+
+async function refreshMqttStatus() {
+    const el = document.getElementById('mqtt-status-line');
+    if (!el) return;
+    try {
+        const d = await (await fetch(`${API}/api/mqtt/status`)).json();
+        if (!d.available) el.textContent = _t3('mqtt.unavailable', "Le module MQTT n'est pas disponible");
+        else if (!d.enabled) el.textContent = '';
+        else if (d.connected) el.textContent = '● ' + _t3('mqtt.connected', 'Connecté au broker');
+        else el.textContent = '○ ' + _t3('mqtt.disconnected', 'Non connecté') + (d.error ? ` (${d.error})` : '');
+    } catch (e) { el.textContent = ''; }
+}
+
+async function saveMqttSettings() {
+    try {
+        const res = await fetch(`${API}/api/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_collectMqttSettings()) });
+        if (res.ok) { showToast(_t3('mqtt.saved', 'Paramètres MQTT enregistrés'), 'success'); setTimeout(refreshMqttStatus, 6000); }
+        else showToast(_t3('toast.error', 'Erreur'), 'error');
+    } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+}
+
+async function testMqtt() {
+    try {
+        const res = await fetch(`${API}/api/mqtt/test`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_collectMqttSettings()) });
+        const data = await res.json().catch(() => ({}));
+        if (data.success) showToast(_t3('mqtt.test_ok', 'Connexion au broker réussie'), 'success');
+        else showToast(_tf('mqtt.test_fail', 'Échec de la connexion : {{error}}', { error: data.error || _t3('toast.error', 'Erreur') }), 'error');
+    } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+}
+
+
 // ============================================================================
 // Réimprimer comme la dernière fois, bilan mensuel, bilan de bobine,
 // détection de nouvelles versions des modèles
@@ -14645,7 +14773,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         if (page === 'library') loadFiles();
         if (page === 'printers') loadPrinters(); else stopAllPrinterCardCameras();
         if (page !== 'dashboard') _stopDashboardCameras();
-        if (page === 'settings') { loadSources(); loadRemoteInstances(); loadGuests(); loadPushSettings(); }
+        if (page === 'settings') { loadSources(); loadRemoteInstances(); loadGuests(); loadPushSettings(); loadMqttSettings(); }
         else stopDiagnosticConsolePoll();
         if (page === 'spoolman') loadSpoolmanPage();
         if (page === 'stats') loadStats();
@@ -15439,6 +15567,18 @@ async function _confirmSendToSlicer(force) {
         close3DViewer();
     }
 }
+
+// Une fenêtre qui contient un formulaire ne se ferme plus quand on clique à côté : on ne perd pas une saisie en cours.
+// (la croix, le bouton Annuler et la touche Échap fonctionnent toujours)
+(function () {
+    const NO_GUARD = '#command-palette, #modal-3d-viewer, .command-palette-overlay, .workshop-overlay';
+    const FIELDS = 'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), textarea, select';
+    document.addEventListener('click', (e) => {
+        const t = e.target;
+        if (!t || !t.matches || !t.matches('.modal, [class*="overlay"]') || t.matches(NO_GUARD)) return;
+        if (t.querySelector(FIELDS)) { e.stopPropagation(); e.preventDefault(); }
+    }, true);
+})();
 
 document.querySelectorAll('.modal').forEach(modal => {
     // Ne ferme que si le clic a AUSSI commencé sur le fond : sélectionner du texte dans un champ
@@ -16362,6 +16502,10 @@ window.addPrinter = async function() {
         config.model = bambuModel;
         config.user = 'bblp';
     }
+    if (type === 'bambuddy') {
+        config.port = parseInt(document.getElementById('printer-bambuddy-port')?.value, 10) || 8000;
+        config.bambuddy_id = parseInt(document.getElementById('printer-bambuddy-id')?.value, 10) || 1;
+    }
     if (type === 'elegoo_cc2') {
         config.code = elegooCc2Code || '123456';
     }
@@ -16372,6 +16516,7 @@ window.addPrinter = async function() {
     if (bedX > 0) config.bed_x = bedX;
     if (bedY > 0) config.bed_y = bedY;
     if (bedZ > 0) config.bed_z = bedZ;
+    if (document.getElementById('printer-timelapse')?.checked) config.timelapse = true;
 
     const isEdit = !!editId;
     const btn = document.getElementById('add-printer-submit-btn');
@@ -16411,6 +16556,28 @@ window.addPrinter = async function() {
 };
 
 
+
+window.loadBambuddyPrinters = async function () {
+    const ip = document.getElementById('printer-ip').value.trim();
+    const apiKey = document.getElementById('printer-api-key').value.trim();
+    const port = parseInt(document.getElementById('printer-bambuddy-port')?.value, 10) || 8000;
+    const editId = document.getElementById('printer-edit-id')?.value.trim() || '';
+    if (!ip) { showToast(_t3('printers.bambuddy_need_ip', "Renseigne d'abord l'adresse du serveur Bambuddy"), 'warning'); return; }
+    try {
+        const res = await fetch(`${API}/api/bambuddy/printers`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ip, api_key: apiKey, printer_id: editId || undefined, config: { port } }) });
+        const d = await res.json();
+        if (!d.success) { showToast(_tf('printers.bambuddy_load_fail', 'Bambuddy : {{error}}', { error: d.error || '' }), 'error'); return; }
+        const sel = document.getElementById('printer-bambuddy-id');
+        const cur = sel.value;
+        sel.innerHTML = d.printers.map(p => `<option value="${p.id}">${escapeHtml(p.name)}${p.model ? ' (' + escapeHtml(p.model) + ')' : ''} — #${p.id}</option>`).join('') || '<option value="1">#1</option>';
+        if (d.printers.some(p => String(p.id) === cur)) sel.value = cur;
+        const nameField = document.getElementById('printer-name');
+        if (nameField && !nameField.value.trim() && d.printers.length) nameField.value = d.printers[0].name;
+        showToast(_tf('printers.bambuddy_loaded', '{{n}} imprimante(s) trouvée(s)', { n: d.printers.length }), 'success');
+    } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+};
+
 window.editPrinter = function(pid) {
     const p = printersList.find(pr => pr.id === pid);
     if (!p) return;
@@ -16440,6 +16607,11 @@ window.editPrinter = function(pid) {
     if (bambuSerialField) bambuSerialField.value = cfg.serial || '';
     const bambuModelField = document.getElementById('printer-bambu-model');
     if (bambuModelField) bambuModelField.value = cfg.model || 'A1';
+    if (p.type === 'bambuddy') {
+        const bdPort = document.getElementById('printer-bambuddy-port'); if (bdPort) bdPort.value = cfg.port || 8000;
+        const bdSel = document.getElementById('printer-bambuddy-id');
+        if (bdSel) { bdSel.innerHTML = `<option value="${cfg.bambuddy_id || 1}">#${cfg.bambuddy_id || 1}</option>`; bdSel.value = String(cfg.bambuddy_id || 1); }
+    }
     const elegooCc2CodeField = document.getElementById('printer-elegoo-cc2-code');
     if (elegooCc2CodeField) elegooCc2CodeField.value = cfg.code || '';
     const flashforgeSerialField = document.getElementById('printer-flashforge-serial');
@@ -16449,6 +16621,7 @@ window.editPrinter = function(pid) {
     const bedXField = document.getElementById('printer-bed-x');
     ['printer-bed-x','printer-bed-y','printer-bed-z'].forEach(i => { const e = document.getElementById(i); if (e) e.dataset.auto = '0'; });
     const _bedHint = document.getElementById('printer-bed-suggest'); if (_bedHint) _bedHint.style.display = 'none';
+    const _tlField = document.getElementById('printer-timelapse'); if (_tlField) _tlField.checked = !!cfg.timelapse;
     if (bedXField) bedXField.value = cfg.bed_x || '';
     const bedYField = document.getElementById('printer-bed-y');
     if (bedYField) bedYField.value = cfg.bed_y || '';
@@ -17275,7 +17448,7 @@ window.stopAllPrinterCardCameras = stopAllPrinterCardCameras;
 function getPrinterIcon(type) {
     if (type === 'klipper') return 'mdi-printer-3d-nozzle';
     if (type === 'octoprint') return 'mdi-printer-3d-nozzle';
-    if (type === 'bambu') return 'mdi-printer-3d-nozzle';
+    if (type === 'bambu' || type === 'bambuddy') return 'mdi-printer-3d-nozzle';
     return 'mdi-printer';
 }
 
@@ -18563,9 +18736,10 @@ window.applyDiscoveredPrinter = function(index) {
 
 window.togglePrinterFields = function() {
     const type = document.getElementById('printer-type').value;
-    document.getElementById('group-api-key').style.display = (type === 'octoprint' || type === 'prusalink') ? 'block' : 'none';
+    document.getElementById('group-api-key').style.display = (type === 'octoprint' || type === 'prusalink' || type === 'bambuddy') ? 'block' : 'none';
     document.getElementById('group-port').style.display = type === 'klipper' ? 'block' : 'none';
     document.getElementById('group-bambu').style.display = type === 'bambu' ? 'block' : 'none';
+    const _gbd = document.getElementById('group-bambuddy'); if (_gbd) _gbd.style.display = type === 'bambuddy' ? 'block' : 'none';
     document.getElementById('group-octoprint-hint').style.display = type === 'octoprint' ? 'block' : 'none';
     document.getElementById('group-klipper-hint').style.display = type === 'klipper' ? 'block' : 'none';
     document.getElementById('group-prusalink-hint').style.display = type === 'prusalink' ? 'block' : 'none';
@@ -18575,7 +18749,7 @@ window.togglePrinterFields = function() {
     document.getElementById('group-flashforge').style.display = type === 'flashforge' ? 'block' : 'none';
     const apiKeyLabel = document.getElementById('printer-api-key');
     if (apiKeyLabel) {
-        apiKeyLabel.placeholder = type === 'prusalink'
+        apiKeyLabel.placeholder = type === 'bambuddy' ? _t3('printers.bambuddy_key_ph', 'Clé API Bambuddy') : type === 'prusalink'
             ? (I18N.t('printers.prusalink_key_ph') || 'Mot de passe / clé API PrusaLink')
             : (I18N.t('printers.octoprint_key_ph') || 'Clé API OctoPrint');
     }
@@ -22897,6 +23071,7 @@ window.openWorkshopMode = function () {
         <div class="ws-top">
             <div class="ws-title"><i class="fa-solid fa-tablet-screen-button"></i> ${escapeHtml(_t3('nav.workshop', 'Mode atelier'))} <span id="workshop-count" class="ws-count"></span></div>
             <div id="workshop-clock" class="ws-clock"></div>
+            <button type="button" class="ws-btn viewer-hide" id="workshop-share" title="${escapeHtml(_t3('statuslink.title', 'Liens de partage en lecture seule'))}"><i class="fa-solid fa-link"></i></button>
             <button type="button" class="ws-btn" id="workshop-fs" title="${escapeHtml(_t3('workshop.fullscreen', 'Plein écran'))}"><i class="fa-solid fa-expand"></i></button>
             <button type="button" class="ws-btn" id="workshop-close" title="${escapeHtml(_t3('workshop.exit', 'Quitter'))}"><i class="fa-solid fa-xmark"></i></button>
         </div>
@@ -22919,6 +23094,7 @@ window.openWorkshopMode = function () {
     document.addEventListener('keydown', onKey);
     document.addEventListener('visibilitychange', onVis);
     ov.querySelector('#workshop-close').addEventListener('click', close);
+    ov.querySelector('#workshop-share')?.addEventListener('click', () => openStatusLinksModal());
     ov.querySelector('#workshop-fs').addEventListener('click', () => {
         if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
         else (ov.requestFullscreen ? ov.requestFullscreen() : Promise.reject()).catch(() => {});
@@ -22929,3 +23105,137 @@ window.openWorkshopMode = function () {
 };
 // Lien direct : http://…/#workshop ouvre le mode atelier (pratique pour un écran dédié dans l'atelier)
 window.addEventListener('load', () => { if (location.hash === '#workshop') setTimeout(() => window.openWorkshopMode(), 1200); });
+
+
+// ── Timelapses : liste, lecture, téléchargement, suppression ────────────────────────────────────
+function _fmtBytes(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' Mo' : Math.max(1, Math.round(n / 1024)) + ' Ko'; }
+window.openTimelapseModal = async function () {
+    document.getElementById('timelapse-overlay')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'timelapse-overlay'; ov.className = 'print-report-overlay';
+    ov.innerHTML = `
+        <div class="print-report-modal" role="dialog" aria-modal="true">
+            <div class="print-report-head">
+                <h3><i class="fa-solid fa-film"></i> ${escapeHtml(_t3('timelapse.title', 'Timelapses'))}</h3>
+                <button type="button" class="print-report-close" aria-label="${escapeHtml(_t3('actions.close', 'Fermer'))}"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="tl-body"><div class="print-report-preview"><i class="fa-solid fa-spinner fa-spin"></i></div></div>
+        </div>`;
+    document.body.appendChild(ov);
+    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = e => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+    ov.querySelector('.print-report-close').addEventListener('click', close);
+    await _renderTimelapseList();
+};
+async function _renderTimelapseList(selectedId) {
+    const body = document.getElementById('tl-body');
+    if (!body) return;
+    let data;
+    try { data = await (await fetch(`${API}/api/timelapses`)).json(); }
+    catch (e) { body.innerHTML = `<p style="color:var(--danger)">${escapeHtml(I18N.t('toast.connection_error'))}</p>`; return; }
+    const list = data.timelapses || [];
+    const cur = list.find(t => t.id === selectedId) || list[0];
+    const rec = (data.recording || []).map(r => `<div class="tl-rec"><span class="tl-dot"></span> ${escapeHtml(_t3('timelapse.recording', 'Enregistrement en cours'))} : ${escapeHtml(r.printer_name)} · ${r.frames} ${escapeHtml(_t3('timelapse.frames', 'images'))}</div>`).join('');
+    const warn = data.ffmpeg ? '' : `<div class="tl-warn"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(_t3('timelapse.no_ffmpeg', 'ffmpeg est introuvable : les vidéos ne peuvent pas être créées (placez ffmpeg dans le dossier bin/ de Stellio).'))}</div>`;
+    const items = list.map(t => `
+        <div class="tl-item${cur && cur.id === t.id ? ' active' : ''}" onclick="_renderTimelapseList(${t.id})">
+            <div class="tl-item-name" title="${escapeHtml(t.file_name)}">${escapeHtml(String(t.file_name || '—').replace(/\.[^.]+$/, ''))}</div>
+            <div class="tl-item-meta">${escapeHtml(t.printer_name || '')} · ${escapeHtml(new Date(String(t.started_at).replace(' ', 'T')).toLocaleString(I18N.lang, { dateStyle: 'medium', timeStyle: 'short' }))} · ${_fmtBytes(t.size)}</div>
+        </div>`).join('');
+    body.innerHTML = `
+        ${warn}${rec}
+        ${list.length ? `
+        <div class="tl-layout">
+            <div class="tl-player">
+                <video controls playsinline preload="metadata" src="${API}/api/timelapses/${cur.id}/video"></video>
+                <div class="tl-actions">
+                    <a class="btn btn-primary" href="${API}/api/timelapses/${cur.id}/video?download=1"><i class="fa-solid fa-download"></i> ${escapeHtml(_t3('history.share_download', 'Télécharger'))}</a>
+                    <button type="button" class="btn btn-ghost" onclick="deleteTimelapse(${cur.id})"><i class="fa-solid fa-trash"></i> ${escapeHtml(_t3('actions.delete', 'Supprimer'))}</button>
+                </div>
+            </div>
+            <div class="tl-list">${items}</div>
+        </div>` : `<div class="ws-empty" style="color:var(--text-muted);padding:30px 10px;"><i class="fa-solid fa-film"></i><p>${escapeHtml(_t3('timelapse.empty', "Aucun timelapse pour l'instant. Active « Timelapse automatique » dans la fiche d'une imprimante."))}</p></div>`}
+        <div class="tl-settings">
+            <label>${escapeHtml(_t3('timelapse.interval', 'Une photo toutes les'))}
+                <input type="number" id="tl-interval" min="5" max="300" step="5" value="${data.interval}" style="width:80px;"> s</label>
+            <button type="button" class="btn btn-ghost" onclick="saveTimelapseInterval()">${escapeHtml(_t3('actions.save', 'Enregistrer'))}</button>
+        </div>`;
+}
+window._renderTimelapseList = _renderTimelapseList;
+window.saveTimelapseInterval = async function () {
+    const v = parseInt(document.getElementById('tl-interval')?.value, 10);
+    try {
+        const res = await fetch(`${API}/api/timelapse/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interval: v }) });
+        if (res.ok) showToast(_t3('timelapse.saved', 'Intervalle enregistré'), 'success');
+        else showToast(I18N.t('toast.error'), 'error');
+    } catch (e) { showToast(I18N.t('toast.connection_error'), 'error'); }
+};
+window.deleteTimelapse = function (id) {
+    showConfirmModal(_t3('timelapse.confirm_delete', 'Supprimer ce timelapse ?'), async () => {
+        try {
+            const res = await fetch(`${API}/api/timelapses/${id}`, { method: 'DELETE' });
+            if (res.ok) _renderTimelapseList();
+        } catch (e) { showToast(I18N.t('toast.connection_error'), 'error'); }
+    });
+};
+
+
+// ── Liens d'état partageables (page publique en lecture seule) ──────────────────────────────────
+window.openStatusLinksModal = async function () {
+    document.getElementById('statuslinks-overlay')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'statuslinks-overlay'; ov.className = 'print-report-overlay'; ov.style.zIndex = '100001';
+    ov.innerHTML = `
+        <div class="print-report-modal" role="dialog" aria-modal="true" style="max-width:640px;">
+            <div class="print-report-head">
+                <h3><i class="fa-solid fa-link"></i> ${escapeHtml(_t3('statuslink.title', 'Liens de partage en lecture seule'))}</h3>
+                <button type="button" class="print-report-close" aria-label="${escapeHtml(_t3('actions.close', 'Fermer'))}"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p style="font-size:13px;color:var(--text-muted);margin:0;">${escapeHtml(_t3('statuslink.intro', "Une page sans compte qui montre l'état des imprimantes (progression, temps restant, températures). Les liens sont secrets : révoque-les quand tu veux."))}</p>
+            <div id="sl-list"><i class="fa-solid fa-spinner fa-spin"></i></div>
+            <div class="sl-create">
+                <input type="text" id="sl-label" maxlength="60" placeholder="${escapeHtml(_t3('statuslink.label_ph', 'Nom du lien (ex. Atelier, Client)'))}">
+                <label class="print-report-opt"><input type="checkbox" id="sl-files"> ${escapeHtml(_t3('statuslink.show_files', 'Afficher les noms de fichiers'))}</label>
+                <button type="button" class="btn btn-primary" id="sl-create"><i class="fa-solid fa-plus"></i> ${escapeHtml(_t3('statuslink.create', 'Créer un lien'))}</button>
+            </div>
+        </div>`;
+    document.body.appendChild(ov);
+    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey, true); };
+    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    document.addEventListener('keydown', onKey, true);
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+    ov.querySelector('.print-report-close').addEventListener('click', close);
+    const refresh = async () => {
+        const box = ov.querySelector('#sl-list');
+        try {
+            const d = await (await fetch(`${API}/api/status-links`)).json();
+            const links = d.links || [];
+            box.innerHTML = links.length ? links.map(l => `
+                <div class="sl-item">
+                    <div class="sl-info"><strong>${escapeHtml(l.label || _t3('statuslink.unnamed', 'Sans nom'))}</strong>
+                        <span>${escapeHtml(l.url)}</span></div>
+                    <button type="button" class="btn btn-ghost" data-copy="${escapeHtml(l.url)}" title="${escapeHtml(_t3('history.share_copy', 'Copier'))}"><i class="fa-solid fa-copy"></i></button>
+                    <button type="button" class="btn btn-ghost" data-del="${l.id}" title="${escapeHtml(_t3('statuslink.revoke', 'Révoquer'))}"><i class="fa-solid fa-trash"></i></button>
+                </div>`).join('') : `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(_t3('statuslink.none', 'Aucun lien pour le moment.'))}</p>`;
+            if (!d.remote && links.length) box.insertAdjacentHTML('beforeend', `<p style="color:var(--text-muted);font-size:12px;"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(_t3('statuslink.lan_note', "Ces liens fonctionnent sur ton réseau local. Pour les ouvrir depuis Internet, active l'accès distant de Stellio."))}</p>`);
+            box.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', async () => {
+                try { await navigator.clipboard.writeText(b.dataset.copy); showToast(_t3('statuslink.copied', 'Lien copié'), 'success'); }
+                catch (_) { window.prompt(_t3('statuslink.copy_manual', 'Copie ce lien :'), b.dataset.copy); }
+            }));
+            box.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
+                await fetch(`${API}/api/status-links/${b.dataset.del}`, { method: 'DELETE' });
+                refresh();
+            }));
+        } catch (e) { box.textContent = I18N.t('toast.connection_error'); }
+    };
+    ov.querySelector('#sl-create').addEventListener('click', async () => {
+        const res = await fetch(`${API}/api/status-links`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ label: ov.querySelector('#sl-label').value, show_files: ov.querySelector('#sl-files').checked }) });
+        if (!res.ok) { const d = await res.json().catch(() => ({})); showToast(d.error || I18N.t('toast.error'), 'error'); return; }
+        ov.querySelector('#sl-label').value = '';
+        refresh();
+    });
+    refresh();
+};

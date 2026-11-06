@@ -2731,6 +2731,9 @@
 					<button onclick="openAddPrinterModal()" class="btn btn-primary viewer-hide">
 						<i class="fa-solid fa-plus"></i> <span data-i18n="printers.add">Ajouter une imprimante</span>
 					</button>
+					<button onclick="openTimelapseModal()" class="btn btn-ghost" style="margin-left:8px;">
+						<i class="fa-solid fa-film"></i> <span data-i18n="timelapse.open_btn">Timelapses</span>
+					</button>
 					<button onclick="openPartsModal()" class="btn btn-ghost" style="margin-left:8px;">
 						<i class="fa-solid fa-toolbox"></i> <span data-i18n="parts.open_btn">Pièces &amp; consommables</span>
 					</button>
@@ -4114,6 +4117,13 @@
 						</div>
 						<small id="printer-bed-suggest" style="display:none;color:var(--accent);font-size:11px;" data-i18n="printers.bed_suggested">Valeurs suggérées d'après le modèle : vérifie-les et ajuste si besoin.</small>
 						<small style="color:var(--text-muted);font-size:11px;" data-i18n="printers.bed_size_hint">Largeur × profondeur × hauteur maximale d'impression. Sert à avertir quand une pièce est trop grande avant l'envoi au slicer.</small>
+					</div>
+					<div class="input-group" id="group-timelapse">
+						<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+							<input type="checkbox" id="printer-timelapse" style="width:auto;margin:0;">
+							<span data-i18n="printers.timelapse_label">Timelapse automatique</span>
+						</label>
+						<small style="color:var(--text-muted);font-size:11px;" data-i18n="printers.timelapse_hint">Stellio prend des photos avec la caméra de l'imprimante pendant l'impression et crée une vidéo à la fin (ffmpeg requis).</small>
 					</div>
 				</form>
 			</div>
