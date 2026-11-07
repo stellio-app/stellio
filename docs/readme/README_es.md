@@ -246,7 +246,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/stellio-app/stellio/main
 ```
 
 El script ofrece ajustes por defecto o avanzados (CTID, núcleos, RAM, disco, bridge, VLAN, IP DHCP o fija, almacenamiento, carpeta del host a montar) y después:
-- crea un contenedor **Debian 12 sin privilegios** (por defecto 2 núcleos, 2 GB de RAM, 8 GB de disco, arranque automático);
+- crea un contenedor **Debian 12 sin privilegios** (por defecto 2 núcleos, 2 GB de RAM, 32 GB de disco, arranque automático);
 - instala Stellio en él con `install-pi.sh` (dependencias, entorno Python, **servicio systemd**);
 - muestra la dirección de acceso `http://<ip-del-contenedor>:5000` y la contraseña root generada.
 

@@ -246,7 +246,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/stellio-app/stellio/main
 ```
 
 The script offers default or advanced settings (CTID, cores, RAM, disk, bridge, VLAN, DHCP or static IP, storage, host folder to mount), then:
-- creates an **unprivileged Debian 12** container (2 cores, 2 GB RAM, 8 GB disk by default, start on boot);
+- creates an **unprivileged Debian 12** container (2 cores, 2 GB RAM, 32 GB disk by default, start on boot);
 - installs Stellio in it with `install-pi.sh` (dependencies, Python environment, **systemd service**);
 - prints the access address `http://<container-ip>:5000` and the generated root password.
 

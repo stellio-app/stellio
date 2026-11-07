@@ -246,7 +246,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/stellio-app/stellio/main
 ```
 
 脚本提供默认或高级设置（CTID、CPU 核心、内存、磁盘、网桥、VLAN、DHCP 或静态 IP、存储、要挂载的主机文件夹），然后：
-- 创建一个**非特权 Debian 12** 容器（默认 2 核、2 GB 内存、8 GB 磁盘、开机自启）；
+- 创建一个**非特权 Debian 12** 容器（默认 2 核、2 GB 内存、32 GB 磁盘、开机自启）；
 - 使用 `install-pi.sh` 在其中安装 Stellio（依赖项、Python 环境、**systemd 服务**）；
 - 显示访问地址 `http://<容器IP>:5000` 和生成的 root 密码。
 

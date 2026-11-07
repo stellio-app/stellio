@@ -838,6 +838,17 @@
                                     <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
                                 </div>
                             </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-gcodes" data-widget-id="gcodes" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-file-code"></i> <span data-i18n="gcode.widget_title">G-code</span></h3>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('gcodes')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-gcodes-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
                         </div>
 
                         <div id="dashboard-hidden-widgets" class="dashboard-hidden-widgets hidden">
@@ -4316,6 +4327,11 @@
                 <button class="file-action-row commercial-only" id="ctx-cost-btn">
                     <span class="file-action-icon"><i class="fa-solid fa-coins"></i></span>
                     <span class="file-action-label" data-i18n="modal.print_cost">Coût d'impression</span>
+                    <i class="fa-solid fa-chevron-right file-action-arrow"></i>
+                </button>
+                <button class="file-action-row" id="ctx-gcode-btn">
+                    <span class="file-action-icon"><i class="fa-solid fa-file-code"></i></span>
+                    <span class="file-action-label" data-i18n="projects.gcode_menu">Mes G-code</span>
                     <i class="fa-solid fa-chevron-right file-action-arrow"></i>
                 </button>
                 <button class="file-action-row" id="ctx-project-btn">

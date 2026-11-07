@@ -246,7 +246,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/stellio-app/stellio/main
 ```
 
 スクリプトはデフォルト設定または詳細設定（CTID、コア数、RAM、ディスク、ブリッジ、VLAN、DHCP または固定 IP、ストレージ、マウントするホストのフォルダ）を提供し、その後：
-- **非特権 Debian 12** コンテナを作成します（デフォルトは 2 コア、RAM 2 GB、ディスク 8 GB、起動時に自動開始）。
+- **非特権 Debian 12** コンテナを作成します（デフォルトは 2 コア、RAM 2 GB、ディスク 32 GB、起動時に自動開始）。
 - `install-pi.sh` で Stellio をインストールします（依存関係、Python 環境、**systemd サービス**）。
 - アクセス先 `http://<コンテナのIP>:5000` と生成された root パスワードを表示します。
 

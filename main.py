@@ -1388,6 +1388,8 @@ UPLOADS_DIR = os.path.join(DATA_DIR, "uploads")
 THUMBNAILS_DIR = os.path.join(DATA_DIR, "thumbnails")
 PRINT_PHOTOS_DIR = os.path.join(DATA_DIR, "print_photos")
 os.makedirs(PRINT_PHOTOS_DIR, exist_ok=True)
+PROJECT_GCODES_DIR = os.path.join(DATA_DIR, "project_gcodes")
+os.makedirs(PROJECT_GCODES_DIR, exist_ok=True)
 SOSPRINT_CONV_PHOTOS_DIR = os.path.join(DATA_DIR, "sosprint_conversation_photos")
 os.makedirs(SOSPRINT_CONV_PHOTOS_DIR, exist_ok=True)
 
@@ -2225,6 +2227,21 @@ def init_db():
         FOREIGN KEY (project_id) REFERENCES projects(id),
         PRIMARY KEY (project_id, file_path)
     )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS project_gcodes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        stored_name TEXT NOT NULL,
+        size INTEGER DEFAULT 0,
+        meta TEXT DEFAULT '{}',
+        notes TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
+    try:
+        c.execute("ALTER TABLE project_gcodes ADD COLUMN file_path TEXT DEFAULT ''")
+    except Exception:
+        pass   # colonne déjà présente
     c.execute("""CREATE TABLE IF NOT EXISTS quotes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -7693,12 +7710,57 @@ _SOURCE_STATUS_TTL = 10.0
 _SOURCE_STATUS_TIMEOUT = 6.0
 
 
-def _check_one_source_available(source):
-    """True si la source répond (dossier/fichier présent, partage SMB joignable)."""
+_NET_CACHE = {'t': 0.0, 'up': True}
+
+
+def _network_up():
+    """Étape 1 : la machine a-t-elle une connexion réseau ? (au moins une interface active avec une adresse hors boucle locale).
+    Sans réseau, inutile d'attendre les délais d'expiration des partages SMB. En cas de doute, on répond « oui »."""
+    now = time.time()
+    if now - _NET_CACHE['t'] < 2:
+        return _NET_CACHE['up']
+    up = True
+    try:
+        import psutil
+        stats = psutil.net_if_stats()
+        up = False
+        for name, addrs in psutil.net_if_addrs().items():
+            st = stats.get(name)
+            if not st or not st.isup:
+                continue
+            if any(a.family == socket.AF_INET and not a.address.startswith('127.') and not a.address.startswith('169.254.') for a in addrs):
+                up = True
+                break
+    except Exception:
+        up = True
+    _NET_CACHE.update(t=now, up=up)
+    return up
+
+
+def _smb_host_reachable(path, timeout=1.5):
+    """Étape 2 : le serveur répond-il sur le port SMB ? Test rapide avant d'ouvrir une session SMB."""
+    host = _smb_host_of(path)
+    if not host:
+        return False
+    try:
+        with socket.create_connection((host, 445), timeout=timeout):
+            return True
+    except Exception:
+        return False
+
+
+def _check_one_source_available(source, network_up=True):
+    """True si la source répond (dossier/fichier présent, partage SMB joignable). Réseau d'abord, puis serveur, puis partage."""
     try:
         stype = source['type']
         if stype == 'smb':
+            if not network_up:
+                return False
             unc_path = source['path'].replace('\\\\', '//').replace('\\', '/')
+            if not _smb_host_reachable(unc_path):
+                _smb_host_mark_down(unc_path)
+                return False
+            _smb_host_down.pop(_smb_host_of(unc_path), None)
             kwargs = {'connection_timeout': 4}
             config = json.loads(source['config']) if source['config'] else {}
             if config.get('username'):
@@ -7728,9 +7790,10 @@ def api_sources_status():
     finally:
         conn.close()
     results = {}
+    network_up = _network_up()
     if rows:
         pool = ThreadPoolExecutor(max_workers=min(8, len(rows)))
-        futures = {r['id']: pool.submit(_check_one_source_available, r) for r in rows}
+        futures = {r['id']: pool.submit(_check_one_source_available, r, network_up) for r in rows}
         deadline = time.time() + _SOURCE_STATUS_TIMEOUT
         for r in rows:
             try:
@@ -7738,7 +7801,7 @@ def api_sources_status():
             except Exception:
                 results[r['id']] = False
         pool.shutdown(wait=False)
-    payload = {"sources": [{"id": r['id'], "name": r['name'], "type": r['type'], "available": results.get(r['id'], False)} for r in rows]}
+    payload = {"network": network_up, "sources": [{"id": r['id'], "name": r['name'], "type": r['type'], "available": results.get(r['id'], False)} for r in rows]}
     _SOURCE_STATUS_CACHE[user_id] = (now, payload)
     return jsonify(payload)
 
@@ -8082,6 +8145,13 @@ def api_delete_source(source_id):
         ).fetchall()]
     finally:
         conn.close()
+    # Fichiers déjà connus des sources restantes : si l'une d'elles est injoignable, on les garde au lieu de les perdre.
+    _prev_cached = []
+    try:
+        _keep = {s['name'] for s in remaining_sources}
+        _prev_cached = [pf for pf in (load_file_cache() or []) if pf.get('source') in _keep]
+    except Exception:
+        _prev_cached = []
     invalidate_cache()
 
     def _rescan_after_delete(sources):
@@ -8090,9 +8160,13 @@ def api_delete_source(source_id):
             try:
                 app_logger.info("[DELETE] Rescan post-suppression source...")
                 all_files = []
+                _failed = set()
                 for source in sources:
                     try:
                         if source['type'] == 'folder':
+                            if not os.path.exists(source['path']):
+                                _failed.add(source['name'])
+                                continue
                             all_files.extend(_filter_files_for_source(source, scan_local_folder(source['path'])))
                         elif source['type'] == 'smb':
                             try:
@@ -8108,7 +8182,10 @@ def api_delete_source(source_id):
                                 kwargs['password'] = config['password']
                             all_files.extend(_filter_files_for_source(source, scan_smb_folder_recursive(unc_path, '', kwargs, source['name'])))
                     except Exception as e:
+                        _failed.add(source.get('name'))
                         app_logger.warning(f"[DELETE] Erreur source {source.get('name')}: {e}")
+                if _failed:
+                    all_files.extend(pf for pf in _prev_cached if pf.get('source') in _failed)
                 save_file_cache(all_files, sources)
                 app_logger.info(f"[DELETE] Cache mis à jour : {len(all_files)} fichiers")
             finally:
@@ -10389,7 +10466,13 @@ def _do_background_scan(sources_list, user_id, blocking=False):
                         app_logger.warning(f"[SCAN] Source \"{source['name']}\" introuvable ({source['path']}) — ignorée pour ce scan")
                         unreachable_sources.append(source['name'])
                         continue
+                    _n_before = len(all_files)
                     all_files.extend(_filter_files_for_source(source, scan_local_folder(source['path'])))
+                    if not os.path.exists(source['path']):
+                        del all_files[_n_before:]
+                        app_logger.warning(f"[SCAN] Source \"{source['name']}\" perdue pendant l'analyse — ignorée pour ce scan")
+                        unreachable_sources.append(source['name'])
+                        continue
                 elif source['type'] == 'smb':
                     try:
                         smbclient.reset_connection_cache()
@@ -10408,7 +10491,16 @@ def _do_background_scan(sources_list, user_id, blocking=False):
                         app_logger.warning(f"[SCAN] Source réseau \"{source['name']}\" injoignable ({unc_path}) — ignorée pour ce scan")
                         unreachable_sources.append(source['name'])
                         continue
+                    _n_before = len(all_files)
                     all_files.extend(_filter_files_for_source(source, scan_smb_folder_recursive(unc_path, '', kwargs, source['name'])))
+                    try:
+                        smbclient.stat(unc_path, **kwargs)
+                    except Exception:
+                        # La connexion a lâché pendant l'analyse : le résultat est partiel, on le jette et on garde l'existant.
+                        del all_files[_n_before:]
+                        app_logger.warning(f"[SCAN] Source réseau \"{source['name']}\" perdue pendant l'analyse — ignorée pour ce scan")
+                        unreachable_sources.append(source['name'])
+                        continue
                 elif source['type'] == 'file':
                     if not os.path.exists(source['path']):
                         app_logger.warning(f"[SCAN] Fichier source \"{source['name']}\" introuvable — ignoré pour ce scan")
@@ -10484,15 +10576,30 @@ def _do_background_scan(sources_list, user_id, blocking=False):
 
         previous_count = 0
         previous_paths = set()
+        carried_files = []
         try:
             if os.path.exists(CACHE_FILE):
                 with open(CACHE_FILE, 'r', encoding='utf-8') as f:
                     prev_files = json.load(f).get('files', [])
                 previous_count = len(prev_files)
                 previous_paths = {pf['path'] for pf in prev_files if 'path' in pf}
+                # Source injoignable : ses fichiers (et donc leurs miniatures) restent dans la bibliothèque tels quels.
+                if unreachable_sources:
+                    down = set(unreachable_sources)
+                    down_roots = tuple(
+                        str(src['path']).replace('\\', '/').rstrip('/') + '/'
+                        for src in sources_list if src['name'] in down and src.get('path')
+                    )
+                    scanned = {f['path'] for f in all_files}
+                    carried_files = [
+                        pf for pf in prev_files
+                        if pf.get('path') not in scanned
+                        and (pf.get('source') in down or str(pf.get('path', '')).replace('\\', '/').startswith(down_roots))
+                    ]
         except Exception:
             previous_count = 0
             previous_paths = set()
+            carried_files = []
 
         newly_seen_files = [f for f in all_files if f['path'] not in previous_paths]
         if newly_seen_files:
@@ -10514,14 +10621,16 @@ def _do_background_scan(sources_list, user_id, blocking=False):
             except Exception as e:
                 app_logger.info(f"[SCAN] Erreur auto-tagging: {e}")
 
-        if unreachable_sources and len(all_files) < previous_count * 0.5 and previous_count > 0:
+        if unreachable_sources and len(all_files) + len(carried_files) < previous_count * 0.5 and previous_count > 0:
             app_logger.warning(
                 f"[SCAN] ⚠️ Résultat suspect ({len(all_files)} fichiers contre {previous_count} avant, "
                 f"sources injoignables: {', '.join(unreachable_sources)}) — cache existant conservé, pas d'écrasement."
             )
         else:
             try:
-                save_file_cache(all_files, sources_list)
+                if carried_files:
+                    app_logger.info(f"[SCAN] {len(carried_files)} fichier(s) conservé(s) des sources injoignables ({', '.join(unreachable_sources)})")
+                save_file_cache(all_files + carried_files, sources_list)
             except Exception as e:
                 app_logger.info(f"[SCAN] Échec sauvegarde cache: {e}")
             missing_count = 0
@@ -16877,7 +16986,8 @@ def api_get_project(project_id):
         "status": _project_effective_status(p['status'], _needed, _printed),
         "created_at": p['created_at'],
         "updated_at": p['updated_at'],
-        "files": out_files
+        "files": out_files,
+        "gcodes": _project_gcodes_list(project_id, session['user_id'])
     })
 
 @app.route('/api/projects/<int:project_id>', methods=['PUT'])
@@ -16928,8 +17038,10 @@ def api_delete_project(project_id):
     ).fetchall()
     conn.execute("DELETE FROM project_files WHERE project_id = ?", (project_id,))
     conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+    conn.execute("DELETE FROM project_gcodes WHERE project_id = ?", (project_id,))
     conn.commit()
     conn.close()
+    shutil.rmtree(os.path.join(PROJECT_GCODES_DIR, str(project_id)), ignore_errors=True)
     return jsonify({
         "message": "Projet supprimé",
         "undo": {
@@ -17043,6 +17155,278 @@ def api_update_project_file(project_id):
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
     finally:
         conn.close()
+
+# ── Archive G-code d'un projet ──────────────────────────────────────────────
+GCODE_ARCHIVE_EXTS = ('.gcode', '.gco', '.gc', '.bgcode')
+GCODE_ARCHIVE_MAX_BYTES = 1024 * 1024 * 1024
+_GCODE_META_KEYS = {
+    'filament_type': 'material', 'filament_settings_id': 'filament', 'nozzle_diameter': 'nozzle',
+    'layer_height': 'layer', 'nozzle_temperature': 'temp', 'temperature': 'temp', 'bed_temperature': 'bed',
+    'hot_plate_temp': 'bed', 'first_layer_bed_temperature': 'bed', 'filament used [g]': 'weight',
+    'total filament weight [g]': 'weight', 'filament used [mm]': 'length', 'estimated printing time (normal mode)': 'time',
+    'total estimated time': 'time', 'print_settings_id': 'profile', 'printer_settings_id': 'printer',
+    'fill_density': 'infill', 'sparse_infill_density': 'infill', 'perimeters': 'walls', 'wall_loops': 'walls',
+}
+
+
+def _extract_gcode_meta(path):
+    """Réglages lus dans les commentaires du G-code (PrusaSlicer, OrcaSlicer, Bambu Studio, Cura) : matière, buse, hauteur de couche,
+    températures, durée, poids. Ne lit que le début et la fin du fichier."""
+    meta = {}
+    try:
+        size = os.path.getsize(path)
+        chunks = []
+        with open(path, 'rb') as f:
+            chunks.append(f.read(96 * 1024))
+            if size > 96 * 1024:
+                f.seek(max(96 * 1024, size - 192 * 1024))
+                chunks.append(f.read())
+        text = b'\n'.join(chunks).decode('utf-8', errors='ignore')
+    except Exception:
+        return meta
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith(';'):
+            continue
+        body = line.lstrip(';').strip()
+        low = body.lower()
+        if low.startswith('generated by') or low.startswith('flavor:'):
+            meta.setdefault('slicer', body.split(':', 1)[-1].strip()[:80] if low.startswith('flavor:') else body[12:].strip()[:80])
+            continue
+        if low.startswith('time:'):
+            try:
+                sec = int(float(body.split(':', 1)[1]))
+                meta.setdefault('time', f"{sec // 3600}h {(sec % 3600) // 60:02d}m")
+            except Exception:
+                pass
+            continue
+        if '=' not in body:
+            continue
+        key, _, val = body.partition('=')
+        k = _GCODE_META_KEYS.get(key.strip().lower())
+        if not k or k in meta:
+            continue
+        v = val.strip().split(';')[0].split(',')[0].strip().strip('"')
+        if v:
+            meta[k] = v[:80]
+    return meta
+
+
+def _project_gcodes_list(project_id, user_id):
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, name, size, meta, notes, created_at FROM project_gcodes WHERE project_id = ? AND user_id = ? AND COALESCE(file_path, '') = '' ORDER BY created_at DESC, id DESC",
+            (project_id, user_id)
+        ).fetchall()
+    finally:
+        conn.close()
+    out = []
+    for r in rows:
+        try:
+            m = json.loads(r['meta'] or '{}')
+        except Exception:
+            m = {}
+        out.append({"id": r['id'], "name": r['name'], "size": r['size'], "meta": m, "notes": r['notes'] or '', "created_at": r['created_at']})
+    return out
+
+
+def _gcode_folder(project_id, file_path=''):
+    """Dossier de stockage : un par projet, ou un par fichier 3D (clé = empreinte du chemin)."""
+    if file_path:
+        return os.path.join(PROJECT_GCODES_DIR, 'files', hashlib.md5(str(file_path).encode()).hexdigest())
+    return os.path.join(PROJECT_GCODES_DIR, str(project_id))
+
+
+def _store_gcode_upload(conn, project_id, file_path):
+    """Enregistre le G-code reçu (champ « file ») pour un projet ou pour un fichier 3D. Retourne (réponse JSON, code HTTP)."""
+    up = request.files.get('file')
+    if not up or not up.filename:
+        return jsonify({"error": "Fichier requis"}), 400
+    orig = os.path.basename(up.filename.replace('\\', '/'))
+    if not orig.lower().endswith(GCODE_ARCHIVE_EXTS):
+        return jsonify({"error": "bad_extension"}), 400
+    safe = secure_filename(orig) or 'fichier.gcode'
+    notes = (request.form.get('notes') or '').strip()[:2000]
+    cur = conn.execute("INSERT INTO project_gcodes (project_id, user_id, name, stored_name, notes, file_path) VALUES (?, ?, ?, '', ?, ?)",
+                       (project_id, session['user_id'], orig, notes, file_path))
+    gid = cur.lastrowid
+    folder = _gcode_folder(project_id, file_path)
+    os.makedirs(folder, exist_ok=True)
+    stored = f"{gid}_{safe}"
+    dest = os.path.join(folder, stored)
+    try:
+        up.save(dest)
+    except Exception:
+        conn.rollback()
+        try:
+            os.remove(dest)
+        except OSError:
+            pass
+        raise
+    meta = _extract_gcode_meta(dest) if not orig.lower().endswith('.bgcode') else {}
+    conn.execute("UPDATE project_gcodes SET stored_name = ?, size = ?, meta = ? WHERE id = ?",
+                 (stored, os.path.getsize(dest), json.dumps(meta, ensure_ascii=False), gid))
+    conn.commit()
+    return jsonify({"message": "G-code archivé", "id": gid}), 200
+
+
+@app.route('/api/projects/<int:project_id>/gcodes', methods=['POST'])
+@login_required
+def api_project_gcode_upload(project_id):
+    request.max_content_length = GCODE_ARCHIVE_MAX_BYTES
+    conn = get_db()
+    try:
+        p = conn.execute("SELECT id FROM projects WHERE id = ? AND user_id = ?", (project_id, session['user_id'])).fetchone()
+        if not p:
+            return jsonify({"error": "Introuvable"}), 404
+        resp = _store_gcode_upload(conn, project_id, '')
+        if resp[1] == 200:
+            conn.execute("UPDATE projects SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", (project_id,))
+            conn.commit()
+        return resp
+    except Exception as e:
+        app_logger.error(f"[API] Erreur api_project_gcode_upload: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+    finally:
+        conn.close()
+
+
+def _file_gcodes_rows(file_path):
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, name, size, meta, notes, created_at FROM project_gcodes WHERE user_id = ? AND file_path = ? ORDER BY created_at DESC, id DESC",
+            (session['user_id'], file_path)
+        ).fetchall()
+    finally:
+        conn.close()
+    out = []
+    for r in rows:
+        try:
+            m = json.loads(r['meta'] or '{}')
+        except Exception:
+            m = {}
+        out.append({"id": r['id'], "name": r['name'], "size": r['size'], "meta": m, "notes": r['notes'] or '', "created_at": r['created_at']})
+    return out
+
+
+@app.route('/api/gcodes', methods=['GET'])
+@login_required
+def api_gcodes_all():
+    """Tous les G-code archivés (de projets et de fichiers), du plus récent au plus ancien, avec de quoi afficher la miniature du fichier lié."""
+    try:
+        limit = max(1, min(int(request.args.get('limit', 50)), 500))
+    except ValueError:
+        limit = 50
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT g.id, g.name, g.size, g.meta, g.notes, g.created_at, g.project_id, COALESCE(g.file_path, '') AS file_path, p.name AS project_name "
+            "FROM project_gcodes g LEFT JOIN projects p ON p.id = g.project_id "
+            "WHERE g.user_id = ? ORDER BY g.created_at DESC, g.id DESC LIMIT ?", (session['user_id'], limit)
+        ).fetchall()
+        total = conn.execute("SELECT COUNT(*) FROM project_gcodes WHERE user_id = ?", (session['user_id'],)).fetchone()[0]
+        out = []
+        for r in rows:
+            try:
+                m = json.loads(r['meta'] or '{}')
+            except Exception:
+                m = {}
+            thumb_path = r['file_path']
+            if not thumb_path and r['project_id']:
+                first = conn.execute("SELECT file_path FROM project_files WHERE project_id = ? ORDER BY position, added_at LIMIT 1", (r['project_id'],)).fetchone()
+                thumb_path = first['file_path'] if first else ''
+            out.append({"id": r['id'], "name": r['name'], "size": r['size'], "meta": m, "notes": r['notes'] or '', "created_at": r['created_at'],
+                        "file_path": r['file_path'], "project_id": r['project_id'] or 0, "project_name": r['project_name'] or '',
+                        "thumb_path": thumb_path})
+    finally:
+        conn.close()
+    return jsonify({"gcodes": out, "total": total})
+
+
+@app.route('/api/files/gcodes', methods=['GET'])
+@login_required
+def api_file_gcodes_list():
+    file_path = (request.args.get('path') or '').strip()
+    if not file_path:
+        return jsonify({"error": "Chemin requis"}), 400
+    return jsonify({"gcodes": _file_gcodes_rows(file_path)})
+
+
+@app.route('/api/files/gcodes', methods=['POST'])
+@login_required
+def api_file_gcode_upload():
+    """G-code personnel rattaché à un fichier 3D (menu Actions du fichier)."""
+    request.max_content_length = GCODE_ARCHIVE_MAX_BYTES
+    file_path = (request.form.get('path') or '').strip()
+    if not file_path:
+        return jsonify({"error": "Chemin requis"}), 400
+    conn = get_db()
+    try:
+        return _store_gcode_upload(conn, 0, file_path)
+    except Exception as e:
+        app_logger.error(f"[API] Erreur api_file_gcode_upload: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+    finally:
+        conn.close()
+
+
+def _gcode_row(gid):
+    conn = get_db()
+    try:
+        return conn.execute("SELECT * FROM project_gcodes WHERE id = ? AND user_id = ?", (gid, session['user_id'])).fetchone()
+    finally:
+        conn.close()
+
+
+@app.route('/api/projects/gcodes/<int:gid>', methods=['PUT'])
+@login_required
+def api_project_gcode_update(gid):
+    r = _gcode_row(gid)
+    if not r:
+        return jsonify({"error": "Introuvable"}), 404
+    data = request.json or {}
+    notes = str(data.get('notes') or '').strip()[:2000]
+    conn = get_db()
+    try:
+        conn.execute("UPDATE project_gcodes SET notes = ? WHERE id = ? AND user_id = ?", (notes, gid, session['user_id']))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"message": "Mis à jour"})
+
+
+@app.route('/api/projects/gcodes/<int:gid>', methods=['DELETE'])
+@login_required
+def api_project_gcode_delete(gid):
+    r = _gcode_row(gid)
+    if not r:
+        return jsonify({"error": "Introuvable"}), 404
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM project_gcodes WHERE id = ? AND user_id = ?", (gid, session['user_id']))
+        conn.commit()
+    finally:
+        conn.close()
+    try:
+        os.remove(os.path.join(_gcode_folder(r['project_id'], r['file_path']), r['stored_name']))
+    except OSError:
+        pass
+    return jsonify({"message": "Supprimé"})
+
+
+@app.route('/api/projects/gcodes/<int:gid>/download', methods=['GET'])
+@login_required
+def api_project_gcode_download(gid):
+    r = _gcode_row(gid)
+    if not r:
+        return jsonify({"error": "Introuvable"}), 404
+    path = os.path.join(_gcode_folder(r['project_id'], r['file_path']), r['stored_name'])
+    if not os.path.isfile(path):
+        return jsonify({"error": "Fichier introuvable"}), 404
+    return send_file(path, as_attachment=True, download_name=r['name'])
+
 
 @app.route('/api/projects/<int:project_id>/files', methods=['DELETE'])
 @login_required
@@ -20351,7 +20735,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.8.9"
+CURRENT_VERSION = "0.9.0"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -22425,7 +22809,7 @@ def _mqtt_discovery_configs(cfg, p):
         ('sensor', 'layers_total', {'name': 'Total layers', 'value_template': '{{ value_json.layers_total }}', 'state_class': 'measurement', 'icon': 'mdi:layers-triple'}),
         ('sensor', 'hours', {'name': 'Print hours', 'value_template': '{{ value_json.hours }}', 'unit_of_measurement': 'h', 'device_class': 'duration', 'state_class': 'total_increasing', 'icon': 'mdi:clock-outline'}),
         ('sensor', 'maintenance_days', {'name': 'Next maintenance', 'value_template': "{{ 'unknown' if value_json.maintenance_days is none else value_json.maintenance_days }}", 'unit_of_measurement': 'd', 'icon': 'mdi:wrench-clock'}),
-        ('binary_sensor', 'spool_low', {'name': 'Spool almost empty', 'value_template': "{{ 'ON' if value_json.spool_low else 'OFF' }}", 'device_class': 'problem', 'icon': 'mdi:spool'}),
+        ('binary_sensor', 'spool_low', {'name': 'Spool almost empty', 'value_template': "{{ 'ON' if value_json.spool_low else 'OFF' }}", 'device_class': 'problem', 'icon': 'mdi:printer-3d-nozzle'}),
         ('binary_sensor', 'drift', {'name': 'Print drift', 'value_template': "{{ 'ON' if value_json.drift else 'OFF' }}", 'device_class': 'problem', 'icon': 'mdi:alert-circle'}),
     ]
     out = []
@@ -22524,7 +22908,7 @@ _MQTT_APP_ENTITIES = [
     ('sensor', 'orders_pieces_left', 'Parts left to print', {'icon': 'mdi:cube-send', 'state_class': 'measurement'}, True),
     ('sensor', 'margin_est', 'Expected order margin', {'icon': 'mdi:chart-line', 'state_class': 'measurement'}, True),
     ('sensor', 'margin_real', 'Actual order margin', {'icon': 'mdi:chart-areaspline', 'state_class': 'measurement'}, True),
-    ('binary_sensor', 'alert_spool_low', 'Spool almost empty', {'device_class': 'problem', 'icon': 'mdi:spool', 'bool_of': 'alerts_spool_low'}, False),
+    ('binary_sensor', 'alert_spool_low', 'Spool almost empty', {'device_class': 'problem', 'icon': 'mdi:printer-3d-nozzle', 'bool_of': 'alerts_spool_low'}, False),
     ('binary_sensor', 'alert_drift', 'Print drift', {'device_class': 'problem', 'icon': 'mdi:alert-circle', 'bool_of': 'alerts_drift'}, False),
     ('sensor', 'last_backup', 'Last backup', {'device_class': 'timestamp', 'icon': 'mdi:backup-restore', 'entity_category': 'diagnostic'}, False),
     ('binary_sensor', 'update_available', 'Update available', {'device_class': 'update', 'icon': 'mdi:update', 'bool_of': 'update_flag', 'entity_category': 'diagnostic'}, False),
@@ -22623,7 +23007,7 @@ def _mqtt_app_entities():
     for sl in _mqtt_spool_slots():
         label = sl['name'] + (f" ({sl['material']})" if sl['material'] else '')
         ents.append(('sensor', sl['key'], f"Spool {label}", {'unit_of_measurement': 'g', 'device_class': 'weight', 'state_class': 'measurement',
-                                                           'icon': 'mdi:spool', 'spool': True}, False))
+                                                           'icon': 'mdi:printer-3d-nozzle', 'spool': True}, False))
     return ents
 
 

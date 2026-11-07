@@ -1,5 +1,122 @@
 [
   {
+    "version": "0.9.0",
+    "items": {
+      "fr": [
+        "Projets : un clic sur l'image d'une pièce de la liste des fichiers du projet l'ouvre dans le viewer 3D",
+        "MQTT / Home Assistant : les capteurs de bobine utilisent l'icône de Spoolman (imprimante 3D et buse) et l'ancienne icône inexistante est corrigée",
+        "Script Proxmox : le disque du conteneur passe de 8 à 32 Go par défaut (évite le disque plein avec les miniatures et les sauvegardes)",
+        "Bibliothèque : quand la source d'un fichier est indisponible, sa miniature reste affichée mais nettement plus sombre (dès le chargement de la liste)",
+        "Première utilisation : après la visite guidée, si la bibliothèque est vide, une fenêtre invite à ajouter une source ou des fichiers, avec un bouton « Ajouter » qui ouvre l'ajout de source",
+        "Sources : l'état est surveillé en deux temps, d'abord le réseau puis la source (serveur, puis partage), avec réaction immédiate aux coupures et reconnexions et dernier état connu affiché dès l'ouverture, pour que les miniatures s'assombrissent sans attendre un scan",
+        "Viewer : si le réseau est coupé ou la source indisponible, un clic sur la miniature affiche une fenêtre avec la raison au lieu d'ouvrir le viewer en erreur, et le bouton « Ouvrir dans le viewer » est masqué dans la fenêtre de détails (clic droit)",
+        "Bibliothèque : quand une source est inaccessible pendant le scan automatique (réseau coupé, disque débranché, connexion perdue en cours d'analyse), ses fichiers et leurs miniatures restent dans la bibliothèque au lieu d'être retirés",
+        "Détails du fichier (clic droit) : si la source est indisponible, le fichier n'est plus analysé ; la raison est affichée à la place",
+        "Nouveau : archive G-code dans chaque projet (suggestion GitHub). Archivez les G-code aux réglages précis, par exemple pour des pièces techniques ou des prototypes en filaments techniques : matière, buse, hauteur de couche, températures, durée et poids sont lus dans le fichier, avec des notes libres, téléchargement et suppression",
+        "Nouveau : menu Actions d'un fichier > « Mes G-code » pour importer vos propres G-code rattachés à ce fichier (réglages lus dans le fichier, notes, téléchargement, suppression), conservés même si la source est indisponible",
+        "Nouveau widget « G-code » sur le tableau de bord : les G-code archivés (de projets et de fichiers) avec leurs réglages ; un clic ouvre le détail dans la même présentation que le clic droit sur un fichier, avec la miniature du fichier et le G-code"
+      ],
+      "en": [
+        "Projects: clicking a part's image in the project file list opens it in the 3D viewer",
+        "MQTT / Home Assistant: spool sensors use the Spoolman icon (3D printer nozzle), replacing a non-existent icon",
+        "Proxmox script: the container disk now defaults to 32 GB instead of 8 GB (avoids a full disk with thumbnails and backups)",
+        "Library: when a file's source is unavailable, its thumbnail stays visible but is clearly darker (from the moment the list loads)",
+        "First run: after the guided tour, if the library is empty, a window invites you to add a source or files, with an \"Add\" button that opens the add-source window",
+        "Sources: availability is now checked in two steps, network first and then the source (server, then share), reacting immediately to disconnections and reconnections and showing the last known state at startup, so thumbnails darken without waiting for a scan",
+        "Viewer: when the network is down or the source is unavailable, clicking a thumbnail shows a window with the reason instead of opening the viewer with an error, and the \"Open in viewer\" button is hidden in the details window (right-click)",
+        "Library: when a source is unreachable during the automatic scan (network down, drive unplugged, connection lost mid-scan), its files and thumbnails stay in the library instead of being removed",
+        "File details (right-click): when the source is unavailable the file is no longer analysed; the reason is shown instead",
+        "New: G-code archive in each project (GitHub suggestion). Keep G-code with precise settings, for example for technical parts or prototypes in engineering filaments: material, nozzle, layer height, temperatures, time and weight are read from the file, with free notes, download and delete",
+        "New: a file's Actions menu > \"My G-code\" to upload your own G-code attached to that file (settings read from the file, notes, download, delete), kept even when the source is unavailable",
+        "New \"G-code\" dashboard widget: archived G-code (from projects and files) with their settings; a click opens the details in the same layout as right-clicking a file, with the file's thumbnail and the G-code"
+      ],
+      "de": [
+        "Projekte: Ein Klick auf das Bild eines Teils in der Dateiliste des Projekts öffnet es im 3D-Viewer",
+        "MQTT / Home Assistant: Spulen-Sensoren verwenden das Spoolman-Symbol (3D-Drucker-Düse); ein nicht vorhandenes Symbol wurde ersetzt",
+        "Proxmox-Skript: Die Container-Festplatte beträgt jetzt standardmäßig 32 statt 8 GB (verhindert eine volle Festplatte durch Vorschaubilder und Sicherungen)",
+        "Bibliothek: Ist die Quelle einer Datei nicht verfügbar, bleibt ihr Vorschaubild sichtbar, ist aber deutlich dunkler (schon beim Laden der Liste)",
+        "Erster Start: Ist die Bibliothek nach der Tour leer, fordert ein Fenster zum Hinzufügen einer Quelle oder von Dateien auf; die Schaltfläche „Hinzufügen“ öffnet das Fenster zum Hinzufügen einer Quelle",
+        "Quellen: Die Verfügbarkeit wird jetzt in zwei Schritten geprüft, zuerst das Netzwerk, dann die Quelle (Server, dann Freigabe); auf Trennungen und Wiederverbindungen wird sofort reagiert und der zuletzt bekannte Zustand beim Start angezeigt, damit Vorschaubilder ohne Scan abdunkeln",
+        "Viewer: Bei fehlendem Netzwerk oder nicht verfügbarer Quelle zeigt ein Klick auf das Vorschaubild ein Fenster mit dem Grund statt den Viewer mit Fehler zu öffnen; die Schaltfläche „Im Viewer öffnen“ wird im Detailfenster (Rechtsklick) ausgeblendet",
+        "Bibliothek: Ist eine Quelle beim automatischen Scan nicht erreichbar (Netzwerk getrennt, Laufwerk abgezogen, Verbindung während des Scans verloren), bleiben ihre Dateien und Vorschaubilder in der Bibliothek, statt entfernt zu werden",
+        "Dateidetails (Rechtsklick): Ist die Quelle nicht verfügbar, wird die Datei nicht mehr analysiert; stattdessen wird der Grund angezeigt",
+        "Neu: G-Code-Archiv in jedem Projekt (GitHub-Vorschlag). Bewahren Sie G-Code mit präzisen Einstellungen auf, z. B. für technische Teile oder Prototypen aus technischen Filamenten: Material, Düse, Schichthöhe, Temperaturen, Zeit und Gewicht werden aus der Datei gelesen, dazu freie Notizen, Download und Löschen",
+        "Neu: Aktionsmenü einer Datei > „Meine G-Codes“, um eigene G-Codes für diese Datei hochzuladen (Einstellungen aus der Datei gelesen, Notizen, Download, Löschen); sie bleiben auch bei nicht verfügbarer Quelle erhalten",
+        "Neues Dashboard-Widget „G-Code“: archivierte G-Codes (aus Projekten und Dateien) mit ihren Einstellungen; ein Klick öffnet die Details im gleichen Layout wie der Rechtsklick auf eine Datei, mit Vorschaubild der Datei und dem G-Code"
+      ],
+      "es": [
+        "Proyectos: al hacer clic en la imagen de una pieza de la lista de archivos del proyecto se abre en el visor 3D",
+        "MQTT / Home Assistant: los sensores de bobina usan el icono de Spoolman (boquilla de impresora 3D) y se corrige un icono inexistente",
+        "Script de Proxmox: el disco del contenedor pasa de 8 a 32 GB por defecto (evita un disco lleno por las miniaturas y las copias de seguridad)",
+        "Biblioteca: cuando la fuente de un archivo no está disponible, su miniatura sigue visible pero mucho más oscura (desde que se carga la lista)",
+        "Primer uso: tras la visita guiada, si la biblioteca está vacía, una ventana invita a añadir una fuente o archivos, con un botón «Añadir» que abre la ventana de añadir fuente",
+        "Fuentes: la disponibilidad se comprueba ahora en dos pasos, primero la red y luego la fuente (servidor y después recurso compartido), con reacción inmediata a desconexiones y reconexiones y mostrando el último estado conocido al abrir, para que las miniaturas se oscurezcan sin esperar a un análisis",
+        "Visor: si la red está caída o la fuente no está disponible, al hacer clic en la miniatura se muestra una ventana con el motivo en lugar de abrir el visor con un error, y el botón «Abrir en el visor» se oculta en la ventana de detalles (clic derecho)",
+        "Biblioteca: cuando una fuente no es accesible durante el análisis automático (red caída, disco desconectado, conexión perdida durante el análisis), sus archivos y miniaturas se conservan en la biblioteca en lugar de eliminarse",
+        "Detalles del archivo (clic derecho): si la fuente no está disponible, el archivo ya no se analiza; se muestra el motivo",
+        "Nuevo: archivo de G-code en cada proyecto (sugerencia de GitHub). Conserve G-code con ajustes precisos, por ejemplo para piezas técnicas o prototipos con filamentos técnicos: material, boquilla, altura de capa, temperaturas, tiempo y peso se leen del archivo, con notas libres, descarga y eliminación",
+        "Nuevo: menú Acciones de un archivo > «Mis G-code» para subir sus propios G-code asociados a ese archivo (ajustes leídos del archivo, notas, descarga, eliminación), conservados aunque la fuente no esté disponible",
+        "Nuevo widget «G-code» en el panel: los G-code archivados (de proyectos y archivos) con sus ajustes; un clic abre el detalle con la misma presentación que el clic derecho en un archivo, con la miniatura del archivo y el G-code"
+      ],
+      "pt": [
+        "Projetos: clicar na imagem de uma peça na lista de ficheiros do projeto abre-a no visualizador 3D",
+        "MQTT / Home Assistant: os sensores de bobina usam o ícone do Spoolman (bico de impressora 3D) e corrige-se um ícone inexistente",
+        "Script do Proxmox: o disco do contêiner passa de 8 para 32 GB por padrão (evita disco cheio com miniaturas e cópias de segurança)",
+        "Biblioteca: quando a fonte de um ficheiro não está disponível, a miniatura continua visível, mas bem mais escura (desde o carregamento da lista)",
+        "Primeira utilização: após a visita guiada, se a biblioteca estiver vazia, uma janela convida a adicionar uma fonte ou ficheiros, com um botão «Adicionar» que abre a janela de adicionar fonte",
+        "Fontes: a disponibilidade é agora verificada em duas etapas, primeiro a rede e depois a fonte (servidor, depois partilha), com reação imediata a desligações e religações e mostrando o último estado conhecido ao abrir, para que as miniaturas escureçam sem esperar por uma análise",
+        "Visualizador: se a rede estiver em baixo ou a fonte indisponível, clicar na miniatura mostra uma janela com o motivo em vez de abrir o visualizador com erro, e o botão «Abrir no visualizador» fica oculto na janela de detalhes (clique direito)",
+        "Biblioteca: quando uma fonte está inacessível durante a análise automática (rede em baixo, disco desligado, ligação perdida durante a análise), os seus ficheiros e miniaturas permanecem na biblioteca em vez de serem removidos",
+        "Detalhes do ficheiro (clique direito): se a fonte estiver indisponível, o ficheiro deixa de ser analisado; é mostrado o motivo",
+        "Novo: arquivo de G-code em cada projeto (sugestão do GitHub). Guarde G-code com definições precisas, por exemplo para peças técnicas ou protótipos em filamentos técnicos: material, bico, altura de camada, temperaturas, tempo e peso são lidos do ficheiro, com notas livres, transferência e eliminação",
+        "Novo: menu Ações de um ficheiro > «Os meus G-code» para carregar os seus próprios G-code associados a esse ficheiro (definições lidas do ficheiro, notas, transferência, eliminação), mantidos mesmo com a fonte indisponível",
+        "Novo widget «G-code» no painel: os G-code arquivados (de projetos e ficheiros) com as suas definições; um clique abre o detalhe com a mesma apresentação do clique direito num ficheiro, com a miniatura do ficheiro e o G-code"
+      ],
+      "it": [
+        "Progetti: un clic sull'immagine di un pezzo nell'elenco file del progetto lo apre nel visualizzatore 3D",
+        "MQTT / Home Assistant: i sensori delle bobine usano l'icona di Spoolman (ugello della stampante 3D) e viene corretta un'icona inesistente",
+        "Script Proxmox: il disco del container passa da 8 a 32 GB di default (evita il disco pieno con miniature e backup)",
+        "Libreria: quando la sorgente di un file non è disponibile, la miniatura resta visibile ma molto più scura (fin dal caricamento dell'elenco)",
+        "Primo avvio: dopo il tour guidato, se la libreria è vuota, una finestra invita ad aggiungere una sorgente o dei file, con un pulsante «Aggiungi» che apre la finestra di aggiunta sorgente",
+        "Sorgenti: la disponibilità viene ora verificata in due fasi, prima la rete e poi la sorgente (server, poi condivisione), con reazione immediata a disconnessioni e riconnessioni e ultimo stato noto mostrato all'avvio, così le miniature si scuriscono senza attendere una scansione",
+        "Visualizzatore: se la rete è assente o la sorgente non è disponibile, cliccando sulla miniatura compare una finestra con il motivo invece di aprire il visualizzatore con un errore, e il pulsante «Apri nel visualizzatore» è nascosto nella finestra dei dettagli (clic destro)",
+        "Libreria: quando una sorgente non è raggiungibile durante la scansione automatica (rete assente, disco scollegato, connessione persa durante l'analisi), i suoi file e le sue miniature restano nella libreria invece di essere rimossi",
+        "Dettagli del file (clic destro): se la sorgente non è disponibile, il file non viene più analizzato; viene mostrato il motivo",
+        "Novità: archivio G-code in ogni progetto (suggerimento GitHub). Conservate G-code con impostazioni precise, ad esempio per parti tecniche o prototipi in filamenti tecnici: materiale, ugello, altezza dello strato, temperature, tempo e peso vengono letti dal file, con note libere, download ed eliminazione",
+        "Novità: menu Azioni di un file > «I miei G-code» per caricare i vostri G-code associati a quel file (impostazioni lette dal file, note, download, eliminazione), conservati anche se la sorgente non è disponibile",
+        "Nuovo widget «G-code» nella dashboard: i G-code archiviati (di progetti e file) con le loro impostazioni; un clic apre il dettaglio con la stessa presentazione del clic destro su un file, con la miniatura del file e il G-code"
+      ],
+      "zh": [
+        "项目：点击项目文件列表中零件的图片，即可在 3D 查看器中打开",
+        "MQTT / Home Assistant：耗材传感器改用 Spoolman 的图标（3D 打印机喷嘴），并修正了一个不存在的图标",
+        "Proxmox 脚本：容器磁盘默认由 8 GB 改为 32 GB（避免缩略图和备份占满磁盘）",
+        "文件库：文件来源不可用时，缩略图仍会显示，但明显更暗（列表加载时即生效）",
+        "首次使用：引导教程结束后，如果文件库为空，会弹出窗口提示添加来源或文件，点击“添加”按钮即可打开添加来源窗口",
+        "来源：现在分两步检测可用性，先检测网络，再检测来源（服务器，然后共享），对断开和重连立即响应，并在启动时显示上次已知状态，因此缩略图无需等待扫描即可变暗",
+        "查看器：网络断开或来源不可用时，点击缩略图会弹出说明原因的窗口，而不是打开报错的查看器；详情窗口（右键）中的“在查看器中打开”按钮也会隐藏",
+        "文件库：自动扫描期间来源无法访问（网络断开、磁盘拔出、扫描中连接中断）时，其文件和缩略图会保留在文件库中，而不是被移除",
+        "文件详情（右键）：来源不可用时不再分析文件，改为显示原因",
+        "新增：每个项目都有 G-code 归档（来自 GitHub 的建议）。可保存带有精确参数的 G-code，例如技术零件或使用工程耗材的原型：材料、喷嘴、层高、温度、时间和重量会从文件中读取，并支持自由备注、下载和删除",
+        "新增：文件的“操作”菜单 > “我的 G-code”，可上传与该文件关联的自有 G-code（从文件读取参数，支持备注、下载、删除），即使来源不可用也会保留",
+        "仪表板新增“G-code”小组件：显示已归档的 G-code（来自项目和文件）及其参数；点击后以与右键单击文件相同的版式显示详情，包含文件缩略图和 G-code"
+      ],
+      "ja": [
+        "プロジェクト：プロジェクトのファイル一覧で部品の画像をクリックすると、3D ビューアーで開きます",
+        "MQTT / Home Assistant：スプールのセンサーに Spoolman と同じアイコン（3D プリンターのノズル）を使用し、存在しないアイコンを修正",
+        "Proxmox スクリプト：コンテナのディスクの既定値を 8 GB から 32 GB に変更（サムネイルやバックアップでディスクが満杯になるのを防止）",
+        "ライブラリ：ファイルのソースが利用できない場合、サムネイルは表示されたままですが、はっきり暗くなります（一覧の読み込み時から）",
+        "初回起動：ガイドツアーの後、ライブラリが空の場合、ソースまたはファイルの追加を促すウィンドウが開き、「追加」ボタンでソース追加画面が開きます",
+        "ソース：利用可否を2段階で確認するようになりました。まずネットワーク、次にソース（サーバー、続いて共有）を確認し、切断・再接続に即座に反応し、起動時には前回の状態を表示するため、スキャンを待たずにサムネイルが暗くなります",
+        "ビューアー：ネットワーク切断やソース利用不可の場合、サムネイルをクリックするとエラー付きでビューアーを開く代わりに理由を示すウィンドウを表示し、詳細ウィンドウ（右クリック）の「ビューアーで開く」ボタンを非表示にします",
+        "ライブラリ：自動スキャン中にソースへアクセスできない場合（ネットワーク切断、ドライブの取り外し、スキャン中の接続断）、そのファイルとサムネイルは削除されずライブラリに残ります",
+        "ファイル詳細（右クリック）：ソースが利用できない場合はファイルを分析せず、代わりに理由を表示します",
+        "新機能：各プロジェクトに G-code アーカイブを追加（GitHub からの提案）。技術部品やエンジニアリングフィラメントの試作品など、精密な設定の G-code を保存できます。素材、ノズル、積層ピッチ、温度、時間、重量はファイルから読み取られ、自由なメモ、ダウンロード、削除にも対応します",
+        "新機能：ファイルの「アクション」メニュー >「マイ G-code」で、そのファイルに紐づく独自の G-code をアップロードできます（設定をファイルから読み取り、メモ、ダウンロード、削除に対応）。ソースが利用できなくても保持されます",
+        "ダッシュボードに「G-code」ウィジェットを追加：アーカイブ済みの G-code（プロジェクトとファイル）を設定とともに表示し、クリックするとファイルを右クリックしたときと同じ表示で、ファイルのサムネイルと G-code の詳細を開きます"
+      ]
+    }
+  },
+  {
     "version": "0.8.9",
     "items": {
       "fr": [

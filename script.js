@@ -1794,7 +1794,7 @@ function setupKeyboardShortcuts() {
         }
 
         if (e.key === 'Escape') {
-            const openModalEl = document.querySelector('.modal:not(.hidden)');
+            const openModalEl = [...document.querySelectorAll('.modal:not(.hidden)')].pop();
             if (openModalEl) {
                 if (openModalEl.id === 'modal-3d-viewer') close3DViewer();
                 else closeModal(openModalEl.id);
@@ -2864,7 +2864,7 @@ document.addEventListener('visibilitychange', _syncAppHeight);
 _syncAppHeight();
 
 // --- Tableau de bord ---
-const DASHBOARD_WIDGET_IDS = ['printers', 'cameras', 'stock', 'restock', 'history', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'timelapses', 'mqtt', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues'];
+const DASHBOARD_WIDGET_IDS = ['printers', 'cameras', 'stock', 'restock', 'history', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'timelapses', 'mqtt', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues', 'gcodes'];
 let _dashboardEditMode = false;
 let _draggedDashboardWidget = null;
 
@@ -2903,6 +2903,7 @@ async function loadDashboard(force = false) {
     _loadDashboardSuggestions();
     _loadDashboardBackups();
     _loadDashboardIssues();
+    _loadDashboardGcodes();
 }
 window.loadDashboard = loadDashboard;
 
@@ -3218,6 +3219,98 @@ async function _loadDashboardFavorites() {
         body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
     }
 }
+
+// ── Widget « G-code » : les G-code archivés (de projets et de fichiers), un clic ouvre le détail avec la miniature du fichier ──
+let _dashboardGcodes = [];
+async function _loadDashboardGcodes() {
+    const body = document.getElementById('dashboard-gcodes-body');
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/api/gcodes?limit=40`, { cache: 'no-store' });
+        const data = await res.json();
+        _dashboardGcodes = data.gcodes || [];
+        if (!_dashboardGcodes.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-file-code"></i><p>${escapeHtml(I18N.t('gcode.widget_empty'))}</p></div>`;
+            return;
+        }
+        body.innerHTML = _dashboardGcodes.slice(0, 5).map(g => {
+            const m = g.meta || {};
+            const sub = [m.material, m.nozzle ? `${m.nozzle} mm` : '', m.layer ? `${m.layer} mm` : '', m.time].filter(Boolean).join(' · ') || formatSize(g.size || 0);
+            const thumb = g.thumb_path ? `<img src="${API}/api/thumb?path=${encodeURIComponent(g.thumb_path)}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'fa-solid fa-file-code'}))">` : '<i class="fa-solid fa-file-code"></i>';
+            return `<div class="dashboard-row" onclick="openGcodeDetails(${g.id})" style="cursor:pointer;">
+                <div class="dashboard-row-thumb">${thumb}</div>
+                <div class="dashboard-row-body">
+                    <div class="dashboard-row-title" title="${escapeHtml(g.name)}">${escapeHtml(g.name)}</div>
+                    <div class="dashboard-row-sub">${escapeHtml(sub)}</div>
+                </div>
+                <div class="dashboard-row-meta"><i class="fa-solid fa-file-code" style="color:var(--accent);"></i></div>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        console.error('[Dashboard] Erreur G-code:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
+// Détail d'un G-code : même présentation que le clic droit sur un fichier (miniature à gauche, tableau à droite)
+window.openGcodeDetails = function (gid) {
+    const g = _dashboardGcodes.find(x => x.id === gid);
+    if (!g) return;
+    let modal = document.getElementById('modal-gcode-details');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-gcode-details';
+        modal.className = 'modal hidden';
+        modal.innerHTML = `<div class="modal-content" style="max-width:1080px; width:94vw;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-file-code"></i> <span id="gcode-details-title"></span></h3>
+                <button class="modal-close" onclick="closeModal('modal-gcode-details')">×</button>
+            </div>
+            <div class="modal-body" id="gcode-details-body"></div>
+        </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-gcode-details'); });
+    }
+    const e = escapeHtml;
+    const m = g.meta || {};
+    const row = (label, value) => value ? `<tr><th>${e(label)}</th><td>${value}</td></tr>` : '';
+    const linkedFile = g.file_path ? (allFiles.find(f => f.path === g.file_path) || { name: g.file_path.split(/[\\/]/).pop(), path: g.file_path }) : null;
+    const linked = linkedFile ? e(linkedFile.name) : (g.project_name ? e(g.project_name) : '');
+    const linkedLabel = linkedFile ? I18N.t('gcode.linked_file') : I18N.t('gcode.linked_project');
+    const thumbUrl = g.thumb_path ? `${API}/api/thumb?path=${encodeURIComponent(g.thumb_path)}` : '';
+    const added = g.created_at ? new Date(String(g.created_at).replace(' ', 'T') + 'Z').toLocaleString(I18N.lang, { dateStyle: 'medium', timeStyle: 'short' }) : '';
+    document.getElementById('gcode-details-title').textContent = I18N.t('gcode.details_title');
+    document.getElementById('gcode-details-body').innerHTML = `<div class="file-info-layout">
+        <div class="file-info-thumb">${thumbUrl ? `<img src="${thumbUrl}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'fa-solid fa-file-code fa-3x'}))">` : '<i class="fa-solid fa-file-code fa-3x" style="color:var(--text-muted)"></i>'}</div>
+        <div style="flex:1; min-width:0;">
+            <table class="file-info-table"><tbody>
+                ${row(I18N.t('fileinfo.name'), e(g.name))}
+                ${row(I18N.t('fileinfo.format'), 'G-CODE')}
+                ${row(I18N.t('fileinfo.file_size'), e(formatSize(g.size || 0)))}
+                ${row(I18N.t('gcode.added_on'), e(added))}
+                ${row(linkedLabel, linked)}
+                ${row(I18N.t('gcode.material'), e(m.material || ''))}
+                ${m.filament && m.filament !== m.material ? row(I18N.t('gcode.filament'), e(m.filament)) : ''}
+                ${row(I18N.t('gcode.nozzle'), m.nozzle ? `${e(m.nozzle)} mm` : '')}
+                ${row(I18N.t('gcode.layer'), m.layer ? `${e(m.layer)} mm` : '')}
+                ${row(I18N.t('gcode.temp'), m.temp ? `${e(m.temp)} °C` : '')}
+                ${row(I18N.t('gcode.bed'), m.bed ? `${e(m.bed)} °C` : '')}
+                ${row(I18N.t('gcode.infill'), e(m.infill || ''))}
+                ${row(I18N.t('gcode.time'), e(m.time || ''))}
+                ${row(I18N.t('gcode.weight'), m.weight ? `${e(m.weight)} g` : '')}
+                ${row(I18N.t('gcode.slicer'), e(m.slicer || ''))}
+            </tbody></table>
+            <textarea class="gcode-notes" rows="3" placeholder="${e(I18N.t('projects.gcode_notes_ph'))}" onchange="saveProjectGcodeNotes(${g.id}, this.value)">${e(g.notes || '')}</textarea>
+            <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+                <a class="btn btn-primary btn-sm" style="text-decoration:none;" href="${API}/api/projects/gcodes/${g.id}/download"><i class="fa-solid fa-download"></i> ${e(I18N.t('projects.gcode_download'))}</a>
+                ${linkedFile ? `<button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('modal-gcode-details'); openProjectFile3D('${escapeJs(linkedFile.path)}')"><i class="fa-solid fa-cube"></i> ${e(I18N.t('gcode.open_file'))}</button>` : ''}
+            </div>
+        </div>
+    </div>`;
+    const dm = document.getElementById('modal-gcode-details');
+    document.body.appendChild(dm);
+    openModal('modal-gcode-details');
+};
 
 async function _loadDashboardProjects() {
     const body = document.getElementById('dashboard-projects-body');
@@ -5311,7 +5404,40 @@ function endTour() {
     _tourRemoveDemo();
     document.getElementById('tour-overlay')?.classList.add('hidden');
     localStorage.setItem(TOUR_DONE_KEY, '1');
+    setTimeout(maybePromptAddSource, 400);
 }
+
+// Après la visite guidée : si la bibliothèque est vide (aucune source, aucun fichier), invite à en ajouter une.
+async function maybePromptAddSource() {
+    try {
+        if (document.getElementById('modal-add-source-prompt')) return;
+        const res = await fetch(`${API}/api/sources`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const sources = await res.json();
+        if ((Array.isArray(sources) ? sources.length : 0) > 0) return;
+        if (typeof allFiles !== 'undefined' && allFiles.length > 0) return;
+        if (document.querySelector('.modal:not(.hidden)')) return;
+        const modal = document.createElement('div');
+        modal.id = 'modal-add-source-prompt';
+        modal.className = 'modal';
+        modal.innerHTML = `<div class="modal-content small" style="text-align:center;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-folder-plus"></i> ${escapeHtml(I18N.t('onboarding.add_source_title'))}</h3>
+                <button class="modal-close" onclick="closeAddSourcePrompt()" aria-label="${escapeHtml(I18N.t('actions.close'))}">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:14px; line-height:1.6; margin:6px 0 18px;">${escapeHtml(I18N.t('onboarding.add_source_desc'))}</p>
+                <button class="btn btn-primary" onclick="confirmAddSourcePrompt()"><i class="fa-solid fa-plus"></i> ${escapeHtml(I18N.t('onboarding.add_source_btn'))}</button>
+            </div>
+        </div>`;
+        document.body.appendChild(modal);
+    } catch (e) { /* sans réseau : pas d'invite */ }
+}
+window.closeAddSourcePrompt = function () { document.getElementById('modal-add-source-prompt')?.remove(); };
+window.confirmAddSourcePrompt = function () {
+    closeAddSourcePrompt();
+    openModal('modal-select-type');
+};
 
 function maybeAutoStartTour() {
     if (!localStorage.getItem(TOUR_DONE_KEY)) {
@@ -6946,7 +7072,8 @@ throw new Error(`${I18N.t('toast.server_error')}: ${res.status} - ${errorText.su
     if (!Array.isArray(data)) throw new Error(I18N.t('toast.parse_error'));
 
     allFiles = _dedupeFilesByPath(data);
-    loadSourceStatus();
+    // On attend brièvement l'état des sources pour que le premier affichage soit juste ; au-delà, il se met à jour tout seul.
+    await Promise.race([loadSourceStatus(), new Promise(r => setTimeout(r, 1200))]);
     filteredFiles = rebuildFilteredFiles();
     applySorting();
     renderFiles();
@@ -7207,23 +7334,51 @@ thumbProgressInterval = setInterval(async () => {
 
 
 // --- Disponibilité des sources (coche verte / croix rouge dans la bulle de survol et widget du tableau de bord) ---
-let _sourceAvailability = {};
+// Dernier état connu des sources, mémorisé pour que les miniatures soient justes dès l'ouverture (avant le premier test).
+const _SOURCE_STATUS_LS = 'stellio_source_status_v1';
+let _sourceAvailability = (() => { try { return JSON.parse(localStorage.getItem(_SOURCE_STATUS_LS) || '{}') || {}; } catch (e) { return {}; } })();
 let _sourceStatusList = [];
+let _sourceStatusBusy = null;
+
+function _applySourceMap(map, list) {
+    const changed = JSON.stringify(map) !== JSON.stringify(_sourceAvailability);
+    _sourceAvailability = map;
+    if (list) _sourceStatusList = list;
+    if (changed) {
+        try { localStorage.setItem(_SOURCE_STATUS_LS, JSON.stringify(map)); } catch (e) { /* stockage indisponible */ }
+        _refreshSourceBadges();
+    }
+}
+
+// Étape 1 : le réseau. Sans connexion (navigator.onLine), les sources réseau sont indisponibles tout de suite, sans attendre le serveur.
+function _markNetworkSourcesDown() {
+    const map = { ..._sourceAvailability };
+    (_sourceStatusList || []).forEach(s => { if (s.type === 'smb' || s.type === 'nfs') map[s.name] = false; });
+    _applySourceMap(map);
+}
+
+// Étape 2 : la source elle-même (le serveur teste le réseau, le serveur distant, puis le partage).
 async function loadSourceStatus(force = false) {
-    try {
-        const res = await fetch(`${API}/api/sources/status${force ? '?force=1' : ''}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        const list = data.sources || [];
-        const map = {};
-        list.forEach(s => { map[s.name] = !!s.available; });
-        const changed = JSON.stringify(map) !== JSON.stringify(_sourceAvailability);
-        _sourceAvailability = map;
-        _sourceStatusList = list;
-        if (changed) _refreshSourceBadges();
-    } catch (e) { /* statut indisponible : on garde l'affichage précédent */ }
+    if (navigator.onLine === false) _markNetworkSourcesDown();
+    if (_sourceStatusBusy) return _sourceStatusBusy;
+    _sourceStatusBusy = (async () => {
+        try {
+            const res = await fetch(`${API}/api/sources/status${force ? '?force=1' : ''}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            const list = data.sources || [];
+            const map = {};
+            list.forEach(s => { map[s.name] = !!s.available; });
+            _applySourceMap(map, list);
+        } catch (e) { /* statut indisponible : on garde l'affichage précédent */ }
+        finally { _sourceStatusBusy = null; }
+    })();
+    return _sourceStatusBusy;
 }
 window.loadSourceStatus = loadSourceStatus;
+window.addEventListener('offline', () => { _markNetworkSourcesDown(); loadSourceStatus(true); });
+window.addEventListener('online', () => { loadSourceStatus(true); setTimeout(() => loadSourceStatus(true), 3000); });
+window.addEventListener('focus', () => loadSourceStatus(true));
 
 function _sourceStateHtml(ok) {
     return `<span class="meta-val ${ok ? 'meta-yes' : 'meta-no'}"><i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${ok ? _t2('card.source_available', 'Disponible') : _t2('card.source_unavailable', 'Indisponible')}</span>`;
@@ -7278,7 +7433,7 @@ setInterval(() => {
     const onDashboard = w && w.offsetParent !== null;
     const onLibrary = document.getElementById('page-library')?.classList.contains('active');
     if (onDashboard || onLibrary) loadSourceStatus(true);
-}, 30000);
+}, 10000);
 
 // --- Clic droit sur une carte de fichier : fenêtre « détails du fichier » (miniature à gauche, tableau à droite) ---
 let _fileInfoToken = 0;
@@ -7405,6 +7560,7 @@ window.openFileInfoModal = async function (path, opts) {
     </div>`;
     const $ = (id) => document.getElementById(id);
     const demoNote = () => showToast(_t3('tour.demo_toast', 'Fichier de démonstration : ces boutons fonctionnent sur vos vrais fichiers.'), 'info');
+    if (!demo && _sourceUnavailableReason(path)) $('file-info-open').style.display = 'none';
     $('file-info-open').addEventListener('click', () => { if (demo) return demoNote(); closeModal('modal-file-info'); open3DViewer(name, path, file.plate_count || 1); });
     $('file-info-slicer').addEventListener('click', () => { if (demo) return demoNote(); closeModal('modal-file-info'); sendToSlicer(path, name, null, 'default'); });
     $('file-info-cost').addEventListener('click', () => { if (demo) return demoNote(); closeModal('modal-file-info'); if (typeof openPrintCostModal === 'function') openPrintCostModal(path, name); });
@@ -7544,6 +7700,19 @@ window.openFileInfoModal = async function (path, opts) {
         requestSlicerEstimate();
     });
 
+    // Source indisponible (réseau coupé, disque absent) : inutile d'analyser le fichier, on affiche seulement la raison.
+    const downReason = demo ? null : _sourceUnavailableReason(path);
+    if (downReason) {
+        $('file-info-rows').innerHTML = baseRows.join('')
+            + row(_t3('fileinfo.analysis', 'Analyse'), `<span style="color:#f87171"><i class="fa-solid fa-triangle-exclamation"></i> ${e(_t3('fileinfo.source_down_row', 'Source indisponible : analyse impossible'))}</span>`)
+            + tailRows;
+        setStatus(`<i class="fa-solid fa-circle-info"></i> ${e(downReason)}`);
+        body.querySelector('.file-info-controls')?.classList.add('hidden');
+        ['file-info-slicer', 'file-info-cost'].forEach(id => { const b = $(id); if (b) b.style.display = 'none'; });
+        openModal('modal-file-info');
+        return;
+    }
+
     renderRows();
     openModal('modal-file-info');
 
@@ -7615,11 +7784,12 @@ const checkboxHtml = isSelectionMode ? `<div class="file-checkbox" onclick="even
 const fileMenuBtnHtml = isSelectionMode ? '' : `<button type="button" class="file-menu-btn" onclick="event.stopPropagation(); openFileCtxMenu(event, '${escapeJs(f.path)}', '${escapeJs(f.name)}')" title="${I18N.t('actions.more') || 'Actions'}"><i class="fa-solid fa-bars"></i></button>`;
 const viewerClick = `onclick="open3DViewer('${escapeJs(f.name)}', '${escapeJs(f.path)}', ${f.plate_count || 1})" style="cursor:pointer;"`;
 const selectedClass = isSelected ? ' selected' : '';
+const offlineClass = (f.source && _sourceAvailability[f.source] === false) ? ' source-offline' : '';
 if (currentView === 'details') {
     const dirPath = escapeHtml(f.path.replace(/\\/g, '/').split('/').slice(0, -1).join('/') || I18N.t('source.local_folder'));
     const sizeStr = formatSize(f.size || 0);
     const safeId = f.path.replace(/[^\w]/g, '-');
-    return `<div class="file-card file-card--details${selectedClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}>
+    return `<div class="file-card file-card--details${selectedClass}${offlineClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}>
   <div class="dv-thumb">${checkboxHtml}${thumbContent}${isNew ? `<span class="file-new-badge file-new-badge--small"><i class="fa-solid fa-sparkles"></i></span>` : ''}${inArchiveBadgeHtml}${multiPlateBadgeHtml}${viewedByOtherBadgeHtml}</div>
   <div class="dv-name">
     <span class="dv-filename" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
@@ -7644,7 +7814,7 @@ const isVirtualEntry = f.path.includes('::');
 const deleteBtnHtml = (!isVirtualEntry && !isSelectionMode)
     ? `<button type="button" class="file-delete-btn" onclick="event.stopPropagation(); openDeleteFileModal('${escapeJs(f.path)}', '${escapeJs(f.name)}')" title="${I18N.t('actions.delete') || 'Supprimer'}"><i class="fa-solid fa-xmark"></i></button>`
     : '';
-return `<div class="file-card${selectedClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}><div class="file-thumb" style="position:relative;">${checkboxHtml}${fileMenuBtnHtml}${thumbContent}${tooltipHtml}<span class="file-ext-badge">${ext.replace('.', '')}</span>${deleteBtnHtml}${isArchive ? archiveEntryHtml : ''}${inArchiveBadgeHtml}${multiPlateBadgeHtml}${viewedByOtherBadgeHtml}${isNew ? newBadgeHtml : ''}${isArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); decompressFile('${escapeJs(f.path)}', event)" title="${I18N.t('toast.extract_success')}"><i class="fa-solid fa-file-zipper"></i> ${I18N.t('actions.add')}</button>` : ''}${inArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); extractArchiveEntry('${escapeJs(f.archive_path)}', '${escapeJs(f.internal_path)}', event)" title="${I18N.t('actions.extract_single_file') || 'Extraire uniquement ce fichier'}"><i class="fa-solid fa-download"></i></button>` : ''}<button type="button" class="file-favorite-btn ${isFav ? 'favorited' : ''}" onclick="toggleFavorite('${escapeJs(f.path)}', event); return false;" title="${isFav ? I18N.t('toast.favorites_removed') : I18N.t('toast.favorites_added')}"><i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-star"></i></button><button type="button" class="file-tag-btn" onclick="event.stopPropagation(); openTagModal('${escapeJs(f.path)}')" title="${I18N.t('modal.manage_tags')}"><i class="fa-solid fa-tag"></i></button></div><div class="file-info"><div class="file-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>${f.tags?.length ? `<div class="file-tags">${f.tags.map(t => `<span class="file-tag" style="background:${t.color}20;color:${t.color};border-color:${t.color}">${escapeHtml(t.name)}</span>`).join('')}</div>` : ''}</div></div>`;
+return `<div class="file-card${selectedClass}${offlineClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}><div class="file-thumb" style="position:relative;">${checkboxHtml}${fileMenuBtnHtml}${thumbContent}${tooltipHtml}<span class="file-ext-badge">${ext.replace('.', '')}</span>${deleteBtnHtml}${isArchive ? archiveEntryHtml : ''}${inArchiveBadgeHtml}${multiPlateBadgeHtml}${viewedByOtherBadgeHtml}${isNew ? newBadgeHtml : ''}${isArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); decompressFile('${escapeJs(f.path)}', event)" title="${I18N.t('toast.extract_success')}"><i class="fa-solid fa-file-zipper"></i> ${I18N.t('actions.add')}</button>` : ''}${inArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); extractArchiveEntry('${escapeJs(f.archive_path)}', '${escapeJs(f.internal_path)}', event)" title="${I18N.t('actions.extract_single_file') || 'Extraire uniquement ce fichier'}"><i class="fa-solid fa-download"></i></button>` : ''}<button type="button" class="file-favorite-btn ${isFav ? 'favorited' : ''}" onclick="toggleFavorite('${escapeJs(f.path)}', event); return false;" title="${isFav ? I18N.t('toast.favorites_removed') : I18N.t('toast.favorites_added')}"><i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-star"></i></button><button type="button" class="file-tag-btn" onclick="event.stopPropagation(); openTagModal('${escapeJs(f.path)}')" title="${I18N.t('modal.manage_tags')}"><i class="fa-solid fa-tag"></i></button></div><div class="file-info"><div class="file-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>${f.tags?.length ? `<div class="file-tags">${f.tags.map(t => `<span class="file-tag" style="background:${t.color}20;color:${t.color};border-color:${t.color}">${escapeHtml(t.name)}</span>`).join('')}</div>` : ''}</div></div>`;
 }
 
 
@@ -9632,7 +9802,52 @@ let viewerPlateCount = 1;
 let viewerCurrentPath = null;
 let viewerCurrentFileName = null;
 
+// Source du fichier indisponible ou réseau coupé : retourne le message à afficher, sinon null.
+function _sourceUnavailableReason(filePath) {
+    const f = allFiles.find(x => x.path === filePath);
+    const src = f && f.source;
+    if (!src || _sourceAvailability[src] !== false) {
+        // Réseau coupé alors que la source est distante : même raison, même sans test récent du serveur
+        const info = (_sourceStatusList || []).find(s => s.name === src);
+        if (src && navigator.onLine === false && info && (info.type === 'smb' || info.type === 'nfs')) {
+            return I18N.t('viewer.source_down_net', { name: src });
+        }
+        return null;
+    }
+    const info = (_sourceStatusList || []).find(s => s.name === src);
+    if (navigator.onLine === false && info && (info.type === 'smb' || info.type === 'nfs')) {
+        return I18N.t('viewer.source_down_net', { name: src });
+    }
+    return I18N.t('viewer.source_down_src', { name: src });
+}
+window._sourceUnavailableReason = _sourceUnavailableReason;
+
+function showSourceUnavailablePopup(message) {
+    document.getElementById('modal-source-unavailable')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'modal-source-unavailable';
+    modal.className = 'modal';
+    modal.style.zIndex = '10050';
+    modal.innerHTML = `<div class="modal-content small" style="text-align:center;">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-triangle-exclamation" style="color:#f87171;"></i> ${escapeHtml(I18N.t('viewer.source_down_title'))}</h3>
+            <button class="modal-close" aria-label="${escapeHtml(I18N.t('actions.close'))}">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:14px; line-height:1.6; margin:6px 0 18px;">${escapeHtml(message)}</p>
+            <button class="btn btn-primary">${escapeHtml(I18N.t('actions.close'))}</button>
+        </div>
+    </div>`;
+    const close = () => modal.remove();
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+    modal.querySelector('.modal-close').addEventListener('click', close);
+    modal.querySelector('.btn-primary').addEventListener('click', close);
+    document.body.appendChild(modal);
+}
+
 function open3DViewer(fileName, filePath, plateCount) {
+const _downReason = _sourceUnavailableReason(filePath);
+if (_downReason) { showSourceUnavailablePopup(_downReason); return; }
 loadThumbColorSetting();
 loadThumbPerfSetting();
 document.getElementById('viewer-title').innerHTML = `<i class="fa-solid fa-cube"></i> ${fileName}`;
@@ -20522,6 +20737,10 @@ startThumbAutoRefresh();
             closeModal('modal-file-actions');
             repairFileFromMenu(_ctxPath, _ctxName);
         });
+        document.getElementById('ctx-gcode-btn')?.addEventListener('click', () => {
+            closeModal('modal-file-actions');
+            openFileGcodesModal(_ctxPath, _ctxName);
+        });
         document.getElementById('ctx-project-btn')?.addEventListener('click', () => {
             closeModal('modal-file-actions');
             openAddToProjectModal(_ctxPath, _ctxName);
@@ -22920,6 +23139,10 @@ window.openProjectFile3D = async function (filePath) {
             if (res.ok) plates = (await res.json()).plate_count || 1;
         } catch (e) { /* un seul plateau par défaut */ }
     }
+    // La visionneuse passe en dernier dans le DOM pour s'afficher devant la fenêtre du projet,
+    // qui reste ouverte quand on la ferme.
+    const vm = document.getElementById('modal-3d-viewer');
+    if (vm) document.body.appendChild(vm);
     open3DViewer(name, filePath, plates);
 };
 
@@ -23184,6 +23407,156 @@ window.openProjectDetailModal = async function (projectId) {
     await refreshProjectDetail(projectId);
 };
 
+// ── Archive G-code du projet : réglages précis (pièces techniques, filaments techniques) conservés avec le projet ──
+function _gcodeItemHtml(g, deleteCall) {
+    const chip = (icon, text) => `<span class="gcode-chip"><i class="fa-solid ${icon}"></i> ${escapeHtml(text)}</span>`;
+    const m = g.meta || {};
+    const chips = [
+        m.material ? chip('fa-layer-group', m.material) : '',
+        m.filament && m.filament !== m.material ? chip('fa-fill-drip', m.filament) : '',
+        m.nozzle ? chip('fa-circle-dot', `${m.nozzle} mm`) : '',
+        m.layer ? chip('fa-bars', `${m.layer} mm`) : '',
+        m.temp ? chip('fa-temperature-high', `${m.temp} °C`) : '',
+        m.bed ? chip('fa-table-cells-large', `${m.bed} °C`) : '',
+        m.infill ? chip('fa-border-all', m.infill) : '',
+        m.time ? chip('fa-clock', m.time) : '',
+        m.weight ? chip('fa-weight-scale', `${m.weight} g`) : '',
+        m.slicer ? chip('fa-wand-magic-sparkles', m.slicer) : ''
+    ].join('');
+    return `<div class="gcode-item" data-gid="${g.id}">
+        <div class="gcode-item-head">
+            <i class="fa-solid fa-file-code"></i>
+            <span class="gcode-item-name" title="${escapeHtml(g.name)}">${escapeHtml(g.name)}</span>
+            <span class="gcode-item-size">${escapeHtml(formatSize(g.size || 0))}</span>
+            <a class="dv-btn" href="${API}/api/projects/gcodes/${g.id}/download" title="${escapeHtml(I18N.t('projects.gcode_download'))}"><i class="fa-solid fa-download"></i></a>
+            <button type="button" class="dv-btn" style="color:var(--danger)" title="${escapeHtml(I18N.t('actions.delete'))}" onclick="${deleteCall}"><i class="fa-solid fa-trash"></i></button>
+        </div>
+        ${chips ? `<div class="gcode-chips">${chips}</div>` : ''}
+        <textarea class="gcode-notes" rows="2" placeholder="${escapeHtml(I18N.t('projects.gcode_notes_ph'))}" onchange="saveProjectGcodeNotes(${g.id}, this.value)">${escapeHtml(g.notes || '')}</textarea>
+    </div>`;
+}
+
+function _projectGcodeSectionHtml(projectId, gcodes) {
+    const items = gcodes.map(g => _gcodeItemHtml(g, `deleteProjectGcode(${projectId}, ${g.id})`)).join('');
+    return `<div class="gcode-archive">
+        <h4 class="gcode-archive-title"><i class="fa-solid fa-box-archive"></i> ${escapeHtml(I18N.t('projects.gcode_title'))}</h4>
+        <p class="gcode-archive-hint">${escapeHtml(I18N.t('projects.gcode_hint'))}</p>
+        ${items || `<p style="color:var(--text-muted); font-size:13px; margin:8px 0;">${escapeHtml(I18N.t('projects.gcode_empty'))}</p>`}
+        <input type="file" id="project-gcode-input" accept=".gcode,.gco,.gc,.bgcode" multiple style="display:none" onchange="uploadProjectGcodes(${projectId}, this)">
+        <button class="btn btn-ghost" style="width:100%; margin-top:10px;" onclick="document.getElementById('project-gcode-input').click()">
+            <i class="fa-solid fa-plus"></i> ${escapeHtml(I18N.t('projects.gcode_add'))}
+        </button>
+    </div>`;
+}
+
+window.uploadProjectGcodes = async function (projectId, input) {
+    const files = [...(input.files || [])];
+    input.value = '';
+    if (!files.length) return;
+    let ok = 0;
+    for (const f of files) {
+        if (!/\.(gcode|gco|gc|bgcode)$/i.test(f.name)) { showToast(I18N.t('projects.gcode_bad_ext'), 'error'); continue; }
+        showToast(`${I18N.t('projects.gcode_uploading')} ${f.name}`, 'info');
+        const fd = new FormData();
+        fd.append('file', f);
+        try {
+            const res = await fetch(`${API}/api/projects/${projectId}/gcodes`, { method: 'POST', body: fd });
+            if (res.ok) ok++;
+            else showToast(res.status === 413 ? I18N.t('projects.gcode_too_big') : I18N.t('toast.error'), 'error');
+        } catch (err) { showToast(I18N.t('toast.connection_error'), 'error'); }
+    }
+    if (ok) showToast(I18N.t('projects.gcode_added'), 'success');
+    await refreshProjectDetail(projectId);
+};
+
+// ── G-code personnel d'un fichier 3D (menu Actions du fichier) ──
+let _fileGcodePath = null;
+window.openFileGcodesModal = async function (filePath, fileName) {
+    _fileGcodePath = filePath;
+    let modal = document.getElementById('modal-file-gcodes');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-file-gcodes';
+        modal.className = 'modal hidden';
+        modal.innerHTML = `<div class="modal-content" style="max-width:620px; width:94vw;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-file-code"></i> <span id="file-gcodes-title"></span></h3>
+                <button class="modal-close" onclick="closeModal('modal-file-gcodes')">×</button>
+            </div>
+            <div class="modal-body" id="file-gcodes-body"></div>
+        </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-file-gcodes'); });
+    }
+    document.getElementById('file-gcodes-title').textContent = `${I18N.t('projects.gcode_title')} — ${fileName || ''}`;
+    openModal('modal-file-gcodes');
+    await _renderFileGcodes();
+};
+
+async function _renderFileGcodes() {
+    const body = document.getElementById('file-gcodes-body');
+    if (!body || !_fileGcodePath) return;
+    let list = [];
+    try {
+        const res = await fetch(`${API}/api/files/gcodes?path=${encodeURIComponent(_fileGcodePath)}`, { cache: 'no-store' });
+        if (res.ok) list = (await res.json()).gcodes || [];
+    } catch (err) { showToast(I18N.t('toast.connection_error'), 'error'); }
+    body.innerHTML = `<div class="gcode-archive" style="margin-top:0; padding-top:0; border-top:0;">
+        <p class="gcode-archive-hint">${escapeHtml(I18N.t('projects.gcode_file_hint'))}</p>
+        ${list.map(g => _gcodeItemHtml(g, `deleteFileGcode(${g.id})`)).join('') || `<p style="color:var(--text-muted); font-size:13px; margin:8px 0;">${escapeHtml(I18N.t('projects.gcode_file_empty'))}</p>`}
+        <input type="file" id="file-gcode-input" accept=".gcode,.gco,.gc,.bgcode" multiple style="display:none" onchange="uploadFileGcodes(this)">
+        <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="document.getElementById('file-gcode-input').click()">
+            <i class="fa-solid fa-upload"></i> ${escapeHtml(I18N.t('projects.gcode_upload'))}
+        </button>
+    </div>`;
+}
+
+window.uploadFileGcodes = async function (input) {
+    const files = [...(input.files || [])];
+    input.value = '';
+    let ok = 0;
+    for (const f of files) {
+        if (!/\.(gcode|gco|gc|bgcode)$/i.test(f.name)) { showToast(I18N.t('projects.gcode_bad_ext'), 'error'); continue; }
+        showToast(`${I18N.t('projects.gcode_uploading')} ${f.name}`, 'info');
+        const fd = new FormData();
+        fd.append('file', f);
+        fd.append('path', _fileGcodePath);
+        try {
+            const res = await fetch(`${API}/api/files/gcodes`, { method: 'POST', body: fd });
+            if (res.ok) ok++;
+            else showToast(res.status === 413 ? I18N.t('projects.gcode_too_big') : I18N.t('toast.error'), 'error');
+        } catch (err) { showToast(I18N.t('toast.connection_error'), 'error'); }
+    }
+    if (ok) showToast(I18N.t('projects.gcode_added'), 'success');
+    await _renderFileGcodes();
+};
+
+window.deleteFileGcode = async function (gid) {
+    const ok = await showConfirmDialog(I18N.t('projects.gcode_delete_confirm'), { danger: true, confirmLabel: I18N.t('actions.delete') });
+    if (!ok) return;
+    try {
+        await fetch(`${API}/api/projects/gcodes/${gid}`, { method: 'DELETE' });
+        await _renderFileGcodes();
+    } catch (err) { showToast(I18N.t('toast.connection_error'), 'error'); }
+};
+
+window.saveProjectGcodeNotes = async function (gid, value) {
+    try {
+        await fetch(`${API}/api/projects/gcodes/${gid}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes: value })
+        });
+    } catch (err) { showToast(I18N.t('toast.connection_error'), 'error'); }
+};
+
+window.deleteProjectGcode = async function (projectId, gid) {
+    const ok = await showConfirmDialog(I18N.t('projects.gcode_delete_confirm'), { danger: true, confirmLabel: I18N.t('actions.delete') });
+    if (!ok) return;
+    try {
+        await fetch(`${API}/api/projects/gcodes/${gid}`, { method: 'DELETE' });
+        await refreshProjectDetail(projectId);
+    } catch (err) { showToast(I18N.t('toast.connection_error'), 'error'); }
+};
+
 async function refreshProjectDetail(projectId) {
     const body = document.getElementById('project-detail-body');
     try {
@@ -23204,7 +23577,7 @@ async function refreshProjectDetail(projectId) {
             const isDone = f.quantity_printed >= f.quantity_needed;
             const safeId = f.file_path.replace(/[^\w]/g, '-');
             return `<div class="project-file-row${isDone ? ' project-file-row--done' : ''}" data-path="${escapeHtml(f.file_path)}">
-                <div class="project-file-thumb">${thumbUrl ? `<img src="${thumbUrl}" onerror="this.style.display='none'">` : `<i class="fa-solid fa-cube"></i>`}</div>
+                <div class="project-file-thumb${known ? ' project-file-thumb--view' : ''}"${known ? ` role="button" tabindex="0" title="${escapeHtml(I18N.t('projects.open_viewer'))}" onclick="openProjectFile3D(this.closest('.project-file-row').dataset.path)"` : ''}>${thumbUrl ? `<img src="${thumbUrl}" onerror="this.style.display='none'">` : `<i class="fa-solid fa-cube"></i>`}</div>
                 <div class="project-file-info">
                     <span class="project-file-name" title="${escapeHtml(f.file_path)}">${escapeHtml(fileName)}</span>
                     ${!known ? `<span class="project-file-missing">${I18N.t('projects.file_missing')}</span>` : ''}
@@ -23226,6 +23599,7 @@ async function refreshProjectDetail(projectId) {
             <button class="btn btn-ghost" style="width:100%; margin-top:14px;" onclick="openProjectFilePicker(${projectId})">
                 <i class="fa-solid fa-plus"></i> ${I18N.t('projects.add_files')}
             </button>
+            ${_projectGcodeSectionHtml(projectId, p.gcodes || [])}
         `;
         I18N.apply();
         // Fichiers tout juste créés (plateaux d'un 3MF découpé) : le scan et les miniatures se font en arrière-plan,
