@@ -848,6 +848,7 @@ import base64
 from pathlib import Path
 from functools import wraps
 import functools
+import urllib.parse
 from flask import Flask, request, jsonify, session, send_file, Response, make_response
 from werkzeug.utils import secure_filename
 import trimesh.transformations as tra
@@ -1891,6 +1892,39 @@ def _cleanup_expired_shares():
         expired = [t for t, info in _share_links.items() if now - info['created'] > SHARE_LINK_MAX_AGE]
         for t in expired:
             _share_links.pop(t, None)
+
+
+# Liens temporaires « envoi au slicer du PC » (édition serveur) : multi-usage (le slicer peut relire le fichier), 1 h
+_slicer_fetch_links = {}
+SLICER_FETCH_MAX_AGE = 3600
+
+
+def _cleanup_slicer_fetch_links():
+    now = time.time()
+    with _share_lock:
+        for t in [t for t, i in _slicer_fetch_links.items() if now - i['created'] > SLICER_FETCH_MAX_AGE]:
+            _slicer_fetch_links.pop(t, None)
+
+
+def _smb_kwargs_for_path(user_id, unc_path):
+    """Identifiants de la source SMB qui contient ce chemin (None si aucune)."""
+    norm = unc_path.replace('\\', '/').rstrip('/').lower()
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT path, config FROM sources WHERE user_id=? AND type='smb'", (user_id,)).fetchall()
+    finally:
+        conn.close()
+    for r in rows:
+        base = (r['path'] or '').replace('\\', '/').rstrip('/').lower()
+        if base and (norm == base or norm.startswith(base + '/')):
+            cfg = json.loads(r['config'] or '{}')
+            kw = {}
+            if cfg.get('username'):
+                kw['username'] = cfg['username']
+            if cfg.get('password'):
+                kw['password'] = cfg['password']
+            return kw
+    return None
 
 
 def encrypt_password(password):
@@ -10935,6 +10969,38 @@ def api_create_share_link():
     return jsonify({"url": share_url, "expires_in": SHARE_LINK_MAX_AGE}), 200
 
 
+@app.route('/api/slicer-fetch/<token>/<path:fname>', methods=['GET'])
+def slicer_fetch_file(token, fname):
+    """Fichier servi au slicer du PC (lien temporaire, le slicer n'a pas la session du navigateur)."""
+    _cleanup_slicer_fetch_links()
+    with _share_lock:
+        info = _slicer_fetch_links.get(token)
+    if not info:
+        return "Lien invalide ou expiré.", 404
+    if not info['smb']:
+        if not os.path.isfile(info['path']):
+            return "Fichier introuvable.", 404
+        return send_file(info['path'], as_attachment=True, download_name=info['name'])
+    smb_path = info['path'].replace('\\', '/')
+    try:
+        size = smbclient.stat(smb_path, connection_timeout=8, **info['smb_kwargs']).st_size
+    except Exception as e:
+        app_logger.warning(f"[Slicer] SMB inaccessible pour le slicer du PC: {e}")
+        return "Source réseau injoignable.", 503
+
+    def _stream():
+        with smbclient.open_file(smb_path, mode='rb', share_access='r', **info['smb_kwargs']) as fh:
+            while True:
+                chunk = fh.read(SMB_COPY_CHUNK)
+                if not chunk:
+                    break
+                yield chunk
+    resp = Response(_stream(), mimetype='application/octet-stream')
+    resp.headers['Content-Length'] = str(size)
+    resp.headers['Content-Disposition'] = "attachment; filename*=UTF-8''" + urllib.parse.quote(info['name'])
+    return resp
+
+
 @app.route('/share/<token>', methods=['GET'])
 def download_shared_file(token):
     _cleanup_expired_shares()
@@ -14000,7 +14066,10 @@ def api_slicer_process_profiles():
 def api_send_to_slicer():
     data = request.json
     file_path = data.get('file_path', '')
-    if not file_path or not os.path.exists(file_path):
+    is_smb_file = file_path.startswith('//') or file_path.startswith('\\\\')
+    # Édition serveur : pas de slicer sur la machine, le fichier est ouvert dans le slicer du PC de l'utilisateur
+    pc_mode = IS_SERVER_EDITION
+    if not file_path or (not os.path.exists(file_path) and not (pc_mode and is_smb_file)):
         return jsonify({"error": "Fichier non trouvé"}), 404
     if not _is_path_within_sources(file_path, session['user_id']):
         app_logger.warning(f"[SECURITY] Tentative d'ouverture slicer hors sources: {file_path}")
@@ -14041,15 +14110,51 @@ def api_send_to_slicer():
         slicer_name = settings.get('default_slicer', 'system_default')
         slicer_path = find_slicer_by_name(slicer_name)
         detected_slicer = os.path.basename(slicer_path).replace('.exe','') if slicer_path else 'Défaut système'
+        if pc_mode:
+            detected_slicer = (slicer_name or '').replace('.exe', '') if slicer_name and slicer_name != 'system_default' else 'Slicer du PC'
 
         orientation_key = data.get('orientation') or 'default'
-        reoriented_path = _export_reoriented_mesh(file_path, orientation_key)
-        converted_path = None if reoriented_path else _prepare_model_for_slicer(file_path, slicer_name, slicer_path)
+        if pc_mode and is_smb_file:
+            reoriented_path = converted_path = None
+        else:
+            reoriented_path = _export_reoriented_mesh(file_path, orientation_key)
+            converted_path = None if (reoriented_path or pc_mode) else _prepare_model_for_slicer(file_path, slicer_name, slicer_path)
         path_to_open = reoriented_path or converted_path or file_path
+
+        pc_open = None
+        if pc_mode:
+            smb_kw = None
+            if is_smb_file:
+                smb_kw = _smb_kwargs_for_path(session['user_id'], file_path)
+                if smb_kw is None:
+                    return jsonify({"error": "Source réseau introuvable pour ce fichier"}), 404
+                try:
+                    smbclient.stat(file_path.replace('\\', '/'), connection_timeout=8, **smb_kw)
+                except Exception as smb_err:
+                    app_logger.warning(f"[Slicer] SMB inaccessible: {smb_err}")
+                    return jsonify({"error": "Source réseau injoignable"}), 503
+            _cleanup_slicer_fetch_links()
+            ftoken = secrets.token_urlsafe(24)
+            with _share_lock:
+                _slicer_fetch_links[ftoken] = {
+                    'path': path_to_open, 'smb': bool(smb_kw is not None), 'smb_kwargs': smb_kw or {},
+                    'name': os.path.basename(file_path.replace('\\', '/')) if path_to_open == file_path
+                            else os.path.basename(path_to_open),
+                    'created': time.time(),
+                }
+            fname = _slicer_fetch_links[ftoken]['name']
+            pc_open = {
+                "url": f"{request.host_url.rstrip('/')}/api/slicer-fetch/{ftoken}/{urllib.parse.quote(fname)}",
+                "slicer": slicer_name or 'system_default',
+                "name": fname,
+            }
 
 
         applied_profile_ids = []
-        if slicer_path:
+        printer_id = data.get('printer_id')
+        if pc_mode:
+            pass
+        elif slicer_path:
             slicer_family = _resolve_slicer_family(slicer_path, slicer_name)
             printer_id = data.get('printer_id')
             material_type = data.get('material_type')
@@ -14137,7 +14242,7 @@ def api_send_to_slicer():
             app_logger.warning(f"[PrintHistory] Log échoué: {log_err}")
             history_id = None
 
-        return jsonify({"message": f"Envoyé via {detected_slicer}", "history_id": history_id,
+        return jsonify({"message": f"Envoyé via {detected_slicer}", "history_id": history_id, "pc_open": pc_open,
                          "stock_warning": None if data.get('ignore_stock') else (_check_restock_for_files([file_path], session['user_id']) or [None])[0]}), 200
 
     except Exception as e:
@@ -20735,7 +20840,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.9.0"
+CURRENT_VERSION = "0.9.1"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 

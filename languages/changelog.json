@@ -1,5 +1,58 @@
 [
   {
+    "version": "0.9.1",
+    "items": {
+      "fr": [
+        "Script Proxmox : correction de l'erreur « storage_type : command not found » au choix du stockage du conteneur",
+        "Première installation : la fenêtre « Quoi de neuf » n'apparaît plus par-dessus la visite guidée ; elle s'affiche après la visite (et pas du tout sur une bibliothèque vide, où l'invite d'ajout de source la remplace)",
+        "Version serveur (Proxmox, Docker, Raspberry Pi…) : le réglage « Démarrage » (lancer Stellio au démarrage de Windows) n'est plus affiché, car il ne sert qu'à la version Windows",
+        "Version serveur : « Envoyer au slicer » ouvre maintenant le fichier dans le slicer installé sur votre PC (OrcaSlicer, Bambu Studio, PrusaSlicer), y compris pour les fichiers d'une source réseau (SMB) ; pour les autres slicers, le fichier est téléchargé"
+      ],
+      "en": [
+        "Proxmox script: fixed the \"storage_type: command not found\" error when choosing the container storage",
+        "First install: the \"What's new\" window no longer appears over the guided tour; it shows after the tour (and not at all on an empty library, where the add-source prompt replaces it)",
+        "Server edition (Proxmox, Docker, Raspberry Pi…): the \"Startup\" setting (launch Stellio when Windows starts) is no longer shown, as it only applies to the Windows version",
+        "Server edition: \"Send to slicer\" now opens the file in the slicer installed on your PC (OrcaSlicer, Bambu Studio, PrusaSlicer), including files from a network (SMB) source; for other slicers, the file is downloaded"
+      ],
+      "de": [
+        "Proxmox-Skript: Der Fehler „storage_type: command not found“ bei der Speicherauswahl für den Container wurde behoben",
+        "Erstinstallation: Das Fenster „Neuigkeiten“ erscheint nicht mehr über der geführten Tour; es wird nach der Tour angezeigt (bei leerer Bibliothek gar nicht, dort ersetzt es die Aufforderung zum Hinzufügen einer Quelle)",
+        "Server-Edition (Proxmox, Docker, Raspberry Pi …): Die Einstellung „Start“ (Stellio beim Windows-Start starten) wird nicht mehr angezeigt, da sie nur für die Windows-Version gilt",
+        "Server-Edition: „An Slicer senden“ öffnet die Datei jetzt im auf Ihrem PC installierten Slicer (OrcaSlicer, Bambu Studio, PrusaSlicer), auch bei Dateien aus einer Netzwerkquelle (SMB); bei anderen Slicern wird die Datei heruntergeladen"
+      ],
+      "es": [
+        "Script de Proxmox: corregido el error «storage_type: command not found» al elegir el almacenamiento del contenedor",
+        "Primera instalación: la ventana «Novedades» ya no aparece sobre la visita guiada; se muestra después (y no se muestra con una biblioteca vacía, donde la sustituye la invitación a añadir una fuente)",
+        "Edición de servidor (Proxmox, Docker, Raspberry Pi…): el ajuste «Inicio» (iniciar Stellio al arrancar Windows) ya no se muestra, porque solo sirve para la versión de Windows",
+        "Edición de servidor: «Enviar al slicer» ahora abre el archivo en el slicer instalado en tu PC (OrcaSlicer, Bambu Studio, PrusaSlicer), también para archivos de una fuente de red (SMB); con otros slicers se descarga el archivo"
+      ],
+      "pt": [
+        "Script do Proxmox: corrigido o erro «storage_type: command not found» ao escolher o armazenamento do contentor",
+        "Primeira instalação: a janela «Novidades» já não aparece por cima da visita guiada; é mostrada depois (e não aparece numa biblioteca vazia, onde é substituída pelo convite para adicionar uma fonte)",
+        "Edição de servidor (Proxmox, Docker, Raspberry Pi…): a definição «Arranque» (iniciar o Stellio com o Windows) já não é mostrada, pois só serve para a versão Windows",
+        "Edição de servidor: «Enviar para o slicer» abre agora o ficheiro no slicer instalado no seu PC (OrcaSlicer, Bambu Studio, PrusaSlicer), incluindo ficheiros de uma fonte de rede (SMB); com outros slicers o ficheiro é transferido"
+      ],
+      "it": [
+        "Script Proxmox: corretto l'errore «storage_type: command not found» nella scelta dello storage del container",
+        "Prima installazione: la finestra «Novità» non appare più sopra il tour guidato; compare dopo il tour (e per niente con una libreria vuota, dove la sostituisce l'invito ad aggiungere una sorgente)",
+        "Edizione server (Proxmox, Docker, Raspberry Pi…): l'impostazione «Avvio» (avviare Stellio con Windows) non viene più mostrata, perché riguarda solo la versione Windows",
+        "Edizione server: «Invia allo slicer» ora apre il file nello slicer installato sul tuo PC (OrcaSlicer, Bambu Studio, PrusaSlicer), anche per i file di una sorgente di rete (SMB); con altri slicer il file viene scaricato"
+      ],
+      "zh": [
+        "Proxmox 脚本：修复选择容器存储时出现的“storage_type: command not found”错误",
+        "首次安装：“新功能”窗口不再覆盖在引导教程之上，而是在教程结束后显示（文件库为空时不显示，由添加来源的提示取代）",
+        "服务器版（Proxmox、Docker、树莓派等）：不再显示“启动”设置（随 Windows 启动 Stellio），因为它只适用于 Windows 版",
+        "服务器版：“发送到切片软件”现在会在您电脑上安装的切片软件（OrcaSlicer、Bambu Studio、PrusaSlicer）中打开文件，也适用于网络（SMB）来源的文件；其他切片软件则下载文件"
+      ],
+      "ja": [
+        "Proxmox スクリプト：コンテナのストレージ選択時に出る「storage_type: command not found」エラーを修正",
+        "初回インストール：「新機能」ウィンドウがガイドツアーの上に表示されなくなり、ツアー終了後に表示されます（ライブラリが空の場合は表示されず、ソース追加の案内に置き換わります）",
+        "サーバー版（Proxmox、Docker、Raspberry Pi など）：Windows 版専用の「起動」設定（Windows 起動時に Stellio を起動）を表示しないようにしました",
+        "サーバー版：「スライサーに送信」で、PCにインストールされたスライサー（OrcaSlicer、Bambu Studio、PrusaSlicer）でファイルが開くようになりました（ネットワーク(SMB)ソースのファイルも対象）。それ以外のスライサーではファイルをダウンロードします"
+      ]
+    }
+  },
+  {
     "version": "0.9.0",
     "items": {
       "fr": [

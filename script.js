@@ -554,6 +554,9 @@ function applyServerEditionUI() {
         const el = document.getElementById(id);
         if (el) el.style.display = on ? blocks[id] : 'none';
     });
+    // Le démarrage avec la session Windows n'a pas de sens sur un serveur (Proxmox, Docker, Raspberry Pi…) : le service démarre avec la machine.
+    const startupSection = document.getElementById('startup-settings-section');
+    if (startupSection) startupSection.style.display = on ? 'none' : '';
     if (on && typeof loadAiProviderSettings === 'function') loadAiProviderSettings();
     if (on) startServerRestartWatcher();
     if (on && typeof loadTigerTagStudioDir === 'function') loadTigerTagStudioDir();
@@ -2829,6 +2832,8 @@ async function checkWhatsNew() {
         if (!res.ok) return;
         const data = await res.json();
         if (data.seen || !data.items?.length) return;
+        // Pas de « Quoi de neuf » pendant la visite guidée (ni avant qu'elle ait eu lieu : première installation).
+        if (!localStorage.getItem(TOUR_DONE_KEY) || !document.getElementById('tour-overlay')?.classList.contains('hidden')) return;
         document.getElementById('whatsnew-version').textContent = `${_t2('whatsnew.version_label', 'Version')} ${data.version}`;
         document.getElementById('whatsnew-list').innerHTML = data.items.map(item => `<li>${escapeHtml(item)}</li>`).join('');
         window._whatsNewVersion = data.version;
@@ -5404,19 +5409,33 @@ function endTour() {
     _tourRemoveDemo();
     document.getElementById('tour-overlay')?.classList.add('hidden');
     localStorage.setItem(TOUR_DONE_KEY, '1');
-    setTimeout(maybePromptAddSource, 400);
+    setTimeout(async () => {
+        const prompted = await maybePromptAddSource();
+        // Installation toute neuve (bibliothèque vide) : rien à découvrir dans les nouveautés, on les marque comme vues.
+        if (prompted) _markWhatsNewSeen();
+        else checkWhatsNew();
+    }, 400);
+}
+
+async function _markWhatsNewSeen() {
+    try {
+        const data = await (await fetch(`${API}/api/changelog/latest`)).json();
+        if (data && data.version && !data.seen) {
+            await fetch(`${API}/api/changelog/seen`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: data.version }) });
+        }
+    } catch (err) { /* sans conséquence */ }
 }
 
 // Après la visite guidée : si la bibliothèque est vide (aucune source, aucun fichier), invite à en ajouter une.
 async function maybePromptAddSource() {
     try {
-        if (document.getElementById('modal-add-source-prompt')) return;
+        if (document.getElementById('modal-add-source-prompt')) return false;
         const res = await fetch(`${API}/api/sources`, { cache: 'no-store' });
-        if (!res.ok) return;
+        if (!res.ok) return false;
         const sources = await res.json();
-        if ((Array.isArray(sources) ? sources.length : 0) > 0) return;
-        if (typeof allFiles !== 'undefined' && allFiles.length > 0) return;
-        if (document.querySelector('.modal:not(.hidden)')) return;
+        if ((Array.isArray(sources) ? sources.length : 0) > 0) return false;
+        if (typeof allFiles !== 'undefined' && allFiles.length > 0) return false;
+        if (document.querySelector('.modal:not(.hidden)')) return false;
         const modal = document.createElement('div');
         modal.id = 'modal-add-source-prompt';
         modal.className = 'modal';
@@ -5431,7 +5450,9 @@ async function maybePromptAddSource() {
             </div>
         </div>`;
         document.body.appendChild(modal);
+        return true;
     } catch (e) { /* sans réseau : pas d'invite */ }
+    return false;
 }
 window.closeAddSourcePrompt = function () { document.getElementById('modal-add-source-prompt')?.remove(); };
 window.confirmAddSourcePrompt = function () {
@@ -16930,6 +16951,34 @@ document.getElementById('apply-filters')?.addEventListener('click', applyFilters
 
 document.getElementById('confirm-slicer')?.addEventListener('click', () => _confirmSendToSlicer(false));
 
+// Édition serveur : le slicer est sur le PC de l'utilisateur, on l'ouvre via son lien « protocole » (bambustudio://…)
+const PC_SLICER_SCHEMES = [
+    { match: /orca/i, scheme: 'orcaslicer' },
+    { match: /bambu/i, scheme: 'bambustudio' },
+    { match: /prusa/i, scheme: 'prusaslicer' },
+];
+function _openInPcSlicer(info) {
+    const entry = PC_SLICER_SCHEMES.find(e => e.match.test(info.slicer || ''));
+    if (entry) {
+        const a = document.createElement('a');
+        a.href = `${entry.scheme}://open?file=${encodeURIComponent(info.url)}`;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => a.remove(), 1000);
+        showToast(I18N.t('toast.sent_to_pc_slicer'), 'success');
+    } else {
+        const a = document.createElement('a');
+        a.href = info.url;
+        a.download = info.name || '';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => a.remove(), 1000);
+        showToast(I18N.t('toast.sent_to_pc_download'), 'info');
+    }
+}
+
 async function _confirmSendToSlicer(force, ignoreStock) {
     if (!currentSlicerFile) return;
     const consumeSpool = !!document.getElementById('slicer-spool-select')?.value
@@ -16971,7 +17020,11 @@ async function _confirmSendToSlicer(force, ignoreStock) {
             return;
         }
 
-        showToast(res.ok ? I18N.t('toast.files_sent') : data.error, res.ok ? 'success' : 'error');
+        if (res.ok && data.pc_open) {
+            _openInPcSlicer(data.pc_open);
+        } else {
+            showToast(res.ok ? I18N.t('toast.files_sent') : data.error, res.ok ? 'success' : 'error');
+        }
         if (res.ok && data.stock_warning) _showStockWarningToast(data.stock_warning);
     } catch (err) { showToast(I18N.t('toast.send_error'), 'error'); }
     currentSlicerOrientation = 'default';
