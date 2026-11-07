@@ -8923,3 +8923,17 @@ body.commercial-off .commercial-only { display: none !important; }
 .gcode-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 6px; }
 .gcode-chip { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--accent-glow); color: var(--accent); display: inline-flex; align-items: center; gap: 5px; }
 .gcode-notes { width: 100%; box-sizing: border-box; margin-top: 6px; resize: vertical; font-size: 12px; background: var(--bg-secondary, transparent); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-family: inherit; }
+
+/* Imprimante hors ligne */
+.printer-card { cursor: pointer; }
+.printer-card.is-offline { cursor: default; }
+.printer-card.is-offline:hover { transform: none; }
+.printer-card.is-offline .printer-action-live { display: none; }
+.printer-card-camera.is-offline { background: var(--bg-input) !important; pointer-events: none; }
+.printer-offline-logo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 90px; height: 90px; border-radius: 14px; background: rgba(229, 231, 235, 0.92); color: #374151; font-size: 11px; font-weight: 600; opacity: 0.85; }
+.printer-card.is-offline:hover { border-color: var(--border); }
+
+.thumb-pause-btn { margin-left: auto; background: transparent; border: 1px solid var(--border); color: var(--text-secondary); border-radius: 6px; width: 24px; height: 22px; padding: 0; font-size: 10px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.thumb-pause-btn:hover { color: var(--text-primary); border-color: var(--accent); }
+.thumb-progress.completed .thumb-pause-btn { display: none; }
+.thumb-progress.paused .progress-bar { background: #f59e0b; }

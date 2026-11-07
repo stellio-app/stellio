@@ -1041,8 +1041,63 @@ def _machine_is_modest():
     return cores <= 4
 
 
+def _rss_cap_bytes():
+    """Mémoire que Stellio peut occuper avant de brider la génération : 25 % de la RAM, entre 1,5 et 6 Go."""
+    try:
+        import psutil
+        total = psutil.virtual_memory().total
+    except Exception:
+        return 4 * 1024 ** 3
+    return int(min(6 * 1024 ** 3, max(1536 * 1024 ** 2, total * 0.25)))
+
+
+def _process_rss():
+    try:
+        import psutil
+        return psutil.Process().memory_info().rss
+    except Exception:
+        return 0
+
+
+_last_mem_trim = 0.0
+
+
+def _trim_memory(force=False):
+    """Rend au système la mémoire libérée par Python (gc + vidage du working set Windows / malloc_trim Linux)."""
+    global _last_mem_trim
+    now = time.time()
+    if not force and now - _last_mem_trim < 5:
+        return
+    _last_mem_trim = now
+    try:
+        import gc
+        gc.collect()
+    except Exception:
+        pass
+    try:
+        import ctypes
+        if os.name == 'nt':
+            k32 = ctypes.windll.kernel32
+            k32.GetCurrentProcess.restype = ctypes.c_void_p
+            k32.SetProcessWorkingSetSize(ctypes.c_void_p(k32.GetCurrentProcess()), ctypes.c_size_t(-1), ctypes.c_size_t(-1))
+        else:
+            ctypes.CDLL('libc.so.6').malloc_trim(0)
+    except Exception:
+        pass
+
+
+def _trim_memory_if_needed():
+    """Après chaque rendu : si Stellio dépasse les 70 % de son plafond, on rend la mémoire inutilisée."""
+    if _process_rss() > _rss_cap_bytes() * 0.7:
+        _trim_memory()
+
+
+_thumb_paused = False   # mis en pause par l'utilisateur (bouton à côté de la barre de progression)
+
+
 def _low_memory(threshold_mb=300):
-    """Vrai si la mémoire disponible (celle du conteneur, via cgroup, sinon celle du système) est presque épuisée."""
+    """Vrai si la mémoire disponible est presque épuisée : celle du conteneur (cgroup) ou celle du système
+    (au moins 10 % de la RAM, 1 Go minimum sur une machine de 8 Go et plus, pour ne pas faire planter les autres programmes)."""
     try:
         with open('/sys/fs/cgroup/memory.max') as fh:
             mx = fh.read().strip()
@@ -1059,7 +1114,9 @@ def _low_memory(threshold_mb=300):
         pass
     try:
         import psutil
-        return psutil.virtual_memory().available < threshold_mb * 1024 ** 2
+        vm = psutil.virtual_memory()
+        floor = 1024 * 1024 ** 2 if vm.total >= 8 * 1024 ** 3 else threshold_mb * 1024 ** 2
+        return vm.available < max(floor, vm.total * 0.10)
     except Exception:
         return False
 
@@ -1088,8 +1145,9 @@ def _thumb_allowed_workers():
             n = moderate if thumb_generation_queue.qsize() > 50 else NUM_THUMB_WORKERS
     try:
         import psutil
-        if psutil.virtual_memory().available < 400 * 1024 ** 2:
-            n = 1   # mémoire presque épuisée : un seul rendu à la fois pour ne pas faire tomber la machine
+        vm = psutil.virtual_memory()
+        if vm.available < max(400 * 1024 ** 2, vm.total * 0.20) or _process_rss() > _rss_cap_bytes():
+            n = 1   # mémoire serrée ou Stellio déjà gourmand : un seul rendu à la fois pour ne pas gêner le reste
     except Exception:
         pass
     _thumb_perf_cache.update({'t': now, 'n': max(1, n), 'mode': mode})
@@ -3863,8 +3921,9 @@ ELEGOO_CC2_STATUS_MAP = {
 _klipper_bounds_cache = {}
 
 
-def _klipper_gcode_bounds(base, filename):
-    """(gcode_start_byte, gcode_end_byte) du fichier en cours, lus via Moonraker (mis en cache par fichier)."""
+def _klipper_gcode_meta(base, filename):
+    """Métadonnées du fichier en cours via Moonraker : {'start','end','est'} (octets de début/fin du G-code,
+    durée estimée par le slicer en secondes), mises en cache par fichier."""
     key = (base, filename)
     if key in _klipper_bounds_cache:
         return _klipper_bounds_cache[key]
@@ -3873,15 +3932,26 @@ def _klipper_gcode_bounds(base, filename):
         r = requests.get(f"{base}/server/files/metadata", params={'filename': filename}, timeout=3)
         if r.ok:
             m = (r.json() or {}).get('result', {}) or {}
-            a, b = m.get('gcode_start_byte'), m.get('gcode_end_byte')
-            if isinstance(a, (int, float)) and isinstance(b, (int, float)) and b > a:
-                val = (a, b)
+            gs, ge = m.get('gcode_start_byte'), m.get('gcode_end_byte')
+            est = m.get('estimated_time')
+            val = {
+                'start': gs if isinstance(gs, (int, float)) else None,
+                'end': ge if isinstance(ge, (int, float)) else None,
+                'est': est if isinstance(est, (int, float)) and est > 0 else None,
+            }
     except Exception:
         return None  # pas de cache en cas d'erreur réseau : on réessaiera
     if len(_klipper_bounds_cache) > 50:
         _klipper_bounds_cache.clear()
     _klipper_bounds_cache[key] = val
     return val
+
+
+def _klipper_gcode_bounds(base, filename):
+    m = _klipper_gcode_meta(base, filename)
+    if m and m['start'] is not None and m['end'] is not None and m['end'] > m['start']:
+        return (m['start'], m['end'])
+    return None
 
 
 def _build_elegoo_cc2_result(raw_state, default_result):
@@ -4088,6 +4158,86 @@ def _stop_elegoo_cc2_connection(pid):
         conn.stop()
 
 
+HTTP_PRINTER_TYPES = ('klipper', 'octoprint', 'prusalink')
+_printer_ext_urls = {}        # IP locale -> adresse externe (https://imprimante.mondomaine.fr)
+_printer_ext_loaded = False
+_printer_reach_cache = {}     # (ip, port) -> (instant, joignable)
+PRINTER_REACH_TTL = 15
+
+
+def _clean_external_url(value):
+    """Adresse externe saisie : http(s)://hôte[:port][/chemin], sans espace ; '' si invalide."""
+    v = str(value or '').strip().rstrip('/')
+    if not v:
+        return ''
+    if '://' not in v:
+        v = 'https://' + v
+    try:
+        p = urllib.parse.urlparse(v)
+    except Exception:
+        return ''
+    if p.scheme not in ('http', 'https') or not p.hostname or any(c.isspace() for c in v):
+        return ''
+    return v[:300]
+
+
+def _printers_ext_reload():
+    """Recharge la table IP locale -> adresse externe à partir des imprimantes enregistrées."""
+    global _printer_ext_loaded
+    m = {}
+    try:
+        conn = get_db()
+        try:
+            rows = conn.execute("SELECT ip, type, config FROM printers").fetchall()
+        finally:
+            conn.close()
+        for r in rows:
+            if r['type'] not in HTTP_PRINTER_TYPES:
+                continue
+            try:
+                ext = _clean_external_url((json.loads(r['config'] or '{}') or {}).get('external_url'))
+            except Exception:
+                ext = ''
+            if ext:
+                m[r['ip']] = ext
+    except Exception as e:
+        app_logger.info(f"[Printer] Adresses externes non chargées: {e}")
+    _printer_ext_urls.clear()
+    _printer_ext_urls.update(m)
+    _printer_reach_cache.clear()
+    _printer_ext_loaded = True
+
+
+def _local_printer_reachable(ip, port):
+    key = (ip, int(port or 80))
+    hit = _printer_reach_cache.get(key)
+    now = time.time()
+    if hit and now - hit[0] < PRINTER_REACH_TTL:
+        return hit[1]
+    try:
+        with socket.create_connection((ip, key[1]), timeout=1.0):
+            ok = True
+    except Exception:
+        ok = False
+    _printer_reach_cache[key] = (now, ok)
+    return ok
+
+
+def _pbase(ip, port=None):
+    """Adresse de base d'une imprimante HTTP : locale si elle répond, sinon son adresse externe (si renseignée)."""
+    local = f"http://{ip}" + (f":{port}" if port else "")
+    if not _printer_ext_loaded:
+        _printers_ext_reload()
+    ext = _printer_ext_urls.get(ip)
+    if ext and not _local_printer_reachable(ip, port or 80):
+        return ext
+    return local
+
+
+def _pbase_is_external(ip, port=None):
+    return _pbase(ip, port) != f"http://{ip}" + (f":{port}" if port else "")
+
+
 class PrinterManager:
     def __init__(self):
         self.clients = {}
@@ -4099,12 +4249,12 @@ class PrinterManager:
         api_key = db_row['api_key']
         try:
             if ptype == 'octoprint':
-                url = f"http://{ip}/api/connection"
+                url = f"{_pbase(ip)}/api/connection"
                 headers = {'X-Api-Key': api_key}
                 r = requests.get(url, headers=headers, timeout=5)
                 return r.status_code == 200
             elif ptype == 'prusalink':
-                url = f"http://{ip}/api/version"
+                url = f"{_pbase(ip)}/api/version"
                 headers = {'X-Api-Key': api_key}
                 r = requests.get(url, headers=headers, timeout=5)
                 return r.status_code == 200
@@ -4114,7 +4264,7 @@ class PrinterManager:
                 return r.status_code == 200
             elif ptype == 'klipper':
                 port = db_row['config'].get('port', '7125') if db_row['config'] else '7125'
-                url = f"http://{ip}:{port}/server/info"
+                url = f"{_pbase(ip, port)}/server/info"
                 r = requests.get(url, timeout=5)
                 return r.status_code == 200
             elif ptype == 'bambu':
@@ -4187,12 +4337,12 @@ class PrinterManager:
         try:
             if ptype in ('octoprint', 'prusalink'):
                 headers = {'X-Api-Key': api_key}
-                r_temp = requests.get(f"http://{ip}/api/printer", headers=headers, timeout=3).json()
+                r_temp = requests.get(f"{_pbase(ip)}/api/printer", headers=headers, timeout=3).json()
                 temps = r_temp.get('temperature', {})
                 extruder = temps.get('tool0', {})
                 bed = temps.get('bed', {})
                 chamber = temps.get('chamber', {})
-                r_job = requests.get(f"http://{ip}/api/job", headers=headers, timeout=3).json()
+                r_job = requests.get(f"{_pbase(ip)}/api/job", headers=headers, timeout=3).json()
                 state = r_job.get('state', 'Offline').lower()
                 progress = r_job.get('progress', {}) or {}
                 job = r_job.get('job', {}) or {}
@@ -4228,7 +4378,7 @@ class PrinterManager:
                 }
             elif ptype == 'klipper':
                 port = db_row['config'].get('port', '7125') if isinstance(db_row['config'], dict) else '7125'
-                base = f"http://{ip}:{port}"
+                base = _pbase(ip, port)
                 try:
                     query_params = 'extruder&heater_bed&print_stats&display_status&virtual_sdcard'
                     url = f"{base}/printer/objects/query?{query_params}"
@@ -4284,6 +4434,16 @@ class PrinterManager:
                     remaining = 0
                     if progress > 0 and progress < 100 and duration > 0:
                         remaining = int((duration / progress) * (100 - progress))
+                        # En début d'impression, l'extrapolation (2 % en 20 min → « 15 h ») est absurde : on s'appuie sur
+                        # l'estimation du slicer, puis on glisse vers l'extrapolation à mesure que l'impression avance
+                        try:
+                            _m = _klipper_gcode_meta(base, filename) if filename else None
+                            if _m and _m.get('est'):
+                                slicer_left = max(0.0, _m['est'] - duration)
+                                w = min(1.0, progress / 100.0)
+                                remaining = int(w * remaining + (1 - w) * slicer_left)
+                        except Exception:
+                            pass
                     last_print = self._get_klipper_last_print(ip, port)
                     mm_info = []
                     try:
@@ -4456,10 +4616,10 @@ class PrinterManager:
     def _get_octoprint_last_print(self, ip, api_key):
         try:
             headers = {'X-Api-Key': api_key}
-            r = requests.get(f"http://{ip}/api/job", headers=headers, timeout=3).json()
+            r = requests.get(f"{_pbase(ip)}/api/job", headers=headers, timeout=3).json()
             if r.get('state', '').lower() in ['printing', 'paused']:
                 return {'filename': '', 'duration': 0, 'finished_at': ''}
-            history = requests.get(f"http://{ip}/api/history?limit=1", headers=headers, timeout=3).json()
+            history = requests.get(f"{_pbase(ip)}/api/history?limit=1", headers=headers, timeout=3).json()
             records = history.get('logs', [])
             if records:
                 last = records[0]
@@ -4474,7 +4634,7 @@ class PrinterManager:
 
     def _get_klipper_last_print(self, ip, port):
         try:
-            base = f"http://{ip}:{port}"
+            base = _pbase(ip, port)
             r = requests.get(f"{base}/server/history/list?limit=1", timeout=3)
             if r.status_code == 200:
                 data = r.json()
@@ -4503,7 +4663,7 @@ class PrinterManager:
         api_key = db_row['api_key']
         try:
             if ptype in ('octoprint', 'prusalink'):
-                url = f"http://{ip}/api/files/local"
+                url = f"{_pbase(ip)}/api/files/local"
                 headers = {'X-Api-Key': api_key}
                 with open(file_path, 'rb') as f:
                     files = {'file': f}
@@ -4511,7 +4671,7 @@ class PrinterManager:
                 return r.status_code == 201
             elif ptype == 'klipper':
                 port = db_row['config'].get('port', '7125') if isinstance(db_row['config'], dict) else '7125'
-                base = f"http://{ip}:{port}"
+                base = _pbase(ip, port)
                 try:
                     with open(file_path, 'rb') as f:
                         files = {'file': (os.path.basename(file_path), f, 'application/octet-stream')}
@@ -5337,6 +5497,10 @@ def process_generation_queue():
             if _user_is_active() and _thumb_high_pending <= 0:
                 time.sleep(0.5)
                 continue
+            # génération mise en pause par l'utilisateur : seules les demandes prioritaires (il ouvre un fichier) passent
+            if _thumb_paused and _thumb_high_pending <= 0:
+                time.sleep(1)
+                continue
             # au-delà du nombre de rendus autorisé, le worker attend (sauf demande prioritaire de l'utilisateur)
             if worker_id >= _thumb_allowed_workers() and _thumb_high_pending <= 0:
                 time.sleep(1)
@@ -5441,6 +5605,7 @@ def process_generation_queue():
                 if 'file_path' in locals() and file_path:
                     _release_thumb_inflight(file_path)
                 thumb_generation_queue.task_done()
+                _trim_memory_if_needed()
                 if thumb_generation_queue.empty():
                     _thumb_session_maybe_finish()
 
@@ -9761,9 +9926,18 @@ def pregenerate_thumbnails_on_startup(limit=90):
 
     def _generate_one(item):
         file_path, thumb_path = item
+        for _ in range(3600):   # pause demandée par l'utilisateur : on attend la reprise (jusqu'à 1 h)
+            if not _thumb_paused:
+                break
+            time.sleep(1)
+        for _ in range(60):   # mémoire presque épuisée : on attend (jusqu'à 2 min) plutôt que de faire planter la machine
+            if not _low_memory():
+                break
+            time.sleep(2)
         try:
             app_logger.info(f"[THUMBS] Génération: {os.path.basename(file_path)}")
             success = generate_thumbnail_pyrender(file_path, thumb_path)
+            _trim_memory_if_needed()
             if success:
                 update_cache_thumb_status(file_path, True)
                 return True
@@ -9954,9 +10128,21 @@ def api_thumb_progress():
         'progress': round(progress, 1),
         'is_generating': pending > 0 or is_generation_running,
         'workers': _thumb_allowed_workers(),
+        'paused': _thumb_paused,
         'mode': _thumb_perf_cache['mode'],
         'analysis': dict(_analysis_progress)
     })
+
+
+@app.route('/api/thumb/pause', methods=['POST'])
+@login_required
+def api_thumb_pause():
+    """Met en pause ou relance la génération des miniatures (les rendus déjà commencés vont jusqu'au bout)."""
+    global _thumb_paused
+    data = request.get_json(silent=True) or {}
+    _thumb_paused = bool(data.get('paused', not _thumb_paused))
+    app_logger.info(f"[THUMBS] Génération {'mise en pause' if _thumb_paused else 'reprise'} par l'utilisateur")
+    return jsonify({'paused': _thumb_paused})
 
 
 @app.route('/api/thumb/summary', methods=['GET'])
@@ -20943,7 +21129,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.9.2"
+CURRENT_VERSION = "0.9.3"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -21709,6 +21895,12 @@ def api_add_printer():
         raw_config = {'code': code, 'serial': serial}
 
     raw_config.update(_extract_bed_config(data.get('config')))
+    _ext = _clean_external_url((data.get('config') or {}).get('external_url'))
+    raw_config.pop('external_url', None)
+    if ptype in HTTP_PRINTER_TYPES:
+        if _ext:
+            raw_config['external_url'] = _ext
+            _printer_ext_urls[ip] = _ext
     config = json.dumps(raw_config)
 
     if not name or not ip or not ptype:
@@ -21726,6 +21918,7 @@ def api_add_printer():
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (session['user_id'], name, ptype, ip, encrypt_password(api_key) if api_key else None, config, is_connected))
         conn.commit()
+        _printers_ext_reload()
 
         return jsonify({"message": "Imprimante ajoutée", "connected": is_connected}), 200
 
@@ -21813,7 +22006,7 @@ def api_printer_job_thumb(pid):
     if not filename or '..' in filename.replace('\\', '/').split('/'):
         return jsonify({"error": "Fichier invalide"}), 400
     cfg = printer.get('config') if isinstance(printer.get('config'), dict) else {}
-    base = f"http://{printer['ip']}:{cfg.get('port', '7125')}"
+    base = _pbase(printer['ip'], cfg.get('port', '7125'))
     try:
         result = _klipper_fetch_job_thumbnail(base, filename)
     except Exception as e:
@@ -22050,6 +22243,12 @@ def api_edit_printer(pid):
                 data['api_key'] = code
 
         raw_config.update(_extract_bed_config(data.get('config')))
+        _ext = _clean_external_url((data.get('config') or {}).get('external_url'))
+        raw_config.pop('external_url', None)
+        if ptype in HTTP_PRINTER_TYPES:
+            if _ext:
+                raw_config['external_url'] = _ext
+                _printer_ext_urls[ip] = _ext
         config = json.dumps(raw_config)
         api_key = data.get('api_key', '') if has_new_api_key else decrypt_account_secret(existing['api_key']) if existing['api_key'] else ''
 
@@ -22070,6 +22269,7 @@ def api_edit_printer(pid):
             WHERE id = ? AND user_id = ?
         """, (name, ptype, ip, encrypt_password(api_key) if api_key else None, config, is_connected, pid, session['user_id']))
         conn.commit()
+        _printers_ext_reload()
 
         return jsonify({"message": "Imprimante mise à jour", "connected": is_connected}), 200
 
@@ -22087,6 +22287,7 @@ def api_delete_printer(pid):
         conn.execute("DELETE FROM printers WHERE id = ? AND user_id = ?",
                      (pid, session['user_id']))
         conn.commit()
+        _printers_ext_reload()
         _stop_bambu_connection(pid)
         _stop_elegoo_sdcp_connection(pid)
         _stop_elegoo_cc2_connection(pid)
@@ -22281,7 +22482,7 @@ def _resolve_printer_camera(printer, pid, host_url=''):
         if ptype == 'klipper':
             port = printer.get('config', {}).get('port', '7125')
             try:
-                r = requests.get(f"http://{ip}:{port}/server/webcams/list", timeout=3)
+                r = requests.get(f"{_pbase(ip, port)}/server/webcams/list", timeout=3)
                 if r.status_code == 200:
                     webcams = r.json().get('result', {}).get('webcams', [])
                     if webcams:
@@ -22289,7 +22490,14 @@ def _resolve_printer_camera(printer, pid, host_url=''):
                         stream_url = cam.get('stream_url', '')
                         snapshot_url = cam.get('snapshot_url', '')
 
-                        if stream_url and stream_url.startswith('/'):
+                        if _pbase_is_external(ip, port):
+                            # accès externe : tout passe par l'adresse publique (reverse proxy), pas de ports de caméra à tester
+                            ext_base = _pbase(ip, port)
+                            if stream_url and stream_url.startswith('/'):
+                                stream_url = ext_base + stream_url
+                            if snapshot_url and snapshot_url.startswith('/'):
+                                snapshot_url = ext_base + snapshot_url
+                        elif stream_url and stream_url.startswith('/'):
                             webcam_ports = [80, 4408, 8080, 8181]
                             for wport in webcam_ports:
                                 test_url = f"http://{ip}:{wport}{stream_url}"
@@ -22303,7 +22511,7 @@ def _resolve_printer_camera(printer, pid, host_url=''):
                         else:
                             stream_url = f"http://{ip}:80{stream_url}"
 
-                        if snapshot_url and snapshot_url.startswith('/'):
+                        if snapshot_url and snapshot_url.startswith('/') and not _pbase_is_external(ip, port):
                             snapshot_url = f"http://{ip}:80{snapshot_url}"
 
                         camera_info.update({
@@ -22318,14 +22526,14 @@ def _resolve_printer_camera(printer, pid, host_url=''):
         elif ptype == 'octoprint':
             headers = {'X-Api-Key': printer.get('api_key', '')}
             try:
-                r = requests.get(f"http://{ip}/api/settings", headers=headers, timeout=3)
+                r = requests.get(f"{_pbase(ip)}/api/settings", headers=headers, timeout=3)
                 if r.status_code == 200:
                     settings = r.json()
                     webcam = settings.get('webcam', {})
                     if webcam.get('streamUrl'):
                         stream_url = webcam.get('streamUrl')
                         if stream_url.startswith('/'):
-                            stream_url = f"http://{ip}{stream_url}"
+                            stream_url = f"{_pbase(ip)}{stream_url}"
 
                         camera_info.update({
                             "available": True,
@@ -23656,7 +23864,7 @@ def api_printer_camera(pid):
 def _fetch_moonraker_total_print_hours(printer):
     try:
         port = printer.get('config', {}).get('port', '7125')
-        r = requests.get(f"http://{printer['ip']}:{port}/server/history/totals", timeout=3)
+        r = requests.get(f"{_pbase(printer['ip'], port)}/server/history/totals", timeout=3)
         if r.status_code == 200:
             totals = r.json().get('result', {}).get('job_totals', {})
             total_seconds = totals.get('total_print_time')

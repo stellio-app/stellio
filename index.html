@@ -399,6 +399,7 @@
 						<div class="progress-text-row">
 							<i class="fa-solid fa-image thumb-progress-icon" id="thumb-progress-icon"></i>
 							<span class="progress-text" id="thumb-progress-text">0/0</span>
+							<button type="button" id="thumb-pause-btn" class="thumb-pause-btn" onclick="toggleThumbPause(event)"><i class="fa-solid fa-pause"></i></button>
 						</div>
 						<div class="progress-track">
 							<div class="progress-bar" id="thumb-progress-bar" style="width: 0%"></div>
@@ -443,19 +444,6 @@
                     <button id="select-all-btn" class="btn btn-ghost btn-sm" data-i18n-title="library.select_multiple" title="Sélectionner plusieurs fichiers">
                         <i class="fa-solid fa-square-check"></i> <span data-i18n="actions.select">Sélectionner</span>
                     </button>
-					<button class="desktop-only-nav" onclick="showQuitConfirmation()" data-i18n-title="nav.quit_app" title="Quitter Stellio" style="
-						background: transparent;
-						border: none;
-						color: var(--text-muted);
-						cursor: pointer;
-						padding: 6px 8px;
-						border-radius: 6px;
-						transition: all 0.2s;
-						font-size: 14px;
-					" onmouseover="this.style.color='var(--danger)'; this.style.background='rgba(248,113,113,0.1)'"
-					   onmouseout="this.style.color='var(--text-muted)'; this.style.background='transparent'">
-						<i class="fa-solid fa-power-off"></i>
-					</button>
 					<span id="presence-indicator" class="presence-indicator hidden" aria-live="polite">
 						<i class="fa-solid fa-users" aria-hidden="true"></i>
 						<span id="presence-count">0</span>
@@ -4168,6 +4156,11 @@
 					<div class="input-group" id="group-port" style="display:none;">
 						<label data-i18n="printers.port_moonraker">Port Moonraker</label>
 						<input type="text" id="printer-port" placeholder="7125" value="7125">
+					</div>
+					<div class="input-group" id="group-external-url" style="display:none;">
+						<label data-i18n="printers.external_url">Adresse externe (optionnel)</label>
+						<input type="text" id="printer-external-url" data-i18n-placeholder="printers.external_url_ph" placeholder="https://imprimante.mondomaine.fr" autocomplete="off">
+						<small style="color:var(--text-secondary); font-size:11px; line-height:1.5;" data-i18n="printers.external_url_hint">Utilisée automatiquement quand l'adresse locale ne répond pas (hors de chez toi, VPN absent…).</small>
 					</div>
 					<div id="group-bambuddy" style="display:none;">
 						<div style="background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:12px;">

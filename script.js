@@ -7288,6 +7288,27 @@ default: return 0;
 
 let thumbProgressInterval = null;
 let thumbProgressCompleted = false;
+let _thumbPaused = false;
+function _applyThumbPausedUI(paused) {
+    _thumbPaused = paused;
+    const btn = document.getElementById('thumb-pause-btn');
+    const container = document.getElementById('thumb-progress-container');
+    if (container) container.classList.toggle('paused', paused);
+    if (!btn) return;
+    btn.innerHTML = `<i class="fa-solid ${paused ? 'fa-play' : 'fa-pause'}"></i>`;
+    btn.title = paused ? _t3('thumbs.resume', 'Reprendre la génération des miniatures') : _t3('thumbs.pause', 'Mettre en pause la génération des miniatures');
+}
+async function toggleThumbPause(ev) {
+    if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+    try {
+        const res = await fetch(`${API}/api/thumb/pause`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paused: !_thumbPaused }) });
+        if (res.ok) {
+            const d = await res.json();
+            _applyThumbPausedUI(!!d.paused);
+            if (!thumbProgressInterval && typeof startThumbProgressMonitor === 'function') startThumbProgressMonitor();
+        }
+    } catch (_) {}
+}
 function startThumbProgressMonitor() {
 if (thumbProgressInterval) clearInterval(thumbProgressInterval);
 const container = document.getElementById('thumb-progress-container');
@@ -7304,8 +7325,9 @@ thumbProgressInterval = setInterval(async () => {
         if (!res.ok) return;
 
         const data = await res.json();
+        _applyThumbPausedUI(!!data.paused);
 
-        if (data.progress === lastProgress && data.pending === lastPending) {
+        if (data.progress === lastProgress && data.pending === lastPending && !data.paused) {
             if (data.files_without_thumb === 0 && data.pending === 0) {
                 if (!container.classList.contains('completed')) {
                     container.classList.add('completed');
@@ -7329,7 +7351,7 @@ thumbProgressInterval = setInterval(async () => {
 
             requestAnimationFrame(() => {
                 progressBar.style.width = `${data.progress}%`;
-                progressText.textContent = `${_t3('thumbs.progress', 'Miniatures')} : ${data.files_with_thumb}/${data.total}` + (data.pending ? ` · ${_t3('thumbs.pending', 'en attente')} : ${data.pending}` : '');
+                progressText.textContent = `${_t3('thumbs.progress', 'Miniatures')} : ${data.files_with_thumb}/${data.total}` + (data.pending ? ` · ${_t3('thumbs.pending', 'en attente')} : ${data.pending}` : '') + (data.paused ? ` · ${_t3('thumbs.paused', 'en pause')}` : '');
                 container.title = `${_t3('thumbs.workers', 'Rendus simultanés')} : ${data.workers || 1}`;
             });
 
@@ -17964,6 +17986,8 @@ window.addPrinter = async function() {
 
     const config = {};
     if (type === 'klipper' && port) config.port = port;
+    const _extUrl = (document.getElementById('printer-external-url')?.value || '').trim();
+    if (['klipper', 'octoprint', 'prusalink'].includes(type) && _extUrl) config.external_url = _extUrl;
     if (type === 'bambu') {
         config.code = bambuCode;
         config.serial = bambuSerial;
@@ -18067,6 +18091,7 @@ window.editPrinter = function(pid) {
         apiKeyField.value = '';
         apiKeyField.placeholder = I18N.t('printers.keep_current_key') || 'Laisser vide pour conserver la clé actuelle';
     }
+    const _extField = document.getElementById('printer-external-url'); if (_extField) _extField.value = cfg.external_url || '';
     const portField = document.getElementById('printer-port');
     if (portField) portField.value = cfg.port || PRINTER_DEFAULT_PORTS?.[p.type] || '7125';
     const bambuCodeField = document.getElementById('printer-bambu-code');
@@ -18821,7 +18846,7 @@ function renderPrinters() {
         return;
     }
     grid.innerHTML = printersList.map(p => `
-        <div class="printer-card" data-id="${p.id}" style="cursor:pointer" onclick="openPrinterMonitor(${p.id})">
+        <div class="printer-card${p.is_connected ? '' : ' is-offline'}" data-id="${p.id}" onclick="if (!this.classList.contains('is-offline')) openPrinterMonitor(${p.id})">
             <div class="printer-header">
                 <i class="mdi ${getPrinterIcon(p.type)}" style="font-size:22px;"></i>
                 <span class="printer-name">${escapeHtml(p.name)}</span>
@@ -18842,15 +18867,15 @@ function renderPrinters() {
                     <span title="${I18N.t('printers.bed')}">🛏️ <span id="card-bed-${p.id}">--°C</span></span>
                 </div>
                 <div id="card-spools-${p.id}" class="printer-card-spools"></div>
-                <div class="printer-card-camera" data-pid="${p.id}" style="margin-top:8px; border-radius:8px; overflow:hidden; background:#000; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-video" style="color:var(--text-muted); font-size:16px;"></i></div>
+                <div class="printer-card-camera${p.is_connected ? '' : ' is-offline'}" data-pid="${p.id}" data-ptype="${escapeHtml(p.type || '')}" ${p.is_connected ? '' : 'data-offline="1"'} style="margin-top:8px; border-radius:8px; overflow:hidden; background:#000; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center;">${p.is_connected ? '<i class="fa-solid fa-video" style="color:var(--text-muted); font-size:16px;"></i>' : _printerOfflineLogoHtml(p.type)}</div>
             </div>
             <div class="printer-actions" onclick="event.stopPropagation()">
-                <button class="btn btn-ghost btn-sm" onclick="openPrinterMonitor(${p.id})" title="${I18N.t('printers.monitoring')}"><i class="fa-solid fa-chart-line"></i></button>
+                <button class="btn btn-ghost btn-sm printer-action-live" onclick="openPrinterMonitor(${p.id})" title="${I18N.t('printers.monitoring')}"><i class="fa-solid fa-chart-line"></i></button>
                 <button class="btn btn-ghost btn-sm" style="position:relative;" onclick="openMaintenanceModal(${p.id}, '${escapeHtml(p.name).replace(/'/g, "\\'")}', '${(p.brand || '').replace(/'/g, "\\'")}')" title="${_t3('printers.maintenance', 'Maintenance')}">
                     <i class="fa-solid fa-wrench"></i>
                     <span id="maintenance-badge-${p.id}" style="display:none; position:absolute; top:2px; right:2px; width:7px; height:7px; border-radius:50%; background:var(--danger);"></span>
                 </button>
-                <button class="btn btn-ghost btn-sm" onclick="refreshPrinterStatus(${p.id})" title="${I18N.t('actions.refresh')}"><i class="fa-solid fa-rotate"></i></button>
+                <button class="btn btn-ghost btn-sm printer-action-live" onclick="refreshPrinterStatus(${p.id})" title="${I18N.t('actions.refresh')}"><i class="fa-solid fa-rotate"></i></button>
                 <button class="btn btn-ghost btn-sm" onclick="editPrinter(${p.id})" title="${I18N.t('actions.edit') || 'Modifier'}"><i class="fa-solid fa-pen"></i></button>
                 <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deletePrinter(${p.id})" title="${I18N.t('actions.delete')}"><i class="fa-solid fa-trash"></i></button>
             </div>
@@ -18883,7 +18908,7 @@ function _setupPrinterCardCameras() {
 }
 
 async function _startPrinterCardCamera(el, pid) {
-    if (!el || el.dataset.active === 'true') return;
+    if (!el || el.dataset.active === 'true' || el.dataset.offline === '1') return;
     el.dataset.active = 'true';
     try {
         const res = await fetch(`${API}/api/printers/${pid}/camera`);
@@ -18902,9 +18927,40 @@ async function _startPrinterCardCamera(el, pid) {
 function _stopPrinterCardCamera(el) {
     if (!el) return;
     el.dataset.active = 'false';
+    if (el.dataset.offline === '1') return;   // hors ligne : on garde le logo de l'imprimante
     const img = el.querySelector('img');
     if (img) img.src = '';
     el.innerHTML = `<i class="fa-solid fa-video" style="color:var(--text-muted); font-size:16px;"></i>`;
+}
+
+// Imprimante hors ligne : logo à la place de la caméra (un carré noir n'apprend rien), boutons « live » masqués, pas d'agrandissement
+const PRINTER_TYPE_LABELS = { klipper: 'Klipper', octoprint: 'OctoPrint', prusalink: 'PrusaLink', bambu: 'Bambu Lab', bambuddy: 'Bambuddy',
+    elegoo_sdcp: 'Elegoo', elegoo_cc2: 'Elegoo', creality: 'Creality', flashforge: 'FlashForge' };
+function _printerOfflineLogoHtml(type) {
+    const label = PRINTER_TYPE_LABELS[type] || '';
+    const generic = `<svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true"><g fill="none" stroke="#6b7280" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="8" width="44" height="6" rx="2"/><path d="M16 14v36M48 14v36"/><rect x="24" y="22" width="16" height="9" rx="2" fill="#6b7280"/><path d="M32 31v6"/><rect x="12" y="50" width="40" height="6" rx="2"/></g></svg>`;
+    const img = generic;
+    return `<div class="printer-offline-logo">${img}${label ? `<span>${escapeHtml(label)}</span>` : ''}</div>`;
+}
+function _setPrinterCardOffline(pid, offline) {
+    const card = document.querySelector(`.printer-card[data-id="${pid}"]`);
+    if (!card) return;
+    const cam = card.querySelector('.printer-card-camera');
+    const was = card.classList.contains('is-offline');
+    card.classList.toggle('is-offline', offline);
+    if (!cam || was === offline) return;
+    cam.classList.toggle('is-offline', offline);
+    if (offline) {
+        _stopPrinterCardCamera(cam);
+        cam.dataset.active = 'false';
+        cam.dataset.offline = '1';
+        cam.innerHTML = _printerOfflineLogoHtml(cam.dataset.ptype);
+    } else {
+        delete cam.dataset.offline;
+        cam.dataset.active = 'false';
+        cam.innerHTML = `<i class="fa-solid fa-video" style="color:var(--text-muted); font-size:16px;"></i>`;
+        if (_printerCardCameraObserver) { _printerCardCameraObserver.unobserve(cam); _printerCardCameraObserver.observe(cam); }
+    }
 }
 
 function stopAllPrinterCardCameras() {
@@ -19144,6 +19200,7 @@ async function refreshAllPrinters() {
                     statusBadge.className = `printer-status ${isOnline ? 'connected' : 'disconnected'}`;
                     statusBadge.textContent = isOnline ? I18N.t('printers.online') : I18N.t('printers.offline');
                     p.is_connected = isOnline;
+                    _setPrinterCardOffline(p.id, !isOnline);
                 }
 
                 if (cardStatus) {
@@ -20210,6 +20267,7 @@ window.togglePrinterFields = function() {
     const type = document.getElementById('printer-type').value;
     document.getElementById('group-api-key').style.display = (type === 'octoprint' || type === 'prusalink' || type === 'bambuddy') ? 'block' : 'none';
     document.getElementById('group-port').style.display = type === 'klipper' ? 'block' : 'none';
+    const _gext = document.getElementById('group-external-url'); if (_gext) _gext.style.display = ['klipper', 'octoprint', 'prusalink'].includes(type) ? 'block' : 'none';
     document.getElementById('group-bambu').style.display = type === 'bambu' ? 'block' : 'none';
     const _gbd = document.getElementById('group-bambuddy'); if (_gbd) _gbd.style.display = type === 'bambuddy' ? 'block' : 'none';
     document.getElementById('group-octoprint-hint').style.display = type === 'octoprint' ? 'block' : 'none';

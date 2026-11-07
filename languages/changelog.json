@@ -1,5 +1,74 @@
 [
   {
+    "version": "0.9.3",
+    "items": {
+      "fr": [
+        "Cartes imprimantes : quand l'imprimante est hors ligne, un logo remplace le carré noir de la caméra, les boutons de suivi en direct (monitoring, actualiser) sont masqués et la carte ne s'ouvre plus au clic ; modification, maintenance et suppression restent disponibles",
+        "Configuration des imprimantes Klipper, OctoPrint et PrusaLink : nouveau champ « Adresse externe » (ex. https://imprimante.mondomaine.fr) ; Stellio utilise l'adresse locale quand elle répond et bascule automatiquement sur l'adresse externe sinon (statut, historique, caméra)",
+        "Imprimantes Klipper : le temps restant et le total estimé en début d'impression sont maintenant réalistes (ex. 15 h pour une impression de 4 h 20) : Stellio part de l'estimation du slicer, puis se cale peu à peu sur la progression réelle",
+        "Windows et toutes les versions : la génération des miniatures s'adapte dynamiquement à la machine sans bloquer le reste : moins de rendus en parallèle quand la mémoire se resserre, pause quand il reste moins de 10 % de RAM libre (1 Go minimum), plafond de mémoire propre à Stellio (25 % de la RAM, 1,5 à 6 Go) et libération de la mémoire inutilisée après chaque rendu",
+        "Miniatures : nouveau bouton pause / reprise à côté de la barre de progression pour arrêter ou relancer la génération à tout moment (les rendus déjà commencés vont jusqu'au bout ; ouvrir un fichier génère toujours sa miniature)",
+        "Suppression du bouton « Quitter l'application » de l'en-tête : on ferme Stellio avec la croix de la fenêtre"
+      ],
+      "en": [
+        "Printer cards: when a printer is offline, a logo replaces the black camera square, the live buttons (monitoring, refresh) are hidden and the card no longer opens on click; edit, maintenance and delete remain available",
+        "Klipper, OctoPrint and PrusaLink printer settings: new \"External address\" field (e.g. https://printer.mydomain.com); Stellio uses the local address when it responds and switches automatically to the external one otherwise (status, history, camera)",
+        "Klipper printers: remaining and total estimated time early in a print are now realistic (e.g. 15 h shown for a 4 h 20 print): Stellio starts from the slicer's estimate, then gradually follows the actual progress",
+        "Windows and all editions: thumbnail generation now adapts dynamically to the machine without blocking everything else: fewer parallel renders when memory gets tight, a pause when less than 10% of RAM is free (1 GB minimum), a memory ceiling of its own for Stellio (25% of RAM, 1.5 to 6 GB) and unused memory released after each render",
+        "Thumbnails: new pause / resume button next to the progress bar to stop or restart generation at any time (renders already started finish; opening a file still generates its thumbnail)",
+        "Removed the \"Quit application\" button from the header: close Stellio with the window's close button"
+      ],
+      "de": [
+        "Druckerkarten: Ist ein Drucker offline, ersetzt ein Logo das schwarze Kamerafeld, die Live-Schaltflächen (Überwachung, Aktualisieren) werden ausgeblendet und die Karte öffnet sich nicht mehr per Klick; Bearbeiten, Wartung und Löschen bleiben verfügbar",
+        "Einstellungen für Klipper-, OctoPrint- und PrusaLink-Drucker: neues Feld „Externe Adresse“ (z. B. https://drucker.meinedomain.de); Stellio nutzt die lokale Adresse, wenn sie antwortet, und wechselt sonst automatisch zur externen (Status, Verlauf, Kamera)",
+        "Klipper-Drucker: Restzeit und geschätzte Gesamtzeit zu Beginn eines Drucks sind jetzt realistisch (z. B. 15 h statt 4 h 20): Stellio geht von der Slicer-Schätzung aus und passt sich dann schrittweise dem tatsächlichen Fortschritt an",
+        "Windows und alle Editionen: Die Vorschaubild-Erzeugung passt sich dynamisch an den Rechner an, ohne den Rest zu blockieren: weniger parallele Renderings bei knappem Speicher, Pause bei weniger als 10 % freiem RAM (mindestens 1 GB), ein eigenes Speicherlimit für Stellio (25 % des RAM, 1,5 bis 6 GB) und Freigabe ungenutzten Speichers nach jedem Rendering",
+        "Vorschaubilder: neue Pause-/Fortsetzen-Schaltfläche neben dem Fortschrittsbalken, um die Erzeugung jederzeit zu stoppen oder fortzusetzen (bereits begonnene Renderings werden beendet; beim Öffnen einer Datei wird deren Vorschaubild weiterhin erzeugt)",
+        "Die Schaltfläche „Anwendung beenden“ wurde aus der Kopfzeile entfernt: Stellio wird über das Schließen-Kreuz des Fensters beendet"
+      ],
+      "es": [
+        "Tarjetas de impresora: cuando una impresora está sin conexión, un logotipo sustituye el cuadrado negro de la cámara, se ocultan los botones en directo (monitorización, actualizar) y la tarjeta ya no se abre al hacer clic; editar, mantenimiento y eliminar siguen disponibles",
+        "Configuración de impresoras Klipper, OctoPrint y PrusaLink: nuevo campo «Dirección externa» (p. ej. https://impresora.midominio.com); Stellio usa la dirección local cuando responde y cambia automáticamente a la externa si no (estado, historial, cámara)",
+        "Impresoras Klipper: el tiempo restante y el total estimado al inicio de una impresión ahora son realistas (p. ej. 15 h para una impresión de 4 h 20): Stellio parte de la estimación del slicer y se ajusta poco a poco al progreso real",
+        "Windows y todas las ediciones: la generación de miniaturas se adapta dinámicamente al equipo sin bloquear el resto: menos renders en paralelo cuando la memoria escasea, pausa cuando queda menos del 10 % de RAM libre (1 GB como mínimo), un límite de memoria propio para Stellio (25 % de la RAM, de 1,5 a 6 GB) y liberación de la memoria no usada tras cada render",
+        "Miniaturas: nuevo botón de pausa / reanudar junto a la barra de progreso para detener o reanudar la generación en cualquier momento (los renders ya iniciados terminan; al abrir un archivo se sigue generando su miniatura)",
+        "Se ha eliminado el botón «Salir de la aplicación» del encabezado: Stellio se cierra con la cruz de la ventana"
+      ],
+      "pt": [
+        "Cartões de impressora: quando uma impressora está offline, um logótipo substitui o quadrado preto da câmara, os botões em direto (monitorização, atualizar) ficam ocultos e o cartão já não abre ao clicar; editar, manutenção e eliminar continuam disponíveis",
+        "Definições de impressoras Klipper, OctoPrint e PrusaLink: novo campo «Endereço externo» (ex.: https://impressora.meudominio.com); o Stellio usa o endereço local quando responde e passa automaticamente para o externo caso contrário (estado, histórico, câmara)",
+        "Impressoras Klipper: o tempo restante e o total estimado no início de uma impressão são agora realistas (ex.: 15 h para uma impressão de 4 h 20): o Stellio parte da estimativa do slicer e ajusta-se gradualmente ao progresso real",
+        "Windows e todas as edições: a geração de miniaturas adapta-se dinamicamente à máquina sem bloquear o resto: menos renderizações em paralelo quando a memória aperta, pausa quando resta menos de 10 % de RAM livre (mínimo de 1 GB), um limite de memória próprio para o Stellio (25 % da RAM, de 1,5 a 6 GB) e libertação da memória não utilizada após cada renderização",
+        "Miniaturas: novo botão de pausa / retomar junto à barra de progresso para parar ou retomar a geração a qualquer momento (as renderizações já iniciadas terminam; ao abrir um ficheiro a sua miniatura continua a ser gerada)",
+        "Removido o botão «Sair da aplicação» do cabeçalho: o Stellio fecha-se com o X da janela"
+      ],
+      "it": [
+        "Schede stampante: quando una stampante è offline, un logo sostituisce il quadrato nero della fotocamera, i pulsanti live (monitoraggio, aggiorna) sono nascosti e la scheda non si apre più al clic; modifica, manutenzione ed eliminazione restano disponibili",
+        "Impostazioni delle stampanti Klipper, OctoPrint e PrusaLink: nuovo campo «Indirizzo esterno» (es. https://stampante.miodominio.com); Stellio usa l'indirizzo locale quando risponde e passa automaticamente a quello esterno altrimenti (stato, cronologia, fotocamera)",
+        "Stampanti Klipper: il tempo rimanente e il totale stimato all'inizio di una stampa sono ora realistici (es. 15 h per una stampa di 4 h 20): Stellio parte dalla stima dello slicer e si adatta gradualmente all'avanzamento reale",
+        "Windows e tutte le edizioni: la generazione delle miniature si adatta dinamicamente al computer senza bloccare il resto: meno rendering in parallelo quando la memoria scarseggia, pausa quando resta meno del 10 % di RAM libera (minimo 1 GB), un limite di memoria proprio per Stellio (25 % della RAM, da 1,5 a 6 GB) e rilascio della memoria inutilizzata dopo ogni rendering",
+        "Miniature: nuovo pulsante pausa / riprendi accanto alla barra di avanzamento per fermare o riavviare la generazione in qualsiasi momento (i rendering già avviati terminano; aprendo un file la sua miniatura viene comunque generata)",
+        "Rimosso il pulsante «Esci dall'applicazione» dall'intestazione: Stellio si chiude con la X della finestra"
+      ],
+      "zh": [
+        "打印机卡片：打印机离线时，用徽标替代摄像头的黑色方块，隐藏实时按钮（监控、刷新），点击卡片不再展开；编辑、维护和删除仍可使用",
+        "Klipper、OctoPrint 和 PrusaLink 打印机设置：新增“外部地址”字段（例如 https://printer.example.com）；本地地址可访问时使用本地地址，否则自动切换到外部地址（状态、历史、摄像头）",
+        "Klipper 打印机：打印初期的剩余时间和预计总时间现在更合理（例如 4 小时 20 分钟的任务不再显示 15 小时）：Stellio 先采用切片软件的估算，再随实际进度逐步调整",
+        "Windows 及所有版本：缩略图生成现在会根据机器情况动态调整，且不影响其他功能：内存紧张时减少并行渲染，可用内存低于 10%（至少 1 GB）时暂停，Stellio 自身设有内存上限（内存的 25%，1.5 至 6 GB），并在每次渲染后释放未使用的内存",
+        "缩略图：进度条旁新增暂停/继续按钮，可随时停止或恢复生成（已开始的渲染会完成；打开文件时仍会生成其缩略图）",
+        "已移除标题栏中的“退出应用”按钮：请使用窗口的关闭按钮退出 Stellio"
+      ],
+      "ja": [
+        "プリンターカード：プリンターがオフラインのとき、カメラの黒い四角の代わりにロゴを表示し、ライブ系ボタン（モニタリング、更新）を非表示にして、クリックでカードが開かないようにしました。編集・メンテナンス・削除は引き続き使えます",
+        "Klipper、OctoPrint、PrusaLink のプリンター設定：新しい「外部アドレス」欄（例：https://printer.example.com）を追加。ローカルアドレスが応答する間はそれを使い、応答しない場合は自動的に外部アドレスへ切り替えます（状態、履歴、カメラ）",
+        "Klipper プリンター：印刷開始直後の残り時間と推定合計時間が現実的になりました（例：4時間20分の印刷で15時間と表示されていた問題）。スライサーの見積もりから始めて、実際の進捗に合わせて徐々に調整します",
+        "Windows を含む全エディション：サムネイル生成がマシンの状態に合わせて動的に調整され、他の動作を妨げないようになりました。メモリが逼迫すると並列レンダリングを減らし、空きRAMが10％未満（最低1GB）で一時停止、Stellio 自身のメモリ上限（RAMの25％、1.5〜6GB）を設け、各レンダリング後に未使用メモリを解放します",
+        "サムネイル：進捗バーの横に一時停止／再開ボタンを追加し、生成をいつでも止めたり再開したりできます（開始済みのレンダリングは完了します。ファイルを開いたときはそのサムネイルが引き続き生成されます）",
+        "ヘッダーの「アプリを終了」ボタンを削除しました。Stellio はウィンドウの閉じるボタンで終了します"
+      ]
+    }
+  },
+  {
     "version": "0.9.2",
     "items": {
       "fr": [
