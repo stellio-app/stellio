@@ -1,5 +1,50 @@
 [
   {
+    "version": "0.9.2",
+    "items": {
+      "fr": [
+        "Imprimantes Klipper / Moonraker : la progression affichée est maintenant la même que celle de Mainsail (position dans le fichier G-code) au lieu de la progression basée sur le temps (M73) ; l'écart pouvait atteindre plusieurs points (ex. 27 % dans Stellio contre 19 % dans Mainsail)",
+        "Version serveur / LXC : un gros scan (ex. une source SMB de ~2 000 fichiers) ne peut plus saturer la machine : les cœurs réellement alloués au conteneur sont détectés (et non ceux de l'hôte Proxmox), les rendus de miniatures sont limités en conséquence et mis à 1 si la mémoire libre est presque épuisée, et Stellio tourne en priorité basse (CPU et disque)",
+        "Version Proxmox (LXC) : le script d'installation plafonne désormais le service Stellio à 75 % de la RAM (ralentissement progressif, arrêt net à 85 %) et à 75 % du CPU du conteneur ; les miniatures se mettent aussi en pause quand la mémoire du conteneur est presque épuisée au lieu d'être tuées en boucle par le noyau (OOM)"
+      ],
+      "en": [
+        "Klipper / Moonraker printers: the progress shown now matches Mainsail (position in the G-code file) instead of the time-based progress (M73); the gap could reach several points (e.g. 27% in Stellio vs 19% in Mainsail)",
+        "Server / LXC edition: a big scan (e.g. an SMB source of ~2,000 files) can no longer overload the machine: the cores actually allocated to the container are detected (not the Proxmox host's), thumbnail rendering is limited accordingly and drops to 1 when free memory is nearly exhausted, and Stellio runs at low CPU and disk priority",
+        "Proxmox (LXC) edition: the install script now caps the Stellio service at 75% of the container's RAM (gradual throttling, hard stop at 85%) and 75% of its CPU; thumbnails also pause when the container's memory is nearly exhausted instead of being killed repeatedly by the kernel (OOM)"
+      ],
+      "de": [
+        "Klipper-/Moonraker-Drucker: Der angezeigte Fortschritt entspricht jetzt Mainsail (Position in der G-Code-Datei) statt dem zeitbasierten Fortschritt (M73); die Abweichung konnte mehrere Punkte betragen (z. B. 27 % in Stellio vs. 19 % in Mainsail)",
+        "Server-/LXC-Edition: Ein großer Scan (z. B. eine SMB-Quelle mit ~2.000 Dateien) kann die Maschine nicht mehr überlasten: Es werden die dem Container tatsächlich zugewiesenen Kerne erkannt (nicht die des Proxmox-Hosts), das Rendern von Vorschaubildern wird entsprechend begrenzt und bei fast erschöpftem Arbeitsspeicher auf 1 reduziert, und Stellio läuft mit niedriger CPU- und Festplattenpriorität",
+        "Proxmox-Edition (LXC): Das Installationsskript begrenzt den Stellio-Dienst jetzt auf 75 % des Arbeitsspeichers (schrittweise Drosselung, harter Stopp bei 85 %) und 75 % der CPU des Containers; Vorschaubilder pausieren außerdem, wenn der Container-Speicher fast erschöpft ist, statt wiederholt vom Kernel beendet zu werden (OOM)"
+      ],
+      "es": [
+        "Impresoras Klipper / Moonraker: el progreso mostrado ahora coincide con Mainsail (posición en el archivo G-code) en lugar del progreso basado en el tiempo (M73); la diferencia podía ser de varios puntos (p. ej. 27 % en Stellio frente a 19 % en Mainsail)",
+        "Edición servidor / LXC: un escaneo grande (p. ej. una fuente SMB de ~2000 archivos) ya no puede saturar la máquina: se detectan los núcleos realmente asignados al contenedor (no los del host Proxmox), el renderizado de miniaturas se limita en consecuencia y baja a 1 si la memoria libre casi se agota, y Stellio se ejecuta con prioridad baja de CPU y disco",
+        "Edición Proxmox (LXC): el script de instalación limita ahora el servicio Stellio al 75 % de la RAM (ralentización progresiva, parada a 85 %) y al 75 % de la CPU del contenedor; las miniaturas también se pausan cuando la memoria del contenedor está casi agotada, en lugar de ser eliminadas repetidamente por el kernel (OOM)"
+      ],
+      "pt": [
+        "Impressoras Klipper / Moonraker: o progresso mostrado passa a coincidir com o Mainsail (posição no ficheiro G-code) em vez do progresso baseado no tempo (M73); a diferença podia chegar a vários pontos (ex.: 27 % no Stellio contra 19 % no Mainsail)",
+        "Edição servidor / LXC: uma análise grande (ex.: uma fonte SMB com ~2000 ficheiros) já não consegue sobrecarregar a máquina: são detetados os núcleos realmente atribuídos ao contentor (não os do anfitrião Proxmox), a geração de miniaturas é limitada em conformidade e desce para 1 quando a memória livre está quase esgotada, e o Stellio corre com prioridade baixa de CPU e disco",
+        "Edição Proxmox (LXC): o script de instalação limita agora o serviço Stellio a 75 % da RAM (abrandamento progressivo, paragem a 85 %) e a 75 % do CPU do contentor; as miniaturas também fazem pausa quando a memória do contentor está quase esgotada, em vez de serem terminadas repetidamente pelo kernel (OOM)"
+      ],
+      "it": [
+        "Stampanti Klipper / Moonraker: l'avanzamento mostrato ora coincide con Mainsail (posizione nel file G-code) invece di quello basato sul tempo (M73); la differenza poteva arrivare a diversi punti (es. 27 % in Stellio contro 19 % in Mainsail)",
+        "Edizione server / LXC: una scansione grande (es. una sorgente SMB di ~2000 file) non può più saturare la macchina: vengono rilevati i core realmente assegnati al container (non quelli dell'host Proxmox), il rendering delle miniature è limitato di conseguenza e scende a 1 se la memoria libera è quasi esaurita, e Stellio gira con priorità bassa di CPU e disco",
+        "Edizione Proxmox (LXC): lo script di installazione limita ora il servizio Stellio al 75 % della RAM (rallentamento progressivo, arresto all'85 %) e al 75 % della CPU del container; le miniature si mettono anche in pausa quando la memoria del container è quasi esaurita, invece di essere terminate ripetutamente dal kernel (OOM)"
+      ],
+      "zh": [
+        "Klipper / Moonraker 打印机：显示的进度现在与 Mainsail 一致（基于 G-code 文件中的位置），而不是基于时间的进度（M73）；两者差距可达数个百分点（例如 Stellio 显示 27%，Mainsail 显示 19%）",
+        "服务器 / LXC 版：大规模扫描（例如约 2000 个文件的 SMB 来源）不再会拖垮机器：现在会检测容器实际分配的 CPU 核心（而非 Proxmox 主机的核心），缩略图渲染相应受限，可用内存几乎耗尽时降为 1 个，并且 Stellio 以较低的 CPU 和磁盘优先级运行",
+        "Proxmox（LXC）版：安装脚本现在将 Stellio 服务限制在容器内存的 75%（逐步限速，达 85% 时强制停止）和 CPU 的 75%；容器内存几乎耗尽时，缩略图生成也会暂停，而不是被内核（OOM）反复终止"
+      ],
+      "ja": [
+        "Klipper / Moonraker プリンター：表示される進捗を、時間ベース（M73）ではなく Mainsail と同じ G-code ファイル内の位置ベースに変更しました。差が数ポイントになることがありました（例：Stellio 27％、Mainsail 19％）",
+        "サーバー / LXC 版：大規模なスキャン（例：約2,000ファイルのSMBソース）でマシンが過負荷にならないようにしました。コンテナに実際に割り当てられたコア数（Proxmoxホストのコア数ではなく）を検出してサムネイル生成を制限し、空きメモリが少ない場合は1つに絞り、Stellio をCPU・ディスクとも低優先度で実行します",
+        "Proxmox（LXC）版：インストールスクリプトが Stellio サービスをコンテナのRAMの75％（段階的に抑制、85％で強制停止）とCPUの75％に制限するようになりました。コンテナのメモリが残りわずかになると、カーネル（OOM）に何度も強制終了される代わりにサムネイル生成を一時停止します"
+      ]
+    }
+  },
+  {
     "version": "0.9.1",
     "items": {
       "fr": [

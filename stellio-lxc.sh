@@ -1182,6 +1182,8 @@ ask() {  # ask "question" "défaut"
 
 # Liste les stockages Proxmox qui acceptent un type de contenu (rootdir, vztmpl)
 list_storages() { pvesm status -content "$1" 2>/dev/null | awk 'NR>1 && $3=="active" {print $1}'; }
+storage_free_gb() { pvesm status 2>/dev/null | awk -v s="$1" '$1==s {printf "%.1f", $6/1048576}'; }
+storage_type()    { pvesm status 2>/dev/null | awk -v s="$1" '$1==s {print $2}'; }
 
 pick_storage() {  # pick_storage <content> <titre> <préféré>
     local content="$1" title="$2" preferred="$3"
@@ -1276,8 +1278,6 @@ kv() {  # kv <icône> <libellé> <valeur>
     printf ' %s  %s%s%s %s%s%s%s\n' "$1" "$CYAN" "$2" "$RESET" "$UL" "$GREEN" "$3" "$RESET"
 }
 
-storage_free_gb() { pvesm status 2>/dev/null | awk -v s="$1" '$1==s {printf "%.1f", $6/1048576}'; }
-storage_type()    { pvesm status 2>/dev/null | awk -v s="$1" '$1==s {print $2}'; }
 
 # step "Message" commande args...   -> exécute en arrière-plan avec un indicateur animé ; la sortie va dans $LOG
 step() {
@@ -1446,7 +1446,21 @@ stage_service() {
     cat > /etc/systemd/system/stellio.service.d/sources.conf <<CONF
 [Service]
 Environment="STELLIO_ALLOWED_SOURCE_TYPES=${SOURCE_TYPES}"
+Nice=10
+CPUWeight=50
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
 CONF
+    # Plafonds de ressources : Stellio ne peut pas dépasser ~75 % de la RAM et du CPU du conteneur
+    # (MemoryHigh = ralentissement progressif, MemoryMax = limite dure avant que le noyau ne tue tout le conteneur)
+    mem_mb=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
+    cpus=$(nproc 2>/dev/null || echo 1)
+    cat > /etc/systemd/system/stellio.service.d/limits.conf <<LIM
+[Service]
+MemoryHigh=$((mem_mb * 75 / 100))M
+MemoryMax=$((mem_mb * 85 / 100))M
+CPUQuota=$((cpus * 75))%
+LIM
     systemctl daemon-reload
     systemctl restart stellio
     cat > /usr/local/bin/update-stellio <<'UPD'

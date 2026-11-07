@@ -978,7 +978,25 @@ def _release_persistent_renderer():
                 pass
             _persistent_renderer = None
             _persistent_renderer_size = None
-NUM_THUMB_WORKERS = max(2, min(6, (os.cpu_count() or 4) - 1))
+def _effective_cpu_count():
+    """Cœurs réellement utilisables : dans un conteneur (LXC, Docker), os.cpu_count() renvoie ceux de l'hôte,
+    alors que le conteneur n'en a parfois que 1 ou 2 (quota cgroup / affinité)."""
+    n = os.cpu_count() or 4
+    try:
+        n = min(n, len(os.sched_getaffinity(0)))
+    except Exception:
+        pass
+    try:
+        with open('/sys/fs/cgroup/cpu.max') as fh:
+            quota, period = fh.read().split()[:2]
+        if quota != 'max':
+            n = min(n, max(1, int(round(int(quota) / int(period)))))
+    except Exception:
+        pass
+    return max(1, n)
+
+
+NUM_THUMB_WORKERS = max(2, min(6, _effective_cpu_count() - 1))
 
 # Lectures SMB pour les miniatures : au plus 2 copies simultanées (le NAS ne doit pas être saturé par la génération),
 # et un « disjoncteur » par serveur : un hôte qui ne répond pas est laissé tranquille quelques instants.
@@ -1013,7 +1031,7 @@ _thumb_perf_cache = {'t': 0.0, 'n': NUM_THUMB_WORKERS, 'mode': 'auto'}
 
 
 def _machine_is_modest():
-    cores = os.cpu_count() or 4
+    cores = _effective_cpu_count()
     try:
         import psutil
         if psutil.virtual_memory().total < 8 * 1024 ** 3:
@@ -1021,6 +1039,29 @@ def _machine_is_modest():
     except Exception:
         pass
     return cores <= 4
+
+
+def _low_memory(threshold_mb=300):
+    """Vrai si la mémoire disponible (celle du conteneur, via cgroup, sinon celle du système) est presque épuisée."""
+    try:
+        with open('/sys/fs/cgroup/memory.max') as fh:
+            mx = fh.read().strip()
+        if mx != 'max':
+            anon = 0
+            with open('/sys/fs/cgroup/memory.stat') as fh:   # « anon » : le cache disque est récupérable, il ne compte pas
+                for line in fh:
+                    if line.startswith('anon '):
+                        anon = int(line.split()[1])
+                        break
+            if anon and int(mx) - anon < threshold_mb * 1024 ** 2:
+                return True
+    except Exception:
+        pass
+    try:
+        import psutil
+        return psutil.virtual_memory().available < threshold_mb * 1024 ** 2
+    except Exception:
+        return False
 
 
 def _thumb_allowed_workers():
@@ -1033,7 +1074,7 @@ def _thumb_allowed_workers():
         mode = 'auto'
     if mode not in THUMB_PERF_MODES:
         mode = 'auto'
-    moderate = min(NUM_THUMB_WORKERS, max(2, (os.cpu_count() or 4) // 4))
+    moderate = min(NUM_THUMB_WORKERS, max(2, _effective_cpu_count() // 4))
     if mode == 'eco':
         n = 1
     elif mode == 'normal':
@@ -1045,6 +1086,12 @@ def _thumb_allowed_workers():
             n = 1
         else:
             n = moderate if thumb_generation_queue.qsize() > 50 else NUM_THUMB_WORKERS
+    try:
+        import psutil
+        if psutil.virtual_memory().available < 400 * 1024 ** 2:
+            n = 1   # mémoire presque épuisée : un seul rendu à la fois pour ne pas faire tomber la machine
+    except Exception:
+        pass
     _thumb_perf_cache.update({'t': now, 'n': max(1, n), 'mode': mode})
     return _thumb_perf_cache['n']
 THUMB_GENERATION_TIMEOUT = 90
@@ -1373,6 +1420,11 @@ def _detect_server_edition():
 
 
 IS_SERVER_EDITION = _detect_server_edition()
+if IS_SERVER_EDITION and hasattr(os, 'nice'):
+    try:
+        os.nice(10)   # priorité basse : un gros scan ne doit jamais rendre la machine (ou l'hôte Proxmox) injoignable
+    except Exception:
+        pass
 
 DATA_DIR = get_data_path()
 
@@ -3808,6 +3860,30 @@ ELEGOO_CC2_STATUS_MAP = {
 }
 
 
+_klipper_bounds_cache = {}
+
+
+def _klipper_gcode_bounds(base, filename):
+    """(gcode_start_byte, gcode_end_byte) du fichier en cours, lus via Moonraker (mis en cache par fichier)."""
+    key = (base, filename)
+    if key in _klipper_bounds_cache:
+        return _klipper_bounds_cache[key]
+    val = None
+    try:
+        r = requests.get(f"{base}/server/files/metadata", params={'filename': filename}, timeout=3)
+        if r.ok:
+            m = (r.json() or {}).get('result', {}) or {}
+            a, b = m.get('gcode_start_byte'), m.get('gcode_end_byte')
+            if isinstance(a, (int, float)) and isinstance(b, (int, float)) and b > a:
+                val = (a, b)
+    except Exception:
+        return None  # pas de cache en cas d'erreur réseau : on réessaiera
+    if len(_klipper_bounds_cache) > 50:
+        _klipper_bounds_cache.clear()
+    _klipper_bounds_cache[key] = val
+    return val
+
+
 def _build_elegoo_cc2_result(raw_state, default_result):
     machine_status = raw_state.get('machine_status', {})
     sub_status = machine_status.get('sub_status', 0)
@@ -4185,7 +4261,26 @@ class PrinterManager:
                     filename = stats.get('filename', '')
                     if not filename and v_sdcard:
                         filename = v_sdcard.get('file', '').split('/')[-1]
-                    progress = (display.get('progress', 0) or 0) * 100
+                    # Même calcul que Mainsail : progression par position dans le fichier G-code (hors en-tête/fin),
+                    # à défaut virtual_sdcard.progress, et en dernier recours display_status (M73, basé sur le temps)
+                    progress = None
+                    try:
+                        fpos = v_sdcard.get('file_position')
+                        meta = _klipper_gcode_bounds(base, filename) if (fpos is not None and filename) else None
+                        if meta:
+                            g_start, g_end = meta
+                            if fpos <= g_start:
+                                progress = 0.0
+                            elif fpos >= g_end:
+                                progress = 100.0
+                            else:
+                                progress = (fpos - g_start) / (g_end - g_start) * 100
+                    except Exception:
+                        progress = None
+                    if progress is None and v_sdcard.get('progress') is not None and v_sdcard.get('file_path', v_sdcard.get('file')):
+                        progress = (v_sdcard.get('progress') or 0) * 100
+                    if progress is None:
+                        progress = (display.get('progress', 0) or 0) * 100
                     remaining = 0
                     if progress > 0 and progress < 100 and duration > 0:
                         remaining = int((duration / progress) * (100 - progress))
@@ -5245,6 +5340,14 @@ def process_generation_queue():
             # au-delà du nombre de rendus autorisé, le worker attend (sauf demande prioritaire de l'utilisateur)
             if worker_id >= _thumb_allowed_workers() and _thumb_high_pending <= 0:
                 time.sleep(1)
+                continue
+            # même une demande prioritaire est plafonnée à 2 rendus simultanés (un rendu consomme des centaines de Mo)
+            if worker_id >= max(2, _thumb_allowed_workers()):
+                time.sleep(1)
+                continue
+            # mémoire presque épuisée (conteneur à 2 Go, par ex.) : on attend plutôt que de se faire tuer (OOM) en boucle
+            if _low_memory():
+                time.sleep(3)
                 continue
             try:
                 item = thumb_generation_queue.get(timeout=1)
@@ -9673,7 +9776,7 @@ def pregenerate_thumbnails_on_startup(limit=90):
 
     generated = 0
     if to_process:
-        with ThreadPoolExecutor(max_workers=NUM_THUMB_WORKERS) as pool:
+        with ThreadPoolExecutor(max_workers=max(1, min(NUM_THUMB_WORKERS, _thumb_allowed_workers()))) as pool:
             results = list(pool.map(_generate_one, to_process))
         generated = sum(1 for r in results if r)
 
@@ -17907,7 +18010,7 @@ def api_convert_file_batch():
 INTEGRITY_CHECK_BASE_TIMEOUT = 120
 INTEGRITY_CHECK_TIMEOUT_PER_MB = 3.0
 INTEGRITY_CHECK_TIMEOUT_MAX = 900
-INTEGRITY_CHECK_WORKERS = max(1, min(3, (os.cpu_count() or 2) // 2))
+INTEGRITY_CHECK_WORKERS = max(1, min(3, _effective_cpu_count() // 2))
 INTEGRITY_CHECKSUM_MAX_MB = 64
 INTEGRITY_REPORT_FILE = os.path.join(DATA_DIR, "integrity_report.json")
 
@@ -20840,7 +20943,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.9.1"
+CURRENT_VERSION = "0.9.2"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
