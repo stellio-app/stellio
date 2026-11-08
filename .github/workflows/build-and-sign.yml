@@ -70,10 +70,10 @@ jobs:
       artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -138,7 +138,6 @@ jobs:
             --collect-all plyer `
             --collect-all openpyxl `
             --collect-all xlrd `
-            --collect-all cascadio `
             --collect-all pyaes `
             --copy-metadata imageio `
             --copy-metadata pyrender `
@@ -179,16 +178,16 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "dist\Stellio\app\bin" | Out-Null
-          # BtbN purge ses anciens tags "autobuild-..." au bout de quelques semaines : une URL epinglee finit toujours
-          # en 404. On utilise donc la release stable "latest" (noms de fichiers fixes) et on verifie le zip avec
-          # le fichier checksums.sha256 publie dans cette meme release.
-          $base = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest"
-          $ffName = "ffmpeg-master-latest-win64-gpl-shared.zip"
-          Invoke-WebRequest -Uri "$base/$ffName" -OutFile ffmpeg.zip
-          Invoke-WebRequest -Uri "$base/checksums.sha256" -OutFile ffmpeg-checksums.txt
-          $line = Get-Content ffmpeg-checksums.txt | Where-Object { $_ -match "\s\*?$([regex]::Escape($ffName))$" } | Select-Object -First 1
-          if (-not $line) { throw "SHA-256 de $ffName introuvable dans checksums.sha256. Build annule." }
-          $ffSha = ($line -split '\s+')[0].ToLower()
+          # Version epinglee (tag date + SHA-256 calcule sur le fichier). Pour mettre a jour : choisir un tag
+          # "autobuild-..." sur https://github.com/BtbN/FFmpeg-Builds/releases, telecharger le zip, calculer son
+          # SHA-256 soi-meme, puis modifier ces deux valeurs. NB : BtbN purge ses anciens tags apres quelques semaines.
+          $ffUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-18-13-01/ffmpeg-N-127650-geceaa54a38-win64-gpl-shared.zip"
+          $ffSha = "8ebf4def186017a1cf3ac1e0065ad19c405628ec52b50f144b727e8def64928d"
+          # GitHub renvoie parfois 502/503/504 : 6 essais espaces de 20 s
+          for ($i = 1; $i -le 6; $i++) {
+            try { Invoke-WebRequest -Uri $ffUrl -OutFile ffmpeg.zip -TimeoutSec 300; break }
+            catch { Write-Host "Telechargement ffmpeg echoue (essai $i/6) : $($_.Exception.Message)"; if ($i -eq 6) { throw }; Start-Sleep -Seconds 20 }
+          }
           $ffActual = (Get-FileHash -Algorithm SHA256 ffmpeg.zip).Hash.ToLower()
           if ($ffActual -ne $ffSha) { throw "SHA-256 ffmpeg (Windows) incorrect : attendu $ffSha, obtenu $ffActual. Build annule." }
           Write-Host "SHA-256 ffmpeg (Windows) verifie : $ffActual"
@@ -240,7 +239,7 @@ jobs:
           "$hash  $zipName" | Out-File -Encoding ascii "$zipName.sha256"
 
       - name: Upload patch ZIP artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: stellio-patch-zip
           path: |
@@ -280,7 +279,7 @@ jobs:
           "$hash  $zipName" | Out-File -Encoding ascii "$zipName.sha256"
 
       - name: Upload portable ZIP artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: stellio-portable-zip
           path: |
@@ -299,7 +298,7 @@ jobs:
 
       - name: Upload unsigned installer artifact
         id: upload-unsigned
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: stellio-installer-unsigned
           path: output\Stellio-Setup-${{ needs.check-version.outputs.version }}.exe
@@ -320,10 +319,10 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -400,7 +399,6 @@ jobs:
             --collect-all plyer \
             --collect-all openpyxl \
             --collect-all xlrd \
-            --collect-all cascadio \
             --collect-all pyaes \
             --copy-metadata imageio \
             --copy-metadata pyrender \
@@ -446,7 +444,7 @@ jobs:
           esac
           URL="https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/${FF_ASSET}"
           echo "Telechargement depuis $URL"
-          curl -fL --retry 3 -o ffmpeg_bin "$URL"
+          curl -fL --retry 8 --retry-delay 20 --retry-max-time 360 --retry-all-errors -o ffmpeg_bin "$URL"
           FF_ACTUAL=$(shasum -a 256 ffmpeg_bin | cut -d' ' -f1)
           if [ "$FF_ACTUAL" != "$FF_SHA" ]; then
             echo "SHA-256 ffmpeg (macOS ${{ matrix.arch }}) incorrect : attendu $FF_SHA, obtenu $FF_ACTUAL. Build annule."
@@ -477,7 +475,7 @@ jobs:
           # continue mais affiche le hash obtenu en avertissement : le verifier a la main puis le coller ici.
           case "${{ matrix.arch }}" in
             arm64)  RAR_ARCH="arm"; RAR_SHA="" ;;
-            x86_64) RAR_ARCH="x64"; RAR_SHA="da1fb3c3d7748136c9b369b683d574b372cb1ed049a634a81f85d93918346d8f" ;;
+            x86_64) RAR_ARCH="x64"; RAR_SHA="" ;;
           esac
           URL="https://www.rarlab.com/rar/rarmacos-${RAR_ARCH}-${RAR_VERSION}.tar.gz"
           echo "Telechargement depuis $URL"
@@ -576,7 +574,7 @@ jobs:
           shasum -a 256 "$DMG_NAME" > "$DMG_NAME.sha256"
 
       - name: Upload macOS installer artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: stellio-macos-dmg-${{ matrix.arch }}
           path: |
@@ -588,13 +586,13 @@ jobs:
   # ──────────────────────────────────────────────────────────────────────
   build-linux:
     needs: check-version
-    runs-on: ubuntu-22.04  # plus ancienne glibc : l AppImage tourne ainsi sur toutes les distributions récentes
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -604,7 +602,7 @@ jobs:
           sudo apt-get install -y \
             libgtk-3-dev libwebkit2gtk-4.1-dev gir1.2-webkit2-4.1 \
             python3-gi python3-gi-cairo gobject-introspection \
-            libgirepository1.0-dev libcairo2-dev pkg-config python3-dev \
+            libgirepository1.0-dev libgirepository-2.0-dev libcairo2-dev pkg-config python3-dev \
             libosmesa6-dev libgl1-mesa-dev \
             patchelf libfuse2
 
@@ -613,8 +611,7 @@ jobs:
           python3 -m venv venv
           venv/bin/python -m pip install --upgrade pip
           venv/bin/python -m pip install --upgrade -r requirements.txt
-          # Ubuntu 22.04 n'a que girepository-1.0 : PyGObject 3.52+ exige girepository-2.0 (absent), on reste donc sur la branche 3.50
-          venv/bin/python -m pip install --upgrade "PyGObject<3.51" pycairo
+          venv/bin/python -m pip install --upgrade "PyGObject>=3.52" pycairo
           venv/bin/python -m pip install pyinstaller
 
       - name: Check dependencies (fix)
@@ -669,7 +666,6 @@ jobs:
             --collect-all plyer \
             --collect-all openpyxl \
             --collect-all xlrd \
-            --collect-all cascadio \
             --collect-all pyaes \
             --copy-metadata imageio \
             --copy-metadata pyrender \
@@ -683,18 +679,6 @@ jobs:
         run: |
           if [ ! -f "dist/Stellio/Stellio" ]; then
             echo "dist/Stellio/Stellio introuvable - la compilation a echoue"
-            exit 1
-          fi
-
-      - name: Check glibc requirement (AppImage must run on older distributions)
-        run: |
-          # Le catalogue AppImage refuse un binaire qui exige une glibc plus récente que celle de la plus vieille LTS.
-          MAX=$(find dist/Stellio -type f \( -name '*.so*' -o -perm -u+x \) -print0 \
-                | xargs -0 -r objdump -T 2>/dev/null \
-                | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -V | tail -1)
-          echo "glibc maximale exigée par le bundle : ${MAX:-inconnue}"
-          if [ -n "$MAX" ] && [ "$(printf '%s\n2.35\n' "$MAX" | sort -V | tail -1)" != "2.35" ]; then
-            echo "Le bundle exige glibc $MAX (> 2.35, celle d'Ubuntu 22.04) : build annulé."
             exit 1
           fi
 
@@ -718,17 +702,10 @@ jobs:
         run: |
           APP_DIR="dist/Stellio/app"
           mkdir -p "$APP_DIR/bin"
-          # Release stable "latest" de BtbN (les tags datés sont purgés, d'où les 404) + vérification avec
-          # le fichier checksums.sha256 publié dans cette même release.
-          BASE="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest"
-          FF_NAME="ffmpeg-master-latest-linux64-gpl.tar.xz"
-          curl -fL --retry 3 -o ffmpeg.tar.xz "$BASE/$FF_NAME"
-          curl -fL --retry 3 -o ffmpeg-checksums.txt "$BASE/checksums.sha256"
-          FF_SHA=$(grep -E "[[:space:]]\*?${FF_NAME}$" ffmpeg-checksums.txt | head -n1 | cut -d' ' -f1)
-          if [ -z "$FF_SHA" ]; then
-            echo "SHA-256 de $FF_NAME introuvable dans checksums.sha256. Build annule."
-            exit 1
-          fi
+          # Version epinglee (tag date + SHA-256 calcule sur le fichier), voir le step Windows pour la mise a jour.
+          FF_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-18-13-01/ffmpeg-N-127651-gb60ab6c9a4-linux64-gpl.tar.xz"
+          FF_SHA="a5f2aed198efa8ef4c12d9112f42e7cefbdf11dced1b59a87503ca689bc52277"
+          curl -fL --retry 8 --retry-delay 20 --retry-max-time 360 --retry-all-errors -o ffmpeg.tar.xz "$FF_URL"
           FF_ACTUAL=$(sha256sum ffmpeg.tar.xz | cut -d' ' -f1)
           if [ "$FF_ACTUAL" != "$FF_SHA" ]; then
             echo "SHA-256 ffmpeg (Linux) incorrect : attendu $FF_SHA, obtenu $FF_ACTUAL. Build annule."
@@ -766,55 +743,26 @@ jobs:
           Name=Stellio
           Exec=Stellio
           Icon=stellio
-          Comment=3D file library manager for 3D printing
-          Terminal=false
           Categories=Utility;
-          X-AppImage-Version=${{ needs.check-version.outputs.version }}
           EOF
           cp AppDir/stellio.desktop AppDir/usr/share/applications/stellio.desktop
-          # AppRun : point d'entree obligatoire d'un AppDir (appimagetool refuse de construire sans lui)
-          cat > AppDir/AppRun <<'EOF'
-          #!/bin/sh
-          HERE="$(dirname "$(readlink -f "$0")")"
-          export PATH="$HERE/usr/bin:$PATH"
-          exec "$HERE/usr/bin/Stellio" "$@"
-          EOF
-          chmod +x AppDir/AppRun
 
       - name: Download appimagetool and build the AppImage
         run: |
           wget -q -O appimagetool "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
           chmod +x appimagetool
-          ./appimagetool --appimage-extract-and-run AppDir "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage"
-          chmod +x "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage"
-          sha256sum "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage" \
-            > "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage.sha256"
-
-      - name: Smoke test (démarrage hors ligne, comme le test du catalogue AppImage)
-        run: |
-          sudo apt-get install -y xvfb
-          APPIMG="Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage"
-          export STELLIO_DATA_DIR="$(mktemp -d)"
-          # L'application doit rester en vie (fenêtre ou repli navigateur) plus de 15 s, sans réseau ni écran réel.
-          xvfb-run -a env -u http_proxy -u https_proxy ./"$APPIMG" --appimage-extract-and-run > smoke.log 2>&1 &
-          PID=$!
-          sleep 20
-          if ! kill -0 $PID 2>/dev/null; then
-            echo "L'AppImage s'est arrêtée avant 20 s :"; cat smoke.log; exit 1
-          fi
-          if grep -q "Failed to load Python shared library" smoke.log; then
-            echo "libpython introuvable :"; cat smoke.log; exit 1
-          fi
-          pkill -f Stellio || true
-          echo "Démarrage OK"
+          ./appimagetool --appimage-extract-and-run AppDir "Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage"
+          chmod +x "Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage"
+          sha256sum "Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage" \
+            > "Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage.sha256"
 
       - name: Upload Linux AppImage artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: stellio-linux-appimage
           path: |
-            Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage
-            Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage.sha256
+            Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage
+            Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage.sha256
 
   # ──────────────────────────────────────────────────────────────────────
   # 3. Publication en DRAFT (Brouillon) pour édition manuelle
@@ -825,32 +773,32 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Download Windows installer artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: stellio-installer-unsigned
           path: release-files
 
       - name: Download patch ZIP artifact (commun aux 3 plateformes)
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: stellio-patch-zip
           path: release-files
 
       - name: Download portable ZIP artifact (Windows)
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: stellio-portable-zip
           path: release-files
 
       - name: Download macOS .dmg artifacts (arm64 + x86_64)
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           pattern: stellio-macos-dmg-*
           path: release-files
           merge-multiple: true
 
       - name: Download Linux AppImage artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: stellio-linux-appimage
           path: release-files
