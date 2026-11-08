@@ -378,6 +378,9 @@
                         <button type="button" id="global-search-clear" class="search-clear-btn" data-i18n-aria="actions.clear_search" aria-label="Effacer la recherche" title="Effacer">
                             <i class="fa-solid fa-xmark"></i>
                         </button>
+                        <button type="button" id="photo-search-btn" class="photo-search-btn" data-i18n-aria="photosearch.title" aria-label="Recherche par photo" title="Recherche par photo">
+                            <i class="fa-solid fa-camera"></i>
+                        </button>
                         <div id="search-recent-dropdown" class="search-recent-dropdown hidden"></div>
                     </div>
                     <div class="search-box header-hide" id="spool-header-search-wrap">
@@ -2520,36 +2523,63 @@
                 </div>
 
 				<div id="page-repair" class="page">
-				  <div class="repair-header">
-					<h2 data-i18n="repair.title">Réparation de maillage</h2>
-					<p data-i18n="repair.subtitle">Fichiers détectés comme non-manifold ou avec des trous géométriques</p>
+				  <div class="repair-hero">
+					<div class="repair-hero-text">
+					  <h2><i class="fa-solid fa-screwdriver-wrench"></i> <span data-i18n="repair.title">Réparation de maillage</span></h2>
+					  <p data-i18n="repair.subtitle">Fichiers détectés comme non-manifold ou avec des trous géométriques</p>
+					</div>
+					<div class="repair-stats">
+					  <div class="repair-stat warn"><strong id="repair-stat-bad">0</strong><span data-i18n="repair.stat_to_repair">à réparer</span></div>
+					  <div class="repair-stat"><strong id="repair-stat-analyzed">0 / 0</strong><span data-i18n="repair.stat_analyzed">analysés</span></div>
+					</div>
 				  </div>
 
-				  <div class="integrity-panel">
-					<div class="integrity-panel-header">
-					  <div>
-						<h3><i class="fa-solid fa-shield-halved"></i> <span data-i18n="integrity.title">Vérification d'intégrité</span></h3>
-						<p class="settings-hint" data-i18n="integrity.subtitle">Détecte les fichiers manquants, vides ou corrompus (illisibles par le moteur 3D) dans votre bibliothèque.</p>
+				  <div class="repair-tools">
+					<div class="integrity-panel">
+					  <div class="integrity-panel-header">
+						<div class="repair-tool-icon"><i class="fa-solid fa-shield-halved"></i></div>
+						<div class="repair-tool-text">
+						  <h3><span data-i18n="integrity.title">Vérification d'intégrité</span></h3>
+						  <p class="settings-hint" data-i18n="integrity.subtitle">Détecte les fichiers manquants, vides ou corrompus (illisibles par le moteur 3D) dans votre bibliothèque.</p>
+						</div>
+						<button id="integrity-check-btn" class="btn btn-primary btn-sm" onclick="startIntegrityCheck()">
+						  <i class="fa-solid fa-magnifying-glass"></i> <span data-i18n="integrity.run_btn">Lancer une vérification</span>
+						</button>
 					  </div>
-					  <button id="integrity-check-btn" class="btn btn-primary btn-sm" onclick="startIntegrityCheck()">
-						<i class="fa-solid fa-magnifying-glass"></i> <span data-i18n="integrity.run_btn">Lancer une vérification</span>
-					  </button>
-					</div>
-					<div id="integrity-progress-container" class="integrity-progress hidden">
-					  <div class="integrity-progress-text-row">
-						<i class="fa-solid fa-shield-halved fa-spin"></i>
-						<span id="integrity-progress-text">0/0</span>
+					  <div id="integrity-progress-container" class="integrity-progress hidden">
+						<div class="integrity-progress-text-row">
+						  <i class="fa-solid fa-shield-halved fa-spin"></i>
+						  <span id="integrity-progress-text">0/0</span>
+						</div>
+						<div class="progress-track"><div class="progress-bar" id="integrity-progress-bar" style="width:0%"></div></div>
 					  </div>
-					  <div class="progress-track"><div class="progress-bar" id="integrity-progress-bar" style="width:0%"></div></div>
+					  <div id="integrity-summary" class="integrity-summary hidden">
+						<div class="integrity-stat ok"><i class="fa-solid fa-circle-check"></i> <span id="integrity-ok-count">0</span> <span data-i18n="integrity.valid">valides</span></div>
+						<div class="integrity-stat warn"><i class="fa-solid fa-triangle-exclamation"></i> <span id="integrity-corrupted-count">0</span> <span data-i18n="integrity.corrupted">corrompus</span></div>
+						<div class="integrity-stat danger"><i class="fa-solid fa-file-circle-xmark"></i> <span id="integrity-missing-count">0</span> <span data-i18n="integrity.missing">manquants</span></div>
+					  </div>
+					  <div id="integrity-results" class="integrity-results"></div>
 					</div>
-					<div id="integrity-summary" class="integrity-summary hidden">
-					  <div class="integrity-stat ok"><i class="fa-solid fa-circle-check"></i> <span id="integrity-ok-count">0</span> <span data-i18n="integrity.valid">valides</span></div>
-					  <div class="integrity-stat warn"><i class="fa-solid fa-triangle-exclamation"></i> <span id="integrity-corrupted-count">0</span> <span data-i18n="integrity.corrupted">corrompus</span></div>
-					  <div class="integrity-stat danger"><i class="fa-solid fa-file-circle-xmark"></i> <span id="integrity-missing-count">0</span> <span data-i18n="integrity.missing">manquants</span></div>
+
+					<div class="integrity-panel" id="repair-analyze-card">
+					  <div class="integrity-panel-header">
+						<div class="repair-tool-icon"><i class="fa-solid fa-cube"></i></div>
+						<div class="repair-tool-text">
+						  <h3><span data-i18n="repair.analyze_title">Analyse du maillage</span></h3>
+						  <p class="settings-hint" data-i18n="repair.analyze_hint">Repère les trous et arêtes ouvertes (non-manifold). Fait aussi automatiquement en arrière-plan, dès la création des miniatures.</p>
+						</div>
+						<button id="repair-analyze-btn" class="btn btn-primary btn-sm" onclick="scanUnanalyzedFiles()" style="display:none;">
+						  <i class="fa-solid fa-play"></i> <span data-i18n="repair.analyze_btn">Analyser ces fichiers</span>
+						</button>
+					  </div>
+					  <div id="repair-analyze-status" class="repair-analyze-status"></div>
+					  <div id="repair-analyze-progress" class="integrity-progress hidden">
+						<div class="progress-track"><div class="progress-bar" id="repair-analyze-bar" style="width:0%"></div></div>
+					  </div>
 					</div>
-					<div id="integrity-results" class="integrity-results"></div>
 				  </div>
 
+				  <h3 class="repair-section-title"><i class="fa-solid fa-triangle-exclamation"></i> <span data-i18n="repair.section_files">Fichiers à réparer</span> <span class="repair-section-count" id="repair-section-count"></span></h3>
 				  <div id="repair-grid" class="repair-grid"></div>
 				  <div id="repair-empty" class="empty-state hidden">
 					<i class="fa-solid fa-circle-check"></i>
@@ -2579,9 +2609,13 @@
 					<div class="converter-toolbar-group">
 					  <label data-i18n="converter.output_format">Format de sortie</label>
 					  <select id="converter-output-format" class="settings-select">
-						<option value="stl">STL</option>
+						<option value="stl">STL (binaire)</option>
+						<option value="stl_ascii">STL (ASCII)</option>
 						<option value="3mf">3MF</option>
 						<option value="obj">OBJ</option>
+						<option value="ply">PLY</option>
+						<option value="off">OFF</option>
+						<option value="glb">GLB (glTF)</option>
 					  </select>
 					</div>
 					<div class="converter-toolbar-group">
@@ -3520,12 +3554,15 @@
                 </div>
                 <div class="about-section">
                     <h4><i class="fa-solid fa-handshake"></i> <span data-i18n="about.partner_title">Partenariat</span></h4>
-                    <p class="about-legal" data-i18n="about.partner_desc">Stellio est partenaire d'intégration de TigerTag, le système d'identification NFC/RFID des filaments.</p>
-                    <div class="tech-tags">
-                        <a href="https://tigersystem.io" target="_blank" rel="noopener noreferrer"><span>tigersystem.io</span></a>
-                        <a href="https://tigertag.io" target="_blank" rel="noopener noreferrer"><span>tigertag.io</span></a>
-                        <a href="https://github.com/TigerTag-Project/TigerTag-Studio-Manager" target="_blank" rel="noopener noreferrer"><span>Studio Manager</span></a>
-                        <a href="https://github.com/TigerTag-Project/TigerTag-RFID-Guide" target="_blank" rel="noopener noreferrer"><span>RFID Guide</span></a>
+                    <div class="about-partner">
+                        <img src="assets/tigertag-logo.svg" alt="TigerTag" class="about-partner-logo" onerror="this.style.display='none'">
+                        <p class="about-legal" data-i18n="about.partner_desc">Stellio est partenaire d'intégration de TigerTag, le système d'identification NFC/RFID des filaments.</p>
+                    </div>
+                    <div class="about-partner-links">
+                        <a class="about-link-btn" href="https://tigersystem.io" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-globe"></i><span>tigersystem.io</span></a>
+                        <a class="about-link-btn" href="https://tigertag.io" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-tag"></i><span>tigertag.io</span></a>
+                        <a class="about-link-btn" href="https://github.com/TigerTag-Project/TigerTag-Studio-Manager" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i><span>Studio Manager</span></a>
+                        <a class="about-link-btn" href="https://github.com/TigerTag-Project/TigerTag-RFID-Guide" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i><span>RFID Guide</span></a>
                     </div>
                 </div>
                 <div class="about-section">
@@ -3725,6 +3762,7 @@
                     <h3><i class="fa-solid fa-boxes-stacked"></i> <span data-i18n="filters.stock">Stock de filament</span></h3>
                     <select id="filter-stock" class="settings-select" style="width:100%;">
                         <option value="" data-i18n="filters.stock_all">Tous les fichiers</option>
+                        <option value="now" data-i18n="filters.stock_now">Imprimable chez moi maintenant</option>
                         <option value="any" data-i18n="filters.stock_any">Imprimable avec mon stock</option>
                         <option value="pla">PLA</option>
                         <option value="petg">PETG</option>

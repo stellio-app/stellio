@@ -4244,6 +4244,7 @@ async function _ordersRender() {
             <div class="quote-history-actions">
                 ${j.margin ? `<button type="button" class="btn btn-ghost btn-sm" onclick="_orderSet(${j.id}, {scrap: ${(j.scrap || 0) + 1}})" title="${escapeHtml(_t3('orders.scrap_add', '+1 pièce ratée (rebut)'))}"><i class="fa-solid fa-triangle-exclamation"></i></button>` : ''}
                 ${closed ? '' : `<button type="button" class="btn btn-ghost btn-sm" onclick="_orderSet(${j.id}, {qty_done: ${j.qty_done + 1}})" title="${escapeHtml(_t3('orders.plus_one', '+1 pièce imprimée'))}"><i class="fa-solid fa-plus"></i></button>`}
+                <button type="button" class="btn btn-ghost btn-sm${j.track_token ? ' active' : ''}" onclick="_orderTrack(${j.id})" title="${escapeHtml(_t3('orders.track', 'Lien de suivi client'))}"><i class="fa-solid fa-link"></i></button>
                 <button type="button" class="btn btn-ghost btn-sm" onclick="_orderDelete(${j.id})" title="${escapeHtml(_t3('orders.delete', 'Supprimer'))}"><i class="fa-solid fa-trash"></i></button>
             </div></div>`;
     }).join('');
@@ -4283,6 +4284,78 @@ window._orderSet = async function (id, patch) {
     const r = await _ordersApi('PUT', `/api/orders/${id}`, patch);
     if (!r.ok) showToast(_t3('toast.error', 'Erreur'), 'error');
     _ordersRender();
+};
+window._orderTrack = async function (id) {
+    const job = (_ordersData.jobs || []).find(j => j.id === id) || {};
+    const old = document.getElementById('order-track-dlg'); if (old) old.remove();
+    const dlg = document.createElement('div');
+    dlg.id = 'order-track-dlg'; dlg.className = 'modal';
+    dlg.style.zIndex = 100000;
+    dlg.innerHTML = `<div class="modal-content" style="max-width:480px">
+        <div class="modal-header"><h3><i class="fa-solid fa-link"></i> ${escapeHtml(_t3('orders.track', 'Lien de suivi client'))}</h3>
+        <button class="modal-close" id="otd-x">×</button></div>
+        <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+            <p style="margin:0;opacity:.75;font-size:14px">${escapeHtml(_t3('orders.track_help', 'Votre client voit l’avancement (en file, en cours, prête à retirer). Aucun prix ni détail interne n’est affiché.'))}</p>
+            <label style="font-size:13px">${escapeHtml(_t3('orders.track_note', 'Message pour le client (optionnel)'))}</label>
+            <textarea id="otd-note" class="settings-input" rows="3" maxlength="300">${escapeHtml(job.client_note || '')}</textarea>
+            <input id="otd-url" class="settings-input" readonly style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border-color,#3a4254);background:var(--bg-input,#0f131b);color:inherit">
+            <div id="otd-remote" style="display:flex;flex-direction:column;gap:8px;font-size:13px"></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+                <button type="button" class="btn btn-ghost btn-sm" id="otd-revoke"><i class="fa-solid fa-ban"></i> ${escapeHtml(_t3('orders.track_revoke', 'Révoquer le lien'))}</button>
+                <button type="button" class="btn btn-primary btn-sm" id="otd-copy"><i class="fa-solid fa-copy"></i> ${escapeHtml(_t3('orders.track_copy', 'Copier le lien'))}</button>
+            </div></div></div>`;
+    document.body.appendChild(dlg);
+    const close = () => { clearInterval(remotePoll); dlg.remove(); _ordersRender(); };
+    dlg.querySelector('#otd-x').onclick = close;
+    dlg.addEventListener('click', e => { if (e.target === dlg) close(); });
+    const urlEl = dlg.querySelector('#otd-url'), noteEl = dlg.querySelector('#otd-note');
+    let remotePoll = null;
+    const renderRemote = (d) => {
+        const box = dlg.querySelector('#otd-remote'); if (!box) return;
+        if (d.remote) {
+            box.innerHTML = `<div style="color:#38c172"><i class="fa-solid fa-globe"></i> ${escapeHtml(_t3('orders.track_public', 'Lien public Cloudflare : accessible depuis n’importe où.'))}</div>` +
+                (d.remote_mode === 'quick' ? `<div style="opacity:.7">${escapeHtml(_t3('orders.track_quick_warn', 'Ce lien Cloudflare temporaire change à chaque redémarrage de Stellio : pour des liens durables, configurez un tunnel fixe ou une adresse personnalisée dans Paramètres > Accès à distance.'))}</div>` : '');
+        } else if (d.remote_status === 'starting') {
+            box.innerHTML = `<div><i class="fa-solid fa-spinner fa-spin"></i> ${escapeHtml(_t3('orders.track_starting', 'Création du lien Cloudflare…'))}</div>`;
+        } else {
+            box.innerHTML = `<div style="color:#f59e0b"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(d.remote_status === 'error' ? _t3('orders.track_remote_error', 'Le tunnel Cloudflare n’a pas pu démarrer.') : _t3('orders.track_local_only', 'Ce lien ne fonctionne que sur votre réseau local (adresse IP).'))}</div>
+                <button type="button" class="btn btn-primary btn-sm" id="otd-enable" style="align-self:flex-start"><i class="fa-brands fa-cloudflare"></i> ${escapeHtml(_t3('orders.track_enable', 'Créer un lien Cloudflare'))}</button>
+                <div style="opacity:.7">${escapeHtml(_t3('orders.track_enable_hint', 'Active l’accès à distance de Stellio (tunnel Cloudflare, connexion toujours protégée par mot de passe) ; seule la page de suivi de cette commande est publique grâce à son lien secret.'))}</div>`;
+            const b = box.querySelector('#otd-enable');
+            if (b) b.onclick = async () => {
+                b.disabled = true;
+                await _ordersApi('POST', '/api/remote-access/toggle', { enabled: true });
+                renderRemote({ remote: false, remote_status: 'starting' });
+                let tries = 0;
+                clearInterval(remotePoll);
+                remotePoll = setInterval(async () => {
+                    tries++;
+                    if (!document.body.contains(dlg)) { clearInterval(remotePoll); return; }
+                    const st = await save(true);
+                    if (!st || st.remote || st.remote_status === 'error' || tries > 40) clearInterval(remotePoll);
+                }, 2000);
+            };
+        }
+    };
+    const save = async (quiet) => {
+        const r = await _ordersApi('POST', `/api/orders/${id}/track`, { client_note: noteEl.value });
+        if (r.ok) { urlEl.value = r.data.url; job.client_note = noteEl.value; job.track_token = r.data.token; renderRemote(r.data); }
+        else if (!quiet) showToast(_t3('toast.error', 'Erreur'), 'error');
+        return r.ok ? r.data : null;
+    };
+    await save();
+    noteEl.addEventListener('change', save);
+    dlg.querySelector('#otd-copy').onclick = async () => {
+        if (!await save()) return;
+        try { await navigator.clipboard.writeText(urlEl.value); } catch (e) { urlEl.select(); document.execCommand('copy'); }
+        showToast(_t3('toast.copied', 'Copié'), 'success');
+    };
+    dlg.querySelector('#otd-revoke').onclick = async () => {
+        await _ordersApi('DELETE', `/api/orders/${id}/track`);
+        job.track_token = '';
+        showToast(_t3('orders.track_revoked', 'Lien révoqué'), 'success');
+        close();
+    };
 };
 window._orderDelete = async function (id) {
     if (!await showConfirmDialog(_t3('orders.delete_confirm', 'Supprimer cette commande ?'), { danger: true })) return;
@@ -9333,6 +9406,9 @@ icon.classList.add('fa-chevron-right');
 }
 }
 function openFiltersModal() {
+// Toujours afficher la bibliothèque en arrière-plan
+const _libBtn = document.querySelector('.nav-btn[data-page="library"]');
+if (_libBtn && !_libBtn.classList.contains('active')) _libBtn.click();
 document.querySelectorAll('#modal-filters .filter-type').forEach(cb => { cb.checked = !activeTypeFilters || activeTypeFilters.length === 0 || activeTypeFilters.includes(cb.value); });
 document.getElementById('size-min').value = currentSizeFilter?.min || '';
 document.getElementById('size-max').value = currentSizeFilter?.max || '';
@@ -9367,7 +9443,7 @@ stockPrintableMap = null;
 let stockInfo = null;
 if (stockFilter) {
 try {
-const res = await fetch(`${API}/api/filament/printable-files?material=${encodeURIComponent(stockFilter === 'any' ? '' : stockFilter)}`);
+const res = await fetch(stockFilter === 'now' ? `${API}/api/filament/printable-now` : `${API}/api/filament/printable-files?material=${encodeURIComponent(stockFilter === 'any' ? '' : stockFilter)}`);
 if (!res.ok) throw new Error(`HTTP ${res.status}`);
 stockInfo = await res.json();
 stockPrintableMap = stockInfo.printable || {};
@@ -9378,7 +9454,9 @@ showToast(I18N.t('filters.stock_error'), 'error');
 }
 closeModal('modal-filters');
 applyFilters();
-if (stockInfo && stockInfo.slots_count === 0) {
+if (stockInfo && stockFilter === 'now' && !stockInfo.printers_count) {
+showToast(_t3('filters.now_no_printers', 'Ajoutez au moins une imprimante pour utiliser ce filtre'), 'warning');
+} else if (stockInfo && stockInfo.slots_count === 0) {
 showToast(I18N.t('filters.stock_no_spools'), 'warning');
 } else if (stockInfo) {
 showToast(I18N.t('filters.stock_result', { count: stockInfo.printable_count, checked: stockInfo.files_checked }), 'success');
@@ -13583,7 +13661,7 @@ async function loadSpoolmanPage() {
     // Une bannière + une grille par source : Spoolman, inventaire manuel, TigerTag
     spoolmanSection.style.display = url ? 'block' : 'none';
     if (label) label.textContent = url || '';
-    manualSection.style.display = (manualEnabled || !url) ? 'block' : 'none';
+    manualSection.style.display = manualEnabled ? 'block' : 'none';   // désactivé : la bannière disparaît (sauf message vide plus bas)
 
     const tasks = [];
     if (url) tasks.push(loadSpoolmanServer(url));
@@ -13608,6 +13686,11 @@ async function loadSpoolmanPage() {
     }
     tasks.push(loadTigerTagSpools());
     await Promise.all(tasks);
+    // Aucune source visible (ni Spoolman, ni manuel, ni TigerTag) : on affiche le message d'aide à la place de la bannière manuelle
+    if (!manualEnabled && !url) {
+        const tt = document.getElementById('tigertag-section');
+        manualSection.style.display = (tt && tt.style.display === 'block') ? 'none' : 'block';
+    }
 }
 window.loadSpoolmanPage = loadSpoolmanPage;
 
@@ -16576,6 +16659,113 @@ function rebuildFilteredFiles() {
     return showFavoritesOnly ? allFiles.filter(f => favoriteFiles.has(f.path)) : [...allFiles];
 }
 
+// ---- Recherche par photo (modèle de vision local) ----
+let _photoDataUrl = '';
+let _photoPoll = null;
+let _photoBlocked = '';
+function _photoErr(code) {
+    return ({
+        ai_disabled: _t3('photosearch.err_ai_disabled', 'Activez l’IA dans Paramètres > IA.'),
+        local_only: _t3('photosearch.err_local_only', 'Cette fonction reste 100 % locale : choisissez Ollama (et non un fournisseur en ligne) dans Paramètres > IA.'),
+        no_vision: _t3('photosearch.err_no_vision', 'Le modèle Ollama choisi ne gère pas les images. Installez un modèle de vision (ex. qwen2.5vl, llava, gemma3) et sélectionnez-le.'),
+        not_indexed: _t3('photosearch.err_not_indexed', 'La bibliothèque n’est pas encore indexée : lancez l’indexation ci-dessus.'),
+        low_memory: _t3('photosearch.err_low_memory', 'Mémoire insuffisante pour le moment.'),
+        ai_error: _t3('photosearch.err_ai', 'Le modèle n’a pas répondu (Ollama est-il lancé ?).'),
+        bad_image: _t3('photosearch.err_image', 'Image invalide.')
+    })[code] || _t3('toast.error', 'Erreur');
+}
+async function _photoResize(file, max = 512) {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+    cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+    return cv.toDataURL('image/jpeg', 0.85);
+}
+async function _photoRefreshIndex() {
+    const box = document.getElementById('photo-index-box'); if (!box) { clearInterval(_photoPoll); _photoPoll = null; return; }
+    let d; try { d = await (await fetch(`${API}/api/ai/photo-index`)).json(); } catch (e) { return; }
+    const pct = d.total ? Math.round(100 * d.indexed / d.total) : 0;
+    const waitTxt = d.running && d.waiting ? `<div style="font-size:13px;opacity:.75"><i class="fa-solid fa-hourglass-half"></i> ${escapeHtml(d.waiting === 'active' ? _t3('photosearch.wait_active', 'En pause pendant que vous utilisez Stellio : reprise dès que vous arrêtez.') : d.waiting === 'load' ? _t3('photosearch.wait_load', 'En pause : la machine est occupée.') : _t3('photosearch.wait_paused', 'En pause (génération de miniatures suspendue).'))}</div>` : '';
+    const label = _tf('photosearch.indexed', '{{n}} / {{total}} modèles indexés', { n: d.indexed, total: d.total });
+    _photoBlocked = d.blocked || '';
+    const dlgEl = document.getElementById('photo-search-dlg');
+    if (dlgEl) {
+        const go = dlgEl.querySelector('#ps-go'), drop = dlgEl.querySelector('#ps-drop');
+        if (go) go.disabled = !!_photoBlocked || !_photoDataUrl;
+        if (drop) { drop.style.opacity = _photoBlocked ? '.4' : ''; drop.style.pointerEvents = _photoBlocked ? 'none' : ''; }
+    }
+    const err = d.error ? `<div style="color:#f59e0b;font-size:13px">${escapeHtml(_photoErr(d.error))}</div>` : (d.blocked ? `<div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;background:rgba(245,158,11,.12);border:1px solid #f59e0b;color:#f59e0b;font-size:14px"><i class="fa-solid fa-lock" style="margin-top:3px"></i><span>${escapeHtml(_photoErr(d.blocked))}</span></div>` : '');
+    box.innerHTML = `<div style="display:flex;justify-content:space-between;font-size:13px"><span>${escapeHtml(label)}</span><span>${pct}%</span></div>
+        <div class="photo-index-bar"><span style="width:${pct}%"></span></div>${waitTxt}${err}
+        ${!d.running && d.indexed < d.total && !d.blocked ? `<label style="display:flex;gap:8px;align-items:center;font-size:13px;opacity:.85"><input type="checkbox" id="ps-fast"${window._photoFast ? ' checked' : ''} onchange="window._photoFast=this.checked"> ${escapeHtml(_t3('photosearch.fast', 'Aller plus vite (continue même quand j’utilise Stellio, charge le processeur davantage)'))}</label>` : ''}
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+        ${d.running ? `<button type="button" class="btn btn-ghost btn-sm" onclick="_photoIndexCtl('stop')"><i class="fa-solid fa-pause"></i> ${escapeHtml(_t3('photosearch.stop', 'Pause'))}</button>`
+                    : (d.indexed < d.total && !d.blocked ? `<button type="button" class="btn btn-primary btn-sm" onclick="_photoIndexCtl('start')"><i class="fa-solid fa-wand-magic-sparkles"></i> ${escapeHtml(_t3('photosearch.index', 'Indexer la bibliothèque'))}</button>` : '')}
+        </div>`;
+}
+window._photoIndexCtl = async function (action) {
+    const r = await _ordersApi('POST', '/api/ai/photo-index', { action, mode: window._photoFast ? 'fast' : 'gentle' });
+    if (!r.ok && r.data.error) showToast(_photoErr(r.data.error), 'warning');
+    _photoRefreshIndex();
+};
+window.openPhotoSearch = function () {
+    const old = document.getElementById('photo-search-dlg'); if (old) old.remove();
+    _photoDataUrl = '';
+    const dlg = document.createElement('div');
+    dlg.id = 'photo-search-dlg'; dlg.className = 'modal'; dlg.style.zIndex = 100000;
+    dlg.innerHTML = `<div class="modal-content" style="max-width:520px">
+        <div class="modal-header"><h3><i class="fa-solid fa-camera"></i> ${escapeHtml(_t3('photosearch.title', 'Recherche par photo'))}</h3><button class="modal-close" id="ps-x">×</button></div>
+        <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+            <p style="margin:0;opacity:.75;font-size:14px">${escapeHtml(_t3('photosearch.help', 'Envoyez une photo : Stellio trouve dans votre bibliothèque les modèles qui lui ressemblent, avec un modèle de vision local (rien ne quitte votre machine). L’indexation tourne en arrière-plan, une image à la fois, et se met en pause si la mémoire manque.'))}</p>
+            <div id="photo-index-box" style="display:flex;flex-direction:column;gap:8px"></div>
+            <label class="photo-drop" id="ps-drop"><input type="file" accept="image/*" id="ps-file" hidden><span id="ps-drop-text"><i class="fa-solid fa-image"></i> ${escapeHtml(_t3('photosearch.drop', 'Choisir, glisser ou coller une photo'))}</span></label>
+            <div style="display:flex;justify-content:flex-end"><button type="button" class="btn btn-primary btn-sm" id="ps-go" disabled><i class="fa-solid fa-magnifying-glass"></i> ${escapeHtml(_t3('photosearch.search', 'Chercher'))}</button></div>
+        </div></div>`;
+    document.body.appendChild(dlg);
+    const close = () => { dlg.remove(); clearInterval(_photoPoll); _photoPoll = null; document.removeEventListener('paste', onPaste); };
+    const setFile = async (f) => {
+        if (!f || !f.type.startsWith('image/')) return;
+        try { _photoDataUrl = await _photoResize(f); } catch (e) { showToast(_photoErr('bad_image'), 'error'); return; }
+        dlg.querySelector('#ps-drop-text').innerHTML = `<img src="${_photoDataUrl}" alt="">`;
+        dlg.querySelector('#ps-go').disabled = !!_photoBlocked;
+    };
+    const onPaste = (e) => { const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it) setFile(it.getAsFile()); };
+    document.addEventListener('paste', onPaste);
+    dlg.querySelector('#ps-x').onclick = close;
+    dlg.addEventListener('click', e => { if (e.target === dlg) close(); });
+    const drop = dlg.querySelector('#ps-drop');
+    dlg.querySelector('#ps-file').onchange = e => setFile(e.target.files[0]);
+    ['dragover', 'dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('drag'); }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('drag'); }));
+    drop.addEventListener('drop', e => setFile(e.dataTransfer.files[0]));
+    dlg.querySelector('#ps-go').onclick = async () => {
+        if (_photoBlocked) { showToast(_photoErr(_photoBlocked), 'warning'); return; }
+        const go = dlg.querySelector('#ps-go'); go.disabled = true;
+        go.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${escapeHtml(_t3('photosearch.searching', 'Analyse…'))}`;
+        try {
+            const res = await fetch(`${API}/api/ai/photo-search`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: _photoDataUrl }) });
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) { showToast(_photoErr(d.error), 'warning'); return; }
+            const byPath = new Map(allFiles.map(f => [f.path, f]));
+            const ordered = (d.results || []).filter(p => byPath.has(p));
+            if (!ordered.length) { showToast(_t3('photosearch.none', 'Aucun modèle ressemblant trouvé'), 'info'); return; }
+            const label = '📷 ' + _t3('photosearch.label', 'photo');
+            const input = document.getElementById('global-search');
+            cancelSemanticSearch();
+            if (input) input.value = label;
+            currentSearchQuery = label; lastSemanticQuery = label; lastSemanticResultPaths = ordered;
+            filteredFiles = ordered.map(p => byPath.get(p));
+            applySorting(); renderFiles(); updateSidebarCounts(filteredFiles);
+            showToast(_tf('photosearch.found', '{{count}} modèle(s) ressemblant(s)', { count: ordered.length }), 'success');
+            close();
+        } catch (e) { showToast(_photoErr('ai_error'), 'error'); }
+        finally { if (document.body.contains(go)) { go.disabled = false; go.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> ${escapeHtml(_t3('photosearch.search', 'Chercher'))}`; } }
+    };
+    _photoRefreshIndex().then(() => { if (_photoBlocked) showToast(_photoErr(_photoBlocked), 'warning'); }); _photoPoll = setInterval(_photoRefreshIndex, 3000);
+};
+document.getElementById('photo-search-btn')?.addEventListener('click', () => window.openPhotoSearch());
+
 let semanticSearchToken = 0;
 let semanticAbortController = null;
 let lastSemanticResultPaths = null;
@@ -17219,6 +17409,7 @@ window.testBatchPreview = async function (filePaths) {  };
 let repairFilesList = [];
 let isRepairScanning = false;
 const MAX_FILES_TO_SCAN = 30;
+let repairLibraryTotals = { total: 0, analyzed: 0 };
 document.querySelector('.nav-btn[data-page="repair"]')?.addEventListener('click', () => {
 document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
 document.querySelector('.nav-btn[data-page="repair"]')?.classList.add('active');
@@ -17242,17 +17433,41 @@ const res = await fetch(`${API}/api/files`);
 if (!res.ok) throw new Error(I18N.t('toast.connection_error'));
 const files = await res.json();
 repairFilesList = files.filter(f => f.metadata?.needs_repair === true || f.metadata?.is_manifold === false);
-const unanalyzedFiles = files.filter(f => !f.metadata).slice(0, MAX_FILES_TO_SCAN);
+const unanalyzedAll = files.filter(f => !f.metadata || f.metadata.integrity_checked === false);
+repairLibraryTotals = { total: files.length, analyzed: files.length - unanalyzedAll.length };
+const unanalyzedFiles = unanalyzedAll.slice(0, MAX_FILES_TO_SCAN);
 renderRepairFiles(unanalyzedFiles);
 updateRepairBadge();
 } catch (err) {
 grid.innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>${err.message}</p></div>`;
 }
 }
+function _repairCountLabel(n) {
+const forms = String(I18N.t('repair.unanalyzed_count')).split('|').map(s => s.trim());
+return (n === 1 ? forms[0] : (forms[1] || forms[0])).replace(/\{\{\s*count\s*\}\}/g, n);
+}
+function updateRepairHero(unanalyzedFiles = []) {
+const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+set('repair-stat-bad', repairFilesList.length);
+set('repair-stat-analyzed', `${repairLibraryTotals.analyzed} / ${repairLibraryTotals.total}`);
+set('repair-section-count', repairFilesList.length ? `(${repairFilesList.length})` : '');
+const status = document.getElementById('repair-analyze-status');
+const btn = document.getElementById('repair-analyze-btn');
+if (status && !isRepairScanning) {
+    if (unanalyzedFiles.length > 0) {
+        status.innerHTML = `<span class="repair-analyze-count"><i class="fa-solid fa-hourglass-half"></i> ${escapeHtml(_repairCountLabel(unanalyzedFiles.length))}</span> <span class="repair-analyze-limit">${escapeHtml(I18N.t('repair.scan_limit', { max: MAX_FILES_TO_SCAN }))}</span>`;
+        if (btn) btn.style.display = '';
+    } else {
+        status.innerHTML = `<span class="repair-analyze-ok"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(I18N.t('repair.all_analyzed'))}</span>`;
+        if (btn) btn.style.display = 'none';
+    }
+}
+}
 function renderRepairFiles(unanalyzedFiles = []) {
 const grid = document.getElementById('repair-grid');
 const empty = document.getElementById('repair-empty');
-if (repairFilesList.length === 0 && unanalyzedFiles.length === 0) {
+updateRepairHero(unanalyzedFiles);
+if (repairFilesList.length === 0) {
 grid.innerHTML = '';
 empty.classList.remove('hidden');
 updateRepairBadge();
@@ -17261,22 +17476,24 @@ return;
 empty.classList.add('hidden');
 let html = '';
 repairFilesList.forEach(f => {
-html += `<div class="repair-card" data-path="${escapeHtml(f.path)}"><div class="repair-thumb">${f.has_thumb ? `<img src="${API}/api/thumb?path=${encodeURIComponent(f.path)}" alt="${escapeHtml(f.name)}">` : `<i class="fa-solid fa-cube"></i>`}<span class="repair-badge-warn"><i class="fa-solid fa-triangle-exclamation"></i> ${I18N.t('repair.non_manifold_badge')}</span></div><div class="repair-info"><div class="repair-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div><div class="repair-meta">${formatSize(f.size)} • ${(f.extension || '.stl').toUpperCase()}</div><button class="btn btn-primary btn-sm repair-btn" onclick="repairFile('${escapeJs(f.path)}', this)"><i class="fa-solid fa-wrench"></i> ${I18N.t('actions.repair') || 'Réparer'}</button></div></div>`;
+html += `<div class="repair-card" data-path="${escapeHtml(f.path)}"><div class="repair-thumb">${f.has_thumb ? `<img src="${API}/api/thumb?path=${encodeURIComponent(f.path)}" alt="${escapeHtml(f.name)}" loading="lazy">` : `<i class="fa-solid fa-cube"></i>`}<span class="repair-badge-warn"><i class="fa-solid fa-triangle-exclamation"></i> ${I18N.t('repair.non_manifold_badge')}</span></div><div class="repair-info"><div class="repair-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div><div class="repair-meta"><span>${formatSize(f.size)}</span><span class="repair-ext">${(f.extension || '.stl').replace('.', '').toUpperCase()}</span></div><button class="btn btn-primary btn-sm repair-btn" onclick="repairFile('${escapeJs(f.path)}', this)"><i class="fa-solid fa-wrench"></i> ${I18N.t('actions.repair') || 'Réparer'}</button></div></div>`;
 });
-if (unanalyzedFiles.length > 0 && !isRepairScanning) {
-html += `<div class="repair-card" style="grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;border:2px dashed var(--border);background:transparent;"><i class="fa-solid fa-magnifying-glass" style="font-size:32px;color:var(--text-muted);margin-bottom:12px;"></i><p style="color:var(--text-secondary);margin-bottom:16px;font-size:14px;">${I18N.tp('repair.unanalyzed_count', unanalyzedFiles.length, { count: unanalyzedFiles.length })}</p><button class="btn btn-primary" onclick="scanUnanalyzedFiles()" style="gap:8px;"><i class="fa-solid fa-play"></i> ${I18N.t('repair.analyze_btn')}</button><p style="color:var(--text-muted);font-size:12px;margin-top:10px;">${I18N.t('repair.scan_limit', { max: MAX_FILES_TO_SCAN })}</p></div>`;
-}
 grid.innerHTML = html;
 updateRepairBadge();
 }
 async function scanUnanalyzedFiles() {
 if (isRepairScanning) return;
 isRepairScanning = true;
-const grid = document.getElementById('repair-grid');
-grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;"><i class="fa-solid fa-spinner fa-spin fa-2x" style="color:var(--accent);"></i><p style="margin-top:12px;color:var(--text-muted);">${I18N.t('repair.scanning')}</p><p id="repair-progress-text" style="margin-top:8px;color:var(--text-secondary);font-size:12px;">${I18N.t('repair.progress_zero')}</p></div>`;
+const statusEl = document.getElementById('repair-analyze-status');
+const progBox = document.getElementById('repair-analyze-progress');
+const progBar = document.getElementById('repair-analyze-bar');
+const analyzeBtn = document.getElementById('repair-analyze-btn');
+if (analyzeBtn) analyzeBtn.disabled = true;
+if (progBox) progBox.classList.remove('hidden');
+if (statusEl) statusEl.innerHTML = `<span class="repair-analyze-count"><i class="fa-solid fa-spinner fa-spin"></i> ${escapeHtml(I18N.t('repair.scanning'))}</span>`;
 const res = await fetch(`${API}/api/files`);
 const files = await res.json();
-const unanalyzed = files.filter(f => !f.metadata).slice(0, MAX_FILES_TO_SCAN);
+const unanalyzed = files.filter(f => !f.metadata || f.metadata.integrity_checked === false).slice(0, MAX_FILES_TO_SCAN);
 let analyzed = 0;
 let found = 0;
 for (const f of unanalyzed) {
@@ -17295,9 +17512,9 @@ data = await analyzeRes.json();
 } finally { clearTimeout(_acTimer); }
 analyzed++;
 if (analyzed % 5 === 0) {
-const progressEl = document.getElementById('repair-progress-text');
-if (progressEl) progressEl.textContent = I18N.t('repair.progress', { analyzed, total: unanalyzed.length, found });
 }
+if (statusEl) statusEl.innerHTML = `<span class="repair-analyze-count"><i class="fa-solid fa-spinner fa-spin"></i> ${escapeHtml(I18N.t('repair.progress', { analyzed, total: unanalyzed.length, found }))}</span>`;
+if (progBar) progBar.style.width = Math.round(100 * analyzed / Math.max(1, unanalyzed.length)) + '%';
 if (data.success && data.metadata?.needs_repair) {
 found++;
 repairFilesList.push({ ...f, metadata: data.metadata });
@@ -17308,7 +17525,10 @@ console.debug(`[Repair] Erreur analyse ${f.name}:`, err);
 }
 }
 isRepairScanning = false;
-renderRepairFiles();
+if (analyzeBtn) analyzeBtn.disabled = false;
+if (progBox) progBox.classList.add('hidden');
+repairLibraryTotals.analyzed = Math.min(repairLibraryTotals.total, repairLibraryTotals.analyzed + analyzed);
+renderRepairFiles(files.filter(f => (!f.metadata || f.metadata.integrity_checked === false) && !unanalyzed.includes(f)).slice(0, MAX_FILES_TO_SCAN));
 showToast(I18N.t('toast.repair_scan_done', { found, analyzed }), 'success');
 }
 function updateRepairBadge() {
@@ -17481,7 +17701,7 @@ return (converterAllFiles || []).filter(f => {
     const ext = (f.extension || '').toLowerCase();
     if (!['.stl', '.3mf', '.obj', '.step', '.stp', '.ply', '.amf'].includes(ext)) return false;
     if (inputFormat !== 'all' && ext !== inputFormat) return false;
-    if (ext === '.' + outputFormat) return false;
+    if (ext === '.' + (outputFormat === 'stl_ascii' ? 'stl_ascii' : outputFormat)) return false;   // STL → STL ASCII reste possible
     if (search && !f.name.toLowerCase().includes(search)) return false;
     return true;
 });
@@ -17561,7 +17781,7 @@ try {
     });
     const data = await res.json();
     if (res.ok && data.success) {
-        let msg = I18N.t('converter.converted_success', { format: targetFormat, suffix: data.deleted_original ? I18N.t('converter.deleted_original_suffix') : I18N.t('converter.kept_original_suffix') });
+        let msg = I18N.t('converter.converted_success', { format: targetFormat.replace('_ascii', ' ASCII').toUpperCase(), suffix: data.deleted_original ? I18N.t('converter.deleted_original_suffix') : I18N.t('converter.kept_original_suffix') });
         if (typeof data.size_reduction_pct === 'number' && data.size_reduction_pct > 0) {
             msg += I18N.t('converter.size_reduction_suffix', { newSize: formatSize(data.new_size), oldSize: formatSize(data.original_size), pct: data.size_reduction_pct });
         }

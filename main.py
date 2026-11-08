@@ -2412,6 +2412,10 @@ def init_db():
         failed INTEGER DEFAULT 0,
         updated_at REAL DEFAULT 0
     )""")
+    try:
+        c.execute("ALTER TABLE file_analysis ADD COLUMN integrity INTEGER DEFAULT 0")   # 1 = contrôle non-manifold effectué
+    except Exception:
+        pass
     c.execute("""CREATE TABLE IF NOT EXISTS spool_assignments (
         file_path TEXT NOT NULL,
         user_id INTEGER NOT NULL,
@@ -6880,6 +6884,8 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
             MAX_RENDER_FACES = 400000
             RENDER_TARGET_FACES = 300000
             faces_before = len(mesh.faces)
+            if not is_virtual and ext in ('.stl', '.obj', '.ply', '.amf') and faces_before <= 1500000:
+                _record_integrity_hint(stl_path, mesh)   # contrôle non-manifold pendant que le maillage est en mémoire
             _has_face_colors = (hasattr(mesh, 'metadata') and mesh.metadata.get('stellio_face_rgb') is not None)
             if faces_before > MAX_RENDER_FACES and not _has_face_colors:  # la décimation globale ferait perdre les couleurs par face
                 try:
@@ -7307,10 +7313,11 @@ def analysis_db_put(path, metadata):
         conn = get_db()
         try:
             conn.execute(
-                "INSERT OR REPLACE INTO file_analysis (path_hash, path, mtime, size, data, failed, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO file_analysis (path_hash, path, mtime, size, data, failed, updated_at, integrity) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (_analysis_hash(path), path.replace('\\', '/'), stat[0], stat[1],
-                 json.dumps(metadata) if metadata else '', 0 if metadata else 1, time.time()))
+                 json.dumps(metadata) if metadata else '', 0 if metadata else 1, time.time(),
+                 1 if (metadata and metadata.get('integrity_checked')) else 0))
             conn.commit()
         finally:
             conn.close()
@@ -7318,14 +7325,15 @@ def analysis_db_put(path, metadata):
         app_logger.info(f"[ANALYSE] Enregistrement impossible: {e}")
 
 
-def analyze_3d_file_stored(path):
-    """Analyse (rapide) d'un fichier avec conservation en base ; None si l'analyse est impossible."""
+def analyze_3d_file_stored(path, full=False):
+    """Analyse d'un fichier avec conservation en base ; None si l'analyse est impossible.
+    full=True : avec contrôle non-manifold (analyse de fond) ; sinon rapide (fenêtre de détails)."""
     meta, failed = analysis_db_get(path)
-    if meta is not None:
+    if meta is not None and (not full or meta.get('integrity_checked')):
         return meta
     if failed:
         return None
-    meta = analyze_3d_file(path, fast=True)
+    meta = analyze_3d_file(path, fast=not full)
     analysis_db_put(path, meta)
     return meta
 
@@ -7351,8 +7359,8 @@ def analysis_background_worker():
             try:
                 sources = conn.execute("SELECT * FROM sources").fetchall()
                 # état connu chargé d'un seul coup (au lieu d'une connexion par fichier)
-                known_rows = {r['path_hash']: (r['mtime'], r['size'], r['failed'])
-                              for r in conn.execute("SELECT path_hash, mtime, size, failed FROM file_analysis").fetchall()}
+                known_rows = {r['path_hash']: (r['mtime'], r['size'], r['failed'], r['integrity'])
+                              for r in conn.execute("SELECT path_hash, mtime, size, failed, integrity FROM file_analysis").fetchall()}
             finally:
                 conn.close()
             exts = tuple(e for e in SUPPORTED_EXTENSIONS_TUPLE if e not in ('.step', '.stp'))
@@ -7372,14 +7380,15 @@ def analysis_background_worker():
                             continue
                         total += 1
                         kr = known_rows.get(_analysis_hash(fpath))
-                        if kr and abs((kr[0] or 0) - stat[0]) <= 0.001 and int(kr[1] or 0) == stat[1]:
+                        # connu = analysé ET contrôle non-manifold fait (les anciennes analyses rapides sont complétées)
+                        if kr and abs((kr[0] or 0) - stat[0]) <= 0.001 and int(kr[1] or 0) == stat[1] and (kr[2] or kr[3]):
                             known += 1
                             continue
                         # pas de calcul tant que l'utilisateur agit ou que des miniatures se génèrent
                         while _user_is_active() or not thumb_generation_queue.empty():
                             time.sleep(2)
                         t0 = time.time()
-                        analyze_3d_file_stored(fpath)
+                        analyze_3d_file_stored(fpath, full=True)
                         done += 1
                         known += 1
                         _analysis_progress.update({'total': total, 'done': known})
@@ -7511,6 +7520,37 @@ def thumb_render_migration_worker():
         app_logger.info(f"[THUMBS] Migration du rendu impossible: {e}")
 
 
+# Contrôle non-manifold fait gratuitement pendant le rendu de la miniature (le maillage est déjà chargé) :
+# l'analyse de fond le reprend au lieu de recharger le fichier et de refaire le calcul.
+_integrity_hints = {}   # chemin normalisé -> (mtime, taille, needs_repair)
+_integrity_hints_lock = threading.Lock()
+
+
+def _record_integrity_hint(path, mesh):
+    try:
+        stat = _analysis_stat(path)
+        if stat is None:
+            return
+        needs = bool(mesh_really_needs_repair(mesh))
+        with _integrity_hints_lock:
+            if len(_integrity_hints) > 5000:
+                _integrity_hints.pop(next(iter(_integrity_hints)), None)
+            _integrity_hints[path.replace('\\', '/')] = (stat[0], stat[1], needs)
+        if needs:
+            app_logger.info(f"[INTEGRITE] Défaut de maillage détecté pendant la miniature : {os.path.basename(path)}")
+    except Exception:
+        pass
+
+
+def _take_integrity_hint(path):
+    stat = _analysis_stat(path)
+    with _integrity_hints_lock:
+        h = _integrity_hints.pop(path.replace('\\', '/'), None)
+    if h and stat and abs(h[0] - stat[0]) <= 0.001 and h[1] == stat[1]:
+        return h[2]
+    return None
+
+
 def analyze_3d_file(file_path, fast=False):
     try:
         if file_path.lower().endswith('.3mf'):
@@ -7551,7 +7591,11 @@ def analyze_3d_file(file_path, fast=False):
         already_handled = file_path.replace('\\', '/') in repair_ignored_cache
 
         # fast=True (fenêtre de détails) : on saute le contrôle d'intégrité du maillage, qui demande plusieurs secondes
-        mesh_is_sane = True if fast else not mesh_really_needs_repair(mesh)
+        if fast:
+            mesh_is_sane = True
+        else:
+            _hint = _take_integrity_hint(file_path)   # déjà calculé pendant la miniature ?
+            mesh_is_sane = (not _hint) if _hint is not None else not mesh_really_needs_repair(mesh)
 
         return {
             'dimensions': {'x': round(dimensions[0], 1), 'y': round(dimensions[1], 1), 'z': round(dimensions[2], 1)},
@@ -7563,6 +7607,7 @@ def analyze_3d_file(file_path, fast=False):
             'is_manifold': mesh_is_sane or already_handled,
             'needs_repair': (not mesh_is_sane) and not already_handled,
             'is_empty': mesh.is_empty,
+            'integrity_checked': not fast,
             'estimate_source': 'geometric'
         }
     except Exception as e:
@@ -18012,7 +18057,13 @@ def api_repair_file():
         return jsonify({"error": f"Échec: {str(e)}"}), 500
 
 
-CONVERT_SUPPORTED_FORMATS = ('stl', '3mf', 'obj')
+CONVERT_SUPPORTED_FORMATS = ('stl', '3mf', 'obj')   # formats relus par le contrôle d'intégrité (rapides à charger)
+CONVERT_SOURCE_FORMATS = ('stl', '3mf', 'obj', 'ply', 'amf', 'step', 'stp')
+# format de sortie demandé → (type d'export trimesh, extension du fichier créé)
+CONVERT_TARGET_FORMATS = {
+    'stl': ('stl', 'stl'), 'stl_ascii': ('stl_ascii', 'stl'), 'obj': ('obj', 'obj'), '3mf': ('3mf', '3mf'),
+    'ply': ('ply', 'ply'), 'off': ('off', 'off'), 'glb': ('glb', 'glb'),
+}
 CONVERT_UNIT_TO_MM = {
     'mm': 1.0,
     'cm': 10.0,
@@ -18074,16 +18125,17 @@ def _load_mesh_for_conversion(file_path):
 
 def _convert_single_file(file_path, target_format, delete_original, repair=False, source_unit='mm'):
     target_format = (target_format or '').lower().lstrip('.')
-    if target_format not in CONVERT_SUPPORTED_FORMATS:
+    if target_format not in CONVERT_TARGET_FORMATS:
         return {"success": False, "path": file_path, "error": "Format de sortie non supporté"}
 
     if not file_path or not os.path.exists(file_path):
         return {"success": False, "path": file_path, "error": "Fichier non trouvé"}
 
     src_ext = os.path.splitext(file_path)[1].lower().lstrip('.')
-    if src_ext not in CONVERT_SUPPORTED_FORMATS:
+    if src_ext not in CONVERT_SOURCE_FORMATS:
         return {"success": False, "path": file_path, "error": "Format d'entrée non supporté"}
-    if src_ext == target_format:
+    export_type, target_ext = CONVERT_TARGET_FORMATS[target_format]
+    if src_ext == target_ext and target_format != 'stl_ascii':
         return {"success": False, "path": file_path, "error": "Le fichier est déjà dans ce format"}
 
     try:
@@ -18099,14 +18151,14 @@ def _convert_single_file(file_path, target_format, delete_original, repair=False
 
         base_dir = os.path.dirname(file_path)
         base_name = os.path.splitext(os.path.basename(file_path))[0]
-        out_path = os.path.join(base_dir, f"{base_name}.{target_format}")
+        out_path = os.path.join(base_dir, f"{base_name}.{target_ext}")
 
         counter = 1
         while os.path.exists(out_path):
-            out_path = os.path.join(base_dir, f"{base_name} ({counter}).{target_format}")
+            out_path = os.path.join(base_dir, f"{base_name} ({counter}).{target_ext}")
             counter += 1
 
-        mesh.export(out_path, file_type=target_format)
+        mesh.export(out_path, file_type=export_type)
 
         original_size = os.path.getsize(file_path)
         new_size = os.path.getsize(out_path) if os.path.exists(out_path) else 0
@@ -21129,7 +21181,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.9.3"
+CURRENT_VERSION = "0.9.5"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -24203,9 +24255,18 @@ def _ensure_workshop_tables():
         )""")
         cols = {r['name'] for r in conn.execute("PRAGMA table_info(print_jobs)").fetchall()}
         for name, ddl in (('scrap', 'INTEGER DEFAULT 0'), ('actual_hours', 'REAL DEFAULT 0'),
-                          ('actual_weight_g', 'REAL'), ('cost_model', "TEXT DEFAULT ''")):
+                          ('actual_weight_g', 'REAL'), ('cost_model', "TEXT DEFAULT ''"),
+                          ('track_token', "TEXT DEFAULT ''"), ('client_note', "TEXT DEFAULT ''")):
             if name not in cols:
                 conn.execute(f"ALTER TABLE print_jobs ADD COLUMN {name} {ddl}")
+        conn.execute("""CREATE TABLE IF NOT EXISTS visual_index (
+            file_path TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            caption TEXT DEFAULT '',
+            model TEXT DEFAULT '',
+            indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (file_path, user_id)
+        )""")
         conn.commit()
     finally:
         conn.close()
@@ -24314,6 +24375,7 @@ def _job_dict(r, printer_names, revenue=0):
         'due_date': r['due_date'], 'status': r['status'], 'notes': r['notes'],
         'late': bool(open_ and r['due_date'] and r['due_date'] < today),
         'created_at': r['created_at'], 'done_at': r['done_at'],
+        'track_token': r['track_token'] or '', 'client_note': r['client_note'] or '',
     }
 
 
@@ -24348,7 +24410,7 @@ def _job_fields(data, partial=False):
             return None
         if part:
             out['part'] = part
-    for k, lim in (('client', 120), ('material', 40), ('notes', 300)):
+    for k, lim in (('client', 120), ('material', 40), ('notes', 300), ('client_note', 300)):
         if k in data:
             out[k] = str(data.get(k) or '').strip()[:lim]
     if 'quantity' in data:
@@ -24444,6 +24506,157 @@ def api_orders_from_quote(qid):
     if not row:
         return jsonify({'success': False, 'error': 'not_found'}), 404
     return jsonify({'success': True, 'created': _create_jobs_from_quote(session['user_id'], row)})
+
+
+# ── Page de suivi client : un lien public par commande ──────────────────────────────────────
+def _share_base_url():
+    remote_state = get_remote_state()
+    if remote_state.get('status') == 'ready' and remote_state.get('url'):
+        return remote_state['url'].rstrip('/'), True
+    return f"http://{get_local_ip()}:{SERVER_PORT}", False
+
+
+@app.route('/api/orders/<int:jid>/track', methods=['POST'])
+@login_required
+def api_orders_track_create(jid):
+    """Crée (ou renvoie) le lien de suivi public d'une commande ; enregistre au passage le message au client."""
+    data = request.get_json(silent=True) or {}
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT track_token FROM print_jobs WHERE id=? AND user_id=?", (jid, session['user_id'])).fetchone()
+        if not row:
+            return jsonify({'success': False, 'error': 'not_found'}), 404
+        token = row['track_token'] or secrets.token_urlsafe(18)
+        if 'client_note' in data:
+            conn.execute("UPDATE print_jobs SET track_token=?, client_note=? WHERE id=?",
+                         (token, str(data.get('client_note') or '').strip()[:300], jid))
+        else:
+            conn.execute("UPDATE print_jobs SET track_token=? WHERE id=?", (token, jid))
+        conn.commit()
+    finally:
+        conn.close()
+    base, remote = _share_base_url()
+    rs = get_remote_state()
+    return jsonify({'success': True, 'token': token, 'url': f"{base}/order/{token}", 'remote': remote,
+                    'remote_status': rs.get('status'), 'remote_mode': rs.get('mode'), 'remote_error': rs.get('error')})
+
+
+@app.route('/api/orders/<int:jid>/track', methods=['DELETE'])
+@login_required
+def api_orders_track_revoke(jid):
+    conn = get_db()
+    try:
+        conn.execute("UPDATE print_jobs SET track_token='' WHERE id=? AND user_id=?", (jid, session['user_id']))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({'success': True})
+
+
+def _order_by_track_token(token):
+    # Un jeton vide ne doit jamais correspondre : les commandes sans lien ont track_token = ''
+    if not token or len(token) < 10 or len(token) > 80:
+        return None
+    conn = get_db()
+    try:
+        return conn.execute("SELECT * FROM print_jobs WHERE track_token=? AND track_token!=''", (token,)).fetchone()
+    finally:
+        conn.close()
+
+
+@app.route('/order/<token>/data', methods=['GET'])
+def api_order_track_data(token):
+    """Données publiques minimales : jamais de prix, de marge, de notes internes ni de nom d'imprimante."""
+    job = _order_by_track_token(token)
+    if not job:
+        return jsonify({"error": "Lien invalide"}), 404
+    try:
+        settings = load_settings() or {}
+    except Exception:
+        settings = {}
+    shop = str(settings.get('quote_company') or settings.get('print_cost_quote_company') or '').strip()[:120]
+    qty = max(1, int(job['quantity'] or 1))
+    done = max(0, min(int(job['qty_done'] or 0), qty))
+    status = job['status'] if job['status'] in _JOB_STATUSES else 'queued'
+    live = None
+    if status == 'printing' and job['printer_id']:
+        try:
+            conn = get_db()
+            try:
+                prow = conn.execute("SELECT * FROM printers WHERE id=? AND user_id=?", (job['printer_id'], job['user_id'])).fetchone()
+            finally:
+                conn.close()
+            if prow:
+                st = _printer_status_cached(parse_printer_config(prow))
+                if st.get('status') in ('printing', 'paused'):
+                    live = round(float(st.get('progress') or 0), 1)
+        except Exception:
+            live = None
+    resp = jsonify({
+        "shop": shop, "part": job['part'], "quantity": qty, "qty_done": done, "status": status,
+        "due_date": job['due_date'] or '', "created_at": (job['created_at'] or '')[:10], "done_at": job['done_at'] or '',
+        "note": job['client_note'] or '', "live_progress": live, "now": int(time.time()),
+    })
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+
+_ORDER_TRACK_PAGE = r"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>Suivi de commande</title><style>
+*{box-sizing:border-box}body{margin:0;background:#0b0e13;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:24px 18px 40px;display:flex;justify-content:center}
+.card{width:100%;max-width:520px;background:#151a23;border:2px solid #232a38;border-radius:22px;padding:26px 24px;display:flex;flex-direction:column;gap:18px}
+.shop{font-size:13px;color:#8b95a8;letter-spacing:.04em;text-transform:uppercase}h1{font-size:24px;margin:0;word-break:break-word}
+.pill{display:inline-block;font-size:15px;font-weight:700;padding:6px 14px;border-radius:999px;background:#232a38;color:#cbd5e1}
+.s-printing .pill{background:rgba(78,161,211,.2);color:#4ea1d3}.s-done .pill{background:rgba(56,193,114,.2);color:#38c172}.s-cancelled .pill{background:rgba(232,93,117,.2);color:#e85d75}
+.steps{display:flex;align-items:flex-start;gap:0}.step{flex:1;text-align:center;font-size:12px;color:#5b6577;position:relative}
+.dot{width:22px;height:22px;border-radius:50%;background:#232a38;margin:0 auto 6px;border:2px solid #232a38;position:relative;z-index:1}
+.step:not(:last-child):after{content:"";position:absolute;top:10px;left:50%;width:100%;height:3px;background:#232a38}
+.step.on{color:#e2e8f0}.step.on .dot{background:#4ea1d3;border-color:#4ea1d3}.step.on:not(:last-child):after{background:#4ea1d3}
+.s-done .step.on .dot{background:#38c172;border-color:#38c172}.s-done .step.on:not(:last-child):after{background:#38c172}
+.bar{height:12px;background:#232a38;border-radius:8px;overflow:hidden}.bar div{height:100%;background:#4ea1d3;border-radius:8px;transition:width .6s}.s-done .bar div{background:#38c172}
+.row{display:flex;justify-content:space-between;gap:10px;font-size:15px;color:#cbd5e1}.row b{color:#fff}
+.note{background:#0f131b;border-left:3px solid #4ea1d3;border-radius:8px;padding:12px 14px;font-size:15px;color:#e2e8f0;white-space:pre-wrap}
+.ready{background:rgba(56,193,114,.15);border:1px solid #38c172;color:#7ee2a8;border-radius:12px;padding:14px;font-size:17px;font-weight:700;text-align:center}
+.msg{text-align:center;color:#8b95a8;padding:40px 10px}footer{text-align:center;color:#5b6577;font-size:12px}
+</style></head><body><div class="card" id="c"><div class="msg">…</div></div><script>
+const L={fr:{st:{queued:'En file d’attente',printing:'En cours d’impression',done:'Terminée',cancelled:'Annulée'},s1:'Reçue',s2:'Impression',s3:'Prête',ready:'Votre commande est prête à être retirée',qty:'Quantité',done:'Pièces terminées',due:'Livraison prévue',since:'Commande du',doneat:'Terminée le',err:'Lien invalide ou révoqué',foot:'Suivi en lecture seule'},
+en:{st:{queued:'Queued',printing:'Printing',done:'Done',cancelled:'Cancelled'},s1:'Received',s2:'Printing',s3:'Ready',ready:'Your order is ready for pickup',qty:'Quantity',done:'Parts finished',due:'Expected on',since:'Ordered on',doneat:'Finished on',err:'Invalid or revoked link',foot:'Read-only tracking'},
+de:{st:{queued:'In der Warteschlange',printing:'Wird gedruckt',done:'Fertig',cancelled:'Storniert'},s1:'Erhalten',s2:'Druck',s3:'Bereit',ready:'Ihre Bestellung ist abholbereit',qty:'Menge',done:'Fertige Teile',due:'Voraussichtlich am',since:'Bestellt am',doneat:'Fertig am',err:'Ungültiger oder widerrufener Link',foot:'Nur-Lese-Verfolgung'},
+es:{st:{queued:'En cola',printing:'Imprimiendo',done:'Terminado',cancelled:'Cancelado'},s1:'Recibido',s2:'Impresión',s3:'Listo',ready:'Su pedido está listo para recoger',qty:'Cantidad',done:'Piezas terminadas',due:'Entrega prevista',since:'Pedido el',doneat:'Terminado el',err:'Enlace no válido o revocado',foot:'Seguimiento de solo lectura'},
+pt:{st:{queued:'Em fila',printing:'A imprimir',done:'Concluído',cancelled:'Cancelado'},s1:'Recebido',s2:'Impressão',s3:'Pronto',ready:'A sua encomenda está pronta para levantamento',qty:'Quantidade',done:'Peças concluídas',due:'Entrega prevista',since:'Encomendado em',doneat:'Concluído em',err:'Ligação inválida ou revogada',foot:'Acompanhamento só de leitura'},
+it:{st:{queued:'In coda',printing:'In stampa',done:'Completato',cancelled:'Annullato'},s1:'Ricevuto',s2:'Stampa',s3:'Pronto',ready:'Il suo ordine è pronto per il ritiro',qty:'Quantità',done:'Pezzi completati',due:'Consegna prevista',since:'Ordinato il',doneat:'Completato il',err:'Link non valido o revocato',foot:'Monitoraggio in sola lettura'},
+zh:{st:{queued:'排队中',printing:'打印中',done:'已完成',cancelled:'已取消'},s1:'已接收',s2:'打印',s3:'可取',ready:'您的订单已可取货',qty:'数量',done:'已完成件数',due:'预计交付',since:'下单日期',doneat:'完成日期',err:'链接无效或已撤销',foot:'只读跟踪'},
+ja:{st:{queued:'順番待ち',printing:'印刷中',done:'完了',cancelled:'キャンセル'},s1:'受付',s2:'印刷',s3:'受取可',ready:'ご注文の品はお受け取りいただけます',qty:'数量',done:'完成数',due:'お渡し予定',since:'注文日',doneat:'完了日',err:'リンクが無効か取り消されました',foot:'閲覧専用の追跡'}};
+const T=L[(navigator.language||'fr').slice(0,2)]||L.en,$=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fd=s=>{if(!s)return'';const d=new Date(s+'T00:00:00');return isNaN(d)?esc(s):d.toLocaleDateString()};
+async function load(){try{const r=await fetch(location.pathname.replace(/\/$/,'')+'/data',{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();
+document.title=d.part;const st=d.status,step=st==='done'?3:st==='printing'?2:1;
+let pct=Math.round(100*d.qty_done/d.quantity);if(st==='printing'&&d.live_progress!=null&&d.qty_done<d.quantity)pct=Math.round(100*(d.qty_done+d.live_progress/100)/d.quantity);if(st==='done')pct=100;
+$('c').className='card s-'+st;
+$('c').innerHTML=(d.shop?'<div class="shop">'+esc(d.shop)+'</div>':'')+'<h1>'+esc(d.part)+'</h1><div><span class="pill">'+T.st[st]+'</span></div>'+
+(st==='done'?'<div class="ready">✓ '+T.ready+'</div>':'')+
+(st!=='cancelled'?'<div class="steps"><div class="step on"><div class="dot"></div>'+T.s1+'</div><div class="step '+(step>=2?'on':'')+'"><div class="dot"></div>'+T.s2+'</div><div class="step '+(step>=3?'on':'')+'"><div class="dot"></div>'+T.s3+'</div></div><div class="bar"><div style="width:'+pct+'%"></div></div>':'')+
+'<div class="row"><span>'+T.done+'</span><b>'+d.qty_done+' / '+d.quantity+'</b></div>'+
+(d.due_date&&st!=='done'&&st!=='cancelled'?'<div class="row"><span>'+T.due+'</span><b>'+fd(d.due_date)+'</b></div>':'')+
+(d.created_at?'<div class="row"><span>'+T.since+'</span><b>'+fd(d.created_at)+'</b></div>':'')+
+(st==='done'&&d.done_at?'<div class="row"><span>'+T.doneat+'</span><b>'+fd(d.done_at)+'</b></div>':'')+
+(d.note?'<div class="note">'+esc(d.note)+'</div>':'')+'<footer>'+T.foot+'</footer>'}
+catch(e){$('c').innerHTML='<div class="msg">'+T.err+'</div>'}}
+load();setInterval(load,15000);
+</script></body></html>"""
+
+
+@app.route('/order/<token>', methods=['GET'])
+def order_track_page(token):
+    if not _order_by_track_token(token):
+        return Response("Lien invalide ou révoqué", status=404, mimetype='text/plain; charset=utf-8')
+    resp = Response(_ORDER_TRACK_PAGE, mimetype='text/html')
+    resp.headers['Cache-Control'] = 'no-store'
+    resp.headers['X-Robots-Tag'] = 'noindex, nofollow'
+    resp.headers['Referrer-Policy'] = 'no-referrer'
+    return resp
 
 
 # ── Maintenance prédictive : rythme réel d'impression par imprimante ──
@@ -24733,10 +24946,14 @@ def _ollama_is_reachable(base_url: str, timeout: int = 4) -> bool:
 
 def _call_ollama(base_url: str, model: str, prompt: str, system: str = "",
                  temperature: float = 0.2, num_predict: int = 200,
-                 timeout: int = 300, images: list = None) -> str:
+                 timeout: int = 300, images: list = None, extra_options: dict = None, keep_alive=None) -> str:
     payload = {"model": model, "prompt": prompt, "stream": False,
                "think": False,
                "options": {"temperature": temperature, "num_predict": num_predict}}
+    if extra_options:
+        payload["options"].update(extra_options)
+    if keep_alive is not None:
+        payload["keep_alive"] = keep_alive
     if system:
         payload["system"] = system
     if images:
@@ -25097,7 +25314,8 @@ def is_ai_enabled() -> bool:
 OLLAMA_TIMEOUT_SECONDS = 300
 
 def _call_ai(prompt: str, system: str = "",
-             num_predict: int = 200, temperature: float = 0.2, images: list = None) -> tuple:
+             num_predict: int = 200, temperature: float = 0.2, images: list = None,
+             extra_options: dict = None, keep_alive=None) -> tuple:
     if not is_ai_enabled():
         raise AIDisabledError("Les fonctionnalités IA sont désactivées dans les Paramètres.")
 
@@ -25119,7 +25337,8 @@ def _call_ai(prompt: str, system: str = "",
 
     try:
         text = _call_ollama(base_url, model, prompt, system=system, temperature=temperature,
-                            num_predict=num_predict, timeout=OLLAMA_TIMEOUT_SECONDS, images=images)
+                            num_predict=num_predict, timeout=OLLAMA_TIMEOUT_SECONDS, images=images,
+                            extra_options=extra_options, keep_alive=keep_alive)
         if text:
             app_logger.info(f"[AI] ✅ Ollama ({model})")
             return text, 'ollama'
@@ -26582,6 +26801,278 @@ def api_ollama_semantic_search():
     except Exception as e:
         app_logger.error(f"[SemanticSearch] {e}")
         return jsonify({"results": [f['path'] for f in candidates], "fallback": True}), 200
+
+
+# ── Recherche par photo (modèle de vision local) ────────────────────────────────────────────
+# Principe économe : chaque miniature de la bibliothèque est décrite UNE fois en mots-clés par le modèle de vision
+# (indexation en arrière-plan, pausable, une image à la fois, interrompue si la mémoire manque). Ensuite une recherche
+# ne coûte qu'UN appel au modèle (la photo envoyée) : le classement se fait en local par recoupement de mots-clés.
+_VISUAL_PROMPT = ("Describe this 3D printed object (or photo of one) with 8 to 14 lowercase English keywords, comma-separated: "
+                  "object type, shape, function, style, notable parts. Keywords only, no sentence.")
+_VISUAL_SYSTEM = "You index a 3D model library. Reply only with comma-separated lowercase English keywords."
+_visual_state = {'running': False, 'stop': False, 'done': 0, 'total': 0, 'error': '', 'current': '', 'mode': 'gentle', 'waiting': ''}
+_visual_call_lock = threading.Lock()   # un seul appel au modèle de vision à la fois (indexation ou recherche)
+
+
+def _visual_ollama_opts(mode):
+    """Limite les threads du modèle : mode doux = la moitié des cœurs, rapide = tous sauf un."""
+    n = max(1, _effective_cpu_count())
+    return {'num_thread': max(1, n // 2) if mode == 'gentle' else max(1, n - 1)}
+
+
+def _visual_machine_busy():
+    """Raison pour laquelle l'indexation doit patienter (CPU déjà chargé), sinon ''."""
+    try:
+        import psutil
+        if psutil.cpu_percent(interval=0.5) > 70:
+            return 'load'
+    except Exception:
+        try:
+            if os.getloadavg()[0] / max(1, _effective_cpu_count()) > 0.8:
+                return 'load'
+        except Exception:
+            pass
+    return ''
+
+
+def _visual_unload_model():
+    """Libère la RAM : demande à Ollama de décharger le modèle de vision."""
+    try:
+        model = (load_settings() or {}).get('ollama_model') or ''
+        if model:
+            requests.post(f"{get_ollama_base_url()}/api/generate", json={"model": model, "keep_alive": 0}, timeout=10)
+    except Exception:
+        pass
+_visual_lock = threading.Lock()
+_VISUAL_STOP_WORDS = {'a', 'an', 'the', 'of', 'and', 'or', 'with', 'for', 'object', 'objects', 'printed', 'print', 'model', 'models',
+                      '3d', 'piece', 'part', 'parts', 'item', 'shape', 'style', 'white', 'gray', 'grey'}
+
+
+def _visual_tokens(text):
+    out = set()
+    for w in re.findall(r"[a-z0-9]+", (text or '').lower()):
+        if len(w) < 3 or w in _VISUAL_STOP_WORDS:
+            continue
+        if len(w) > 4 and w.endswith('s') and not w.endswith('ss'):
+            w = w[:-1]
+        out.add(w)
+    return out
+
+
+def _visual_thumb_b64(file_path, size=448):
+    """Miniature du fichier en JPEG réduit (base64) pour le modèle de vision ; None si absente."""
+    base = _thumb_base_path(file_path)
+    for ext in ('.webp', '.png', '.jpg'):
+        p = base + ext
+        if os.path.exists(p):
+            try:
+                from PIL import Image
+                import io as _io
+                with Image.open(p) as im:
+                    im = im.convert('RGB')
+                    im.thumbnail((size, size))
+                    buf = _io.BytesIO()
+                    im.save(buf, 'JPEG', quality=80)
+                return base64.b64encode(buf.getvalue()).decode('ascii')
+            except Exception:
+                return None
+    return None
+
+
+def _visual_local_check():
+    """Erreur (code) si la recherche par photo ne peut pas tourner : IA coupée, ou fournisseur en ligne (on garde les images en local)."""
+    if not is_ai_enabled():
+        return 'ai_disabled'
+    if get_ai_provider() != 'ollama':
+        return 'local_only'
+    return ''
+
+
+def _visual_library_paths():
+    try:
+        with open(CACHE_FILE, 'r', encoding='utf-8') as f:
+            cache = json.load(f)
+    except Exception:
+        return []
+    out = []
+    for fobj in (cache.get('files') if isinstance(cache, dict) else None) or []:
+        p = (fobj.get('path') or '').replace('\\', '/')
+        if p and not is_virtual_archive_path(p):
+            out.append(p)
+    return out
+
+
+def _visual_index_worker(user_id, paths):
+    model = (load_settings() or {}).get('ollama_model') or ''
+    try:
+        for p in paths:
+            if _visual_state['stop']:
+                break
+            mode = _visual_state['mode']
+            while not _visual_state['stop']:   # patiente tant que l'utilisateur ou la machine a besoin du CPU
+                if _thumb_paused:
+                    why = 'paused'
+                elif mode == 'gentle' and _user_is_active():
+                    why = 'active'
+                else:
+                    why = _visual_machine_busy()
+                _visual_state['waiting'] = why
+                if not why:
+                    break
+                time.sleep(2)
+            if _visual_state['stop']:
+                break
+            if _low_memory():
+                _visual_state['error'] = 'low_memory'
+                break
+            b64 = _visual_thumb_b64(p)
+            _visual_state['current'] = os.path.basename(p)
+            if not b64:
+                continue
+            t0 = time.time()
+            try:
+                with _visual_call_lock:
+                    text, source = _call_ai(_VISUAL_PROMPT, system=_VISUAL_SYSTEM, num_predict=70, temperature=0.1,
+                                            images=[b64], extra_options=_visual_ollama_opts(mode), keep_alive='30s')
+            except AIDisabledError:
+                _visual_state['error'] = 'ai_disabled'
+                break
+            except Exception as e:
+                _visual_state['error'] = 'ai_error'
+                app_logger.info(f"[VisualIndex] Arrêt : {e}")
+                break
+            if source == 'ollama_no_vision':
+                _visual_state['error'] = 'no_vision'
+                break
+            caption = ', '.join(sorted(_visual_tokens(text)))[:300]
+            if caption:
+                conn = get_db()
+                try:
+                    conn.execute("""INSERT INTO visual_index (file_path, user_id, caption, model) VALUES (?,?,?,?)
+                                    ON CONFLICT(file_path, user_id) DO UPDATE SET caption=excluded.caption, model=excluded.model, indexed_at=CURRENT_TIMESTAMP""",
+                                 (p, user_id, caption, model))
+                    conn.commit()
+                finally:
+                    conn.close()
+            _visual_state['done'] += 1
+            # cycle de service : on dort aussi longtemps que l'appel (≈ 50 % de CPU max en mode doux, ≈ 25 % en rapide)
+            time.sleep(max(0.5, (time.time() - t0) * (1.0 if mode == 'gentle' else 0.3)))
+    finally:
+        _visual_state['running'] = False
+        _visual_state['current'] = ''
+        _visual_state['waiting'] = ''
+        _visual_unload_model()
+        _trim_memory(force=True)
+
+
+def _visual_counts(user_id):
+    paths = [p for p in _visual_library_paths() if _has_thumb_on_disk(p)]
+    conn = get_db()
+    try:
+        have = {r['file_path'] for r in conn.execute("SELECT file_path FROM visual_index WHERE user_id=?", (user_id,)).fetchall()}
+    finally:
+        conn.close()
+    return paths, have
+
+
+@app.route('/api/ai/photo-index', methods=['GET'])
+@login_required
+def api_photo_index_status():
+    paths, have = _visual_counts(session['user_id'])
+    return jsonify({"total": len(paths), "indexed": sum(1 for p in paths if p in have),
+                    "running": _visual_state['running'], "run_done": _visual_state['done'], "run_total": _visual_state['total'],
+                    "error": _visual_state['error'], "current": _visual_state['current'],
+                    "waiting": _visual_state['waiting'], "mode": _visual_state['mode'],
+                    "blocked": _visual_local_check()}), 200
+
+
+@app.route('/api/ai/photo-index', methods=['POST'])
+@login_required
+def api_photo_index_control():
+    data = request.get_json(silent=True) or {}
+    if data.get('action') == 'stop':
+        _visual_state['stop'] = True
+        return jsonify({"success": True}), 200
+    blocked = _visual_local_check()
+    if blocked:
+        return jsonify({"success": False, "error": blocked}), 403
+    user_id = session['user_id']
+    with _visual_lock:
+        if _visual_state['running']:
+            return jsonify({"success": True, "already": True}), 200
+        paths, have = _visual_counts(user_id)
+        todo = [p for p in paths if p not in have]
+        try:
+            limit = int(data.get('limit') or 0)
+        except (TypeError, ValueError):
+            limit = 0
+        if limit > 0:
+            todo = todo[:limit]
+        _visual_state.update(running=True, stop=False, done=0, total=len(todo), error='', current='', waiting='',
+                             mode='fast' if data.get('mode') == 'fast' else 'gentle')
+    if not todo:
+        _visual_state['running'] = False
+        return jsonify({"success": True, "total": 0}), 200
+    threading.Thread(target=_visual_index_worker, args=(user_id, todo), daemon=True, name='visual-index').start()
+    return jsonify({"success": True, "total": len(todo)}), 200
+
+
+@app.route('/api/ai/photo-search', methods=['POST'])
+@login_required
+def api_photo_search():
+    """Reçoit une photo (data-URL ou base64) ; renvoie les chemins de la bibliothèque les plus ressemblants."""
+    blocked = _visual_local_check()
+    if blocked:
+        return jsonify({"error": blocked}), 403
+    data = request.get_json(silent=True) or {}
+    raw = str(data.get('image') or '')
+    if ',' in raw[:80]:
+        raw = raw.split(',', 1)[1]
+    if len(raw) < 100 or len(raw) > 6_000_000:
+        return jsonify({"error": "bad_image"}), 400
+    try:
+        base64.b64decode(raw, validate=True)
+    except Exception:
+        return jsonify({"error": "bad_image"}), 400
+    user_id = session['user_id']
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT file_path, caption FROM visual_index WHERE user_id=?", (user_id,)).fetchall()
+    finally:
+        conn.close()
+    if not rows:
+        return jsonify({"error": "not_indexed"}), 409
+    if _low_memory():
+        return jsonify({"error": "low_memory"}), 503
+    try:
+        with _visual_call_lock:
+            text, source = _call_ai(_VISUAL_PROMPT, system=_VISUAL_SYSTEM, num_predict=70, temperature=0.1, images=[raw],
+                                    extra_options=_visual_ollama_opts('gentle'),
+                                    keep_alive='30s' if _visual_state['running'] else 0)
+    except AIDisabledError:
+        return jsonify({"error": "ai_disabled"}), 403
+    except RuntimeError as e:
+        return jsonify({"error": "ai_error", "detail": str(e)[:200]}), 503
+    if source == 'ollama_no_vision':
+        return jsonify({"error": "no_vision"}), 422
+    qtok = _visual_tokens(text)
+    if not qtok:
+        return jsonify({"results": [], "keywords": []}), 200
+    docs = {r['file_path']: _visual_tokens(r['caption']) for r in rows}
+    n = len(docs)
+    df = {}
+    for toks in docs.values():
+        for t in toks:
+            df[t] = df.get(t, 0) + 1
+    scored = []
+    for p, toks in docs.items():
+        common = qtok & toks
+        if not common:
+            continue
+        score = sum(math.log(1 + n / df[t]) for t in common) / math.sqrt(len(toks) or 1)
+        scored.append((score, p))
+    scored.sort(reverse=True)
+    return jsonify({"results": [p for _s, p in scored[:30]], "keywords": sorted(qtok)}), 200
 
 
 SLICER_PROFILES_FILE = os.path.join(DATA_DIR, "slicer_profiles.json")
@@ -31549,6 +32040,79 @@ def api_filament_printable_files():
             printable[path] = True
     return jsonify({"printable": printable, "printable_count": len(printable),
                     "files_checked": checked, "slots_count": len(remaining)}), 200
+
+
+@app.route('/api/filament/printable-now', methods=['GET'])
+@login_required
+def api_filament_printable_now():
+    """Fichiers « imprimables chez moi maintenant » : la pièce tient sur le plateau d'au moins une de mes imprimantes
+    ET une bobine en stock (inventaire, Spoolman, TigerTag) ou chargée dans un AMS a assez de filament.
+    Ne regarde que les fichiers déjà analysés (aucune analyse lancée ici : pas de charge CPU)."""
+    user_id = session['user_id']
+    slots = []
+    try:
+        slots.extend(_get_manual_filament_slots(user_id))
+        url = ((load_settings() or {}).get('spoolman_url') or '').rstrip('/')
+        if url:
+            slots.extend(_get_spoolman_slots(url)[0])
+        slots.extend(_get_tigertag_slots(user_id))
+    except Exception as e:
+        app_logger.warning(f"[PrintableNow] Lecture du stock incomplète: {e}")
+    try:
+        slots.extend(_get_bambu_ams_slots(user_id))
+    except Exception as e:
+        app_logger.info(f"[PrintableNow] AMS ignoré: {e}")
+    remaining = [s.get('remaining_g') for s in slots
+                 if not s.get('archived') and isinstance(s.get('remaining_g'), (int, float))]
+    best = max(remaining) if remaining else 0
+
+    conn = get_db()
+    try:
+        prows = conn.execute("SELECT id, name, config FROM printers WHERE user_id=?", (user_id,)).fetchall()
+    finally:
+        conn.close()
+    printers = []
+    for r in prows:
+        try:
+            cfg = json.loads(r["config"]) if r["config"] else {}
+        except Exception:
+            cfg = {}
+        printers.append((r["name"], cfg))
+    if not printers or not remaining:
+        return jsonify({"printable": {}, "printable_count": 0, "files_checked": 0,
+                        "slots_count": len(remaining), "printers_count": len(printers), "unknown_bed": 0}), 200
+    unknown_bed = sum(1 for _n, c in printers if _bed_fit({'x': 1, 'y': 1, 'z': 1}, c) is None)
+
+    try:
+        with open(CACHE_FILE, 'r', encoding='utf-8') as f:
+            cache = json.load(f)
+    except Exception:
+        cache = {}
+    files = cache.get('files') if isinstance(cache, dict) else None
+    printable, checked = {}, 0
+    for fobj in files or []:
+        path = (fobj.get('path') or '').replace('\\', '/')
+        if not path or is_virtual_archive_path(path):
+            continue
+        analysis = cache.get(f"analysis_{hashlib.md5(path.encode()).hexdigest()}")
+        if not isinstance(analysis, dict):
+            continue
+        dims = analysis.get('dimensions')
+        w = (analysis.get('weights') or {}).get('pla')
+        if not dims or not isinstance(w, (int, float)):
+            continue
+        checked += 1
+        if w > best:
+            continue
+        ok_printers = []
+        for pname, cfg in printers:
+            res = _bed_fit(dims, cfg)
+            if res is None or res[0]:  # volume non renseigné : on ne l'exclut pas
+                ok_printers.append(pname)
+        if ok_printers:
+            printable[path] = ok_printers[:6]
+    return jsonify({"printable": printable, "printable_count": len(printable), "files_checked": checked,
+                    "slots_count": len(remaining), "printers_count": len(printers), "unknown_bed": unknown_bed}), 200
 
 
 @app.route('/api/files/assign-filament', methods=['POST'])

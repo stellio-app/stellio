@@ -686,6 +686,18 @@ jobs:
             exit 1
           fi
 
+      - name: Check glibc requirement (AppImage must run on older distributions)
+        run: |
+          # Le catalogue AppImage refuse un binaire qui exige une glibc plus récente que celle de la plus vieille LTS.
+          MAX=$(find dist/Stellio -type f \( -name '*.so*' -o -perm -u+x \) -print0 \
+                | xargs -0 -r objdump -T 2>/dev/null \
+                | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -V | tail -1)
+          echo "glibc maximale exigée par le bundle : ${MAX:-inconnue}"
+          if [ -n "$MAX" ] && [ "$(printf '%s\n2.35\n' "$MAX" | sort -V | tail -1)" != "2.35" ]; then
+            echo "Le bundle exige glibc $MAX (> 2.35, celle d'Ubuntu 22.04) : build annulé."
+            exit 1
+          fi
+
       - name: Copy patchable files into dist/Stellio/app
         run: |
           APP_DIR="dist/Stellio/app"
@@ -754,7 +766,10 @@ jobs:
           Name=Stellio
           Exec=Stellio
           Icon=stellio
+          Comment=3D file library manager for 3D printing
+          Terminal=false
           Categories=Utility;
+          X-AppImage-Version=${{ needs.check-version.outputs.version }}
           EOF
           cp AppDir/stellio.desktop AppDir/usr/share/applications/stellio.desktop
           # AppRun : point d'entree obligatoire d'un AppDir (appimagetool refuse de construire sans lui)
@@ -774,6 +789,24 @@ jobs:
           chmod +x "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage"
           sha256sum "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage" \
             > "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage.sha256"
+
+      - name: Smoke test (démarrage hors ligne, comme le test du catalogue AppImage)
+        run: |
+          sudo apt-get install -y xvfb
+          APPIMG="Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage"
+          export STELLIO_DATA_DIR="$(mktemp -d)"
+          # L'application doit rester en vie (fenêtre ou repli navigateur) plus de 15 s, sans réseau ni écran réel.
+          xvfb-run -a env -u http_proxy -u https_proxy ./"$APPIMG" --appimage-extract-and-run > smoke.log 2>&1 &
+          PID=$!
+          sleep 20
+          if ! kill -0 $PID 2>/dev/null; then
+            echo "L'AppImage s'est arrêtée avant 20 s :"; cat smoke.log; exit 1
+          fi
+          if grep -q "Failed to load Python shared library" smoke.log; then
+            echo "libpython introuvable :"; cat smoke.log; exit 1
+          fi
+          pkill -f Stellio || true
+          echo "Démarrage OK"
 
       - name: Upload Linux AppImage artifact
         uses: actions/upload-artifact@v6
