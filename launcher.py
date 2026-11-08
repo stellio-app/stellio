@@ -40,16 +40,38 @@ app_dir = _setup_early_env()
 # ---------------------------------------------------------
 
 
+def _log_dir_candidates(app_dir: Path):
+    """Dossiers de logs possibles, du plus habituel au plus sur.
+    Le premier (a cote de l'application) est lu-seul dans un AppImage, dans Program Files
+    ou dans un bac a sable : on bascule alors sur le dossier de donnees de l'utilisateur."""
+    yield app_dir.parent / "logs"
+    env_dir = os.environ.get("STELLIO_DATA_DIR", "").strip()
+    if env_dir:
+        yield Path(env_dir) / "logs"
+    if os.name == "nt":
+        yield Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming"))) / "Stellio" / "logs"
+    else:
+        yield Path.home() / ".stellio" / "logs"
+    import tempfile
+    yield Path(tempfile.gettempdir()) / "stellio-logs"
+
+
 def _setup_bootstrap_logger(app_dir: Path) -> logging.Logger:
-    log_dir = app_dir.parent / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
     logger = logging.getLogger("stellio.launcher")
     logger.setLevel(logging.INFO)
-    handler = RotatingFileHandler(
-        log_dir / "launcher.log", maxBytes=2_000_000, backupCount=2, encoding="utf-8"
-    )
-    handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)-8s %(message)s"))
-    logger.addHandler(handler)
+    for log_dir in _log_dir_candidates(app_dir):
+        try:
+            log_dir.mkdir(parents=True, exist_ok=True)
+            handler = RotatingFileHandler(
+                log_dir / "launcher.log", maxBytes=2_000_000, backupCount=2, encoding="utf-8"
+            )
+        except OSError:
+            continue
+        handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)-8s %(message)s"))
+        logger.addHandler(handler)
+        return logger
+    # Aucun dossier inscriptible : on demarre quand meme, sans fichier de log.
+    logger.addHandler(logging.NullHandler())
     return logger
 
 
