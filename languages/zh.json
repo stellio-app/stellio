@@ -2615,5 +2615,7 @@
   "repair.analyze_title": "网格分析",
   "repair.analyze_hint": "查找孔洞和开放边（非流形）。缩略图生成后也会在后台自动执行。",
   "repair.all_analyzed": "所有文件均已分析",
-  "repair.section_files": "待修复的文件"
+  "repair.section_files": "待修复的文件",
+  "demo.banner": "公开只读演示：可自由浏览，无法修改任何内容。",
+  "demo.get": "获取 Stellio"
 }

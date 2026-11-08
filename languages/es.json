@@ -2615,5 +2615,7 @@
   "repair.analyze_title": "Análisis de la malla",
   "repair.analyze_hint": "Detecta agujeros y aristas abiertas (non-manifold). También se hace automáticamente en segundo plano, en cuanto se crean las miniaturas.",
   "repair.all_analyzed": "Todos los archivos están analizados",
-  "repair.section_files": "Archivos por reparar"
+  "repair.section_files": "Archivos por reparar",
+  "demo.banner": "Demo pública de solo lectura: explore con libertad, nada se puede modificar.",
+  "demo.get": "Obtener Stellio"
 }

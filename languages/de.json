@@ -2615,5 +2615,7 @@
   "repair.analyze_title": "Netzanalyse",
   "repair.analyze_hint": "Findet Löcher und offene Kanten (Non-Manifold). Läuft auch automatisch im Hintergrund, sobald Vorschaubilder erstellt werden.",
   "repair.all_analyzed": "Alle Dateien sind analysiert",
-  "repair.section_files": "Zu reparierende Dateien"
+  "repair.section_files": "Zu reparierende Dateien",
+  "demo.banner": "Öffentliche Demo (nur Lesen): frei erkunden, nichts kann geändert werden.",
+  "demo.get": "Stellio holen"
 }

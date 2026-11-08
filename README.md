@@ -14,6 +14,25 @@
 </p>
 
 <p align="center">
+  <a href="https://demo.stellio-app.com"><b>▶ Try the live demo (read-only)</b></a>
+</p>
+
+<p align="center">
+  <img src="docs/demo.gif" alt="Stellio demo" width="860">
+</p>
+
+<table align="center">
+  <tr>
+    <td align="center"><a href="docs/screenshots/02-library.png"><img src="docs/screenshots/02-library.png" width="200"><br>Library</a></td>
+    <td align="center"><a href="docs/screenshots/03-viewer.png"><img src="docs/screenshots/03-viewer.png" width="200"><br>3D viewer</a></td>
+    <td align="center"><a href="docs/screenshots/04-filters.png"><img src="docs/screenshots/04-filters.png" width="200"><br>Filters</a></td>
+    <td align="center"><a href="docs/screenshots/05-repair.png"><img src="docs/screenshots/05-repair.png" width="200"><br>Repair</a></td>
+    <td align="center"><a href="docs/screenshots/06-converter.png"><img src="docs/screenshots/06-converter.png" width="200"><br>Converter</a></td>
+  </tr>
+</table>
+
+
+<p align="center">
   🇬🇧 <strong>English</strong> |
   <a href="docs/readme/README_fr.md">🇫🇷 Français</a> |
   <a href="docs/readme/README_de.md">🇩🇪 Deutsch</a> |

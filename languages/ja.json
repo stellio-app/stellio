@@ -2615,5 +2615,7 @@
   "repair.analyze_title": "メッシュ解析",
   "repair.analyze_hint": "穴や開いたエッジ（非多様体）を検出します。サムネイル作成と同時にバックグラウンドでも自動的に実行されます。",
   "repair.all_analyzed": "すべてのファイルを解析済み",
-  "repair.section_files": "修復が必要なファイル"
+  "repair.section_files": "修復が必要なファイル",
+  "demo.banner": "公開デモ（読み取り専用）：自由に操作できますが、何も変更されません。",
+  "demo.get": "Stellio を入手"
 }

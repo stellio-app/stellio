@@ -2615,5 +2615,7 @@
   "repair.analyze_title": "Analisi della mesh",
   "repair.analyze_hint": "Individua buchi e spigoli aperti (non-manifold). Viene eseguita anche automaticamente in background, appena vengono create le miniature.",
   "repair.all_analyzed": "Tutti i file sono analizzati",
-  "repair.section_files": "File da riparare"
+  "repair.section_files": "File da riparare",
+  "demo.banner": "Demo pubblica in sola lettura: esplora liberamente, nulla può essere modificato.",
+  "demo.get": "Ottieni Stellio"
 }

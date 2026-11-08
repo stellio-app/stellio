@@ -2615,5 +2615,7 @@
   "repair.analyze_title": "Mesh analysis",
   "repair.analyze_hint": "Finds holes and open edges (non-manifold). Also runs automatically in the background, as soon as thumbnails are created.",
   "repair.all_analyzed": "All files are analyzed",
-  "repair.section_files": "Files to repair"
+  "repair.section_files": "Files to repair",
+  "demo.banner": "Public read-only demo: explore freely, nothing can be changed.",
+  "demo.get": "Get Stellio"
 }

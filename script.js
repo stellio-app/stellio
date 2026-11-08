@@ -59,6 +59,14 @@
     window.addEventListener('focus', () => setTimeout(focusPage, 50));
 })();
 
+function detectBrowserLang() {
+const list = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || 'en'];
+for (const l of list) {
+const code = String(l || '').toLowerCase().split('-')[0];
+if (['fr','en','de','es','pt','it','zh','ja'].includes(code)) return code;
+}
+return 'en';
+}
 const I18N = {
 _langCache: null,
 get lang() {
@@ -94,7 +102,14 @@ const { folder, autoApply = true, onReady = null } = options;
 if (folder) this._config.folder = folder.startsWith('/') ? folder : `/${folder}`;
 try {
 let serverLang = null;
+let systemLang = null;
 const baseUrl = window.location.origin;
+if (!localStorage.getItem('stellio-lang')) {
+try {
+const fl = await fetch(`${baseUrl}/api/auth/first-launch`);
+if (fl.ok) { const info = await fl.json(); if (info && info.system_lang && this._supportedLangs[info.system_lang]) systemLang = info.system_lang; }
+} catch (e) { /* hors ligne : détection navigateur */ }
+}
 try {
 const res = await fetch(`${baseUrl}/api/settings`);
 if (res.ok) {
@@ -106,7 +121,7 @@ serverLang = settings.lang;
 } catch (e) {
 console.debug('[I18N] Backend indisponible, fallback localStorage');
 }
-this.lang = serverLang || localStorage.getItem('stellio-lang') || document.cookie.replace(/(?:(?:^|.*;\s*)stellio-lang\s*=\s*([^;]*).*$)|^.*$/, "$1") || 'fr';
+this.lang = serverLang || localStorage.getItem('stellio-lang') || document.cookie.replace(/(?:(?:^|.*;\s*)stellio-lang\s*=\s*([^;]*).*$)|^.*$/, "$1") || systemLang || detectBrowserLang();
 await this._loadLang(this.lang);
 if (this.lang !== this.fallback) {
 await this._loadLang(this.fallback);
@@ -455,6 +470,13 @@ await I18N.init({ folder: 'languages', autoApply: true });
 populateLanguageSelectors();
 translateSortOptions();
 translateAuthFields();
+firstLaunchPromise.then(info => {
+    // Édition bureau (Windows/macOS) : la langue suit le système ; le choix reste dans les paramètres.
+    if (info && info.server_edition === false) {
+        const box = document.querySelector('.auth-lang-selector');
+        if (box) box.style.display = 'none';
+    }
+});
 checkAuth(firstLaunchPromise);
 setupEventListeners();
 initSettings();
@@ -2014,7 +2036,7 @@ cards.forEach(card => observer.observe(card));
 
 
 (function applyThemeOnLoad() {
-const savedTheme = localStorage.getItem('stellio-theme') || 'dark';
+const savedTheme = localStorage.getItem('stellio-theme') || 'auto';
 const savedFabricant = localStorage.getItem('stellio-fabricant') || 'stellio';
 if (savedTheme === 'auto') {
 const isLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
@@ -2707,8 +2729,31 @@ function showAutoLoginConfirm(user) {
     yesBtn?.focus();
 }
 
+function showDemoBanner() {
+    if (document.getElementById('demo-banner')) return;
+    const b = document.createElement('div');
+    b.id = 'demo-banner';
+    b.innerHTML = '<i class="fa-solid fa-flask"></i> <span data-i18n="demo.banner">' + _t3('demo.banner', 'Démo publique en lecture seule : explorez librement, rien ne peut être modifié.') + '</span> <a href="https://github.com/stellio-app/stellio" target="_blank" rel="noopener" data-i18n="demo.get">' + _t3('demo.get', 'Obtenir Stellio') + '</a>';
+    document.body.prepend(b);
+    document.body.classList.add('has-demo-banner');
+}
 async function checkAuth(preFetchedFirstLaunch = null) {
 try {
+
+// Démo publique : entrée directe en lecture seule, sans écran de connexion
+try {
+    const flDemo = preFetchedFirstLaunch ? await preFetchedFirstLaunch : null;
+    if (flDemo && flDemo.demo) {
+        const r = await fetch(`${API}/api/demo/enter`, { method: 'POST', credentials: 'same-origin' });
+        if (r.ok) {
+            const d = await r.json();
+            window.STELLIO_DEMO = true;
+            showApp(d.user);
+            showDemoBanner();
+            return;
+        }
+    }
+} catch (e) { console.warn('[demo] entrée impossible', e); }
 
 // Reprise de session : si la session du serveur est toujours valide (retour dans l'app sans l'avoir fermée,
 // rechargement de la page par le téléphone…), on ne redemande pas les identifiants.
@@ -11426,7 +11471,7 @@ if (!themeSelector || !fabricantSelector) {
 console.warn('[Theme] ⚠️ Sélecteurs introuvables');
 return;
 }
-let savedTheme = localStorage.getItem('stellio-theme') || 'dark';
+let savedTheme = localStorage.getItem('stellio-theme') || 'auto';
 let savedFabricant = localStorage.getItem('stellio-fabricant') || 'stellio';
 themeSelector.value = savedTheme;
 fabricantSelector.value = savedFabricant;
@@ -11465,7 +11510,7 @@ applyFabricant(fabricant);
 });
 if (window.matchMedia) {
 window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', e => {
-if (localStorage.getItem('stellio-theme') === 'auto') {
+if ((localStorage.getItem('stellio-theme') || 'auto') === 'auto') {
 applyTheme('auto');
 console.log('[Theme] 🔄 Système:', e.matches ? I18N.t('settings.theme_light') : I18N.t('settings.theme_dark'));
 }

@@ -2615,5 +2615,7 @@
   "repair.analyze_title": "Analyse du maillage",
   "repair.analyze_hint": "Repère les trous et arêtes ouvertes (non-manifold). Fait aussi automatiquement en arrière-plan, dès la création des miniatures.",
   "repair.all_analyzed": "Tous les fichiers sont analysés",
-  "repair.section_files": "Fichiers à réparer"
+  "repair.section_files": "Fichiers à réparer",
+  "demo.banner": "Démo publique en lecture seule : explorez librement, rien ne peut être modifié.",
+  "demo.get": "Obtenir Stellio"
 }

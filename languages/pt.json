@@ -2615,5 +2615,7 @@
   "repair.analyze_title": "Análise da malha",
   "repair.analyze_hint": "Deteta buracos e arestas abertas (non-manifold). Também é feito automaticamente em segundo plano, assim que as miniaturas são criadas.",
   "repair.all_analyzed": "Todos os ficheiros estão analisados",
-  "repair.section_files": "Ficheiros a reparar"
+  "repair.section_files": "Ficheiros a reparar",
+  "demo.banner": "Demo pública somente leitura: explore à vontade, nada pode ser alterado.",
+  "demo.get": "Obter o Stellio"
 }

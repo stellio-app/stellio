@@ -1,4 +1,4 @@
-#define MyAppName      "Stellio-app"
+﻿#define MyAppName      "Stellio-app"
 #ifndef MyAppVersion
   #define MyAppVersion "0.0.0-dev"
 #endif
@@ -29,10 +29,133 @@ PrivilegesRequiredOverridesAllowed=dialog
 SetupIconFile={#SourcePath}assets\logo-nom-stellio.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 SetupLogging=yes
+ShowLanguageDialog=no
+LanguageDetectionMethod=uilanguage
+UsePreviousLanguage=no
 
 [Languages]
-Name: "french";  MessagesFile: "compiler:Languages\French.isl"
+; Langue détectée automatiquement d'après la langue d'affichage de Windows (ShowLanguageDialog=no).
+; Si elle n'est pas prise en charge (ex. chinois : pas de fichier officiel), l'anglais (1re ligne) est utilisé.
 Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "french";  MessagesFile: "compiler:Languages\French.isl"
+Name: "german";  MessagesFile: "compiler:Languages\German.isl"
+Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
+Name: "italian"; MessagesFile: "compiler:Languages\Italian.isl"
+Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
+Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
+
+[CustomMessages]
+english.LangCode=en
+french.LangCode=fr
+german.LangCode=de
+spanish.LangCode=es
+italian.LangCode=it
+brazilianportuguese.LangCode=pt
+japanese.LangCode=ja
+
+english.ExistTitle=Existing installation detected
+french.ExistTitle=Installation existante détectée
+german.ExistTitle=Vorhandene Installation erkannt
+spanish.ExistTitle=Instalación existente detectada
+italian.ExistTitle=Installazione esistente rilevata
+brazilianportuguese.ExistTitle=Instalação existente detectada
+japanese.ExistTitle=既存のインストールが見つかりました
+
+english.ExistDesc={#MyAppName} is already installed on your computer.
+french.ExistDesc={#MyAppName} est déjà installé sur votre ordinateur.
+german.ExistDesc={#MyAppName} ist bereits auf Ihrem Computer installiert.
+spanish.ExistDesc={#MyAppName} ya está instalado en su equipo.
+italian.ExistDesc={#MyAppName} è già installato sul computer.
+brazilianportuguese.ExistDesc={#MyAppName} já está instalado no seu computador.
+japanese.ExistDesc={#MyAppName} はすでにインストールされています。
+
+english.ExistVersion=Version %1 detected. What would you like to do?
+french.ExistVersion=Version %1 détectée. Que souhaitez-vous faire ?
+german.ExistVersion=Version %1 erkannt. Was möchten Sie tun?
+spanish.ExistVersion=Versión %1 detectada. ¿Qué desea hacer?
+italian.ExistVersion=Versione %1 rilevata. Cosa desidera fare?
+brazilianportuguese.ExistVersion=Versão %1 detectada. O que deseja fazer?
+japanese.ExistVersion=バージョン %1 が見つかりました。どうしますか？
+
+english.OptRepair=Repair / Update (overwrites existing files)
+french.OptRepair=Réparer / Mettre à jour (écrase les fichiers existants)
+german.OptRepair=Reparieren / Aktualisieren (überschreibt vorhandene Dateien)
+spanish.OptRepair=Reparar / Actualizar (sobrescribe los archivos existentes)
+italian.OptRepair=Ripara / Aggiorna (sovrascrive i file esistenti)
+brazilianportuguese.OptRepair=Reparar / Atualizar (substitui os arquivos existentes)
+japanese.OptRepair=修復 / 更新（既存のファイルを上書き）
+
+english.OptUninstall=Uninstall the current version, then reinstall
+french.OptUninstall=Désinstaller la version actuelle puis réinstaller
+german.OptUninstall=Aktuelle Version deinstallieren und neu installieren
+spanish.OptUninstall=Desinstalar la versión actual y volver a instalar
+italian.OptUninstall=Disinstalla la versione attuale e reinstalla
+brazilianportuguese.OptUninstall=Desinstalar a versão atual e reinstalar
+japanese.OptUninstall=現在のバージョンをアンインストールして再インストール
+
+english.OptCancel=Cancel
+french.OptCancel=Annuler
+german.OptCancel=Abbrechen
+spanish.OptCancel=Cancelar
+italian.OptCancel=Annulla
+brazilianportuguese.OptCancel=Cancelar
+japanese.OptCancel=キャンセル
+
+english.UninstallError=Error during uninstallation (code %1).
+french.UninstallError=Erreur lors de la désinstallation (code %1).
+german.UninstallError=Fehler bei der Deinstallation (Code %1).
+spanish.UninstallError=Error durante la desinstalación (código %1).
+italian.UninstallError=Errore durante la disinstallazione (codice %1).
+brazilianportuguese.UninstallError=Erro durante a desinstalação (código %1).
+japanese.UninstallError=アンインストール中にエラーが発生しました（コード %1）。
+
+english.DlVC=Downloading Visual C++ Redistributable...
+french.DlVC=Téléchargement de Visual C++ Redistributable...
+german.DlVC=Visual C++ Redistributable wird heruntergeladen...
+spanish.DlVC=Descargando Visual C++ Redistributable...
+italian.DlVC=Download di Visual C++ Redistributable...
+brazilianportuguese.DlVC=Baixando o Visual C++ Redistributable...
+japanese.DlVC=Visual C++ Redistributable をダウンロードしています...
+
+english.InstVC=Installing Visual C++ Redistributable...
+french.InstVC=Installation de Visual C++ Redistributable...
+german.InstVC=Visual C++ Redistributable wird installiert...
+spanish.InstVC=Instalando Visual C++ Redistributable...
+italian.InstVC=Installazione di Visual C++ Redistributable...
+brazilianportuguese.InstVC=Instalando o Visual C++ Redistributable...
+japanese.InstVC=Visual C++ Redistributable をインストールしています...
+
+english.FailVC=Unable to download Visual C++ Redistributable.%nCheck your internet connection.
+french.FailVC=Impossible de télécharger Visual C++ Redistributable.%nVérifiez votre connexion internet.
+german.FailVC=Visual C++ Redistributable konnte nicht heruntergeladen werden.%nÜberprüfen Sie Ihre Internetverbindung.
+spanish.FailVC=No se pudo descargar Visual C++ Redistributable.%nCompruebe su conexión a Internet.
+italian.FailVC=Impossibile scaricare Visual C++ Redistributable.%nControllare la connessione a Internet.
+brazilianportuguese.FailVC=Não foi possível baixar o Visual C++ Redistributable.%nVerifique sua conexão com a Internet.
+japanese.FailVC=Visual C++ Redistributable をダウンロードできませんでした。%nインターネット接続を確認してください。
+
+english.DlWV2=Downloading Microsoft Edge WebView2...
+french.DlWV2=Téléchargement de Microsoft Edge WebView2...
+german.DlWV2=Microsoft Edge WebView2 wird heruntergeladen...
+spanish.DlWV2=Descargando Microsoft Edge WebView2...
+italian.DlWV2=Download di Microsoft Edge WebView2...
+brazilianportuguese.DlWV2=Baixando o Microsoft Edge WebView2...
+japanese.DlWV2=Microsoft Edge WebView2 をダウンロードしています...
+
+english.InstWV2=Installing Microsoft Edge WebView2...
+french.InstWV2=Installation de Microsoft Edge WebView2...
+german.InstWV2=Microsoft Edge WebView2 wird installiert...
+spanish.InstWV2=Instalando Microsoft Edge WebView2...
+italian.InstWV2=Installazione di Microsoft Edge WebView2...
+brazilianportuguese.InstWV2=Instalando o Microsoft Edge WebView2...
+japanese.InstWV2=Microsoft Edge WebView2 をインストールしています...
+
+english.FailWV2=Unable to download WebView2.%nStellio will run in default browser mode.
+french.FailWV2=Impossible de télécharger WebView2.%nStellio fonctionnera en mode navigateur par défaut.
+german.FailWV2=WebView2 konnte nicht heruntergeladen werden.%nStellio wird im Standardbrowser ausgeführt.
+spanish.FailWV2=No se pudo descargar WebView2.%nStellio se ejecutará en el navegador predeterminado.
+italian.FailWV2=Impossibile scaricare WebView2.%nStellio verrà eseguito nel browser predefinito.
+brazilianportuguese.FailWV2=Não foi possível baixar o WebView2.%nO Stellio será executado no navegador padrão.
+japanese.FailWV2=WebView2 をダウンロードできませんでした。%nStellio は既定のブラウザーで動作します。
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
@@ -45,7 +168,7 @@ Source: "{#SourcePath}dist\Stellio\*"; DestDir: "{app}"; Flags: ignoreversion re
 
 [Icons]
 Name: "{commonprograms}\{#MyAppName}";             Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"
-Name: "{commonprograms}\Désinstaller {#MyAppName}"; Filename: "{uninstallexe}"
+Name: "{commonprograms}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{commondesktop}\{#MyAppName}";              Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [UninstallDelete]
@@ -138,13 +261,13 @@ begin
   if ExistingInstall then
   begin
     ChoicePage := CreateInputOptionPage(wpWelcome,
-      'Installation existante détectée',
-      'Une version de {#MyAppName} est déjà installée sur votre ordinateur.',
-      'Version ' + GetInstalledVersion + ' détectée. Que souhaitez-vous faire ?',
+      CustomMessage('ExistTitle'),
+      CustomMessage('ExistDesc'),
+      FmtMessage(CustomMessage('ExistVersion'), [GetInstalledVersion]),
       True, False);
-    ChoicePage.Add('Réparer / Mettre à jour (écrase les fichiers existants)');
-    ChoicePage.Add('Désinstaller la version actuelle puis réinstaller');
-    ChoicePage.Add('Annuler');
+    ChoicePage.Add(CustomMessage('OptRepair'));
+    ChoicePage.Add(CustomMessage('OptUninstall'));
+    ChoicePage.Add(CustomMessage('OptCancel'));
     ChoicePage.Values[0] := True;
   end;
 end;
@@ -166,7 +289,7 @@ begin
         Sleep(2000)
       else
       begin
-        MsgBox('Erreur lors de la désinstallation (code ' + IntToStr(Code) + ').', mbError, MB_OK);
+        MsgBox(FmtMessage(CustomMessage('UninstallError'), [IntToStr(Code)]), mbError, MB_OK);
         Result := False;
       end;
     end
@@ -193,37 +316,37 @@ begin
     // ── 1. Visual C++ Redistributable ────────────────────────────────────
     if not IsVCRedistInstalled then
     begin
-      WizardForm.StatusLabel.Caption := 'Téléchargement de Visual C++ Redistributable...';
+      WizardForm.StatusLabel.Caption := CustomMessage('DlVC');
       if DownloadFile('{#UrlVCRedist}', TmpVCRedist, 'VC++ Redist') then
       begin
-        WizardForm.StatusLabel.Caption := 'Installation de Visual C++ Redistributable...';
+        WizardForm.StatusLabel.Caption := CustomMessage('InstVC');
         Exec(TmpVCRedist, '/install /quiet /norestart', '', SW_HIDE, ewWaitUntilTerminated, Code);
         Log('VC++ installé, code = ' + IntToStr(Code));
       end
       else
-        MsgBox('Impossible de télécharger Visual C++ Redistributable.' + #13#10 +
-               'Vérifiez votre connexion internet.', mbError, MB_OK);
+        MsgBox(CustomMessage('FailVC'), mbError, MB_OK);
     end;
 
     // ── 2. Microsoft Edge WebView2 ────────────────────────────────────────
     if not IsWebView2Installed then
     begin
-      WizardForm.StatusLabel.Caption := 'Téléchargement de Microsoft Edge WebView2...';
+      WizardForm.StatusLabel.Caption := CustomMessage('DlWV2');
       if DownloadFile('{#UrlWebView2}', TmpWebView2, 'WebView2') then
       begin
-        WizardForm.StatusLabel.Caption := 'Installation de Microsoft Edge WebView2...';
+        WizardForm.StatusLabel.Caption := CustomMessage('InstWV2');
         Exec(TmpWebView2, '/install /norestart', '', SW_HIDE, ewWaitUntilTerminated, Code);
         Log('WebView2 installé, code = ' + IntToStr(Code));
       end
       else
-        MsgBox('Impossible de télécharger WebView2.' + #13#10 +
-               'Stellio fonctionnera en mode navigateur par défaut.', mbInformation, MB_OK);
+        MsgBox(CustomMessage('FailWV2'), mbInformation, MB_OK);
     end;
   end;
 
   if CurStep = ssPostInstall then
   begin
     SendMessageTimeout($FFFF, $001A, 0, 'Environment', $0002, 1000, Res);
+    // Mémorise la langue de l'installateur : Stellio démarre dans la même langue (modifiable dans ses paramètres).
+    SaveStringToFile(ExpandConstant('{app}\install-lang.txt'), CustomMessage('LangCode'), False);
   end;
 end;
 
@@ -236,4 +359,4 @@ begin
 end;
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Lancer {#MyAppName}"; Flags: nowait postinstall skipifsilent; Check: ShouldLaunchApp
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent; Check: ShouldLaunchApp
