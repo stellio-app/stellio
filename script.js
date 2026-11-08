@@ -2729,31 +2729,8 @@ function showAutoLoginConfirm(user) {
     yesBtn?.focus();
 }
 
-function showDemoBanner() {
-    if (document.getElementById('demo-banner')) return;
-    const b = document.createElement('div');
-    b.id = 'demo-banner';
-    b.innerHTML = '<i class="fa-solid fa-flask"></i> <span data-i18n="demo.banner">' + _t3('demo.banner', 'Démo publique en lecture seule : explorez librement, rien ne peut être modifié.') + '</span> <a href="https://github.com/stellio-app/stellio" target="_blank" rel="noopener" data-i18n="demo.get">' + _t3('demo.get', 'Obtenir Stellio') + '</a>';
-    document.body.prepend(b);
-    document.body.classList.add('has-demo-banner');
-}
 async function checkAuth(preFetchedFirstLaunch = null) {
 try {
-
-// Démo publique : entrée directe en lecture seule, sans écran de connexion
-try {
-    const flDemo = preFetchedFirstLaunch ? await preFetchedFirstLaunch : null;
-    if (flDemo && flDemo.demo) {
-        const r = await fetch(`${API}/api/demo/enter`, { method: 'POST', credentials: 'same-origin' });
-        if (r.ok) {
-            const d = await r.json();
-            window.STELLIO_DEMO = true;
-            showApp(d.user);
-            showDemoBanner();
-            return;
-        }
-    }
-} catch (e) { console.warn('[demo] entrée impossible', e); }
 
 // Reprise de session : si la session du serveur est toujours valide (retour dans l'app sans l'avoir fermée,
 // rechargement de la page par le téléphone…), on ne redemande pas les identifiants.

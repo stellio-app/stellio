@@ -42,6 +42,10 @@ def _early_extra_libs_dir():
 
 _EXTRA_LIBS_DIR = _early_extra_libs_dir()
 
+# ── Splash précoce ───────────────────────────────────────────────────────────
+# Affiché dès les premières millisecondes, AVANT la vérification des modules et les gros
+# imports (trimesh, numpy, pyrender...). Il tourne dans son propre thread : tous les objets Tk y
+# sont créés ET détruits, pendant que le reste du démarrage continue dans le thread principal.
 import threading as _early_threading
 import queue as _early_queue
 
@@ -4325,10 +4329,6 @@ class PrinterManager:
     def get_status(self, db_row):
         ptype = db_row['type']
         ip = db_row['ip']
-        if IS_DEMO and str(ip) in _DEMO_LIVE:
-            _fs = _demo_fake_status(ip)
-            if _fs:
-                return _fs
         api_key = db_row['api_key']
         default_result = {
             'status': 'unknown', 'progress': 0, 'file': '',
@@ -4900,7 +4900,6 @@ _VIEWER_WRITE_WHITELIST = {
     ('POST', '/api/ollama/semantic-search'),
     ('POST', '/api/ollama/explain-orientation'),
     ('POST', '/api/nesting/arrange'),
-    ('POST', '/api/demo/enter'),
 }
 _VIEWER_BLOCKED_GET_PREFIXES = (
     '/api/accounts', '/api/remote-access', '/api/remote-instances', '/api/peer',
@@ -7779,271 +7778,9 @@ def _system_ui_lang():
         pass
     return 'en'
 
-
-# ── Mode démo publique (lecture seule) ───────────────────────────────────────
-# STELLIO_DEMO=1 : l'instance fabrique quelques modèles libres (générés par le code, domaine public),
-# les indexe pour un compte propriétaire interne et ouvre l'interface en « invité » (lecture seule) en un clic.
-IS_DEMO = os.environ.get('STELLIO_DEMO', '').strip().lower() in ('1', 'true', 'yes')
-_DEMO_OWNER = 'demo-owner'
-_DEMO_VIEWER = 'demo'
-_DEMO_BLOCKED = {
-    ('POST', '/api/ollama/semantic-search'), ('POST', '/api/ollama/explain-orientation'),
-    ('POST', '/api/nesting/arrange'), ('POST', '/api/thumb/generate-now'),
-    ('POST', '/api/ai/predict-print-time'), ('POST', '/api/ai/photo-search'),
-}
-
-
-def _demo_generate_models(folder):
-    """Crée une douzaine de modèles 3D simples (CC0, générés par le code) dans `folder`."""
-    import numpy as _np
-    import trimesh
-    from shapely.geometry import Polygon
-
-    def save(mesh, rel):
-        path = os.path.join(folder, rel)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        if not os.path.exists(path):
-            mesh.export(path)
-
-    def gear(teeth, r_out, r_in, thick, hole):
-        pts = []
-        for i in range(teeth * 4):
-            a = 2 * _np.pi * i / (teeth * 4)
-            r = r_out if (i % 4) in (0, 1) else r_in
-            pts.append((r * _np.cos(a), r * _np.sin(a)))
-        poly = Polygon(pts).difference(Polygon([(hole * _np.cos(t), hole * _np.sin(t)) for t in _np.linspace(0, 2 * _np.pi, 24, endpoint=False)]))
-        return trimesh.creation.extrude_polygon(poly, thick)
-
-    profile = [(0, 0), (22, 0), (30, 25), (24, 55), (32, 80), (26, 100), (24, 100), (28, 80), (20, 55), (26, 25), (0, 2)]
-    vase = trimesh.creation.revolve(_np.array(profile, dtype=float), sections=64)
-    save(vase, 'Déco/vase_galbe.stl')
-    save(trimesh.creation.torus(major_radius=25, minor_radius=6, major_sections=64, minor_sections=24) if hasattr(trimesh.creation, 'torus') else trimesh.creation.annulus(r_min=19, r_max=31, height=12, sections=64), 'Déco/anneau.stl')
-    save(trimesh.creation.icosphere(subdivisions=3, radius=20), 'Déco/boule_facettes.obj')
-    save(trimesh.creation.cone(radius=18, height=40, sections=48), 'Jeux/pion_cone.stl')
-    save(trimesh.creation.capsule(height=30, radius=9), 'Jeux/pion_capsule.stl')
-    save(trimesh.creation.box(extents=(20, 20, 20)), 'Jeux/de_20mm.stl')
-    save(gear(14, 22, 18, 6, 5), 'Mécanique/engrenage_14.stl')
-    save(gear(22, 34, 30, 6, 6), 'Mécanique/engrenage_22.stl')
-    save(trimesh.creation.annulus(r_min=8, r_max=14, height=5, sections=48), 'Mécanique/rondelle_m8.stl')
-    base = trimesh.creation.box(extents=(60, 40, 4))
-    wall = trimesh.creation.box(extents=(60, 4, 30)); wall.apply_translation((0, 18, 17))
-    lip = trimesh.creation.box(extents=(60, 8, 6)); lip.apply_translation((0, -16, 5))
-    save(trimesh.util.concatenate([base, wall, lip]), 'Utilitaire/support_telephone.stl')
-    clip = trimesh.creation.annulus(r_min=7, r_max=11, height=10, sections=48)
-    save(clip, 'Utilitaire/anneau_cable.ply')
-    box = trimesh.creation.box(extents=(70, 50, 25)); inner = trimesh.creation.box(extents=(66, 46, 25)); inner.apply_translation((0, 0, 2))
-    try:
-        save(box.difference(inner), 'Utilitaire/boite_rangement.stl')
-    except Exception:
-        save(box, 'Utilitaire/boite_rangement.stl')
-
-
-def _demo_bootstrap():
-    """Prépare l'instance de démonstration (idempotent)."""
-    demo_dir = os.path.join(DATA_DIR, 'demo_models')
-    try:
-        _demo_generate_models(demo_dir)
-    except Exception as e:
-        app_logger.warning(f"[DEMO] Génération des modèles impossible : {e}")
-    conn = get_db()
-    try:
-        owner = conn.execute("SELECT id FROM users WHERE username = ?", (_DEMO_OWNER,)).fetchone()
-        if not owner:
-            cur = conn.execute("INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'user')",
-                               (_DEMO_OWNER, hash_pw_strong(secrets.token_urlsafe(24))))
-            owner_id = cur.lastrowid
-        else:
-            owner_id = owner['id']
-        if not conn.execute("SELECT 1 FROM users WHERE username = ?", (_DEMO_VIEWER,)).fetchone():
-            conn.execute("INSERT INTO users (username, password_hash, role, owner_id) VALUES (?, ?, 'viewer', ?)",
-                         (_DEMO_VIEWER, hash_pw_strong(secrets.token_urlsafe(24)), owner_id))
-        has_src = conn.execute("SELECT 1 FROM sources WHERE user_id = ? AND path = ?", (owner_id, demo_dir)).fetchone()
-        if not has_src:
-            conn.execute("INSERT INTO sources (user_id, name, type, path, config) VALUES (?, ?, 'folder', ?, '{}')",
-                         (owner_id, 'Démo', demo_dir))
-        conn.commit()
-        try:
-            _demo_seed(conn, owner_id, demo_dir)
-        except Exception as e:
-            app_logger.warning(f"[DEMO] Données fictives impossibles : {e}")
-        sources = [dict(r) for r in conn.execute("SELECT * FROM sources WHERE user_id = ?", (owner_id,)).fetchall()]
-    finally:
-        conn.close()
-    invalidate_cache()
-    threading.Thread(target=_do_background_scan, args=(sources, owner_id), daemon=True).start()
-    app_logger.info("[DEMO] Instance de démonstration prête (compte invité « demo », lecture seule).")
-
-
-def _demo_seed(conn, owner_id, demo_dir):
-    """Données fictives (imprimantes, bobines, historique, devis, commandes…) pour que le tableau de bord soit parlant. Idempotent."""
-    if conn.execute("SELECT 1 FROM printers WHERE user_id = ?", (owner_id,)).fetchone():
-        return
-    now = datetime.datetime.now()
-    ago = lambda **kw: (now - datetime.timedelta(**kw)).isoformat(sep=' ', timespec='seconds')
-    P = lambda rel: os.path.join(demo_dir, rel)
-    printers = [('Voron 2.4', 'klipper', '192.168.1.41', 612.0), ('Prusa MK4', 'prusalink', '192.168.1.42', 348.5), ('Ender 3 V3', 'octoprint', '192.168.1.43', 127.0)]
-    pid = {}
-    for name, typ, ip, hours in printers:
-        cur = conn.execute("INSERT INTO printers (user_id, name, type, ip, api_key, config, is_connected, total_print_hours) VALUES (?, ?, ?, ?, '', ?, 1, ?)",
-                           (owner_id, name, typ, ip, json.dumps({'bed_x': 250, 'bed_y': 250, 'bed_z': 250}), hours))
-        pid[name] = cur.lastrowid
-    spools = [('PLA Blanc', 'PLA', '#f2f2f2', 842, 1000, 'Polymaker', 'Drybox 1'), ('PLA Noir', 'PLA', '#1a1a1a', 120, 1000, 'eSun', 'Drybox 1'),
-              ('PLA Rouge', 'PLA', '#d62828', 655, 1000, 'Sunlu', 'Drybox 2'), ('PLA Bleu', 'PLA', '#2a6fdb', 31, 1000, 'Geeetech', 'Drybox 2'),
-              ('PETG Gris', 'PETG', '#8d99ae', 480, 1000, 'Prusament', 'Drybox 3'), ('PETG Orange', 'PETG', '#f77f00', 940, 1000, 'Prusament', 'Drybox 3'),
-              ('TPU Vert', 'TPU', '#2dc653', 210, 500, 'Fiberlogy', 'Étagère'), ('PLA Soie Or', 'PLA', '#e0b84c', 18, 1000, 'Polymaker', 'Drybox 1'),
-              ('ASA Noir', 'ASA', '#222222', 760, 1000, 'Bambu Lab', 'Drybox 3')]
-    for n, m, c, rem, cap, v, loc in spools:
-        conn.execute("INSERT INTO manual_filament_spools (user_id, name, material, color_hex, remaining_g, capacity_g, vendor, price, storage_location, archived) VALUES (?,?,?,?,?,?,?,?,?,0)",
-                     (owner_id, n, m, c, rem, cap, v, 19.9, loc))
-    hist = [('Mécanique/engrenage_22.stl', 'Voron 2.4', 'success', 'PLA', 'PLA Blanc', 38.2, 2.1, 1, 7),
-            ('Utilitaire/support_telephone.stl', 'Prusa MK4', 'success', 'PETG', 'PETG Gris', 61.0, 4.4, 2, 5),
-            ('Jeux/de_20mm.stl', 'Ender 3 V3', 'success', 'PLA', 'PLA Rouge', 6.5, 0.7, 3, 4),
-            ('Déco/vase_galbe.stl', 'Voron 2.4', 'success', 'PLA', 'PLA Soie Or', 54.0, 5.3, 5, 3),
-            ('Utilitaire/boite_rangement.stl', 'Prusa MK4', 'failed', 'PETG', 'PETG Orange', 22.0, 1.2, 7, 2),
-            ('Mécanique/rondelle_m8.stl', 'Ender 3 V3', 'success', 'PLA', 'PLA Noir', 3.1, 0.5, 9, 1),
-            ('Jeux/pion_cone.stl', 'Voron 2.4', 'success', 'PLA', 'PLA Bleu', 9.8, 1.0, 12, 0)]
-    for rel, pn, res, mat, lab, g, hrs, days, _ in hist:
-        mc = round(g * 0.02, 2); ec = round(hrs * 0.04, 2)
-        conn.execute("""INSERT INTO print_history (user_id, file_path, file_name, file_size, file_ext, slicer, sent_at, result, printer_id,
-                        filament_material, filament_label, spool_weight_used_g, material_cost, elec_cost, total_cost, actual_seconds)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                     (owner_id, P(rel), os.path.basename(rel), 120000, os.path.splitext(rel)[1], 'OrcaSlicer', ago(days=days, hours=2), res, pid[pn],
-                      mat, lab, g, mc, ec, round(mc + ec, 2), int(hrs * 3600)))
-    for name, col in (('Utilitaire', '#4ea1d3'), ('Mécanique', '#f77f00'), ('Déco', '#c77dff'), ('Jeux', '#2dc653')):
-        conn.execute("INSERT OR IGNORE INTO tags (name, color) VALUES (?, ?)", (name, col))
-        tid = conn.execute("SELECT id FROM tags WHERE name = ?", (name,)).fetchone()[0]
-        for rel in [r for r in ('Déco/vase_galbe.stl', 'Déco/anneau.stl', 'Déco/boule_facettes.obj', 'Jeux/pion_cone.stl', 'Jeux/pion_capsule.stl', 'Jeux/de_20mm.stl',
-                                'Mécanique/engrenage_14.stl', 'Mécanique/engrenage_22.stl', 'Mécanique/rondelle_m8.stl', 'Utilitaire/support_telephone.stl',
-                                'Utilitaire/anneau_cable.ply', 'Utilitaire/boite_rangement.stl') if r.startswith(name + '/')]:
-            conn.execute("INSERT OR IGNORE INTO file_tags (file_path, tag_id) VALUES (?, ?)", (P(rel), tid))
-    for rel in ('Déco/vase_galbe.stl', 'Mécanique/engrenage_22.stl', 'Utilitaire/support_telephone.stl'):
-        conn.execute("INSERT OR IGNORE INTO favorites (file_path, user_id) VALUES (?, ?)", (P(rel), owner_id))
-    for i, rel in enumerate(('Utilitaire/boite_rangement.stl', 'Jeux/pion_capsule.stl', 'Déco/anneau.stl')):
-        conn.execute("INSERT OR IGNORE INTO print_queue (user_id, file_path, position, note) VALUES (?,?,?,?)", (owner_id, P(rel), i, ''))
-    for name, color, status, files in (('Jeu d\'échecs fantaisie', '#c77dff', 'in_progress', [('Jeux/pion_cone.stl', 8, 5), ('Jeux/pion_capsule.stl', 8, 8), ('Jeux/de_20mm.stl', 2, 0)]),
-                                       ('Kit d\'engrenages', '#f77f00', 'in_progress', [('Mécanique/engrenage_14.stl', 4, 4), ('Mécanique/engrenage_22.stl', 4, 2), ('Mécanique/rondelle_m8.stl', 12, 12)]),
-                                       ('Déco salon', '#4ea1d3', 'done', [('Déco/vase_galbe.stl', 1, 1), ('Déco/anneau.stl', 2, 2)])):
-        cur = conn.execute("INSERT INTO projects (user_id, name, color, status) VALUES (?,?,?,?)", (owner_id, name, color, status))
-        for j, (rel, need, done) in enumerate(files):
-            conn.execute("INSERT INTO project_files (project_id, file_path, quantity_needed, quantity_printed, position) VALUES (?,?,?,?,?)", (cur.lastrowid, P(rel), need, done, j))
-    quotes = [('D-2026-014', 'Atelier Martin', 'Support de téléphone', '12', '4.50 €', '54.00 €', 54.0, 12),
-              ('D-2026-015', 'Boutique Le Dé', 'Dés 20 mm (lot)', '40', '1.20 €', '48.00 €', 48.0, 6),
-              ('D-2026-016', 'Mairie de Valmont', 'Engrenages pédagogiques', '25', '3.80 €', '95.00 €', 95.0, 2)]
-    for num, cl, desc, qty, up, tot, tv, days in quotes:
-        conn.execute("INSERT INTO quotes (user_id, number, client, item_desc, qty, unit_price, total, total_value, filename, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                     (owner_id, num, cl, desc, qty, up, tot, tv, num, ago(days=days)))
-    jobs = [('Atelier Martin', 'Support de téléphone', 12, 12, 'PETG', 'Prusa MK4', 3, 'done'),
-            ('Boutique Le Dé', 'Dés 20 mm', 40, 26, 'PLA', 'Ender 3 V3', 2, 'printing'),
-            ('Mairie de Valmont', 'Engrenage 22 dents', 25, 0, 'PLA', 'Voron 2.4', 6, 'queued'),
-            ('Mairie de Valmont', 'Rondelle M8', 50, 0, 'PLA', 'Ender 3 V3', -1, 'queued')]
-    for cl, part, q, d, mat, pn, due, st in jobs:
-        conn.execute("INSERT INTO print_jobs (user_id, client, part, quantity, qty_done, material, printer_id, due_date, status, done_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                     (owner_id, cl, part, q, d, mat, pid[pn], (now + datetime.timedelta(days=due)).strftime('%Y-%m-%d'), st, ago(days=1) if st == 'done' else ''))
-    for pn, task, hrs in (('Voron 2.4', 'Graisser les rails', 500), ('Voron 2.4', 'Changer la buse', 300), ('Prusa MK4', 'Nettoyer le plateau', 100), ('Ender 3 V3', 'Retendre les courroies', 150)):
-        conn.execute("INSERT INTO printer_maintenance_tasks (printer_id, user_id, name, interval_hours, hours_at_last_reset) VALUES (?,?,?,?,?)",
-                     (pid[pn], owner_id, task, hrs, 0))
-    conn.commit()
-
-
-_DEMO_LIVE = {'192.168.1.41': ('Utilitaire/boite_rangement.stl', 1860, 2.4, 'PLA'), '192.168.1.42': ('', 0, 0, 'PETG'), '192.168.1.43': ('Jeux/de_20mm.stl', 5400, 3.5, 'PLA')}
-
-
-def _demo_fake_status(ip):
-    """Statut fictif d'une imprimante de démo : la Voron « imprime » en boucle, la MK4 est prête, l'Ender termine un lot."""
-    live = _DEMO_LIVE.get(ip)
-    if not live:
-        return None
-    rel, total, _h, _m = live
-    temps = lambda e, b: {'extruder': {'current': e, 'target': e}, 'bed': {'current': b, 'target': b}, 'chamber': {'current': 0, 'target': 0}}
-    if not rel:
-        return {'status': 'idle', 'progress': 0, 'file': '', 'temps': {'extruder': {'current': 24.1, 'target': 0}, 'bed': {'current': 23.6, 'target': 0}, 'chamber': {'current': 0, 'target': 0}},
-                'time': {'elapsed': 0, 'remaining': 0, 'total': 0}, 'last_print': {'filename': 'support_telephone.stl', 'duration': 15840, 'finished_at': ''}}
-    elapsed = int(time.time()) % total
-    return {'status': 'printing', 'progress': round(100.0 * elapsed / total, 1), 'file': os.path.basename(rel),
-            'temps': temps(215.0 if live[3] == 'PLA' else 245.0, 60.0),
-            'time': {'elapsed': elapsed, 'remaining': total - elapsed, 'total': total}, 'last_print': {'filename': '', 'duration': 0, 'finished_at': ''}}
-
-
-def _demo_lockdown_network():
-    """Démo publique : interdit à l'application toute connexion vers le réseau local (RFC 1918, lien local, multicast, diffusion),
-    même si une fonction ou un bug tentait de joindre une imprimante, un NAS ou un autre appareil.
-    Restent autorisés : la boucle locale (127.x / ::1) et le DNS (port 53). Complète le pare-feu du conteneur Proxmox."""
-    import ipaddress
-    _sock = socket.socket
-    _orig = {n: getattr(_sock, n) for n in ('connect', 'connect_ex', 'sendto')}
-
-    def _blocked(addr):
-        try:
-            host, port = addr[0], int(addr[1])
-        except Exception:
-            return False
-        if port == 53 or not isinstance(host, str):
-            return False
-        try:
-            ip = ipaddress.ip_address(host)
-        except ValueError:
-            try:
-                ip = ipaddress.ip_address(socket.getaddrinfo(host, None)[0][4][0])
-            except Exception:
-                return False
-        if ip.is_loopback:
-            return False
-        return bool(ip.is_private or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified
-                    or str(ip) == '255.255.255.255')
-
-    def _wrap(name):
-        def f(self, *a):
-            addr = a[-1] if name == 'sendto' else a[0]
-            if self.family in (socket.AF_INET, socket.AF_INET6) and _blocked(addr):
-                app_logger.warning(f"[DEMO] Connexion réseau local refusée : {addr[0]}")
-                if name == 'connect_ex':
-                    return 113
-                raise PermissionError("Accès au réseau local désactivé dans la démo publique")
-            return _orig[name](self, *a)
-        f.__name__ = name
-        return f
-    for n in _orig:
-        setattr(_sock, n, _wrap(n))
-    app_logger.info("[DEMO] Réseau local verrouillé (connexions sortantes vers 10/8, 172.16/12, 192.168/16, lien local, multicast refusées).")
-
-
-if IS_DEMO:
-    _demo_lockdown_network()
-
-
-@app.before_request
-def _demo_guard():
-    if not IS_DEMO:
-        return
-    if (request.method, request.path) in _DEMO_BLOCKED:
-        return jsonify({"error": "Désactivé dans la démo publique", "code": "demo_disabled"}), 403
-    if request.path == '/api/auth/register':
-        return jsonify({"error": "Inscriptions fermées sur la démo"}), 403
-
-
-@app.route('/api/demo/enter', methods=['POST'])
-def api_demo_enter():
-    """Ouvre une session invitée (lecture seule) sur l'instance de démonstration."""
-    if not IS_DEMO:
-        return jsonify({"error": "Non disponible"}), 404
-    conn = get_db()
-    try:
-        viewer = conn.execute("SELECT id, owner_id FROM users WHERE username = ? AND role = 'viewer'", (_DEMO_VIEWER,)).fetchone()
-    finally:
-        conn.close()
-    if not viewer or not viewer['owner_id']:
-        return jsonify({"error": "Démo en cours de préparation"}), 503
-    session.clear()
-    session['user_id'] = viewer['owner_id']
-    session['username'] = _DEMO_VIEWER
-    session['role'] = 'viewer'
-    session['viewer_id'] = viewer['id']
-    return jsonify({"user": {"id": viewer['owner_id'], "username": _DEMO_VIEWER, "role": "viewer"}})
-
-
 @app.route('/api/auth/first-launch', methods=['GET'])
 def api_first_launch():
-    return jsonify({"first_launch": is_first_launch() and not IS_DEMO, "demo": IS_DEMO, "server_edition": IS_SERVER_EDITION,
+    return jsonify({"first_launch": is_first_launch(), "server_edition": IS_SERVER_EDITION,
                     "system_lang": None if IS_SERVER_EDITION else _system_ui_lang()})
 
 _login_attempts = {}
@@ -33608,8 +33345,6 @@ if __name__ in ('__main__', 'stellio_main'):
         try:
             if on_status:
                 on_status('database')
-            if IS_DEMO:
-                _demo_bootstrap()
             process_generation_queue()
             process_slice_estimate_queue()
             _start_timelapse_worker()
