@@ -7,6 +7,14 @@
 - Inscriptions (`/api/auth/register`) et fonctions coûteuses : recherche sémantique/photo IA, imbrication (nesting), génération de miniatures à la demande, prédiction de temps IA.
 - Accès aux secrets (comptes, accès distant, logs, sauvegardes, mises à jour) : déjà masqués pour les invités.
 
+## Installation automatique (recommandée)
+Sur l'hôte Proxmox, en root :
+```
+CF_TOKEN=<jeton du tunnel> bash stellio-demo-lxc.sh
+```
+Le script crée le conteneur Debian 12, installe Stellio, active `STELLIO_DEMO=1`, limite les ressources, ajoute le Benchy dans `demo_models/Benchy/` (avec un fichier `CREDITS.txt`) et installe le tunnel Cloudflare si `CF_TOKEN` est fourni. Variables : `CTID`, `HN`, `STORAGE` (sinon menu de choix), `TEMPLATE_STORAGE`, `BRIDGE`, `CORES`, `RAM`, `DISK`. Mise à jour : `pct exec <CTID> -- update-stellio`.
+
+## Installation manuelle
 ## Mise en place sur un LXC Proxmox (Debian 13)
 1. Installe Stellio comme d'habitude (`install-pi.sh`) dans un conteneur **dédié** (jamais avec tes vraies données).
 2. Dans `/etc/systemd/system/stellio.service`, ajoute dans `[Service]` :
@@ -17,6 +25,11 @@
 3. `systemctl daemon-reload && systemctl restart stellio`. Au premier démarrage, les modèles sont créés dans `/opt/stellio_demo_data/demo_models` puis indexés (1 à 2 minutes).
 4. Expose-la avec un tunnel Cloudflare (nom fixe, ex. `demo.stellio-app.com`) : **Zero Trust → Tunnels → Public hostname → `http://IP_DU_CONTENEUR:5000`**. Ne redirige aucun port de ta box.
 5. Dans le README, l'URL `https://demo.stellio-app.com` doit correspondre à ce nom.
+
+## Isolation du réseau local
+La démo ne doit jamais pouvoir joindre tes appareils (NAS, imprimantes, PC). Deux protections se cumulent :
+- **Dans l'application** : en mode démo, toute connexion sortante vers 10/8, 172.16/12, 192.168/16, lien local ou multicast est refusée (seuls la boucle locale et le DNS passent). Les imprimantes de la démo sont fictives, et la détection réseau est désactivée.
+- **Dans Proxmox** : `stellio-demo-lxc.sh` crée un pare-feu pour le conteneur qui interdit les réseaux privés (hors DNS). Il faut que le **pare-feu du datacenter soit activé** (Datacenter → Pare-feu → Options). Pour aller plus loin, mets le conteneur dans un VLAN dédié.
 
 ## Bonnes pratiques
 - Limite le conteneur (2 vCPU, 2 Go RAM) et ajoute une règle de limitation de débit Cloudflare (WAF → Rate limiting) sur `/`.

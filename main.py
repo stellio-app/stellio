@@ -42,6 +42,10 @@ def _early_extra_libs_dir():
 
 _EXTRA_LIBS_DIR = _early_extra_libs_dir()
 
+# ── Splash précoce ───────────────────────────────────────────────────────────
+# Affiché dès les premières millisecondes, AVANT la vérification des modules et les gros
+# imports (trimesh, numpy, pyrender...). Il tourne dans son propre thread : tous les objets Tk y
+# sont créés ET détruits, pendant que le reste du démarrage continue dans le thread principal.
 import threading as _early_threading
 import queue as _early_queue
 
@@ -7962,6 +7966,53 @@ def _demo_fake_status(ip):
     return {'status': 'printing', 'progress': round(100.0 * elapsed / total, 1), 'file': os.path.basename(rel),
             'temps': temps(215.0 if live[3] == 'PLA' else 245.0, 60.0),
             'time': {'elapsed': elapsed, 'remaining': total - elapsed, 'total': total}, 'last_print': {'filename': '', 'duration': 0, 'finished_at': ''}}
+
+
+def _demo_lockdown_network():
+    """Démo publique : interdit à l'application toute connexion vers le réseau local (RFC 1918, lien local, multicast, diffusion),
+    même si une fonction ou un bug tentait de joindre une imprimante, un NAS ou un autre appareil.
+    Restent autorisés : la boucle locale (127.x / ::1) et le DNS (port 53). Complète le pare-feu du conteneur Proxmox."""
+    import ipaddress
+    _sock = socket.socket
+    _orig = {n: getattr(_sock, n) for n in ('connect', 'connect_ex', 'sendto')}
+
+    def _blocked(addr):
+        try:
+            host, port = addr[0], int(addr[1])
+        except Exception:
+            return False
+        if port == 53 or not isinstance(host, str):
+            return False
+        try:
+            ip = ipaddress.ip_address(host)
+        except ValueError:
+            try:
+                ip = ipaddress.ip_address(socket.getaddrinfo(host, None)[0][4][0])
+            except Exception:
+                return False
+        if ip.is_loopback:
+            return False
+        return bool(ip.is_private or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified
+                    or str(ip) == '255.255.255.255')
+
+    def _wrap(name):
+        def f(self, *a):
+            addr = a[-1] if name == 'sendto' else a[0]
+            if self.family in (socket.AF_INET, socket.AF_INET6) and _blocked(addr):
+                app_logger.warning(f"[DEMO] Connexion réseau local refusée : {addr[0]}")
+                if name == 'connect_ex':
+                    return 113
+                raise PermissionError("Accès au réseau local désactivé dans la démo publique")
+            return _orig[name](self, *a)
+        f.__name__ = name
+        return f
+    for n in _orig:
+        setattr(_sock, n, _wrap(n))
+    app_logger.info("[DEMO] Réseau local verrouillé (connexions sortantes vers 10/8, 172.16/12, 192.168/16, lien local, multicast refusées).")
+
+
+if IS_DEMO:
+    _demo_lockdown_network()
 
 
 @app.before_request

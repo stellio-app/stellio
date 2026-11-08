@@ -183,17 +183,28 @@ jobs:
           # SHA-256 soi-meme, puis modifier ces deux valeurs. NB : BtbN purge ses anciens tags apres quelques semaines.
           $ffUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-18-13-01/ffmpeg-N-127650-geceaa54a38-win64-gpl-shared.zip"
           $ffSha = "8ebf4def186017a1cf3ac1e0065ad19c405628ec52b50f144b727e8def64928d"
-          # GitHub renvoie parfois 502/503/504 : 6 essais espaces de 20 s
-          for ($i = 1; $i -le 6; $i++) {
-            try { Invoke-WebRequest -Uri $ffUrl -OutFile ffmpeg.zip -TimeoutSec 300; break }
-            catch { Write-Host "Telechargement ffmpeg echoue (essai $i/6) : $($_.Exception.Message)"; if ($i -eq 6) { throw }; Start-Sleep -Seconds 20 }
+          # Source principale : ffmpeg.exe statique du paquet PyPI imageio-ffmpeg (version epinglee, hashes SHA-256 verifies par pip).
+          # PyPI est beaucoup plus fiable que les releases GitHub (504 frequents) ; GitHub ne sert plus que de repli.
+          $ok = $false
+          Set-Content -Path ffreq.txt -Value "imageio-ffmpeg==0.6.0 --hash=sha256:9d2baaf867088508d4a3458e61eeb30e945c4ad8016025545f66c4b5aaef0a61 --hash=sha256:b1ae3173414b5fc5f538a726c4e48ea97edc0d2cdc11f103afee655c463fa742 --hash=sha256:c7e46fcec401dd990405049d2e2f475e2b397779df2519b544b8aab515195282 --hash=sha256:02fa47c83703c37df6bfe4896aab339013f62bf02c5ebf2dce6da56af04ffc0a"
+          python -m pip install --quiet --retries 10 --timeout 60 --require-hashes --only-binary=:all: -r ffreq.txt
+          if ($LASTEXITCODE -eq 0) {
+            python -c "import imageio_ffmpeg,glob,os,shutil; d=os.path.join(os.path.dirname(imageio_ffmpeg.__file__),'binaries'); f=sorted(glob.glob(os.path.join(d,'ffmpeg-*')))[0]; shutil.copy(f, r'dist\Stellio\app\bin\ffmpeg.exe')"
+            if ($LASTEXITCODE -eq 0) { $ok = $true; Write-Host "ffmpeg installe depuis PyPI" }
           }
-          $ffActual = (Get-FileHash -Algorithm SHA256 ffmpeg.zip).Hash.ToLower()
-          if ($ffActual -ne $ffSha) { throw "SHA-256 ffmpeg (Windows) incorrect : attendu $ffSha, obtenu $ffActual. Build annule." }
-          Write-Host "SHA-256 ffmpeg (Windows) verifie : $ffActual"
-          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_extracted
-          $binDir = (Get-ChildItem -Path ffmpeg_extracted -Recurse -Directory -Filter "bin" | Select-Object -First 1).FullName
-          Copy-Item "$binDir\*" "dist\Stellio\app\bin\" -Force
+          if (-not $ok) {
+            Write-Host "PyPI indisponible, repli sur GitHub"
+            for ($i = 1; $i -le 6; $i++) {
+              try { Invoke-WebRequest -Uri $ffUrl -OutFile ffmpeg.zip -TimeoutSec 120; break }
+              catch { Write-Host "Telechargement ffmpeg echoue (essai $i/6) : $($_.Exception.Message)"; if ($i -eq 6) { throw }; Start-Sleep -Seconds 20 }
+            }
+            $ffActual = (Get-FileHash -Algorithm SHA256 ffmpeg.zip).Hash.ToLower()
+            if ($ffActual -ne $ffSha) { throw "SHA-256 ffmpeg (Windows) incorrect : attendu $ffSha, obtenu $ffActual. Build annule." }
+            Write-Host "SHA-256 ffmpeg (Windows) verifie : $ffActual"
+            Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_extracted
+            $binDir = (Get-ChildItem -Path ffmpeg_extracted -Recurse -Directory -Filter "bin" | Select-Object -First 1).FullName
+            Copy-Item "$binDir\*" "dist\Stellio\app\bin\" -Force
+          }
           if (-not (Test-Path "dist\Stellio\app\bin\ffmpeg.exe")) { throw "ffmpeg.exe manquant apres telechargement" }
 
       - name: Add UnRAR (bin/unrar.exe du depot si present, sinon telecharge ; signature Authenticode verifiee)
@@ -444,7 +455,21 @@ jobs:
           esac
           URL="https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/${FF_ASSET}"
           echo "Telechargement depuis $URL"
-          curl -fL --retry 8 --retry-delay 20 --retry-max-time 360 --retry-all-errors -o ffmpeg_bin "$URL"
+          # Source principale : binaire ffmpeg statique du paquet PyPI imageio-ffmpeg (version epinglee, hashes SHA-256 verifies par pip).
+          # PyPI est beaucoup plus fiable que les releases GitHub (504 frequents) ; GitHub ne sert plus que de repli.
+          ffmpeg_from_pypi() {
+            echo "imageio-ffmpeg==0.6.0 --hash=sha256:9d2baaf867088508d4a3458e61eeb30e945c4ad8016025545f66c4b5aaef0a61 --hash=sha256:b1ae3173414b5fc5f538a726c4e48ea97edc0d2cdc11f103afee655c463fa742 --hash=sha256:c7e46fcec401dd990405049d2e2f475e2b397779df2519b544b8aab515195282 --hash=sha256:02fa47c83703c37df6bfe4896aab339013f62bf02c5ebf2dce6da56af04ffc0a" > ffreq.txt
+            python3 -m pip install --quiet --retries 10 --timeout 60 --require-hashes --only-binary=:all: -r ffreq.txt || return 1
+            python3 -c "import imageio_ffmpeg,glob,os,shutil; d=os.path.join(os.path.dirname(imageio_ffmpeg.__file__),'binaries'); f=sorted(glob.glob(os.path.join(d,'ffmpeg-*')))[0]; shutil.copy(f, '$APP_DIR/bin/ffmpeg')" || return 1
+            chmod +x "$APP_DIR/bin/ffmpeg"
+            "$APP_DIR/bin/ffmpeg" -version | head -1
+          }
+          if ffmpeg_from_pypi; then
+            echo "ffmpeg installe depuis PyPI"
+            exit 0
+          fi
+          echo "PyPI indisponible, repli sur GitHub"
+          curl -fL --retry 6 --retry-delay 20 --retry-max-time 240 --retry-all-errors -o ffmpeg_bin "$URL"
           FF_ACTUAL=$(shasum -a 256 ffmpeg_bin | cut -d' ' -f1)
           if [ "$FF_ACTUAL" != "$FF_SHA" ]; then
             echo "SHA-256 ffmpeg (macOS ${{ matrix.arch }}) incorrect : attendu $FF_SHA, obtenu $FF_ACTUAL. Build annule."
@@ -705,7 +730,21 @@ jobs:
           # Version epinglee (tag date + SHA-256 calcule sur le fichier), voir le step Windows pour la mise a jour.
           FF_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-18-13-01/ffmpeg-N-127651-gb60ab6c9a4-linux64-gpl.tar.xz"
           FF_SHA="a5f2aed198efa8ef4c12d9112f42e7cefbdf11dced1b59a87503ca689bc52277"
-          curl -fL --retry 8 --retry-delay 20 --retry-max-time 360 --retry-all-errors -o ffmpeg.tar.xz "$FF_URL"
+          # Source principale : binaire ffmpeg statique du paquet PyPI imageio-ffmpeg (version epinglee, hashes SHA-256 verifies par pip).
+          # PyPI est beaucoup plus fiable que les releases GitHub (504 frequents) ; GitHub ne sert plus que de repli.
+          ffmpeg_from_pypi() {
+            echo "imageio-ffmpeg==0.6.0 --hash=sha256:9d2baaf867088508d4a3458e61eeb30e945c4ad8016025545f66c4b5aaef0a61 --hash=sha256:b1ae3173414b5fc5f538a726c4e48ea97edc0d2cdc11f103afee655c463fa742 --hash=sha256:c7e46fcec401dd990405049d2e2f475e2b397779df2519b544b8aab515195282 --hash=sha256:02fa47c83703c37df6bfe4896aab339013f62bf02c5ebf2dce6da56af04ffc0a" > ffreq.txt
+            python3 -m pip install --quiet --retries 10 --timeout 60 --require-hashes --only-binary=:all: -r ffreq.txt || return 1
+            python3 -c "import imageio_ffmpeg,glob,os,shutil; d=os.path.join(os.path.dirname(imageio_ffmpeg.__file__),'binaries'); f=sorted(glob.glob(os.path.join(d,'ffmpeg-*')))[0]; shutil.copy(f, '$APP_DIR/bin/ffmpeg')" || return 1
+            chmod +x "$APP_DIR/bin/ffmpeg"
+            "$APP_DIR/bin/ffmpeg" -version | head -1
+          }
+          if ffmpeg_from_pypi; then
+            echo "ffmpeg installe depuis PyPI"
+            exit 0
+          fi
+          echo "PyPI indisponible, repli sur GitHub"
+          curl -fL --retry 6 --retry-delay 20 --retry-max-time 240 --retry-all-errors -o ffmpeg.tar.xz "$FF_URL"
           FF_ACTUAL=$(sha256sum ffmpeg.tar.xz | cut -d' ' -f1)
           if [ "$FF_ACTUAL" != "$FF_SHA" ]; then
             echo "SHA-256 ffmpeg (Linux) incorrect : attendu $FF_SHA, obtenu $FF_ACTUAL. Build annule."
