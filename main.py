@@ -15143,7 +15143,6 @@ def _nexprint_json(resp, what):
 
 
 def _nexprint_auth_strategies(token):
-    """Variantes d'authentification, la première reproduit celle du site officiel."""
     site = {
         "Authorization": "Bearer " + token,
         "client-id": "Nexprint",
