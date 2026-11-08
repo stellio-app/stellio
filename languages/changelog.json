@@ -1,8 +1,10 @@
 [
   {
-    "version": "0.9.5",
+    "version": "0.9.4",
     "items": {
       "fr": [
+        "Tableau de bord : la molette de la souris défile maintenant la page même quand le curseur est au-dessus d'un widget (auparavant, sur la version serveur/navigateur, il fallait passer par un autre endroit de la page pour pouvoir défiler)",
+        "Textes manquants traduits : le champ « Adresse externe » des imprimantes et les messages d'envoi vers le slicer du PC s'affichent maintenant dans la langue choisie, sous Windows comme sur la version serveur (LXC)",
         "Suivi client : un lien public par commande (en file, en cours, prête à retirer) à envoyer à votre client, avec un message optionnel ; aucun prix ni détail interne n'est exposé, et le lien se révoque en un clic (bouton lien dans la file de commandes) ; si l'accès à distance n'est pas actif, la fenêtre propose de créer le lien Cloudflare en un clic au lieu d'un lien en adresse IP",
         "Nouveau filtre « Imprimable chez moi maintenant » dans la bibliothèque : ne garde que les fichiers qui tiennent sur le plateau d'au moins une de vos imprimantes et dont le poids passe avec vos bobines en stock ou celles de l'AMS",
         "Recherche par photo (bouton appareil photo de la barre de recherche) : retrouvez dans votre bibliothèque les modèles qui ressemblent à une photo, avec un modèle de vision Ollama 100 % local ; indexation en arrière-plan, une image à la fois, pausable et suspendue si la mémoire manque ; mode doux par défaut (en pause tant que vous utilisez Stellio ou que le processeur est chargé, moitié des cœurs, modèle déchargé de la mémoire à la fin), option « aller plus vite »",
@@ -14,6 +16,8 @@
         "Fenêtre des filtres élargie sur plusieurs colonnes : tout est visible sans défiler"
       ],
       "en": [
+        "Dashboard: the mouse wheel now scrolls the page even when the cursor is over a widget (previously, on the server/browser edition, you had to point elsewhere on the page to scroll)",
+        "Missing texts translated: the printers' \"External address\" field and the send-to-PC-slicer messages now appear in the chosen language, on Windows and on the server edition (LXC)",
         "Customer tracking: one public link per order (queued, printing, ready for pickup) to send to your customer, with an optional message; no price or internal detail is exposed, and the link can be revoked in one click (link button in the orders queue); if remote access isn't on, the window offers to create the Cloudflare link in one click instead of an IP-address link",
         "New \"Printable at home right now\" library filter: keeps only files that fit the bed of at least one of your printers and whose weight fits your spools in stock or in the AMS",
         "Search by photo (camera button in the search bar): find the models in your library that look like a photo, using a 100% local Ollama vision model; background indexing, one image at a time, pausable and suspended when memory runs low; gentle mode by default (paused while you use Stellio or the CPU is busy, half the cores, model unloaded from memory when done), with a \"go faster\" option",
@@ -25,6 +29,8 @@
         "Filters window widened into several columns: everything is visible without scrolling"
       ],
       "de": [
+        "Dashboard: Das Mausrad scrollt die Seite jetzt auch dann, wenn sich der Mauszeiger über einem Widget befindet (zuvor musste man in der Server-/Browser-Edition an eine andere Stelle der Seite zeigen, um scrollen zu können)",
+        "Fehlende Texte übersetzt: Das Feld „Externe Adresse“ der Drucker und die Meldungen zum Senden an den PC-Slicer erscheinen jetzt in der gewählten Sprache, unter Windows wie in der Server-Edition (LXC)",
         "Kunden-Tracking: ein öffentlicher Link pro Auftrag (in der Warteschlange, im Druck, abholbereit) zum Weitergeben an Ihren Kunden, mit optionaler Nachricht; keine Preise oder internen Details sichtbar, der Link lässt sich mit einem Klick widerrufen (Link-Schaltfläche in der Auftragsliste); ist der Fernzugriff nicht aktiv, bietet das Fenster an, den Cloudflare-Link mit einem Klick zu erstellen statt eines IP-Links",
         "Neuer Bibliotheksfilter „Jetzt bei mir druckbar“: zeigt nur Dateien, die auf das Druckbett mindestens eines Ihrer Drucker passen und deren Gewicht zu Ihren Spulen im Lager oder im AMS passt",
         "Suche per Foto (Kamera-Schaltfläche in der Suchleiste): findet in Ihrer Bibliothek Modelle, die einem Foto ähneln, mit einem 100 % lokalen Ollama-Bildmodell; Indexierung im Hintergrund, ein Bild nach dem anderen, pausierbar und bei knappem Speicher ausgesetzt; standardmäßig schonender Modus (pausiert, solange Sie Stellio nutzen oder die CPU ausgelastet ist, halbe Kernzahl, Modell wird danach aus dem Speicher entladen), mit Option „Schneller“",
@@ -36,6 +42,8 @@
         "Filterfenster breiter in mehreren Spalten: alles sichtbar ohne Scrollen"
       ],
       "es": [
+        "Panel: la rueda del ratón ahora desplaza la página aunque el cursor esté sobre un widget (antes, en la edición servidor/navegador, había que colocarlo en otro punto de la página para poder desplazarse)",
+        "Textos que faltaban traducidos: el campo «Dirección externa» de las impresoras y los mensajes de envío al slicer del PC ahora aparecen en el idioma elegido, en Windows y en la edición servidor (LXC)",
         "Seguimiento para el cliente: un enlace público por pedido (en cola, imprimiendo, listo para recoger) para enviar a su cliente, con mensaje opcional; no se expone ningún precio ni dato interno y el enlace se revoca con un clic (botón de enlace en la cola de pedidos); si el acceso remoto no está activo, la ventana ofrece crear el enlace de Cloudflare con un clic en lugar de un enlace con dirección IP",
         "Nuevo filtro «Imprimible en casa ahora mismo» en la biblioteca: conserva solo los archivos que caben en la cama de al menos una de sus impresoras y cuyo peso cabe en sus bobinas en stock o en el AMS",
         "Búsqueda por foto (botón de cámara en la barra de búsqueda): encuentra en su biblioteca los modelos parecidos a una foto, con un modelo de visión de Ollama 100 % local; indexación en segundo plano, una imagen cada vez, pausable y suspendida si falta memoria; modo suave por defecto (en pausa mientras usa Stellio o la CPU está ocupada, la mitad de los núcleos, modelo descargado de la memoria al terminar), con opción «ir más rápido»",
@@ -47,6 +55,8 @@
         "Ventana de filtros más ancha en varias columnas: todo visible sin desplazarse"
       ],
       "pt": [
+        "Painel: a roda do rato agora desloca a página mesmo com o cursor sobre um widget (antes, na edição servidor/navegador, era preciso apontar para outro ponto da página para se poder deslocar)",
+        "Textos em falta traduzidos: o campo «Endereço externo» das impressoras e as mensagens de envio para o slicer do PC aparecem agora no idioma escolhido, no Windows e na edição servidor (LXC)",
         "Acompanhamento do cliente: uma ligação pública por encomenda (em fila, a imprimir, pronta para levantar) para enviar ao seu cliente, com mensagem opcional; nenhum preço nem detalhe interno é exposto e a ligação revoga-se com um clique (botão de ligação na fila de encomendas); se o acesso remoto não estiver ativo, a janela propõe criar a ligação Cloudflare com um clique em vez de uma ligação por endereço IP",
         "Novo filtro «Imprimível aqui agora» na biblioteca: mantém apenas os ficheiros que cabem na mesa de pelo menos uma das suas impressoras e cujo peso cabe nas suas bobinas em stock ou no AMS",
         "Pesquisa por foto (botão de câmara na barra de pesquisa): encontre na sua biblioteca os modelos parecidos com uma foto, com um modelo de visão Ollama 100 % local; indexação em segundo plano, uma imagem de cada vez, com pausa e suspensa se faltar memória; modo suave por predefinição (em pausa enquanto utiliza o Stellio ou o processador está ocupado, metade dos núcleos, modelo descarregado da memória no fim), com opção «mais rápido»",
@@ -58,6 +68,8 @@
         "Janela de filtros mais larga em várias colunas: tudo visível sem rolar"
       ],
       "it": [
+        "Dashboard: la rotellina del mouse ora scorre la pagina anche quando il cursore è sopra un widget (prima, nell'edizione server/browser, bisognava puntare altrove nella pagina per poter scorrere)",
+        "Testi mancanti tradotti: il campo «Indirizzo esterno» delle stampanti e i messaggi di invio allo slicer del PC ora compaiono nella lingua scelta, su Windows e nell'edizione server (LXC)",
         "Tracciamento per il cliente: un link pubblico per ordine (in coda, in stampa, pronto per il ritiro) da inviare al cliente, con messaggio facoltativo; nessun prezzo né dettaglio interno è esposto e il link si revoca con un clic (pulsante link nella coda ordini); se l'accesso remoto non è attivo, la finestra propone di creare il link Cloudflare con un clic invece di un link con indirizzo IP",
         "Nuovo filtro «Stampabile da me adesso» nella libreria: mantiene solo i file che entrano nel piatto di almeno una delle tue stampanti e il cui peso rientra nelle bobine in magazzino o nell'AMS",
         "Ricerca per foto (pulsante fotocamera nella barra di ricerca): trova nella tua libreria i modelli simili a una foto, con un modello di visione Ollama 100% locale; indicizzazione in background, un'immagine alla volta, in pausa e sospesa se la memoria scarseggia; modalità leggera predefinita (in pausa mentre usi Stellio o la CPU è occupata, metà dei core, modello scaricato dalla memoria al termine), con opzione «più veloce»",
@@ -69,6 +81,8 @@
         "Finestra dei filtri più larga su più colonne: tutto visibile senza scorrere"
       ],
       "zh": [
+        "仪表盘：鼠标滚轮现在即使在指针位于小组件上方时也能滚动页面（此前在服务器/浏览器版中，必须把指针移到页面其他位置才能滚动）",
+        "补全缺失的翻译：打印机的“外部地址”字段和发送到电脑切片软件的提示现在会以所选语言显示，Windows 和服务器版（LXC）均如此",
         "客户跟踪：每个订单一个公开链接（排队中、打印中、可取货），可发给客户并附带可选留言；不会暴露任何价格或内部信息，且可一键撤销链接（订单队列中的链接按钮）；若未启用远程访问，窗口会提供一键创建 Cloudflare 链接，而不是使用 IP 地址链接",
         "资料库新增“现在可在我这里打印”筛选：只保留能放进至少一台打印机热床、且重量不超过库存耗材盘或 AMS 余量的文件",
         "以图搜索（搜索栏中的相机按钮）：用完全本地的 Ollama 视觉模型，在资料库中找到与照片相似的模型；后台逐张建立索引，可暂停，内存不足时自动挂起；默认采用温和模式（使用 Stellio 或 CPU 繁忙时暂停、只用一半核心、完成后从内存卸载模型），并可选“加快速度”",
@@ -80,6 +94,8 @@
         "筛选窗口加宽为多列：无需滚动即可查看全部内容"
       ],
       "ja": [
+        "ダッシュボード：カーソルがウィジェット上にあってもマウスホイールでページをスクロールできるようになりました（以前はサーバー／ブラウザー版で、ページの別の場所にカーソルを移さないとスクロールできませんでした）",
+        "未翻訳だったテキストを翻訳：プリンターの「外部アドレス」欄と、PCのスライサーへ送信する際のメッセージが、WindowsでもサーバーLXC版でも選択した言語で表示されます",
         "お客様向け追跡：注文ごとに公開リンクを1つ発行（順番待ち・印刷中・受取可）。任意のメッセージを添えて送れます。価格や内部情報は一切表示されず、リンクはワンクリックで取り消せます（注文キューのリンクボタン）。リモートアクセスが無効の場合は、IP アドレスのリンクではなく、ワンクリックで Cloudflare リンクを作成できます",
         "ライブラリに新フィルター「今すぐ自宅で印刷可能」：少なくとも1台のプリンターのベッドに収まり、在庫のスプールまたはAMSの残量で足りるファイルだけを表示します",
         "写真で検索（検索バーのカメラボタン）：完全ローカルの Ollama ビジョンモデルで、写真に似たモデルをライブラリから探します。インデックス作成はバックグラウンドで1枚ずつ、一時停止可能で、メモリ不足時は自動的に中断します。既定はやさしいモード（Stellio の使用中や CPU が忙しい間は一時停止、使用コアは半分、完了後にモデルをメモリから解放）で、「高速モード」も選べます",
@@ -89,43 +105,6 @@
         "修復ページを刷新（概要、ツール、進捗付き解析カード）",
         "サムネイル生成とバックグラウンド解析中に非多様体の不具合を検出",
         "フィルターウィンドウを複数列に拡大：スクロールなしで全項目を表示"
-      ]
-    }
-  },
-  {
-    "version": "0.9.4",
-    "items": {
-      "fr": [
-        "Tableau de bord : la molette de la souris défile maintenant la page même quand le curseur est au-dessus d'un widget (auparavant, sur la version serveur/navigateur, il fallait passer par un autre endroit de la page pour pouvoir défiler)",
-        "Textes manquants traduits : le champ « Adresse externe » des imprimantes et les messages d'envoi vers le slicer du PC s'affichent maintenant dans la langue choisie, sous Windows comme sur la version serveur (LXC)"
-      ],
-      "en": [
-        "Dashboard: the mouse wheel now scrolls the page even when the cursor is over a widget (previously, on the server/browser edition, you had to point elsewhere on the page to scroll)",
-        "Missing texts translated: the printers' \"External address\" field and the send-to-PC-slicer messages now appear in the chosen language, on Windows and on the server edition (LXC)"
-      ],
-      "de": [
-        "Dashboard: Das Mausrad scrollt die Seite jetzt auch dann, wenn sich der Mauszeiger über einem Widget befindet (zuvor musste man in der Server-/Browser-Edition an eine andere Stelle der Seite zeigen, um scrollen zu können)",
-        "Fehlende Texte übersetzt: Das Feld „Externe Adresse“ der Drucker und die Meldungen zum Senden an den PC-Slicer erscheinen jetzt in der gewählten Sprache, unter Windows wie in der Server-Edition (LXC)"
-      ],
-      "es": [
-        "Panel: la rueda del ratón ahora desplaza la página aunque el cursor esté sobre un widget (antes, en la edición servidor/navegador, había que colocarlo en otro punto de la página para poder desplazarse)",
-        "Textos que faltaban traducidos: el campo «Dirección externa» de las impresoras y los mensajes de envío al slicer del PC ahora aparecen en el idioma elegido, en Windows y en la edición servidor (LXC)"
-      ],
-      "pt": [
-        "Painel: a roda do rato agora desloca a página mesmo com o cursor sobre um widget (antes, na edição servidor/navegador, era preciso apontar para outro ponto da página para se poder deslocar)",
-        "Textos em falta traduzidos: o campo «Endereço externo» das impressoras e as mensagens de envio para o slicer do PC aparecem agora no idioma escolhido, no Windows e na edição servidor (LXC)"
-      ],
-      "it": [
-        "Dashboard: la rotellina del mouse ora scorre la pagina anche quando il cursore è sopra un widget (prima, nell'edizione server/browser, bisognava puntare altrove nella pagina per poter scorrere)",
-        "Testi mancanti tradotti: il campo «Indirizzo esterno» delle stampanti e i messaggi di invio allo slicer del PC ora compaiono nella lingua scelta, su Windows e nell'edizione server (LXC)"
-      ],
-      "zh": [
-        "仪表盘：鼠标滚轮现在即使在指针位于小组件上方时也能滚动页面（此前在服务器/浏览器版中，必须把指针移到页面其他位置才能滚动）",
-        "补全缺失的翻译：打印机的“外部地址”字段和发送到电脑切片软件的提示现在会以所选语言显示，Windows 和服务器版（LXC）均如此"
-      ],
-      "ja": [
-        "ダッシュボード：カーソルがウィジェット上にあってもマウスホイールでページをスクロールできるようになりました（以前はサーバー／ブラウザー版で、ページの別の場所にカーソルを移さないとスクロールできませんでした）",
-        "未翻訳だったテキストを翻訳：プリンターの「外部アドレス」欄と、PCのスライサーへ送信する際のメッセージが、WindowsでもサーバーLXC版でも選択した言語で表示されます"
       ]
     }
   },
