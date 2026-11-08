@@ -15110,7 +15110,6 @@ class NexprintError(Exception):
 
 
 def _nexprint_clean_token(raw):
-    """Accepte la valeur brute du cookie auth_token ou un en-tête Cookie complet."""
     raw = (raw or '').strip()
     if raw.lower().startswith('cookie:'):
         raw = raw.split(':', 1)[1].strip()
