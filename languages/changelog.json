@@ -1,38 +1,75 @@
 [
   {
+    "version": "0.9.6",
+    "items": {
+      "fr": [
+        "Mémoire : les miniatures dont le rendu dépasse le délai ne s'empilent plus en arrière-plan (elles occupaient CPU et mémoire pendant que les suivantes démarraient, jusqu'à saturer la RAM sur de très grosses bibliothèques de fichiers lourds) : elles sont comptées, s'arrêtent d'elles-mêmes dès que possible, et la génération attend qu'elles se terminent avant de continuer"
+      ],
+      "en": [
+        "Memory: thumbnail renders that exceed their time limit no longer pile up in the background (they kept using CPU and memory while the next ones started, which could exhaust RAM on very large libraries of heavy files): they are now counted, stop on their own as soon as possible, and generation waits for them to finish before continuing"
+      ],
+      "de": [
+        "Speicher: Vorschaubilder, deren Rendering das Zeitlimit überschreitet, stapeln sich nicht mehr im Hintergrund (sie belegten CPU und Speicher, während die nächsten starteten, und konnten bei sehr großen Bibliotheken mit schweren Dateien den Arbeitsspeicher erschöpfen): Sie werden gezählt, beenden sich so früh wie möglich selbst, und die Erzeugung wartet auf ihr Ende, bevor sie fortfährt"
+      ],
+      "es": [
+        "Memoria: las miniaturas cuyo renderizado supera el tiempo límite ya no se acumulan en segundo plano (seguían usando CPU y memoria mientras empezaban las siguientes, lo que podía agotar la RAM en bibliotecas muy grandes de archivos pesados): ahora se cuentan, se detienen solas lo antes posible y la generación espera a que terminen antes de continuar"
+      ],
+      "pt": [
+        "Memória: as miniaturas cuja renderização excede o tempo limite já não se acumulam em segundo plano (continuavam a usar CPU e memória enquanto as seguintes começavam, o que podia esgotar a RAM em bibliotecas muito grandes de ficheiros pesados): passam a ser contadas, param sozinhas assim que possível e a geração aguarda que terminem antes de continuar"
+      ],
+      "it": [
+        "Memoria: le miniature il cui rendering supera il tempo limite non si accumulano più in background (continuavano a usare CPU e memoria mentre partivano le successive, fino a saturare la RAM su librerie molto grandi di file pesanti): ora vengono contate, si fermano da sole appena possibile e la generazione attende che finiscano prima di continuare"
+      ],
+      "zh": [
+        "内存：渲染超时的缩略图不再在后台堆积（它们在后续缩略图开始时仍占用 CPU 和内存，在包含大量大文件的超大型库中可能耗尽内存）：现在会被计数，并尽快自行停止，生成流程会等待它们结束后再继续"
+      ],
+      "ja": [
+        "メモリ：レンダリングが制限時間を超えたサムネイルがバックグラウンドに積み重ならなくなりました（次のサムネイルが始まっても CPU とメモリを使い続け、重いファイルが非常に多いライブラリでは RAM を使い切ることがありました）。これらを数えて可能な限り早く自動停止し、完了するまで生成を待機してから続行します"
+      ]
+    }
+  },
+  {
     "version": "0.9.5",
     "items": {
       "fr": [
         "Thème : suit désormais le mode clair/sombre du système par défaut (y compris sur l'écran de création de compte et de connexion) et change en direct si le système bascule ; le choix Sombre/Clair reste disponible dans les paramètres",
-        "Langue : sur Windows/macOS, Stellio démarre dans la langue du système (ou celle choisie dans l'installateur) ; le sélecteur de langue disparaît de la page de connexion et reste dans les paramètres. L'installateur Windows s'adapte aussi à la langue du système (EN, FR, DE, ES, IT, PT, JA)"
+        "Langue : sur Windows/macOS, Stellio démarre dans la langue du système (ou celle choisie dans l'installateur) ; le sélecteur de langue disparaît de la page de connexion et reste dans les paramètres. L'installateur Windows s'adapte aussi à la langue du système (EN, FR, DE, ES, IT, PT, JA)",
+        "Démo publique en lecture seule : STELLIO_DEMO=1 génère 12 modèles libres et ouvre l'interface en invité en un clic (guide docs/DEMO.md) ; README enrichi d'un GIF de démonstration et de captures par fonction"
       ],
       "en": [
         "Theme: now follows the system light/dark mode by default (including the account creation and login screen) and switches live when the system changes; the Dark/Light choice remains available in settings",
-        "Language: on Windows/macOS, Stellio starts in the system language (or the one chosen in the installer); the language selector is removed from the login page and stays in settings. The Windows installer also follows the system language (EN, FR, DE, ES, IT, PT, JA)"
+        "Language: on Windows/macOS, Stellio starts in the system language (or the one chosen in the installer); the language selector is removed from the login page and stays in settings. The Windows installer also follows the system language (EN, FR, DE, ES, IT, PT, JA)",
+        "Public read-only demo: STELLIO_DEMO=1 generates 12 free models and opens the interface as a guest in one click (guide docs/DEMO.md); README now has a demo GIF and per-feature screenshots"
       ],
       "de": [
         "Design: folgt standardmäßig dem hellen/dunklen Systemmodus (auch auf dem Konto- und Anmeldebildschirm) und wechselt live mit dem System; die Auswahl Dunkel/Hell bleibt in den Einstellungen verfügbar",
-        "Sprache: Unter Windows/macOS startet Stellio in der Systemsprache (oder der im Installer gewählten); die Sprachauswahl verschwindet von der Anmeldeseite und bleibt in den Einstellungen. Der Windows-Installer folgt ebenfalls der Systemsprache (EN, FR, DE, ES, IT, PT, JA)"
+        "Sprache: Unter Windows/macOS startet Stellio in der Systemsprache (oder der im Installer gewählten); die Sprachauswahl verschwindet von der Anmeldeseite und bleibt in den Einstellungen. Der Windows-Installer folgt ebenfalls der Systemsprache (EN, FR, DE, ES, IT, PT, JA)",
+        "Öffentliche Nur-Lese-Demo: STELLIO_DEMO=1 erzeugt 12 freie Modelle und öffnet die Oberfläche mit einem Klick als Gast (Anleitung docs/DEMO.md); README mit Demo-GIF und Screenshots je Funktion"
       ],
       "es": [
         "Tema: ahora sigue por defecto el modo claro/oscuro del sistema (también en la pantalla de creación de cuenta e inicio de sesión) y cambia en directo con el sistema; la opción Oscuro/Claro sigue disponible en los ajustes",
-        "Idioma: en Windows/macOS, Stellio arranca en el idioma del sistema (o el elegido en el instalador); el selector de idioma desaparece de la página de inicio de sesión y permanece en los ajustes. El instalador de Windows también sigue el idioma del sistema (EN, FR, DE, ES, IT, PT, JA)"
+        "Idioma: en Windows/macOS, Stellio arranca en el idioma del sistema (o el elegido en el instalador); el selector de idioma desaparece de la página de inicio de sesión y permanece en los ajustes. El instalador de Windows también sigue el idioma del sistema (EN, FR, DE, ES, IT, PT, JA)",
+        "Demo pública de solo lectura: STELLIO_DEMO=1 genera 12 modelos libres y abre la interfaz como invitado con un clic (guía docs/DEMO.md); README con GIF de demostración y capturas por función"
       ],
       "pt": [
         "Tema: agora segue por padrão o modo claro/escuro do sistema (inclusive na tela de criação de conta e login) e muda em tempo real com o sistema; a escolha Escuro/Claro continua nas configurações",
-        "Idioma: no Windows/macOS, o Stellio inicia no idioma do sistema (ou no escolhido no instalador); o seletor de idioma sai da página de login e permanece nas configurações. O instalador do Windows também segue o idioma do sistema (EN, FR, DE, ES, IT, PT, JA)"
+        "Idioma: no Windows/macOS, o Stellio inicia no idioma do sistema (ou no escolhido no instalador); o seletor de idioma sai da página de login e permanece nas configurações. O instalador do Windows também segue o idioma do sistema (EN, FR, DE, ES, IT, PT, JA)",
+        "Demo pública somente leitura: STELLIO_DEMO=1 gera 12 modelos livres e abre a interface como convidado com um clique (guia docs/DEMO.md); README com GIF de demonstração e capturas por função"
       ],
       "it": [
         "Tema: ora segue per impostazione predefinita la modalità chiaro/scuro del sistema (anche nella schermata di creazione account e accesso) e cambia in tempo reale con il sistema; la scelta Scuro/Chiaro resta nelle impostazioni",
-        "Lingua: su Windows/macOS, Stellio si avvia nella lingua del sistema (o in quella scelta nell'installer); il selettore di lingua scompare dalla pagina di accesso e resta nelle impostazioni. Anche l'installer di Windows segue la lingua del sistema (EN, FR, DE, ES, IT, PT, JA)"
+        "Lingua: su Windows/macOS, Stellio si avvia nella lingua del sistema (o in quella scelta nell'installer); il selettore di lingua scompare dalla pagina di accesso e resta nelle impostazioni. Anche l'installer di Windows segue la lingua del sistema (EN, FR, DE, ES, IT, PT, JA)",
+        "Demo pubblica in sola lettura: STELLIO_DEMO=1 genera 12 modelli liberi e apre l'interfaccia come ospite con un clic (guida docs/DEMO.md); README con GIF dimostrativa e schermate per funzione"
       ],
       "zh": [
         "主题：默认跟随系统的浅色/深色模式（包括创建账户和登录界面），并随系统实时切换；仍可在设置中手动选择深色/浅色",
-        "语言：在 Windows/macOS 上，Stellio 默认使用系统语言（或安装程序中选择的语言）；登录页不再显示语言选择器，仍可在设置中更改。Windows 安装程序也会跟随系统语言（EN、FR、DE、ES、IT、PT、JA）"
+        "语言：在 Windows/macOS 上，Stellio 默认使用系统语言（或安装程序中选择的语言）；登录页不再显示语言选择器，仍可在设置中更改。Windows 安装程序也会跟随系统语言（EN、FR、DE、ES、IT、PT、JA）",
+        "公开只读演示：设置 STELLIO_DEMO=1 会生成 12 个免费模型，并一键以访客身份进入（指南见 docs/DEMO.md）；README 新增演示 GIF 和各功能截图"
       ],
       "ja": [
         "テーマ：既定でシステムのライト／ダークモードに従い（アカウント作成・ログイン画面を含む）、システムの切り替えに即時反映。設定でダーク／ライトを手動選択することも可能",
-        "言語：Windows/macOS では、Stellio はシステム言語（またはインストーラーで選んだ言語）で起動します。ログイン画面の言語選択は削除され、設定内に残ります。Windows インストーラーもシステム言語に従います（EN、FR、DE、ES、IT、PT、JA）"
+        "言語：Windows/macOS では、Stellio はシステム言語（またはインストーラーで選んだ言語）で起動します。ログイン画面の言語選択は削除され、設定内に残ります。Windows インストーラーもシステム言語に従います（EN、FR、DE、ES、IT、PT、JA）",
+        "公開読み取り専用デモ：STELLIO_DEMO=1 で無料モデル 12 点を生成し、ワンクリックでゲストとして開きます（手順は docs/DEMO.md）。README にデモ GIF と機能別スクリーンショットを追加"
       ]
     }
   },
