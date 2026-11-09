@@ -1583,8 +1583,10 @@ body {
     background: rgba(0, 0, 0, 0.7);
     color: var(--accent);
     border-radius: 4px;
-    width: 22px;
+    min-width: 22px;
     height: 22px;
+    padding: 0 5px;
+    gap: 3px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1593,9 +1595,16 @@ body {
     pointer-events: none;
 }
 
+.file-multiplate-badge b {
+    font-weight: 700;
+    color: #fff;
+    line-height: 1;
+}
+
 .dv-thumb .file-multiplate-badge {
-    width: 16px;
+    min-width: 16px;
     height: 16px;
+    padding: 0 3px;
     bottom: 2px;
     right: 2px;
     font-size: 8px;
@@ -9055,3 +9064,13 @@ body.has-demo-banner { padding-top: 32px; }
     body.role-viewer .main-content { padding-bottom: calc(var(--bottom-nav-h) + 28px + 36px); }
     body.role-viewer.has-mini-printer .main-content { padding-bottom: calc(var(--bottom-nav-h) + 92px + 36px); }
 }
+
+
+/* v0.9.8 : toast avec barre de progression (conversion en lot, envoi de fichiers, import de sauvegarde) */
+.toast.toast-progress { min-width: 260px; }
+.toast-progress-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.toast-progress .progress-track { height: 5px; }
+.toast-progress .progress-track.indeterminate .progress-bar { animation: toast-progress-slide 1.1s ease-in-out infinite alternate; }
+@keyframes toast-progress-slide { from { margin-left: 0; } to { margin-left: 65%; } }
+
+.toast-progress .toast-progress-cancel { flex: none; padding: 2px 8px; font-size: 12px; }

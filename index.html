@@ -40,7 +40,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Stellio">
     <meta name="theme-color" content="#1a1d2e">
-    <link rel="stylesheet" href="style.css?v=20261109">
+    <link rel="stylesheet" href="style.css?v=20261112">
     <link rel="stylesheet" href="assets/vendor/inter/inter.css">
     <link rel="stylesheet" href="assets/vendor/fontawesome/css/all.min.css">
 	<link rel="stylesheet" href="assets/vendor/mdi/css/materialdesignicons.min.css">
@@ -4590,13 +4590,22 @@
                     <input type="radio" name="split-plates-format" value="3mf" checked>
                     <span data-i18n="modal.split_plates_3mf">3MF — conserve les réglages du plateau</span>
                 </label>
-                <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                <label id="split-plates-format-stl" style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
                     <input type="radio" name="split-plates-format" value="stl">
                     <span data-i18n="modal.split_plates_stl">STL — géométrie seule</span>
                 </label>
+                <div id="split-plates-progress" class="hidden" style="margin-top:18px;" role="status" aria-live="polite">
+                    <div class="progress-text-row" style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;">
+                        <span id="split-plates-progress-text" data-i18n="modal.split_plates_starting">Préparation de la découpe…</span>
+                        <span id="split-plates-progress-pct">0 %</span>
+                    </div>
+                    <div class="progress-track" style="height: 6px;">
+                        <div class="progress-bar" id="split-plates-progress-bar" style="width: 0%"></div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-ghost" onclick="closeModal('modal-split-plates')" data-i18n="actions.cancel">Annuler</button>
+                <button class="btn btn-ghost" id="split-plates-cancel-btn" onclick="cancelSplitPlates()" data-i18n="actions.cancel">Annuler</button>
                 <button class="btn btn-primary" id="split-plates-confirm-btn" onclick="confirmSplitPlates()">
                     <i class="fa-solid fa-scissors"></i> <span data-i18n="modal.split_plates_confirm">Découper</span>
                 </button>

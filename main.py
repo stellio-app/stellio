@@ -10072,10 +10072,65 @@ def _split_3mf_plate_to_stl(src_path, plate_index, dest_path):
     mesh.export(dest_path, file_type='stl')
 
 
+# Découpe d'un 3MF multi-plateaux : tâche de fond avec avancement, pour que l'interface affiche « plateau 3 sur 6 »
+# au lieu d'un simple sablier (une découpe en STL ou d'un gros 3MF peut prendre plusieurs secondes par plateau).
+_split_jobs = {}
+_split_jobs_lock = threading.Lock()
+SPLIT_JOB_TTL_S = 900
+
+
+class _JobCancelled(Exception):
+    """Levée quand l'utilisateur annule une tâche de fond (découpe, conversion en lot)."""
+
+
+_convert_jobs = {}  # tâches de conversion en lot (même verrou et même durée de vie que les découpes)
+
+
+def _purge_split_jobs():
+    now = time.time()
+    with _split_jobs_lock:
+        for registry in (_split_jobs, _convert_jobs):
+            for jid in [j for j, v in registry.items() if v.get('finished') and now - v['finished'] > SPLIT_JOB_TTL_S]:
+                registry.pop(jid, None)
+
+
+def _run_split_plates(file_path, fmt, plates, keys, job=None):
+    """Découpe tout-ou-rien d'un 3MF multi-plateaux. Si `job` est fourni, y inscrit le plateau en cours et le nombre de
+    plateaux terminés. Renvoie la liste des fichiers créés ; en cas d'erreur, supprime ceux déjà créés et relève l'erreur."""
+    created = []
+    base_dir = os.path.dirname(file_path)
+    base_name = os.path.splitext(os.path.basename(file_path))[0]
+    try:
+        for idx, key in enumerate(keys, start=1):
+            if job is not None:
+                with _split_jobs_lock:
+                    if job.get('cancel'):
+                        raise _JobCancelled()
+                    job['current'] = idx
+            dest = _unique_file_path(base_dir, f"{base_name}_plateau_{idx}", '.' + fmt)
+            created.append(dest)
+            if fmt == '3mf':
+                _split_3mf_plate_to_3mf(file_path, key, plates, dest)
+            else:
+                _split_3mf_plate_to_stl(file_path, idx, dest)
+            if job is not None:
+                with _split_jobs_lock:
+                    job['done'] = idx
+    except Exception:
+        for p in created:  # tout ou rien : on ne laisse pas de découpe partielle
+            try:
+                if os.path.exists(p):
+                    os.remove(p)
+            except OSError:
+                pass
+        raise
+    _rescan_sources_in_background()
+    return created
+
+
 @app.route('/api/files/split-plates', methods=['POST'])
 @login_required
 def api_split_plates():
-    created = []
     try:
         data = request.get_json(silent=True) or {}
         file_path = (data.get('file_path') or '').strip()
@@ -10102,33 +10157,74 @@ def api_split_plates():
         if not plates:
             return jsonify({"error": "Ce fichier ne contient qu'un seul plateau"}), 400
         keys = sorted(plates.keys(), key=lambda k: (len(k), k))
-        base_dir = os.path.dirname(file_path)
-        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        user_id = session['user_id']
 
-        for idx, key in enumerate(keys, start=1):
-            dest = _unique_file_path(base_dir, f"{base_name}_plateau_{idx}", '.' + fmt)
-            created.append(dest)
-            if fmt == '3mf':
-                _split_3mf_plate_to_3mf(file_path, key, plates, dest)
-            else:
-                _split_3mf_plate_to_stl(file_path, idx, dest)
+        if data.get('async'):
+            _purge_split_jobs()
+            with _split_jobs_lock:
+                for jid, v in _split_jobs.items():   # déjà en cours pour ce fichier : on rend la même tâche
+                    if v.get('state') == 'running' and v.get('user_id') == user_id and v.get('path') == file_path and v.get('fmt') == fmt:
+                        return jsonify({"job_id": jid, "total": v['total']}), 202
+                job_id = uuid.uuid4().hex
+                job = {'user_id': user_id, 'path': file_path, 'fmt': fmt, 'state': 'running', 'done': 0, 'current': 1,
+                       'total': len(keys), 'name': os.path.basename(file_path), 'finished': None}
+                _split_jobs[job_id] = job
 
-        _rescan_sources_in_background()
+            def _runner():
+                try:
+                    created = _run_split_plates(file_path, fmt, plates, keys, job)
+                    names = [os.path.basename(p) for p in created]
+                    app_logger.info(f"[SPLIT] {os.path.basename(file_path)} → {len(created)} fichier(s) {fmt.upper()}: {names}")
+                    with _split_jobs_lock:
+                        job.update(state='done', files=names, count=len(names), finished=time.time())
+                except _JobCancelled:
+                    app_logger.info(f"[SPLIT] Annulée par l'utilisateur : {os.path.basename(file_path)} (fichiers déjà créés supprimés)")
+                    with _split_jobs_lock:
+                        job.update(state='cancelled', finished=time.time())
+                except Exception as e:
+                    app_logger.error(f"[SPLIT] Erreur: {e}")
+                    import traceback
+                    app_logger.error(traceback.format_exc())
+                    with _split_jobs_lock:
+                        job.update(state='error', error=f"Découpe impossible : {e}", finished=time.time())
+
+            threading.Thread(target=_runner, daemon=True, name='split-plates').start()
+            return jsonify({"job_id": job_id, "total": len(keys)}), 202
+
+        created = _run_split_plates(file_path, fmt, plates, keys)
         names = [os.path.basename(p) for p in created]
         app_logger.info(f"[SPLIT] {os.path.basename(file_path)} → {len(created)} fichier(s) {fmt.upper()}: {names}")
         return jsonify({"success": True, "count": len(created), "files": names,
                         "message": f"{len(created)} fichiers créés"}), 200
     except Exception as e:
-        for p in created:  # tout ou rien : on ne laisse pas de découpe partielle
-            try:
-                if os.path.exists(p):
-                    os.remove(p)
-            except OSError:
-                pass
         app_logger.error(f"[SPLIT] Erreur: {e}")
         import traceback
         app_logger.error(traceback.format_exc())
         return jsonify({"error": f"Découpe impossible : {e}"}), 500
+
+
+@app.route('/api/files/split-plates/<job_id>', methods=['GET'])
+@login_required
+def api_split_plates_status(job_id):
+    with _split_jobs_lock:
+        job = _split_jobs.get(job_id)
+        if not job or job.get('user_id') != session['user_id']:
+            return jsonify({"error": "Tâche introuvable"}), 404
+        out = {k: job.get(k) for k in ('state', 'done', 'current', 'total', 'name', 'count', 'files', 'error')}
+    return jsonify(out)
+
+
+@app.route('/api/files/split-plates/<job_id>/cancel', methods=['POST'])
+@login_required
+def api_split_plates_cancel(job_id):
+    """Demande l'arrêt d'une découpe : le plateau en cours se termine, puis tout ce qui a été créé est supprimé."""
+    with _split_jobs_lock:
+        job = _split_jobs.get(job_id)
+        if not job or job.get('user_id') != session['user_id']:
+            return jsonify({"error": "Tâche introuvable"}), 404
+        if job.get('state') == 'running':
+            job['cancel'] = True
+    return jsonify({"success": True})
 
 
 PLATE_SPLIT_DIRNAME = '.stellio_plateaux'  # sous-dossier masqué des plateaux séparés (projets) : hors bibliothèque et hors sources
@@ -18667,10 +18763,76 @@ def api_convert_file_batch():
             app_logger.warning(f"[SECURITY] Tentative de conversion batch hors sources: {p}")
             return jsonify({"error": "Un ou plusieurs fichiers n'appartiennent à aucune source configurée"}), 403
 
+    if data.get('async'):
+        _purge_split_jobs()
+        job_id = uuid.uuid4().hex
+        job = {'state': 'running', 'user_id': session['user_id'], 'done': 0, 'current': 1, 'total': len(paths),
+               'results': [], 'converted': 0, 'error': None, 'finished': None}
+        with _split_jobs_lock:
+            _convert_jobs[job_id] = job
+
+        def _run_convert_job():
+            try:
+                for idx, p in enumerate(paths, start=1):
+                    with _split_jobs_lock:
+                        if job.get('cancel'):
+                            raise _JobCancelled()
+                        job['current'] = idx
+                    r = _convert_single_file(p, target_format, delete_original, repair=repair, source_unit=source_unit)
+                    with _split_jobs_lock:
+                        job['results'].append(r)
+                        job['done'] = idx
+                        if r.get('success'):
+                            job['converted'] += 1
+                app_logger.info(f"[CONVERT-BATCH] {job['converted']}/{len(paths)} fichier(s) converti(s) avec succès")
+                with _split_jobs_lock:
+                    job['state'] = 'done'
+            except _JobCancelled:
+                app_logger.info(f"[CONVERT-BATCH] Annulée par l'utilisateur après {job['done']}/{len(paths)} fichier(s)")
+                with _split_jobs_lock:
+                    job['state'] = 'cancelled'
+            except Exception as e:
+                app_logger.error(f"[CONVERT-BATCH] {e}")
+                with _split_jobs_lock:
+                    job['state'] = 'error'
+                    job['error'] = "Une erreur interne est survenue lors de la conversion"
+            finally:
+                with _split_jobs_lock:
+                    job['finished'] = time.time()
+
+        threading.Thread(target=_run_convert_job, daemon=True, name='convert-batch').start()
+        return jsonify({"job_id": job_id, "total": len(paths)}), 202
+
     results = [_convert_single_file(p, target_format, delete_original, repair=repair, source_unit=source_unit) for p in paths]
     succeeded = sum(1 for r in results if r.get('success'))
     app_logger.info(f"[CONVERT-BATCH] {succeeded}/{len(results)} fichier(s) converti(s) avec succès")
     return jsonify({"success": True, "results": results, "converted": succeeded, "total": len(results)})
+
+
+@app.route('/api/files/convert-batch/<job_id>', methods=['GET'])
+@login_required
+def api_convert_file_batch_status(job_id):
+    with _split_jobs_lock:
+        job = _convert_jobs.get(job_id)
+        if not job or job.get('user_id') != session['user_id']:
+            return jsonify({"error": "Tâche introuvable"}), 404
+        out = {k: job.get(k) for k in ('state', 'done', 'current', 'total', 'converted', 'error')}
+        if job.get('state') != 'running':
+            out['results'] = list(job.get('results') or [])
+    return jsonify(out)
+
+
+@app.route('/api/files/convert-batch/<job_id>/cancel', methods=['POST'])
+@login_required
+def api_convert_file_batch_cancel(job_id):
+    """Arrête la conversion en lot après le fichier en cours ; les fichiers déjà convertis restent."""
+    with _split_jobs_lock:
+        job = _convert_jobs.get(job_id)
+        if not job or job.get('user_id') != session['user_id']:
+            return jsonify({"error": "Tâche introuvable"}), 404
+        if job.get('state') == 'running':
+            job['cancel'] = True
+    return jsonify({"success": True})
 
 
 INTEGRITY_CHECK_BASE_TIMEOUT = 120
@@ -21610,7 +21772,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.9.7"
+CURRENT_VERSION = "0.9.8"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 

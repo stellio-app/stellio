@@ -1,5 +1,58 @@
 [
   {
+    "version": "0.9.8",
+    "items": {
+      "fr": [
+        "Découpe des plateaux d'un 3MF : la fenêtre affiche maintenant l'avancement (barre de progression et « plateau 3 sur 6 »), la découpe se fait en tâche de fond et reste tout-ou-rien",
+        "Avancement ajouté aux opérations longues qui n'en avaient pas : la conversion de plusieurs fichiers (barre de progression et « 2 / 5 », sur le bouton et dans une notification), l'ajout de fichiers par glisser-déposer et l'import d'une sauvegarde (pourcentage d'envoi, puis « Traitement par le serveur… »)",
+        "Fichiers multi-plateaux : le nombre de plateaux s'affiche maintenant sur la miniature (à côté de l'icône)",
+        "Annulation possible de la découpe des plateaux (aucun fichier n'est conservé) et de la conversion en lot (les fichiers déjà convertis restent), avec un bouton « Annuler » pendant l'opération"
+      ],
+      "en": [
+        "Splitting the plates of a 3MF: the window now shows progress (progress bar and “plate 3 of 6”); the split runs in the background and is still all-or-nothing",
+        "Progress added to long operations that had none: converting several files (progress bar and “2 / 5”, on the button and in a notification), adding files by drag and drop, and importing a backup (upload percentage, then “Processing on the server…”)",
+        "Multi-plate files: the number of plates is now shown on the thumbnail (next to the icon)",
+        "The plate split (no file is kept) and the batch conversion (files already converted are kept) can now be cancelled with a “Cancel” button while they run"
+      ],
+      "de": [
+        "Aufteilen der Platten einer 3MF-Datei: Das Fenster zeigt jetzt den Fortschritt (Fortschrittsbalken und „Platte 3 von 6“); die Aufteilung läuft im Hintergrund und bleibt alles-oder-nichts",
+        "Fortschrittsanzeige für lange Vorgänge, die bisher keine hatten: Konvertierung mehrerer Dateien (Fortschrittsbalken und „2 / 5“ auf der Schaltfläche und in einer Benachrichtigung), Hinzufügen von Dateien per Drag & Drop und Import einer Sicherung (Upload-Prozentsatz, dann „Verarbeitung auf dem Server …“)",
+        "Mehrplatten-Dateien: Die Anzahl der Platten wird jetzt auf der Vorschau angezeigt (neben dem Symbol)",
+        "Das Aufteilen der Platten (keine Datei bleibt erhalten) und die Stapelkonvertierung (bereits konvertierte Dateien bleiben) lassen sich jetzt mit einer Schaltfläche „Abbrechen“ stoppen"
+      ],
+      "es": [
+        "División de las placas de un 3MF: la ventana ahora muestra el progreso (barra de progreso y «placa 3 de 6»); la división se hace en segundo plano y sigue siendo todo o nada",
+        "Progreso añadido a las operaciones largas que no lo tenían: conversión de varios archivos (barra de progreso y «2 / 5», en el botón y en una notificación), adición de archivos arrastrando y soltando, e importación de una copia de seguridad (porcentaje de envío, luego «Procesando en el servidor…»)",
+        "Archivos de varias placas: el número de placas se muestra ahora en la miniatura (junto al icono)",
+        "La división de placas (no se conserva ningún archivo) y la conversión por lotes (los archivos ya convertidos se conservan) ahora se pueden cancelar con un botón «Cancelar»"
+      ],
+      "pt": [
+        "Divisão das placas de um 3MF: a janela mostra agora o progresso (barra de progresso e «placa 3 de 6»); a divisão faz-se em segundo plano e continua a ser tudo ou nada",
+        "Progresso adicionado às operações longas que não o tinham: conversão de vários ficheiros (barra de progresso e «2 / 5», no botão e numa notificação), adição de ficheiros por arrastar e largar, e importação de uma cópia de segurança (percentagem de envio, depois «Processando no servidor…»)",
+        "Ficheiros com várias placas: o número de placas aparece agora na miniatura (junto ao ícone)",
+        "A divisão das placas (nenhum ficheiro é mantido) e a conversão em lote (os ficheiros já convertidos são mantidos) podem agora ser canceladas com um botão «Cancelar»"
+      ],
+      "it": [
+        "Divisione dei piatti di un 3MF: la finestra ora mostra l'avanzamento (barra di avanzamento e «piatto 3 di 6»); la divisione avviene in background ed è sempre tutto o niente",
+        "Avanzamento aggiunto alle operazioni lunghe che non lo avevano: conversione di più file (barra di avanzamento e «2 / 5», sul pulsante e in una notifica), aggiunta di file con trascinamento e importazione di un backup (percentuale di invio, poi «Elaborazione sul server…»)",
+        "File con più piatti: il numero di piatti è ora mostrato sulla miniatura (accanto all'icona)",
+        "La divisione dei piatti (nessun file viene conservato) e la conversione in blocco (i file già convertiti restano) ora si possono annullare con un pulsante «Annulla»"
+      ],
+      "zh": [
+        "拆分 3MF 的打印板：窗口现在显示进度（进度条和“第 3 个打印板，共 6 个”）；拆分在后台进行，仍然是要么全部成功要么全部不保留",
+        "为此前没有进度显示的长时间操作增加了进度：批量转换多个文件（按钮和通知中显示进度条和“2 / 5”）、拖放添加文件、导入备份（先显示上传百分比，再显示“服务器处理中…”）",
+        "多打印板文件：缩略图上现在显示打印板数量（图标旁边）",
+        "拆分打印板（不保留任何文件）和批量转换（已转换的文件保留）现在可以通过“取消”按钮中止"
+      ],
+      "ja": [
+        "3MF のプレート分割：ウィンドウに進行状況（プログレスバーと「プレート 3 / 6」）が表示されるようになりました。分割はバックグラウンドで実行され、全部成功か全部取り消しのままです",
+        "進行状況が表示されなかった長時間の操作に進行状況を追加しました：複数ファイルの一括変換（ボタンと通知に進行バーと「2 / 5」）、ドラッグ＆ドロップでのファイル追加、バックアップのインポート（アップロードの割合、続いて「サーバーで処理中…」）",
+        "複数プレートのファイル：サムネイルのアイコンの横にプレート数が表示されるようになりました",
+        "プレート分割（ファイルは残りません）と一括変換（変換済みのファイルは残ります）を、実行中に「キャンセル」ボタンで中止できるようになりました"
+      ]
+    }
+  },
+  {
     "version": "0.9.7",
     "items": {
       "fr": [

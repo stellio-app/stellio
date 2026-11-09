@@ -737,10 +737,14 @@ async function importBackup(file) {
     const formData = new FormData();
     formData.append('backup', file);
 
-    showToast(I18N.t('toast.backup_importing') || 'Import de la sauvegarde en cours...', 'info');
+    const prog = showProgressToast(I18N.t('toast.progress_uploading', { pct: 0 }));
+    prog.set(0);
     try {
-        const res = await fetch(`${API}/api/backup/import`, { method: 'POST', body: formData });
-        const data = await res.json();
+        const { ok: res_ok, data } = await postFormWithProgress(`${API}/api/backup/import`, formData, (loaded, total) => {
+            if (loaded == null) prog.set(null, I18N.t('toast.backup_importing') || I18N.t('toast.progress_processing'));
+            else { const p = Math.round(loaded / total * 100); prog.set(p, I18N.t('toast.progress_uploading', { pct: p })); }
+        });
+        const res = { ok: res_ok };
         if (res.ok && data.success) {
             showBackupRestartPopup();
         } else {
@@ -749,6 +753,7 @@ async function importBackup(file) {
     } catch (err) {
         showToast(I18N.t('toast.connection_error') || 'Erreur de connexion', 'error');
     } finally {
+        prog.close();
         document.getElementById('backup-import-input').value = '';
     }
 }
@@ -2729,8 +2734,31 @@ function showAutoLoginConfirm(user) {
     yesBtn?.focus();
 }
 
+function showDemoBanner() {
+    if (document.getElementById('demo-banner')) return;
+    const b = document.createElement('div');
+    b.id = 'demo-banner';
+    b.innerHTML = '<i class="fa-solid fa-flask"></i> <span data-i18n="demo.banner">' + _t3('demo.banner', 'Démo publique en lecture seule : explorez librement, rien ne peut être modifié.') + '</span> <a href="https://github.com/stellio-app/stellio" target="_blank" rel="noopener" data-i18n="demo.get">' + _t3('demo.get', 'Obtenir Stellio') + '</a>';
+    document.body.prepend(b);
+    document.body.classList.add('has-demo-banner');
+}
 async function checkAuth(preFetchedFirstLaunch = null) {
 try {
+
+// Démo publique : entrée directe en lecture seule, sans écran de connexion
+try {
+    const flDemo = preFetchedFirstLaunch ? await preFetchedFirstLaunch : null;
+    if (flDemo && flDemo.demo) {
+        const r = await fetch(`${API}/api/demo/enter`, { method: 'POST', credentials: 'same-origin' });
+        if (r.ok) {
+            const d = await r.json();
+            window.STELLIO_DEMO = true;
+            showApp(d.user);
+            showDemoBanner();
+            return;
+        }
+    }
+} catch (e) { console.warn('[demo] entrée impossible', e); }
 
 // Reprise de session : si la session du serveur est toujours valide (retour dans l'app sans l'avoir fermée,
 // rechargement de la page par le téléphone…), on ne redemande pas les identifiants.
@@ -6180,6 +6208,58 @@ setTimeout(() => toast.remove(), 300);
 }
 
 /**
+ * Toast persistant avec barre de progression (opérations longues). Renvoie { set(pct, text), close() }.
+ * pct = null -> barre indéterminée (traitement dont on ne connaît pas la durée).
+ */
+function showProgressToast(text, onCancel) {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = 'toast info toast-progress';
+    toast.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><div class="toast-progress-body"><span class="toast-message"></span><div class="progress-track"><div class="progress-bar"></div></div></div>';
+    if (onCancel) {
+        const cb = document.createElement('button');
+        cb.type = 'button'; cb.className = 'btn btn-ghost btn-sm toast-progress-cancel';
+        cb.textContent = I18N.t('actions.cancel') || 'Annuler';
+        cb.onclick = () => { cb.disabled = true; cb.textContent = I18N.t('toast.progress_cancelling'); onCancel(); };
+        toast.appendChild(cb);
+    }
+    const msg = toast.querySelector('.toast-message');
+    const track = toast.querySelector('.progress-track');
+    const bar = toast.querySelector('.progress-bar');
+    msg.textContent = text || '';
+    if (container) container.appendChild(toast);
+    return {
+        set(pct, label) {
+            if (label != null) msg.textContent = label;
+            if (pct == null) { track.classList.add('indeterminate'); bar.style.width = '35%'; }
+            else { track.classList.remove('indeterminate'); bar.style.width = Math.max(0, Math.min(100, pct)) + '%'; }
+        },
+        close() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s ease'; setTimeout(() => toast.remove(), 300); }
+    };
+}
+
+/** POST multipart avec progression d'envoi (fetch ne l'expose pas). Renvoie { ok, status, data }. */
+function postFormWithProgress(url, formData, onProgress) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        xhr.withCredentials = true;
+        const csrf = _getCsrfCookie();
+        if (csrf) xhr.setRequestHeader('X-CSRF-Token', csrf);
+        xhr.addEventListener('load', () => { if (xhr.status === 403 && IS_VIEWER) { try { showToast(_t3('viewer.readonly_toast', 'Compte invité : lecture seule'), 'warning'); } catch (e) { } } });
+        xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded, e.total); };
+        xhr.upload.onload = () => { if (onProgress) onProgress(null, null); };
+        xhr.onerror = () => reject(new Error('network'));
+        xhr.onload = () => {
+            let data = {};
+            try { data = JSON.parse(xhr.responseText); } catch (e) { }
+            resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, data });
+        };
+        xhr.send(formData);
+    });
+}
+
+/**
  * Toast avec bouton "Annuler" pour les suppressions (restauration depuis la corbeille temporaire).
  * @param {string} message - Texte déjà traduit (ex: "3 fichiers supprimés").
  * @param {string} batchId - Identifiant de lot renvoyé par /api/files/delete ou /api/files/delete-batch.
@@ -7905,7 +7985,7 @@ const isNew = f.mtime && (Date.now() / 1000 - f.mtime) < NEW_THRESHOLD_S && !see
 const newBadgeHtml = isNew ? `<span class="file-new-badge"><i class="fa-solid fa-sparkles"></i> ${escapeHtml(_t3('card.new_badge', 'Nouveau'))}</span>` : '';
 const multiPlateLabel = I18N.t('card.multi_plate') || 'Plateau multiple';
 const multiPlateBadgeHtml = f.multi_plate
-    ? `<span class="file-multiplate-badge" title="${multiPlateLabel}"><i class="fa-solid fa-table-cells"></i></span>`
+    ? `<span class="file-multiplate-badge" title="${multiPlateLabel}${f.plate_count > 1 ? ' : ' + f.plate_count : ''}"><i class="fa-solid fa-table-cells"></i>${f.plate_count > 1 ? `<b>${f.plate_count}</b>` : ''}</span>`
     : '';
 const viewedByOtherBadgeHtml = isFileViewedByOther(f.path)
     ? `<span class="file-viewed-by-other-badge" title="${_t2('presence.file_viewed_by_other', 'Consulté en ce moment sur un autre appareil')}"><i class="fa-solid fa-eye"></i></span>`
@@ -16435,13 +16515,16 @@ document.getElementById('delete-selected-btn')?.addEventListener('click', () => 
 
 async function _uploadDroppedFiles(fileList) {
     const files = [...fileList];
-    showToast(I18N.tp('toast.drop_uploading', files.length, { count: files.length }) || `Envoi de ${files.length} fichier(s)...`, 'info');
     const formData = new FormData();
     files.forEach(f => formData.append('files', f));
+    const prog = showProgressToast(I18N.t('toast.progress_uploading', { pct: 0 }));
+    prog.set(0);
     try {
-        const res = await fetch(`${API}/api/files/upload-drop`, { method: 'POST', body: formData });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
+        const { ok, data } = await postFormWithProgress(`${API}/api/files/upload-drop`, formData, (loaded, total) => {
+            if (loaded == null) prog.set(null, I18N.t('toast.progress_processing'));
+            else { const p = Math.round(loaded / total * 100); prog.set(p, I18N.t('toast.progress_uploading', { pct: p })); }
+        });
+        if (!ok) {
             showToast(data.error || I18N.t('toast.connection_error'), 'error');
             return;
         }
@@ -16460,6 +16543,8 @@ async function _uploadDroppedFiles(fileList) {
     } catch (err) {
         console.error('[DropUpload] Erreur:', err);
         showToast(I18N.t('toast.connection_error'), 'error');
+    } finally {
+        prog.close();
     }
 }
 
@@ -17835,29 +17920,64 @@ const btn = document.getElementById('converter-convert-btn');
 const originalHtml = btn.innerHTML;
 btn.disabled = true;
 btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${I18N.t('converter.converting_progress')}`;
+let convertJobId = null;
+const prog = showProgressToast(I18N.t('toast.progress_converting', { done: 0, total: paths.length }), () => {
+    if (convertJobId) fetch(`${API}/api/files/convert-batch/${convertJobId}/cancel`, { method: 'POST' }).catch(() => {});
+});
+prog.set(0);
 try {
-    const res = await fetch(`${API}/api/files/convert-batch`, {
+    const startRes = await fetch(`${API}/api/files/convert-batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paths, target_format: targetFormat, delete_original: deleteOriginal, repair, source_unit: sourceUnit })
+        body: JSON.stringify({ paths, target_format: targetFormat, delete_original: deleteOriginal, repair, source_unit: sourceUnit, async: true })
     });
-    const data = await res.json();
-    if (res.ok) {
-        const okCount = data.converted || 0;
-        const failCount = paths.length - okCount;
-        let msg = I18N.t('converter.batch_result', { count: okCount, failSuffix: failCount ? I18N.t('converter.batch_fail_suffix', { count: failCount }) : '' });
-        const okResults = (data.results || []).filter(r => r.success && typeof r.size_reduction_pct === 'number');
-        if (okResults.length) {
-            const avgReduction = okResults.reduce((sum, r) => sum + r.size_reduction_pct, 0) / okResults.length;
-            if (avgReduction > 0) msg += I18N.t('converter.avg_reduction_suffix', { pct: avgReduction.toFixed(1) });
-        }
-        showToast(msg, failCount ? 'warning' : 'success');
+    const start = await startRes.json().catch(() => ({}));
+    if (!startRes.ok || !start.job_id) {
+        showToast(start.error || I18N.t('converter.batch_failed'), 'error');
     } else {
-        showToast(data.error || I18N.t('converter.batch_failed'), 'error');
+        convertJobId = start.job_id;
+        let data = null, failures = 0;
+        while (!data) {
+            await new Promise(r => setTimeout(r, 500));
+            let st = null;
+            try {
+                const r = await fetch(`${API}/api/files/convert-batch/${start.job_id}`);
+                st = await r.json().catch(() => null);
+                if (!r.ok) st = { state: 'error', error: (st && st.error) || '' };
+                failures = 0;
+            } catch (e) {
+                if (++failures >= 6) { showToast(I18N.t('toast.connection_error'), 'error'); break; }
+                continue;
+            }
+            if (st.state === 'running') {
+                const done = st.done || 0, total = st.total || paths.length;
+                prog.set(Math.round(done / total * 100), I18N.t('toast.progress_converting', { done, total }));
+                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${done} / ${total}`;
+            } else if (st.state === 'done' || st.state === 'cancelled') {
+                data = st;
+            } else {
+                showToast(st.error || I18N.t('converter.batch_failed'), 'error');
+                break;
+            }
+        }
+        if (data && data.state === 'cancelled') {
+            showToast(I18N.t('toast.convert_cancelled', { count: data.converted || 0 }), 'warning');
+        } else if (data) {
+            const okCount = data.converted || 0;
+            const failCount = paths.length - okCount;
+            let msg = I18N.t('converter.batch_result', { count: okCount, failSuffix: failCount ? I18N.t('converter.batch_fail_suffix', { count: failCount }) : '' });
+            const okResults = (data.results || []).filter(r => r.success && typeof r.size_reduction_pct === 'number');
+            if (okResults.length) {
+                const avgReduction = okResults.reduce((sum, r) => sum + r.size_reduction_pct, 0) / okResults.length;
+                if (avgReduction > 0) msg += I18N.t('converter.avg_reduction_suffix', { pct: avgReduction.toFixed(1) });
+            }
+            showToast(msg, failCount ? 'warning' : 'success');
+        }
     }
 } catch (err) {
     showToast(I18N.t('toast.connection_error'), 'error');
 } finally {
+    prog.close();
     converterSelectedFiles.clear();
     btn.innerHTML = originalHtml;
     await loadConverterFiles();
@@ -21148,31 +21268,103 @@ startThumbAutoRefresh();
         openModal('modal-split-plates');
     };
 
+    // Progression de la découpe : la tâche tourne côté serveur, on l'interroge toutes les 0,5 s.
+    function _setSplitProgress(done, total, current) {
+        const bar = document.getElementById('split-plates-progress-bar');
+        const pct = document.getElementById('split-plates-progress-pct');
+        const txt = document.getElementById('split-plates-progress-text');
+        const p = total > 0 ? Math.round((done / total) * 100) : 0;
+        if (bar) bar.style.width = p + '%';
+        if (pct) pct.textContent = p + ' %';
+        if (txt) txt.textContent = I18N.t('modal.split_plates_progress', { current: Math.min(current || 1, total || 1), total: total || 1 });
+    }
+
+    let _splitJobId = null;
+
+    // « Annuler » : ferme la fenêtre ; pendant la découpe, arrête la tâche (tout ce qui a été créé est supprimé).
+    window.cancelSplitPlates = function () {
+        if (!_splitJobId) { closeModal('modal-split-plates'); return; }
+        const cancel = document.getElementById('split-plates-cancel-btn');
+        if (cancel) cancel.disabled = true;
+        const txt = document.getElementById('split-plates-progress-text');
+        if (txt) txt.textContent = I18N.t('toast.progress_cancelling');
+        fetch(`${API}/api/files/split-plates/${_splitJobId}/cancel`, { method: 'POST' }).catch(() => {});
+    };
+
+    function _setSplitBusy(busy) {
+        const progress = document.getElementById('split-plates-progress');
+        if (progress) progress.classList.toggle('hidden', !busy);
+        document.querySelectorAll('input[name="split-plates-format"]').forEach(r => { r.disabled = busy; });
+        const cancel = document.getElementById('split-plates-cancel-btn');
+        if (cancel) cancel.disabled = false;
+        if (busy) {
+            const txt = document.getElementById('split-plates-progress-text');
+            const pct = document.getElementById('split-plates-progress-pct');
+            const bar = document.getElementById('split-plates-progress-bar');
+            if (txt) txt.textContent = I18N.t('modal.split_plates_starting');
+            if (pct) pct.textContent = '0 %';
+            if (bar) bar.style.width = '0%';
+        }
+    }
+
     window.confirmSplitPlates = async function () {
         if (!_splitPlatesPath) return;
         const format = document.querySelector('input[name="split-plates-format"]:checked')?.value || '3mf';
         const btn = document.getElementById('split-plates-confirm-btn');
         const originalHtml = btn ? btn.innerHTML : '';
         if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
+        _setSplitBusy(true);
         try {
             const res = await fetch(`${API}/api/files/split-plates`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ file_path: _splitPlatesPath, format })
+                body: JSON.stringify({ file_path: _splitPlatesPath, format, async: true })
             });
-            const data = await res.json().catch(() => ({}));
-            if (res.ok) {
-                closeModal('modal-split-plates');
-                const n = data.count || (data.files || []).length;
-                showToast(I18N.t('toast.split_plates_success', { count: n }), 'success');
-                if (typeof loadFiles === 'function') loadFiles();
-            } else {
-                showToast(data.error || I18N.t('toast.split_plates_error'), 'error');
+            const start = await res.json().catch(() => ({}));
+            if (!res.ok || !start.job_id) {
+                showToast(start.error || I18N.t('toast.split_plates_error'), 'error');
+                return;
+            }
+            _splitJobId = start.job_id;
+            const total = start.total || 1;
+            _setSplitProgress(0, total, 1);
+            let failures = 0;
+            for (;;) {
+                await new Promise(r => setTimeout(r, 500));
+                let st = null;
+                try {
+                    const r = await fetch(`${API}/api/files/split-plates/${start.job_id}`);
+                    st = await r.json().catch(() => null);
+                    if (!r.ok) st = { state: 'error', error: (st && st.error) || '' };
+                    failures = 0;
+                } catch (e) {
+                    if (++failures >= 6) { showToast(I18N.t('toast.network_error_backend'), 'error'); return; }
+                    continue;
+                }
+                if (st.state === 'running') {
+                    _setSplitProgress(st.done || 0, st.total || total, st.current || 1);
+                } else if (st.state === 'done') {
+                    _setSplitProgress(st.total || total, st.total || total, st.total || total);
+                    closeModal('modal-split-plates');
+                    const n = st.count || (st.files || []).length;
+                    showToast(I18N.t('toast.split_plates_success', { count: n }), 'success');
+                    if (typeof loadFiles === 'function') loadFiles();
+                    return;
+                } else if (st.state === 'cancelled') {
+                    closeModal('modal-split-plates');
+                    showToast(I18N.t('toast.split_plates_cancelled'), 'warning');
+                    return;
+                } else {
+                    showToast(st.error || I18N.t('toast.split_plates_error'), 'error');
+                    return;
+                }
             }
         } catch (err) {
             console.error('[SplitPlates]', err);
             showToast(I18N.t('toast.network_error_backend'), 'error');
         } finally {
+            _splitJobId = null;
+            _setSplitBusy(false);
             if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
         }
     };
