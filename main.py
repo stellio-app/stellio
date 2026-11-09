@@ -5581,6 +5581,7 @@ def process_generation_queue():
                         success = generate_thumbnail_pyrender(file_path, thumb_path, timeout_s=timeout_s)
                     except Exception as render_err:
                         app_logger.warning(f"[ERROR #{worker_id}] Génération {os.path.basename(file_path)}: {render_err}")
+                    timed_out = (not success) and _consume_thumb_timeout(file_path)
 
                     if success:
                         processed_count += 1
@@ -5591,7 +5592,7 @@ def process_generation_queue():
                     else:
                         app_logger.info(f"[FALLBACK] Création miniature fallback pour {os.path.basename(file_path)}")
                         create_fallback_thumbnail(thumb_path)
-                        update_cache_thumb_status(file_path, True, is_fallback=True)
+                        update_cache_thumb_status(file_path, True, is_fallback=True, give_up=timed_out)
                         consecutive_errors = 0
                         reason = 'timeout' if timed_out else 'error'
                         thumb_failure_notifications.put({
@@ -6755,6 +6756,30 @@ _thumb_ghosts = []
 _thumb_ghosts_lock = threading.Lock()
 _thumb_ghost_log_t = 0.0
 
+# Gros fichiers : un seul rendu à la fois. Un STL de plusieurs centaines de milliers de faces occupe ~1 Go de RAM pendant
+# son chargement ; six rendus de ce type en parallèle (un par worker) suffisent à saturer la mémoire d'un PC.
+THUMB_HEAVY_BYTES = 20 * 1024 * 1024
+THUMB_HEAVY_WAIT_S = 900
+_thumb_heavy_sem = threading.BoundedSemaphore(1)
+
+# Fichiers dont le rendu a dépassé son délai : le worker le sait (pour ne pas relancer le même rendu en boucle).
+_thumb_timed_out = set()
+_thumb_timed_out_lock = threading.Lock()
+
+# Rendu CPU (z-buffer) : une boucle Python triangle par triangle. Les threads Python se partagent le GIL : lancer 6 rendus
+# en parallèle ne va pas plus vite, c'est bien plus lent (mesuré sur un STL de 1,3 million de faces : 6 s seul, 109 s
+# chacun quand six tournent ensemble). Un seul à la fois donc : le temps total est le même ou meilleur.
+_raster_cpu_lock = threading.Lock()
+
+
+def _consume_thumb_timeout(path):
+    """Vrai (une seule fois) si le dernier rendu de ce fichier a dépassé son délai."""
+    with _thumb_timed_out_lock:
+        if path in _thumb_timed_out:
+            _thumb_timed_out.discard(path)
+            return True
+    return False
+
 
 def _live_thumb_ghosts():
     """Nombre de rendus abandonnés qui tournent encore (la liste est nettoyée au passage)."""
@@ -6792,6 +6817,20 @@ def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(768, 768), tim
 
     _wait_for_thumb_ghosts()
 
+    # Gros fichier : on prend le « jeton » des gros rendus. Il est rendu par le thread de rendu lui-même, donc un rendu
+    # abandonné qui tourne encore le garde : le gros fichier suivant attend (au plus THUMB_HEAVY_WAIT_S) au lieu de s'ajouter.
+    heavy = False
+    try:
+        heavy = os.path.getsize(stl_path) >= THUMB_HEAVY_BYTES
+    except OSError:
+        heavy = False
+    holds_heavy = False
+    if heavy:
+        holds_heavy = _thumb_heavy_sem.acquire(timeout=THUMB_HEAVY_WAIT_S)
+        if not holds_heavy:
+            app_logger.warning(f"[MEMOIRE] Jeton « gros fichier » toujours occupé après {THUMB_HEAVY_WAIT_S}s : "
+                               f"rendu lancé quand même ({os.path.basename(stl_path)})")
+
     result = {}
 
     def _run():
@@ -6799,6 +6838,12 @@ def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(768, 768), tim
             result['value'] = _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution)
         except Exception as e:
             result['error'] = e
+        finally:
+            if holds_heavy:
+                try:
+                    _thumb_heavy_sem.release()
+                except ValueError:
+                    pass
 
     worker = threading.Thread(target=_run, daemon=True, name="thumb-render-1shot")
     worker.stellio_abandoned = False
@@ -6809,6 +6854,8 @@ def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(768, 768), tim
         worker.stellio_abandoned = True   # le rendu s'arrêtera de lui-même à son prochain point de contrôle
         with _thumb_ghosts_lock:
             _thumb_ghosts.append(worker)
+        with _thumb_timed_out_lock:
+            _thumb_timed_out.add(stl_path)
         app_logger.warning(
             f"[TIMEOUT] Rendu miniature trop long (> {timeout_s:.0f}s), "
             f"abandon et passage au fichier suivant: {os.path.basename(stl_path)} "
@@ -6820,6 +6867,9 @@ def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(768, 768), tim
         app_logger.warning(f"[ERROR] Rendu miniature {os.path.basename(stl_path)}: {result['error']}")
         return False
 
+    if result.get('value'):
+        with _thumb_timed_out_lock:
+            _thumb_timed_out.discard(stl_path)
     return bool(result.get('value', False))
 
 
@@ -6964,19 +7014,24 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
             rot_fix = tra.rotation_matrix(np.radians(-90), [1, 0, 0])
             mesh.apply_transform(rot_fix)
 
-            try:
-                with warnings.catch_warnings():
-                    warnings.filterwarnings(
-                        'ignore', category=RuntimeWarning,
-                        message='.*divide by zero encountered in divide.*'
-                    )
-                    warnings.filterwarnings(
-                        'ignore', category=RuntimeWarning,
-                        message='.*invalid value encountered in divide.*'
-                    )
-                    mesh.fix_normals()
-            except Exception:
-                pass
+            # Le rendu CPU recalcule ses normales et éclaire la face visible : réorienter les normales ne change rien
+            # à son résultat, et sur un gros maillage défectueux cela prenait 12 s (davantage quand plusieurs rendus tournent).
+            _cpu_render_path = bool(_pyrender_unavailable or
+                                    (hasattr(mesh, 'metadata') and mesh.metadata.get('stellio_face_rgb') is not None))
+            if not _cpu_render_path:
+                try:
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings(
+                            'ignore', category=RuntimeWarning,
+                            message='.*divide by zero encountered in divide.*'
+                        )
+                        warnings.filterwarnings(
+                            'ignore', category=RuntimeWarning,
+                            message='.*invalid value encountered in divide.*'
+                        )
+                        mesh.fix_normals()
+                except Exception:
+                    pass
 
             _face_rgb = mesh.metadata.get('stellio_face_rgb') if hasattr(mesh, 'metadata') else None
             if _face_rgb is not None and len(_face_rgb) != len(mesh.faces):
@@ -7159,33 +7214,42 @@ def _generate_thumbnail_raster(mesh, thumb_path, resolution=(768, 768), face_rgb
         zbuf = np.full((h, w), np.inf, dtype=np.float32)
         fid = np.full((h, w), -1, dtype=np.int32)
 
-        for i in range(len(F)):
-            x0, x1, x2 = tx[i]
-            y0, y1, y2 = ty[i]
-            den = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
-            if abs(den) < 1e-9:
-                continue
-            xmin = max(int(min(x0, x1, x2)), 0)
-            xmax = min(int(max(x0, x1, x2)) + 1, w - 1)
-            ymin = max(int(min(y0, y1, y2)), 0)
-            ymax = min(int(max(y0, y1, y2)) + 1, h - 1)
-            if xmin > xmax or ymin > ymax:
-                continue
-            X = np.arange(xmin, xmax + 1, dtype=np.float64)[None, :] + 0.5
-            Y = np.arange(ymin, ymax + 1, dtype=np.float64)[:, None] + 0.5
-            l0 = ((y1 - y2) * (X - x2) + (x2 - x1) * (Y - y2)) / den
-            l1 = ((y2 - y0) * (X - x2) + (x0 - x2) * (Y - y2)) / den
-            l2 = 1.0 - l0 - l1
-            inside = (l0 >= -1e-6) & (l1 >= -1e-6) & (l2 >= -1e-6)
-            if not inside.any():
-                continue
-            z = l0 * tz[i, 0] + l1 * tz[i, 1] + l2 * tz[i, 2]
-            zs = zbuf[ymin:ymax + 1, xmin:xmax + 1]
-            win = inside & (z < zs)
-            if not win.any():
-                continue
-            zs[win] = z[win]
-            fid[ymin:ymax + 1, xmin:xmax + 1][win] = i
+        # un seul rendu CPU à la fois (voir _raster_cpu_lock) ; un rendu abandonné n'attend pas et s'arrête
+        while not _raster_cpu_lock.acquire(timeout=1.0):
+            if _render_cancelled():
+                return False
+        try:
+            for i in range(len(F)):
+                if (i & 0x7FF) == 0 and _render_cancelled():
+                    return False
+                x0, x1, x2 = tx[i]
+                y0, y1, y2 = ty[i]
+                den = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+                if abs(den) < 1e-9:
+                    continue
+                xmin = max(int(min(x0, x1, x2)), 0)
+                xmax = min(int(max(x0, x1, x2)) + 1, w - 1)
+                ymin = max(int(min(y0, y1, y2)), 0)
+                ymax = min(int(max(y0, y1, y2)) + 1, h - 1)
+                if xmin > xmax or ymin > ymax:
+                    continue
+                X = np.arange(xmin, xmax + 1, dtype=np.float64)[None, :] + 0.5
+                Y = np.arange(ymin, ymax + 1, dtype=np.float64)[:, None] + 0.5
+                l0 = ((y1 - y2) * (X - x2) + (x2 - x1) * (Y - y2)) / den
+                l1 = ((y2 - y0) * (X - x2) + (x0 - x2) * (Y - y2)) / den
+                l2 = 1.0 - l0 - l1
+                inside = (l0 >= -1e-6) & (l1 >= -1e-6) & (l2 >= -1e-6)
+                if not inside.any():
+                    continue
+                z = l0 * tz[i, 0] + l1 * tz[i, 1] + l2 * tz[i, 2]
+                zs = zbuf[ymin:ymax + 1, xmin:xmax + 1]
+                win = inside & (z < zs)
+                if not win.any():
+                    continue
+                zs[win] = z[win]
+                fid[ymin:ymax + 1, xmin:xmax + 1][win] = i
+        finally:
+            _raster_cpu_lock.release()
 
         img_arr = np.empty((h, w, 3), dtype=np.uint8)
         img_arr[:, :] = THUMB_BG_RGB
@@ -10252,10 +10316,12 @@ _last_thumb_flush = 0.0
 THUMB_CACHE_BATCH_SIZE = 25
 THUMB_CACHE_FLUSH_INTERVAL = 2.0  
 
-def update_cache_thumb_status(file_path, has_thumb, is_fallback=False):
+def update_cache_thumb_status(file_path, has_thumb, is_fallback=False, give_up=False):
+    """give_up : le rendu a dépassé son délai. On garde la miniature de remplacement et on ne le relance plus tout seul
+    (sinon le superviseur de couverture le remettait en file à chaque passage, avec le même résultat à chaque fois)."""
     global _last_thumb_flush
     with _pending_thumb_lock:
-        _pending_thumb_updates[file_path] = (has_thumb, is_fallback)
+        _pending_thumb_updates[file_path] = (has_thumb, is_fallback, give_up)
         should_flush = (
             len(_pending_thumb_updates) >= THUMB_CACHE_BATCH_SIZE
             or (time.time() - _last_thumb_flush) >= THUMB_CACHE_FLUSH_INTERVAL
@@ -10282,11 +10348,12 @@ def flush_pending_thumb_updates():
                     upd = updates.get(f.get('path'))
                     if upd is None:
                         continue
-                    has_thumb, is_fallback = upd
+                    has_thumb, is_fallback, give_up = upd
                     f['has_thumb'] = has_thumb
                     if is_fallback:
                         f['thumb_fallback'] = True
-                        f['thumb_fallback_retries'] = f.get('thumb_fallback_retries', 0) + 1
+                        f['thumb_fallback_retries'] = (MAX_THUMB_FALLBACK_RETRIES if give_up
+                                                       else f.get('thumb_fallback_retries', 0) + 1)
                     else:
                         f.pop('thumb_fallback', None)
                         f.pop('thumb_fallback_retries', None)
@@ -10347,7 +10414,8 @@ def pregenerate_thumbnails_on_startup(limit=90):
                 update_cache_thumb_status(file_path, True)
                 return True
             create_fallback_thumbnail(thumb_path)
-            update_cache_thumb_status(file_path, True, is_fallback=True)
+            update_cache_thumb_status(file_path, True, is_fallback=True,
+                                      give_up=_consume_thumb_timeout(file_path))
             return False
         except Exception as e:
             app_logger.info(f"[THUMBS] Erreur génération {os.path.basename(file_path)}: {e}")
@@ -21542,7 +21610,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.9.6"
+CURRENT_VERSION = "0.9.7"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 

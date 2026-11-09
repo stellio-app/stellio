@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.9.7",
+    "items": {
+      "fr": [
+        "Miniatures : un fichier dont le rendu dépasse le délai n'est plus relancé en boucle (il gardait sa miniature de remplacement, mais le contrôle de couverture le remettait en file à chaque passage, pour le même échec) ; les fichiers de 20 Mo et plus sont rendus un à la fois pour ne plus saturer la mémoire d'une grosse bibliothèque",
+        "Miniatures : le rendu sur processeur (quand OpenGL n'est pas disponible) est désormais limité à un seul à la fois, car plusieurs rendus simultanés se ralentissaient mutuellement (un gros maillage : 6 s seul, 109 s chacun à six) et dépassaient leur délai ; la correction des normales, inutile pour ce rendu, est sautée (12 s gagnées sur un gros maillage, image identique)"
+      ],
+      "en": [
+        "Thumbnails: a file whose render exceeds its time limit is no longer retried in a loop (it kept its placeholder thumbnail, but the coverage check put it back in the queue on every pass, with the same failure each time); files of 20 MB and more are rendered one at a time so a large library no longer exhausts memory",
+        "Thumbnails: CPU rendering (when OpenGL is not available) now runs one at a time, because several simultaneous renders slowed each other down (one large mesh: 6 s alone, 109 s each when six ran together) and exceeded their time limit; normal fixing, which this renderer does not need, is skipped (12 s saved on a large mesh, identical image)"
+      ],
+      "de": [
+        "Vorschaubilder: Eine Datei, deren Rendering das Zeitlimit überschreitet, wird nicht mehr in einer Schleife neu gestartet (sie behielt ihr Ersatzbild, aber die Abdeckungsprüfung stellte sie bei jedem Durchlauf wieder in die Warteschlange, mit demselben Fehlschlag); Dateien ab 20 MB werden nacheinander gerendert, damit eine große Bibliothek den Speicher nicht mehr erschöpft",
+        "Vorschaubilder: Das CPU-Rendering (wenn OpenGL nicht verfügbar ist) läuft jetzt nur noch einzeln, weil mehrere gleichzeitige Renderings sich gegenseitig ausbremsten (ein großes Mesh: 6 s allein, 109 s je Rendering bei sechs parallel) und ihr Zeitlimit überschritten; die Normalenkorrektur, die dieses Rendering nicht braucht, entfällt (12 s gespart bei einem großen Mesh, identisches Bild)"
+      ],
+      "es": [
+        "Miniaturas: un archivo cuyo renderizado supera el tiempo límite ya no se reintenta en bucle (conservaba su miniatura provisional, pero la comprobación de cobertura lo volvía a poner en cola en cada pasada, con el mismo fallo); los archivos de 20 MB o más se renderizan de uno en uno para que una biblioteca grande no agote la memoria",
+        "Miniaturas: el renderizado por CPU (cuando OpenGL no está disponible) ahora se ejecuta de uno en uno, porque varios renderizados simultáneos se ralentizaban entre sí (una malla grande: 6 s sola, 109 s cada una con seis a la vez) y superaban su tiempo límite; se omite la corrección de normales, innecesaria para este renderizado (12 s ahorrados en una malla grande, imagen idéntica)"
+      ],
+      "pt": [
+        "Miniaturas: um ficheiro cuja renderização excede o tempo limite já não é repetido em ciclo (mantinha a miniatura provisória, mas a verificação de cobertura voltava a colocá-lo na fila em cada passagem, com a mesma falha); os ficheiros de 20 MB ou mais são renderizados um de cada vez para que uma biblioteca grande não esgote a memória",
+        "Miniaturas: a renderização por CPU (quando o OpenGL não está disponível) passa a executar-se uma de cada vez, porque várias renderizações simultâneas se atrasavam mutuamente (uma malha grande: 6 s sozinha, 109 s cada uma com seis em simultâneo) e excediam o tempo limite; a correção de normais, desnecessária para esta renderização, é ignorada (12 s poupados numa malha grande, imagem idêntica)"
+      ],
+      "it": [
+        "Miniature: un file il cui rendering supera il tempo limite non viene più ritentato in ciclo (manteneva la miniatura provvisoria, ma il controllo di copertura lo rimetteva in coda a ogni passaggio, con lo stesso fallimento); i file da 20 MB in su vengono renderizzati uno alla volta così una grande libreria non esaurisce più la memoria",
+        "Miniature: il rendering su CPU (quando OpenGL non è disponibile) ora viene eseguito uno alla volta, perché più rendering simultanei si rallentavano a vicenda (una mesh grande: 6 s da sola, 109 s ciascuna con sei insieme) e superavano il tempo limite; la correzione delle normali, inutile per questo rendering, viene saltata (12 s risparmiati su una mesh grande, immagine identica)"
+      ],
+      "zh": [
+        "缩略图：渲染超时的文件不再被循环重试（它保留了占位缩略图，但覆盖率检查每轮都会把它重新放回队列，结果每次都一样）；20 MB 及以上的文件改为逐个渲染，大型库不再耗尽内存",
+        "缩略图：CPU 渲染（OpenGL 不可用时）现在一次只运行一个，因为多个同时渲染会互相拖慢（一个大型网格：单独 6 秒，六个并行时每个 109 秒）并超过时限；跳过该渲染不需要的法线修正（大型网格节省 12 秒，图像完全相同）"
+      ],
+      "ja": [
+        "サムネイル：レンダリングが制限時間を超えたファイルを繰り返し再試行しなくなりました（代替サムネイルは保持されていましたが、カバレッジ確認が毎回キューに戻し、同じ失敗を繰り返していました）。20 MB 以上のファイルは 1 つずつレンダリングし、大きなライブラリでもメモリを使い切らないようにしました",
+        "サムネイル：CPU レンダリング（OpenGL が使えない場合）は 1 つずつ実行するようになりました。複数を同時に実行すると互いに遅くなり（大きなメッシュで単独 6 秒、6 つ同時だと各 109 秒）、制限時間を超えていたためです。このレンダリングに不要な法線の修正は省略します（大きなメッシュで 12 秒短縮、画像は同一）"
+      ]
+    }
+  },
+  {
     "version": "0.9.6",
     "items": {
       "fr": [

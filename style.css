@@ -9022,3 +9022,36 @@ body.commercial-off .commercial-only { display: none !important; }
 #demo-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 6px 12px; font-size: 13px; background: var(--accent); color: #fff; text-align: center; }
 #demo-banner a { color: #fff; font-weight: 600; text-decoration: underline; white-space: nowrap; }
 body.has-demo-banner { padding-top: 32px; }
+
+
+/* --- v0.9.6 : téléphone, les éléments flottants du bas ne se chevauchent plus ---
+   Avant : la pastille « Mode invité », le widget d'impression en cours et le bouton « retour en haut » étaient tous
+   posés au même endroit, au-dessus de la barre du bas, et se recouvraient. Ils sont maintenant empilés :
+   barre du bas → pastille invité → widget d'impression → bouton « retour en haut ». */
+@media (max-width: 860px) {
+    :root { --bottom-nav-h: calc(54px + env(safe-area-inset-bottom)); }
+
+    .viewer-banner { left: 12px; bottom: calc(var(--bottom-nav-h) + 8px); }
+
+    .mini-printer-widget {
+        right: 12px;
+        left: auto;
+        bottom: calc(var(--bottom-nav-h) + 10px);
+        max-width: calc(100vw - 24px);
+    }
+    body.role-viewer .mini-printer-widget { bottom: calc(var(--bottom-nav-h) + 46px); }
+
+    .scroll-to-top {
+        right: 12px;
+        width: 44px;
+        height: 44px;
+        bottom: calc(var(--bottom-nav-h) + 14px);
+    }
+    body.has-mini-printer .scroll-to-top { bottom: calc(var(--bottom-nav-h) + 72px); }
+    body.role-viewer .scroll-to-top { bottom: calc(var(--bottom-nav-h) + 52px); }
+    body.role-viewer.has-mini-printer .scroll-to-top { bottom: calc(var(--bottom-nav-h) + 108px); }
+
+    /* de la place en bas de page pour que le dernier contenu ne passe pas sous ces éléments */
+    body.role-viewer .main-content { padding-bottom: calc(var(--bottom-nav-h) + 28px + 36px); }
+    body.role-viewer.has-mini-printer .main-content { padding-bottom: calc(var(--bottom-nav-h) + 92px + 36px); }
+}
