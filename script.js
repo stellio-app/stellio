@@ -309,6 +309,8 @@ let _activityPingOn = false;
     ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach(ev =>
         window.addEventListener(ev, ping, { passive: true, capture: true }));
 })();
+let _lastUserGestureAt = 0;   // dernier clic / touche : un 403 « lecture seule » reçu sans geste récent vient d'un appel de fond, pas d'une action de l'utilisateur
+['pointerdown', 'keydown', 'touchstart'].forEach(ev => window.addEventListener(ev, () => { _lastUserGestureAt = Date.now(); }, { passive: true, capture: true }));
 const _readonlyToastText = () => window.STELLIO_DEMO
     ? _t3('demo.readonly_toast', 'Démo : lecture seule')
     : _t3('viewer.readonly_toast', 'Compte invité : lecture seule');
@@ -329,7 +331,7 @@ window.fetch = function (input, init = {}) {
     if (!isSameOrigin || method === 'GET') return _p;
     return _p.then((res) => {
         // les signaux automatiques (activité, présence) ne sont jamais une action de l'utilisateur : pas de toast pour eux
-        if (res.status === 403 && IS_VIEWER && !/\/api\/(ui\/activity|presence\/heartbeat)/.test(url) && Date.now() - _viewerToastAt > 3000) {
+        if (res.status === 403 && IS_VIEWER && !/\/api\/(ui\/activity|presence\/heartbeat)/.test(url) && Date.now() - _viewerToastAt > 3000 && Date.now() - _lastUserGestureAt < 2500) {
             _viewerToastAt = Date.now();
             try { showToast(_readonlyToastText(), 'warning'); } catch (e) { /* ignore */ }
         }
@@ -26208,15 +26210,99 @@ async function loadAcctModels(kind) {
 }
 window.loadAcctModels = loadAcctModels;
 
-async function _acctDownloadUrls(urls) {
-    const sel = document.getElementById('download-source');
+// Popup « où enregistrer ? » : le même choix que dans Télécharger (dossier source, nouveau dossier, ajout d'une source),
+// sans le champ URL. Renvoie { sourceId, targetSubfolder } ou null si l'utilisateur annule.
+function _acctDestPopup(title) {
+    return new Promise(async (resolve) => {
+        await loadDownloadSources();
+        const hidden = document.getElementById('download-source');
+        if (!hidden) { resolve(null); return; }
+        document.getElementById('modal-acct-dest')?.remove();
+        let remembered = '';
+        try { remembered = localStorage.getItem('stellio_acct_dest') || ''; } catch (_) {}
+        const modal = document.createElement('div');
+        modal.id = 'modal-acct-dest';
+        modal.className = 'modal';
+        modal.innerHTML = `<div class="modal-content small">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-download"></i> ${escapeHtml(title)}</h3>
+                <button type="button" class="modal-close" data-dest-cancel aria-label="${escapeHtml(I18N.t('actions.cancel'))}">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label>${escapeHtml(I18N.t('form.save_to'))}</label>
+                    <select id="acct-dest-select" style="width:100%;"></select>
+                    <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-ghost btn-sm" data-dest-create style="flex:1;"><i class="fa-solid fa-folder-plus"></i> ${escapeHtml(I18N.t('download.create_folder'))}</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-dest-addsource style="flex:1;"><i class="fa-solid fa-plus"></i> ${escapeHtml(_t3('acct.dest_add_source', 'Ajouter un dossier source'))}</button>
+                    </div>
+                    <small style="color:var(--text-muted); display:block; margin-top:6px;">${escapeHtml(I18N.t('form.save_hint'))}</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost" data-dest-cancel>${escapeHtml(I18N.t('actions.cancel'))}</button>
+                <button type="button" class="btn btn-primary" data-dest-go><i class="fa-solid fa-download"></i> ${escapeHtml(_t3('acct.dest_go', 'Télécharger'))}</button>
+            </div>
+        </div>`;
+        document.body.appendChild(modal);
+        const sel = modal.querySelector('#acct-dest-select');
+        const go = modal.querySelector('[data-dest-go]');
+        const refresh = () => {
+            sel.innerHTML = hidden.innerHTML;                       // mêmes options que le formulaire Télécharger (dossiers, sous-dossiers créés)
+            let v = hidden.value;
+            const ok = (x) => x && [...sel.options].some(o => o.value === x && !o.disabled);
+            if (!ok(v)) v = ok(remembered) ? remembered : ([...sel.options].find(o => o.value && !o.disabled) || {}).value || '';
+            sel.value = v;
+            hidden.value = v;
+            go.disabled = !v;
+        };
+        const obs = new MutationObserver(refresh);
+        obs.observe(hidden, { childList: true });
+        refresh();
+        let done = false, poll = null;
+        const finish = (val) => {
+            if (done) return;
+            done = true;
+            obs.disconnect();
+            if (poll) clearInterval(poll);
+            document.removeEventListener('keydown', onKey, true);
+            modal.remove();
+            resolve(val);
+        };
+        const onKey = (e) => { if (e.key === 'Escape' && modal.style.display !== 'none') finish(null); };
+        document.addEventListener('keydown', onKey, true);
+        sel.addEventListener('change', () => { hidden.value = sel.value; go.disabled = !sel.value; });
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal || e.target.closest('[data-dest-cancel]')) { finish(null); return; }
+            if (e.target.closest('[data-dest-create]')) { openCreateFolderModal(); return; }
+            if (e.target.closest('[data-dest-addsource]')) {
+                // la fenêtre d'ajout de source passe devant : on masque ce popup le temps de l'ajout, puis on le réaffiche
+                modal.style.display = 'none';
+                openModal('modal-select-type');
+                if (poll) clearInterval(poll);
+                poll = setInterval(() => {
+                    if (document.querySelector('.modal:not(.hidden):not(#modal-acct-dest)')) return;
+                    clearInterval(poll); poll = null;
+                    modal.style.display = '';
+                    loadDownloadSources();
+                }, 500);
+                return;
+            }
+            if (e.target.closest('[data-dest-go]')) {
+                const opt = sel.options[sel.selectedIndex];
+                if (!sel.value || !opt) { showToast(_t3('acct.no_source', 'Ajoute d\'abord un dossier source.'), 'warning'); return; }
+                try { localStorage.setItem('stellio_acct_dest', sel.value); } catch (_) {}
+                finish({ sourceId: opt.dataset.baseSourceId || sel.value, targetSubfolder: opt.dataset.relPath || '' });
+            }
+        });
+    });
+}
+
+async function _acctDownloadUrls(urls, title) {
     if (!urls.length) return;
-    if (!sel || !sel.value) { await loadDownloadSources(); }
-    const s = document.getElementById('download-source');
-    const opt = s && s.options[s.selectedIndex];
-    const sourceId = (opt && opt.dataset.baseSourceId) || (s && s.value);
-    if (!sourceId) { showToast(_t3('acct.no_source', 'Ajoute d\'abord un dossier source.'), 'warning'); return; }
-    const targetSubfolder = (opt && opt.dataset.relPath) || '';
+    const dest = await _acctDestPopup(title || _t3('acct.dest_title', 'Choisir la destination'));
+    if (!dest) return;
+    const { sourceId, targetSubfolder } = dest;
     let i = 0;
     for (const url of urls) {
         const downloadInfo = { id: ++downloadIdCounter, url, sourceId, targetSubfolder, preferredFormat: '', status: 'starting', filename: '', progress: 0, current: 0, total: 0, toastElement: null };
@@ -26250,8 +26336,7 @@ document.addEventListener('click', async (ev) => {
         const p = data?.platforms.find(x => x.platform === all.dataset.acctAll);
         const urls = (p?.items || []).filter(i => !i.in_library).map(i => i.url);
         if (!urls.length) return;
-        if (!confirm(_t3('acct.confirm_all', 'Télécharger {{n}} modèles depuis {{platform}} dans le dossier sélectionné ?', { n: urls.length, platform: p.label }))) return;
-        await _acctDownloadUrls(urls);
+        await _acctDownloadUrls(urls, _t3('acct.dest_title_n', 'Télécharger {{n}} modèles depuis {{platform}}', { n: urls.length, platform: p.label }));
         return;
     }
     // repli / dépli des sections (bannière ou chevron)

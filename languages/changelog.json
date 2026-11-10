@@ -1,5 +1,58 @@
 [
   {
+    "version": "1.0.0",
+    "items": {
+      "fr": [
+        "« Mes likes » et « Mes créations » : le bouton Télécharger ouvre maintenant une fenêtre pour choisir la destination (dossier source existant, nouveau dossier ou ajout d'un dossier source), au lieu d'un message demandant d'en choisir un d'abord. Même chose pour « Tout télécharger »",
+        "MakerWorld : quand la session est expirée ou refusée, le message l'indique clairement (avec le code HTTP) et invite à se reconnecter, au lieu d'un simple « aucun fichier 3D trouvé »",
+        "Visionneuse 3D : les volumes modificateurs, négatifs et supports forcés des fichiers 3MF Bambu Studio / Orca ne sont plus affichés comme des pièces (plus de boîtes ou cylindres étirés autour du modèle)",
+        "Comptes invités : le message « lecture seule » n'apparaît plus que lorsque vous venez de cliquer, plus à cause d'une requête automatique en arrière-plan"
+      ],
+      "en": [
+        "“My likes” and “My creations”: the Download button now opens a window to choose the destination (existing source folder, new folder, or add a source folder) instead of a message asking you to pick one first. Same for “Download all”",
+        "MakerWorld: when the session has expired or is refused, the message now says so clearly (with the HTTP code) and asks you to sign in again, instead of a plain “no 3D file found”",
+        "3D viewer: modifier volumes, negative parts and support enforcers/blockers in Bambu Studio / Orca 3MF files are no longer shown as parts (no more stretched boxes or cylinders around the model)",
+        "Guest accounts: the “read-only” message now only appears right after you click, not because of an automatic background request"
+      ],
+      "de": [
+        "„Meine Likes“ und „Meine Kreationen“: Die Schaltfläche Herunterladen öffnet jetzt ein Fenster zur Wahl des Ziels (vorhandener Quellordner, neuer Ordner oder Quellordner hinzufügen) statt einer Meldung, zuerst einen auszuwählen. Gilt auch für „Alle herunterladen“",
+        "MakerWorld: Ist die Sitzung abgelaufen oder wird sie abgelehnt, sagt die Meldung das jetzt deutlich (mit HTTP-Code) und bittet um erneute Anmeldung, statt nur „keine 3D-Datei gefunden“",
+        "3D-Ansicht: Modifikator-Volumen, negative Teile und erzwungene/blockierte Stützen in 3MF-Dateien aus Bambu Studio / Orca werden nicht mehr als Bauteile angezeigt (keine gestreckten Quader oder Zylinder mehr um das Modell)",
+        "Gastkonten: Die Meldung „schreibgeschützt“ erscheint nur noch direkt nach einem Klick, nicht mehr wegen einer automatischen Hintergrundanfrage"
+      ],
+      "es": [
+        "«Mis likes» y «Mis creaciones»: el botón Descargar abre ahora una ventana para elegir el destino (carpeta de origen existente, carpeta nueva o añadir una carpeta de origen), en lugar de un mensaje que pedía elegir una antes. Igual para «Descargar todo»",
+        "MakerWorld: cuando la sesión ha caducado o se rechaza, el mensaje lo indica con claridad (con el código HTTP) y pide volver a iniciar sesión, en lugar de un simple «no se encontró ningún archivo 3D»",
+        "Visor 3D: los volúmenes modificadores, las partes negativas y los soportes forzados/bloqueados de los archivos 3MF de Bambu Studio / Orca ya no se muestran como piezas (se acabaron las cajas o cilindros estirados alrededor del modelo)",
+        "Cuentas de invitado: el mensaje de «solo lectura» solo aparece justo después de hacer clic, no por una petición automática en segundo plano"
+      ],
+      "pt": [
+        "«Os meus likes» e «As minhas criações»: o botão Transferir abre agora uma janela para escolher o destino (pasta de origem existente, nova pasta ou adicionar uma pasta de origem), em vez de uma mensagem a pedir para escolher uma antes. O mesmo para «Transferir tudo»",
+        "MakerWorld: quando a sessão expirou ou é recusada, a mensagem indica-o claramente (com o código HTTP) e pede para iniciar sessão novamente, em vez de um simples «nenhum ficheiro 3D encontrado»",
+        "Visualizador 3D: os volumes modificadores, as partes negativas e os suportes forçados/bloqueados dos ficheiros 3MF do Bambu Studio / Orca já não são mostrados como peças (acabaram-se as caixas ou cilindros esticados à volta do modelo)",
+        "Contas de convidado: a mensagem de «só de leitura» só aparece logo após um clique, não por causa de um pedido automático em segundo plano"
+      ],
+      "it": [
+        "«I miei like» e «Le mie creazioni»: il pulsante Scarica ora apre una finestra per scegliere la destinazione (cartella sorgente esistente, nuova cartella o aggiunta di una cartella sorgente), invece di un messaggio che chiedeva di sceglierne una prima. Lo stesso per «Scarica tutto»",
+        "MakerWorld: quando la sessione è scaduta o viene rifiutata, il messaggio lo indica chiaramente (con il codice HTTP) e chiede di accedere di nuovo, invece di un semplice «nessun file 3D trovato»",
+        "Visualizzatore 3D: i volumi modificatori, le parti negative e i supporti forzati/bloccati dei file 3MF di Bambu Studio / Orca non vengono più mostrati come parti (niente più scatole o cilindri allungati attorno al modello)",
+        "Account ospite: il messaggio «sola lettura» compare solo subito dopo un clic, non più a causa di una richiesta automatica in background"
+      ],
+      "zh": [
+        "“我的点赞”和“我的作品”：下载按钮现在会弹出窗口选择保存位置（已有源文件夹、新建文件夹或添加源文件夹），不再只提示先选择一个。“全部下载”同样适用",
+        "MakerWorld：会话过期或被拒绝时，提示会明确说明（含 HTTP 状态码）并请求重新登录，而不再只显示“未找到 3D 文件”",
+        "3D 查看器：Bambu Studio / Orca 的 3MF 文件中的修改器体积、负体积和强制/阻挡支撑不再被当作零件显示（模型周围不再出现被拉伸的方块或圆柱）",
+        "访客账户：“只读”提示现在只在您刚点击之后出现，不再因后台自动请求而弹出"
+      ],
+      "ja": [
+        "「いいね」と「作成したモデル」：ダウンロードボタンで保存先（既存のソースフォルダ、新規フォルダ、ソースフォルダの追加）を選ぶウィンドウが開くようになりました。以前は先に選ぶよう促すメッセージだけでした。「すべてダウンロード」も同様です",
+        "MakerWorld：セッションの期限切れや拒否の場合、HTTP コードとともに分かりやすく表示し、再ログインを促します（以前は「3D ファイルが見つかりません」のみ）",
+        "3D ビューア：Bambu Studio / Orca の 3MF に含まれる修飾ボリューム、ネガティブパーツ、サポートの強制/ブロックを部品として表示しなくなりました（モデルの周りに引き伸ばされた箱や円柱が出なくなります）",
+        "ゲストアカウント：「読み取り専用」のメッセージは、クリックした直後にのみ表示されます（バックグラウンドの自動リクエストでは表示されません）"
+      ]
+    }
+  },
+  {
     "version": "0.9.9",
     "items": {
       "fr": [

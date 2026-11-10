@@ -42,6 +42,10 @@ def _early_extra_libs_dir():
 
 _EXTRA_LIBS_DIR = _early_extra_libs_dir()
 
+# ── Splash précoce ───────────────────────────────────────────────────────────
+# Affiché dès les premières millisecondes, AVANT la vérification des modules et les gros
+# imports (trimesh, numpy, pyrender...). Il tourne dans son propre thread : tous les objets Tk y
+# sont créés ET détruits, pendant que le reste du démarrage continue dans le thread principal.
 import threading as _early_threading
 import queue as _early_queue
 
@@ -5041,6 +5045,7 @@ def _viewer_guard():
         return
     if (request.method, path) in _VIEWER_WRITE_WHITELIST:
         return
+    app_logger.info(f"[Viewer] Écriture refusée (lecture seule) : {request.method} {path}")
     return jsonify({"error": "Compte invité : lecture seule", "code": "viewer_readonly"}), 403
 
 @app.after_request
@@ -6138,6 +6143,21 @@ def _resolve_3mf_plate_mesh(source, wanted_ids, want_colors=False, max_faces=Non
             _mat_cache = {}
             _fast_cache = {}
 
+            # Bambu / Orca : les volumes « modificateur », « négatif » et supports forcés/bloqués servent à régler
+            # le tranchage, ils ne s'impriment pas. On ne les affiche pas (sinon cylindres et boîtes étirés autour de la pièce).
+            _non_printed_parts = set()
+            try:
+                _cfg_name = next((n for n in all_names if n.lower().endswith('metadata/model_settings.config')), None)
+                if _cfg_name:
+                    with zf.open(_cfg_name) as _cf:
+                        _cfg_root = _safe_xml_parse(_cf).getroot()
+                    for _o in _cfg_root.iter('object'):
+                        for _p in _o.iter('part'):
+                            if (_p.get('subtype') or '') in ('modifier_part', 'negative_part', 'support_blocker', 'support_enforcer'):
+                                _non_printed_parts.add((_o.get('id'), _p.get('id')))
+            except Exception:
+                _non_printed_parts = set()
+
             def _get_tree(model_path):
                 if model_path not in _tree_cache:
                     try:
@@ -6281,6 +6301,8 @@ def _resolve_3mf_plate_mesh(source, wanted_ids, want_colors=False, max_faces=Non
                     for comp in _findall(components_el, 'component'):
                         comp_id = comp.get('objectid')
                         if not comp_id:
+                            continue
+                        if (oid, comp_id) in _non_printed_parts:
                             continue
                         comp_tf = _parse_transform(comp.get('transform'))
                         target_file = model_path
@@ -9599,7 +9621,7 @@ def api_delete_account(platform):
     return jsonify({"message": "Compte supprimé"}), 200
 
 
-VIEWER_CACHE_VERSION = 4   # 4 : invalide les maillages 3MF mis en cache par d'anciennes versions (assemblage <build> incomplet → viewer déformé)
+VIEWER_CACHE_VERSION = 5   # 5 : volumes modificateurs Bambu/Orca exclus du rendu ; 4 : invalide les maillages 3MF mis en cache par d'anciennes versions (assemblage <build> incomplet → viewer déformé)
 VIEWER_CACHE_MAX_BYTES = 1024 * 1024 * 1024
 
 
@@ -16196,7 +16218,9 @@ MAKERWORLD_DL_HEADERS = {
     "Accept": "application/json",
 }
 
-def makerworld_get_model_files(model_id, bearer_token=None, profile_id=None, preferred_format=None):
+def makerworld_get_model_files(model_id, bearer_token=None, profile_id=None, preferred_format=None, diag=None):
+    if diag is None:
+        diag = {}
     headers = {
         "User-Agent": "BambuStudio/01.09.00.00",
         "Accept": "application/json",
@@ -16213,7 +16237,15 @@ def makerworld_get_model_files(model_id, bearer_token=None, profile_id=None, pre
             timeout=20
         )
         app_logger.info(f"[MakerWorld] design/{model_id} status={r.status_code}")
+        if r.status_code in (401, 403) and bearer_token:
+            # Jeton périmé : la fiche d'un modèle public reste lisible sans session, on retente sans jeton
+            diag['auth_rejected'] = r.status_code
+            app_logger.warning(f"[MakerWorld] design/{model_id} refusé avec le jeton ({r.status_code}), nouvel essai sans jeton")
+            _h_anon = {k: v for k, v in headers.items() if k != "Authorization"}
+            r = requests.get(f"{MAKERWORLD_API}/v1/design-service/design/{model_id}", headers=_h_anon, timeout=20)
+            app_logger.info(f"[MakerWorld] design/{model_id} (sans jeton) status={r.status_code}")
         if not r.ok:
+            diag['design_status'] = r.status_code
             app_logger.warning(f"[MakerWorld] design/{model_id} non-OK: {r.status_code} {r.text[:200]}")
             return files
 
@@ -16276,6 +16308,10 @@ def makerworld_get_model_files(model_id, bearer_token=None, profile_id=None, pre
                     timeout=15
                 )
                 app_logger.info(f"[MakerWorld] iot-service/profile/{pid_primary} status={r_dl.status_code}")
+                if r_dl.status_code in (401, 403):
+                    diag['auth_rejected'] = r_dl.status_code
+                elif not r_dl.ok:
+                    diag['profile_status'] = r_dl.status_code
 
                 if not r_dl.ok and pid_fallback and pid_fallback != pid_primary:
                     app_logger.info(f"[MakerWorld] Retry avec id={pid_fallback}")
@@ -17229,11 +17265,23 @@ def api_download_file():
                     "error": "Compte MakerWorld non configuré. Ajoutez votre compte dans Paramètres → Comptes externes → MakerWorld."
                 }), 400
 
-            mw_files = makerworld_get_model_files(model_id, mw_token, profile_id=mw_profile_id, preferred_format=preferred_format)
+            _mw_diag = {}
+            mw_files = makerworld_get_model_files(model_id, mw_token, profile_id=mw_profile_id, preferred_format=preferred_format, diag=_mw_diag)
             if not mw_files:
                 active_downloads.pop(download_id, None)
+                if _mw_diag.get('auth_rejected'):
+                    return jsonify({
+                        "error": f"MakerWorld a refusé votre session (HTTP {_mw_diag['auth_rejected']}) : elle a expiré. "
+                                 "Reconnectez-vous dans Paramètres → Comptes externes → MakerWorld, puis réessayez.",
+                        "code": "makerworld_session_expired"
+                    }), 401
+                if _mw_diag.get('design_status'):
+                    return jsonify({
+                        "error": f"MakerWorld ne renvoie pas ce modèle (HTTP {_mw_diag['design_status']}). Il est peut-être supprimé, privé ou temporairement indisponible."
+                    }), 404
                 return jsonify({
                     "error": "Aucun fichier 3D trouvé pour ce modèle MakerWorld. Vérifiez que le modèle est public et que votre compte est bien connecté."
+                    + (f" (profil : HTTP {_mw_diag['profile_status']})" if _mw_diag.get('profile_status') else "")
                 }), 404
 
             mw_dl_headers = {
@@ -23117,7 +23165,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.9.9"
+CURRENT_VERSION = "1.0.0"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
