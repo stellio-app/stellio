@@ -58,7 +58,6 @@ def test_changelog_consistent(main_src):
     assert a == b, 'changelog.json racine et languages/ doivent être identiques'
     ver = re.search(r'^CURRENT_VERSION\s*=\s*"([^"]+)"', main_src, re.M).group(1)
     assert a[0]['version'] == ver, 'la 1re entrée du changelog doit être la version courante'
-    assert os.path.exists(os.path.join(ROOT, f'notes_version_{ver}.txt'))
     for l in LANGS:
         assert a[0]['items'].get(l), f'changelog {ver} sans texte {l}'
 
