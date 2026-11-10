@@ -16225,6 +16225,12 @@ def makerworld_get_model_files(model_id, bearer_token=None, profile_id=None, pre
         "User-Agent": "BambuStudio/01.09.00.00",
         "Accept": "application/json",
         "Referer": f"https://makerworld.com/en/models/{model_id}",
+        # en-têtes envoyés par Bambu Studio : sans eux, l'API peut répondre 200 mais sans lien de téléchargement
+        "X-BBL-Client-Type": "slicer",
+        "X-BBL-Client-Name": "BambuStudio",
+        "X-BBL-Client-Version": "01.09.00.00",
+        "X-BBL-OS-Type": "windows",
+        "X-BBL-Language": "en-US",
     }
     if bearer_token:
         headers["Authorization"] = f"Bearer {bearer_token}"
@@ -16333,6 +16339,28 @@ def makerworld_get_model_files(model_id, bearer_token=None, profile_id=None, pre
                         dl_data.get("download_url") or
                         dl_data.get("fileUrl")
                     )
+                    if not dl_url:
+                        _dd = dl_data if isinstance(dl_data, dict) else {}
+                        _pmsg = str(_dd.get('message') or _dd.get('error') or '')[:160]
+                        app_logger.warning(f"[MakerWorld] iot-service sans lien : code={_dd.get('code')!r} message={_pmsg!r} status={_dd.get('status')!r} filename={_dd.get('filename')!r} url_vide={_dd.get('url')!r}")
+                        diag['profile_msg'] = (f"code {_dd.get('code')} : {_pmsg}" if (_dd.get('code') or _pmsg) else "réponse sans lien")
+                        # repli : point d'accès « instance » utilisé par le site MakerWorld (renvoie {name, url})
+                        for _inst_id in [x for x in dict.fromkeys([pid_fallback, pid_primary]) if x]:
+                            try:
+                                r_f = requests.get(f"{MAKERWORLD_API}/v1/design-service/instance/{_inst_id}/f3mf",
+                                                   params={"type": "download"}, headers=headers, timeout=15)
+                                app_logger.info(f"[MakerWorld] instance/{_inst_id}/f3mf status={r_f.status_code}")
+                                if r_f.ok:
+                                    _jf = r_f.json()
+                                    app_logger.info(f"[MakerWorld] f3mf keys={list(_jf.keys()) if isinstance(_jf, dict) else type(_jf).__name__}")
+                                    dl_url = (_jf.get("url") or _jf.get("downloadUrl")) if isinstance(_jf, dict) else None
+                                    if dl_url:
+                                        diag.pop('profile_msg', None)
+                                        break
+                                else:
+                                    app_logger.warning(f"[MakerWorld] f3mf refusé : {r_f.status_code} {r_f.text[:160]}")
+                            except Exception as _ef:
+                                app_logger.warning(f"[MakerWorld] f3mf erreur : {_ef}")
                     if dl_url:
                         ext = os.path.splitext(dl_url.split("?")[0])[1].lower()
                         if not ext:
@@ -17282,6 +17310,7 @@ def api_download_file():
                 return jsonify({
                     "error": "Aucun fichier 3D trouvé pour ce modèle MakerWorld. Vérifiez que le modèle est public et que votre compte est bien connecté."
                     + (f" (profil : HTTP {_mw_diag['profile_status']})" if _mw_diag.get('profile_status') else "")
+                    + (f" MakerWorld répond : {_mw_diag['profile_msg']}." if _mw_diag.get('profile_msg') else "")
                 }), 404
 
             mw_dl_headers = {
