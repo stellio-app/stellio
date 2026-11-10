@@ -42,6 +42,10 @@ def _early_extra_libs_dir():
 
 _EXTRA_LIBS_DIR = _early_extra_libs_dir()
 
+# ── Splash précoce ───────────────────────────────────────────────────────────
+# Affiché dès les premières millisecondes, AVANT la vérification des modules et les gros
+# imports (trimesh, numpy, pyrender...). Il tourne dans son propre thread : tous les objets Tk y
+# sont créés ET détruits, pendant que le reste du démarrage continue dans le thread principal.
 import threading as _early_threading
 import queue as _early_queue
 
@@ -1514,19 +1518,66 @@ os.makedirs(THUMBNAILS_DIR, exist_ok=True)
 
 TRASH_DIR = os.path.join(DATA_DIR, "trash")
 os.makedirs(TRASH_DIR, exist_ok=True)
-TRASH_RETENTION_SECONDS = 300  
-_trash_registry = {}  
+TRASH_RETENTION_DAYS = 30                       # durée de conservation par défaut (réglable : paramètre « trash_retention_days », 0 = jamais)
+TRASH_RETENTION_SECONDS = TRASH_RETENTION_DAYS * 86400
+TRASH_UNDO_SECONDS = 300                        # durée d'affichage du bouton « Annuler » juste après une suppression
+TRASH_ITEMS_DIR = os.path.join(TRASH_DIR, "items")   # pièces jointes des éléments supprimés (PDF de devis, G-codes de projet…)
+_TRASH_MANIFEST = ".stellio-manifest.json"
+_trash_registry = {}
 _trash_registry_lock = threading.Lock()
 
 _active_sessions = {}
 _active_sessions_lock = threading.Lock()
 PRESENCE_TIMEOUT_SECONDS = 30
 
+def _trash_retention_seconds():
+    """Durée de conservation en secondes (0 = jamais de purge automatique)."""
+    try:
+        days = int(load_settings().get('trash_retention_days', TRASH_RETENTION_DAYS))
+    except Exception:
+        days = TRASH_RETENTION_DAYS
+    return max(0, min(days, 3650)) * 86400
+
+
+def _trash_save_manifest(batch_id):
+    """Écrit la liste du lot à côté des fichiers : la corbeille survit à un redémarrage."""
+    try:
+        with _trash_registry_lock:
+            entry = _trash_registry.get(batch_id)
+        if not entry:
+            return
+        with open(os.path.join(TRASH_DIR, batch_id, _TRASH_MANIFEST), 'w', encoding='utf-8') as f:
+            json.dump(entry, f, ensure_ascii=False)
+    except Exception as e:
+        logging.getLogger('stellio').warning(f"[Trash] Manifeste non écrit ({batch_id}): {e}")
+
+
+def _trash_load_registry():
+    """Recharge les lots de fichiers laissés en corbeille avant l'arrêt de l'application."""
+    try:
+        for bid in os.listdir(TRASH_DIR):
+            mp = os.path.join(TRASH_DIR, bid, _TRASH_MANIFEST)
+            if bid == 'items' or not os.path.isfile(mp):
+                continue
+            try:
+                with open(mp, 'r', encoding='utf-8') as f:
+                    entry = json.load(f)
+                if isinstance(entry, dict) and entry.get('entries') and entry.get('user_id'):
+                    _trash_registry[bid] = entry
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+
 def _purge_expired_trash():
     now = time.time()
+    keep = _trash_retention_seconds()
+    if keep <= 0:
+        return
     with _trash_registry_lock:
         expired_ids = [bid for bid, entry in _trash_registry.items()
-                       if now - entry["created_at"] > TRASH_RETENTION_SECONDS]
+                       if now - entry["created_at"] > keep]
         for bid in expired_ids:
             entry = _trash_registry.pop(bid, None)
             if not entry:
@@ -1536,6 +1587,40 @@ def _purge_expired_trash():
                 shutil.rmtree(batch_dir, ignore_errors=True)
             except Exception as e:
                 app_logger.warning(f"[Trash] Erreur purge lot {bid}: {e}")
+
+JOURNAL_MAX_ROWS_PER_USER = 3000
+JOURNAL_RETENTION_DAYS = 90
+
+
+def journal_log(action, name, from_path=None, to_path=None, detail=None, batch_id=None, user_id=None):
+    """Inscrit une opération sur les fichiers dans le journal (au mieux : ne fait jamais échouer l'opération)."""
+    try:
+        if user_id is None:
+            user_id = session.get('user_id')
+        if not user_id:
+            return
+        conn = get_db()
+        try:
+            conn.execute(
+                "INSERT INTO file_journal (user_id, ts, action, name, from_path, to_path, detail, batch_id) VALUES (?,?,?,?,?,?,?,?)",
+                (user_id, time.time(), action, name or '', from_path, to_path, detail, batch_id))
+            if (time.time_ns() // 1000) % 50 == 0:  # ménage de temps en temps : 90 jours et 3000 lignes au plus
+                conn.execute("DELETE FROM file_journal WHERE user_id = ? AND ts < ?", (user_id, time.time() - JOURNAL_RETENTION_DAYS * 86400))
+                conn.execute("DELETE FROM file_journal WHERE user_id = ? AND id NOT IN (SELECT id FROM file_journal WHERE user_id = ? ORDER BY ts DESC LIMIT ?)",
+                             (user_id, user_id, JOURNAL_MAX_ROWS_PER_USER))
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        app_logger.warning(f"[JOURNAL] Écriture impossible : {e}")
+
+
+def _journal_convert_results(results, user_id=None):
+    for r in results or []:
+        if r.get('success') and r.get('new_path'):
+            journal_log('convert', os.path.basename(r['new_path']), r.get('path'), r['new_path'],
+                        detail='original supprimé' if r.get('deleted_original') else None, user_id=user_id)
+
 
 def _move_file_to_trash(file_path, batch_id):
     batch_dir = os.path.join(TRASH_DIR, batch_id)
@@ -1548,7 +1633,11 @@ def _move_file_to_trash(file_path, batch_id):
         trashed_path = os.path.join(batch_dir, f"{base}_{counter}{ext}")
         counter += 1
     shutil.move(file_path, trashed_path)
+    journal_log('delete', filename, file_path, trashed_path, batch_id=batch_id)
     return trashed_path
+
+
+_trash_load_registry()
 
 
 KEY_FILE = os.path.join(DATA_DIR, 'encryption.key')
@@ -2314,6 +2403,19 @@ def init_db():
         sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id)
     )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS file_journal (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        ts REAL NOT NULL,
+        action TEXT NOT NULL,
+        name TEXT DEFAULT '',
+        from_path TEXT,
+        to_path TEXT,
+        detail TEXT,
+        batch_id TEXT,
+        undone INTEGER DEFAULT 0
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_file_journal_user_ts ON file_journal(user_id, ts DESC)")
     c.execute("""CREATE TABLE IF NOT EXISTS file_descriptions (
         file_path TEXT NOT NULL,
         user_id INTEGER NOT NULL,
@@ -4325,10 +4427,6 @@ class PrinterManager:
     def get_status(self, db_row):
         ptype = db_row['type']
         ip = db_row['ip']
-        if IS_DEMO and str(ip) in _DEMO_LIVE:
-            _fs = _demo_fake_status(ip)
-            if _fs:
-                return _fs
         api_key = db_row['api_key']
         default_result = {
             'status': 'unknown', 'progress': 0, 'file': '',
@@ -4891,6 +4989,7 @@ def _csrf_protect():
 _VIEWER_WRITE_WHITELIST = {
     ('POST', '/api/auth/logout'),
     ('POST', '/api/presence/heartbeat'),
+    ('POST', '/api/ui/activity'),   # signal d'activité envoyé en continu par l'interface : sans cette entrée, l'invité recevait un 403 + un toast toutes les 3 s
     ('POST', '/api/files/analyze'),
     ('POST', '/api/files/analyze-now'),
     ('POST', '/api/files/pre-print-check'),
@@ -6297,7 +6396,7 @@ def _resolve_3mf_plate_mesh(source, wanted_ids, want_colors=False, max_faces=Non
                     return mesh
         return None
     except Exception as e:
-        app_logger.debug(f"[3MF] _resolve_3mf_plate_mesh échoué: {e}")
+        app_logger.warning(f"[3MF] _resolve_3mf_plate_mesh échoué ({type(e).__name__}): {e}")
         return None
 
 
@@ -7140,6 +7239,80 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
         app_logger.error(f"[ERROR] generate_thumbnail_pyrender {os.path.basename(stl_path)}: {e}")
         return False
 
+RASTER_BATCH_PIXELS = 3_000_000  # nombre maximal de (triangle, pixel) candidats traités d'un coup (mémoire bornée)
+
+
+def _raster_zbuffer(tx, ty, tz, w, h, zbuf, fid, cancelled=None):
+    """Z-buffer vectorisé (numpy) : remplit zbuf (profondeur minimale) et fid (indice du triangle visible).
+
+    Même résultat que l'ancienne boucle Python triangle par triangle (coordonnées barycentriques, tolérance
+    -1e-6, le premier triangle gagne à profondeur égale), mais par lots : environ 20 à 50 fois plus rapide.
+    tx, ty, tz : tableaux (n, 3) des sommets projetés ; zbuf (h, w) float32 et fid (h, w) int32 modifiés sur place.
+    Renvoie False si le rendu a été annulé (cancelled() vrai entre deux lots).
+    """
+    n = len(tx)
+    if n == 0:
+        return True
+    x0, x1, x2 = tx[:, 0], tx[:, 1], tx[:, 2]
+    y0, y1, y2 = ty[:, 0], ty[:, 1], ty[:, 2]
+    den = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+    ok = np.abs(den) >= 1e-9
+    xmin = np.maximum(np.floor(np.minimum(np.minimum(x0, x1), x2)).astype(np.int64), 0)
+    xmax = np.minimum(np.floor(np.maximum(np.maximum(x0, x1), x2)).astype(np.int64) + 1, w - 1)
+    ymin = np.maximum(np.floor(np.minimum(np.minimum(y0, y1), y2)).astype(np.int64), 0)
+    ymax = np.minimum(np.floor(np.maximum(np.maximum(y0, y1), y2)).astype(np.int64) + 1, h - 1)
+    ok &= (xmin <= xmax) & (ymin <= ymax)
+    bw = np.where(ok, xmax - xmin + 1, 0)
+    bh = np.where(ok, ymax - ymin + 1, 0)
+    cnt = bw * bh
+    safe_den = np.where(ok, den, 1.0)
+    zflat = zbuf.reshape(-1)
+    fflat = fid.reshape(-1)
+    csum = np.cumsum(cnt)
+    start = 0
+    while start < n:
+        if cancelled is not None and cancelled():
+            return False
+        base = csum[start - 1] if start > 0 else 0
+        end = int(np.searchsorted(csum, base + RASTER_BATCH_PIXELS, side='right'))
+        end = min(max(end, start + 1), n)
+        c = cnt[start:end]
+        total = int(c.sum())
+        if total > 0:
+            idx = np.repeat(np.arange(start, end), c)
+            first = np.cumsum(c) - c
+            k = np.arange(total) - np.repeat(first, c)
+            bwi = bw[idx]
+            px = xmin[idx] + k % bwi
+            py = ymin[idx] + k // bwi
+            X = px + 0.5
+            Y = py + 0.5
+            d = safe_den[idx]
+            ax2, ay2 = x2[idx], y2[idx]
+            l0 = ((y1[idx] - ay2) * (X - ax2) + (ax2 - x1[idx]) * (Y - ay2)) / d
+            l1 = ((ay2 - y0[idx]) * (X - ax2) + (x0[idx] - ax2) * (Y - ay2)) / d
+            l2 = 1.0 - l0 - l1
+            keep = (l0 >= -1e-6) & (l1 >= -1e-6) & (l2 >= -1e-6)
+            if keep.any():
+                idx, px, py, l0, l1, l2 = idx[keep], px[keep], py[keep], l0[keep], l1[keep], l2[keep]
+                z = l0 * tz[idx, 0] + l1 * tz[idx, 1] + l2 * tz[idx, 2]
+                p = py * w + px
+                order = np.lexsort((z, p))  # par pixel puis profondeur croissante ; stable : le premier triangle gagne une égalité
+                ps = p[order]
+                head = np.empty(len(ps), dtype=bool)
+                head[0] = True
+                head[1:] = ps[1:] != ps[:-1]
+                sel = order[head]
+                psel = p[sel]
+                better = z[sel] < zflat[psel]
+                if better.any():
+                    sel, psel = sel[better], psel[better]
+                    zflat[psel] = z[sel]
+                    fflat[psel] = idx[sel]
+        start = end
+    return True
+
+
 def _generate_thumbnail_raster(mesh, thumb_path, resolution=(768, 768), face_rgb=None, base_rgb=None):
     try:
         vertices = mesh.vertices
@@ -7215,35 +7388,8 @@ def _generate_thumbnail_raster(mesh, thumb_path, resolution=(768, 768), face_rgb
             if _render_cancelled():
                 return False
         try:
-            for i in range(len(F)):
-                if (i & 0x7FF) == 0 and _render_cancelled():
-                    return False
-                x0, x1, x2 = tx[i]
-                y0, y1, y2 = ty[i]
-                den = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
-                if abs(den) < 1e-9:
-                    continue
-                xmin = max(int(min(x0, x1, x2)), 0)
-                xmax = min(int(max(x0, x1, x2)) + 1, w - 1)
-                ymin = max(int(min(y0, y1, y2)), 0)
-                ymax = min(int(max(y0, y1, y2)) + 1, h - 1)
-                if xmin > xmax or ymin > ymax:
-                    continue
-                X = np.arange(xmin, xmax + 1, dtype=np.float64)[None, :] + 0.5
-                Y = np.arange(ymin, ymax + 1, dtype=np.float64)[:, None] + 0.5
-                l0 = ((y1 - y2) * (X - x2) + (x2 - x1) * (Y - y2)) / den
-                l1 = ((y2 - y0) * (X - x2) + (x0 - x2) * (Y - y2)) / den
-                l2 = 1.0 - l0 - l1
-                inside = (l0 >= -1e-6) & (l1 >= -1e-6) & (l2 >= -1e-6)
-                if not inside.any():
-                    continue
-                z = l0 * tz[i, 0] + l1 * tz[i, 1] + l2 * tz[i, 2]
-                zs = zbuf[ymin:ymax + 1, xmin:xmax + 1]
-                win = inside & (z < zs)
-                if not win.any():
-                    continue
-                zs[win] = z[win]
-                fid[ymin:ymax + 1, xmin:xmax + 1][win] = i
+            if not _raster_zbuffer(tx, ty, tz, w, h, zbuf, fid, _render_cancelled):
+                return False
         finally:
             _raster_cpu_lock.release()
 
@@ -7899,270 +8045,9 @@ def _system_ui_lang():
     return 'en'
 
 
-# ── Mode démo publique (lecture seule) ───────────────────────────────────────
-# STELLIO_DEMO=1 : l'instance fabrique quelques modèles libres (générés par le code, domaine public),
-# les indexe pour un compte propriétaire interne et ouvre l'interface en « invité » (lecture seule) en un clic.
-IS_DEMO = os.environ.get('STELLIO_DEMO', '').strip().lower() in ('1', 'true', 'yes')
-_DEMO_OWNER = 'demo-owner'
-_DEMO_VIEWER = 'demo'
-_DEMO_BLOCKED = {
-    ('POST', '/api/ollama/semantic-search'), ('POST', '/api/ollama/explain-orientation'),
-    ('POST', '/api/nesting/arrange'), ('POST', '/api/thumb/generate-now'),
-    ('POST', '/api/ai/predict-print-time'), ('POST', '/api/ai/photo-search'),
-}
-
-
-def _demo_generate_models(folder):
-    """Crée une douzaine de modèles 3D simples (CC0, générés par le code) dans `folder`."""
-    import numpy as _np
-    import trimesh
-    from shapely.geometry import Polygon
-
-    def save(mesh, rel):
-        path = os.path.join(folder, rel)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        if not os.path.exists(path):
-            mesh.export(path)
-
-    def gear(teeth, r_out, r_in, thick, hole):
-        pts = []
-        for i in range(teeth * 4):
-            a = 2 * _np.pi * i / (teeth * 4)
-            r = r_out if (i % 4) in (0, 1) else r_in
-            pts.append((r * _np.cos(a), r * _np.sin(a)))
-        poly = Polygon(pts).difference(Polygon([(hole * _np.cos(t), hole * _np.sin(t)) for t in _np.linspace(0, 2 * _np.pi, 24, endpoint=False)]))
-        return trimesh.creation.extrude_polygon(poly, thick)
-
-    profile = [(0, 0), (22, 0), (30, 25), (24, 55), (32, 80), (26, 100), (24, 100), (28, 80), (20, 55), (26, 25), (0, 2)]
-    vase = trimesh.creation.revolve(_np.array(profile, dtype=float), sections=64)
-    save(vase, 'Déco/vase_galbe.stl')
-    save(trimesh.creation.torus(major_radius=25, minor_radius=6, major_sections=64, minor_sections=24) if hasattr(trimesh.creation, 'torus') else trimesh.creation.annulus(r_min=19, r_max=31, height=12, sections=64), 'Déco/anneau.stl')
-    save(trimesh.creation.icosphere(subdivisions=3, radius=20), 'Déco/boule_facettes.obj')
-    save(trimesh.creation.cone(radius=18, height=40, sections=48), 'Jeux/pion_cone.stl')
-    save(trimesh.creation.capsule(height=30, radius=9), 'Jeux/pion_capsule.stl')
-    save(trimesh.creation.box(extents=(20, 20, 20)), 'Jeux/de_20mm.stl')
-    save(gear(14, 22, 18, 6, 5), 'Mécanique/engrenage_14.stl')
-    save(gear(22, 34, 30, 6, 6), 'Mécanique/engrenage_22.stl')
-    save(trimesh.creation.annulus(r_min=8, r_max=14, height=5, sections=48), 'Mécanique/rondelle_m8.stl')
-    base = trimesh.creation.box(extents=(60, 40, 4))
-    wall = trimesh.creation.box(extents=(60, 4, 30)); wall.apply_translation((0, 18, 17))
-    lip = trimesh.creation.box(extents=(60, 8, 6)); lip.apply_translation((0, -16, 5))
-    save(trimesh.util.concatenate([base, wall, lip]), 'Utilitaire/support_telephone.stl')
-    clip = trimesh.creation.annulus(r_min=7, r_max=11, height=10, sections=48)
-    save(clip, 'Utilitaire/anneau_cable.ply')
-    box = trimesh.creation.box(extents=(70, 50, 25)); inner = trimesh.creation.box(extents=(66, 46, 25)); inner.apply_translation((0, 0, 2))
-    try:
-        save(box.difference(inner), 'Utilitaire/boite_rangement.stl')
-    except Exception:
-        save(box, 'Utilitaire/boite_rangement.stl')
-
-
-def _demo_bootstrap():
-    """Prépare l'instance de démonstration (idempotent)."""
-    demo_dir = os.path.join(DATA_DIR, 'demo_models')
-    try:
-        _demo_generate_models(demo_dir)
-    except Exception as e:
-        app_logger.warning(f"[DEMO] Génération des modèles impossible : {e}")
-    conn = get_db()
-    try:
-        owner = conn.execute("SELECT id FROM users WHERE username = ?", (_DEMO_OWNER,)).fetchone()
-        if not owner:
-            cur = conn.execute("INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'user')",
-                               (_DEMO_OWNER, hash_pw_strong(secrets.token_urlsafe(24))))
-            owner_id = cur.lastrowid
-        else:
-            owner_id = owner['id']
-        if not conn.execute("SELECT 1 FROM users WHERE username = ?", (_DEMO_VIEWER,)).fetchone():
-            conn.execute("INSERT INTO users (username, password_hash, role, owner_id) VALUES (?, ?, 'viewer', ?)",
-                         (_DEMO_VIEWER, hash_pw_strong(secrets.token_urlsafe(24)), owner_id))
-        has_src = conn.execute("SELECT 1 FROM sources WHERE user_id = ? AND path = ?", (owner_id, demo_dir)).fetchone()
-        if not has_src:
-            conn.execute("INSERT INTO sources (user_id, name, type, path, config) VALUES (?, ?, 'folder', ?, '{}')",
-                         (owner_id, 'Démo', demo_dir))
-        conn.commit()
-        try:
-            _demo_seed(conn, owner_id, demo_dir)
-        except Exception as e:
-            app_logger.warning(f"[DEMO] Données fictives impossibles : {e}")
-        sources = [dict(r) for r in conn.execute("SELECT * FROM sources WHERE user_id = ?", (owner_id,)).fetchall()]
-    finally:
-        conn.close()
-    invalidate_cache()
-    threading.Thread(target=_do_background_scan, args=(sources, owner_id), daemon=True).start()
-    app_logger.info("[DEMO] Instance de démonstration prête (compte invité « demo », lecture seule).")
-
-
-def _demo_seed(conn, owner_id, demo_dir):
-    """Données fictives (imprimantes, bobines, historique, devis, commandes…) pour que le tableau de bord soit parlant. Idempotent."""
-    if conn.execute("SELECT 1 FROM printers WHERE user_id = ?", (owner_id,)).fetchone():
-        return
-    now = datetime.datetime.now()
-    ago = lambda **kw: (now - datetime.timedelta(**kw)).isoformat(sep=' ', timespec='seconds')
-    P = lambda rel: os.path.join(demo_dir, rel)
-    printers = [('Voron 2.4', 'klipper', '192.168.1.41', 612.0), ('Prusa MK4', 'prusalink', '192.168.1.42', 348.5), ('Ender 3 V3', 'octoprint', '192.168.1.43', 127.0)]
-    pid = {}
-    for name, typ, ip, hours in printers:
-        cur = conn.execute("INSERT INTO printers (user_id, name, type, ip, api_key, config, is_connected, total_print_hours) VALUES (?, ?, ?, ?, '', ?, 1, ?)",
-                           (owner_id, name, typ, ip, json.dumps({'bed_x': 250, 'bed_y': 250, 'bed_z': 250}), hours))
-        pid[name] = cur.lastrowid
-    spools = [('PLA Blanc', 'PLA', '#f2f2f2', 842, 1000, 'Polymaker', 'Drybox 1'), ('PLA Noir', 'PLA', '#1a1a1a', 120, 1000, 'eSun', 'Drybox 1'),
-              ('PLA Rouge', 'PLA', '#d62828', 655, 1000, 'Sunlu', 'Drybox 2'), ('PLA Bleu', 'PLA', '#2a6fdb', 31, 1000, 'Geeetech', 'Drybox 2'),
-              ('PETG Gris', 'PETG', '#8d99ae', 480, 1000, 'Prusament', 'Drybox 3'), ('PETG Orange', 'PETG', '#f77f00', 940, 1000, 'Prusament', 'Drybox 3'),
-              ('TPU Vert', 'TPU', '#2dc653', 210, 500, 'Fiberlogy', 'Étagère'), ('PLA Soie Or', 'PLA', '#e0b84c', 18, 1000, 'Polymaker', 'Drybox 1'),
-              ('ASA Noir', 'ASA', '#222222', 760, 1000, 'Bambu Lab', 'Drybox 3')]
-    for n, m, c, rem, cap, v, loc in spools:
-        conn.execute("INSERT INTO manual_filament_spools (user_id, name, material, color_hex, remaining_g, capacity_g, vendor, price, storage_location, archived) VALUES (?,?,?,?,?,?,?,?,?,0)",
-                     (owner_id, n, m, c, rem, cap, v, 19.9, loc))
-    hist = [('Mécanique/engrenage_22.stl', 'Voron 2.4', 'success', 'PLA', 'PLA Blanc', 38.2, 2.1, 1, 7),
-            ('Utilitaire/support_telephone.stl', 'Prusa MK4', 'success', 'PETG', 'PETG Gris', 61.0, 4.4, 2, 5),
-            ('Jeux/de_20mm.stl', 'Ender 3 V3', 'success', 'PLA', 'PLA Rouge', 6.5, 0.7, 3, 4),
-            ('Déco/vase_galbe.stl', 'Voron 2.4', 'success', 'PLA', 'PLA Soie Or', 54.0, 5.3, 5, 3),
-            ('Utilitaire/boite_rangement.stl', 'Prusa MK4', 'failed', 'PETG', 'PETG Orange', 22.0, 1.2, 7, 2),
-            ('Mécanique/rondelle_m8.stl', 'Ender 3 V3', 'success', 'PLA', 'PLA Noir', 3.1, 0.5, 9, 1),
-            ('Jeux/pion_cone.stl', 'Voron 2.4', 'success', 'PLA', 'PLA Bleu', 9.8, 1.0, 12, 0)]
-    for rel, pn, res, mat, lab, g, hrs, days, _ in hist:
-        mc = round(g * 0.02, 2); ec = round(hrs * 0.04, 2)
-        conn.execute("""INSERT INTO print_history (user_id, file_path, file_name, file_size, file_ext, slicer, sent_at, result, printer_id,
-                        filament_material, filament_label, spool_weight_used_g, material_cost, elec_cost, total_cost, actual_seconds)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                     (owner_id, P(rel), os.path.basename(rel), 120000, os.path.splitext(rel)[1], 'OrcaSlicer', ago(days=days, hours=2), res, pid[pn],
-                      mat, lab, g, mc, ec, round(mc + ec, 2), int(hrs * 3600)))
-    for name, col in (('Utilitaire', '#4ea1d3'), ('Mécanique', '#f77f00'), ('Déco', '#c77dff'), ('Jeux', '#2dc653')):
-        conn.execute("INSERT OR IGNORE INTO tags (name, color) VALUES (?, ?)", (name, col))
-        tid = conn.execute("SELECT id FROM tags WHERE name = ?", (name,)).fetchone()[0]
-        for rel in [r for r in ('Déco/vase_galbe.stl', 'Déco/anneau.stl', 'Déco/boule_facettes.obj', 'Jeux/pion_cone.stl', 'Jeux/pion_capsule.stl', 'Jeux/de_20mm.stl',
-                                'Mécanique/engrenage_14.stl', 'Mécanique/engrenage_22.stl', 'Mécanique/rondelle_m8.stl', 'Utilitaire/support_telephone.stl',
-                                'Utilitaire/anneau_cable.ply', 'Utilitaire/boite_rangement.stl') if r.startswith(name + '/')]:
-            conn.execute("INSERT OR IGNORE INTO file_tags (file_path, tag_id) VALUES (?, ?)", (P(rel), tid))
-    for rel in ('Déco/vase_galbe.stl', 'Mécanique/engrenage_22.stl', 'Utilitaire/support_telephone.stl'):
-        conn.execute("INSERT OR IGNORE INTO favorites (file_path, user_id) VALUES (?, ?)", (P(rel), owner_id))
-    for i, rel in enumerate(('Utilitaire/boite_rangement.stl', 'Jeux/pion_capsule.stl', 'Déco/anneau.stl')):
-        conn.execute("INSERT OR IGNORE INTO print_queue (user_id, file_path, position, note) VALUES (?,?,?,?)", (owner_id, P(rel), i, ''))
-    for name, color, status, files in (('Jeu d\'échecs fantaisie', '#c77dff', 'in_progress', [('Jeux/pion_cone.stl', 8, 5), ('Jeux/pion_capsule.stl', 8, 8), ('Jeux/de_20mm.stl', 2, 0)]),
-                                       ('Kit d\'engrenages', '#f77f00', 'in_progress', [('Mécanique/engrenage_14.stl', 4, 4), ('Mécanique/engrenage_22.stl', 4, 2), ('Mécanique/rondelle_m8.stl', 12, 12)]),
-                                       ('Déco salon', '#4ea1d3', 'done', [('Déco/vase_galbe.stl', 1, 1), ('Déco/anneau.stl', 2, 2)])):
-        cur = conn.execute("INSERT INTO projects (user_id, name, color, status) VALUES (?,?,?,?)", (owner_id, name, color, status))
-        for j, (rel, need, done) in enumerate(files):
-            conn.execute("INSERT INTO project_files (project_id, file_path, quantity_needed, quantity_printed, position) VALUES (?,?,?,?,?)", (cur.lastrowid, P(rel), need, done, j))
-    quotes = [('D-2026-014', 'Atelier Martin', 'Support de téléphone', '12', '4.50 €', '54.00 €', 54.0, 12),
-              ('D-2026-015', 'Boutique Le Dé', 'Dés 20 mm (lot)', '40', '1.20 €', '48.00 €', 48.0, 6),
-              ('D-2026-016', 'Mairie de Valmont', 'Engrenages pédagogiques', '25', '3.80 €', '95.00 €', 95.0, 2)]
-    for num, cl, desc, qty, up, tot, tv, days in quotes:
-        conn.execute("INSERT INTO quotes (user_id, number, client, item_desc, qty, unit_price, total, total_value, filename, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                     (owner_id, num, cl, desc, qty, up, tot, tv, num, ago(days=days)))
-    jobs = [('Atelier Martin', 'Support de téléphone', 12, 12, 'PETG', 'Prusa MK4', 3, 'done'),
-            ('Boutique Le Dé', 'Dés 20 mm', 40, 26, 'PLA', 'Ender 3 V3', 2, 'printing'),
-            ('Mairie de Valmont', 'Engrenage 22 dents', 25, 0, 'PLA', 'Voron 2.4', 6, 'queued'),
-            ('Mairie de Valmont', 'Rondelle M8', 50, 0, 'PLA', 'Ender 3 V3', -1, 'queued')]
-    for cl, part, q, d, mat, pn, due, st in jobs:
-        conn.execute("INSERT INTO print_jobs (user_id, client, part, quantity, qty_done, material, printer_id, due_date, status, done_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                     (owner_id, cl, part, q, d, mat, pid[pn], (now + datetime.timedelta(days=due)).strftime('%Y-%m-%d'), st, ago(days=1) if st == 'done' else ''))
-    for pn, task, hrs in (('Voron 2.4', 'Graisser les rails', 500), ('Voron 2.4', 'Changer la buse', 300), ('Prusa MK4', 'Nettoyer le plateau', 100), ('Ender 3 V3', 'Retendre les courroies', 150)):
-        conn.execute("INSERT INTO printer_maintenance_tasks (printer_id, user_id, name, interval_hours, hours_at_last_reset) VALUES (?,?,?,?,?)",
-                     (pid[pn], owner_id, task, hrs, 0))
-    conn.commit()
-
-
-_DEMO_LIVE = {'192.168.1.41': ('Utilitaire/boite_rangement.stl', 1860, 2.4, 'PLA'), '192.168.1.42': ('', 0, 0, 'PETG'), '192.168.1.43': ('Jeux/de_20mm.stl', 5400, 3.5, 'PLA')}
-
-
-def _demo_fake_status(ip):
-    """Statut fictif d'une imprimante de démo : la Voron « imprime » en boucle, la MK4 est prête, l'Ender termine un lot."""
-    live = _DEMO_LIVE.get(ip)
-    if not live:
-        return None
-    rel, total, _h, _m = live
-    temps = lambda e, b: {'extruder': {'current': e, 'target': e}, 'bed': {'current': b, 'target': b}, 'chamber': {'current': 0, 'target': 0}}
-    if not rel:
-        return {'status': 'idle', 'progress': 0, 'file': '', 'temps': {'extruder': {'current': 24.1, 'target': 0}, 'bed': {'current': 23.6, 'target': 0}, 'chamber': {'current': 0, 'target': 0}},
-                'time': {'elapsed': 0, 'remaining': 0, 'total': 0}, 'last_print': {'filename': 'support_telephone.stl', 'duration': 15840, 'finished_at': ''}}
-    elapsed = int(time.time()) % total
-    return {'status': 'printing', 'progress': round(100.0 * elapsed / total, 1), 'file': os.path.basename(rel),
-            'temps': temps(215.0 if live[3] == 'PLA' else 245.0, 60.0),
-            'time': {'elapsed': elapsed, 'remaining': total - elapsed, 'total': total}, 'last_print': {'filename': '', 'duration': 0, 'finished_at': ''}}
-
-
-def _demo_lockdown_network():
-    """Démo publique : interdit à l'application toute connexion vers le réseau local (RFC 1918, lien local, multicast, diffusion),
-    même si une fonction ou un bug tentait de joindre une imprimante, un NAS ou un autre appareil.
-    Restent autorisés : la boucle locale (127.x / ::1) et le DNS (port 53). Complète le pare-feu du conteneur Proxmox."""
-    import ipaddress
-    _sock = socket.socket
-    _orig = {n: getattr(_sock, n) for n in ('connect', 'connect_ex', 'sendto')}
-
-    def _blocked(addr):
-        try:
-            host, port = addr[0], int(addr[1])
-        except Exception:
-            return False
-        if port == 53 or not isinstance(host, str):
-            return False
-        try:
-            ip = ipaddress.ip_address(host)
-        except ValueError:
-            try:
-                ip = ipaddress.ip_address(socket.getaddrinfo(host, None)[0][4][0])
-            except Exception:
-                return False
-        if ip.is_loopback:
-            return False
-        return bool(ip.is_private or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified
-                    or str(ip) == '255.255.255.255')
-
-    def _wrap(name):
-        def f(self, *a):
-            addr = a[-1] if name == 'sendto' else a[0]
-            if self.family in (socket.AF_INET, socket.AF_INET6) and _blocked(addr):
-                app_logger.warning(f"[DEMO] Connexion réseau local refusée : {addr[0]}")
-                if name == 'connect_ex':
-                    return 113
-                raise PermissionError("Accès au réseau local désactivé dans la démo publique")
-            return _orig[name](self, *a)
-        f.__name__ = name
-        return f
-    for n in _orig:
-        setattr(_sock, n, _wrap(n))
-    app_logger.info("[DEMO] Réseau local verrouillé (connexions sortantes vers 10/8, 172.16/12, 192.168/16, lien local, multicast refusées).")
-
-
-if IS_DEMO:
-    _demo_lockdown_network()
-
-
-@app.before_request
-def _demo_guard():
-    if not IS_DEMO:
-        return
-    if (request.method, request.path) in _DEMO_BLOCKED:
-        return jsonify({"error": "Désactivé dans la démo publique", "code": "demo_disabled"}), 403
-    if request.path == '/api/auth/register':
-        return jsonify({"error": "Inscriptions fermées sur la démo"}), 403
-
-
-@app.route('/api/demo/enter', methods=['POST'])
-def api_demo_enter():
-    """Ouvre une session invitée (lecture seule) sur l'instance de démonstration."""
-    if not IS_DEMO:
-        return jsonify({"error": "Non disponible"}), 404
-    conn = get_db()
-    try:
-        viewer = conn.execute("SELECT id, owner_id FROM users WHERE username = ? AND role = 'viewer'", (_DEMO_VIEWER,)).fetchone()
-    finally:
-        conn.close()
-    if not viewer or not viewer['owner_id']:
-        return jsonify({"error": "Démo en cours de préparation"}), 503
-    session.clear()
-    session['user_id'] = viewer['owner_id']
-    session['username'] = _DEMO_VIEWER
-    session['role'] = 'viewer'
-    session['viewer_id'] = viewer['id']
-    return jsonify({"user": {"id": viewer['owner_id'], "username": _DEMO_VIEWER, "role": "viewer"}})
-
-
 @app.route('/api/auth/first-launch', methods=['GET'])
 def api_first_launch():
-    return jsonify({"first_launch": is_first_launch() and not IS_DEMO, "demo": IS_DEMO, "server_edition": IS_SERVER_EDITION,
+    return jsonify({"first_launch": is_first_launch(), "server_edition": IS_SERVER_EDITION,
                     "system_lang": None if IS_SERVER_EDITION else _system_ui_lang()})
 
 _login_attempts = {}
@@ -8819,6 +8704,7 @@ def api_upload_dropped_files():
 
                 f.save(dest_path)
                 saved.append(os.path.basename(dest_path))
+                journal_log('add', os.path.basename(dest_path), None, dest_path, user_id=user_id)
         finally:
             conn.close()
 
@@ -9680,6 +9566,30 @@ def api_platform_browser_login_status(platform):
     return jsonify({"state": browser_login_state.get((session['user_id'], platform), 'idle')})
 
 
+@app.route('/api/accounts/printables', methods=['POST'])
+@login_required
+def api_save_printables_account():
+    data = request.json or {}
+    handle, uid = _printables_parse_profile(data.get('handle'))
+    token = (data.get('token') or '').strip()
+    if not uid:
+        return jsonify({"error": "Profil invalide : colle le lien de ton profil Printables (https://www.printables.com/@pseudo_123456)"}), 400
+    conn = get_db()
+    try:
+        old = conn.execute("SELECT api_key FROM account_credentials WHERE user_id = ? AND platform = 'printables'", (session['user_id'],)).fetchone()
+        enc = encrypt_password(token) if token else (old['api_key'] if (old and not data.get('clear_token')) else None)
+        conn.execute("""
+            INSERT INTO account_credentials (user_id, platform, email, api_key, last_login)
+            VALUES (?, 'printables', ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id, platform) DO UPDATE SET email = excluded.email, api_key = excluded.api_key, last_login = CURRENT_TIMESTAMP
+        """, (session['user_id'], '@' + handle, enc))
+        conn.commit()
+    finally:
+        conn.close()
+    app_logger.info(f"[Printables] profil enregistré pour user {session['user_id']} : @{handle} (jeton {'oui' if enc else 'non'})")
+    return jsonify({"message": "Compte enregistré avec succès", "handle": '@' + handle, "has_token": bool(enc)})
+
+
 @app.route('/api/accounts/<platform>', methods=['DELETE'])
 @login_required
 def api_delete_account(platform):
@@ -9693,7 +9603,7 @@ def api_delete_account(platform):
     return jsonify({"message": "Compte supprimé"}), 200
 
 
-VIEWER_CACHE_VERSION = 3
+VIEWER_CACHE_VERSION = 4   # 4 : invalide les maillages 3MF mis en cache par d'anciennes versions (assemblage <build> incomplet → viewer déformé)
 VIEWER_CACHE_MAX_BYTES = 1024 * 1024 * 1024
 
 
@@ -10171,6 +10081,8 @@ def api_split_plates():
                     created = _run_split_plates(file_path, fmt, plates, keys, job)
                     names = [os.path.basename(p) for p in created]
                     app_logger.info(f"[SPLIT] {os.path.basename(file_path)} → {len(created)} fichier(s) {fmt.upper()}: {names}")
+                    journal_log('split', os.path.basename(file_path), file_path, os.path.dirname(created[0]) if created else None,
+                                detail=f"{len(created)} {fmt.upper()}", user_id=user_id)
                     with _split_jobs_lock:
                         job.update(state='done', files=names, count=len(names), finished=time.time())
                 except _JobCancelled:
@@ -10190,6 +10102,8 @@ def api_split_plates():
         created = _run_split_plates(file_path, fmt, plates, keys)
         names = [os.path.basename(p) for p in created]
         app_logger.info(f"[SPLIT] {os.path.basename(file_path)} → {len(created)} fichier(s) {fmt.upper()}: {names}")
+        journal_log('split', os.path.basename(file_path), file_path, os.path.dirname(created[0]) if created else None,
+                    detail=f"{len(created)} {fmt.upper()}")
         return jsonify({"success": True, "count": len(created), "files": names,
                         "message": f"{len(created)} fichiers créés"}), 200
     except Exception as e:
@@ -10658,6 +10572,120 @@ def reconcile_thumbnails_with_disk():
         app_logger.info(f"[THUMBS] Erreur réconciliation: {e}")
 
     return result
+
+
+JOURNAL_UNDOABLE = ('rename', 'move', 'delete')
+
+
+def _journal_entry_can_undo(row):
+    if row['undone'] or row['action'] not in JOURNAL_UNDOABLE:
+        return False
+    try:
+        if not row['to_path'] or not os.path.exists(row['to_path']):
+            return False
+        if row['action'] in ('rename', 'move') and row['from_path'] and os.path.exists(row['from_path']):
+            return False   # l'ancien emplacement est de nouveau occupé
+        return True
+    except Exception:
+        return False
+
+
+@app.route('/api/journal', methods=['GET'])
+@login_required
+def api_journal_list():
+    """Dernières opérations sur les fichiers (ajout, déplacement, renommage, suppression, conversion, découpe)."""
+    if _is_viewer():
+        return jsonify({"error": "Accès refusé"}), 403
+    try:
+        limit = max(1, min(request.args.get('limit', 200, type=int), 500))
+        action = (request.args.get('action') or '').strip()
+        conn = get_db()
+        try:
+            if action:
+                rows = conn.execute("SELECT * FROM file_journal WHERE user_id = ? AND action = ? ORDER BY ts DESC, id DESC LIMIT ?",
+                                    (session['user_id'], action, limit)).fetchall()
+            else:
+                rows = conn.execute("SELECT * FROM file_journal WHERE user_id = ? ORDER BY ts DESC, id DESC LIMIT ?",
+                                    (session['user_id'], limit)).fetchall()
+        finally:
+            conn.close()
+        out = [{
+            'id': r['id'], 'ts': r['ts'], 'action': r['action'], 'name': r['name'],
+            'from_path': r['from_path'], 'to_path': r['to_path'], 'detail': r['detail'],
+            'undone': bool(r['undone']), 'can_undo': _journal_entry_can_undo(r),
+        } for r in rows]
+        return jsonify({'entries': out, 'retention_days': JOURNAL_RETENTION_DAYS, 'trash_days': _trash_retention_seconds() // 86400})
+    except Exception as e:
+        app_logger.error(f"[JOURNAL] {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+
+@app.route('/api/journal/undo', methods=['POST'])
+@login_required
+def api_journal_undo():
+    """Annule un renommage ou un déplacement, ou restaure une suppression encore présente dans la corbeille."""
+    if _is_viewer():
+        return jsonify({"error": "Accès refusé"}), 403
+    try:
+        entry_id = (request.get_json(silent=True) or {}).get('id')
+        conn = get_db()
+        try:
+            row = conn.execute("SELECT * FROM file_journal WHERE id = ? AND user_id = ?", (entry_id, session['user_id'])).fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return jsonify({"error": "Entrée introuvable"}), 404
+        if not _journal_entry_can_undo(row):
+            return jsonify({"error": "Cette opération ne peut plus être annulée"}), 409
+        dest = row['from_path']
+        if not dest or not _is_path_within_sources(dest, session['user_id']):
+            return jsonify({"error": "L'emplacement d'origine n'appartient plus à une source configurée"}), 403
+        if row['action'] == 'delete' and os.path.exists(dest):
+            base, ext = os.path.splitext(dest)
+            dest = f"{base}_restauré{ext}"
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.move(row['to_path'], dest)
+        conn = get_db()
+        try:
+            conn.execute("UPDATE file_journal SET undone = 1 WHERE id = ?", (row['id'],))
+            conn.commit()
+        finally:
+            conn.close()
+        journal_log('restore' if row['action'] == 'delete' else 'undo', os.path.basename(dest), row['to_path'], dest)
+        invalidate_cache()
+        app_logger.info(f"[JOURNAL] ↩ {row['action']} annulé : {os.path.basename(dest)}")
+        return jsonify({"success": True, "path": dest})
+    except PermissionError:
+        return jsonify({"error": "Permission refusée — fichier ouvert dans une autre application ?"}), 403
+    except Exception as e:
+        app_logger.error(f"[JOURNAL] Annulation impossible : {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+
+@app.route('/api/thumb/cancel', methods=['POST'])
+@login_required
+def api_thumb_cancel():
+    """Vide la file des miniatures en attente (les rendus déjà commencés vont jusqu'au bout).
+    Les fichiers concernés restent sans miniature jusqu'au prochain scan de la bibliothèque."""
+    global _thumb_high_pending
+    removed = 0
+    while True:
+        try:
+            item = thumb_generation_queue.get_nowait()
+        except queue.Empty:
+            break
+        try:
+            if item[0] == 0:
+                with _thumb_high_lock:
+                    _thumb_high_pending = max(0, _thumb_high_pending - 1)
+            task = item[2] if len(item) > 2 else {}
+            if task.get('path'):
+                _release_thumb_inflight(task['path'])
+        finally:
+            thumb_generation_queue.task_done()
+            removed += 1
+    app_logger.info(f"[THUMBS] File vidée par l'utilisateur : {removed} miniature(s) abandonnée(s)")
+    return jsonify({"success": True, "removed": removed})
 
 
 @app.route('/api/thumb/progress', methods=['GET'])
@@ -12741,6 +12769,7 @@ def api_delete_file():
                 "user_id": session['user_id'],
                 "entries": [{"original": file_path, "trashed": trashed_path}],
             }
+        _trash_save_manifest(batch_id)
         app_logger.info(f"[DELETE] ✅ Fichier déplacé vers la corbeille: {filename} (lot {batch_id})")
 
         try:
@@ -12754,7 +12783,7 @@ def api_delete_file():
             "success": True,
             "message": f"Fichier '{filename}' supprimé avec succès",
             "batch_id": batch_id,
-            "undo_seconds": TRASH_RETENTION_SECONDS,
+            "undo_seconds": TRASH_UNDO_SECONDS,
         }), 200
 
     except PermissionError:
@@ -12833,6 +12862,7 @@ def api_delete_files_batch():
                     "user_id": session['user_id'],
                     "entries": trash_entries,
                 }
+            _trash_save_manifest(batch_id)
 
         return jsonify({
             "success": len(errors) == 0,
@@ -12840,21 +12870,356 @@ def api_delete_files_batch():
             "deleted": deleted,
             "errors": errors,
             "batch_id": batch_id if deleted else None,
-            "undo_seconds": TRASH_RETENTION_SECONDS,
+            "undo_seconds": TRASH_UNDO_SECONDS,
         }), 200
     except Exception as e:
         app_logger.error(f"[DELETE] Erreur suppression en lot: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 
+# ───────────────────────── Corbeille unifiée (0.9.9) ─────────────────────────
+# Fichiers : déplacés dans TRASH_DIR/<lot> (registre _trash_registry, manifeste sur disque).
+# Autres éléments (devis, clients, commandes, projets, bobines) : instantané des lignes dans la table trash_items,
+# pièces jointes déplacées dans TRASH_ITEMS_DIR/<id>. Rien n'est effacé avant « Supprimer définitivement » ou la fin du délai.
+_trash_table_ready = False
+
+
+def _ensure_trash_table(conn=None):
+    """Crée la table si besoin. Avec `conn`, utilise la connexion de l'appelant (une 2e connexion bloquerait pendant sa transaction)."""
+    global _trash_table_ready
+    if _trash_table_ready:
+        return
+    own = conn is None
+    if own:
+        conn = get_db()
+    try:
+        conn.execute("""CREATE TABLE IF NOT EXISTS trash_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            kind TEXT NOT NULL,
+            label TEXT DEFAULT '',
+            detail TEXT DEFAULT '',
+            payload TEXT DEFAULT '{}',
+            deleted_at REAL NOT NULL
+        )""")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_trash_items_user ON trash_items(user_id, deleted_at DESC)")
+        if own:
+            conn.commit()
+        _trash_table_ready = True
+    finally:
+        if own:
+            conn.close()
+
+
+def _trash_snapshot(conn, table, where, params=()):
+    return [dict(r) for r in conn.execute(f"SELECT * FROM {table} WHERE {where}", params).fetchall()]
+
+
+def _trash_insert(conn, table, row, keep_id=True):
+    """Réinsère une ligne sauvegardée (colonnes inconnues ignorées). Renvoie l'id utilisé."""
+    cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    data = {k: v for k, v in row.items() if k in cols}
+    if not keep_id:
+        data.pop('id', None)
+    names = list(data.keys())
+    sql = f"INSERT INTO {table} ({','.join(names)}) VALUES ({','.join('?' * len(names))})"
+    try:
+        cur = conn.execute(sql, [data[n] for n in names])
+    except sqlite3.IntegrityError:
+        if 'id' not in data:
+            raise
+        data.pop('id')   # id déjà repris entre-temps : on en attribue un nouveau
+        names = list(data.keys())
+        cur = conn.execute(f"INSERT INTO {table} ({','.join(names)}) VALUES ({','.join('?' * len(names))})", [data[n] for n in names])
+    return data.get('id') or cur.lastrowid
+
+
+def _trash_rm(path):
+    try:
+        if os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
+        elif os.path.exists(path):
+            os.remove(path)
+    except OSError:
+        pass
+
+
+def trash_record(conn, user_id, kind, label, payload, detail='', files=()):
+    """Met un élément en corbeille. `files` : fichiers ou dossiers associés, déplacés dans la corbeille avec lui."""
+    _ensure_trash_table(conn)
+    payload = dict(payload or {})
+    tid = conn.execute("INSERT INTO trash_items (user_id, kind, label, detail, payload, deleted_at) VALUES (?,?,?,?,?,?)",
+                       (user_id, kind, (label or '')[:200], (detail or '')[:200], '{}', time.time())).lastrowid
+    moved = []
+    dest_dir = os.path.join(TRASH_ITEMS_DIR, str(tid))
+    for i, p in enumerate(files or []):
+        if not p or not os.path.exists(p):
+            continue
+        try:
+            os.makedirs(dest_dir, exist_ok=True)
+            stored = os.path.join(dest_dir, f"{i}_{os.path.basename(p.rstrip('/\\'))}")
+            shutil.move(p, stored)
+            moved.append({'orig': p, 'stored': stored})
+        except Exception as e:
+            app_logger.warning(f"[Trash] Pièce jointe non déplacée ({p}): {e}")
+    payload['files'] = moved
+    conn.execute("UPDATE trash_items SET payload = ? WHERE id = ?", (json.dumps(payload, ensure_ascii=False, default=str), tid))
+    return tid
+
+
+def _trash_purge_row(conn, tid):
+    conn.execute("DELETE FROM trash_items WHERE id = ?", (tid,))
+    _trash_rm(os.path.join(TRASH_ITEMS_DIR, str(tid)))
+
+
+def _trash_purge_expired_rows():
+    keep = _trash_retention_seconds()
+    if keep <= 0:
+        return
+    try:
+        _ensure_trash_table()
+        conn = get_db()
+        try:
+            for r in conn.execute("SELECT id FROM trash_items WHERE deleted_at < ?", (time.time() - keep,)).fetchall():
+                _trash_purge_row(conn, r['id'])
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        app_logger.warning(f"[Trash] Purge des éléments expirés impossible: {e}")
+
+
+def _trash_restore_files_of(payload):
+    for f in payload.get('files', []):
+        stored, orig = f.get('stored'), f.get('orig')
+        if not stored or not orig or not os.path.exists(stored):
+            continue
+        try:
+            os.makedirs(os.path.dirname(orig), exist_ok=True)
+            if os.path.exists(orig):
+                continue
+            shutil.move(stored, orig)
+        except Exception as e:
+            app_logger.warning(f"[Trash] Pièce jointe non restaurée ({orig}): {e}")
+
+
+def _trash_restore_row(conn, item):
+    """Restaure un élément. Renvoie (ok, message_d_erreur)."""
+    kind = item['kind']
+    p = json.loads(item['payload'] or '{}')
+    uid = item['user_id']
+    if kind == 'quote':
+        _trash_insert(conn, 'quotes', p['row'])
+        _trash_restore_files_of(p)
+    elif kind == 'client':
+        _ensure_quote_columns()
+        new_id = _trash_insert(conn, 'clients', p['row'])
+        qids = [int(x) for x in p.get('quote_ids', [])]
+        if qids:
+            conn.execute(f"UPDATE quotes SET client_id = ? WHERE user_id = ? AND client_id = 0 AND id IN ({','.join('?' * len(qids))})", [new_id, uid] + qids)
+    elif kind == 'order':
+        _trash_insert(conn, 'print_jobs', p['row'])
+    elif kind == 'spool':
+        _trash_insert(conn, 'manual_filament_spools', p['row'])
+    elif kind == 'project':
+        old_id = p['row'].get('id')
+        new_id = _trash_insert(conn, 'projects', p['row'])
+        for r in p.get('project_files', []):
+            r = dict(r); r['project_id'] = new_id
+            try:
+                _trash_insert(conn, 'project_files', r)
+            except sqlite3.IntegrityError:
+                pass
+        for r in p.get('gcodes', []):
+            r = dict(r); r['project_id'] = new_id
+            _trash_insert(conn, 'project_gcodes', r, keep_id=False)
+        for f in p.get('files', []):   # dossier des G-codes : suit le nouvel identifiant du projet
+            if f.get('orig') and old_id is not None and os.path.basename(f['orig'].rstrip('/\\')) == str(old_id):
+                f['orig'] = os.path.join(os.path.dirname(f['orig'].rstrip('/\\')), str(new_id))
+        _trash_restore_files_of(p)
+    else:
+        return False, 'Type inconnu'
+    return True, ''
+
+
+_TRASH_KIND_ICONS = {'files': 'fa-file', 'quote': 'fa-file-invoice', 'client': 'fa-address-book', 'order': 'fa-box',
+                     'project': 'fa-diagram-project', 'spool': 'fa-circle-nodes'}
+
+
+def _trash_list_for_user(uid):
+    now = time.time()
+    keep = _trash_retention_seconds()
+    out = []
+    with _trash_registry_lock:
+        batches = list(_trash_registry.items())
+    for bid, entry in batches:
+        if entry.get('user_id') != uid:
+            continue
+        names = [os.path.basename(e.get('original', '')) for e in entry.get('entries', [])]
+        if not names:
+            continue
+        deleted_at = entry.get('created_at', now)
+        out.append({'key': f'files:{bid}', 'kind': 'files', 'label': names[0] if len(names) == 1 else f'{names[0]} (+{len(names) - 1})',
+                    'detail': '', 'count': len(names), 'names': names[:5], 'deleted_at': deleted_at,
+                    'seconds_left': int(keep - (now - deleted_at)) if keep > 0 else None})
+    try:
+        _ensure_trash_table()
+        conn = get_db()
+        try:
+            rows = conn.execute("SELECT id, kind, label, detail, deleted_at FROM trash_items WHERE user_id = ? ORDER BY deleted_at DESC", (uid,)).fetchall()
+        finally:
+            conn.close()
+        for r in rows:
+            out.append({'key': f"row:{r['id']}", 'kind': r['kind'], 'label': r['label'], 'detail': r['detail'], 'count': 1,
+                        'names': [], 'deleted_at': r['deleted_at'],
+                        'seconds_left': int(keep - (now - r['deleted_at'])) if keep > 0 else None})
+    except Exception as e:
+        app_logger.warning(f"[Trash] Lecture des éléments impossible: {e}")
+    out.sort(key=lambda x: -x['deleted_at'])
+    return out
+
+
+@app.route('/api/trash/items', methods=['GET'])
+@login_required
+def api_trash_items():
+    try:
+        _purge_expired_trash()
+        _trash_purge_expired_rows()
+        items = _trash_list_for_user(session['user_id'])
+        return jsonify({'items': items, 'retention_days': _trash_retention_seconds() // 86400}), 200
+    except Exception as e:
+        app_logger.error(f"[API] Erreur api_trash_items: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+
+def _trash_parse_key(key):
+    kind, _, ident = (key or '').partition(':')
+    return kind, ident
+
+
+@app.route('/api/trash/restore', methods=['POST'])
+@login_required
+def api_trash_restore():
+    try:
+        key = (request.get_json(silent=True) or {}).get('key', '')
+        kind, ident = _trash_parse_key(key)
+        uid = session['user_id']
+        if kind == 'files':
+            return api_restore_trash_batch_core(ident)
+        if kind != 'row' or not ident.isdigit():
+            return jsonify({'error': 'Élément invalide'}), 400
+        _ensure_trash_table()
+        conn = get_db()
+        try:
+            item = conn.execute("SELECT * FROM trash_items WHERE id = ? AND user_id = ?", (int(ident), uid)).fetchone()
+            if not item:
+                return jsonify({'error': "Cet élément n'est plus dans la corbeille"}), 404
+            ok, err = _trash_restore_row(conn, item)
+            if not ok:
+                conn.rollback()
+                return jsonify({'error': err}), 400
+            conn.execute("DELETE FROM trash_items WHERE id = ?", (item['id'],))
+            conn.commit()
+            try:
+                os.rmdir(os.path.join(TRASH_ITEMS_DIR, str(item['id'])))
+            except OSError:
+                pass
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+        return jsonify({'success': True, 'kind': item['kind'], 'label': item['label']}), 200
+    except Exception as e:
+        app_logger.error(f"[Trash] Restauration impossible: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+
+def _trash_purge_batch(batch_id):
+    with _trash_registry_lock:
+        _trash_registry.pop(batch_id, None)
+    shutil.rmtree(os.path.join(TRASH_DIR, batch_id), ignore_errors=True)
+
+
+def _trash_purge_key(conn, uid, key):
+    kind, ident = _trash_parse_key(key)
+    if kind == 'files':
+        with _trash_registry_lock:
+            entry = _trash_registry.get(ident)
+        if not entry or entry.get('user_id') != uid:
+            return False
+        _trash_purge_batch(ident)
+        return True
+    if kind == 'row' and ident.isdigit():
+        r = conn.execute("SELECT id FROM trash_items WHERE id = ? AND user_id = ?", (int(ident), uid)).fetchone()
+        if not r:
+            return False
+        _trash_purge_row(conn, r['id'])
+        return True
+    return False
+
+
+@app.route('/api/trash/purge', methods=['POST'])
+@login_required
+def api_trash_purge():
+    """Supprime définitivement un élément de la corbeille (ou tous : {"all": true})."""
+    try:
+        data = request.get_json(silent=True) or {}
+        uid = session['user_id']
+        _ensure_trash_table()
+        conn = get_db()
+        try:
+            keys = [i['key'] for i in _trash_list_for_user(uid)] if data.get('all') else [data.get('key', '')]
+            n = sum(1 for k in keys if _trash_purge_key(conn, uid, k))
+            conn.commit()
+        finally:
+            conn.close()
+        if n:
+            journal_log('purge', f'{n} élément(s)', detail='suppression définitive depuis la corbeille')
+        return jsonify({'success': True, 'purged': n}), 200
+    except Exception as e:
+        app_logger.error(f"[Trash] Suppression définitive impossible: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+
+@app.route('/api/trash', methods=['GET'])
+@login_required
+def api_trash_list():
+    """Lots présents dans la corbeille (restaurables pendant TRASH_RETENTION_SECONDS) pour l'utilisateur courant."""
+    try:
+        _purge_expired_trash()
+        now = time.time()
+        uid = session.get('user_id')
+        out = []
+        with _trash_registry_lock:
+            items = list(_trash_registry.items())
+        for bid, entry in items:
+            if entry.get('user_id') != uid:
+                continue
+            names = [os.path.basename(e.get('original', '')) for e in entry.get('entries', [])]
+            left = int(TRASH_RETENTION_SECONDS - (now - entry.get('created_at', now)))
+            if left <= 0 or not names:
+                continue
+            out.append({'batch_id': bid, 'count': len(names), 'names': names[:3], 'seconds_left': left})
+        out.sort(key=lambda b: -b['seconds_left'])
+        return jsonify({'batches': out, 'retention_seconds': TRASH_RETENTION_SECONDS}), 200
+    except Exception as e:
+        app_logger.error(f"[API] Erreur api_trash_list: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+
 @app.route('/api/files/restore-batch', methods=['POST'])
 @login_required
 def api_restore_trash_batch():
+    data = request.json or {}
+    batch_id = (data.get('batch_id') or '').strip()
+    if not batch_id:
+        return jsonify({"error": "Identifiant de lot requis"}), 400
+    return api_restore_trash_batch_core(batch_id)
+
+
+def api_restore_trash_batch_core(batch_id):
     try:
-        data = request.json or {}
-        batch_id = (data.get('batch_id') or '').strip()
-        if not batch_id:
-            return jsonify({"error": "Identifiant de lot requis"}), 400
 
         with _trash_registry_lock:
             entry = _trash_registry.get(batch_id)
@@ -12878,6 +13243,7 @@ def api_restore_trash_batch():
                     dest_path = f"{base}_restauré{ext}"
                 shutil.move(trashed_path, dest_path)
                 restored.append(os.path.basename(dest_path))
+                journal_log('restore', os.path.basename(dest_path), trashed_path, dest_path, batch_id=batch_id)
             except Exception as e:
                 errors.append({"path": original_path, "error": str(e)})
 
@@ -12885,6 +13251,9 @@ def api_restore_trash_batch():
             _trash_registry.pop(batch_id, None)
         batch_dir = os.path.join(TRASH_DIR, batch_id)
         try:
+            mp = os.path.join(batch_dir, _TRASH_MANIFEST)
+            if os.path.isfile(mp):
+                os.remove(mp)   # le lot n'est plus en corbeille (les éventuels fichiers non restaurés restent dans le dossier)
             if os.path.isdir(batch_dir) and not os.listdir(batch_dir):
                 os.rmdir(batch_dir)
         except Exception:
@@ -12956,6 +13325,7 @@ def api_rename_file():
 
         shutil.move(file_path, new_path)
         _follow_file_origin(file_path, new_path)
+        journal_log('rename', new_name, file_path, new_path, detail=os.path.basename(file_path))
         invalidate_cache()
 
         new_path_norm = new_path.replace('\\', '/')
@@ -13708,6 +14078,7 @@ def api_move_file():
 
         try:
             shutil.move(source_path, dest_path)
+            journal_log('move', os.path.basename(dest_path), source_path, dest_path)
             app_logger.info(f"[MOVE] ✅ Fichier déplacé: {filename} → {destination_folder}")
 
             normalized_path = source_path.replace('\\', '/')
@@ -17995,13 +18366,19 @@ def api_delete_project(project_id):
         "SELECT file_path, quantity_needed, quantity_printed, notes, position FROM project_files WHERE project_id = ? ORDER BY position",
         (project_id,)
     ).fetchall()
+    full_row = _trash_snapshot(conn, 'projects', 'id = ?', (project_id,))
+    tid = trash_record(conn, session['user_id'], 'project', p['name'], {
+        'row': full_row[0] if full_row else dict(p),
+        'project_files': _trash_snapshot(conn, 'project_files', 'project_id = ?', (project_id,)),
+        'gcodes': _trash_snapshot(conn, 'project_gcodes', 'project_id = ?', (project_id,)),
+    }, detail=f"{len(files)} fichier(s)", files=[os.path.join(PROJECT_GCODES_DIR, str(project_id))])
     conn.execute("DELETE FROM project_files WHERE project_id = ?", (project_id,))
     conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
     conn.execute("DELETE FROM project_gcodes WHERE project_id = ?", (project_id,))
     conn.commit()
     conn.close()
-    shutil.rmtree(os.path.join(PROJECT_GCODES_DIR, str(project_id)), ignore_errors=True)
     return jsonify({
+        "trash_key": f"row:{tid}",
         "message": "Projet supprimé",
         "undo": {
             "name": p['name'], "description": p['description'], "color": p['color'], "status": p['status'],
@@ -18419,6 +18796,7 @@ def api_accounts_status():
         'nexprint': False,
         'crealitycloud': False,
         'snapmaker': False,
+        'printables': False,
     }
 
     conn = get_db()
@@ -18446,6 +18824,10 @@ def api_accounts_status():
             if acc['email']:
                 status[platform + '_email'] = acc['email']
                 status[platform + '_has_password'] = bool(acc['password_encrypted'])
+        elif platform == 'printables' and acc['email']:
+            status['printables'] = True
+            status['printables_handle'] = acc['email']
+            status['printables_has_token'] = bool(acc['api_key'])
         elif platform == 'makerworld' and acc['api_key']:
             status['makerworld'] = True
             status['makerworld_email'] = acc['email'] or ''
@@ -18454,6 +18836,854 @@ def api_accounts_status():
             status['tigertag_email'] = acc['email'] or ''
 
     return jsonify(status)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Mes likes / Mes créations : modèles des comptes externes
+#  MakerWorld et Thingiverse : endpoints connus. Creality Cloud, Snapmaker Space et Nexprint : endpoints NON documentés,
+#  plusieurs variantes sont essayées (la première qui répond est retenue) et CHAQUE requête est journalisée
+#  ([Comptes] … dans les logs + rapport Paramètres → Diagnostic) pour pouvoir corriger les adresses d'après les vrais retours.
+#  Les listes sont mises en cache en base (miniature, créateur, lien) puis rafraîchies en arrière-plan.
+#  Une plateforme n'apparaît dans l'interface que si son compte est connecté ET qu'elle a au moins un modèle.
+# ═══════════════════════════════════════════════════════════════════════════
+ACCT_MODELS_KINDS = ('likes', 'creations')
+ACCT_MODELS_MAX_ITEMS = 600
+ACCT_MODELS_PAGE_SIZE = 30
+ACCT_MODELS_AUTO_SYNC_SECONDS = 6 * 3600
+ACCT_MODELS_EXPERIMENTAL_RETRY_SECONDS = 24 * 3600
+ACCT_MODELS_MIN_SYNC_GAP = 30
+_acct_models_lock = threading.Lock()
+_acct_models_running = set()   # (user_id, platform)
+_acct_probe_log = collections.deque(maxlen=500)
+_acct_endpoint_memo = {}       # (platform, kind) -> libellé du dernier endpoint qui a fonctionné
+
+
+def _acct_redact(text):
+    t = str(text)
+    t = re.sub(r'eyJ[\w-]+\.[\w-]+\.[\w-]+', '<jwt>', t)
+    t = re.sub(r'[\w.+-]+@[\w-]+\.[\w.-]+', '<email>', t)
+    t = re.sub(r'(?i)(token|cookie|authorization|password|secret)(["\']?\s*[:=]\s*["\']?)[^"\'\s,;}&]+', r'\1\2<masqué>', t)
+    t = re.sub(r'[A-Za-z0-9_\-]{40,}', '<long>', t)
+    return t
+
+
+def _acct_log(msg):
+    line = _acct_redact(msg)
+    app_logger.info(f"[Comptes] {line}")
+    _acct_probe_log.append(f"{time.strftime('%H:%M:%S')} {line}")
+
+
+def _acct_json_shape(js):
+    if isinstance(js, dict):
+        return "objet{" + ", ".join(list(js.keys())[:12]) + "}"
+    if isinstance(js, list):
+        return f"liste[{len(js)}]"
+    return type(js).__name__
+
+
+def _acct_probe(label, method, url, headers=None, params=None, json_body=None, session_obj=None):
+    """Une requête journalisée : méthode, adresse, paramètres, statut, type, forme du JSON, extrait (secrets masqués)."""
+    t0 = time.time()
+    try:
+        if session_obj is not None:
+            r = session_obj.request(method, url, headers=headers, params=params, json=json_body, timeout=25)
+        elif method == 'GET':
+            r = requests.get(url, headers=headers, params=params, timeout=25)
+        else:
+            r = requests.post(url, headers=headers, params=params, json=json_body, timeout=25)
+    except Exception as e:
+        _acct_log(f"{label} {method} {url} → ÉCHEC réseau : {e.__class__.__name__}: {e}")
+        return None, None
+    try:
+        js = r.json()
+    except Exception:
+        js = None
+    ct = (getattr(r, 'headers', None) or {}).get('Content-Type', '') if hasattr(r, 'headers') else ''
+    body = ''
+    try:
+        body = (r.text or '')[:300].replace('\n', ' ')
+    except Exception:
+        pass
+    extra = ''
+    if isinstance(js, dict) and ('code' in js or 'msg' in js or 'message' in js):
+        extra = f" code={js.get('code')!r} msg={str(js.get('msg') or js.get('message') or '')[:80]!r}"
+    _acct_log(f"{label} {method} {url} params={params or ''} body={json_body or ''} → HTTP {r.status_code}"
+              f" ({int((time.time() - t0) * 1000)} ms, {ct.split(';')[0]}) JSON={_acct_json_shape(js)}{extra}"
+              + (f" extrait={body}" if (js is None or r.status_code >= 400 or not _acct_extract_list(js)) else ''))
+    return r, js
+
+
+def _acct_extract_list(js):
+    """Trouve la liste d'objets dans une réponse JSON (liste directe ou imbriquée sous hits/list/items/data…)."""
+    if isinstance(js, list):
+        return [x for x in js if isinstance(x, dict)]
+    if isinstance(js, dict):
+        for k in ('hits', 'list', 'items', 'results', 'records', 'rows', 'models', 'designs', 'data', 'result'):
+            v = js.get(k)
+            if isinstance(v, (list, dict)):
+                got = _acct_extract_list(v)
+                if got:
+                    return got
+    return []
+
+
+_ACCT_ID_KEYS = ('id', 'modelId', 'model_id', 'designId', 'bizId', 'modelID', 'groupId')
+_ACCT_TITLE_KEYS = ('name', 'title', 'modelName', 'modelTitle', 'model_name', 'designTitle')
+
+
+def _acct_deep_items(js, depth=0):
+    """Repli pour un schéma inconnu : plus grande liste d'objets ressemblant à des modèles (id + nom), n'importe où dans le JSON."""
+    best = []
+    def looks(x):
+        return isinstance(x, dict) and any(k in x for k in _ACCT_ID_KEYS) and any(k in x for k in _ACCT_TITLE_KEYS)
+    def walk(o, d):
+        nonlocal best
+        if d > 6:
+            return
+        if isinstance(o, list):
+            good = [x for x in o if looks(x)]
+            if len(good) > len(best):
+                best = good
+            for x in o[:50]:
+                walk(x, d + 1)
+        elif isinstance(o, dict):
+            for v in o.values():
+                walk(v, d + 1)
+    walk(js, depth)
+    return best
+
+
+def _acct_ts(value):
+    d = _parse_remote_dt(value)
+    return d.isoformat(timespec='seconds') if d else ''
+
+
+def _acct_first(d, keys, default=''):
+    for k in keys:
+        v = d.get(k)
+        if v not in (None, '', [], {}):
+            return v
+    return default
+
+
+def _acct_norm_thingiverse(it):
+    t = it.get('thing') if isinstance(it.get('thing'), dict) else it
+    if not isinstance(t, dict) or not t.get('id'):
+        return None
+    cr = t.get('creator') if isinstance(t.get('creator'), dict) else {}
+    tid = str(t['id'])
+    return {
+        'model_id': tid,
+        'title': str(t.get('name') or '').strip(),
+        'thumb': t.get('thumbnail') or t.get('preview_image') or '',
+        'creator': str(cr.get('name') or cr.get('username') or '').strip(),
+        'creator_url': cr.get('public_url') or '',
+        'url': t.get('public_url') or f"https://www.thingiverse.com/thing:{tid}",
+        'likes': int(t.get('like_count') or 0),
+        'ts': _acct_ts(t.get('added') or t.get('created_at') or t.get('modified')),
+    }
+
+
+def _acct_norm_makerworld(it):
+    d = it.get('design') if isinstance(it.get('design'), dict) else it
+    if not isinstance(d, dict):
+        return None
+    did = d.get('id') or d.get('designId')
+    if not did:
+        return None
+    cr = d.get('designCreator') if isinstance(d.get('designCreator'), dict) else {}
+    handle = cr.get('handle') or cr.get('uid') or cr.get('id') or ''
+    cover = d.get('cover') or d.get('coverUrl') or ''
+    if not cover:
+        imgs = d.get('images')
+        if isinstance(imgs, list) and imgs:
+            first = imgs[0]
+            cover = first.get('url') if isinstance(first, dict) else str(first)
+    return {
+        'model_id': str(did),
+        'title': str(d.get('title') or d.get('name') or '').strip(),
+        'thumb': cover or '',
+        'creator': str(cr.get('name') or '').strip(),
+        'creator_url': f"https://makerworld.com/en/@{handle}" if handle else '',
+        'url': f"https://makerworld.com/en/models/{did}",
+        'likes': int(d.get('likeCount') or 0),
+        'ts': _acct_ts(d.get('createTime') or d.get('publishTime') or d.get('likeTime')),
+    }
+
+
+def _acct_norm_generic(it, url_builder):
+    """Normaliseur tolérant pour les plateformes à schéma inconnu (noms de champs courants essayés un par un)."""
+    d = it
+    for wrap in ('model', 'modelInfo', 'modelBaseInfo', 'detail', 'info'):
+        if isinstance(d.get(wrap), dict):
+            d = {**d, **d[wrap]}
+    mid = _acct_first(d, _ACCT_ID_KEYS)
+    if not mid:
+        return None
+    thumb = _acct_first(d, ('cover', 'coverUrl', 'cover_url', 'coverImg', 'thumbnail', 'thumb', 'image', 'imageUrl',
+                            'img', 'pic', 'previewUrl', 'firstImage', 'headImg'))
+    if isinstance(thumb, dict):
+        thumb = _acct_first(thumb, ('url', 'src', 'path'))
+    if isinstance(thumb, list):
+        thumb = (thumb[0].get('url') if thumb and isinstance(thumb[0], dict) else (thumb[0] if thumb else ''))
+    au = _acct_first(d, ('user', 'author', 'creator', 'owner', 'userInfo', 'authorInfo'), {})
+    creator = _acct_first(au, ('nickName', 'nickname', 'name', 'userName', 'username'), '') if isinstance(au, dict) else ''
+    if not creator:
+        creator = _acct_first(d, ('authorName', 'userName', 'nickName', 'nickname', 'creatorName', 'ownerName'), '')
+    uid = _acct_first(au, ('id', 'uid', 'userId'), '') if isinstance(au, dict) else ''
+    n = {
+        'model_id': str(mid),
+        'title': str(_acct_first(d, _ACCT_TITLE_KEYS, '')).strip(),
+        'thumb': str(thumb or ''),
+        'creator': str(creator or '').strip(),
+        'creator_url': '',
+        'url': '',
+        'likes': 0,
+        'ts': _acct_ts(_acct_first(d, ('createTime', 'create_time', 'createdAt', 'created_at', 'publishTime', 'likeTime', 'collectTime', 'updateTime'), '')),
+    }
+    try:
+        n['likes'] = int(_acct_first(d, ('likeCount', 'like_count', 'likes', 'likeNum', 'collectCount', 'collectNum'), 0) or 0)
+    except (TypeError, ValueError):
+        pass
+    n['url'], n['creator_url'] = url_builder(d, n, uid)
+    return n
+
+
+def _acct_token_for(user_id, platform):
+    """Secret de la plateforme ; Printables : JSON {handle, token} (profil public + jeton facultatif)."""
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT email, api_key FROM account_credentials WHERE user_id = ? AND platform = ?",
+                           (user_id, platform)).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return None
+    tok = ''
+    if row['api_key']:
+        try:
+            tok = decrypt_account_secret(row['api_key'])
+        except Exception:
+            tok = ''
+    if platform == 'printables':
+        return json.dumps({'handle': row['email'] or '', 'token': tok}) if (row['email'] or tok) else None
+    return tok or None
+
+
+def _acct_run_candidates(platform, kind, candidates, call, norm):
+    """Essaie les endpoints candidats ; le premier qui renvoie des modèles est retenu et mémorisé.
+    call(cand, page) -> (response, json) ; renvoie la liste normalisée, [] si un endpoint répond sans modèle,
+    lève RuntimeError si aucun n'a répondu correctement."""
+    memo = _acct_endpoint_memo.get((platform, kind))
+    ordered = sorted(candidates, key=lambda c: 0 if c['label'] == memo else 1)
+    any_ok = False
+    for cand in ordered:
+        out, page = [], 0
+        while len(out) < ACCT_MODELS_MAX_ITEMS:
+            r, js = call(cand, page)
+            if r is None or js is None or r.status_code >= 400:
+                break
+            code = js.get('code') if isinstance(js, dict) else None
+            if code not in (None, 0, 200, '0', '200'):
+                break
+            rows = _acct_extract_list(js) or _acct_deep_items(js)
+            any_ok = True
+            if not rows:
+                break
+            out.extend(rows)
+            if not cand.get('paged') or len(rows) < ACCT_MODELS_PAGE_SIZE:
+                break
+            page += 1
+        if out:
+            _acct_log(f"{platform} {kind} : endpoint retenu = {cand['label']} ({len(out)} élément(s)) ; "
+                      f"champs du 1er : {sorted(out[0].keys())[:25]}")
+            _acct_endpoint_memo[(platform, kind)] = cand['label']
+            items = [n for n in (norm(x) for x in out) if n]
+            if items:
+                _acct_log(f"{platform} {kind} : exemple normalisé = {items[0]}")
+            return items
+    if any_ok:
+        _acct_log(f"{platform} {kind} : des endpoints répondent mais sans aucun modèle (liste vide ?)")
+        return []
+    raise RuntimeError(f"aucun endpoint {platform}/{kind} n'a répondu : voir le rapport de diagnostic")
+
+
+def _acct_cands(label_prefix, paths, **kw):
+    return [{'label': f"{label_prefix}{p}", 'path': p, **kw} for p in paths]
+
+
+# ── Thingiverse (API officielle) ──────────────────────────────────────────
+def _acct_fetch_thingiverse(token, kind):
+    hdr = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    r, js = _acct_probe("Thingiverse profil", 'GET', "https://api.thingiverse.com/users/me", headers=hdr)
+    if r is None or not r.ok:
+        raise RuntimeError(f"Thingiverse : profil inaccessible (HTTP {getattr(r, 'status_code', '?')}), vérifie le token")
+    name = (js or {}).get('name')
+    if not name:
+        raise RuntimeError("profil Thingiverse introuvable")
+    path = f"/users/{name}/likes" if kind == 'likes' else f"/users/{name}/things"
+    out, page, per = [], 1, ACCT_MODELS_PAGE_SIZE
+    while len(out) < ACCT_MODELS_MAX_ITEMS:
+        r, js = _acct_probe(f"Thingiverse {kind} p{page}", 'GET', "https://api.thingiverse.com" + path, headers=hdr,
+                            params={"page": page, "per_page": per})
+        if r is None:
+            raise RuntimeError("Thingiverse injoignable")
+        if not r.ok:
+            raise RuntimeError(f"Thingiverse a répondu HTTP {r.status_code}")
+        rows = _acct_extract_list(js)
+        if not rows:
+            break
+        out.extend(rows)
+        if len(rows) < per:
+            break
+        page += 1
+    return [n for n in (_acct_norm_thingiverse(x) for x in out) if n]
+
+
+# ── MakerWorld (likes : endpoints connus ; créations : variantes) ──────────
+_MW_HDR = {"User-Agent": "BambuStudio/01.09.00.00", "Accept": "application/json"}
+
+
+def _mw_get(path, token, params=None, label='MakerWorld'):
+    return _acct_probe(label, 'GET', MAKERWORLD_API + path, headers={**_MW_HDR, "Authorization": f"Bearer {token}"}, params=params)
+
+
+def _mw_paged(path, token, limit=ACCT_MODELS_PAGE_SIZE):
+    out, offset = [], 0
+    while len(out) < ACCT_MODELS_MAX_ITEMS:
+        r, js = _mw_get(path, token, {"offset": offset, "limit": limit}, label=f"MakerWorld o{offset}")
+        if r is None:
+            return out if out else None
+        if r.status_code in (401, 403):
+            raise RuntimeError(f"MakerWorld a refusé la session (HTTP {r.status_code}), reconnecte-toi")
+        if not r.ok:
+            return out if out else None
+        rows = _acct_extract_list(js) or _acct_deep_items(js)
+        if not rows:
+            break
+        out.extend(rows)
+        if len(rows) < limit:
+            break
+        offset += limit
+    return out
+
+
+def _acct_fetch_makerworld(token, kind):
+    rp, prof = _mw_get("/v1/design-user-service/my/profile", token, label='MakerWorld profil')
+    if rp is not None and rp.status_code in (401, 403):
+        raise RuntimeError(f"MakerWorld a refusé la session (HTTP {rp.status_code}), reconnecte-toi")
+    prof = prof if isinstance(prof, dict) else {}
+    uid = prof.get('uid') or (prof.get('data') or {}).get('uid') if isinstance(prof, dict) else None
+    _acct_log(f"MakerWorld uid détecté = {uid!r}")
+    if kind == 'likes':
+        paths = ["/v1/design-service/my/design/like"]
+        if uid:
+            paths.append(f"/v1/design-service/favorites/designs/{uid}")
+    else:
+        if not uid:
+            raise RuntimeError("MakerWorld : identifiant utilisateur introuvable (profil)")
+        paths = [f"/v1/design-service/published/{uid}/design", "/v1/design-service/my/design/published",
+                 f"/v1/design-service/published/{uid}/designs", f"/v1/design-service/my/design/list",
+                 f"/v1/design-service/design/user/{uid}"]
+    seen, merged, worked = set(), [], False
+    for p in paths:
+        rows = _mw_paged(p, token)
+        if rows is None:
+            continue
+        worked = True
+        _acct_log(f"MakerWorld {kind} via {p} : {len(rows)} modèle(s)")
+        for x in rows:
+            n = _acct_norm_makerworld(x)
+            if n and n['model_id'] not in seen:
+                seen.add(n['model_id'])
+                merged.append(n)
+        if kind == 'creations' and rows:
+            break
+    if not worked:
+        raise RuntimeError("aucun endpoint MakerWorld n'a répondu")
+    return merged
+
+
+# ── Creality Cloud (endpoints devinés, session par cookies) ────────────────
+def _crealitycloud_headers(cookie_header, ck, referer="https://www.crealitycloud.com/"):
+    import uuid
+    offset = -(time.altzone if (time.daylight and time.localtime().tm_isdst > 0) else time.timezone)
+    return {
+        "User-Agent": _MODEL_PAGE_UA, "Accept": "application/json", "Content-Type": "application/json",
+        "Origin": "https://www.crealitycloud.com", "Referer": referer, "Cookie": cookie_header,
+        "__cxy_app_ch_": "Chrome 124.0", "__cxy_app_id_": "cxy-gen2", "__cxy_app_ver_": "7.3.28",
+        "__cxy_brand_": "creality", "__cxy_duid_": ck.get('model_device_id') or str(uuid.uuid4()),
+        "__cxy_os_lang_": ck.get('__CXY_OS_LANG_') or ck.get('model_lang') or '9', "__cxy_os_ver_": "Windows 10",
+        "__cxy_platform_": "2", "__cxy_requestid_": str(uuid.uuid4()), "__cxy_timezone_": str(offset),
+        "__cxy_token_": ck.get('model_token', ''), "__cxy_uid_": ck.get('model_user_id', ''),
+    }
+
+
+_CREALITY_PATHS = {
+    'likes': ['/api/cxy/v3/model/likeList', '/api/cxy/v3/model/collectList', '/api/cxy/v3/model/collectionList',
+              '/api/cxy/v3/model/favoriteList', '/api/cxy/v2/model/likeList', '/api/cxy/v2/model/collectList',
+              '/api/cxy/v3/user/likeModelList', '/api/cxy/v3/user/collectModelList'],
+    'creations': ['/api/cxy/v3/model/userModelList', '/api/cxy/v3/model/listByUser', '/api/cxy/v3/model/myModelList',
+                  '/api/cxy/v3/model/publishList', '/api/cxy/v2/model/userModelList', '/api/cxy/v3/user/modelList'],
+}
+
+
+def _crealitycloud_model_url(d, n, uid):
+    mid = n['model_id']
+    pid = _acct_first(d, ('profileId', 'defaultProfileId', 'printProfileId'), '')
+    url = f"https://www.crealitycloud.com/model-detail/{mid}" + (f"?profileId={pid}" if pid else '')
+    return url, (f"https://www.crealitycloud.com/user/{uid}" if uid else '')
+
+
+def _acct_fetch_crealitycloud(cookie, kind):
+    ck_header = _clean_cookie_header(cookie)
+    ck = _cookie_header_to_dict(ck_header)
+    uid, token = ck.get('model_user_id'), ck.get('model_token')
+    _acct_log(f"Creality Cloud : cookies présents = {sorted(ck.keys())} ; model_user_id={'oui' if uid else 'NON'} ; model_token={'oui' if token else 'NON'}")
+    if not uid or not token:
+        raise RuntimeError("session Creality Cloud incomplète (cookies model_token / model_user_id absents), reconnecte-toi")
+    hdr = _crealitycloud_headers(ck_header, ck)
+    cands = _acct_cands('POST ', _CREALITY_PATHS[kind], paged=True)
+
+    def call(c, page):
+        body = {"page": page + 1, "pageSize": ACCT_MODELS_PAGE_SIZE, "userId": uid, "uid": uid, "pageNum": page + 1}
+        return _acct_probe(f"Creality {kind}", 'POST', "https://www.crealitycloud.com" + c['path'], headers=hdr, json_body=body)
+    try:
+        return _acct_run_candidates('crealitycloud', kind, cands, call, lambda x: _acct_norm_generic(x, _crealitycloud_model_url))
+    except RuntimeError:
+        if kind != 'creations':
+            raise
+    # Repli : la page publique du profil (rendu serveur) contient parfois la liste des modèles
+    r, _js = _acct_probe("Creality profil HTML", 'GET', f"https://www.crealitycloud.com/user/{uid}",
+                         headers={"User-Agent": _MODEL_PAGE_UA, "Cookie": ck_header, "Accept": "text/html"})
+    if r is not None and r.ok:
+        m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', r.text or '', re.S)
+        _acct_log(f"Creality profil HTML : __NEXT_DATA__ {'trouvé' if m else 'absent'} ({len(r.text or '')} octets)")
+        if m:
+            try:
+                rows = _acct_deep_items(json.loads(m.group(1)))
+            except ValueError:
+                rows = []
+            items = [n for n in (_acct_norm_generic(x, _crealitycloud_model_url) for x in rows) if n]
+            if items:
+                return items
+    raise RuntimeError("aucun endpoint Creality Cloud n'a répondu : voir le rapport de diagnostic")
+
+
+# ── Snapmaker Space (endpoints devinés, JWT) ───────────────────────────────
+_SNAPMAKER_PATHS = {
+    'likes': ['/api/model/like/list', '/api/model/collect/list', '/api/model/favorite/list', '/api/user/like/list',
+              '/api/model/likes', '/api/model/liked'],
+    'creations': ['/api/model/my/list', '/api/model/user/list', '/api/user/model/list', '/api/model/mine',
+                  '/api/model/my', '/api/model/published/list'],
+}
+
+
+def _snapmaker_model_url(d, n, uid):
+    return f"https://space.snapmaker.com/en/model/{n['model_id']}", (f"https://space.snapmaker.com/en/user/{uid}" if uid else '')
+
+
+def _acct_fetch_snapmaker(stored, kind):
+    tokens = _JWT_RE.findall(stored or '')
+    _acct_log(f"Snapmaker : {len(tokens)} JWT dans la session enregistrée")
+    if not tokens:
+        raise RuntimeError("session Snapmaker Space absente, reconnecte-toi")
+    last = None
+    for tok in tokens:
+        hdr = {"User-Agent": _MODEL_PAGE_UA, "Accept": "application/json", "Content-Type": "application/json",
+               "x-custom-site": "Web-Space", "Authorization": f"Bearer {tok}",
+               "Origin": "https://space.snapmaker.com", "Referer": "https://space.snapmaker.com/"}
+        cands = _acct_cands('GET ', _SNAPMAKER_PATHS[kind], paged=True)
+
+        def call(c, page):
+            params = {"page": page + 1, "pageNum": page + 1, "pageSize": ACCT_MODELS_PAGE_SIZE, "size": ACCT_MODELS_PAGE_SIZE}
+            return _acct_probe(f"Snapmaker {kind}", 'GET', "https://api-models.snapmaker.com" + c['path'], headers=hdr, params=params)
+        try:
+            return _acct_run_candidates('snapmaker', kind, cands, call, lambda x: _acct_norm_generic(x, _snapmaker_model_url))
+        except RuntimeError as e:
+            last = e
+    raise last or RuntimeError("Snapmaker Space : aucun endpoint n'a répondu")
+
+
+# ── Nexprint (endpoints devinés, cookie auth_token) ────────────────────────
+_NEXPRINT_PATHS = {
+    'likes': ['/model-base-info/like/list', '/model-base-info/collect/list', '/model-base-info/user-like/list',
+              '/user/like/list', '/collection/model/list'],
+    'creations': ['/model-base-info/my/list', '/model-base-info/user/list', '/model-base-info/mine/list',
+                  '/model-base-info/publish/list', '/user/model/list'],
+}
+
+
+def _nexprint_model_url(d, n, uid):
+    return f"https://www.nexprint.com/models/{n['model_id']}", ''
+
+
+def _acct_fetch_nexprint(stored, kind):
+    token = _nexprint_clean_token(stored)
+    if not token:
+        raise RuntimeError("cookie auth_token Nexprint absent, reconnecte-toi")
+    _acct_log(f"Nexprint : jeton longueur={len(token)}")
+    sess = requests.Session()
+    sess.headers.update(NEXPRINT_HEADERS)
+    sess.headers.update({"Authorization": "Bearer " + token, "client-id": "Nexprint", "user-lang": "en"})
+    sess.cookies.set('auth_token', token, domain='.nexprint.com', path='/')
+    cands = []
+    for p in _NEXPRINT_PATHS[kind]:
+        cands.append({'label': f"GET {p}", 'path': p, 'method': 'GET', 'paged': True})
+        cands.append({'label': f"POST {p}", 'path': p, 'method': 'POST', 'paged': True})
+
+    def call(c, page):
+        q = {"pageNum": page + 1, "page": page + 1, "pageSize": ACCT_MODELS_PAGE_SIZE, "size": ACCT_MODELS_PAGE_SIZE}
+        if c['method'] == 'GET':
+            return _acct_probe(f"Nexprint {kind}", 'GET', NEXPRINT_API + c['path'], params=q, session_obj=sess)
+        return _acct_probe(f"Nexprint {kind}", 'POST', NEXPRINT_API + c['path'], json_body=q, session_obj=sess)
+    return _acct_run_candidates('nexprint', kind, cands, call, lambda x: _acct_norm_generic(x, _nexprint_model_url))
+
+
+# ── Printables (API GraphQL publique non officielle) ───────────────────────
+# Créations : requêtes publiques à partir du profil (@pseudo_123456 : les chiffres finaux sont l'identifiant).
+# Likes : nécessitent une session (jeton / cookie collé dans Paramètres) ; noms de requêtes inconnus → variantes + introspection.
+_PRINTABLES_MEDIA = "https://media.printables.com/"
+_PRINTABLES_FIELDS = "id name slug likesCount datePublished image { filePath } user { id handle publicUsername }"
+
+
+def _printables_parse_profile(raw):
+    """'@Nom_123456', 'https://www.printables.com/@Nom_123456/models' ou '123456' -> (handle, id numérique)."""
+    s = str(raw or '').strip()
+    m = re.search(r'@([\w.\-]+)', s)
+    handle = m.group(1) if m else s.strip('/@ ')
+    uid = re.search(r'(\d+)$', handle)
+    return handle, (uid.group(1) if uid else '')
+
+
+def _acct_norm_printables(it):
+    p = it.get('print') if isinstance(it.get('print'), dict) else it
+    if not isinstance(p, dict) or not p.get('id'):
+        return None
+    pid = str(p['id'])
+    u = p.get('user') if isinstance(p.get('user'), dict) else {}
+    img = p.get('image') if isinstance(p.get('image'), dict) else {}
+    fp = img.get('filePath') or ''
+    thumb = (fp if fp.startswith('http') else _PRINTABLES_MEDIA + fp.lstrip('/')) if fp else ''
+    slug = p.get('slug') or ''
+    return {
+        'model_id': pid,
+        'title': str(p.get('name') or '').strip(),
+        'thumb': thumb,
+        'creator': str(u.get('publicUsername') or u.get('handle') or '').strip(),
+        'creator_url': f"https://www.printables.com/@{u['handle']}" if u.get('handle') else '',
+        'url': f"https://www.printables.com/model/{pid}" + (f"-{slug}" if slug else ''),
+        'likes': int(p.get('likesCount') or 0),
+        'ts': _acct_ts(p.get('datePublished') or p.get('firstPublish')),
+    }
+
+
+def _printables_gql(label, query, variables, headers):
+    r, js = _acct_probe(label, 'POST', PRINTABLES_API_URL, headers=headers,
+                        json_body={"query": query, "variables": variables})
+    errs = (js or {}).get('errors') if isinstance(js, dict) else None
+    if errs:
+        _acct_log(f"{label} erreurs GraphQL : {str(errs)[:300]}")
+    return r, (js.get('data') if isinstance(js, dict) else None), errs
+
+
+def _printables_introspect(headers, user_type_hint=None):
+    """Journalise les requêtes/champs du schéma qui parlent de likes, collections ou impressions (aide au diagnostic)."""
+    q = "{ __schema { queryType { fields { name args { name } type { name kind ofType { name kind } } } } } }"
+    r, data, errs = _printables_gql("Printables introspection", q, {}, headers)
+    try:
+        fields = data['__schema']['queryType']['fields']
+    except Exception:
+        _acct_log("Printables introspection : désactivée ou refusée (normal), on continue avec les variantes connues")
+        return
+    pat = re.compile(r'like|saved|collection|favou?rite|print|user|me$|my', re.I)
+    keep = [f for f in fields if pat.search(f.get('name', ''))]
+    _acct_log(f"Printables schéma : {len(fields)} requêtes racine, {len(keep)} pertinentes :")
+    for f in keep[:80]:
+        t = f.get('type') or {}
+        tn = t.get('name') or (t.get('ofType') or {}).get('name') or t.get('kind')
+        _acct_log(f"   Query.{f['name']}({', '.join(a['name'] for a in f.get('args') or [])}) -> {tn}")
+
+
+def _acct_fetch_printables(cred, kind):
+    try:
+        c = json.loads(cred) if cred else {}
+    except ValueError:
+        c = {}
+    handle, uid = _printables_parse_profile(c.get('handle'))
+    token = (c.get('token') or '').strip()
+    hdr = dict(PRINTABLES_HEADERS)
+    if token:
+        if '=' in token and ' ' not in token.replace('; ', ''):
+            hdr['Cookie'] = _clean_cookie_header(token)
+        else:
+            hdr['Authorization'] = token if token.lower().startswith('bearer ') else f"Bearer {token}"
+    _acct_log(f"Printables : profil={handle!r} id={uid!r} jeton={'oui' if token else 'non'} ({kind})")
+    if not uid:
+        raise RuntimeError("profil Printables illisible : colle le lien du profil (https://www.printables.com/@pseudo_123456)")
+    _printables_introspect(hdr)
+    r, data, _e = _printables_gql("Printables profil", "query($id: ID!) { user(id: $id) { id handle publicUsername } }", {"id": uid}, hdr)
+    _acct_log(f"Printables profil résolu : {(data or {}).get('user')}")
+
+    F = _PRINTABLES_FIELDS
+    P = ACCT_MODELS_PAGE_SIZE
+    if kind == 'creations':
+        qs = [
+            ("morePrints", f"query($id: ID!, $limit: Int, $offset: Int) {{ morePrints(userId: $id, limit: $limit, offset: $offset) {{ {F} }} }}"),
+            ("user.prints", f"query($id: ID!, $limit: Int, $offset: Int) {{ user(id: $id) {{ prints(limit: $limit, offset: $offset) {{ {F} }} }} }}"),
+            ("userPrints", f"query($id: ID!, $limit: Int, $offset: Int) {{ userPrints(userId: $id, limit: $limit, offset: $offset) {{ {F} }} }}"),
+            ("searchPrints2(userId)", f"query($id: ID!, $limit: Int, $offset: Int) {{ searchPrints2(userId: $id, limit: $limit, offset: $offset, printType: print) {{ items {{ {F} }} }} }}"),
+        ]
+    else:
+        if not token:
+            raise RuntimeError("Printables : les likes nécessitent un jeton de session (Paramètres → Comptes externes → Printables)")
+        qs = [
+            ("likedPrints", f"query($limit: Int, $offset: Int) {{ likedPrints(limit: $limit, offset: $offset) {{ {F} }} }}"),
+            ("me.likedPrints", f"query($limit: Int, $offset: Int) {{ me {{ likedPrints(limit: $limit, offset: $offset) {{ {F} }} }} }}"),
+            ("user.likedPrints", f"query($id: ID!, $limit: Int, $offset: Int) {{ user(id: $id) {{ likedPrints(limit: $limit, offset: $offset) {{ {F} }} }} }}"),
+            ("userLikedPrints", f"query($id: ID!, $limit: Int, $offset: Int) {{ userLikedPrints(userId: $id, limit: $limit, offset: $offset) {{ {F} }} }}"),
+            ("likedModels", f"query($limit: Int, $offset: Int) {{ likedModels(limit: $limit, offset: $offset) {{ {F} }} }}"),
+        ]
+    memo = _acct_endpoint_memo.get(('printables', kind))
+    qs.sort(key=lambda x: 0 if x[0] == memo else 1)
+    any_ok = False
+    for label, q in qs:
+        out, offset = [], 0
+        while len(out) < ACCT_MODELS_MAX_ITEMS:
+            r, data, errs = _printables_gql(f"Printables {kind} [{label}] o{offset}", q, {"id": uid, "limit": P, "offset": offset}, hdr)
+            if r is None or r.status_code >= 400 or errs or not isinstance(data, dict):
+                break
+            rows = _acct_extract_list(data) or _acct_deep_items(data)
+            any_ok = True
+            if not rows:
+                break
+            out.extend(rows)
+            if len(rows) < P:
+                break
+            offset += P
+        if out:
+            _acct_log(f"printables {kind} : requête retenue = {label} ({len(out)} élément(s)) ; champs du 1er : {sorted(out[0].keys())[:20]}")
+            _acct_endpoint_memo[('printables', kind)] = label
+            return [n for n in (_acct_norm_printables(x) for x in out) if n]
+    if any_ok:
+        _acct_log(f"printables {kind} : requêtes valides mais aucune donnée")
+        return []
+    raise RuntimeError("aucune requête Printables n'a abouti : voir le rapport de diagnostic (schéma + erreurs GraphQL)")
+
+
+ACCT_MODELS_PLATFORMS = {
+    'makerworld': {'label': 'MakerWorld', 'fetch': _acct_fetch_makerworld},
+    'thingiverse': {'label': 'Thingiverse', 'fetch': _acct_fetch_thingiverse},
+    'crealitycloud': {'label': 'Creality Cloud', 'fetch': _acct_fetch_crealitycloud, 'experimental': True},
+    'snapmaker': {'label': 'Snapmaker Space', 'fetch': _acct_fetch_snapmaker, 'experimental': True},
+    'nexprint': {'label': 'Nexprint', 'fetch': _acct_fetch_nexprint, 'experimental': True},
+    'printables': {'label': 'Printables', 'fetch': _acct_fetch_printables, 'experimental': True},
+}
+
+
+def _acct_ref_from_url(url):
+    """Comme _model_ref_from_url, étendu aux plateformes de Mes likes (sans toucher au vérificateur de mises à jour)."""
+    ref = _model_ref_from_url(url)
+    if ref:
+        return ref
+    u, low = str(url or ''), str(url or '').lower()
+    m = re.search(r'/models/([A-Za-z]\d+)', u)
+    if 'nexprint.com' in low and m:
+        return ('Nexprint', m.group(1))
+    m = re.search(r'/model/(\d+)', u)
+    if 'snapmaker.com' in low and m:
+        return ('Snapmaker Space', m.group(1))
+    m = re.search(r'/model-detail/([^/?#]+)', u)
+    if 'crealitycloud.com' in low and m:
+        return ('Creality Cloud', m.group(1))
+    return None
+
+
+def _acct_models_ensure(conn):
+    conn.execute("""CREATE TABLE IF NOT EXISTS account_models (
+        user_id INTEGER NOT NULL, platform TEXT NOT NULL, kind TEXT NOT NULL, model_id TEXT NOT NULL,
+        title TEXT DEFAULT '', thumb TEXT DEFAULT '', creator TEXT DEFAULT '', creator_url TEXT DEFAULT '',
+        url TEXT DEFAULT '', likes INTEGER DEFAULT 0, item_ts TEXT DEFAULT '', pos INTEGER DEFAULT 0,
+        PRIMARY KEY (user_id, platform, kind, model_id))""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS account_models_sync (
+        user_id INTEGER NOT NULL, platform TEXT NOT NULL, kind TEXT NOT NULL,
+        synced_at REAL DEFAULT 0, error TEXT DEFAULT '', PRIMARY KEY (user_id, platform, kind))""")
+
+
+def _acct_sync_store(conn, user_id, platform, kind, items, error=''):
+    _acct_models_ensure(conn)
+    if not error:
+        conn.execute("DELETE FROM account_models WHERE user_id = ? AND platform = ? AND kind = ?", (user_id, platform, kind))
+        for pos, n in enumerate(items):
+            conn.execute(
+                """INSERT OR REPLACE INTO account_models
+                   (user_id, platform, kind, model_id, title, thumb, creator, creator_url, url, likes, item_ts, pos)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (user_id, platform, kind, n['model_id'], n['title'], n['thumb'], n['creator'], n['creator_url'],
+                 n['url'], n['likes'], n['ts'], pos))
+    conn.execute(
+        """INSERT INTO account_models_sync (user_id, platform, kind, synced_at, error) VALUES (?,?,?,?,?)
+           ON CONFLICT(user_id, platform, kind) DO UPDATE SET synced_at = excluded.synced_at, error = excluded.error""",
+        (user_id, platform, kind, time.time(), error or ''))
+    conn.commit()
+
+
+def _acct_sync_platform(user_id, platform):
+    spec = ACCT_MODELS_PLATFORMS.get(platform)
+    token = _acct_token_for(user_id, platform)
+    if not spec or not token:
+        return {}
+    key = (user_id, platform)
+    with _acct_models_lock:
+        if key in _acct_models_running:
+            return {}
+        _acct_models_running.add(key)
+    result = {}
+    try:
+        _acct_log(f"=== Synchronisation {spec['label']} (utilisateur {user_id}) ===")
+        for kind in ACCT_MODELS_KINDS:
+            try:
+                items = spec['fetch'](token, kind)
+                err = ''
+            except Exception as e:
+                items, err = [], (str(e)[:200] or e.__class__.__name__)
+                _acct_log(f"{spec['label']} {kind} : ERREUR {e.__class__.__name__}: {err}")
+            result[kind] = (len(items), err)
+            conn = get_db()
+            try:
+                _acct_sync_store(conn, user_id, platform, kind, items, err)
+            finally:
+                conn.close()
+            _acct_log(f"{spec['label']} {kind} : {len(items)} modèle(s) enregistré(s){' (erreur : ' + err + ')' if err else ''}")
+    finally:
+        with _acct_models_lock:
+            _acct_models_running.discard(key)
+    return result
+
+
+def _acct_sync_async(user_id, platforms, force=False):
+    conn = get_db()
+    try:
+        _acct_models_ensure(conn)
+        rows = conn.execute(
+            "SELECT platform, MAX(synced_at) AS s, MAX(CASE WHEN error != '' THEN 1 ELSE 0 END) AS e "
+            "FROM account_models_sync WHERE user_id = ? GROUP BY platform", (user_id,)).fetchall()
+    finally:
+        conn.close()
+    last = {r['platform']: (r['s'] or 0, bool(r['e'])) for r in rows}
+    now = time.time()
+    started = []
+    for p in platforms:
+        s, failing = last.get(p, (0, False))
+        gap = now - s
+        wait = ACCT_MODELS_EXPERIMENTAL_RETRY_SECONDS if (failing and ACCT_MODELS_PLATFORMS[p].get('experimental')) else ACCT_MODELS_AUTO_SYNC_SECONDS
+        if gap < ACCT_MODELS_MIN_SYNC_GAP or (not force and gap < wait):
+            continue
+        threading.Thread(target=_acct_sync_platform, args=(user_id, p), daemon=True).start()
+        started.append(p)
+    return started
+
+
+@app.route('/api/account-models/overview', methods=['GET'])
+@login_required
+def api_account_models_overview():
+    uid = session['user_id']
+    conn = get_db()
+    try:
+        _acct_models_ensure(conn)
+        connected = [p for p in ACCT_MODELS_PLATFORMS
+                     if conn.execute("SELECT 1 FROM account_credentials WHERE user_id = ? AND platform = ? AND ((api_key IS NOT NULL AND api_key != '') OR (platform = 'printables' AND email IS NOT NULL AND email != ''))",
+                                     (uid, p)).fetchone()]
+        counts = {(r['platform'], r['kind']): r['n'] for r in conn.execute(
+            "SELECT platform, kind, COUNT(*) AS n FROM account_models WHERE user_id = ? GROUP BY platform, kind", (uid,))}
+        sync = {(r['platform'], r['kind']): r for r in conn.execute(
+            "SELECT platform, kind, synced_at, error FROM account_models_sync WHERE user_id = ?", (uid,))}
+    finally:
+        conn.close()
+    started = _acct_sync_async(uid, connected, force=request.args.get('force') == '1') if connected else []
+    platforms = []
+    for p in connected:
+        platforms.append({
+            'platform': p, 'label': ACCT_MODELS_PLATFORMS[p]['label'],
+            'likes': counts.get((p, 'likes'), 0), 'creations': counts.get((p, 'creations'), 0),
+            'synced_at': max([(sync.get((p, k)) or {'synced_at': 0})['synced_at'] or 0 for k in ACCT_MODELS_KINDS] or [0]),
+            'error': next((sync[(p, k)]['error'] for k in ACCT_MODELS_KINDS if sync.get((p, k)) and sync[(p, k)]['error']), ''),
+            'syncing': (uid, p) in _acct_models_running or p in started,
+        })
+    return jsonify({'platforms': platforms,
+                    'likes_total': sum(x['likes'] for x in platforms),
+                    'creations_total': sum(x['creations'] for x in platforms)})
+
+
+@app.route('/api/account-models/<kind>', methods=['GET'])
+@login_required
+def api_account_models_list(kind):
+    if kind not in ACCT_MODELS_KINDS:
+        return jsonify({"error": "type inconnu"}), 404
+    uid = session['user_id']
+    conn = get_db()
+    try:
+        _acct_models_ensure(conn)
+        rows = conn.execute("SELECT * FROM account_models WHERE user_id = ? AND kind = ? ORDER BY platform, pos",
+                            (uid, kind)).fetchall()
+        hist = {}
+        for r in conn.execute("SELECT source_url, file_name, file_path FROM download_history WHERE user_id = ? AND source_url != '' ORDER BY id ASC", (uid,)):
+            ref = _acct_ref_from_url(r['source_url'])
+            if ref:
+                hist[ref] = {'file_name': r['file_name'], 'file_path': r['file_path']}
+    finally:
+        conn.close()
+    out = {}
+    for r in rows:
+        label = ACCT_MODELS_PLATFORMS.get(r['platform'], {}).get('label', r['platform'])
+        h = hist.get((label, r['model_id']))
+        if h and not os.path.exists(h['file_path'] or ''):
+            h = None
+        out.setdefault(r['platform'], {'platform': r['platform'], 'label': label, 'items': []})['items'].append({
+            'model_id': r['model_id'], 'title': r['title'], 'thumb': r['thumb'], 'creator': r['creator'],
+            'creator_url': r['creator_url'], 'url': r['url'], 'likes': r['likes'], 'ts': r['item_ts'],
+            'in_library': bool(h), 'file_name': h['file_name'] if h else '', 'file_path': h['file_path'] if h else '',
+        })
+    return jsonify({'kind': kind, 'platforms': list(out.values())})
+
+
+@app.route('/api/account-models/sync', methods=['POST'])
+@login_required
+def api_account_models_sync():
+    uid = session['user_id']
+    wanted = (request.json or {}).get('platform')
+    plats = [wanted] if wanted in ACCT_MODELS_PLATFORMS else list(ACCT_MODELS_PLATFORMS)
+    started = _acct_sync_async(uid, plats, force=True)
+    return jsonify({'started': started})
+
+
+@app.route('/api/account-models/debug', methods=['GET', 'POST'])
+@login_required
+def api_account_models_debug():
+    """Lance une synchronisation complète (de façon synchrone) et renvoie le rapport détaillé : chaque requête
+    envoyée aux plateformes, statut, forme de la réponse. Secrets masqués. À coller tel quel dans un message d'aide."""
+    uid = session['user_id']
+    conn = get_db()
+    try:
+        _acct_models_ensure(conn)
+        connected = [p for p in ACCT_MODELS_PLATFORMS
+                     if conn.execute("SELECT 1 FROM account_credentials WHERE user_id = ? AND platform = ? AND ((api_key IS NOT NULL AND api_key != '') OR (platform = 'printables' AND email IS NOT NULL AND email != ''))",
+                                     (uid, p)).fetchone()]
+    finally:
+        conn.close()
+    only = (request.args.get('platform') or (request.json or {}).get('platform') if request.method == 'POST' else request.args.get('platform'))
+    if only in ACCT_MODELS_PLATFORMS:
+        connected = [p for p in connected if p == only]
+    _acct_probe_log.clear()
+    _acct_log(f"Rapport Mes likes / Mes créations — Stellio {CURRENT_VERSION} — comptes connectés : {connected or 'aucun'}")
+    summary = []
+    for p in connected:
+        res = _acct_sync_platform(uid, p)
+        for kind, (n, err) in res.items():
+            summary.append(f"  {ACCT_MODELS_PLATFORMS[p]['label']:<16} {kind:<10} {n:>4} modèle(s){('  ERREUR : ' + err) if err else ''}")
+    text = "RÉSUMÉ\n" + ("\n".join(summary) or "  (aucun compte connecté parmi les plateformes prises en charge)") + \
+           "\n\nDÉTAIL DES REQUÊTES\n" + "\n".join(_acct_probe_log)
+    return Response(text, mimetype='text/plain; charset=utf-8')
 
 
 @app.route('/api/files/repair', methods=['POST'])
@@ -18775,6 +20005,7 @@ def api_convert_file_batch():
                             raise _JobCancelled()
                         job['current'] = idx
                     r = _convert_single_file(p, target_format, delete_original, repair=repair, source_unit=source_unit)
+                    _journal_convert_results([r], user_id=job['user_id'])
                     with _split_jobs_lock:
                         job['results'].append(r)
                         job['done'] = idx
@@ -18800,6 +20031,7 @@ def api_convert_file_batch():
         return jsonify({"job_id": job_id, "total": len(paths)}), 202
 
     results = [_convert_single_file(p, target_format, delete_original, repair=repair, source_unit=source_unit) for p in paths]
+    _journal_convert_results(results)
     succeeded = sum(1 for r in results if r.get('success'))
     app_logger.info(f"[CONVERT-BATCH] {succeeded}/{len(results)} fichier(s) converti(s) avec succès")
     return jsonify({"success": True, "results": results, "converted": succeeded, "total": len(results)})
@@ -18940,7 +20172,7 @@ def _run_integrity_check(paths):
         integrity_check_state.update({
             'running': True, 'total': len(paths), 'checked': 0,
             'ok': 0, 'corrupted': 0, 'empty': 0, 'missing': 0,
-            'started_at': time.time(), 'finished_at': None, 'problems': []
+            'started_at': time.time(), 'finished_at': None, 'problems': [], 'cancel': False, 'cancelled': False
         })
 
     executor = ThreadPoolExecutor(max_workers=INTEGRITY_CHECK_WORKERS)
@@ -18968,6 +20200,12 @@ def _run_integrity_check(paths):
             break
 
     while pending:
+        if integrity_check_state.get('cancel'):
+            for _f in list(pending):
+                _f.cancel()
+            pending.clear()
+            retry_paths = []
+            break
         done, _ = futures_wait(list(pending.keys()), timeout=1, return_when=FIRST_COMPLETED)
         now = time.time()
         to_process = list(done) + [
@@ -19008,6 +20246,8 @@ def _run_integrity_check(paths):
 
     # Seconde chance pour les fichiers lents : un seul à la fois (plus de contention CPU/disque), délai x3
     for p in retry_paths:
+        if integrity_check_state.get('cancel'):
+            break
         retry_timeout = get_integrity_timeout(p) * 3
         retry_pool = ThreadPoolExecutor(max_workers=1)
         try:
@@ -19033,12 +20273,13 @@ def _run_integrity_check(paths):
                 })
 
     with integrity_check_lock:
+        integrity_check_state['cancelled'] = bool(integrity_check_state.get('cancel'))
         integrity_check_state['running'] = False
         integrity_check_state['finished_at'] = time.time()
         _save_integrity_report()
 
     app_logger.info(
-        f"[INTEGRITY] Vérification terminée: {integrity_check_state['ok']} OK, "
+        f"[INTEGRITY] Vérification {'annulée' if integrity_check_state['cancelled'] else 'terminée'}: {integrity_check_state['ok']} OK, "
         f"{integrity_check_state['corrupted'] + integrity_check_state['empty']} corrompu(s), "
         f"{integrity_check_state['missing']} manquant(s)"
     )
@@ -19066,12 +20307,23 @@ def api_integrity_check():
     return jsonify({"started": True, "total": len(paths)})
 
 
+@app.route('/api/integrity/cancel', methods=['POST'])
+@login_required
+def api_integrity_cancel():
+    """Arrête la vérification après les fichiers en cours ; ce qui a déjà été vérifié reste dans le rapport."""
+    with integrity_check_lock:
+        if integrity_check_state.get('running'):
+            integrity_check_state['cancel'] = True
+    return jsonify({"success": True})
+
+
 @app.route('/api/integrity/progress', methods=['GET'])
 @login_required
 def api_integrity_progress():
     with integrity_check_lock:
         return jsonify({
             'running': integrity_check_state['running'],
+            'cancelled': bool(integrity_check_state.get('cancelled')),
             'total': integrity_check_state['total'],
             'checked': integrity_check_state['checked'],
             'ok': integrity_check_state['ok'],
@@ -20110,6 +21362,100 @@ def build_diagnostic_zip_bytes():
     buf.seek(0)
     filename = f"stellio-diagnostic-{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.zip"
     return buf.getvalue(), filename
+
+
+def _log_tail_counts(max_bytes=400_000):
+    """Compte les erreurs et avertissements dans la fin du fichier de log (sans le charger en entier)."""
+    out = {'errors': 0, 'warnings': 0, 'last_errors': []}
+    try:
+        size = os.path.getsize(LOG_FILE)
+        with open(LOG_FILE, 'rb') as fh:
+            fh.seek(max(0, size - max_bytes))
+            text = fh.read().decode('utf-8', errors='replace')
+        for line in text.splitlines():
+            if ' ERROR ' in line or '[ERROR]' in line:
+                out['errors'] += 1
+                out['last_errors'].append(line.strip()[:240])
+            elif ' WARNING ' in line or '[WARNING]' in line:
+                out['warnings'] += 1
+        out['last_errors'] = out['last_errors'][-5:]
+    except Exception:
+        pass
+    return out
+
+
+def _collect_health_info():
+    """Instantané de l'état de Stellio (mémoire, miniatures, tâches, disque), sans secret ni chemin personnel."""
+    info = {'version': CURRENT_VERSION, 'uptime_s': int(time.time() - _APP_STARTED)}
+    try:
+        import psutil
+        proc = psutil.Process()
+        vm = psutil.virtual_memory()
+        info['memory'] = {
+            'process_mb': round(proc.memory_info().rss / (1024 ** 2)),
+            'system_total_gb': round(vm.total / (1024 ** 3), 1),
+            'system_used_percent': vm.percent,
+        }
+        info['threads'] = proc.num_threads()
+    except Exception:
+        info['memory'] = None
+    try:
+        info['thumbnails'] = {
+            'queued': thumb_generation_queue.qsize(),
+            'workers': _thumb_allowed_workers(),
+            'paused': bool(_thumb_paused),
+            'mode': _thumb_perf_cache.get('mode'),
+            'abandoned_renders': _live_thumb_ghosts(),
+            'cpu_render_busy': _raster_cpu_lock.locked(),
+        }
+    except Exception:
+        info['thumbnails'] = None
+    with _split_jobs_lock:
+        info['jobs'] = {
+            'split_running': sum(1 for j in _split_jobs.values() if j.get('state') == 'running'),
+            'convert_running': sum(1 for j in _convert_jobs.values() if j.get('state') == 'running'),
+            'integrity_running': bool(integrity_check_state.get('running')),
+        }
+    try:
+        total, used, free = shutil.disk_usage(DATA_DIR)
+        info['disk'] = {'free_gb': round(free / (1024 ** 3), 1), 'total_gb': round(total / (1024 ** 3), 1)}
+    except Exception:
+        info['disk'] = None
+    try:
+        info['database_mb'] = round(os.path.getsize(DB_PATH) / (1024 ** 2), 1)
+    except Exception:
+        info['database_mb'] = None
+    try:
+        info['cache_files'] = len(load_file_cache() or [])
+    except Exception:
+        info['cache_files'] = None
+    info['log'] = _log_tail_counts()
+    warnings = []
+    mem = info.get('memory') or {}
+    if mem.get('process_mb') and mem['process_mb'] > 2500:
+        warnings.append('memory_high')
+    if mem.get('system_used_percent') and mem['system_used_percent'] > 90:
+        warnings.append('system_memory_high')
+    if (info.get('thumbnails') or {}).get('abandoned_renders', 0) >= THUMB_MAX_GHOSTS:
+        warnings.append('thumb_ghosts')
+    if (info.get('disk') or {}).get('free_gb') is not None and info['disk']['free_gb'] < 1:
+        warnings.append('disk_low')
+    if info['log']['errors'] > 50:
+        warnings.append('many_errors')
+    info['warnings'] = warnings
+    return info
+
+
+@app.route('/api/diagnostic/health', methods=['GET'])
+@login_required
+def api_diagnostic_health():
+    if _is_viewer():
+        return jsonify({"error": "Accès refusé"}), 403
+    try:
+        return jsonify(_collect_health_info())
+    except Exception as e:
+        app_logger.error(f"[HEALTH] {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 
 @app.route('/api/logs/export', methods=['GET'])
@@ -21177,12 +22523,18 @@ def api_client_update(cid):
 def api_client_delete(cid):
     conn = get_db()
     try:
+        _ensure_quote_columns()
+        rows = _trash_snapshot(conn, 'clients', 'id = ? AND user_id = ?', (cid, session['user_id']))
+        tid = None
+        if rows:
+            qids = [r[0] for r in conn.execute("SELECT id FROM quotes WHERE client_id = ? AND user_id = ?", (cid, session['user_id'])).fetchall()]
+            tid = trash_record(conn, session['user_id'], 'client', rows[0].get('name') or f"#{cid}", {'row': rows[0], 'quote_ids': qids})
         conn.execute("DELETE FROM clients WHERE id = ? AND user_id = ?", (cid, session['user_id']))
         conn.execute("UPDATE quotes SET client_id = 0 WHERE client_id = ? AND user_id = ?", (cid, session['user_id']))
         conn.commit()
     finally:
         conn.close()
-    return jsonify({"success": True})
+    return jsonify({"success": True, "trash_key": f"row:{tid}" if tid else None})
 
 
 @app.route('/api/clients/import-from-quotes', methods=['POST'])
@@ -21477,17 +22829,17 @@ def api_quote_history_delete(qid):
     path = _stored_quote_path(row)
     conn = get_db()
     try:
+        keys = row.keys()
+        label = (row['number'] if 'number' in keys and row['number'] else '') or f"#{qid}"
+        who = (row['client'] if 'client' in keys else '') or ''
+        tid = trash_record(conn, session['user_id'], 'quote', f"{label}" + (f" — {who}" if who else ''),
+                           {'row': dict(row)}, detail=(row['doc_type'] if 'doc_type' in keys and row['doc_type'] else 'quote'),
+                           files=[path, _quote_payload_path(row)])
         conn.execute("DELETE FROM quotes WHERE id = ? AND user_id = ?", (qid, session['user_id']))
         conn.commit()
     finally:
         conn.close()
-    for p in (path, _quote_payload_path(row)):
-        if p and os.path.isfile(p):
-            try:
-                os.remove(p)
-            except OSError:
-                pass
-    return jsonify({"success": True})
+    return jsonify({"success": True, "trash_key": f"row:{tid}"})
 
 
 @app.route('/api/quote/export-native', methods=['POST'])
@@ -21768,7 +23120,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "0.9.8"
+CURRENT_VERSION = "0.9.9"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -21921,6 +23273,27 @@ def api_changelog_latest():
         }), 200
     except Exception as e:
         app_logger.error(f"[API] Erreur changelog: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+
+@app.route('/api/changelog/recent', methods=['GET'])
+@login_required
+def api_changelog_recent():
+    """Dernières versions du changelog dans la langue demandée (?lang=xx, sinon langue enregistrée), repli en puis fr."""
+    try:
+        limit = max(1, min(request.args.get('limit', 3, type=int), 10))
+        lang = (request.args.get('lang') or get_user_lang() or 'fr').strip().lower()[:2]
+        out = []
+        for entry in load_changelog()[:limit]:
+            by_lang = entry.get('items') or {}
+            if isinstance(by_lang, dict):
+                items = by_lang.get(lang) or by_lang.get('en') or by_lang.get('fr') or []
+            else:
+                items = by_lang
+            out.append({'version': entry['version'], 'items': items})
+        return jsonify({'current': CURRENT_VERSION, 'releases': out, 'lang': lang}), 200
+    except Exception as e:
+        app_logger.error(f"[API] Erreur changelog recent: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 
@@ -25079,11 +26452,17 @@ def api_orders_update(jid):
 def api_orders_delete(jid):
     conn = get_db()
     try:
+        rows = _trash_snapshot(conn, 'print_jobs', 'id = ? AND user_id = ?', (jid, session['user_id']))
+        tid = None
+        if rows:
+            r = rows[0]
+            tid = trash_record(conn, session['user_id'], 'order', r.get('part') or r.get('client') or f"#{jid}", {'row': r},
+                               detail=str(r.get('client') or ''))
         conn.execute("DELETE FROM print_jobs WHERE id=? AND user_id=?", (jid, session['user_id']))
         conn.commit()
     finally:
         conn.close()
-    return jsonify({'success': True})
+    return jsonify({'success': True, 'trash_key': f"row:{tid}" if tid else None})
 
 
 @app.route('/api/orders/from-quote/<int:qid>', methods=['POST'])
@@ -32889,11 +34268,17 @@ def api_delete_manual_spool(spool_id):
     try:
         conn = get_db()
         try:
+            rows = _trash_snapshot(conn, 'manual_filament_spools', 'id = ? AND user_id = ?', (spool_id, session['user_id']))
+            tid = None
+            if rows:
+                r = rows[0]
+                label = r.get('name') or ' '.join(str(x) for x in (r.get('material'), r.get('color_hex')) if x) or f"#{spool_id}"
+                tid = trash_record(conn, session['user_id'], 'spool', label, {'row': r})
             conn.execute("DELETE FROM manual_filament_spools WHERE id=? AND user_id=?", (spool_id, session['user_id']))
             conn.commit()
         finally:
             conn.close()
-        return jsonify({"success": True}), 200
+        return jsonify({"success": True, "trash_key": f"row:{tid}" if tid else None}), 200
     except Exception as e:
         app_logger.error(f"[API] Erreur non gérée: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
@@ -33893,8 +35278,6 @@ if __name__ in ('__main__', 'stellio_main'):
         try:
             if on_status:
                 on_status('database')
-            if IS_DEMO:
-                _demo_bootstrap()
             process_generation_queue()
             process_slice_estimate_queue()
             _start_timelapse_worker()

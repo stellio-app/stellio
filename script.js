@@ -309,6 +309,9 @@ let _activityPingOn = false;
     ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach(ev =>
         window.addEventListener(ev, ping, { passive: true, capture: true }));
 })();
+const _readonlyToastText = () => window.STELLIO_DEMO
+    ? _t3('demo.readonly_toast', 'Démo : lecture seule')
+    : _t3('viewer.readonly_toast', 'Compte invité : lecture seule');
 const _nativeFetch = window.fetch.bind(window);
 window.fetch = function (input, init = {}) {
     const url = typeof input === 'string' ? input : (input?.url || '');
@@ -325,9 +328,10 @@ window.fetch = function (input, init = {}) {
     const _p = _nativeFetch(input, init);
     if (!isSameOrigin || method === 'GET') return _p;
     return _p.then((res) => {
-        if (res.status === 403 && IS_VIEWER && Date.now() - _viewerToastAt > 3000) {
+        // les signaux automatiques (activité, présence) ne sont jamais une action de l'utilisateur : pas de toast pour eux
+        if (res.status === 403 && IS_VIEWER && !/\/api\/(ui\/activity|presence\/heartbeat)/.test(url) && Date.now() - _viewerToastAt > 3000) {
             _viewerToastAt = Date.now();
-            try { showToast(_t3('viewer.readonly_toast', 'Compte invité : lecture seule'), 'warning'); } catch (e) { /* ignore */ }
+            try { showToast(_readonlyToastText(), 'warning'); } catch (e) { /* ignore */ }
         }
         return res;
     });
@@ -737,13 +741,14 @@ async function importBackup(file) {
     const formData = new FormData();
     formData.append('backup', file);
 
-    const prog = showProgressToast(I18N.t('toast.progress_uploading', { pct: 0 }));
+    const upHandle = {};
+    const prog = showProgressToast(I18N.t('toast.progress_uploading', { pct: 0 }), () => upHandle.abort && upHandle.abort());
     prog.set(0);
     try {
         const { ok: res_ok, data } = await postFormWithProgress(`${API}/api/backup/import`, formData, (loaded, total) => {
-            if (loaded == null) prog.set(null, I18N.t('toast.backup_importing') || I18N.t('toast.progress_processing'));
+            if (loaded == null) { prog.hideCancel(); prog.set(null, I18N.t('toast.backup_importing') || I18N.t('toast.progress_processing')); }
             else { const p = Math.round(loaded / total * 100); prog.set(p, I18N.t('toast.progress_uploading', { pct: p })); }
-        });
+        }, upHandle);
         const res = { ok: res_ok };
         if (res.ok && data.success) {
             showBackupRestartPopup();
@@ -751,6 +756,7 @@ async function importBackup(file) {
             showToast(data.error || I18N.t('toast.error') || 'Erreur', 'error');
         }
     } catch (err) {
+        if (err && err.name === 'AbortError') { showToast(I18N.t('toast.upload_cancelled'), 'warning'); return; }
         showToast(I18N.t('toast.connection_error') || 'Erreur de connexion', 'error');
     } finally {
         prog.close();
@@ -1641,6 +1647,8 @@ function pollIntegrityProgress() {
                 clearInterval(integrityPollInterval);
                 document.getElementById('integrity-check-btn').disabled = false;
                 document.getElementById('integrity-progress-container').classList.add('hidden');
+                const cb = document.getElementById('integrity-cancel-btn'); if (cb) cb.disabled = false;
+                if (data.cancelled) showToast(I18N.t('integrity.cancelled', { checked: data.checked || 0, total: data.total || 0 }), 'warning');
             }
         } catch (err) {
             clearInterval(integrityPollInterval);
@@ -1837,6 +1845,12 @@ function setupKeyboardShortcuts() {
             } else {
                 search?.blur();
             }
+            return;
+        }
+
+        if (!typing && !ctrlOrCmd && !e.altKey && e.key.toLowerCase() === 'j' && !document.querySelector('.modal:not(.hidden)')) {
+            e.preventDefault();
+            openJournalModal();
             return;
         }
 
@@ -2040,6 +2054,17 @@ cards.forEach(card => observer.observe(card));
 }
 
 
+// ---- Palettes : constantes déclarées avant leur premier usage (applyThemeOnLoad)
+const STELLIO_PALETTES = [{"id":"midnight","mode":"dark","swatch":["#0f131f","#1c243b","#5b8cff"]},{"id":"ocean","mode":"dark","swatch":["#0e1c20","#1a343d","#0ea5b7"]},{"id":"forest","mode":"dark","swatch":["#121c15","#223528","#22a55b"]},{"id":"dusk","mode":"dark","swatch":["#16111d","#291f37","#8b5cf6"]},{"id":"rose","mode":"dark","swatch":["#1d1116","#36212a","#db2777"]},{"id":"ember","mode":"dark","swatch":["#1d1511","#362821","#ea6a0a"]},{"id":"nord","mode":"dark","swatch":["#13161b","#242932","#5e81ac"]},{"id":"paper","mode":"light","swatch":["#f8f6f1","#fdfdfc","#b45309"]},{"id":"mint","mode":"light","swatch":["#f2f8f5","#fcfdfc","#059669"]},{"id":"sky","mode":"light","swatch":["#f0f4f9","#fbfcfe","#2563eb"]},{"id":"lavender","mode":"light","swatch":["#f4f1f8","#fcfcfd","#7c3aed"]},{"id":"sakura","mode":"light","swatch":["#f9f1f4","#fdfbfc","#db2777"]}];
+const THEME_COLOR_GROUPS = [
+    { key: 'settings.colors_group_bg', vars: [['--bg-primary', 'settings.color_bg_primary'], ['--bg-secondary', 'settings.color_bg_secondary'], ['--bg-tertiary', 'settings.color_bg_tertiary'], ['--bg-card', 'settings.color_bg_card'], ['--bg-hover', 'settings.color_bg_hover'], ['--bg-input', 'settings.color_bg_input']] },
+    { key: 'settings.colors_group_text', vars: [['--text-primary', 'settings.color_text_primary'], ['--text-secondary', 'settings.color_text_secondary'], ['--text-muted', 'settings.color_text_muted']] },
+    { key: 'settings.colors_group_border', vars: [['--border', 'settings.color_border'], ['--border-light', 'settings.color_border_light']] },
+    { key: 'settings.colors_group_status', vars: [['--success', 'settings.color_success'], ['--warning', 'settings.color_warning'], ['--danger', 'settings.color_danger']] },
+];
+const _THEME_VARS = THEME_COLOR_GROUPS.flatMap(g => g.vars.map(v => v[0]));
+const _HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
 (function applyThemeOnLoad() {
 const savedTheme = localStorage.getItem('stellio-theme') || 'auto';
 const savedFabricant = localStorage.getItem('stellio-fabricant') || 'stellio';
@@ -2050,6 +2075,7 @@ document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
 document.documentElement.setAttribute('data-theme', savedTheme);
 }
 document.documentElement.setAttribute('data-fabricant', savedFabricant);
+try { applyPalette(_getPaletteId()); applyCustomColors(_getCustomColors()); applyBackgroundImage(); } catch (_) {}
 const savedCustomAccent = localStorage.getItem('stellio-custom-accent');
 if (savedCustomAccent) applyCustomAccent(savedCustomAccent);
 console.log('[Theme] ✅ Appliqué:', savedTheme, savedFabricant);
@@ -2413,7 +2439,7 @@ function renderPrintQueue() {
         <div class="print-queue-item" draggable="true" data-path="${escapeHtml(item.path)}" data-idx="${idx}">
             <i class="fa-solid fa-grip-vertical print-queue-drag-handle"></i>
             <span class="print-queue-position">${idx + 1}</span>
-            <div class="print-queue-thumb">${thumbSrc ? `<img src="${thumbSrc}" loading="lazy">` : '<i class="fa-solid fa-cube"></i>'}</div>
+            <div class="print-queue-thumb clickable" role="button" tabindex="0" title="${escapeHtml(_t3('queue.open_viewer', 'Afficher dans le viewer 3D'))}" onclick="open3DViewer('${escapeJs(name)}', '${escapeJs(item.path)}', ${(file && file.plate_count) || 1})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">${thumbSrc ? `<img src="${thumbSrc}" loading="lazy" draggable="false">` : '<i class="fa-solid fa-cube"></i>'}</div>
             <div class="print-queue-info">
                 <div class="print-queue-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
             </div>
@@ -2741,6 +2767,10 @@ function showDemoBanner() {
     b.innerHTML = '<i class="fa-solid fa-flask"></i> <span data-i18n="demo.banner">' + _t3('demo.banner', 'Démo publique en lecture seule : explorez librement, rien ne peut être modifié.') + '</span> <a href="https://github.com/stellio-app/stellio" target="_blank" rel="noopener" data-i18n="demo.get">' + _t3('demo.get', 'Obtenir Stellio') + '</a>';
     document.body.prepend(b);
     document.body.classList.add('has-demo-banner');
+    const syncBannerH = () => document.documentElement.style.setProperty('--demo-banner-h', `${b.offsetHeight || 32}px`);
+    syncBannerH();
+    window.addEventListener('resize', syncBannerH);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncBannerH);
 }
 async function checkAuth(preFetchedFirstLaunch = null) {
 try {
@@ -2836,6 +2866,9 @@ startTigerTagAutoRefresh();
 if (!IS_VIEWER) checkSpoolmanAutoDiscovery();
 if (!IS_VIEWER) checkSlicerDefaultDiscovery();
 if (!IS_VIEWER) checkWhatsNew();
+if (window.UpdateManager) window.UpdateManager.onAppShown();
+refreshTrashBadge();
+if (!IS_VIEWER) refreshAcctModelsNav();
 if (!IS_VIEWER) checkMissedBackupOnStartup();
 if (!IS_VIEWER) checkFeedbackUpdatesOnStartup();
 if (!IS_VIEWER) checkModulesOnStartup();
@@ -2877,6 +2910,7 @@ startAutoFileMonitor();
 startThumbFailureMonitor();
 }
 async function checkWhatsNew() {
+    if (window.STELLIO_DEMO) return;   // démo publique : pas de « Quoi de neuf »
     try {
         const res = await fetch(`${API}/api/changelog/latest`);
         if (!res.ok) return;
@@ -2919,7 +2953,7 @@ document.addEventListener('visibilitychange', _syncAppHeight);
 _syncAppHeight();
 
 // --- Tableau de bord ---
-const DASHBOARD_WIDGET_IDS = ['printers', 'cameras', 'stock', 'restock', 'history', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'timelapses', 'mqtt', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues', 'gcodes'];
+const DASHBOARD_WIDGET_IDS = ['printers', 'cameras', 'stock', 'restock', 'history', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'timelapses', 'mqtt', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues', 'gcodes', 'health', 'trash', 'changelog'];
 let _dashboardEditMode = false;
 let _draggedDashboardWidget = null;
 
@@ -2959,6 +2993,9 @@ async function loadDashboard(force = false) {
     _loadDashboardBackups();
     _loadDashboardIssues();
     _loadDashboardGcodes();
+    _loadDashboardHealth();
+    _loadDashboardTrash();
+    _loadDashboardChangelog();
 }
 window.loadDashboard = loadDashboard;
 
@@ -4172,7 +4209,9 @@ window._clientsRenderForm = async function (cid) {
     if (del) del.onclick = async () => {
         const ok = await showConfirmDialog(_t3('clients.confirm_delete', 'Supprimer ce client ? Ses devis et factures sont conservés.'), { danger: true, confirmLabel: I18N.t('actions.delete') });
         if (!ok) return;
-        await fetch(`${API}/api/clients/${cid}`, { method: 'DELETE' });
+        const _cr = await fetch(`${API}/api/clients/${cid}`, { method: 'DELETE' });
+        const _cd = await _cr.json().catch(() => ({}));
+        showTrashedToast(I18N.t('trash.kind_client'), _cd.trash_key, () => _clientsRenderList());
         _clientsRenderList();
     };
 };
@@ -4409,7 +4448,8 @@ window._orderTrack = async function (id) {
 };
 window._orderDelete = async function (id) {
     if (!await showConfirmDialog(_t3('orders.delete_confirm', 'Supprimer cette commande ?'), { danger: true })) return;
-    await _ordersApi('DELETE', `/api/orders/${id}`);
+    const _od = await _ordersApi('DELETE', `/api/orders/${id}`);
+    showTrashedToast(I18N.t('trash.kind_order'), _od && _od.data && _od.data.trash_key, () => _ordersRender());
     _ordersRender();
 };
 
@@ -4561,7 +4601,8 @@ window.deleteStoredQuote = async function (id) {
     try {
         const res = await fetch(`${API}/api/quotes/${id}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('delete');
-        showToast(_t2('quotes.deleted', 'Devis supprimé'), 'success');
+        const _qd = await res.json().catch(() => ({}));
+        showTrashedToast(I18N.t('trash.kind_quote'), _qd.trash_key, async () => { await _renderQuoteHistory(); _loadDashboardQuotes(); });
         await _renderQuoteHistory();
         _loadDashboardQuotes();
     } catch (err) {
@@ -5596,6 +5637,7 @@ let _cmdPaletteResults = [];
 function _staticCommands() {
     const cmds = [
         { icon: 'fa-plus', label: _t2('cmdpalette.add_source', 'Ajouter une source'), action: () => openModal('modal-select-type') },
+        { icon: 'fa-clock-rotate-left', label: _t2('cmdpalette.journal', 'Journal des opérations'), action: () => openJournalModal() },
         { icon: 'fa-square-check', label: _t2('cmdpalette.select_files', 'Sélectionner plusieurs fichiers'), action: () => document.getElementById('select-all-btn')?.click() },
         { icon: 'fa-map-signs', label: _t2('tour.settings_restart', 'Relancer la visite guidée'), action: () => startTour() },
         { icon: 'fa-comment-dots', label: _t2('nav.feedback', 'Suggestions & bugs'), action: () => openFeedbackModal() },
@@ -6191,6 +6233,7 @@ async function _loadDashboardRecentFiles() {
 }
 
 function showToast(message, type = 'info') {
+if (window.STELLIO_DEMO && message === 'Compte invité : lecture seule') message = _readonlyToastText();   // message du serveur (403) : en démo, on parle de la démo
 const translated = I18N.has(`toast.${message}`) ? I18N.t(`toast.${message}`) : message;
 const container = document.getElementById('toast-container');
 if (!container) return;
@@ -6234,22 +6277,25 @@ function showProgressToast(text, onCancel) {
             if (pct == null) { track.classList.add('indeterminate'); bar.style.width = '35%'; }
             else { track.classList.remove('indeterminate'); bar.style.width = Math.max(0, Math.min(100, pct)) + '%'; }
         },
+        hideCancel() { const cb = toast.querySelector('.toast-progress-cancel'); if (cb) cb.remove(); },
         close() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s ease'; setTimeout(() => toast.remove(), 300); }
     };
 }
 
 /** POST multipart avec progression d'envoi (fetch ne l'expose pas). Renvoie { ok, status, data }. */
-function postFormWithProgress(url, formData, onProgress) {
+function postFormWithProgress(url, formData, onProgress, handle) {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', url);
         xhr.withCredentials = true;
         const csrf = _getCsrfCookie();
         if (csrf) xhr.setRequestHeader('X-CSRF-Token', csrf);
-        xhr.addEventListener('load', () => { if (xhr.status === 403 && IS_VIEWER) { try { showToast(_t3('viewer.readonly_toast', 'Compte invité : lecture seule'), 'warning'); } catch (e) { } } });
+        xhr.addEventListener('load', () => { if (xhr.status === 403 && IS_VIEWER) { try { showToast(_readonlyToastText(), 'warning'); } catch (e) { } } });
         xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded, e.total); };
         xhr.upload.onload = () => { if (onProgress) onProgress(null, null); };
+        if (handle) handle.abort = () => xhr.abort();
         xhr.onerror = () => reject(new Error('network'));
+        xhr.onabort = () => { const e = new Error('abort'); e.name = 'AbortError'; reject(e); };
         xhr.onload = () => {
             let data = {};
             try { data = JSON.parse(xhr.responseText); } catch (e) { }
@@ -6266,6 +6312,7 @@ function postFormWithProgress(url, formData, onProgress) {
  * @param {number} undoSeconds - Durée pendant laquelle l'annulation reste possible (fenêtre serveur).
  */
 function showUndoToast(message, batchId, undoSeconds = 300) {
+    if (typeof refreshTrashBadge === 'function') refreshTrashBadge();
     const container = document.getElementById('toast-container');
     if (!container || !batchId) { showToast(message, 'success'); return; }
     const toast = document.createElement('div');
@@ -11504,7 +11551,257 @@ document.documentElement.style.removeProperty('--accent-hover');
 document.documentElement.style.removeProperty('--accent-glow');
 }
 
+// ---- Palettes et couleurs personnalisées (0.9.9)
+function _getPaletteId() {
+    let id = 'default';
+    try { id = localStorage.getItem('stellio-palette') || 'default'; } catch (_) {}
+    return STELLIO_PALETTES.some(p => p.id === id) ? id : 'default';
+}
+function _getCustomColors() {
+    try {
+        const o = JSON.parse(localStorage.getItem('stellio-custom-colors') || '{}') || {};
+        const out = {};
+        _THEME_VARS.forEach(v => { if (_HEX_RE.test(o[v] || '')) out[v] = o[v]; });
+        return out;
+    } catch (_) { return {}; }
+}
+function _saveCustomColors(map) {
+    try {
+        if (Object.keys(map).length) localStorage.setItem('stellio-custom-colors', JSON.stringify(map));
+        else localStorage.removeItem('stellio-custom-colors');
+    } catch (_) {}
+}
+function applyCustomColors(map) {
+    const st = document.documentElement.style;
+    _THEME_VARS.forEach(v => st.removeProperty(v));
+    Object.entries(map || {}).forEach(([k, v]) => { if (_THEME_VARS.includes(k) && _HEX_RE.test(v)) st.setProperty(k, v); });
+}
+function _syncThemeColorMeta() {
+    try {
+        const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg-primary').trim();
+        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg || '#1a1d2e');
+    } catch (_) {}
+}
+function applyPalette(id) {
+    const pal = STELLIO_PALETTES.find(p => p.id === id);
+    if (pal) document.documentElement.setAttribute('data-palette', pal.id);
+    else document.documentElement.removeAttribute('data-palette');
+    applyTheme(localStorage.getItem('stellio-theme') || 'auto');
+    _syncThemeColorMeta();
+}
+function _cssColorToHex(val) {
+    val = (val || '').trim();
+    if (_HEX_RE.test(val)) return val.toLowerCase();
+    if (/^#[0-9a-fA-F]{3}$/.test(val)) return ('#' + val.slice(1).split('').map(c => c + c).join('')).toLowerCase();
+    const m = val.match(/rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)/);
+    return m ? '#' + [m[1], m[2], m[3]].map(n => Number(n).toString(16).padStart(2, '0')).join('') : '#000000';
+}
+
+// ---- Image de fond (0.9.9) : stockée sur l'appareil (localStorage), réduite à 1920 px max
+const BG_IMG_KEY = 'stellio-bg-image', BG_OPT_KEY = 'stellio-bg-opts';
+function _getBgOpts() {
+    const d = { dim: 50, blur: 0, alpha: 80 };
+    try { const o = JSON.parse(localStorage.getItem(BG_OPT_KEY) || '{}') || {}; ['dim', 'blur', 'alpha'].forEach(k => { if (Number.isFinite(+o[k])) d[k] = +o[k]; }); } catch (_) {}
+    d.dim = Math.max(0, Math.min(90, d.dim)); d.blur = Math.max(0, Math.min(20, d.blur)); d.alpha = Math.max(40, Math.min(100, d.alpha));
+    return d;
+}
+function applyBackgroundImage() {
+    let url = null;
+    try { url = localStorage.getItem(BG_IMG_KEY); } catch (_) {}
+    const root = document.documentElement;
+    let layer = document.getElementById('app-bg');
+    if (!url || !url.startsWith('data:image/')) {
+        root.classList.remove('has-bg-image');
+        layer?.remove();
+        return false;
+    }
+    const o = _getBgOpts();
+    if (!layer) { layer = document.createElement('div'); layer.id = 'app-bg'; layer.setAttribute('aria-hidden', 'true'); document.body.prepend(layer); }
+    layer.style.backgroundImage = `url("${url}")`;
+    layer.style.filter = o.blur ? `blur(${o.blur}px)` : 'none';
+    layer.style.setProperty('--bg-image-dim', String(o.dim / 100));
+    root.style.setProperty('--bg-surface-alpha', o.alpha + '%');
+    root.classList.add('has-bg-image');
+    return true;
+}
+function _downscaleImageToDataUrl(file, maxSide = 1920, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+        const img = new Image(), src = URL.createObjectURL(file);
+        img.onload = () => {
+            try {
+                const k = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+                const cv = document.createElement('canvas');
+                cv.width = Math.max(1, Math.round(img.naturalWidth * k)); cv.height = Math.max(1, Math.round(img.naturalHeight * k));
+                cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+                resolve(cv.toDataURL('image/jpeg', quality));
+            } catch (e) { reject(e); } finally { URL.revokeObjectURL(src); }
+        };
+        img.onerror = () => { URL.revokeObjectURL(src); reject(new Error('image')); };
+        img.src = src;
+    });
+}
+async function setBackgroundImageFromFile(file) {
+    if (!file || !file.type.startsWith('image/')) { showToast(_t3('settings.bg_invalid', "Ce fichier n'est pas une image"), 'error'); return; }
+    if (file.size > 25 * 1024 * 1024) { showToast(_t3('settings.bg_too_big', 'Image trop lourde (25 Mo maximum)'), 'error'); return; }
+    try {
+        let url = await _downscaleImageToDataUrl(file);
+        if (url.length > 3.5e6) url = await _downscaleImageToDataUrl(file, 1280, 0.7);   // garde de la place dans le stockage du navigateur
+        localStorage.setItem(BG_IMG_KEY, url);
+        applyBackgroundImage(); refreshBackgroundControls();
+        showToast(_t3('settings.bg_applied', 'Image de fond appliquée'), 'success');
+    } catch (err) {
+        try { localStorage.removeItem(BG_IMG_KEY); } catch (_) {}
+        showToast(_t3('settings.bg_failed', "Impossible d'enregistrer cette image (trop lourde pour le navigateur ?)"), 'error');
+    }
+}
+function removeBackgroundImage() {
+    try { localStorage.removeItem(BG_IMG_KEY); } catch (_) {}
+    applyBackgroundImage(); refreshBackgroundControls();
+    showToast(_t3('settings.bg_removed', 'Image de fond supprimée'), 'info');
+}
+function refreshBackgroundControls() {
+    const has = document.documentElement.classList.contains('has-bg-image');
+    const o = _getBgOpts();
+    const prev = document.getElementById('bg-image-preview');
+    if (prev) { prev.style.backgroundImage = has ? `url("${localStorage.getItem(BG_IMG_KEY)}")` : 'none'; prev.classList.toggle('hidden', !has); }
+    document.getElementById('bg-image-remove')?.classList.toggle('hidden', !has);
+    document.getElementById('bg-image-opts')?.classList.toggle('hidden', !has);
+    [['bg-dim', o.dim], ['bg-blur', o.blur], ['bg-alpha', o.alpha]].forEach(([id, v]) => { const el = document.getElementById(id); if (el) { el.value = v; const out = document.getElementById(id + '-val'); if (out) out.textContent = v; } });
+}
+function _wireBackgroundControls() {
+    document.getElementById('bg-image-pick')?.addEventListener('click', () => document.getElementById('bg-image-file')?.click());
+    document.getElementById('bg-image-file')?.addEventListener('change', async (e) => { const f = e.target.files?.[0]; e.target.value = ''; await setBackgroundImageFromFile(f); });
+    document.getElementById('bg-image-remove')?.addEventListener('click', removeBackgroundImage);
+    [['bg-dim', 'dim'], ['bg-blur', 'blur'], ['bg-alpha', 'alpha']].forEach(([id, key]) => {
+        document.getElementById(id)?.addEventListener('input', (e) => {
+            const o = _getBgOpts(); o[key] = +e.target.value;
+            try { localStorage.setItem(BG_OPT_KEY, JSON.stringify(o)); } catch (_) {}
+            const out = document.getElementById(id + '-val'); if (out) out.textContent = e.target.value;
+            applyBackgroundImage();
+        });
+    });
+}
+
+function buildThemeEditor() {
+    const host = document.getElementById('theme-editor');
+    if (!host) return;
+    const T = (k, f) => escapeHtml(_t3(k, f));
+    host.innerHTML = `
+        <div class="settings-row" style="flex-direction:column; align-items:stretch;">
+            <label data-i18n="settings.palette_title">Palettes de couleurs</label>
+            <p class="settings-hint" style="margin-top:2px;" data-i18n="settings.palette_hint">Choisir une palette remplace le fond, le texte et les bordures (et l'accent, sauf si une couleur de marque est sélectionnée ci-dessus). Elle impose son mode clair ou sombre.</p>
+            <div class="palette-grid" id="palette-grid"></div>
+        </div>
+        <div class="settings-row" style="flex-direction:column; align-items:stretch;">
+            <label data-i18n="settings.bg_title">Image de fond</label>
+            <p class="settings-hint" style="margin-top:2px;" data-i18n="settings.bg_hint">Affiche une image derrière l'application (enregistrée sur cet appareil, réduite à 1920 px). Les fenêtres restent opaques pour rester lisibles.</p>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <div id="bg-image-preview" class="bg-image-preview hidden"></div>
+                <input type="file" id="bg-image-file" accept="image/*" class="hidden">
+                <button type="button" class="btn btn-ghost btn-sm" id="bg-image-pick"><i class="fa-solid fa-image"></i> <span data-i18n="settings.bg_choose">Choisir une image</span></button>
+                <button type="button" class="btn btn-ghost btn-sm hidden" id="bg-image-remove" style="color:var(--danger);"><i class="fa-solid fa-trash"></i> <span data-i18n="settings.bg_remove">Supprimer</span></button>
+            </div>
+            <div id="bg-image-opts" class="bg-image-opts hidden">
+                <label><span data-i18n="settings.bg_dim">Assombrissement</span> <output id="bg-dim-val"></output> %<input type="range" id="bg-dim" min="0" max="90" step="5"></label>
+                <label><span data-i18n="settings.bg_blur">Flou</span> <output id="bg-blur-val"></output> px<input type="range" id="bg-blur" min="0" max="20" step="1"></label>
+                <label><span data-i18n="settings.bg_panels">Opacité des panneaux</span> <output id="bg-alpha-val"></output> %<input type="range" id="bg-alpha" min="40" max="100" step="5"></label>
+            </div>
+        </div>
+        <details class="settings-row" style="display:block;" id="color-editor-details">
+            <summary style="cursor:pointer; font-weight:600;" data-i18n="settings.colors_custom_title">Personnaliser toutes les couleurs</summary>
+            <p class="settings-hint" data-i18n="settings.colors_custom_hint">Chaque couleur modifiée est repérée par un point et s'applique par-dessus la palette. L'accent se règle avec « Couleur personnalisée » ci-dessus.</p>
+            <div id="color-editor"></div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+                <button type="button" class="btn btn-ghost btn-sm" id="colors-reset-all"><i class="fa-solid fa-rotate-left"></i> <span data-i18n="settings.colors_reset_all">Tout réinitialiser</span></button>
+                <button type="button" class="btn btn-ghost btn-sm" id="colors-export"><i class="fa-solid fa-file-export"></i> <span data-i18n="settings.colors_export">Exporter</span></button>
+                <button type="button" class="btn btn-ghost btn-sm" id="colors-import"><i class="fa-solid fa-file-import"></i> <span data-i18n="settings.colors_import">Importer</span></button>
+            </div>
+            <textarea id="colors-io" class="color-io-area" spellcheck="false" data-i18n-placeholder="settings.colors_io_placeholder" placeholder="Collez ici un thème exporté, puis cliquez sur Importer"></textarea>
+        </details>`;
+    _wireBackgroundControls();
+    const grid = document.getElementById('palette-grid');
+    const cards = [{ id: 'default', swatch: null }, ...STELLIO_PALETTES];
+    grid.innerHTML = cards.map(p => {
+        const sw = p.swatch ? p.swatch.map(c => `<span style="background:${c}"></span>`).join('') : '<span style="background:#1a1d23"></span><span style="background:#2d3240"></span><span style="background:#4ea1d3"></span>';
+        const mode = p.mode === 'light' ? T('settings.palette_mode_light', 'Clair') : p.mode === 'dark' ? T('settings.palette_mode_dark', 'Sombre') : T('settings.palette_mode_follow', 'Selon le mode');
+        return `<button type="button" class="palette-card" data-palette-id="${p.id}"><div class="palette-swatch">${sw}</div><strong data-i18n="palette.${p.id}">${p.id}</strong><small>${mode}</small></button>`;
+    }).join('');
+    grid.querySelectorAll('.palette-card').forEach(card => card.addEventListener('click', () => {
+        const id = card.dataset.paletteId;
+        try { if (id === 'default') localStorage.removeItem('stellio-palette'); else localStorage.setItem('stellio-palette', id); } catch (_) {}
+        _saveCustomColors({});           // une nouvelle palette repart de ses propres couleurs
+        applyCustomColors({});
+        applyPalette(id);
+        refreshThemeEditor();
+    }));
+    const ed = document.getElementById('color-editor');
+    ed.innerHTML = THEME_COLOR_GROUPS.map(g => `<div class="color-editor-group" data-i18n="${g.key}"></div>` + g.vars.map(([v, lk]) => `
+        <div class="color-editor-row" data-var="${v}"><label data-i18n="${lk}"></label><span class="color-hex"></span>
+            <input type="color" value="#000000" aria-label="${v}">
+            <button type="button" class="btn btn-ghost btn-sm color-reset" title="${T('settings.custom_accent_reset', 'Réinitialiser')}"><i class="fa-solid fa-rotate-left"></i></button></div>`).join('')).join('');
+    ed.querySelectorAll('.color-editor-row').forEach(row => {
+        const v = row.dataset.var, input = row.querySelector('input');
+        input.addEventListener('input', () => {
+            const map = _getCustomColors(); map[v] = input.value; _saveCustomColors(map);
+            document.documentElement.style.setProperty(v, input.value);
+            row.classList.add('modified'); row.querySelector('.color-hex').textContent = input.value; _syncThemeColorMeta();
+        });
+        row.querySelector('.color-reset').addEventListener('click', () => {
+            const map = _getCustomColors(); delete map[v]; _saveCustomColors(map);
+            document.documentElement.style.removeProperty(v); refreshThemeEditor(); _syncThemeColorMeta();
+        });
+    });
+    document.getElementById('colors-reset-all').addEventListener('click', () => {
+        _saveCustomColors({}); applyCustomColors({}); refreshThemeEditor(); _syncThemeColorMeta();
+        showToast(_t3('settings.colors_reset_done', 'Couleurs personnalisées réinitialisées'), 'info');
+    });
+    document.getElementById('colors-export').addEventListener('click', async () => {
+        const data = { stellio_theme: 1, palette: _getPaletteId(), mode: localStorage.getItem('stellio-theme') || 'auto', accent: localStorage.getItem('stellio-custom-accent') || null, colors: _getCustomColors() };
+        const txt = JSON.stringify(data, null, 2);
+        const area = document.getElementById('colors-io'); area.value = txt;
+        try { await navigator.clipboard.writeText(txt); showToast(_t3('settings.colors_copied', 'Thème copié dans le presse-papiers'), 'success'); }
+        catch (_) { area.select(); showToast(_t3('settings.colors_copy_manual', 'Thème affiché : copiez-le manuellement'), 'info'); }
+    });
+    document.getElementById('colors-import').addEventListener('click', () => {
+        try {
+            const d = JSON.parse(document.getElementById('colors-io').value);
+            if (!d || d.stellio_theme !== 1) throw new Error('format');
+            const palId = STELLIO_PALETTES.some(p => p.id === d.palette) ? d.palette : 'default';
+            if (palId === 'default') localStorage.removeItem('stellio-palette'); else localStorage.setItem('stellio-palette', palId);
+            if (['dark', 'light', 'auto'].includes(d.mode)) { localStorage.setItem('stellio-theme', d.mode); const s = document.getElementById('theme-selector'); if (s) s.value = d.mode; }
+            if (_HEX_RE.test(d.accent || '')) { localStorage.setItem('stellio-custom-accent', d.accent); applyCustomAccent(d.accent); const ap = document.getElementById('custom-accent-picker'); if (ap) ap.value = d.accent; }
+            const colors = {}; _THEME_VARS.forEach(v => { if (_HEX_RE.test((d.colors || {})[v] || '')) colors[v] = d.colors[v]; });
+            _saveCustomColors(colors); applyPalette(palId); applyCustomColors(colors); refreshThemeEditor();
+            showToast(_t3('settings.colors_imported', 'Thème importé'), 'success');
+        } catch (_) { showToast(_t3('settings.colors_import_error', 'Thème invalide : vérifiez le texte collé'), 'error'); }
+    });
+    if (window.I18N && typeof I18N.apply === 'function') { try { I18N.apply(host); } catch (_) {} }
+    else host.querySelectorAll('[data-i18n]').forEach(el => { const v = I18N.t(el.dataset.i18n); if (v && v !== el.dataset.i18n) el.textContent = v; });
+    host.querySelectorAll('[data-i18n-placeholder]').forEach(el => { const v = I18N.t(el.dataset.i18nPlaceholder); if (v && v !== el.dataset.i18nPlaceholder) el.placeholder = v; });
+    refreshThemeEditor();
+    refreshBackgroundControls();
+}
+
+function refreshThemeEditor() {
+    const id = _getPaletteId(), custom = _getCustomColors();
+    document.querySelectorAll('#palette-grid .palette-card').forEach(c => c.classList.toggle('active', c.dataset.paletteId === id));
+    const cs = getComputedStyle(document.documentElement);
+    document.querySelectorAll('#color-editor .color-editor-row').forEach(row => {
+        const v = row.dataset.var, hex = custom[v] || _cssColorToHex(cs.getPropertyValue(v));
+        row.querySelector('input').value = hex; row.querySelector('.color-hex').textContent = hex;
+        row.classList.toggle('modified', !!custom[v]);
+    });
+    const sel = document.getElementById('theme-selector');
+    if (sel) {                                      // une palette impose son mode : on l'affiche et on verrouille le sélecteur
+        const pal = STELLIO_PALETTES.find(p => p.id === id);
+        sel.disabled = !!pal;
+        sel.value = pal ? pal.mode : (localStorage.getItem('stellio-theme') || 'auto');
+    }
+}
+
 function applyTheme(mode) {
+const _pal = (typeof _getPaletteId === 'function') ? STELLIO_PALETTES.find(p => p.id === _getPaletteId()) : null;
+if (_pal) { document.documentElement.setAttribute('data-theme', _pal.mode); return; }
 if (mode === 'auto') {
 const isLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
 document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
@@ -11534,6 +11831,7 @@ themeSelector.value = savedTheme;
 fabricantSelector.value = savedFabricant;
 applyTheme(savedTheme);
 applyFabricant(savedFabricant);
+buildThemeEditor();
 
 let savedCustomAccent = localStorage.getItem('stellio-custom-accent') || null;
 const accentPicker = document.getElementById('custom-accent-picker');
@@ -11556,6 +11854,8 @@ themeSelector.addEventListener('change', (e) => {
 const mode = e.target.value;
 localStorage.setItem('stellio-theme', mode);
 applyTheme(mode);
+refreshThemeEditor();
+_syncThemeColorMeta();
 });
 fabricantSelector.addEventListener('change', (e) => {
 const fabricant = e.target.value;
@@ -14252,7 +14552,8 @@ async function deleteManualSpoolFromInventory(spoolId) {
     try {
         const res = await fetch(`${API}/api/filament/manual/${spoolId}`, { method: 'DELETE' });
         if (!res.ok) { showToast(_t2('toast.error', 'Erreur'), 'error'); return; }
-        showToast(_t2('spoolman.spool_deleted', 'Bobine supprimée'), 'success');
+        const _sd = await res.json().catch(() => ({}));
+        showTrashedToast(I18N.t('trash.kind_spool'), _sd.trash_key, () => loadManualSpoolInventory());
         await loadManualSpoolInventory();
     } catch (err) {
         showToast(_t2('toast.connection_error', 'Erreur de connexion'), 'error');
@@ -14275,12 +14576,14 @@ function applyRoleUI(user) {
     window.IS_VIEWER = IS_VIEWER;
     document.body.classList.toggle('role-viewer', IS_VIEWER);
     let banner = document.getElementById('viewer-banner');
-    if (IS_VIEWER) {
+    if (IS_VIEWER && !window.STELLIO_DEMO) {   // démo : le bandeau bleu du haut suffit, pas de pastille
         if (!banner) {
             banner = document.createElement('div');
             banner.id = 'viewer-banner';
             banner.className = 'viewer-banner';
-            document.body.appendChild(banner);
+            const _stk = document.getElementById('bottom-stack');
+            if (_stk) _stk.insertBefore(banner, document.getElementById('scroll-to-top'));   // juste au-dessus du bouton « retour en haut »
+            else document.body.appendChild(banner);
         }
         banner.innerHTML = `<i class="fa-solid fa-eye"></i> <span>${escapeHtml(_t3('viewer.banner', 'Mode invité — lecture seule'))}</span>`;
     } else if (banner) {
@@ -16002,6 +16305,8 @@ function renderTigerTagGrid(spools) {
 window.renderTigerTagGrid = renderTigerTagGrid;
 
 async function loadAccountBadges() {
+if (typeof loadPrintablesAccount === 'function') loadPrintablesAccount();
+if (typeof refreshAcctModelsNav === 'function') refreshAcctModelsNav(true);
 for (const platform of ['thingiverse']) {
 try {
 const res = await fetch(`${API}/api/accounts/${platform}`);
@@ -16413,6 +16718,8 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         if (page === 'settings') { loadSources(); loadRemoteInstances(); loadGuests(); loadPushSettings(); loadMqttSettings(); loadSmtpSettings(); loadWorkshopSettings(); balanceSettingsColumns(); }
         else stopDiagnosticConsolePoll();
         if (page === 'spoolman') loadSpoolmanPage();
+        if (page === 'acct-likes') refreshAcctModelsNav().then(() => loadAcctModels('likes'));
+        if (page === 'acct-creations') refreshAcctModelsNav().then(() => loadAcctModels('creations'));
         if (page === 'stats') loadStats();
         if (page === 'history') { loadHistory(); loadDownloadHistory(); }
         if (page === 'gallery') loadGalleryPage();
@@ -16517,13 +16824,14 @@ async function _uploadDroppedFiles(fileList) {
     const files = [...fileList];
     const formData = new FormData();
     files.forEach(f => formData.append('files', f));
-    const prog = showProgressToast(I18N.t('toast.progress_uploading', { pct: 0 }));
+    const upHandle = {};
+    const prog = showProgressToast(I18N.t('toast.progress_uploading', { pct: 0 }), () => upHandle.abort && upHandle.abort());
     prog.set(0);
     try {
         const { ok, data } = await postFormWithProgress(`${API}/api/files/upload-drop`, formData, (loaded, total) => {
-            if (loaded == null) prog.set(null, I18N.t('toast.progress_processing'));
+            if (loaded == null) { prog.hideCancel(); prog.set(null, I18N.t('toast.progress_processing')); }
             else { const p = Math.round(loaded / total * 100); prog.set(p, I18N.t('toast.progress_uploading', { pct: p })); }
-        });
+        }, upHandle);
         if (!ok) {
             showToast(data.error || I18N.t('toast.connection_error'), 'error');
             return;
@@ -16541,6 +16849,7 @@ async function _uploadDroppedFiles(fileList) {
             showToast(`${data.skipped.length} ${_t2('toast.drop_upload_skipped', "fichier(s) ignoré(s) (format non supporté)")}`, 'warning');
         }
     } catch (err) {
+        if (err && err.name === 'AbortError') { showToast(I18N.t('toast.upload_cancelled'), 'warning'); return; }
         console.error('[DropUpload] Erreur:', err);
         showToast(I18N.t('toast.connection_error'), 'error');
     } finally {
@@ -20692,7 +21001,23 @@ const UpdateManager = {
 lastCheck: 0,
 checkInterval: 6 * 60 * 60 * 1000,
 currentVersion: '1.0.0',
+_timerStarted: false,
+_initRunning: false,
+// Vrai seulement quand l'utilisateur est connecté (écran d'authentification masqué).
+_isAuthenticated() {
+const a = document.getElementById('auth-screen');
+return !!a && a.classList.contains('hidden');
+},
+// Appelé par showApp() : la vérification part dès que l'utilisateur est connecté, même après plusieurs minutes sur l'écran de connexion.
+onAppShown() {
+if (window.STELLIO_DEMO || (typeof IS_VIEWER !== 'undefined' && IS_VIEWER)) return;
+this.init();
+},
 async init() {
+if (window.STELLIO_DEMO) return;   // démo publique : ni changelog GitHub, ni bandeau de mise à jour
+if (!this._isAuthenticated() || this._initRunning) return;
+this._initRunning = true;
+try {
 console.log('[UpdateManager] 🔄 Initialisation...');
 try {
 const res = await fetch(`${API}/api/update/version`);
@@ -20705,10 +21030,17 @@ console.log(`[UpdateManager] Version actuelle: ${this.currentVersion}`);
 console.warn('[UpdateManager] Impossible de récupérer la version');
 }
 await this.checkAndShowChangelog();
-setTimeout(() => this.checkForUpdates(true), 5000);
+await this.checkForUpdates(true);
+if (!this._timerStarted) {
+this._timerStarted = true;
 setInterval(() => this.checkForUpdates(false), this.checkInterval);
+}
+} finally {
+this._initRunning = false;
+}
 },
 async checkAndShowChangelog() {
+if (!this._isAuthenticated()) return;
 try {
 const lastSeenVersion = localStorage.getItem('stellio-last-seen-version');
 const response = await fetch('https://api.github.com/repos/stellio-app/stellio/releases/latest');
@@ -20725,6 +21057,7 @@ console.warn('[UpdateManager] Erreur check changelog:', e);
 }
 },
 async checkForUpdates(showModal = true) {
+if (!this._isAuthenticated()) return;
 try {
 console.log('[UpdateManager] 🔍 Vérification des mises à jour...');
 const res = await fetch(`${API}/api/update/check`);
@@ -20749,6 +21082,8 @@ console.error('[UpdateManager] Erreur:', err);
 }
 },
 showUpdateModal(updateInfo) {
+if (document.querySelector('.update-modal-overlay')) return;   // une seule fenêtre de mise à jour à la fois
+document.querySelectorAll('.toast.update-toast').forEach(el => el.remove());
 const overlay = document.createElement('div');
 overlay.className = 'modal-overlay update-modal-overlay';
 overlay.style.cssText = `position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.75); display: flex; align-items: center; justify-content: center; z-index: 100000; backdrop-filter: blur(5px); animation: fadeIn 0.3s ease;`;
@@ -20760,10 +21095,12 @@ const releaseUrl = updateInfo.release_url || `https://github.com/stellio-app/ste
 modal.innerHTML = `<div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;"><div style="width: 56px; height: 56px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #00d9ff); border-radius: 12px; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-download" style="font-size: 28px; color: white;"></i></div><div style="flex: 1;"><h3 style="margin: 0; color: var(--text-primary, #e6e6e6); font-size: 22px; font-weight: 700;">${I18N.t('update.available_title')}</h3><p style="margin: 4px 0 0 0; color: var(--text-muted, #9ca3af); font-size: 14px;">${I18N.t('update.version_transition', { from: updateInfo.current_version, to: updateInfo.version })}</p></div></div><div style="background: var(--bg-primary, #15181e); padding: 20px; border-radius: 12px; margin-bottom: 24px; max-height: 300px; overflow-y: auto; border: 1px solid var(--border, #2a2f3a);"><h4 style="margin: 0 0 12px 0; color: var(--accent, #4ea1d3); font-size: 14px; text-transform: uppercase; letter-spacing: 1px;"><i class="fa-solid fa-list-check"></i> ${I18N.t('update.release_notes')}</h4><div style="color: var(--text-secondary, #b0b3b8); font-size: 14px; line-height: 1.7;" class="release-notes-content">${releaseNotes}</div></div><div id="update-progress-container" style="display: none; margin-bottom: 24px; padding: 16px; background: var(--bg-primary, #15181e); border-radius: 12px; border: 1px solid var(--border, #2a2f3a);"><div style="display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center;"><span style="color: var(--text-secondary, #b0b3b8); font-size: 13px; font-weight: 500;"><i class="fa-solid fa-download"></i> ${I18N.t('update.downloading')}</span><span id="update-percent" style="color: var(--accent, #4ea1d3); font-size: 14px; font-weight: 700;">0%</span></div><div style="height: 8px; background: var(--bg-tertiary, #2a2f3a); border-radius: 4px; overflow: hidden;"><div id="update-bar" style="height: 100%; background: linear-gradient(90deg, var(--accent, #4ea1d3), #00d9ff); width: 0%; transition: width 0.3s ease; border-radius: 4px;"></div></div></div><div style="display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap;">${!hasInstaller ? `<a href="${releaseUrl}" target="_blank" style="padding: 12px 24px; border: none; border-radius: 10px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #3d8fb8); color: white; cursor: pointer; font-weight: 600; font-size: 14px; box-shadow: 0 4px 12px rgba(78, 161, 211, 0.3); text-decoration: none; display: inline-flex; align-items: center; gap: 8px;"><i class="fa-solid fa-external-link-alt"></i> ${I18N.t('update.download_github')}</a>` : ''}<button id="update-later-btn" style="padding: 12px 24px; border: 1px solid var(--border, #363c4a); border-radius: 10px; background: var(--bg-tertiary, #2a2f3a); color: var(--text-primary, #e6e6e6); cursor: pointer; font-weight: 500; font-size: 14px;">${I18N.t('update.later')}</button>${hasInstaller ? `<button id="update-now-btn" style="padding: 12px 28px; border: none; border-radius: 10px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #3d8fb8); color: white; cursor: pointer; font-weight: 600; font-size: 14px; box-shadow: 0 4px 12px rgba(78, 161, 211, 0.3);"><i class="fa-solid fa-download"></i> ${I18N.t('update.update_now')}</button>` : ''}</div>`;
 overlay.appendChild(modal);
 document.body.appendChild(overlay);
-document.getElementById('update-later-btn').addEventListener('click', () => {
+const _closeUpdateOverlay = () => {
+overlay.classList.remove('update-modal-overlay');   // libère tout de suite le verrou « une seule fenêtre »
 overlay.style.animation = 'fadeOut 0.3s ease';
 setTimeout(() => overlay.remove(), 300);
-});
+};
+document.getElementById('update-later-btn').addEventListener('click', _closeUpdateOverlay);
 if (hasInstaller) {
 document.getElementById('update-now-btn').addEventListener('click', async () => {
 const btn = document.getElementById('update-now-btn');
@@ -20808,22 +21145,20 @@ document.getElementById('update-progress-container').style.display = 'none';
 });
 }
 overlay.addEventListener('click', (e) => {
-if (e.target === overlay) {
-overlay.style.animation = 'fadeOut 0.3s ease';
-setTimeout(() => overlay.remove(), 300);
-}
+if (e.target === overlay) _closeUpdateOverlay();
 });
 },
 showUpdateToast(updateInfo) {
+if (document.querySelector('.update-modal-overlay') || document.querySelector('.toast.update-toast')) return;
 const toast = document.createElement('div');
-toast.className = 'toast info';
-toast.style.cssText = `position: fixed; bottom: 24px; right: 24px; background: var(--bg-secondary, #1e2129); border: 1px solid var(--accent, #4ea1d3); padding: 16px 20px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); cursor: pointer; z-index: 9999; animation: slideInRight 0.3s ease; max-width: 350px;`;
+toast.className = 'toast info update-toast';
+toast.style.cssText = `background: var(--bg-secondary, #1e2129); border: 1px solid var(--accent, #4ea1d3); padding: 16px 20px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); cursor: pointer; z-index: 9999; animation: slideInRight 0.3s ease; max-width: 350px;`;
 toast.innerHTML = `<div style="display: flex; align-items: center; gap: 12px;"><div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #00d9ff); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><i class="fa-solid fa-download" style="font-size: 18px; color: white;"></i></div><div style="flex: 1; min-width: 0;"><div style="font-weight: 600; color: var(--text-primary, #e6e6e6); font-size: 14px;">${I18N.t('update.available_title')}</div><div style="font-size: 12px; color: var(--text-muted, #9ca3af); margin-top: 2px;">${I18N.t('update.toast_subtitle', { version: updateInfo.version })}</div></div></div>`;
 toast.addEventListener('click', () => {
 toast.remove();
 this.showUpdateModal(updateInfo);
 });
-document.body.appendChild(toast);
+(document.getElementById('bottom-stack') || document.body).appendChild(toast);
 setTimeout(() => {
 if (toast.parentNode) {
 toast.style.animation = 'slideOutRight 0.3s ease';
@@ -20869,9 +21204,7 @@ return text
 }
 };
 window.UpdateManager = UpdateManager;
-document.addEventListener('DOMContentLoaded', () => {
-setTimeout(() => UpdateManager.init(), 2000);
-});
+// Le démarrage est déclenché par showApp() (après authentification), plus par un minuteur au chargement de la page.
 if (!document.getElementById('update-animations')) {
 const style = document.createElement('style');
 style.id = 'update-animations';
@@ -21014,11 +21347,15 @@ function startDiagnosticConsolePoll() {
     if (diagConsoleInterval) return;
     pollDiagnosticConsole();
     diagConsoleInterval = setInterval(pollDiagnosticConsole, 2000);
+    refreshDiagnosticHealth();
+    if (diagHealthInterval) clearInterval(diagHealthInterval);
+    diagHealthInterval = setInterval(refreshDiagnosticHealth, 5000);
 }
 window.startDiagnosticConsolePoll = startDiagnosticConsolePoll;
 
 function stopDiagnosticConsolePoll() {
     if (diagConsoleInterval) { clearInterval(diagConsoleInterval); diagConsoleInterval = null; }
+    if (diagHealthInterval) { clearInterval(diagHealthInterval); diagHealthInterval = null; }
 }
 window.stopDiagnosticConsolePoll = stopDiagnosticConsolePoll;
 
@@ -21054,6 +21391,370 @@ async function pollDiagnosticConsole() {
     }
 }
 window.pollDiagnosticConsole = pollDiagnosticConsole;
+
+// ---- Journal des opérations (0.9.9)
+const _JOURNAL_ICONS = { delete: 'fa-trash-can', restore: 'fa-rotate-left', undo: 'fa-rotate-left', move: 'fa-folder-tree', rename: 'fa-pen', convert: 'fa-arrows-rotate', split: 'fa-table-cells', add: 'fa-plus' };
+
+function _journalFolder(p) {
+    if (!p) return '';
+    const parts = String(p).replace(/\\/g, '/').split('/').filter(Boolean);
+    return parts.length > 1 ? parts[parts.length - 2] : '';
+}
+
+async function openJournalModal() {
+    openModal('modal-journal');
+    await loadJournal();
+}
+window.openJournalModal = openJournalModal;
+
+async function loadJournal() {
+    const box = document.getElementById('journal-list');
+    if (!box) return;
+    const filter = document.getElementById('journal-filter')?.value || '';
+    try {
+        const res = await fetch(`${API}/api/journal${filter ? '?action=' + encodeURIComponent(filter) : ''}`);
+        if (!res.ok) { box.innerHTML = `<p class="settings-hint">${escapeHtml(_t3('settings.health_unavailable', 'Indisponible'))}</p>`; return; }
+        const data = await res.json();
+        const hint = document.getElementById('journal-hint');
+        if (hint) hint.textContent = I18N.t('journal.hint', { days: data.retention_days, trash_days: data.trash_days });
+        if (!data.entries.length) { box.innerHTML = `<p class="settings-hint" style="padding:12px;">${escapeHtml(_t3('journal.empty', 'Aucune opération enregistrée pour le moment.'))}</p>`; return; }
+        box.innerHTML = data.entries.map(e => {
+            const label = _t3('journal.action_' + e.action, e.action);
+            const when = new Date(e.ts * 1000).toLocaleString();
+            let detail = '';
+            if (e.action === 'rename' && e.detail) detail = `${escapeHtml(e.detail)} → ${escapeHtml(e.name)}`;
+            else if (e.action === 'move') detail = `${escapeHtml(_journalFolder(e.from_path))} → ${escapeHtml(_journalFolder(e.to_path))}`;
+            else if (e.detail) detail = escapeHtml(e.detail);
+            else if (e.from_path) detail = escapeHtml(_journalFolder(e.from_path));
+            const action = e.undone ? `<span class="journal-undone">${escapeHtml(_t3('journal.undone', 'Annulé'))}</span>`
+                : (e.can_undo ? `<button type="button" class="btn btn-ghost btn-sm" onclick="undoJournalEntry(${e.id}, this)"><i class="fa-solid fa-rotate-left"></i> ${escapeHtml(_t3('journal.undo_btn', 'Annuler'))}</button>` : '');
+            return `<div class="journal-row"><i class="fa-solid ${_JOURNAL_ICONS[e.action] || 'fa-circle'} journal-icon"></i>
+                <div class="journal-main"><strong title="${escapeHtml(e.name)}">${escapeHtml(e.name)}</strong><span class="journal-sub">${escapeHtml(label)}${detail ? ' · ' + detail : ''}</span></div>
+                <span class="journal-when">${escapeHtml(when)}</span><span class="journal-act">${action}</span></div>`;
+        }).join('');
+    } catch (_) {
+        box.innerHTML = `<p class="settings-hint">${escapeHtml(_t3('toast.connection_error', 'Erreur de connexion'))}</p>`;
+    }
+}
+window.loadJournal = loadJournal;
+
+async function undoJournalEntry(id, btn) {
+    if (btn) btn.disabled = true;
+    try {
+        const res = await fetch(`${API}/api/journal/undo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+        const d = await res.json().catch(() => ({}));
+        if (res.ok) { showToast(_t3('journal.undo_ok', 'Opération annulée'), 'success'); if (typeof loadFiles === 'function') loadFiles(); }
+        else showToast(d.error || _t3('journal.undo_failed', "Impossible d'annuler cette opération"), 'error');
+    } catch (_) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+    loadJournal();
+}
+window.undoJournalEntry = undoJournalEntry;
+
+// ---- Widgets 0.9.9 : santé, corbeille, nouveautés
+async function _loadDashboardHealth() {
+    const body = document.getElementById('dashboard-health-body');
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/api/diagnostic/health`, { cache: 'no-store' });
+        if (res.status === 403) { body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-lock"></i><p>${escapeHtml(_t3('dashboard.health_restricted', 'Réservé aux administrateurs'))}</p></div>`; return; }
+        if (!res.ok) throw new Error(res.status);
+        const d = await res.json();
+        const warns = Array.isArray(d.warnings) ? d.warnings : [];
+        const rows = _healthRows(d).slice(2, 9);   // sans version ni durée de fonctionnement (déjà visibles ailleurs)
+        const status = warns.length
+            ? `<div class="dashboard-health-status warn"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(I18N.t('dashboard.health_alerts', { n: warns.length }))}</div>`
+            : `<div class="dashboard-health-status ok"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(_t3('dashboard.health_ok', 'Tout va bien'))}</div>`;
+        body.innerHTML = status + rows.map(([k, v]) => `<div class="dashboard-health-row"><span>${escapeHtml(k)}</span><strong>${escapeHtml(String(v))}</strong></div>`).join('')
+            + `<div style="margin-top:8px;"><button type="button" class="btn btn-ghost btn-sm" onclick="document.querySelector('.nav-btn[data-page=\\'settings\\']')?.click()"><i class="fa-solid fa-stethoscope"></i> ${escapeHtml(_t3('dashboard.health_details', 'Détails dans Diagnostic'))}</button></div>`;
+    } catch (err) {
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${escapeHtml(I18N.t('toast.connection_error'))}</p></div>`;
+    }
+}
+
+// ---- Corbeille (devis, factures, clients, commandes, projets, bobines et fichiers)
+const _TRASH_ICONS = { files: 'fa-file', quote: 'fa-file-invoice', client: 'fa-address-book', order: 'fa-box', project: 'fa-diagram-project', spool: 'fa-circle-nodes' };
+let _trashItemsCache = [];
+
+function _trashKindLabel(it) {
+    if (it.kind === 'quote') return I18N.t(it.detail === 'invoice' ? 'trash.kind_invoice' : 'trash.kind_quote');
+    return I18N.t(`trash.kind_${it.kind}`);
+}
+function _trashLeft(it) {
+    if (it.seconds_left === null || it.seconds_left === undefined) return '';
+    if (it.seconds_left >= 86400) return I18N.t('trash.left_days', { n: Math.ceil(it.seconds_left / 86400) });
+    if (it.seconds_left >= 3600) return I18N.t('trash.left_hours', { n: Math.ceil(it.seconds_left / 3600) });
+    return I18N.t('trash.left_soon');
+}
+function _trashSub(it) {
+    const bits = [_trashKindLabel(it)];
+    if (it.kind === 'files' && it.count > 1) bits.push(it.names.slice(0, 3).join(', '));
+    else if (it.kind !== 'quote' && it.detail) bits.push(it.detail);
+    const left = _trashLeft(it);
+    if (left) bits.push(left);
+    return bits.join(' · ');
+}
+
+async function _fetchTrashItems() {
+    const res = await fetch(`${API}/api/trash/items`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(res.status);
+    const d = await res.json();
+    _trashItemsCache = d.items || [];
+    _updateTrashBadge(_trashItemsCache.length);
+    return d;
+}
+
+function _updateTrashBadge(n) {
+    const b = document.getElementById('trash-count');
+    if (!b) return;
+    b.textContent = n > 99 ? '99+' : String(n);
+    b.style.display = n > 0 ? '' : 'none';
+}
+async function refreshTrashBadge() {
+    if (typeof IS_VIEWER !== 'undefined' && IS_VIEWER) return;
+    try { await _fetchTrashItems(); } catch (_) { /* silencieux : simple compteur */ }
+}
+window.refreshTrashBadge = refreshTrashBadge;
+
+// Après un « Supprimer » : message + bouton Annuler (restaure depuis la corbeille) — remplace l'ancienne suppression définitive
+function showTrashedToast(name, trashKey, onRestored) {
+    refreshTrashBadge();
+    const msg = I18N.t('trash.moved', { name });
+    if (!trashKey) { showToast(msg, 'success'); return; }
+    showGenericUndoToast(msg, async () => {
+        const r = await fetch(`${API}/api/trash/restore`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: trashKey }) });
+        const d = await r.json().catch(() => ({}));
+        refreshTrashBadge();
+        if (r.ok && typeof onRestored === 'function') await onRestored();
+        return { success: r.ok, message: r.ok ? I18N.t('trash.restored', { name }) : (d.error || I18N.t('trash.error')) };
+    });
+}
+window.showTrashedToast = showTrashedToast;
+
+let _trashTimer = null;
+async function _loadDashboardTrash() {
+    const body = document.getElementById('dashboard-trash-body');
+    if (!body) return;
+    try {
+        const d = await _fetchTrashItems();
+        clearTimeout(_trashTimer);
+        const open = `<button type="button" class="btn btn-ghost btn-sm dashboard-trash-open" onclick="openTrashModal()"><i class="fa-solid fa-trash-can-arrow-up"></i> ${escapeHtml(I18N.t('dashboard.trash_open'))}</button>`;
+        if (!d.items.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty dashboard-widget-empty--ok"><i class="fa-solid fa-trash-can"></i><p>${escapeHtml(I18N.t('dashboard.trash_empty'))}</p></div>`;
+            return;
+        }
+        body.innerHTML = d.items.slice(0, 5).map(it => `<div class="dashboard-row"><div class="dashboard-row-body"><div class="dashboard-row-title" title="${escapeHtml(it.label)}">${escapeHtml(it.label)}</div>
+                <div class="dashboard-row-sub">${escapeHtml(_trashSub(it))}</div></div>
+                <div class="dashboard-row-meta"><button type="button" class="btn btn-ghost btn-sm" onclick="restoreTrashItem('${escapeJs(it.key)}', this)"><i class="fa-solid fa-rotate-left"></i> ${escapeHtml(I18N.t('trash.restore'))}</button></div></div>`).join('')
+            + `<div class="dashboard-trash-more">${open}</div>`;
+    } catch (err) {
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${escapeHtml(I18N.t('toast.connection_error'))}</p></div>`;
+    }
+}
+
+function _trashRefreshViews() {
+    if (document.getElementById('modal-trash') && !document.getElementById('modal-trash').classList.contains('hidden')) loadTrashModal();
+    if (document.getElementById('dashboard-trash-body')?.offsetParent) _loadDashboardTrash();
+    // les listes dont un élément vient de revenir
+    try { if (typeof loadFiles === 'function') loadFiles(); } catch (_) {}
+    try { if (typeof loadProjects === 'function' && document.getElementById('page-projects')?.classList.contains('active')) loadProjects(); } catch (_) {}
+    try { if (typeof _renderQuoteHistory === 'function' && document.getElementById('quote-history-list')?.offsetParent) _renderQuoteHistory(); } catch (_) {}
+    try { if (typeof loadManualSpoolInventory === 'function') loadManualSpoolInventory(); } catch (_) {}
+}
+
+async function restoreTrashItem(key, btn) {
+    if (btn) btn.disabled = true;
+    try {
+        const res = await fetch(`${API}/api/trash/restore`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) });
+        const d = await res.json().catch(() => ({}));
+        if (res.ok) {
+            const it = _trashItemsCache.find(i => i.key === key);
+            showToast(I18N.t('trash.restored', { name: (it && it.label) || d.label || '' }), 'success');
+        } else {
+            showToast(d.error || I18N.t('trash.error'), 'error');
+        }
+    } catch (_) { showToast(I18N.t('toast.connection_error'), 'error'); }
+    await refreshTrashBadge();
+    _trashRefreshViews();
+}
+window.restoreTrashItem = restoreTrashItem;
+window.restoreTrashBatch = (batchId, btn) => restoreTrashItem(`files:${batchId}`, btn);   // compatibilité
+
+async function purgeTrashItem(key) {
+    const it = _trashItemsCache.find(i => i.key === key);
+    if (!await showConfirmDialog(I18N.t('trash.confirm_purge', { name: it ? it.label : '' }), { danger: true, confirmLabel: I18N.t('trash.purge') })) return;
+    try {
+        const res = await fetch(`${API}/api/trash/purge`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) });
+        if (!res.ok) throw new Error(res.status);
+        showToast(I18N.t('trash.purged'), 'success');
+    } catch (_) { showToast(I18N.t('trash.error'), 'error'); }
+    await refreshTrashBadge();
+    _trashRefreshViews();
+}
+window.purgeTrashItem = purgeTrashItem;
+
+async function emptyTrash() {
+    if (!_trashItemsCache.length) return;
+    if (!await showConfirmDialog(I18N.t('trash.confirm_empty', { n: _trashItemsCache.length }), { danger: true, confirmLabel: I18N.t('trash.empty_all') })) return;
+    try {
+        const res = await fetch(`${API}/api/trash/purge`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ all: true }) });
+        if (!res.ok) throw new Error(res.status);
+        showToast(I18N.t('trash.purged'), 'success');
+    } catch (_) { showToast(I18N.t('trash.error'), 'error'); }
+    await refreshTrashBadge();
+    _trashRefreshViews();
+}
+window.emptyTrash = emptyTrash;
+
+async function saveTrashRetention(days) {
+    try {
+        await fetch(`${API}/api/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trash_retention_days: parseInt(days, 10) }) });
+        await loadTrashModal();
+    } catch (_) { showToast(I18N.t('toast.connection_error'), 'error'); }
+}
+window.saveTrashRetention = saveTrashRetention;
+
+async function openTrashModal() {
+    openModal('modal-trash');
+    await loadTrashModal();
+}
+window.openTrashModal = openTrashModal;
+
+async function loadTrashModal() {
+    const box = document.getElementById('trash-list');
+    if (!box) return;
+    try {
+        const d = await _fetchTrashItems();
+        const sel = document.getElementById('trash-retention');
+        if (sel) sel.value = String(d.retention_days);
+        const hint = document.getElementById('trash-hint');
+        if (hint) hint.textContent = d.retention_days > 0 ? I18N.t('trash.hint', { days: d.retention_days }) : I18N.t('trash.hint_forever');
+        const emptyBtn = document.getElementById('trash-empty-btn');
+        if (emptyBtn) emptyBtn.disabled = !d.items.length;
+        if (!d.items.length) {
+            box.innerHTML = `<div class="dashboard-widget-empty dashboard-widget-empty--ok"><i class="fa-solid fa-trash-can"></i><p>${escapeHtml(I18N.t('trash.empty'))}</p></div>`;
+            return;
+        }
+        box.innerHTML = d.items.map(it => `<div class="trash-row">
+            <div class="trash-row-icon"><i class="fa-solid ${_TRASH_ICONS[it.kind] || 'fa-file'}"></i></div>
+            <div class="trash-row-body"><div class="trash-row-title" title="${escapeHtml(it.label)}">${escapeHtml(it.label)}</div>
+                <div class="trash-row-sub">${escapeHtml(_trashSub(it))} · ${escapeHtml(I18N.t('trash.deleted_on', { date: new Date(it.deleted_at * 1000).toLocaleDateString(I18N.lang || undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }))}</div></div>
+            <div class="trash-row-actions">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="restoreTrashItem('${escapeJs(it.key)}', this)"><i class="fa-solid fa-rotate-left"></i> <span>${escapeHtml(I18N.t('trash.restore'))}</span></button>
+                <button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="purgeTrashItem('${escapeJs(it.key)}')" title="${escapeHtml(I18N.t('trash.purge'))}" aria-label="${escapeHtml(I18N.t('trash.purge'))}"><i class="fa-solid fa-xmark"></i></button>
+            </div></div>`).join('');
+    } catch (_) {
+        box.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${escapeHtml(I18N.t('toast.connection_error'))}</p></div>`;
+    }
+}
+window.loadTrashModal = loadTrashModal;
+
+async function _loadDashboardChangelog() {
+    const body = document.getElementById('dashboard-changelog-body');
+    if (!body) return;
+    if (window.STELLIO_DEMO) { const w = document.getElementById('dashboard-widget-changelog'); if (w) w.style.display = 'none'; return; }   // démo : pas de nouveautés
+    try {
+        // la langue de l'interface (pas celle enregistrée côté serveur) pilote le texte
+        const res = await fetch(`${API}/api/changelog/recent?limit=3&lang=${encodeURIComponent(I18N.lang)}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(res.status);
+        const d = await res.json();
+        if (!d.releases.length) { body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-gift"></i><p>${escapeHtml(_t3('dashboard.changelog_empty', 'Aucune nouveauté'))}</p></div>`; return; }
+        body.innerHTML = d.releases.map((r, i) => `<details class="dashboard-changelog-release" ${i === 0 ? 'open' : ''}>
+            <summary><strong>v${escapeHtml(r.version)}</strong>${r.version === d.current ? ` <span class="dashboard-changelog-badge">${escapeHtml(_t3('dashboard.changelog_current', 'installée'))}</span>` : ''}</summary>
+            <ul>${r.items.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul></details>`).join('');
+    } catch (err) {
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${escapeHtml(I18N.t('toast.connection_error'))}</p></div>`;
+    }
+}
+// le texte du changelog suit la langue : on recharge le widget quand elle change
+document.addEventListener('i18n:ready', () => { if (document.getElementById('dashboard-changelog-body')) _loadDashboardChangelog(); });
+
+// ---- Santé de Stellio (0.9.9) : état en direct + rapport à coller dans un message d'aide
+let diagHealthInterval = null;
+let _diagHealthLast = null;
+
+function _healthDuration(sec) {
+    const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60);
+    return d ? `${d} j ${h} h` : (h ? `${h} h ${m} min` : `${m} min`);
+}
+
+function _healthRows(d) {
+    const t = (k, f) => _t3(k, f);
+    const rows = [[t('settings.health_version', 'Version'), d.version], [t('settings.health_uptime', 'En marche depuis'), _healthDuration(d.uptime_s || 0)]];
+    if (d.memory) {
+        rows.push([t('settings.health_mem_app', 'Mémoire utilisée par Stellio'), `${d.memory.process_mb} Mo`]);
+        rows.push([t('settings.health_mem_sys', 'Mémoire du système'), `${d.memory.system_used_percent} % (${d.memory.system_total_gb} Go)`]);
+    }
+    if (d.thumbnails) {
+        rows.push([t('settings.health_thumbs_queue', 'Miniatures en attente'), `${d.thumbnails.queued}${d.thumbnails.paused ? ' (' + t('settings.health_paused', 'en pause') + ')' : ''}`]);
+        rows.push([t('settings.health_thumbs_ghosts', 'Rendus abandonnés encore actifs'), String(d.thumbnails.abandoned_renders)]);
+    }
+    if (d.jobs) {
+        const n = (d.jobs.split_running || 0) + (d.jobs.convert_running || 0) + (d.jobs.integrity_running ? 1 : 0);
+        rows.push([t('settings.health_jobs', 'Tâches longues en cours'), String(n)]);
+    }
+    if (d.cache_files != null) rows.push([t('settings.health_files', 'Fichiers connus'), String(d.cache_files)]);
+    if (d.database_mb != null) rows.push([t('settings.health_db', 'Base de données'), `${d.database_mb} Mo`]);
+    if (d.disk) rows.push([t('settings.health_disk', 'Espace disque libre'), `${d.disk.free_gb} Go`]);
+    if (d.log) rows.push([t('settings.health_errors', 'Erreurs / avertissements récents'), `${d.log.errors} / ${d.log.warnings}`]);
+    return rows;
+}
+
+async function refreshDiagnosticHealth() {
+    const grid = document.getElementById('diag-health-grid');
+    const warn = document.getElementById('diag-health-warn');
+    if (!grid) return;
+    const section = document.getElementById('accord-diagnostic');
+    if (section && !section.classList.contains('open') && diagHealthInterval) return;
+    try {
+        const res = await fetch(`${API}/api/diagnostic/health`);
+        if (!res.ok) { grid.innerHTML = `<span class="settings-hint">${escapeHtml(_t3('settings.health_unavailable', 'Indisponible'))}</span>`; return; }
+        const d = await res.json();
+        _diagHealthLast = d;
+        grid.innerHTML = _healthRows(d).map(([k, v]) => `<div class="diag-health-row"><span>${escapeHtml(k)}</span><strong>${escapeHtml(String(v))}</strong></div>`).join('');
+        const msgs = (d.warnings || []).map(w => _t3('settings.health_warn_' + w, w));
+        if (warn) {
+            warn.classList.toggle('hidden', msgs.length === 0);
+            warn.innerHTML = msgs.map(m => `<div><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(m)}</div>`).join('');
+        }
+    } catch (_) { /* réseau coupé : on garde l'affichage précédent */ }
+}
+window.refreshDiagnosticHealth = refreshDiagnosticHealth;
+
+async function copyDiagnosticHealth(btn) {
+    if (!_diagHealthLast) await refreshDiagnosticHealth();
+    const d = _diagHealthLast;
+    if (!d) return;
+    const lines = ['Stellio — ' + _t3('settings.health_title', 'Santé de Stellio'), ..._healthRows(d).map(([k, v]) => `${k} : ${v}`)];
+    if ((d.warnings || []).length) lines.push(_t3('settings.health_alerts', 'Alertes') + ' : ' + d.warnings.join(', '));
+    if (d.log && d.log.last_errors && d.log.last_errors.length) lines.push('', ...d.log.last_errors);
+    const text = lines.join('\n');
+    try { await navigator.clipboard.writeText(text); }
+    catch (_) {
+        const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (__) {}
+        ta.remove();
+    }
+    showToast(_t3('settings.health_copied', 'Rapport copié'), 'success');
+}
+window.copyDiagnosticHealth = copyDiagnosticHealth;
+
+async function cancelIntegrityCheck(btn) {
+    if (btn) btn.disabled = true;
+    try { await fetch(`${API}/api/integrity/cancel`, { method: 'POST' }); } catch (_) {}
+}
+window.cancelIntegrityCheck = cancelIntegrityCheck;
+
+async function cancelThumbQueue(ev) {
+    if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+    const ok = await showConfirmDialog(_t3('thumbs.cancel_confirm', "Abandonner les miniatures en attente ? Les rendus déjà commencés se terminent ; les autres fichiers resteront sans miniature jusqu'au prochain scan."), { title: _t3('thumbs.cancel_title', 'Vider la file des miniatures'), confirmLabel: _t3('thumbs.cancel_btn', 'Vider la file') });
+    if (!ok) return;
+    try {
+        const res = await fetch(`${API}/api/thumb/cancel`, { method: 'POST' });
+        const d = await res.json().catch(() => ({}));
+        if (res.ok) showToast(I18N.t('thumbs.cancelled', { count: d.removed || 0 }), 'info');
+    } catch (_) {}
+}
+window.cancelThumbQueue = cancelThumbQueue;
 
 function clearDiagnosticConsole() {
     const box = document.getElementById('diag-console');
@@ -23910,17 +24611,7 @@ window.deleteProjectConfirm = async function (projectId, name) {
         const data = await res.json();
         if (!res.ok) { showToast(data.error || I18N.t('toast.error'), 'error'); return; }
         closeModal('modal-project-detail');
-        const undoData = data.undo;
-        showGenericUndoToast(`${I18N.t('projects.deleted')} : "${name}"`, undoData ? (async () => {
-            const r = await fetch(`${API}/api/projects/restore`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(undoData),
-            });
-            const d = await r.json().catch(() => ({}));
-            if (r.ok) await loadProjects();
-            return { success: r.ok, message: r.ok ? _t2('toast.project_restored', 'Projet restauré') : d.error };
-        }) : null);
+        showTrashedToast(name, data.trash_key, () => loadProjects());
         await loadProjects();
     } catch (err) {
         showToast(I18N.t('toast.connection_error'), 'error');
@@ -25388,3 +26079,255 @@ window.openStatusLinksModal = async function () {
     });
     refresh();
 };
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Mes likes / Mes créations : modèles des comptes externes (MakerWorld, Thingiverse)
+//  Une section par plateforme, affichée seulement si le compte est connecté ET qu'il contient des modèles.
+// ═══════════════════════════════════════════════════════════════════════════
+const ACCT_BRAND = {
+    makerworld:  { color: '#00ae42', icon: 'fa-cube' },
+    thingiverse: { color: '#3a8ee6', icon: 'fa-t' },
+    crealitycloud: { color: '#1ec0c0', icon: 'fa-cloud' },
+    snapmaker:   { color: '#e5483c', icon: 'fa-circle-nodes' },
+    nexprint:    { color: '#9b6bff', icon: 'fa-layer-group' },
+    printables:  { color: '#fa6831', icon: 'fa-print' },
+};
+let _acctOverview = null;
+let _acctPollTimer = null;
+const _acctKey = 'stellio_acct_collapsed';
+function _acctCollapsedState() { try { return JSON.parse(localStorage.getItem(_acctKey) || '{}') || {}; } catch (_) { return {}; } }
+function _acctSaveCollapsed(o) { try { localStorage.setItem(_acctKey, JSON.stringify(o)); } catch (_) {} }
+
+async function refreshAcctModelsNav(force) {
+    if (typeof IS_VIEWER !== 'undefined' && IS_VIEWER) return null;
+    try {
+        const res = await fetch(`${API}/api/account-models/overview${force ? '?force=1' : ''}`);
+        if (!res.ok) return null;
+        _acctOverview = await res.json();
+    } catch (_) { return null; }
+    const o = _acctOverview;
+    [['likes', o.likes_total], ['creations', o.creations_total]].forEach(([kind, total]) => {
+        const btn = document.getElementById(`nav-acct-${kind}-btn`);
+        if (!btn) return;
+        btn.style.display = total > 0 ? '' : 'none';
+        const badge = btn.querySelector('.acct-count');
+        if (badge) badge.textContent = total;
+        // La page affichée n'a plus rien à montrer : retour à la bibliothèque
+        if (total <= 0 && document.getElementById(`page-acct-${kind}`)?.classList.contains('active')) {
+            document.querySelector('.nav-btn[data-page="library"]')?.click();
+        }
+    });
+    // Synchronisation en cours : on relit régulièrement jusqu'à la fin
+    clearTimeout(_acctPollTimer);
+    if (o.platforms.some(p => p.syncing)) _acctPollTimer = setTimeout(async () => {
+        await refreshAcctModelsNav();
+        ['likes', 'creations'].forEach(k => { if (document.getElementById(`page-acct-${k}`)?.classList.contains('active')) loadAcctModels(k); });
+    }, 4000);
+    return o;
+}
+window.refreshAcctModelsNav = refreshAcctModelsNav;
+
+function _acctDate(ts) {
+    if (!ts) return '';
+    const d = new Date(ts + 'Z');
+    return isNaN(d) ? '' : d.toLocaleDateString();
+}
+
+function _acctCard(kind, p, it) {
+    const e = escapeHtml;
+    const brand = ACCT_BRAND[p.platform] || { color: 'var(--accent)' };
+    const thumb = it.thumb
+        ? `<img src="${e(it.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`
+        : '';
+    const badge = it.in_library
+        ? `<span class="acct-badge acct-in"><i class="fa-solid fa-check"></i> ${e(_t3('acct.in_library', 'Dans la bibliothèque'))}</span>` : '';
+    const who = (kind === 'likes' && it.creator)
+        ? `${e(_t3('acct.by', 'par'))} ${it.creator_url ? `<a href="${e(it.creator_url)}" target="_blank" rel="noopener noreferrer">${e(it.creator)}</a>` : e(it.creator)}`
+        : (kind === 'creations' ? e(_t3('acct.published_on', 'Publié sur {platform}', { platform: p.label })) : '');
+    const action = it.in_library
+        ? `<button class="btn btn-primary btn-sm" data-acct-open="${e(it.file_path)}" data-acct-name="${e(it.file_name)}"><i class="fa-solid fa-folder-open"></i> ${e(_t3('acct.open', 'Ouvrir'))}</button>`
+        : `<button class="btn btn-primary btn-sm" data-acct-dl="${e(it.url)}"><i class="fa-solid fa-download"></i> ${e(_t3('acct.download', 'Télécharger'))}</button>`;
+    const date = _acctDate(it.ts);
+    return `<div class="acct-card">
+        <div class="acct-th" style="--acct-c:${brand.color}"><i class="fa-solid ${brand.icon || 'fa-cube'} acct-th-ph"></i>${thumb}${badge}</div>
+        <div class="acct-in-body">
+            <div class="acct-nm" title="${e(it.title)}">${e(it.title || '—')}</div>
+            <div class="acct-cr">${who}</div>
+            <div class="acct-ac">${action}
+                <a class="btn btn-ghost btn-sm" href="${e(it.url)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i> <span class="acct-hide-sm">${e(_t3('acct.model_page', 'Page du modèle'))}</span></a>
+            </div>
+            <div class="acct-mt"><i class="fa-solid fa-heart"></i> ${it.likes || 0}${date ? ' · ' + e(date) : ''}</div>
+        </div>
+    </div>`;
+}
+
+async function loadAcctModels(kind) {
+    const host = document.getElementById(`acct-${kind}-sections`);
+    if (!host) return;
+    let data;
+    try {
+        const res = await fetch(`${API}/api/account-models/${kind}`);
+        if (!res.ok) return;
+        data = await res.json();
+    } catch (_) { return; }
+    const ov = _acctOverview || { platforms: [] };
+    const collapsed = _acctCollapsedState();
+    const search = (document.getElementById(`acct-${kind}-search`)?.value || '').trim().toLowerCase();
+    const onlyNew = document.getElementById(`acct-${kind}-filter`)?.value === 'new';
+    const html = [];
+    data.platforms.forEach(p => {
+        let items = p.items;
+        if (search) items = items.filter(i => (i.title + ' ' + i.creator).toLowerCase().includes(search));
+        if (onlyNew) items = items.filter(i => !i.in_library);
+        if (!p.items.length) return;                       // plateforme sans modèle : aucune section
+        if (!items.length) return;                         // filtre actif sans résultat : section masquée
+        const brand = ACCT_BRAND[p.platform] || { color: '#4ea1d3', icon: 'fa-cube' };
+        const meta = ov.platforms.find(x => x.platform === p.platform) || {};
+        const key = `${kind}:${p.platform}`;
+        const isCol = !!collapsed[key];
+        const missing = p.items.filter(i => !i.in_library).length;
+        const synced = meta.synced_at ? new Date(meta.synced_at * 1000).toLocaleString() : '';
+        html.push(`<div class="inv-section acct-section${isCol ? ' inv-collapsed' : ''}" data-acct-key="${key}" style="margin-top:20px;">
+            <div class="source-banner" style="background:linear-gradient(135deg, ${brand.color}22, ${brand.color}05); border:1px solid ${brand.color}55;">
+                <button type="button" class="inv-toggle" aria-expanded="${!isCol}"><i class="fa-solid fa-chevron-down"></i></button>
+                <div class="source-banner-icon" style="background:${brand.color}30; color:${brand.color};"><i class="fa-solid ${brand.icon}"></i></div>
+                <div style="flex:1; min-width:0;">
+                    <div style="font-weight:600; font-size:14px;">${escapeHtml(p.label)}</div>
+                    <div class="source-banner-sub">${escapeHtml(_t3('acct.count', '{n} modèles', { n: p.items.length }))}${synced ? ' · ' + escapeHtml(_t3('acct.synced', 'synchronisé le {date}', { date: synced })) : ''}${meta.syncing ? ' · ' + escapeHtml(_t3('acct.syncing', 'synchronisation…')) : ''}${meta.error ? ' · <span style="color:var(--warning)">' + escapeHtml(meta.error) + '</span>' : ''}</div>
+                </div>
+                <button class="btn btn-ghost btn-sm" data-acct-sync="${p.platform}"><i class="fa-solid fa-rotate"></i> <span class="acct-hide-sm">${escapeHtml(_t3('actions.refresh', 'Rafraîchir'))}</span></button>
+                ${missing ? `<button class="btn btn-primary btn-sm viewer-hide" data-acct-all="${p.platform}"><i class="fa-solid fa-download"></i> <span class="acct-hide-sm">${escapeHtml(_t3('acct.download_all', 'Tout télécharger ({n})', { n: missing }))}</span></button>` : ''}
+            </div>
+            <div class="acct-grid">${items.map(i => _acctCard(kind, p, i)).join('') || `<div class="acct-empty">${escapeHtml(_t3('acct.no_match', 'Aucun résultat'))}</div>`}</div>
+        </div>`);
+    });
+    const filtered = !!(search || onlyNew);
+    host.innerHTML = html.join('') || `<div class="acct-empty" style="margin-top:24px;">${escapeHtml(filtered ? _t3('acct.no_match', 'Aucun résultat') : _t3('acct.empty', 'Aucun modèle pour le moment. Connecte un compte dans Paramètres → Comptes externes.'))}</div>`;
+    host._acctData = data;
+}
+window.loadAcctModels = loadAcctModels;
+
+async function _acctDownloadUrls(urls) {
+    const sel = document.getElementById('download-source');
+    if (!urls.length) return;
+    if (!sel || !sel.value) { await loadDownloadSources(); }
+    const s = document.getElementById('download-source');
+    const opt = s && s.options[s.selectedIndex];
+    const sourceId = (opt && opt.dataset.baseSourceId) || (s && s.value);
+    if (!sourceId) { showToast(_t3('acct.no_source', 'Ajoute d\'abord un dossier source.'), 'warning'); return; }
+    const targetSubfolder = (opt && opt.dataset.relPath) || '';
+    let i = 0;
+    for (const url of urls) {
+        const downloadInfo = { id: ++downloadIdCounter, url, sourceId, targetSubfolder, preferredFormat: '', status: 'starting', filename: '', progress: 0, current: 0, total: 0, toastElement: null };
+        activeDownloads.push(downloadInfo);
+        createDownloadToast(downloadInfo);
+        await startDownload(downloadInfo);          // un à la fois : ménage les serveurs des plateformes
+        if (++i < urls.length) await new Promise(r => setTimeout(r, 1200));
+    }
+    ['likes', 'creations'].forEach(k => { if (document.getElementById(`page-acct-${k}`)?.classList.contains('active')) loadAcctModels(k); });
+}
+
+document.addEventListener('click', async (ev) => {
+    const t = ev.target;
+    const dl = t.closest('[data-acct-dl]');
+    if (dl) { await _acctDownloadUrls([dl.dataset.acctDl]); return; }
+    const op = t.closest('[data-acct-open]');
+    if (op) { open3DViewer(op.dataset.acctName, op.dataset.acctOpen, 1); return; }
+    const sy = t.closest('[data-acct-sync]');
+    if (sy) {
+        sy.disabled = true;
+        try { await fetch(`${API}/api/account-models/sync`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ platform: sy.dataset.acctSync }) }); } catch (_) {}
+        await refreshAcctModelsNav();
+        ['likes', 'creations'].forEach(k => { if (document.getElementById(`page-acct-${k}`)?.classList.contains('active')) loadAcctModels(k); });
+        return;
+    }
+    const all = t.closest('[data-acct-all]');
+    if (all) {
+        const sec = all.closest('.acct-section');
+        const kind = sec.dataset.acctKey.split(':')[0];
+        const data = document.getElementById(`acct-${kind}-sections`)._acctData;
+        const p = data?.platforms.find(x => x.platform === all.dataset.acctAll);
+        const urls = (p?.items || []).filter(i => !i.in_library).map(i => i.url);
+        if (!urls.length) return;
+        if (!confirm(_t3('acct.confirm_all', 'Télécharger {n} modèles depuis {platform} dans le dossier sélectionné ?', { n: urls.length, platform: p.label }))) return;
+        await _acctDownloadUrls(urls);
+        return;
+    }
+    // repli / dépli des sections (bannière ou chevron)
+    const banner = t.closest('.acct-section > .source-banner');
+    if (banner && !t.closest('button:not(.inv-toggle), a, input, select')) {
+        const sec = banner.parentElement;
+        const now = !sec.classList.contains('inv-collapsed');
+        sec.classList.toggle('inv-collapsed', now);
+        banner.querySelector('.inv-toggle')?.setAttribute('aria-expanded', String(!now));
+        const st = _acctCollapsedState(); if (now) st[sec.dataset.acctKey] = true; else delete st[sec.dataset.acctKey]; _acctSaveCollapsed(st);
+    }
+});
+document.addEventListener('input', (ev) => {
+    const m = ev.target.id && ev.target.id.match(/^acct-(likes|creations)-search$/);
+    if (m) loadAcctModels(m[1]);
+});
+document.addEventListener('change', (ev) => {
+    const m = ev.target.id && ev.target.id.match(/^acct-(likes|creations)-filter$/);
+    if (m) loadAcctModels(m[1]);
+});
+
+
+async function runAcctDiagnostic(btn) {
+    const out = document.getElementById('acct-diag-out');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${escapeHtml(_t3('acct.diag_running', 'Test en cours…'))}`;
+    try {
+        const res = await fetch(`${API}/api/account-models/debug`);
+        const text = await res.text();
+        out.style.display = 'block';
+        out.value = text;
+        let copied = false;
+        try { await navigator.clipboard.writeText(text); copied = true; } catch (_) { out.select(); }
+        showToast(copied ? _t3('acct.diag_copied', 'Rapport copié dans le presse-papiers') : _t3('acct.diag_ready', 'Rapport prêt : sélectionne et copie le texte'), 'success');
+        refreshAcctModelsNav();
+    } catch (e) {
+        showToast(I18N.t('toast.connection_error'), 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+    }
+}
+window.runAcctDiagnostic = runAcctDiagnostic;
+
+
+async function loadPrintablesAccount() {
+    try {
+        const res = await fetch(`${API}/api/accounts/status`);
+        if (!res.ok) return;
+        const st = await res.json();
+        updateAccountBadge('printables', !!st.printables);
+        const h = document.getElementById('printables-handle');
+        if (h && st.printables_handle && !h.value) h.value = st.printables_handle;
+        const t = document.getElementById('printables-token');
+        if (t) t.placeholder = st.printables_has_token ? '••••••••' : _t3('accounts.printables_token_ph', 'Jeton de session (facultatif, nécessaire pour les likes)');
+    } catch (_) {}
+}
+async function savePrintablesAccount() {
+    const handle = document.getElementById('printables-handle')?.value.trim() || '';
+    const token = document.getElementById('printables-token')?.value.trim() || '';
+    try {
+        const res = await fetch(`${API}/api/accounts/printables`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ handle, token }) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { showToast(data.error || I18N.t('toast.save_error'), 'error'); return; }
+        showToast(data.message || I18N.t('toast.account_saved'), 'success');
+        const t = document.getElementById('printables-token'); if (t) t.value = '';
+        loadPrintablesAccount();
+        refreshAcctModelsNav(true);
+    } catch (_) { showToast(I18N.t('toast.network_error_backend'), 'error'); }
+}
+async function disconnectPrintables() {
+    try { await fetch(`${API}/api/accounts/printables`, { method: 'DELETE' }); } catch (_) {}
+    const h = document.getElementById('printables-handle'); if (h) h.value = '';
+    updateAccountBadge('printables', false);
+    refreshAcctModelsNav();
+}
+window.savePrintablesAccount = savePrintablesAccount;
+window.disconnectPrintables = disconnectPrintables;

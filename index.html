@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<script>try{var t=localStorage.getItem('stellio-theme')||'auto';if(t==='auto')t=(window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<script>try{var t=localStorage.getItem('stellio-theme')||'auto';if(t==='auto')t=(window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';var p=localStorage.getItem('stellio-palette')||'';var LP={"paper":1,"mint":1,"sky":1,"lavender":1,"sakura":1};var DP=['midnight','ocean','forest','dusk','rose','ember','nord'];if(LP[p]||DP.indexOf(p)>-1){document.documentElement.setAttribute('data-palette',p);t=LP[p]?'light':'dark';}document.documentElement.setAttribute('data-theme',t);var c=JSON.parse(localStorage.getItem('stellio-custom-colors')||'null');if(c){for(var k in c){if(/^--[a-z-]+$/.test(k)&&/^#[0-9a-f]{6}$/i.test(c[k]))document.documentElement.style.setProperty(k,c[k]);}}}catch(e){}</script>
     <script>
     (function () {
         try {
@@ -40,7 +40,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Stellio">
     <meta name="theme-color" content="#1a1d2e">
-    <link rel="stylesheet" href="style.css?v=20261112">
+    <link rel="stylesheet" href="style.css?v=20261124">
     <link rel="stylesheet" href="assets/vendor/inter/inter.css">
     <link rel="stylesheet" href="assets/vendor/fontawesome/css/all.min.css">
 	<link rel="stylesheet" href="assets/vendor/mdi/css/materialdesignicons.min.css">
@@ -241,6 +241,16 @@
                     <i class="fa-solid fa-layer-group"></i>
                     <span data-i18n="nav.library">Bibliothèque</span>
                 </button>
+                <button class="nav-btn viewer-hide" id="nav-acct-likes-btn" data-page="acct-likes" data-icon="fa-heart" data-title-key="nav.acct_likes" style="display:none;">
+                    <i class="fa-solid fa-heart"></i>
+                    <span data-i18n="nav.acct_likes">Mes likes</span>
+                    <span class="badge acct-count" style="margin-left:auto;background:var(--bg-tertiary);color:var(--text-secondary);padding:2px 8px;border-radius:12px;font-size:11px;">0</span>
+                </button>
+                <button class="nav-btn viewer-hide" id="nav-acct-creations-btn" data-page="acct-creations" data-icon="fa-pen-ruler" data-title-key="nav.acct_creations" style="display:none;">
+                    <i class="fa-solid fa-pen-ruler"></i>
+                    <span data-i18n="nav.acct_creations">Mes créations</span>
+                    <span class="badge acct-count" style="margin-left:auto;background:var(--bg-tertiary);color:var(--text-secondary);padding:2px 8px;border-radius:12px;font-size:11px;">0</span>
+                </button>
                 <div id="reorderable-nav-items">
 				<button class="nav-btn" data-page="stats" data-nav-id="stats" data-icon="fa-chart-pie" data-title-key="nav.stats">
 				    <i class="fa-solid fa-chart-pie"></i>
@@ -307,6 +317,11 @@
                 </div>
                 </div>
                 <div class="nav-about-spacer">
+					<button class="nav-btn viewer-hide" id="nav-trash-btn" onclick="openTrashModal()">
+						<i class="fa-solid fa-trash-can-arrow-up"></i>
+						<span data-i18n="nav.trash">Corbeille</span>
+						<span class="badge" id="trash-count" style="display:none;">0</span>
+					</button>
 					<button class="nav-btn" id="nav-workshop-btn" onclick="openWorkshopMode()" data-i18n-title="workshop.hint" title="Affichage plein écran des imprimantes, pensé pour tablette et téléphone">
 						<i class="fa-solid fa-tablet-screen-button"></i>
 						<span data-i18n="nav.workshop">Mode atelier</span>
@@ -404,6 +419,7 @@
 							<i class="fa-solid fa-image thumb-progress-icon" id="thumb-progress-icon"></i>
 							<span class="progress-text" id="thumb-progress-text">0/0</span>
 							<button type="button" id="thumb-pause-btn" class="thumb-pause-btn" onclick="toggleThumbPause(event)"><i class="fa-solid fa-pause"></i></button>
+							<button type="button" id="thumb-cancel-btn" class="thumb-pause-btn thumb-cancel-btn" onclick="cancelThumbQueue(event)" style="margin-left:4px;"><i class="fa-solid fa-xmark"></i></button>
 						</div>
 						<div class="progress-track">
 							<div class="progress-bar" id="thumb-progress-bar" style="width: 0%"></div>
@@ -841,6 +857,39 @@
                                     <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
                                 </div>
                             </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-health" data-widget-id="health" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-heart-pulse"></i> <span data-i18n="dashboard.widget_health">Santé de Stellio</span></h3>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('health')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-health-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-trash" data-widget-id="trash" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-trash-can-arrow-up"></i> <span data-i18n="dashboard.widget_trash">Corbeille</span></h3>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('trash')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-trash-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-changelog" data-widget-id="changelog" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-gift"></i> <span data-i18n="dashboard.widget_changelog">Nouveautés</span></h3>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('changelog')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-changelog-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
                         </div>
 
                         <div id="dashboard-hidden-widgets" class="dashboard-hidden-widgets hidden">
@@ -1178,6 +1227,7 @@
                                         <button class="btn btn-ghost btn-sm" id="custom-accent-reset-btn" data-i18n="settings.custom_accent_reset">Réinitialiser</button>
                                     </div>
                                 </div>
+                                <div id="theme-editor"></div>
                                 <div class="settings-row" style="align-items:flex-start;">
                                     <div>
                                         <label data-i18n="settings.thumb_color_title">Couleur des miniatures</label>
@@ -2297,6 +2347,27 @@
                                     <div class="account-card" style="margin-top:12px;">
                                         <div class="account-card-header">
                                             <div style="display:flex;align-items:center;gap:10px;">
+                                                <div class="account-icon-badge" style="background:rgba(250,104,49,0.15);color:#fa6831;"><i class="fa-solid fa-print"></i></div>
+                                                <div><div style="font-weight:600;font-size:13px;">Printables</div><div style="font-size:11px;color:var(--text-muted);">printables.com (Prusa)</div></div>
+                                            </div>
+                                            <span id="printables-status-badge" class="account-badge disconnected">Non configuré</span>
+                                        </div>
+                                        <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
+                                            <input type="text" id="printables-handle" autocomplete="off" data-i18n-placeholder="accounts.printables_handle_ph" placeholder="Lien de ton profil : https://www.printables.com/@pseudo_123456"
+                                                style="padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;">
+                                            <div style="display:flex;gap:8px;">
+                                                <input type="password" id="printables-token" autocomplete="off" data-i18n-placeholder="accounts.printables_token_ph" placeholder="Jeton de session (facultatif, nécessaire pour les likes)"
+                                                    style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;">
+                                                <button class="btn btn-primary btn-sm" onclick="savePrintablesAccount()"><i class="fa-solid fa-floppy-disk"></i></button>
+                                                <button class="btn btn-ghost btn-sm" onclick="disconnectPrintables()" title="Déconnecter"><i class="fa-solid fa-trash"></i></button>
+                                            </div>
+                                        </div>
+                                        <p class="settings-hint" style="margin-top:6px;" data-i18n="accounts.printables_hint">Le lien de ton profil suffit pour « Mes créations ». Pour « Mes likes », colle aussi un jeton : connecte-toi sur printables.com, ouvre les outils du navigateur (F12) → Réseau, clique sur une requête « graphql » et copie la valeur de l'en-tête Authorization (ou l'en-tête Cookie).</p>
+                                    </div>
+
+                                    <div class="account-card" style="margin-top:12px;">
+                                        <div class="account-card-header">
+                                            <div style="display:flex;align-items:center;gap:10px;">
                                                 <div class="account-icon-badge" style="background:rgba(0,174,66,0.15);color:#00ae42;"><i class="fa-solid fa-cube"></i></div>
                                                 <div><div style="font-weight:600;font-size:13px;">MakerWorld</div><div style="font-size:11px;color:var(--text-muted);">makerworld.com (Bambu Lab)</div></div>
                                             </div>
@@ -2472,6 +2543,9 @@
                                     <div class="shortcut-row"><span data-i18n="shortcuts.new_download">Nouveau téléchargement</span><span class="shortcut-keys"><kbd>Ctrl</kbd>+<kbd>N</kbd></span></div>
                                     <div class="shortcut-row"><span data-i18n="shortcuts.toggle_favorites">Basculer le filtre Favoris</span><span class="shortcut-keys"><kbd>F</kbd></span></div>
                                     <div class="shortcut-row"><span data-i18n="shortcuts.open_tags">Gestionnaire de tags</span><span class="shortcut-keys"><kbd>T</kbd></span></div>
+                                    <div class="shortcut-row"><span data-i18n="shortcuts.open_journal">Journal des opérations</span><span class="shortcut-keys"><kbd>J</kbd></span></div>
+                                    <div class="shortcut-row"><span data-i18n="shortcuts.grid_nav">Parcourir la grille de la bibliothèque</span><span class="shortcut-keys"><kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd></span></div>
+                                    <div class="shortcut-row"><span data-i18n="shortcuts.open_selected">Ouvrir le fichier sélectionné (ou le cocher en mode sélection)</span><span class="shortcut-keys"><kbd data-i18n="shortcuts.key_enter">Entrée</kbd></span></div>
                                 </div>
                                 <div class="shortcuts-section">
                                     <h4><i class="fa-solid fa-circle-question"></i> <span data-i18n="shortcuts.general">Général</span></h4>
@@ -2502,11 +2576,29 @@
                                     <pre id="diag-console" class="diag-console"><span class="diag-console-placeholder" data-i18n="settings.diagnostic_console_placeholder">En attente de connexion…</span></pre>
                                     <p class="settings-hint" style="margin-top:6px;" data-i18n="settings.diagnostic_console_hint">Ce flux se met à jour automatiquement toutes les 2 secondes tant que cette section est ouverte.</p>
                                 </div>
+                                <div id="diag-health" style="border-top:1px solid var(--border); padding-top:14px;">
+                                    <h4 style="margin:0 0 8px; font-size:14px;"><i class="fa-solid fa-heart-pulse"></i> <span data-i18n="settings.health_title">Santé de Stellio</span></h4>
+                                    <div id="diag-health-warn" class="diag-health-warn hidden"></div>
+                                    <div id="diag-health-grid" class="diag-health-grid"><span class="settings-hint" data-i18n="settings.health_loading">Chargement…</span></div>
+                                    <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+                                        <button type="button" class="btn btn-ghost btn-sm" onclick="refreshDiagnosticHealth()"><i class="fa-solid fa-rotate"></i> <span data-i18n="settings.health_refresh">Actualiser</span></button>
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="copyDiagnosticHealth(this)"><i class="fa-regular fa-copy"></i> <span data-i18n="settings.health_copy">Copier le rapport</span></button>
+                                    </div>
+                                    <div style="margin-top:12px;"><button type="button" class="btn btn-ghost btn-sm" onclick="openJournalModal()"><i class="fa-solid fa-clock-rotate-left"></i> <span data-i18n="journal.open_btn">Ouvrir le journal des opérations</span></button></div>
+                                    <p class="settings-hint" style="margin-top:8px;" data-i18n="settings.health_hint">Aucun chemin ni mot de passe dans ce rapport : vous pouvez le coller tel quel dans un message d'aide.</p>
+                                </div>
                                 <div style="border-top:1px solid var(--border); padding-top:14px;">
                                     <p class="settings-hint" style="margin-bottom:10px;" data-i18n="settings.diagnostic_export_hint">Génère une archive avec les logs et les informations système (matériel, config), utile pour signaler un bug ou remonter un rapport en tant que bêta-testeur. Les mots de passe et clés API sont automatiquement masqués.</p>
                                     <button type="button" class="btn btn-secondary btn-sm" onclick="exportDiagnosticLogs(this)" style="gap:8px;">
                                         <i class="fa-solid fa-file-zipper"></i> <span data-i18n="settings.diagnostic_export_btn">Exporter les logs</span>
                                     </button>
+                                </div>
+                                <div style="border-top:1px solid var(--border); padding-top:14px;">
+                                    <p class="settings-hint" style="margin-bottom:10px;" data-i18n="acct.diag_hint">Teste la récupération de « Mes likes » et « Mes créations » sur tes comptes connectés (MakerWorld, Thingiverse, Creality Cloud, Snapmaker Space, Nexprint) et génère un rapport détaillé de chaque requête, sans aucun mot de passe ni jeton. Colle-le tel quel dans un message d'aide.</p>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="runAcctDiagnostic(this)" style="gap:8px;">
+                                        <i class="fa-solid fa-stethoscope"></i> <span data-i18n="acct.diag_btn">Tester Mes likes / Mes créations</span>
+                                    </button>
+                                    <textarea id="acct-diag-out" readonly style="display:none; width:100%; height:220px; margin-top:10px; font-family:monospace; font-size:11px; background:var(--bg-input); color:var(--text-primary); border:1px solid var(--border); border-radius:var(--radius); padding:8px;"></textarea>
                                 </div>
                                 <div style="border-top:1px solid var(--border); padding-top:14px;">
                                     <p class="settings-hint" style="margin-bottom:10px;" data-i18n="settings.diagnostic_debug_hint">Par défaut, Stellio n'enregistre que le minimum de logs. Le mode debug redémarre l'application et affiche temporairement le maximum de logs dans la console ci-dessus, le temps de cette session. Il se désactive automatiquement au redémarrage suivant.</p>
@@ -2551,8 +2643,10 @@
 						<div class="integrity-progress-text-row">
 						  <i class="fa-solid fa-shield-halved fa-spin"></i>
 						  <span id="integrity-progress-text">0/0</span>
+						  <button type="button" id="integrity-cancel-btn" class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="cancelIntegrityCheck(this)"><i class="fa-solid fa-xmark"></i> <span data-i18n="integrity.cancel">Annuler</span></button>
 						</div>
 						<div class="progress-track"><div class="progress-bar" id="integrity-progress-bar" style="width:0%"></div></div>
+						<p class="settings-hint" style="margin:6px 0 0;" data-i18n="integrity.cancel_hint">Annuler arrête la vérification ; ce qui a déjà été contrôlé reste dans le rapport.</p>
 					  </div>
 					  <div id="integrity-summary" class="integrity-summary hidden">
 						<div class="integrity-stat ok"><i class="fa-solid fa-circle-check"></i> <span id="integrity-ok-count">0</span> <span data-i18n="integrity.valid">valides</span></div>
@@ -2653,6 +2747,7 @@
 					</button>
 				  </div>
 
+				  <p class="settings-hint" style="margin:6px 0 0;" data-i18n="converter.cancel_hint">Une conversion en lot peut être annulée à tout moment : les fichiers déjà convertis sont conservés.</p>
 				  <div id="converter-grid" class="repair-grid"></div>
 				  <div id="converter-empty" class="empty-state hidden">
 					<i class="fa-solid fa-folder-open"></i>
@@ -2878,6 +2973,26 @@
 							<span data-i18n="sosprint.hint">Le diagnostic utilise exclusivement votre modèle Ollama local (Paramètres → Tags IA), y compris pour l'analyse d'une éventuelle photo. Aucune donnée n'est envoyée en ligne. Si Ollama est indisponible ou met trop de temps à répondre, un message vous l'indique clairement.</span>
 						</div>
 					</div>
+				</div>
+				<div id="page-acct-likes" class="page">
+					<div class="acct-bar">
+						<input type="search" id="acct-likes-search" class="acct-search" data-i18n-placeholder="acct.search" placeholder="Rechercher…" autocomplete="off">
+						<select id="acct-likes-filter" class="acct-filter">
+							<option value="all" data-i18n="acct.filter_all">Tous</option>
+							<option value="new" data-i18n="acct.filter_new">Pas encore dans ma bibliothèque</option>
+						</select>
+					</div>
+					<div id="acct-likes-sections"></div>
+				</div>
+				<div id="page-acct-creations" class="page">
+					<div class="acct-bar">
+						<input type="search" id="acct-creations-search" class="acct-search" data-i18n-placeholder="acct.search" placeholder="Rechercher…" autocomplete="off">
+						<select id="acct-creations-filter" class="acct-filter">
+							<option value="all" data-i18n="acct.filter_all">Tous</option>
+							<option value="new" data-i18n="acct.filter_new">Pas encore dans ma bibliothèque</option>
+						</select>
+					</div>
+					<div id="acct-creations-sections"></div>
 				</div>
 				<div id="page-printers" class="page">
 					<div id="printers-grid" class="grid-printers"></div>
@@ -3574,6 +3689,55 @@
         </div>
     </div>
 
+    <div id="modal-trash" class="modal hidden">
+        <div class="modal-content trash-modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-trash-can-arrow-up"></i> <span data-i18n="trash.title">Corbeille</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-trash')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="settings-hint" id="trash-hint" style="margin:0 0 12px;"></p>
+                <div id="trash-list" class="trash-list"></div>
+                <div class="trash-footer">
+                    <label class="trash-retention"><span data-i18n="trash.retention">Conserver</span>
+                        <select id="trash-retention" class="form-control" onchange="saveTrashRetention(this.value)">
+                            <option value="7" data-i18n="trash.retention_7">7 jours</option>
+                            <option value="30" data-i18n="trash.retention_30">30 jours</option>
+                            <option value="90" data-i18n="trash.retention_90">90 jours</option>
+                            <option value="0" data-i18n="trash.retention_0">Indéfiniment</option>
+                        </select>
+                    </label>
+                    <button type="button" class="btn btn-ghost btn-sm" id="trash-empty-btn" style="color:var(--danger);" onclick="emptyTrash()"><i class="fa-solid fa-fire"></i> <span data-i18n="trash.empty_all">Vider la corbeille</span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-journal" class="modal hidden">
+        <div class="modal-content journal-modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-clock-rotate-left"></i> <span data-i18n="journal.title">Journal des opérations</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-journal')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+                    <select id="journal-filter" class="form-control" style="max-width:220px;" onchange="loadJournal()">
+                        <option value="" data-i18n="journal.filter_all">Toutes les opérations</option>
+                        <option value="delete" data-i18n="journal.action_delete">Suppression</option>
+                        <option value="move" data-i18n="journal.action_move">Déplacement</option>
+                        <option value="rename" data-i18n="journal.action_rename">Renommage</option>
+                        <option value="convert" data-i18n="journal.action_convert">Conversion</option>
+                        <option value="split" data-i18n="journal.action_split">Découpe en plateaux</option>
+                        <option value="add" data-i18n="journal.action_add">Ajout</option>
+                    </select>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="loadJournal()"><i class="fa-solid fa-rotate"></i> <span data-i18n="settings.health_refresh">Actualiser</span></button>
+                </div>
+                <div id="journal-list" class="journal-list"></div>
+                <p class="settings-hint" id="journal-hint" style="margin-top:10px;"></p>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-shortcuts" class="modal hidden">
         <div class="modal-content shortcuts-modal-content">
             <div class="modal-header">
@@ -3600,6 +3764,9 @@
                     <div class="shortcut-row"><span data-i18n="shortcuts.new_download">Nouveau téléchargement</span><span class="shortcut-keys"><kbd>Ctrl</kbd>+<kbd>N</kbd></span></div>
                     <div class="shortcut-row"><span data-i18n="shortcuts.toggle_favorites">Basculer le filtre Favoris</span><span class="shortcut-keys"><kbd>F</kbd></span></div>
                     <div class="shortcut-row"><span data-i18n="shortcuts.open_tags">Gestionnaire de tags</span><span class="shortcut-keys"><kbd>T</kbd></span></div>
+                    <div class="shortcut-row"><span data-i18n="shortcuts.open_journal">Journal des opérations</span><span class="shortcut-keys"><kbd>J</kbd></span></div>
+                    <div class="shortcut-row"><span data-i18n="shortcuts.grid_nav">Parcourir la grille de la bibliothèque</span><span class="shortcut-keys"><kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd></span></div>
+                    <div class="shortcut-row"><span data-i18n="shortcuts.open_selected">Ouvrir le fichier sélectionné (ou le cocher en mode sélection)</span><span class="shortcut-keys"><kbd data-i18n="shortcuts.key_enter">Entrée</kbd></span></div>
                 </div>
                 <div class="shortcuts-section">
                     <h4><i class="fa-solid fa-circle-question"></i> <span data-i18n="shortcuts.general">Général</span></h4>
@@ -4599,6 +4766,7 @@
                         <span id="split-plates-progress-text" data-i18n="modal.split_plates_starting">Préparation de la découpe…</span>
                         <span id="split-plates-progress-pct">0 %</span>
                     </div>
+                    <p class="settings-hint" style="margin:8px 0 0;" data-i18n="modal.split_plates_cancel_hint">Vous pouvez annuler à tout moment : les fichiers déjà créés sont supprimés.</p>
                     <div class="progress-track" style="height: 6px;">
                         <div class="progress-bar" id="split-plates-progress-bar" style="width: 0%"></div>
                     </div>
@@ -4872,16 +5040,7 @@
         </div>
     </div>
 
-    <div id="mini-printer-widget" class="mini-printer-widget hidden" onclick="_openMiniWidgetTarget(event)">
-        <div class="mini-printer-widget-icon"><i class="fa-solid fa-print"></i></div>
-        <div class="mini-printer-widget-body">
-            <div class="mini-printer-widget-name" id="mini-printer-widget-name"></div>
-            <div class="progress-track" style="height:5px; margin-top:4px;"><div class="progress-bar" id="mini-printer-widget-bar" style="width:0%;"></div></div>
-        </div>
-        <div class="mini-printer-widget-pct" id="mini-printer-widget-pct">0%</div>
-        <span class="mini-printer-widget-extra hidden" id="mini-printer-widget-extra">+0</span>
-        <button type="button" class="mini-printer-widget-close" onclick="event.stopPropagation(); dismissMiniPrinterWidget()"><i class="fa-solid fa-xmark"></i></button>
-    </div>
+    
 
     <div id="tour-overlay" class="tour-overlay hidden">
         <div id="tour-spotlight" class="tour-spotlight"></div>
@@ -4899,11 +5058,25 @@
         </div>
     </div>
 
-    <div id="toast-container"></div>
+    
+    
 
-    <button id="scroll-to-top" class="scroll-to-top" data-i18n-title="actions.scroll_to_top" title="Retour en haut">
+    <div id="bottom-stack">
+        <div id="toast-container"></div>
+        <div id="mini-printer-widget" class="mini-printer-widget hidden" onclick="_openMiniWidgetTarget(event)">
+        <div class="mini-printer-widget-icon"><i class="fa-solid fa-print"></i></div>
+        <div class="mini-printer-widget-body">
+            <div class="mini-printer-widget-name" id="mini-printer-widget-name"></div>
+            <div class="progress-track" style="height:5px; margin-top:4px;"><div class="progress-bar" id="mini-printer-widget-bar" style="width:0%;"></div></div>
+        </div>
+        <div class="mini-printer-widget-pct" id="mini-printer-widget-pct">0%</div>
+        <span class="mini-printer-widget-extra hidden" id="mini-printer-widget-extra">+0</span>
+        <button type="button" class="mini-printer-widget-close" onclick="event.stopPropagation(); dismissMiniPrinterWidget()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+        <button id="scroll-to-top" class="scroll-to-top" data-i18n-title="actions.scroll_to_top" title="Retour en haut">
         <i class="fa-solid fa-arrow-up"></i>
     </button>
+    </div>
 
     <script src="script.js"></script>
 </body>

@@ -1,5 +1,114 @@
 [
   {
+    "version": "0.9.9",
+    "items": {
+      "fr": [
+        "Génération des miniatures plus rapide : le rendu logiciel (sans GPU) est maintenant vectorisé avec numpy, jusqu'à 12× plus rapide sur les gros modèles (330 000 faces), pour un résultat identique",
+        "Nouveau bloc « Santé de Stellio » dans Paramètres → Diagnostic : mémoire, file des miniatures, tâches en cours, base, disque, erreurs récentes, avec alertes et copie en un clic",
+        "Annulation étendue : file de miniatures et vérification d'intégrité peuvent maintenant être arrêtées, avec des explications dans les fenêtres concernées",
+        "Nouveau journal des opérations (touche J, palette de commandes ou Paramètres → Diagnostic) : ajout, déplacement, renommage, suppression, conversion et découpe, avec annulation d'un renommage, d'un déplacement ou d'une suppression (depuis la corbeille)",
+        "Trois nouveaux widgets pour le tableau de bord : Santé de Stellio, Corbeille (éléments supprimés restaurables) et Nouveautés (texte dans la langue de l'interface)",
+        "Nouveaux « Mes likes » et « Mes créations » : retrouve les modèles que tu as likés ou publiés sur MakerWorld, Thingiverse, Creality Cloud, Snapmaker Space, Nexprint et Printables, avec miniature, créateur et lien vers le modèle. Une section par plateforme, affichée seulement si le compte est connecté et contient des modèles ; téléchargement en un clic, ou de tout ce qui manque à la bibliothèque",
+        "Corbeille complète : les devis, factures, clients, commandes, projets, bobines et fichiers supprimés ne sont plus effacés d'emblée. Ils vont dans la corbeille (30 jours par défaut, réglable), d'où vous pouvez les restaurer ou les supprimer définitivement ; un bouton Annuler apparaît juste après chaque suppression",
+        "Apparence : 12 nouvelles palettes de couleurs (Minuit, Océan, Forêt, Crépuscule, Rose, Braise, Nord, Papier, Menthe, Ciel, Lavande, Cerisier), éditeur pour personnaliser chaque couleur de l'interface (fonds, textes, bordures, états) et export/import d'un thème",
+        "Image de fond personnalisable (Paramètres → Apparence) : choix d'une image, assombrissement, flou et opacité des panneaux réglables ; les fenêtres restent opaques",
+        "Raccourcis clavier : J (journal), flèches pour parcourir la grille de la bibliothèque, Entrée pour ouvrir le fichier sélectionné",
+        "Suite de tests automatisés ajoutée au dépôt (dossier tests/, exécutée par GitHub Actions)"
+      ],
+      "en": [
+        "Faster thumbnail generation: the software renderer (no GPU) is now vectorised with numpy, up to 12× faster on large models (330,000 faces), with identical results",
+        "New “Stellio health” block in Settings → Diagnostic: memory, thumbnail queue, running jobs, database, disk, recent errors, with alerts and one-click copy",
+        "Extended cancellation: the thumbnail queue and the integrity check can now be stopped, with explanations in the relevant windows",
+        "New operations log (J key, command palette or Settings → Diagnostic): add, move, rename, delete, convert and split, with undo for a rename, move or deletion (from the trash)",
+        "Three new dashboard widgets: Stellio health, Trash (restore deleted items) and What's new (text in the interface language)",
+        "New “My likes” and “My creations”: find the models you liked or published on MakerWorld, Thingiverse, Creality Cloud, Snapmaker Space, Nexprint and Printables, with thumbnail, creator and a link to the model. One section per platform, shown only when the account is connected and has models; download in one click, or everything missing from your library",
+        "Full trash: deleted quotes, invoices, clients, orders, projects, spools and files are no longer erased right away. They go to the trash (30 days by default, adjustable), where you can restore them or delete them permanently; an Undo button appears right after each deletion",
+        "Appearance: 12 new color palettes (Midnight, Ocean, Forest, Dusk, Rose, Ember, Nord, Paper, Mint, Sky, Lavender, Cherry blossom), an editor to customize every interface color (backgrounds, text, borders, status) and theme export/import",
+        "Customizable background image (Settings → Appearance): pick an image, adjustable darkening, blur and panel opacity; windows stay opaque",
+        "Keyboard shortcuts: J (log), arrow keys to browse the library grid, Enter to open the selected file",
+        "Automated test suite added to the repository (tests/ folder, run by GitHub Actions)"
+      ],
+      "de": [
+        "Schnellere Vorschaubilder: Der Software-Renderer (ohne GPU) ist jetzt mit numpy vektorisiert, bei großen Modellen (330.000 Flächen) bis zu 12× schneller, mit identischem Ergebnis",
+        "Neuer Block „Stellio-Zustand“ unter Einstellungen → Diagnose: Speicher, Vorschaubild-Warteschlange, laufende Aufgaben, Datenbank, Speicherplatz, aktuelle Fehler, mit Warnungen und Ein-Klick-Kopie",
+        "Erweiterter Abbruch: Vorschaubild-Warteschlange und Integritätsprüfung lassen sich jetzt stoppen, mit Erklärungen in den jeweiligen Fenstern",
+        "Neues Vorgangsprotokoll (Taste J, Befehlspalette oder Einstellungen → Diagnose): Hinzufügen, Verschieben, Umbenennen, Löschen, Konvertieren und Aufteilen, mit Rückgängig für Umbenennen, Verschieben oder Löschen (über den Papierkorb)",
+        "Drei neue Dashboard-Widgets: Stellio-Zustand, Papierkorb (gelöschte Elemente wiederherstellen) und Neuigkeiten (Text in der Sprache der Oberfläche)",
+        "Neu: „Meine Likes“ und „Meine Kreationen“: Finde die Modelle, die du auf MakerWorld und Thingiverse geliked oder veröffentlicht hast, mit Vorschaubild, Ersteller und Link zum Modell. Ein Abschnitt pro Plattform, nur sichtbar, wenn das Konto verbunden ist und Modelle enthält; Download per Klick oder alles, was in der Bibliothek fehlt",
+        "Vollständiger Papierkorb: Gelöschte Angebote, Rechnungen, Kunden, Aufträge, Projekte, Spulen und Dateien werden nicht mehr sofort gelöscht. Sie landen im Papierkorb (standardmäßig 30 Tage, einstellbar) und können dort wiederhergestellt oder endgültig gelöscht werden; nach jedem Löschen erscheint eine Rückgängig-Schaltfläche",
+        "Darstellung: 12 neue Farbpaletten (Mitternacht, Ozean, Wald, Dämmerung, Rose, Glut, Nord, Papier, Minze, Himmel, Lavendel, Kirschblüte), ein Editor für jede Oberflächenfarbe (Hintergründe, Text, Rahmen, Status) und Export/Import von Designs",
+        "Anpassbares Hintergrundbild (Einstellungen → Darstellung): Bild auswählen, Abdunkelung, Unschärfe und Deckkraft der Panels einstellbar; Fenster bleiben undurchsichtig",
+        "Tastenkürzel: J (Protokoll), Pfeiltasten zum Navigieren im Bibliotheksraster, Eingabe zum Öffnen der ausgewählten Datei",
+        "Automatisierte Testsuite im Repository (Ordner tests/, von GitHub Actions ausgeführt)"
+      ],
+      "es": [
+        "Generación de miniaturas más rápida: el renderizado por software (sin GPU) ahora está vectorizado con numpy, hasta 12× más rápido en modelos grandes (330 000 caras), con resultado idéntico",
+        "Nuevo bloque «Salud de Stellio» en Ajustes → Diagnóstico: memoria, cola de miniaturas, tareas en curso, base de datos, disco, errores recientes, con alertas y copia en un clic",
+        "Cancelación ampliada: la cola de miniaturas y la verificación de integridad ahora se pueden detener, con explicaciones en las ventanas correspondientes",
+        "Nuevo registro de operaciones (tecla J, paleta de comandos o Ajustes → Diagnóstico): añadir, mover, renombrar, eliminar, convertir y dividir, con deshacer para un renombrado, movimiento o eliminación (desde la papelera)",
+        "Tres widgets nuevos en el panel: Salud de Stellio, Papelera (restaura elementos eliminados) y Novedades (texto en el idioma de la interfaz)",
+        "Nuevos «Mis me gusta» y «Mis creaciones»: encuentra los modelos que has marcado o publicado en MakerWorld y Thingiverse, con miniatura, creador y enlace al modelo. Una sección por plataforma, visible solo si la cuenta está conectada y tiene modelos; descarga con un clic o de todo lo que falta en la biblioteca",
+        "Papelera completa: los presupuestos, facturas, clientes, pedidos, proyectos, bobinas y archivos eliminados ya no se borran de inmediato. Van a la papelera (30 días por defecto, ajustable), donde puede restaurarlos o eliminarlos definitivamente; tras cada eliminación aparece un botón Deshacer",
+        "Apariencia: 12 paletas de colores nuevas (Medianoche, Océano, Bosque, Crepúsculo, Rosa, Brasa, Nord, Papel, Menta, Cielo, Lavanda, Cerezo), un editor para personalizar cada color de la interfaz (fondos, textos, bordes, estados) y exportar/importar temas",
+        "Imagen de fondo personalizable (Ajustes → Apariencia): elige una imagen y ajusta oscurecimiento, desenfoque y opacidad de los paneles; las ventanas siguen siendo opacas",
+        "Atajos de teclado: J (registro), flechas para recorrer la cuadrícula de la biblioteca, Intro para abrir el archivo seleccionado",
+        "Conjunto de pruebas automatizadas añadido al repositorio (carpeta tests/, ejecutado por GitHub Actions)"
+      ],
+      "pt": [
+        "Geração de miniaturas mais rápida: a renderização por software (sem GPU) agora é vetorizada com numpy, até 12× mais rápida em modelos grandes (330 000 faces), com resultado idêntico",
+        "Novo bloco «Saúde do Stellio» em Definições → Diagnóstico: memória, fila de miniaturas, tarefas em curso, base de dados, disco, erros recentes, com alertas e cópia num clique",
+        "Cancelamento alargado: a fila de miniaturas e a verificação de integridade podem agora ser paradas, com explicações nas janelas correspondentes",
+        "Novo registo de operações (tecla J, paleta de comandos ou Definições → Diagnóstico): adicionar, mover, renomear, eliminar, converter e dividir, com anulação de uma renomeação, movimentação ou eliminação (a partir da reciclagem)",
+        "Três novos widgets no painel: Saúde do Stellio, Reciclagem (restaura itens eliminados) e Novidades (texto no idioma da interface)",
+        "Novos «Meus gostos» e «Minhas criações»: encontra os modelos que marcaste ou publicaste no MakerWorld e no Thingiverse, com miniatura, criador e ligação para o modelo. Uma secção por plataforma, visível só se a conta estiver ligada e tiver modelos; transferência com um clique ou de tudo o que falta na biblioteca",
+        "Reciclagem completa: orçamentos, faturas, clientes, pedidos, projetos, bobinas e ficheiros eliminados deixam de ser apagados de imediato. Vão para a reciclagem (30 dias por predefinição, ajustável), onde pode restaurá-los ou eliminá-los definitivamente; surge um botão Anular logo após cada eliminação",
+        "Aparência: 12 novas paletas de cores (Meia-noite, Oceano, Floresta, Crepúsculo, Rosa, Brasa, Nord, Papel, Menta, Céu, Lavanda, Cerejeira), um editor para personalizar cada cor da interface (fundos, texto, bordas, estados) e exportação/importação de temas",
+        "Imagem de fundo personalizável (Definições → Aparência): escolha uma imagem e ajuste escurecimento, desfoque e opacidade dos painéis; as janelas continuam opacas",
+        "Atalhos de teclado: J (registo), setas para percorrer a grelha da biblioteca, Enter para abrir o ficheiro selecionado",
+        "Conjunto de testes automáticos adicionado ao repositório (pasta tests/, executado pelo GitHub Actions)"
+      ],
+      "it": [
+        "Generazione delle miniature più veloce: il rendering software (senza GPU) è ora vettorizzato con numpy, fino a 12× più veloce sui modelli grandi (330.000 facce), con risultato identico",
+        "Nuovo blocco «Salute di Stellio» in Impostazioni → Diagnostica: memoria, coda delle miniature, attività in corso, database, disco, errori recenti, con avvisi e copia con un clic",
+        "Annullamento esteso: la coda delle miniature e il controllo di integrità ora possono essere fermati, con spiegazioni nelle finestre interessate",
+        "Nuovo registro delle operazioni (tasto J, palette dei comandi o Impostazioni → Diagnostica): aggiunta, spostamento, rinomina, eliminazione, conversione e divisione, con annullamento di una rinomina, spostamento o eliminazione (dal cestino)",
+        "Tre nuovi widget nella dashboard: Salute di Stellio, Cestino (ripristina gli elementi eliminati) e Novità (testo nella lingua dell'interfaccia)",
+        "Nuovi «I miei Mi piace» e «Le mie creazioni»: ritrova i modelli che hai messo tra i Mi piace o pubblicato su MakerWorld e Thingiverse, con miniatura, autore e link al modello. Una sezione per piattaforma, visibile solo se l'account è collegato e contiene modelli; download con un clic o di tutto ciò che manca nella libreria",
+        "Cestino completo: preventivi, fatture, clienti, ordini, progetti, bobine e file eliminati non vengono più cancellati subito. Finiscono nel cestino (30 giorni di default, regolabile), da cui puoi ripristinarli o eliminarli definitivamente; dopo ogni eliminazione compare un pulsante Annulla",
+        "Aspetto: 12 nuove palette di colori (Mezzanotte, Oceano, Foresta, Crepuscolo, Rosa, Brace, Nord, Carta, Menta, Cielo, Lavanda, Ciliegio), un editor per personalizzare ogni colore dell'interfaccia (sfondi, testo, bordi, stati) ed esportazione/importazione dei temi",
+        "Immagine di sfondo personalizzabile (Impostazioni → Aspetto): scegli un'immagine e regola oscuramento, sfocatura e opacità dei pannelli; le finestre restano opache",
+        "Scorciatoie da tastiera: J (registro), frecce per scorrere la griglia della libreria, Invio per aprire il file selezionato",
+        "Suite di test automatici aggiunta al repository (cartella tests/, eseguita da GitHub Actions)"
+      ],
+      "zh": [
+        "缩略图生成更快：软件渲染（无 GPU）现已用 numpy 向量化，大型模型（33 万面）最高快 12 倍，结果完全相同",
+        "设置 → 诊断中新增“Stellio 健康状态”：内存、缩略图队列、运行中的任务、数据库、磁盘、最近错误，并带有警告与一键复制",
+        "扩展取消功能：缩略图队列和完整性检查现在可以停止，并在相关窗口中给出说明",
+        "新增操作日志（J 键、命令面板或设置 → 诊断）：添加、移动、重命名、删除、转换和拆分，可撤销重命名、移动或删除（可从回收站操作）",
+        "仪表板新增三个小组件：Stellio 健康状态、回收站（可恢复已删除项目）和更新日志（使用界面语言显示）",
+        "新增“我的点赞”和“我的作品”：查看你在 MakerWorld 和 Thingiverse 上点赞或发布的模型，含缩略图、作者及模型链接。每个平台一个分区，仅在账户已连接且有模型时显示；可一键下载，或下载库中缺少的全部模型",
+        "完整的回收站：已删除的报价单、发票、客户、订单、项目、耗材盘和文件不再被立即清除，而是进入回收站（默认保留 30 天，可调整），可在其中还原或永久删除；每次删除后会出现“撤销”按钮",
+        "外观：新增 12 种配色方案（午夜、海洋、森林、暮色、玫瑰、余烬、北欧、纸张、薄荷、天空、薰衣草、樱花），可自定义界面每种颜色（背景、文字、边框、状态）的编辑器，并支持主题导出/导入",
+        "可自定义背景图片（设置 → 外观）：选择图片，可调节变暗程度、模糊和面板不透明度；弹出窗口保持不透明",
+        "键盘快捷键：J（日志）、方向键浏览资料库网格、回车打开所选文件",
+        "仓库新增自动化测试（tests/ 文件夹，由 GitHub Actions 运行）"
+      ],
+      "ja": [
+        "サムネイル生成が高速化：ソフトウェアレンダリング（GPUなし）を numpy でベクトル化し、大きなモデル（33万面）で最大12倍高速に。結果は同一です",
+        "設定 → 診断に「Stellio の状態」ブロックを追加：メモリ、サムネイルキュー、実行中のタスク、データベース、ディスク、最近のエラー。警告とワンクリックコピー付き",
+        "キャンセル機能を拡張：サムネイルキューと整合性チェックを停止できるようになり、各ウィンドウに説明を追加",
+        "操作ログを新設（Jキー、コマンドパレット、設定 → 診断）：追加・移動・名前変更・削除・変換・分割を記録し、名前変更・移動・削除の取り消しが可能（ごみ箱から実行可能）",
+        "ダッシュボードに3つのウィジェットを追加：Stellio の状態、ごみ箱（削除した項目を復元可能）、新着情報（インターフェース言語で表示）",
+        "新機能「いいねしたモデル」と「自作モデル」：MakerWorld と Thingiverse でいいね・公開したモデルを、サムネイル・作者・モデルへのリンク付きで表示。プラットフォームごとにセクションを表示（アカウント接続済みでモデルがある場合のみ）。ワンクリックで、またはライブラリにないものをまとめてダウンロード",
+        "完全なゴミ箱：削除した見積書・請求書・顧客・注文・プロジェクト・スプール・ファイルは、すぐには消去されなくなりました。ゴミ箱（既定で30日、変更可）に入り、復元または完全に削除できます。削除直後には「元に戻す」ボタンも表示されます",
+        "外観：12種類の新しいカラーパレット（ミッドナイト、オーシャン、フォレスト、トワイライト、ローズ、エンバー、ノルド、ペーパー、ミント、スカイ、ラベンダー、桜）、インターフェースの各色（背景・文字・枠線・状態）を編集できるエディター、テーマのエクスポート/インポートを追加",
+        "背景画像のカスタマイズ（設定 → 外観）：画像を選び、暗さ・ぼかし・パネルの不透明度を調整可能。ウィンドウは不透明のまま",
+        "キーボードショートカット：J（ログ）、矢印キーでライブラリのグリッドを移動、Enterで選択ファイルを開く",
+        "自動テストをリポジトリに追加（tests/ フォルダ、GitHub Actions で実行）"
+      ]
+    }
+  },
+  {
     "version": "0.9.8",
     "items": {
       "fr": [
