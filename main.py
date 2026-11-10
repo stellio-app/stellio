@@ -5040,6 +5040,8 @@ def _viewer_guard():
         return jsonify({"error": "non authentifié"}), 401
     path = request.path
     if request.method in ('GET', 'HEAD', 'OPTIONS'):
+        if path == '/api/update/version':      # simple numéro de version : sans risque, affiché dans « À propos »
+            return
         if path.startswith(_VIEWER_BLOCKED_GET_PREFIXES):
             return jsonify({"error": "Accès réservé au propriétaire du compte", "code": "viewer_forbidden"}), 403
         return
@@ -5570,9 +5572,96 @@ scan_state = {
     'total_scanned': 0
 }
 
+_dl_cache_tls = threading.local()   # bilan, pour la requête de téléchargement en cours, des ajouts directs à la bibliothèque
+
+
+def _norm_source_path(p):
+    return (p or '').replace('\\\\', '//').replace('\\', '/').rstrip('/')
+
+
+def _cache_add_downloaded_file(dest_path):
+    """Ajoute tout de suite un fichier téléchargé à la bibliothèque (cache), sans attendre le scan complet des sources
+    (qui peut durer longtemps sur un partage réseau). Renvoie True si l'entrée est dans le cache."""
+    try:
+        ext = os.path.splitext(dest_path)[1].lower()
+        if ext not in SUPPORTED_EXTENSIONS or not os.path.isfile(dest_path) or not os.path.exists(CACHE_FILE):
+            return False
+        norm = dest_path.replace('\\', '/')
+        conn = get_db()
+        try:
+            rows = [dict(r) for r in conn.execute("SELECT name, path, type FROM sources WHERE user_id = ?", (session['user_id'],)).fetchall()]
+        finally:
+            conn.close()
+        best = None
+        for r in rows:
+            if r['type'] not in ('folder', 'nfs', 'smb'):
+                continue
+            base = _norm_source_path(r['path'])
+            if base and norm.lower().startswith(base.lower() + '/') and (best is None or len(base) > len(best[1])):
+                best = (r, base)
+        if best is None:
+            return False
+        src, base = best
+        thumb_path = os.path.join(THUMBNAILS_DIR, hashlib.md5(norm.encode()).hexdigest() + '.webp')
+        thumb_exists = os.path.exists(thumb_path)
+        plate_count = 1
+        if ext == '.3mf':
+            try:
+                plate_count = get_3mf_plate_count(dest_path)
+            except Exception:
+                plate_count = 1
+        entry = {
+            'name': os.path.basename(norm),
+            'path': norm,
+            'extension': ext,
+            'size': os.path.getsize(dest_path),
+            'source': src['name'] if src['type'] == 'smb' else os.path.basename(base),
+            'date_added': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'mtime': int(os.path.getmtime(dest_path)),
+            'has_thumb': thumb_exists,
+            'has_metadata': False,
+            'multi_plate': plate_count > 1,
+            'plate_count': plate_count,
+        }
+        if src['type'] == 'smb':
+            entry['subdir'] = os.path.dirname(norm[len(base):].lstrip('/'))
+        with cache_file_lock:
+            with open(CACHE_FILE, 'r', encoding='utf-8') as f:
+                cache = json.load(f)
+            files = cache.get('files') if isinstance(cache, dict) else None
+            if not isinstance(files, list):
+                return False
+            files[:] = [x for x in files if (x.get('path') or '').replace('\\', '/') != norm]
+            files.append(entry)
+            tmp_path = CACHE_FILE + '.tmp'
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(cache, f, indent=2, ensure_ascii=False)
+            _atomic_replace(tmp_path, CACHE_FILE)
+        return True
+    except Exception as e:
+        app_logger.info(f"[Download] Ajout direct à la bibliothèque impossible ({e}) : le scan prendra le relais")
+        return False
+
+
+def _invalidate_cache_after_download():
+    """Remplace invalidate_cache() en fin de téléchargement : si tous les fichiers ont été ajoutés directement au cache,
+    on le garde (la bibliothèque affiche le fichier aussitôt) ; sinon, comportement d'avant (le scan reconstruit la liste)."""
+    ok = getattr(_dl_cache_tls, 'ok', 0)
+    bad = getattr(_dl_cache_tls, 'bad', 0)
+    _dl_cache_tls.ok = 0
+    _dl_cache_tls.bad = 0
+    if ok > 0 and bad == 0:
+        return
+    invalidate_cache()
+
+
 def mark_download_complete_and_refresh_thumbnail(dest_path):
     normalized = dest_path.replace('\\', '/')
     currently_downloading_paths.discard(normalized)
+    if _cache_add_downloaded_file(dest_path):
+        _dl_cache_tls.ok = getattr(_dl_cache_tls, 'ok', 0) + 1
+    else:
+        _dl_cache_tls.bad = getattr(_dl_cache_tls, 'bad', 0) + 1
     try:
         thumb_filename = hashlib.md5(normalized.encode()).hexdigest()
         thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + '.webp')
@@ -16868,6 +16957,8 @@ def _download_model_page_platform(download_id, url, save_dir, label, account_pla
 @login_required
 def api_download_file():
     import threading
+    _dl_cache_tls.ok = 0
+    _dl_cache_tls.bad = 0
 
     data = request.json or {}
     url = (data.get('url') or '').strip()
@@ -17039,7 +17130,7 @@ def api_download_file():
                 for rf in results:
                     rp = os.path.join(save_dir, rf)
                     save_download_history(session['user_id'], rf, rp, os.path.getsize(rp) if os.path.exists(rp) else 0, os.path.splitext(rf)[1], url, 'Thingiverse')
-                invalidate_cache()
+                _invalidate_cache_after_download()
 
                 active_downloads.pop(download_id, None)
                 return jsonify({"success": True, "filename": fname, "path": os.path.join(save_dir, fname), "size": file_size})
@@ -17130,7 +17221,7 @@ def api_download_file():
                 for rf in results:
                     rp = os.path.join(save_dir, rf)
                     save_download_history(session['user_id'], rf, rp, os.path.getsize(rp) if os.path.exists(rp) else 0, os.path.splitext(rf)[1], url, 'Printables')
-                invalidate_cache()
+                _invalidate_cache_after_download()
 
                 active_downloads.pop(download_id, None)
                 return jsonify({
@@ -17239,7 +17330,7 @@ def api_download_file():
             for rf in results:
                 rp = os.path.join(save_dir, rf)
                 save_download_history(session['user_id'], rf, rp, os.path.getsize(rp) if os.path.exists(rp) else 0, os.path.splitext(rf)[1], url, 'Nexprint')
-            invalidate_cache()
+            _invalidate_cache_after_download()
             return jsonify({
                 "success": True,
                 "filename": fname,
@@ -17423,7 +17514,7 @@ def api_download_file():
                     os.path.getsize(rp) if os.path.exists(rp) else 0,
                     os.path.splitext(rf)[1], url, 'MakerWorld'
                 )
-            invalidate_cache()
+            _invalidate_cache_after_download()
 
             active_downloads.pop(download_id, None)
             return jsonify({
@@ -17511,7 +17602,7 @@ def api_download_file():
 
             platform_name = 'Thingiverse' if 'thingiverse' in url else ('MakerWorld' if 'makerworld' in url else ('Nexprint' if 'nexprint' in url else ''))
             save_download_history(session['user_id'], fname, dest_path, file_size, os.path.splitext(fname)[1], url, platform_name)
-            invalidate_cache()
+            _invalidate_cache_after_download()
 
             app_logger.info(f"[Download] Fichier téléchargé : {fname} ({file_size} octets) → {dest_path}")
 
@@ -17568,7 +17659,7 @@ def _ensure_download_folder_registered(path, user_id):
                 (user_id, name, normalized)
             )
             conn.commit()
-            invalidate_cache()
+            _invalidate_cache_after_download()
             app_logger.info(f"[Download] Dossier de téléchargement par défaut enregistré comme source: {normalized}")
         finally:
             conn.close()
@@ -23194,7 +23285,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.0.0"
+CURRENT_VERSION = "1.0.1"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 

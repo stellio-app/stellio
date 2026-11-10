@@ -2763,6 +2763,7 @@ function showAutoLoginConfirm(user) {
 }
 
 function showDemoBanner() {
+    document.body.classList.add('is-demo');   // masque les widgets propres à l'administration (MQTT, mises à jour…), voir style.css
     if (document.getElementById('demo-banner')) return;
     const b = document.createElement('div');
     b.id = 'demo-banner';
@@ -20969,6 +20970,12 @@ window.manualCheckUpdate = async function () {
     if (icon) icon.className = 'fa-solid fa-spinner fa-spin';
 
     try {
+        if (IS_VIEWER || window.STELLIO_DEMO) {   // invité / démo : pas de recherche de mise à jour, on indique seulement la version installée
+            const vr = await fetch(`${API}/api/update/version`);
+            const vd = vr.ok ? await vr.json() : {};
+            showToast(I18N.t('toast.up_to_date', { version: vd.version || '' }), 'info');
+            return;
+        }
         const res = await fetch(`${API}/api/update/check`);
         const data = await res.json();
 
@@ -20988,7 +20995,7 @@ window.manualCheckUpdate = async function () {
             }
             showToast(I18N.t('toast.update_available', { version: data.version }), 'success');
         } else {
-            showToast(I18N.t('toast.up_to_date', { version: data.current_version }), 'info');
+            showToast(I18N.t('toast.up_to_date', { version: data.current_version || (window.UpdateManager && window.UpdateManager.currentVersion) || '' }), 'info');
         }
     } catch (err) {
         console.error('[CheckUpdate]', err);
@@ -26229,15 +26236,13 @@ function _acctDestPopup(title) {
                 <button type="button" class="modal-close" data-dest-cancel aria-label="${escapeHtml(I18N.t('actions.cancel'))}">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="input-group">
-                    <label>${escapeHtml(I18N.t('form.save_to'))}</label>
-                    <select id="acct-dest-select" style="width:100%;"></select>
-                    <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
-                        <button type="button" class="btn btn-ghost btn-sm" data-dest-create style="flex:1;"><i class="fa-solid fa-folder-plus"></i> ${escapeHtml(I18N.t('download.create_folder'))}</button>
-                        <button type="button" class="btn btn-ghost btn-sm" data-dest-addsource style="flex:1;"><i class="fa-solid fa-plus"></i> ${escapeHtml(_t3('acct.dest_add_source', 'Ajouter un dossier source'))}</button>
-                    </div>
-                    <small style="color:var(--text-muted); display:block; margin-top:6px;">${escapeHtml(I18N.t('form.save_hint'))}</small>
+                <label style="display:block; margin-bottom:6px; font-size:13px; color:var(--text-secondary);">${escapeHtml(I18N.t('form.save_to'))}</label>
+                <select id="acct-dest-select" style="width:100%;"></select>
+                <div class="acct-dest-actions">
+                    <button type="button" class="btn btn-ghost btn-sm" data-dest-create><span class="acct-dest-ico">＋</span> ${escapeHtml(I18N.t('download.create_folder'))}</button>
+                    <button type="button" class="btn btn-ghost btn-sm" data-dest-addsource><span class="acct-dest-ico">📁</span> ${escapeHtml(_t3('acct.dest_add_source', 'Ajouter un dossier source'))}</button>
                 </div>
+                <small style="color:var(--text-muted); display:block; margin-top:8px;">${escapeHtml(I18N.t('form.save_hint'))}</small>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-ghost" data-dest-cancel>${escapeHtml(I18N.t('actions.cancel'))}</button>

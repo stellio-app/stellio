@@ -1,5 +1,58 @@
 [
   {
+    "version": "1.0.1",
+    "items": {
+      "fr": [
+        "Démo et comptes invités : « Vérifier les mises à jour » et « À propos » affichent maintenant la version installée (au lieu de « {{version}} » ou « Chargement… »)",
+        "Démo : les widgets d'administration du tableau de bord (MQTT / Home Assistant, mises à jour, instances, sauvegardes) sont masqués",
+        "Fenêtre « Choisir la destination » (Mes likes / Mes créations) : correction de l'affichage des boutons et des icônes",
+        "Téléchargements : le fichier apparaît tout de suite dans la bibliothèque, sans attendre le scan complet des sources (utile avec un partage réseau), et la barre de progression indique l'avancement de la génération de sa miniature"
+      ],
+      "en": [
+        "Demo and guest accounts: “Check for updates” and “About” now show the installed version (instead of “{{version}}” or “Loading…”)",
+        "Demo: admin-only dashboard widgets (MQTT / Home Assistant, updates, instances, backups) are hidden",
+        "“Choose the destination” window (My likes / My creations): fixed the display of the buttons and icons",
+        "Downloads: the file now appears in the library right away, without waiting for the full scan of your sources (useful with a network share), and the progress bar shows how far its thumbnail generation has got"
+      ],
+      "de": [
+        "Demo und Gastkonten: „Nach Updates suchen“ und „Info“ zeigen jetzt die installierte Version (statt „{{version}}“ oder „Wird geladen…“)",
+        "Demo: Administrations-Widgets des Dashboards (MQTT / Home Assistant, Updates, Instanzen, Sicherungen) werden ausgeblendet",
+        "Fenster „Ziel wählen“ (Meine Likes / Meine Kreationen): Darstellung der Schaltflächen und Symbole korrigiert",
+        "Downloads: Die Datei erscheint sofort in der Bibliothek, ohne den vollständigen Scan der Quellen abzuwarten (nützlich bei Netzwerkfreigaben), und die Fortschrittsanzeige zeigt den Stand der Vorschaubild-Erstellung"
+      ],
+      "es": [
+        "Demo y cuentas de invitado: «Buscar actualizaciones» y «Acerca de» muestran ahora la versión instalada (en lugar de «{{version}}» o «Cargando…»)",
+        "Demo: se ocultan los widgets de administración del panel (MQTT / Home Assistant, actualizaciones, instancias, copias de seguridad)",
+        "Ventana «Elegir el destino» (Mis me gusta / Mis creaciones): corregida la visualización de los botones e iconos",
+        "Descargas: el archivo aparece enseguida en la biblioteca, sin esperar al análisis completo de las fuentes (útil con una carpeta de red), y la barra de progreso indica cómo va la generación de su miniatura"
+      ],
+      "pt": [
+        "Demo e contas de convidado: «Procurar atualizações» e «Acerca de» mostram agora a versão instalada (em vez de «{{version}}» ou «A carregar…»)",
+        "Demo: os widgets de administração do painel (MQTT / Home Assistant, atualizações, instâncias, cópias de segurança) ficam ocultos",
+        "Janela «Escolher o destino» (Os meus likes / As minhas criações): corrigida a apresentação dos botões e ícones",
+        "Transferências: o ficheiro aparece logo na biblioteca, sem esperar pela análise completa das fontes (útil com uma partilha de rede), e a barra de progresso indica o andamento da geração da miniatura"
+      ],
+      "it": [
+        "Demo e account ospite: «Verifica aggiornamenti» e «Informazioni» mostrano ora la versione installata (invece di «{{version}}» o «Caricamento…»)",
+        "Demo: i widget di amministrazione della dashboard (MQTT / Home Assistant, aggiornamenti, istanze, backup) sono nascosti",
+        "Finestra «Scegli la destinazione» (I miei like / Le mie creazioni): corretta la visualizzazione di pulsanti e icone",
+        "Download: il file compare subito nella libreria, senza attendere la scansione completa delle sorgenti (utile con una condivisione di rete), e la barra di avanzamento mostra a che punto è la generazione della miniatura"
+      ],
+      "zh": [
+        "演示版和访客账户：“检查更新”和“关于”现在显示已安装的版本（不再显示“{{version}}”或“加载中…”）",
+        "演示版：隐藏仪表板上的管理类小组件（MQTT / Home Assistant、更新、实例、备份）",
+        "“选择保存位置”窗口（我的点赞 / 我的作品）：修复按钮和图标的显示",
+        "下载：文件会立即出现在资料库中，无需等待所有来源完成扫描（使用网络共享时尤其有用），进度条会显示其缩略图的生成进度"
+      ],
+      "ja": [
+        "デモとゲストアカウント：「更新を確認」と「バージョン情報」で、インストール済みのバージョンが表示されるようになりました（「{{version}}」や「読み込み中…」ではなく）",
+        "デモ：ダッシュボードの管理用ウィジェット（MQTT / Home Assistant、更新、インスタンス、バックアップ）を非表示にしました",
+        "「保存先を選択」ウィンドウ（いいね / 作成したモデル）：ボタンとアイコンの表示を修正しました",
+        "ダウンロード：ソースの完全スキャンを待たずにファイルがすぐライブラリに表示されます（ネットワーク共有で便利）。進行バーにサムネイル生成の進み具合も表示されます"
+      ]
+    }
+  },
+  {
     "version": "1.0.0",
     "items": {
       "fr": [

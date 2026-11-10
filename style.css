@@ -9452,3 +9452,15 @@ html.has-bg-image .dashboard-widget, html.has-bg-image .file-card, html.has-bg-i
 .acct-empty { color: var(--text-muted); padding: 24px; text-align: center; grid-column: 1 / -1; }
 @media (max-width: 700px) { .acct-grid { grid-template-columns: 1fr 1fr; gap: 10px; } .acct-th { height: 96px; } .acct-hide-sm { display: none; } .acct-ac .btn-ghost { display: none; } }
 .acct-ac a.btn { text-decoration: none; } .acct-cr a { text-decoration: none; } .acct-cr a:hover { text-decoration: underline; }
+
+
+/* Popup « Choisir la destination » (Mes likes / Mes créations) */
+.acct-dest-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.acct-dest-actions .btn { flex: 1 1 160px; justify-content: center; }
+.acct-dest-ico { display: inline-block; width: 1.2em; text-align: center; }
+
+/* Démo publique : pas de widgets d'administration (MQTT, mises à jour, instances, sauvegardes) */
+body.is-demo #dashboard-widget-mqtt,
+body.is-demo #dashboard-widget-update,
+body.is-demo #dashboard-widget-instances,
+body.is-demo #dashboard-widget-backups { display: none !important; }
