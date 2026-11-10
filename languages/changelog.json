@@ -1,5 +1,1117 @@
 [
   {
+    "version": "0.9.9",
+    "items": {
+      "fr": [
+        "Génération des miniatures plus rapide : le rendu logiciel (sans GPU) est maintenant vectorisé avec numpy, jusqu'à 12× plus rapide sur les gros modèles (330 000 faces), pour un résultat identique",
+        "Nouveau bloc « Santé de Stellio » dans Paramètres → Diagnostic : mémoire, file des miniatures, tâches en cours, base, disque, erreurs récentes, avec alertes et copie en un clic",
+        "Annulation étendue : file de miniatures et vérification d'intégrité peuvent maintenant être arrêtées, avec des explications dans les fenêtres concernées",
+        "Nouveau journal des opérations (touche J, palette de commandes ou Paramètres → Diagnostic) : ajout, déplacement, renommage, suppression, conversion et découpe, avec annulation d'un renommage, d'un déplacement ou d'une suppression (depuis la corbeille)",
+        "Trois nouveaux widgets pour le tableau de bord : Santé de Stellio, Corbeille (éléments supprimés restaurables) et Nouveautés (texte dans la langue de l'interface)",
+        "Nouveaux « Mes likes » et « Mes créations » : retrouve les modèles que tu as likés ou publiés sur MakerWorld, Thingiverse, Creality Cloud, Snapmaker Space, Nexprint et Printables, avec miniature, créateur et lien vers le modèle. Une section par plateforme, affichée seulement si le compte est connecté et contient des modèles ; téléchargement en un clic, ou de tout ce qui manque à la bibliothèque",
+        "Corbeille complète : les devis, factures, clients, commandes, projets, bobines et fichiers supprimés ne sont plus effacés d'emblée. Ils vont dans la corbeille (30 jours par défaut, réglable), d'où vous pouvez les restaurer ou les supprimer définitivement ; un bouton Annuler apparaît juste après chaque suppression",
+        "Apparence : 12 nouvelles palettes de couleurs (Minuit, Océan, Forêt, Crépuscule, Rose, Braise, Nord, Papier, Menthe, Ciel, Lavande, Cerisier), éditeur pour personnaliser chaque couleur de l'interface (fonds, textes, bordures, états) et export/import d'un thème",
+        "Image de fond personnalisable (Paramètres → Apparence) : choix d'une image, assombrissement, flou et opacité des panneaux réglables ; les fenêtres restent opaques",
+        "Raccourcis clavier : J (journal), flèches pour parcourir la grille de la bibliothèque, Entrée pour ouvrir le fichier sélectionné",
+        "Suite de tests automatisés ajoutée au dépôt (dossier tests/, exécutée par GitHub Actions)"
+      ],
+      "en": [
+        "Faster thumbnail generation: the software renderer (no GPU) is now vectorised with numpy, up to 12× faster on large models (330,000 faces), with identical results",
+        "New “Stellio health” block in Settings → Diagnostic: memory, thumbnail queue, running jobs, database, disk, recent errors, with alerts and one-click copy",
+        "Extended cancellation: the thumbnail queue and the integrity check can now be stopped, with explanations in the relevant windows",
+        "New operations log (J key, command palette or Settings → Diagnostic): add, move, rename, delete, convert and split, with undo for a rename, move or deletion (from the trash)",
+        "Three new dashboard widgets: Stellio health, Trash (restore deleted items) and What's new (text in the interface language)",
+        "New “My likes” and “My creations”: find the models you liked or published on MakerWorld, Thingiverse, Creality Cloud, Snapmaker Space, Nexprint and Printables, with thumbnail, creator and a link to the model. One section per platform, shown only when the account is connected and has models; download in one click, or everything missing from your library",
+        "Full trash: deleted quotes, invoices, clients, orders, projects, spools and files are no longer erased right away. They go to the trash (30 days by default, adjustable), where you can restore them or delete them permanently; an Undo button appears right after each deletion",
+        "Appearance: 12 new color palettes (Midnight, Ocean, Forest, Dusk, Rose, Ember, Nord, Paper, Mint, Sky, Lavender, Cherry blossom), an editor to customize every interface color (backgrounds, text, borders, status) and theme export/import",
+        "Customizable background image (Settings → Appearance): pick an image, adjustable darkening, blur and panel opacity; windows stay opaque",
+        "Keyboard shortcuts: J (log), arrow keys to browse the library grid, Enter to open the selected file",
+        "Automated test suite added to the repository (tests/ folder, run by GitHub Actions)"
+      ],
+      "de": [
+        "Schnellere Vorschaubilder: Der Software-Renderer (ohne GPU) ist jetzt mit numpy vektorisiert, bei großen Modellen (330.000 Flächen) bis zu 12× schneller, mit identischem Ergebnis",
+        "Neuer Block „Stellio-Zustand“ unter Einstellungen → Diagnose: Speicher, Vorschaubild-Warteschlange, laufende Aufgaben, Datenbank, Speicherplatz, aktuelle Fehler, mit Warnungen und Ein-Klick-Kopie",
+        "Erweiterter Abbruch: Vorschaubild-Warteschlange und Integritätsprüfung lassen sich jetzt stoppen, mit Erklärungen in den jeweiligen Fenstern",
+        "Neues Vorgangsprotokoll (Taste J, Befehlspalette oder Einstellungen → Diagnose): Hinzufügen, Verschieben, Umbenennen, Löschen, Konvertieren und Aufteilen, mit Rückgängig für Umbenennen, Verschieben oder Löschen (über den Papierkorb)",
+        "Drei neue Dashboard-Widgets: Stellio-Zustand, Papierkorb (gelöschte Elemente wiederherstellen) und Neuigkeiten (Text in der Sprache der Oberfläche)",
+        "Neu: „Meine Likes“ und „Meine Kreationen“: Finde die Modelle, die du auf MakerWorld und Thingiverse geliked oder veröffentlicht hast, mit Vorschaubild, Ersteller und Link zum Modell. Ein Abschnitt pro Plattform, nur sichtbar, wenn das Konto verbunden ist und Modelle enthält; Download per Klick oder alles, was in der Bibliothek fehlt",
+        "Vollständiger Papierkorb: Gelöschte Angebote, Rechnungen, Kunden, Aufträge, Projekte, Spulen und Dateien werden nicht mehr sofort gelöscht. Sie landen im Papierkorb (standardmäßig 30 Tage, einstellbar) und können dort wiederhergestellt oder endgültig gelöscht werden; nach jedem Löschen erscheint eine Rückgängig-Schaltfläche",
+        "Darstellung: 12 neue Farbpaletten (Mitternacht, Ozean, Wald, Dämmerung, Rose, Glut, Nord, Papier, Minze, Himmel, Lavendel, Kirschblüte), ein Editor für jede Oberflächenfarbe (Hintergründe, Text, Rahmen, Status) und Export/Import von Designs",
+        "Anpassbares Hintergrundbild (Einstellungen → Darstellung): Bild auswählen, Abdunkelung, Unschärfe und Deckkraft der Panels einstellbar; Fenster bleiben undurchsichtig",
+        "Tastenkürzel: J (Protokoll), Pfeiltasten zum Navigieren im Bibliotheksraster, Eingabe zum Öffnen der ausgewählten Datei",
+        "Automatisierte Testsuite im Repository (Ordner tests/, von GitHub Actions ausgeführt)"
+      ],
+      "es": [
+        "Generación de miniaturas más rápida: el renderizado por software (sin GPU) ahora está vectorizado con numpy, hasta 12× más rápido en modelos grandes (330 000 caras), con resultado idéntico",
+        "Nuevo bloque «Salud de Stellio» en Ajustes → Diagnóstico: memoria, cola de miniaturas, tareas en curso, base de datos, disco, errores recientes, con alertas y copia en un clic",
+        "Cancelación ampliada: la cola de miniaturas y la verificación de integridad ahora se pueden detener, con explicaciones en las ventanas correspondientes",
+        "Nuevo registro de operaciones (tecla J, paleta de comandos o Ajustes → Diagnóstico): añadir, mover, renombrar, eliminar, convertir y dividir, con deshacer para un renombrado, movimiento o eliminación (desde la papelera)",
+        "Tres widgets nuevos en el panel: Salud de Stellio, Papelera (restaura elementos eliminados) y Novedades (texto en el idioma de la interfaz)",
+        "Nuevos «Mis me gusta» y «Mis creaciones»: encuentra los modelos que has marcado o publicado en MakerWorld y Thingiverse, con miniatura, creador y enlace al modelo. Una sección por plataforma, visible solo si la cuenta está conectada y tiene modelos; descarga con un clic o de todo lo que falta en la biblioteca",
+        "Papelera completa: los presupuestos, facturas, clientes, pedidos, proyectos, bobinas y archivos eliminados ya no se borran de inmediato. Van a la papelera (30 días por defecto, ajustable), donde puede restaurarlos o eliminarlos definitivamente; tras cada eliminación aparece un botón Deshacer",
+        "Apariencia: 12 paletas de colores nuevas (Medianoche, Océano, Bosque, Crepúsculo, Rosa, Brasa, Nord, Papel, Menta, Cielo, Lavanda, Cerezo), un editor para personalizar cada color de la interfaz (fondos, textos, bordes, estados) y exportar/importar temas",
+        "Imagen de fondo personalizable (Ajustes → Apariencia): elige una imagen y ajusta oscurecimiento, desenfoque y opacidad de los paneles; las ventanas siguen siendo opacas",
+        "Atajos de teclado: J (registro), flechas para recorrer la cuadrícula de la biblioteca, Intro para abrir el archivo seleccionado",
+        "Conjunto de pruebas automatizadas añadido al repositorio (carpeta tests/, ejecutado por GitHub Actions)"
+      ],
+      "pt": [
+        "Geração de miniaturas mais rápida: a renderização por software (sem GPU) agora é vetorizada com numpy, até 12× mais rápida em modelos grandes (330 000 faces), com resultado idêntico",
+        "Novo bloco «Saúde do Stellio» em Definições → Diagnóstico: memória, fila de miniaturas, tarefas em curso, base de dados, disco, erros recentes, com alertas e cópia num clique",
+        "Cancelamento alargado: a fila de miniaturas e a verificação de integridade podem agora ser paradas, com explicações nas janelas correspondentes",
+        "Novo registo de operações (tecla J, paleta de comandos ou Definições → Diagnóstico): adicionar, mover, renomear, eliminar, converter e dividir, com anulação de uma renomeação, movimentação ou eliminação (a partir da reciclagem)",
+        "Três novos widgets no painel: Saúde do Stellio, Reciclagem (restaura itens eliminados) e Novidades (texto no idioma da interface)",
+        "Novos «Meus gostos» e «Minhas criações»: encontra os modelos que marcaste ou publicaste no MakerWorld e no Thingiverse, com miniatura, criador e ligação para o modelo. Uma secção por plataforma, visível só se a conta estiver ligada e tiver modelos; transferência com um clique ou de tudo o que falta na biblioteca",
+        "Reciclagem completa: orçamentos, faturas, clientes, pedidos, projetos, bobinas e ficheiros eliminados deixam de ser apagados de imediato. Vão para a reciclagem (30 dias por predefinição, ajustável), onde pode restaurá-los ou eliminá-los definitivamente; surge um botão Anular logo após cada eliminação",
+        "Aparência: 12 novas paletas de cores (Meia-noite, Oceano, Floresta, Crepúsculo, Rosa, Brasa, Nord, Papel, Menta, Céu, Lavanda, Cerejeira), um editor para personalizar cada cor da interface (fundos, texto, bordas, estados) e exportação/importação de temas",
+        "Imagem de fundo personalizável (Definições → Aparência): escolha uma imagem e ajuste escurecimento, desfoque e opacidade dos painéis; as janelas continuam opacas",
+        "Atalhos de teclado: J (registo), setas para percorrer a grelha da biblioteca, Enter para abrir o ficheiro selecionado",
+        "Conjunto de testes automáticos adicionado ao repositório (pasta tests/, executado pelo GitHub Actions)"
+      ],
+      "it": [
+        "Generazione delle miniature più veloce: il rendering software (senza GPU) è ora vettorizzato con numpy, fino a 12× più veloce sui modelli grandi (330.000 facce), con risultato identico",
+        "Nuovo blocco «Salute di Stellio» in Impostazioni → Diagnostica: memoria, coda delle miniature, attività in corso, database, disco, errori recenti, con avvisi e copia con un clic",
+        "Annullamento esteso: la coda delle miniature e il controllo di integrità ora possono essere fermati, con spiegazioni nelle finestre interessate",
+        "Nuovo registro delle operazioni (tasto J, palette dei comandi o Impostazioni → Diagnostica): aggiunta, spostamento, rinomina, eliminazione, conversione e divisione, con annullamento di una rinomina, spostamento o eliminazione (dal cestino)",
+        "Tre nuovi widget nella dashboard: Salute di Stellio, Cestino (ripristina gli elementi eliminati) e Novità (testo nella lingua dell'interfaccia)",
+        "Nuovi «I miei Mi piace» e «Le mie creazioni»: ritrova i modelli che hai messo tra i Mi piace o pubblicato su MakerWorld e Thingiverse, con miniatura, autore e link al modello. Una sezione per piattaforma, visibile solo se l'account è collegato e contiene modelli; download con un clic o di tutto ciò che manca nella libreria",
+        "Cestino completo: preventivi, fatture, clienti, ordini, progetti, bobine e file eliminati non vengono più cancellati subito. Finiscono nel cestino (30 giorni di default, regolabile), da cui puoi ripristinarli o eliminarli definitivamente; dopo ogni eliminazione compare un pulsante Annulla",
+        "Aspetto: 12 nuove palette di colori (Mezzanotte, Oceano, Foresta, Crepuscolo, Rosa, Brace, Nord, Carta, Menta, Cielo, Lavanda, Ciliegio), un editor per personalizzare ogni colore dell'interfaccia (sfondi, testo, bordi, stati) ed esportazione/importazione dei temi",
+        "Immagine di sfondo personalizzabile (Impostazioni → Aspetto): scegli un'immagine e regola oscuramento, sfocatura e opacità dei pannelli; le finestre restano opache",
+        "Scorciatoie da tastiera: J (registro), frecce per scorrere la griglia della libreria, Invio per aprire il file selezionato",
+        "Suite di test automatici aggiunta al repository (cartella tests/, eseguita da GitHub Actions)"
+      ],
+      "zh": [
+        "缩略图生成更快：软件渲染（无 GPU）现已用 numpy 向量化，大型模型（33 万面）最高快 12 倍，结果完全相同",
+        "设置 → 诊断中新增“Stellio 健康状态”：内存、缩略图队列、运行中的任务、数据库、磁盘、最近错误，并带有警告与一键复制",
+        "扩展取消功能：缩略图队列和完整性检查现在可以停止，并在相关窗口中给出说明",
+        "新增操作日志（J 键、命令面板或设置 → 诊断）：添加、移动、重命名、删除、转换和拆分，可撤销重命名、移动或删除（可从回收站操作）",
+        "仪表板新增三个小组件：Stellio 健康状态、回收站（可恢复已删除项目）和更新日志（使用界面语言显示）",
+        "新增“我的点赞”和“我的作品”：查看你在 MakerWorld 和 Thingiverse 上点赞或发布的模型，含缩略图、作者及模型链接。每个平台一个分区，仅在账户已连接且有模型时显示；可一键下载，或下载库中缺少的全部模型",
+        "完整的回收站：已删除的报价单、发票、客户、订单、项目、耗材盘和文件不再被立即清除，而是进入回收站（默认保留 30 天，可调整），可在其中还原或永久删除；每次删除后会出现“撤销”按钮",
+        "外观：新增 12 种配色方案（午夜、海洋、森林、暮色、玫瑰、余烬、北欧、纸张、薄荷、天空、薰衣草、樱花），可自定义界面每种颜色（背景、文字、边框、状态）的编辑器，并支持主题导出/导入",
+        "可自定义背景图片（设置 → 外观）：选择图片，可调节变暗程度、模糊和面板不透明度；弹出窗口保持不透明",
+        "键盘快捷键：J（日志）、方向键浏览资料库网格、回车打开所选文件",
+        "仓库新增自动化测试（tests/ 文件夹，由 GitHub Actions 运行）"
+      ],
+      "ja": [
+        "サムネイル生成が高速化：ソフトウェアレンダリング（GPUなし）を numpy でベクトル化し、大きなモデル（33万面）で最大12倍高速に。結果は同一です",
+        "設定 → 診断に「Stellio の状態」ブロックを追加：メモリ、サムネイルキュー、実行中のタスク、データベース、ディスク、最近のエラー。警告とワンクリックコピー付き",
+        "キャンセル機能を拡張：サムネイルキューと整合性チェックを停止できるようになり、各ウィンドウに説明を追加",
+        "操作ログを新設（Jキー、コマンドパレット、設定 → 診断）：追加・移動・名前変更・削除・変換・分割を記録し、名前変更・移動・削除の取り消しが可能（ごみ箱から実行可能）",
+        "ダッシュボードに3つのウィジェットを追加：Stellio の状態、ごみ箱（削除した項目を復元可能）、新着情報（インターフェース言語で表示）",
+        "新機能「いいねしたモデル」と「自作モデル」：MakerWorld と Thingiverse でいいね・公開したモデルを、サムネイル・作者・モデルへのリンク付きで表示。プラットフォームごとにセクションを表示（アカウント接続済みでモデルがある場合のみ）。ワンクリックで、またはライブラリにないものをまとめてダウンロード",
+        "完全なゴミ箱：削除した見積書・請求書・顧客・注文・プロジェクト・スプール・ファイルは、すぐには消去されなくなりました。ゴミ箱（既定で30日、変更可）に入り、復元または完全に削除できます。削除直後には「元に戻す」ボタンも表示されます",
+        "外観：12種類の新しいカラーパレット（ミッドナイト、オーシャン、フォレスト、トワイライト、ローズ、エンバー、ノルド、ペーパー、ミント、スカイ、ラベンダー、桜）、インターフェースの各色（背景・文字・枠線・状態）を編集できるエディター、テーマのエクスポート/インポートを追加",
+        "背景画像のカスタマイズ（設定 → 外観）：画像を選び、暗さ・ぼかし・パネルの不透明度を調整可能。ウィンドウは不透明のまま",
+        "キーボードショートカット：J（ログ）、矢印キーでライブラリのグリッドを移動、Enterで選択ファイルを開く",
+        "自動テストをリポジトリに追加（tests/ フォルダ、GitHub Actions で実行）"
+      ]
+    }
+  },
+  {
+    "version": "0.9.8",
+    "items": {
+      "fr": [
+        "Découpe des plateaux d'un 3MF : la fenêtre affiche maintenant l'avancement (barre de progression et « plateau 3 sur 6 »), la découpe se fait en tâche de fond et reste tout-ou-rien",
+        "Avancement ajouté aux opérations longues qui n'en avaient pas : la conversion de plusieurs fichiers (barre de progression et « 2 / 5 », sur le bouton et dans une notification), l'ajout de fichiers par glisser-déposer et l'import d'une sauvegarde (pourcentage d'envoi, puis « Traitement par le serveur… »)",
+        "Fichiers multi-plateaux : le nombre de plateaux s'affiche maintenant sur la miniature (à côté de l'icône)",
+        "Annulation possible de la découpe des plateaux (aucun fichier n'est conservé) et de la conversion en lot (les fichiers déjà convertis restent), avec un bouton « Annuler » pendant l'opération"
+      ],
+      "en": [
+        "Splitting the plates of a 3MF: the window now shows progress (progress bar and “plate 3 of 6”); the split runs in the background and is still all-or-nothing",
+        "Progress added to long operations that had none: converting several files (progress bar and “2 / 5”, on the button and in a notification), adding files by drag and drop, and importing a backup (upload percentage, then “Processing on the server…”)",
+        "Multi-plate files: the number of plates is now shown on the thumbnail (next to the icon)",
+        "The plate split (no file is kept) and the batch conversion (files already converted are kept) can now be cancelled with a “Cancel” button while they run"
+      ],
+      "de": [
+        "Aufteilen der Platten einer 3MF-Datei: Das Fenster zeigt jetzt den Fortschritt (Fortschrittsbalken und „Platte 3 von 6“); die Aufteilung läuft im Hintergrund und bleibt alles-oder-nichts",
+        "Fortschrittsanzeige für lange Vorgänge, die bisher keine hatten: Konvertierung mehrerer Dateien (Fortschrittsbalken und „2 / 5“ auf der Schaltfläche und in einer Benachrichtigung), Hinzufügen von Dateien per Drag & Drop und Import einer Sicherung (Upload-Prozentsatz, dann „Verarbeitung auf dem Server …“)",
+        "Mehrplatten-Dateien: Die Anzahl der Platten wird jetzt auf der Vorschau angezeigt (neben dem Symbol)",
+        "Das Aufteilen der Platten (keine Datei bleibt erhalten) und die Stapelkonvertierung (bereits konvertierte Dateien bleiben) lassen sich jetzt mit einer Schaltfläche „Abbrechen“ stoppen"
+      ],
+      "es": [
+        "División de las placas de un 3MF: la ventana ahora muestra el progreso (barra de progreso y «placa 3 de 6»); la división se hace en segundo plano y sigue siendo todo o nada",
+        "Progreso añadido a las operaciones largas que no lo tenían: conversión de varios archivos (barra de progreso y «2 / 5», en el botón y en una notificación), adición de archivos arrastrando y soltando, e importación de una copia de seguridad (porcentaje de envío, luego «Procesando en el servidor…»)",
+        "Archivos de varias placas: el número de placas se muestra ahora en la miniatura (junto al icono)",
+        "La división de placas (no se conserva ningún archivo) y la conversión por lotes (los archivos ya convertidos se conservan) ahora se pueden cancelar con un botón «Cancelar»"
+      ],
+      "pt": [
+        "Divisão das placas de um 3MF: a janela mostra agora o progresso (barra de progresso e «placa 3 de 6»); a divisão faz-se em segundo plano e continua a ser tudo ou nada",
+        "Progresso adicionado às operações longas que não o tinham: conversão de vários ficheiros (barra de progresso e «2 / 5», no botão e numa notificação), adição de ficheiros por arrastar e largar, e importação de uma cópia de segurança (percentagem de envio, depois «Processando no servidor…»)",
+        "Ficheiros com várias placas: o número de placas aparece agora na miniatura (junto ao ícone)",
+        "A divisão das placas (nenhum ficheiro é mantido) e a conversão em lote (os ficheiros já convertidos são mantidos) podem agora ser canceladas com um botão «Cancelar»"
+      ],
+      "it": [
+        "Divisione dei piatti di un 3MF: la finestra ora mostra l'avanzamento (barra di avanzamento e «piatto 3 di 6»); la divisione avviene in background ed è sempre tutto o niente",
+        "Avanzamento aggiunto alle operazioni lunghe che non lo avevano: conversione di più file (barra di avanzamento e «2 / 5», sul pulsante e in una notifica), aggiunta di file con trascinamento e importazione di un backup (percentuale di invio, poi «Elaborazione sul server…»)",
+        "File con più piatti: il numero di piatti è ora mostrato sulla miniatura (accanto all'icona)",
+        "La divisione dei piatti (nessun file viene conservato) e la conversione in blocco (i file già convertiti restano) ora si possono annullare con un pulsante «Annulla»"
+      ],
+      "zh": [
+        "拆分 3MF 的打印板：窗口现在显示进度（进度条和“第 3 个打印板，共 6 个”）；拆分在后台进行，仍然是要么全部成功要么全部不保留",
+        "为此前没有进度显示的长时间操作增加了进度：批量转换多个文件（按钮和通知中显示进度条和“2 / 5”）、拖放添加文件、导入备份（先显示上传百分比，再显示“服务器处理中…”）",
+        "多打印板文件：缩略图上现在显示打印板数量（图标旁边）",
+        "拆分打印板（不保留任何文件）和批量转换（已转换的文件保留）现在可以通过“取消”按钮中止"
+      ],
+      "ja": [
+        "3MF のプレート分割：ウィンドウに進行状況（プログレスバーと「プレート 3 / 6」）が表示されるようになりました。分割はバックグラウンドで実行され、全部成功か全部取り消しのままです",
+        "進行状況が表示されなかった長時間の操作に進行状況を追加しました：複数ファイルの一括変換（ボタンと通知に進行バーと「2 / 5」）、ドラッグ＆ドロップでのファイル追加、バックアップのインポート（アップロードの割合、続いて「サーバーで処理中…」）",
+        "複数プレートのファイル：サムネイルのアイコンの横にプレート数が表示されるようになりました",
+        "プレート分割（ファイルは残りません）と一括変換（変換済みのファイルは残ります）を、実行中に「キャンセル」ボタンで中止できるようになりました"
+      ]
+    }
+  },
+  {
+    "version": "0.9.7",
+    "items": {
+      "fr": [
+        "Miniatures : un fichier dont le rendu dépasse le délai n'est plus relancé en boucle (il gardait sa miniature de remplacement, mais le contrôle de couverture le remettait en file à chaque passage, pour le même échec) ; les fichiers de 20 Mo et plus sont rendus un à la fois pour ne plus saturer la mémoire d'une grosse bibliothèque",
+        "Miniatures : le rendu sur processeur (quand OpenGL n'est pas disponible) est désormais limité à un seul à la fois, car plusieurs rendus simultanés se ralentissaient mutuellement (un gros maillage : 6 s seul, 109 s chacun à six) et dépassaient leur délai ; la correction des normales, inutile pour ce rendu, est sautée (12 s gagnées sur un gros maillage, image identique)"
+      ],
+      "en": [
+        "Thumbnails: a file whose render exceeds its time limit is no longer retried in a loop (it kept its placeholder thumbnail, but the coverage check put it back in the queue on every pass, with the same failure each time); files of 20 MB and more are rendered one at a time so a large library no longer exhausts memory",
+        "Thumbnails: CPU rendering (when OpenGL is not available) now runs one at a time, because several simultaneous renders slowed each other down (one large mesh: 6 s alone, 109 s each when six ran together) and exceeded their time limit; normal fixing, which this renderer does not need, is skipped (12 s saved on a large mesh, identical image)"
+      ],
+      "de": [
+        "Vorschaubilder: Eine Datei, deren Rendering das Zeitlimit überschreitet, wird nicht mehr in einer Schleife neu gestartet (sie behielt ihr Ersatzbild, aber die Abdeckungsprüfung stellte sie bei jedem Durchlauf wieder in die Warteschlange, mit demselben Fehlschlag); Dateien ab 20 MB werden nacheinander gerendert, damit eine große Bibliothek den Speicher nicht mehr erschöpft",
+        "Vorschaubilder: Das CPU-Rendering (wenn OpenGL nicht verfügbar ist) läuft jetzt nur noch einzeln, weil mehrere gleichzeitige Renderings sich gegenseitig ausbremsten (ein großes Mesh: 6 s allein, 109 s je Rendering bei sechs parallel) und ihr Zeitlimit überschritten; die Normalenkorrektur, die dieses Rendering nicht braucht, entfällt (12 s gespart bei einem großen Mesh, identisches Bild)"
+      ],
+      "es": [
+        "Miniaturas: un archivo cuyo renderizado supera el tiempo límite ya no se reintenta en bucle (conservaba su miniatura provisional, pero la comprobación de cobertura lo volvía a poner en cola en cada pasada, con el mismo fallo); los archivos de 20 MB o más se renderizan de uno en uno para que una biblioteca grande no agote la memoria",
+        "Miniaturas: el renderizado por CPU (cuando OpenGL no está disponible) ahora se ejecuta de uno en uno, porque varios renderizados simultáneos se ralentizaban entre sí (una malla grande: 6 s sola, 109 s cada una con seis a la vez) y superaban su tiempo límite; se omite la corrección de normales, innecesaria para este renderizado (12 s ahorrados en una malla grande, imagen idéntica)"
+      ],
+      "pt": [
+        "Miniaturas: um ficheiro cuja renderização excede o tempo limite já não é repetido em ciclo (mantinha a miniatura provisória, mas a verificação de cobertura voltava a colocá-lo na fila em cada passagem, com a mesma falha); os ficheiros de 20 MB ou mais são renderizados um de cada vez para que uma biblioteca grande não esgote a memória",
+        "Miniaturas: a renderização por CPU (quando o OpenGL não está disponível) passa a executar-se uma de cada vez, porque várias renderizações simultâneas se atrasavam mutuamente (uma malha grande: 6 s sozinha, 109 s cada uma com seis em simultâneo) e excediam o tempo limite; a correção de normais, desnecessária para esta renderização, é ignorada (12 s poupados numa malha grande, imagem idêntica)"
+      ],
+      "it": [
+        "Miniature: un file il cui rendering supera il tempo limite non viene più ritentato in ciclo (manteneva la miniatura provvisoria, ma il controllo di copertura lo rimetteva in coda a ogni passaggio, con lo stesso fallimento); i file da 20 MB in su vengono renderizzati uno alla volta così una grande libreria non esaurisce più la memoria",
+        "Miniature: il rendering su CPU (quando OpenGL non è disponibile) ora viene eseguito uno alla volta, perché più rendering simultanei si rallentavano a vicenda (una mesh grande: 6 s da sola, 109 s ciascuna con sei insieme) e superavano il tempo limite; la correzione delle normali, inutile per questo rendering, viene saltata (12 s risparmiati su una mesh grande, immagine identica)"
+      ],
+      "zh": [
+        "缩略图：渲染超时的文件不再被循环重试（它保留了占位缩略图，但覆盖率检查每轮都会把它重新放回队列，结果每次都一样）；20 MB 及以上的文件改为逐个渲染，大型库不再耗尽内存",
+        "缩略图：CPU 渲染（OpenGL 不可用时）现在一次只运行一个，因为多个同时渲染会互相拖慢（一个大型网格：单独 6 秒，六个并行时每个 109 秒）并超过时限；跳过该渲染不需要的法线修正（大型网格节省 12 秒，图像完全相同）"
+      ],
+      "ja": [
+        "サムネイル：レンダリングが制限時間を超えたファイルを繰り返し再試行しなくなりました（代替サムネイルは保持されていましたが、カバレッジ確認が毎回キューに戻し、同じ失敗を繰り返していました）。20 MB 以上のファイルは 1 つずつレンダリングし、大きなライブラリでもメモリを使い切らないようにしました",
+        "サムネイル：CPU レンダリング（OpenGL が使えない場合）は 1 つずつ実行するようになりました。複数を同時に実行すると互いに遅くなり（大きなメッシュで単独 6 秒、6 つ同時だと各 109 秒）、制限時間を超えていたためです。このレンダリングに不要な法線の修正は省略します（大きなメッシュで 12 秒短縮、画像は同一）"
+      ]
+    }
+  },
+  {
+    "version": "0.9.6",
+    "items": {
+      "fr": [
+        "Mémoire : les miniatures dont le rendu dépasse le délai ne s'empilent plus en arrière-plan (elles occupaient CPU et mémoire pendant que les suivantes démarraient, jusqu'à saturer la RAM sur de très grosses bibliothèques de fichiers lourds) : elles sont comptées, s'arrêtent d'elles-mêmes dès que possible, et la génération attend qu'elles se terminent avant de continuer"
+      ],
+      "en": [
+        "Memory: thumbnail renders that exceed their time limit no longer pile up in the background (they kept using CPU and memory while the next ones started, which could exhaust RAM on very large libraries of heavy files): they are now counted, stop on their own as soon as possible, and generation waits for them to finish before continuing"
+      ],
+      "de": [
+        "Speicher: Vorschaubilder, deren Rendering das Zeitlimit überschreitet, stapeln sich nicht mehr im Hintergrund (sie belegten CPU und Speicher, während die nächsten starteten, und konnten bei sehr großen Bibliotheken mit schweren Dateien den Arbeitsspeicher erschöpfen): Sie werden gezählt, beenden sich so früh wie möglich selbst, und die Erzeugung wartet auf ihr Ende, bevor sie fortfährt"
+      ],
+      "es": [
+        "Memoria: las miniaturas cuyo renderizado supera el tiempo límite ya no se acumulan en segundo plano (seguían usando CPU y memoria mientras empezaban las siguientes, lo que podía agotar la RAM en bibliotecas muy grandes de archivos pesados): ahora se cuentan, se detienen solas lo antes posible y la generación espera a que terminen antes de continuar"
+      ],
+      "pt": [
+        "Memória: as miniaturas cuja renderização excede o tempo limite já não se acumulam em segundo plano (continuavam a usar CPU e memória enquanto as seguintes começavam, o que podia esgotar a RAM em bibliotecas muito grandes de ficheiros pesados): passam a ser contadas, param sozinhas assim que possível e a geração aguarda que terminem antes de continuar"
+      ],
+      "it": [
+        "Memoria: le miniature il cui rendering supera il tempo limite non si accumulano più in background (continuavano a usare CPU e memoria mentre partivano le successive, fino a saturare la RAM su librerie molto grandi di file pesanti): ora vengono contate, si fermano da sole appena possibile e la generazione attende che finiscano prima di continuare"
+      ],
+      "zh": [
+        "内存：渲染超时的缩略图不再在后台堆积（它们在后续缩略图开始时仍占用 CPU 和内存，在包含大量大文件的超大型库中可能耗尽内存）：现在会被计数，并尽快自行停止，生成流程会等待它们结束后再继续"
+      ],
+      "ja": [
+        "メモリ：レンダリングが制限時間を超えたサムネイルがバックグラウンドに積み重ならなくなりました（次のサムネイルが始まっても CPU とメモリを使い続け、重いファイルが非常に多いライブラリでは RAM を使い切ることがありました）。これらを数えて可能な限り早く自動停止し、完了するまで生成を待機してから続行します"
+      ]
+    }
+  },
+  {
+    "version": "0.9.5",
+    "items": {
+      "fr": [
+        "Thème : suit désormais le mode clair/sombre du système par défaut (y compris sur l'écran de création de compte et de connexion) et change en direct si le système bascule ; le choix Sombre/Clair reste disponible dans les paramètres",
+        "Langue : sur Windows/macOS, Stellio démarre dans la langue du système (ou celle choisie dans l'installateur) ; le sélecteur de langue disparaît de la page de connexion et reste dans les paramètres. L'installateur Windows s'adapte aussi à la langue du système (EN, FR, DE, ES, IT, PT, JA)",
+        "Démo publique en lecture seule : STELLIO_DEMO=1 génère 12 modèles libres et ouvre l'interface en invité en un clic (guide docs/DEMO.md) ; README enrichi d'un GIF de démonstration et de captures par fonction"
+      ],
+      "en": [
+        "Theme: now follows the system light/dark mode by default (including the account creation and login screen) and switches live when the system changes; the Dark/Light choice remains available in settings",
+        "Language: on Windows/macOS, Stellio starts in the system language (or the one chosen in the installer); the language selector is removed from the login page and stays in settings. The Windows installer also follows the system language (EN, FR, DE, ES, IT, PT, JA)",
+        "Public read-only demo: STELLIO_DEMO=1 generates 12 free models and opens the interface as a guest in one click (guide docs/DEMO.md); README now has a demo GIF and per-feature screenshots"
+      ],
+      "de": [
+        "Design: folgt standardmäßig dem hellen/dunklen Systemmodus (auch auf dem Konto- und Anmeldebildschirm) und wechselt live mit dem System; die Auswahl Dunkel/Hell bleibt in den Einstellungen verfügbar",
+        "Sprache: Unter Windows/macOS startet Stellio in der Systemsprache (oder der im Installer gewählten); die Sprachauswahl verschwindet von der Anmeldeseite und bleibt in den Einstellungen. Der Windows-Installer folgt ebenfalls der Systemsprache (EN, FR, DE, ES, IT, PT, JA)",
+        "Öffentliche Nur-Lese-Demo: STELLIO_DEMO=1 erzeugt 12 freie Modelle und öffnet die Oberfläche mit einem Klick als Gast (Anleitung docs/DEMO.md); README mit Demo-GIF und Screenshots je Funktion"
+      ],
+      "es": [
+        "Tema: ahora sigue por defecto el modo claro/oscuro del sistema (también en la pantalla de creación de cuenta e inicio de sesión) y cambia en directo con el sistema; la opción Oscuro/Claro sigue disponible en los ajustes",
+        "Idioma: en Windows/macOS, Stellio arranca en el idioma del sistema (o el elegido en el instalador); el selector de idioma desaparece de la página de inicio de sesión y permanece en los ajustes. El instalador de Windows también sigue el idioma del sistema (EN, FR, DE, ES, IT, PT, JA)",
+        "Demo pública de solo lectura: STELLIO_DEMO=1 genera 12 modelos libres y abre la interfaz como invitado con un clic (guía docs/DEMO.md); README con GIF de demostración y capturas por función"
+      ],
+      "pt": [
+        "Tema: agora segue por padrão o modo claro/escuro do sistema (inclusive na tela de criação de conta e login) e muda em tempo real com o sistema; a escolha Escuro/Claro continua nas configurações",
+        "Idioma: no Windows/macOS, o Stellio inicia no idioma do sistema (ou no escolhido no instalador); o seletor de idioma sai da página de login e permanece nas configurações. O instalador do Windows também segue o idioma do sistema (EN, FR, DE, ES, IT, PT, JA)",
+        "Demo pública somente leitura: STELLIO_DEMO=1 gera 12 modelos livres e abre a interface como convidado com um clique (guia docs/DEMO.md); README com GIF de demonstração e capturas por função"
+      ],
+      "it": [
+        "Tema: ora segue per impostazione predefinita la modalità chiaro/scuro del sistema (anche nella schermata di creazione account e accesso) e cambia in tempo reale con il sistema; la scelta Scuro/Chiaro resta nelle impostazioni",
+        "Lingua: su Windows/macOS, Stellio si avvia nella lingua del sistema (o in quella scelta nell'installer); il selettore di lingua scompare dalla pagina di accesso e resta nelle impostazioni. Anche l'installer di Windows segue la lingua del sistema (EN, FR, DE, ES, IT, PT, JA)",
+        "Demo pubblica in sola lettura: STELLIO_DEMO=1 genera 12 modelli liberi e apre l'interfaccia come ospite con un clic (guida docs/DEMO.md); README con GIF dimostrativa e schermate per funzione"
+      ],
+      "zh": [
+        "主题：默认跟随系统的浅色/深色模式（包括创建账户和登录界面），并随系统实时切换；仍可在设置中手动选择深色/浅色",
+        "语言：在 Windows/macOS 上，Stellio 默认使用系统语言（或安装程序中选择的语言）；登录页不再显示语言选择器，仍可在设置中更改。Windows 安装程序也会跟随系统语言（EN、FR、DE、ES、IT、PT、JA）",
+        "公开只读演示：设置 STELLIO_DEMO=1 会生成 12 个免费模型，并一键以访客身份进入（指南见 docs/DEMO.md）；README 新增演示 GIF 和各功能截图"
+      ],
+      "ja": [
+        "テーマ：既定でシステムのライト／ダークモードに従い（アカウント作成・ログイン画面を含む）、システムの切り替えに即時反映。設定でダーク／ライトを手動選択することも可能",
+        "言語：Windows/macOS では、Stellio はシステム言語（またはインストーラーで選んだ言語）で起動します。ログイン画面の言語選択は削除され、設定内に残ります。Windows インストーラーもシステム言語に従います（EN、FR、DE、ES、IT、PT、JA）",
+        "公開読み取り専用デモ：STELLIO_DEMO=1 で無料モデル 12 点を生成し、ワンクリックでゲストとして開きます（手順は docs/DEMO.md）。README にデモ GIF と機能別スクリーンショットを追加"
+      ]
+    }
+  },
+  {
+    "version": "0.9.4",
+    "items": {
+      "fr": [
+        "Tableau de bord : la molette de la souris défile maintenant la page même quand le curseur est au-dessus d'un widget (auparavant, sur la version serveur/navigateur, il fallait passer par un autre endroit de la page pour pouvoir défiler)",
+        "Textes manquants traduits : le champ « Adresse externe » des imprimantes et les messages d'envoi vers le slicer du PC s'affichent maintenant dans la langue choisie, sous Windows comme sur la version serveur (LXC)",
+        "Suivi client : un lien public par commande (en file, en cours, prête à retirer) à envoyer à votre client, avec un message optionnel ; aucun prix ni détail interne n'est exposé, et le lien se révoque en un clic (bouton lien dans la file de commandes) ; si l'accès à distance n'est pas actif, la fenêtre propose de créer le lien Cloudflare en un clic au lieu d'un lien en adresse IP",
+        "Nouveau filtre « Imprimable chez moi maintenant » dans la bibliothèque : ne garde que les fichiers qui tiennent sur le plateau d'au moins une de vos imprimantes et dont le poids passe avec vos bobines en stock ou celles de l'AMS",
+        "Recherche par photo (bouton appareil photo de la barre de recherche) : retrouvez dans votre bibliothèque les modèles qui ressemblent à une photo, avec un modèle de vision Ollama 100 % local ; indexation en arrière-plan, une image à la fois, pausable et suspendue si la mémoire manque ; mode doux par défaut (en pause tant que vous utilisez Stellio ou que le processeur est chargé, moitié des cœurs, modèle déchargé de la mémoire à la fin), option « aller plus vite »",
+        "Inventaire filament : la section « inventaire manuel » est masquée quand elle est désactivée dans les paramètres",
+        "À propos : logo TigerTag et boutons de partenariat harmonisés avec le style global",
+        "Convertisseur : nouveaux formats de sortie (STL ASCII, PLY, OFF, GLB) et sources STEP/STP/PLY/AMF réellement acceptées",
+        "Page Réparation redessinée (résumé, outils, carte d'analyse avec progression)",
+        "Détection des défauts non-manifold pendant la génération des miniatures et l'analyse en arrière-plan",
+        "Fenêtre des filtres élargie sur plusieurs colonnes : tout est visible sans défiler"
+      ],
+      "en": [
+        "Dashboard: the mouse wheel now scrolls the page even when the cursor is over a widget (previously, on the server/browser edition, you had to point elsewhere on the page to scroll)",
+        "Missing texts translated: the printers' \"External address\" field and the send-to-PC-slicer messages now appear in the chosen language, on Windows and on the server edition (LXC)",
+        "Customer tracking: one public link per order (queued, printing, ready for pickup) to send to your customer, with an optional message; no price or internal detail is exposed, and the link can be revoked in one click (link button in the orders queue); if remote access isn't on, the window offers to create the Cloudflare link in one click instead of an IP-address link",
+        "New \"Printable at home right now\" library filter: keeps only files that fit the bed of at least one of your printers and whose weight fits your spools in stock or in the AMS",
+        "Search by photo (camera button in the search bar): find the models in your library that look like a photo, using a 100% local Ollama vision model; background indexing, one image at a time, pausable and suspended when memory runs low; gentle mode by default (paused while you use Stellio or the CPU is busy, half the cores, model unloaded from memory when done), with a \"go faster\" option",
+        "Filament inventory: the manual inventory section is hidden when disabled in settings",
+        "About: TigerTag logo and partnership buttons matched to the global style",
+        "Converter: new output formats (ASCII STL, PLY, OFF, GLB) and STEP/STP/PLY/AMF sources now really accepted",
+        "Repair page redesigned (summary, tools, analysis card with progress)",
+        "Non-manifold defects are now detected during thumbnail generation and background analysis",
+        "Filters window widened into several columns: everything is visible without scrolling"
+      ],
+      "de": [
+        "Dashboard: Das Mausrad scrollt die Seite jetzt auch dann, wenn sich der Mauszeiger über einem Widget befindet (zuvor musste man in der Server-/Browser-Edition an eine andere Stelle der Seite zeigen, um scrollen zu können)",
+        "Fehlende Texte übersetzt: Das Feld „Externe Adresse“ der Drucker und die Meldungen zum Senden an den PC-Slicer erscheinen jetzt in der gewählten Sprache, unter Windows wie in der Server-Edition (LXC)",
+        "Kunden-Tracking: ein öffentlicher Link pro Auftrag (in der Warteschlange, im Druck, abholbereit) zum Weitergeben an Ihren Kunden, mit optionaler Nachricht; keine Preise oder internen Details sichtbar, der Link lässt sich mit einem Klick widerrufen (Link-Schaltfläche in der Auftragsliste); ist der Fernzugriff nicht aktiv, bietet das Fenster an, den Cloudflare-Link mit einem Klick zu erstellen statt eines IP-Links",
+        "Neuer Bibliotheksfilter „Jetzt bei mir druckbar“: zeigt nur Dateien, die auf das Druckbett mindestens eines Ihrer Drucker passen und deren Gewicht zu Ihren Spulen im Lager oder im AMS passt",
+        "Suche per Foto (Kamera-Schaltfläche in der Suchleiste): findet in Ihrer Bibliothek Modelle, die einem Foto ähneln, mit einem 100 % lokalen Ollama-Bildmodell; Indexierung im Hintergrund, ein Bild nach dem anderen, pausierbar und bei knappem Speicher ausgesetzt; standardmäßig schonender Modus (pausiert, solange Sie Stellio nutzen oder die CPU ausgelastet ist, halbe Kernzahl, Modell wird danach aus dem Speicher entladen), mit Option „Schneller“",
+        "Filamentinventar: Der manuelle Bestand wird ausgeblendet, wenn er in den Einstellungen deaktiviert ist",
+        "Über: TigerTag-Logo und Partnerschaftsschaltflächen an den globalen Stil angepasst",
+        "Konverter: neue Ausgabeformate (ASCII-STL, PLY, OFF, GLB); STEP/STP/PLY/AMF als Quelle werden jetzt akzeptiert",
+        "Reparaturseite neu gestaltet (Übersicht, Werkzeuge, Analysekarte mit Fortschritt)",
+        "Non-Manifold-Fehler werden bei der Vorschaubild-Erstellung und der Hintergrundanalyse erkannt",
+        "Filterfenster breiter in mehreren Spalten: alles sichtbar ohne Scrollen"
+      ],
+      "es": [
+        "Panel: la rueda del ratón ahora desplaza la página aunque el cursor esté sobre un widget (antes, en la edición servidor/navegador, había que colocarlo en otro punto de la página para poder desplazarse)",
+        "Textos que faltaban traducidos: el campo «Dirección externa» de las impresoras y los mensajes de envío al slicer del PC ahora aparecen en el idioma elegido, en Windows y en la edición servidor (LXC)",
+        "Seguimiento para el cliente: un enlace público por pedido (en cola, imprimiendo, listo para recoger) para enviar a su cliente, con mensaje opcional; no se expone ningún precio ni dato interno y el enlace se revoca con un clic (botón de enlace en la cola de pedidos); si el acceso remoto no está activo, la ventana ofrece crear el enlace de Cloudflare con un clic en lugar de un enlace con dirección IP",
+        "Nuevo filtro «Imprimible en casa ahora mismo» en la biblioteca: conserva solo los archivos que caben en la cama de al menos una de sus impresoras y cuyo peso cabe en sus bobinas en stock o en el AMS",
+        "Búsqueda por foto (botón de cámara en la barra de búsqueda): encuentra en su biblioteca los modelos parecidos a una foto, con un modelo de visión de Ollama 100 % local; indexación en segundo plano, una imagen cada vez, pausable y suspendida si falta memoria; modo suave por defecto (en pausa mientras usa Stellio o la CPU está ocupada, la mitad de los núcleos, modelo descargado de la memoria al terminar), con opción «ir más rápido»",
+        "Inventario de filamento: la sección de inventario manual se oculta cuando está desactivada en los ajustes",
+        "Acerca de: logo de TigerTag y botones de colaboración acordes con el estilo global",
+        "Conversor: nuevos formatos de salida (STL ASCII, PLY, OFF, GLB) y orígenes STEP/STP/PLY/AMF realmente aceptados",
+        "Página Reparación rediseñada (resumen, herramientas, tarjeta de análisis con progreso)",
+        "Detección de defectos non-manifold durante la generación de miniaturas y el análisis en segundo plano",
+        "Ventana de filtros más ancha en varias columnas: todo visible sin desplazarse"
+      ],
+      "pt": [
+        "Painel: a roda do rato agora desloca a página mesmo com o cursor sobre um widget (antes, na edição servidor/navegador, era preciso apontar para outro ponto da página para se poder deslocar)",
+        "Textos em falta traduzidos: o campo «Endereço externo» das impressoras e as mensagens de envio para o slicer do PC aparecem agora no idioma escolhido, no Windows e na edição servidor (LXC)",
+        "Acompanhamento do cliente: uma ligação pública por encomenda (em fila, a imprimir, pronta para levantar) para enviar ao seu cliente, com mensagem opcional; nenhum preço nem detalhe interno é exposto e a ligação revoga-se com um clique (botão de ligação na fila de encomendas); se o acesso remoto não estiver ativo, a janela propõe criar a ligação Cloudflare com um clique em vez de uma ligação por endereço IP",
+        "Novo filtro «Imprimível aqui agora» na biblioteca: mantém apenas os ficheiros que cabem na mesa de pelo menos uma das suas impressoras e cujo peso cabe nas suas bobinas em stock ou no AMS",
+        "Pesquisa por foto (botão de câmara na barra de pesquisa): encontre na sua biblioteca os modelos parecidos com uma foto, com um modelo de visão Ollama 100 % local; indexação em segundo plano, uma imagem de cada vez, com pausa e suspensa se faltar memória; modo suave por predefinição (em pausa enquanto utiliza o Stellio ou o processador está ocupado, metade dos núcleos, modelo descarregado da memória no fim), com opção «mais rápido»",
+        "Inventário de filamento: a seção de inventário manual é ocultada quando desativada nas configurações",
+        "Sobre: logo da TigerTag e botões de parceria alinhados ao estilo global",
+        "Conversor: novos formatos de saída (STL ASCII, PLY, OFF, GLB) e origens STEP/STP/PLY/AMF realmente aceitas",
+        "Página Reparo redesenhada (resumo, ferramentas, cartão de análise com progresso)",
+        "Defeitos non-manifold detectados durante a geração de miniaturas e a análise em segundo plano",
+        "Janela de filtros mais larga em várias colunas: tudo visível sem rolar"
+      ],
+      "it": [
+        "Dashboard: la rotellina del mouse ora scorre la pagina anche quando il cursore è sopra un widget (prima, nell'edizione server/browser, bisognava puntare altrove nella pagina per poter scorrere)",
+        "Testi mancanti tradotti: il campo «Indirizzo esterno» delle stampanti e i messaggi di invio allo slicer del PC ora compaiono nella lingua scelta, su Windows e nell'edizione server (LXC)",
+        "Tracciamento per il cliente: un link pubblico per ordine (in coda, in stampa, pronto per il ritiro) da inviare al cliente, con messaggio facoltativo; nessun prezzo né dettaglio interno è esposto e il link si revoca con un clic (pulsante link nella coda ordini); se l'accesso remoto non è attivo, la finestra propone di creare il link Cloudflare con un clic invece di un link con indirizzo IP",
+        "Nuovo filtro «Stampabile da me adesso» nella libreria: mantiene solo i file che entrano nel piatto di almeno una delle tue stampanti e il cui peso rientra nelle bobine in magazzino o nell'AMS",
+        "Ricerca per foto (pulsante fotocamera nella barra di ricerca): trova nella tua libreria i modelli simili a una foto, con un modello di visione Ollama 100% locale; indicizzazione in background, un'immagine alla volta, in pausa e sospesa se la memoria scarseggia; modalità leggera predefinita (in pausa mentre usi Stellio o la CPU è occupata, metà dei core, modello scaricato dalla memoria al termine), con opzione «più veloce»",
+        "Inventario filamento: la sezione inventario manuale viene nascosta se disattivata nelle impostazioni",
+        "Informazioni: logo TigerTag e pulsanti di partnership coerenti con lo stile globale",
+        "Convertitore: nuovi formati di uscita (STL ASCII, PLY, OFF, GLB) e sorgenti STEP/STP/PLY/AMF ora accettate davvero",
+        "Pagina Riparazione ridisegnata (riepilogo, strumenti, scheda di analisi con avanzamento)",
+        "Difetti non-manifold rilevati durante la generazione delle miniature e l'analisi in background",
+        "Finestra dei filtri più larga su più colonne: tutto visibile senza scorrere"
+      ],
+      "zh": [
+        "仪表盘：鼠标滚轮现在即使在指针位于小组件上方时也能滚动页面（此前在服务器/浏览器版中，必须把指针移到页面其他位置才能滚动）",
+        "补全缺失的翻译：打印机的“外部地址”字段和发送到电脑切片软件的提示现在会以所选语言显示，Windows 和服务器版（LXC）均如此",
+        "客户跟踪：每个订单一个公开链接（排队中、打印中、可取货），可发给客户并附带可选留言；不会暴露任何价格或内部信息，且可一键撤销链接（订单队列中的链接按钮）；若未启用远程访问，窗口会提供一键创建 Cloudflare 链接，而不是使用 IP 地址链接",
+        "资料库新增“现在可在我这里打印”筛选：只保留能放进至少一台打印机热床、且重量不超过库存耗材盘或 AMS 余量的文件",
+        "以图搜索（搜索栏中的相机按钮）：用完全本地的 Ollama 视觉模型，在资料库中找到与照片相似的模型；后台逐张建立索引，可暂停，内存不足时自动挂起；默认采用温和模式（使用 Stellio 或 CPU 繁忙时暂停、只用一半核心、完成后从内存卸载模型），并可选“加快速度”",
+        "耗材库存：在设置中停用手动库存后，该部分将被隐藏",
+        "关于：加入 TigerTag 标志，合作按钮与整体风格一致",
+        "转换器：新增输出格式（ASCII STL、PLY、OFF、GLB），并真正支持 STEP/STP/PLY/AMF 源文件",
+        "修复页面重新设计（概览、工具、带进度的分析卡片）",
+        "生成缩略图和后台分析时检测非流形缺陷",
+        "筛选窗口加宽为多列：无需滚动即可查看全部内容"
+      ],
+      "ja": [
+        "ダッシュボード：カーソルがウィジェット上にあってもマウスホイールでページをスクロールできるようになりました（以前はサーバー／ブラウザー版で、ページの別の場所にカーソルを移さないとスクロールできませんでした）",
+        "未翻訳だったテキストを翻訳：プリンターの「外部アドレス」欄と、PCのスライサーへ送信する際のメッセージが、WindowsでもサーバーLXC版でも選択した言語で表示されます",
+        "お客様向け追跡：注文ごとに公開リンクを1つ発行（順番待ち・印刷中・受取可）。任意のメッセージを添えて送れます。価格や内部情報は一切表示されず、リンクはワンクリックで取り消せます（注文キューのリンクボタン）。リモートアクセスが無効の場合は、IP アドレスのリンクではなく、ワンクリックで Cloudflare リンクを作成できます",
+        "ライブラリに新フィルター「今すぐ自宅で印刷可能」：少なくとも1台のプリンターのベッドに収まり、在庫のスプールまたはAMSの残量で足りるファイルだけを表示します",
+        "写真で検索（検索バーのカメラボタン）：完全ローカルの Ollama ビジョンモデルで、写真に似たモデルをライブラリから探します。インデックス作成はバックグラウンドで1枚ずつ、一時停止可能で、メモリ不足時は自動的に中断します。既定はやさしいモード（Stellio の使用中や CPU が忙しい間は一時停止、使用コアは半分、完了後にモデルをメモリから解放）で、「高速モード」も選べます",
+        "フィラメント在庫：設定で無効にした場合、手動在庫セクションを非表示に",
+        "情報：TigerTag ロゴを追加し、パートナーボタンを全体のスタイルに統一",
+        "コンバーター：出力形式を追加（ASCII STL、PLY、OFF、GLB）、STEP/STP/PLY/AMF を入力として正しく受け付け",
+        "修復ページを刷新（概要、ツール、進捗付き解析カード）",
+        "サムネイル生成とバックグラウンド解析中に非多様体の不具合を検出",
+        "フィルターウィンドウを複数列に拡大：スクロールなしで全項目を表示"
+      ]
+    }
+  },
+  {
+    "version": "0.9.3",
+    "items": {
+      "fr": [
+        "Cartes imprimantes : quand l'imprimante est hors ligne, un logo remplace le carré noir de la caméra, les boutons de suivi en direct (monitoring, actualiser) sont masqués et la carte ne s'ouvre plus au clic ; modification, maintenance et suppression restent disponibles",
+        "Configuration des imprimantes Klipper, OctoPrint et PrusaLink : nouveau champ « Adresse externe » (ex. https://imprimante.mondomaine.fr) ; Stellio utilise l'adresse locale quand elle répond et bascule automatiquement sur l'adresse externe sinon (statut, historique, caméra)",
+        "Imprimantes Klipper : le temps restant et le total estimé en début d'impression sont maintenant réalistes (ex. 15 h pour une impression de 4 h 20) : Stellio part de l'estimation du slicer, puis se cale peu à peu sur la progression réelle",
+        "Windows et toutes les versions : la génération des miniatures s'adapte dynamiquement à la machine sans bloquer le reste : moins de rendus en parallèle quand la mémoire se resserre, pause quand il reste moins de 10 % de RAM libre (1 Go minimum), plafond de mémoire propre à Stellio (25 % de la RAM, 1,5 à 6 Go) et libération de la mémoire inutilisée après chaque rendu",
+        "Miniatures : nouveau bouton pause / reprise à côté de la barre de progression pour arrêter ou relancer la génération à tout moment (les rendus déjà commencés vont jusqu'au bout ; ouvrir un fichier génère toujours sa miniature)",
+        "Suppression du bouton « Quitter l'application » de l'en-tête : on ferme Stellio avec la croix de la fenêtre"
+      ],
+      "en": [
+        "Printer cards: when a printer is offline, a logo replaces the black camera square, the live buttons (monitoring, refresh) are hidden and the card no longer opens on click; edit, maintenance and delete remain available",
+        "Klipper, OctoPrint and PrusaLink printer settings: new \"External address\" field (e.g. https://printer.mydomain.com); Stellio uses the local address when it responds and switches automatically to the external one otherwise (status, history, camera)",
+        "Klipper printers: remaining and total estimated time early in a print are now realistic (e.g. 15 h shown for a 4 h 20 print): Stellio starts from the slicer's estimate, then gradually follows the actual progress",
+        "Windows and all editions: thumbnail generation now adapts dynamically to the machine without blocking everything else: fewer parallel renders when memory gets tight, a pause when less than 10% of RAM is free (1 GB minimum), a memory ceiling of its own for Stellio (25% of RAM, 1.5 to 6 GB) and unused memory released after each render",
+        "Thumbnails: new pause / resume button next to the progress bar to stop or restart generation at any time (renders already started finish; opening a file still generates its thumbnail)",
+        "Removed the \"Quit application\" button from the header: close Stellio with the window's close button"
+      ],
+      "de": [
+        "Druckerkarten: Ist ein Drucker offline, ersetzt ein Logo das schwarze Kamerafeld, die Live-Schaltflächen (Überwachung, Aktualisieren) werden ausgeblendet und die Karte öffnet sich nicht mehr per Klick; Bearbeiten, Wartung und Löschen bleiben verfügbar",
+        "Einstellungen für Klipper-, OctoPrint- und PrusaLink-Drucker: neues Feld „Externe Adresse“ (z. B. https://drucker.meinedomain.de); Stellio nutzt die lokale Adresse, wenn sie antwortet, und wechselt sonst automatisch zur externen (Status, Verlauf, Kamera)",
+        "Klipper-Drucker: Restzeit und geschätzte Gesamtzeit zu Beginn eines Drucks sind jetzt realistisch (z. B. 15 h statt 4 h 20): Stellio geht von der Slicer-Schätzung aus und passt sich dann schrittweise dem tatsächlichen Fortschritt an",
+        "Windows und alle Editionen: Die Vorschaubild-Erzeugung passt sich dynamisch an den Rechner an, ohne den Rest zu blockieren: weniger parallele Renderings bei knappem Speicher, Pause bei weniger als 10 % freiem RAM (mindestens 1 GB), ein eigenes Speicherlimit für Stellio (25 % des RAM, 1,5 bis 6 GB) und Freigabe ungenutzten Speichers nach jedem Rendering",
+        "Vorschaubilder: neue Pause-/Fortsetzen-Schaltfläche neben dem Fortschrittsbalken, um die Erzeugung jederzeit zu stoppen oder fortzusetzen (bereits begonnene Renderings werden beendet; beim Öffnen einer Datei wird deren Vorschaubild weiterhin erzeugt)",
+        "Die Schaltfläche „Anwendung beenden“ wurde aus der Kopfzeile entfernt: Stellio wird über das Schließen-Kreuz des Fensters beendet"
+      ],
+      "es": [
+        "Tarjetas de impresora: cuando una impresora está sin conexión, un logotipo sustituye el cuadrado negro de la cámara, se ocultan los botones en directo (monitorización, actualizar) y la tarjeta ya no se abre al hacer clic; editar, mantenimiento y eliminar siguen disponibles",
+        "Configuración de impresoras Klipper, OctoPrint y PrusaLink: nuevo campo «Dirección externa» (p. ej. https://impresora.midominio.com); Stellio usa la dirección local cuando responde y cambia automáticamente a la externa si no (estado, historial, cámara)",
+        "Impresoras Klipper: el tiempo restante y el total estimado al inicio de una impresión ahora son realistas (p. ej. 15 h para una impresión de 4 h 20): Stellio parte de la estimación del slicer y se ajusta poco a poco al progreso real",
+        "Windows y todas las ediciones: la generación de miniaturas se adapta dinámicamente al equipo sin bloquear el resto: menos renders en paralelo cuando la memoria escasea, pausa cuando queda menos del 10 % de RAM libre (1 GB como mínimo), un límite de memoria propio para Stellio (25 % de la RAM, de 1,5 a 6 GB) y liberación de la memoria no usada tras cada render",
+        "Miniaturas: nuevo botón de pausa / reanudar junto a la barra de progreso para detener o reanudar la generación en cualquier momento (los renders ya iniciados terminan; al abrir un archivo se sigue generando su miniatura)",
+        "Se ha eliminado el botón «Salir de la aplicación» del encabezado: Stellio se cierra con la cruz de la ventana"
+      ],
+      "pt": [
+        "Cartões de impressora: quando uma impressora está offline, um logótipo substitui o quadrado preto da câmara, os botões em direto (monitorização, atualizar) ficam ocultos e o cartão já não abre ao clicar; editar, manutenção e eliminar continuam disponíveis",
+        "Definições de impressoras Klipper, OctoPrint e PrusaLink: novo campo «Endereço externo» (ex.: https://impressora.meudominio.com); o Stellio usa o endereço local quando responde e passa automaticamente para o externo caso contrário (estado, histórico, câmara)",
+        "Impressoras Klipper: o tempo restante e o total estimado no início de uma impressão são agora realistas (ex.: 15 h para uma impressão de 4 h 20): o Stellio parte da estimativa do slicer e ajusta-se gradualmente ao progresso real",
+        "Windows e todas as edições: a geração de miniaturas adapta-se dinamicamente à máquina sem bloquear o resto: menos renderizações em paralelo quando a memória aperta, pausa quando resta menos de 10 % de RAM livre (mínimo de 1 GB), um limite de memória próprio para o Stellio (25 % da RAM, de 1,5 a 6 GB) e libertação da memória não utilizada após cada renderização",
+        "Miniaturas: novo botão de pausa / retomar junto à barra de progresso para parar ou retomar a geração a qualquer momento (as renderizações já iniciadas terminam; ao abrir um ficheiro a sua miniatura continua a ser gerada)",
+        "Removido o botão «Sair da aplicação» do cabeçalho: o Stellio fecha-se com o X da janela"
+      ],
+      "it": [
+        "Schede stampante: quando una stampante è offline, un logo sostituisce il quadrato nero della fotocamera, i pulsanti live (monitoraggio, aggiorna) sono nascosti e la scheda non si apre più al clic; modifica, manutenzione ed eliminazione restano disponibili",
+        "Impostazioni delle stampanti Klipper, OctoPrint e PrusaLink: nuovo campo «Indirizzo esterno» (es. https://stampante.miodominio.com); Stellio usa l'indirizzo locale quando risponde e passa automaticamente a quello esterno altrimenti (stato, cronologia, fotocamera)",
+        "Stampanti Klipper: il tempo rimanente e il totale stimato all'inizio di una stampa sono ora realistici (es. 15 h per una stampa di 4 h 20): Stellio parte dalla stima dello slicer e si adatta gradualmente all'avanzamento reale",
+        "Windows e tutte le edizioni: la generazione delle miniature si adatta dinamicamente al computer senza bloccare il resto: meno rendering in parallelo quando la memoria scarseggia, pausa quando resta meno del 10 % di RAM libera (minimo 1 GB), un limite di memoria proprio per Stellio (25 % della RAM, da 1,5 a 6 GB) e rilascio della memoria inutilizzata dopo ogni rendering",
+        "Miniature: nuovo pulsante pausa / riprendi accanto alla barra di avanzamento per fermare o riavviare la generazione in qualsiasi momento (i rendering già avviati terminano; aprendo un file la sua miniatura viene comunque generata)",
+        "Rimosso il pulsante «Esci dall'applicazione» dall'intestazione: Stellio si chiude con la X della finestra"
+      ],
+      "zh": [
+        "打印机卡片：打印机离线时，用徽标替代摄像头的黑色方块，隐藏实时按钮（监控、刷新），点击卡片不再展开；编辑、维护和删除仍可使用",
+        "Klipper、OctoPrint 和 PrusaLink 打印机设置：新增“外部地址”字段（例如 https://printer.example.com）；本地地址可访问时使用本地地址，否则自动切换到外部地址（状态、历史、摄像头）",
+        "Klipper 打印机：打印初期的剩余时间和预计总时间现在更合理（例如 4 小时 20 分钟的任务不再显示 15 小时）：Stellio 先采用切片软件的估算，再随实际进度逐步调整",
+        "Windows 及所有版本：缩略图生成现在会根据机器情况动态调整，且不影响其他功能：内存紧张时减少并行渲染，可用内存低于 10%（至少 1 GB）时暂停，Stellio 自身设有内存上限（内存的 25%，1.5 至 6 GB），并在每次渲染后释放未使用的内存",
+        "缩略图：进度条旁新增暂停/继续按钮，可随时停止或恢复生成（已开始的渲染会完成；打开文件时仍会生成其缩略图）",
+        "已移除标题栏中的“退出应用”按钮：请使用窗口的关闭按钮退出 Stellio"
+      ],
+      "ja": [
+        "プリンターカード：プリンターがオフラインのとき、カメラの黒い四角の代わりにロゴを表示し、ライブ系ボタン（モニタリング、更新）を非表示にして、クリックでカードが開かないようにしました。編集・メンテナンス・削除は引き続き使えます",
+        "Klipper、OctoPrint、PrusaLink のプリンター設定：新しい「外部アドレス」欄（例：https://printer.example.com）を追加。ローカルアドレスが応答する間はそれを使い、応答しない場合は自動的に外部アドレスへ切り替えます（状態、履歴、カメラ）",
+        "Klipper プリンター：印刷開始直後の残り時間と推定合計時間が現実的になりました（例：4時間20分の印刷で15時間と表示されていた問題）。スライサーの見積もりから始めて、実際の進捗に合わせて徐々に調整します",
+        "Windows を含む全エディション：サムネイル生成がマシンの状態に合わせて動的に調整され、他の動作を妨げないようになりました。メモリが逼迫すると並列レンダリングを減らし、空きRAMが10％未満（最低1GB）で一時停止、Stellio 自身のメモリ上限（RAMの25％、1.5〜6GB）を設け、各レンダリング後に未使用メモリを解放します",
+        "サムネイル：進捗バーの横に一時停止／再開ボタンを追加し、生成をいつでも止めたり再開したりできます（開始済みのレンダリングは完了します。ファイルを開いたときはそのサムネイルが引き続き生成されます）",
+        "ヘッダーの「アプリを終了」ボタンを削除しました。Stellio はウィンドウの閉じるボタンで終了します"
+      ]
+    }
+  },
+  {
+    "version": "0.9.2",
+    "items": {
+      "fr": [
+        "Imprimantes Klipper / Moonraker : la progression affichée est maintenant la même que celle de Mainsail (position dans le fichier G-code) au lieu de la progression basée sur le temps (M73) ; l'écart pouvait atteindre plusieurs points (ex. 27 % dans Stellio contre 19 % dans Mainsail)",
+        "Version serveur / LXC : un gros scan (ex. une source SMB de ~2 000 fichiers) ne peut plus saturer la machine : les cœurs réellement alloués au conteneur sont détectés (et non ceux de l'hôte Proxmox), les rendus de miniatures sont limités en conséquence et mis à 1 si la mémoire libre est presque épuisée, et Stellio tourne en priorité basse (CPU et disque)",
+        "Version Proxmox (LXC) : le script d'installation plafonne désormais le service Stellio à 75 % de la RAM (ralentissement progressif, arrêt net à 85 %) et à 75 % du CPU du conteneur ; les miniatures se mettent aussi en pause quand la mémoire du conteneur est presque épuisée au lieu d'être tuées en boucle par le noyau (OOM)"
+      ],
+      "en": [
+        "Klipper / Moonraker printers: the progress shown now matches Mainsail (position in the G-code file) instead of the time-based progress (M73); the gap could reach several points (e.g. 27% in Stellio vs 19% in Mainsail)",
+        "Server / LXC edition: a big scan (e.g. an SMB source of ~2,000 files) can no longer overload the machine: the cores actually allocated to the container are detected (not the Proxmox host's), thumbnail rendering is limited accordingly and drops to 1 when free memory is nearly exhausted, and Stellio runs at low CPU and disk priority",
+        "Proxmox (LXC) edition: the install script now caps the Stellio service at 75% of the container's RAM (gradual throttling, hard stop at 85%) and 75% of its CPU; thumbnails also pause when the container's memory is nearly exhausted instead of being killed repeatedly by the kernel (OOM)"
+      ],
+      "de": [
+        "Klipper-/Moonraker-Drucker: Der angezeigte Fortschritt entspricht jetzt Mainsail (Position in der G-Code-Datei) statt dem zeitbasierten Fortschritt (M73); die Abweichung konnte mehrere Punkte betragen (z. B. 27 % in Stellio vs. 19 % in Mainsail)",
+        "Server-/LXC-Edition: Ein großer Scan (z. B. eine SMB-Quelle mit ~2.000 Dateien) kann die Maschine nicht mehr überlasten: Es werden die dem Container tatsächlich zugewiesenen Kerne erkannt (nicht die des Proxmox-Hosts), das Rendern von Vorschaubildern wird entsprechend begrenzt und bei fast erschöpftem Arbeitsspeicher auf 1 reduziert, und Stellio läuft mit niedriger CPU- und Festplattenpriorität",
+        "Proxmox-Edition (LXC): Das Installationsskript begrenzt den Stellio-Dienst jetzt auf 75 % des Arbeitsspeichers (schrittweise Drosselung, harter Stopp bei 85 %) und 75 % der CPU des Containers; Vorschaubilder pausieren außerdem, wenn der Container-Speicher fast erschöpft ist, statt wiederholt vom Kernel beendet zu werden (OOM)"
+      ],
+      "es": [
+        "Impresoras Klipper / Moonraker: el progreso mostrado ahora coincide con Mainsail (posición en el archivo G-code) en lugar del progreso basado en el tiempo (M73); la diferencia podía ser de varios puntos (p. ej. 27 % en Stellio frente a 19 % en Mainsail)",
+        "Edición servidor / LXC: un escaneo grande (p. ej. una fuente SMB de ~2000 archivos) ya no puede saturar la máquina: se detectan los núcleos realmente asignados al contenedor (no los del host Proxmox), el renderizado de miniaturas se limita en consecuencia y baja a 1 si la memoria libre casi se agota, y Stellio se ejecuta con prioridad baja de CPU y disco",
+        "Edición Proxmox (LXC): el script de instalación limita ahora el servicio Stellio al 75 % de la RAM (ralentización progresiva, parada a 85 %) y al 75 % de la CPU del contenedor; las miniaturas también se pausan cuando la memoria del contenedor está casi agotada, en lugar de ser eliminadas repetidamente por el kernel (OOM)"
+      ],
+      "pt": [
+        "Impressoras Klipper / Moonraker: o progresso mostrado passa a coincidir com o Mainsail (posição no ficheiro G-code) em vez do progresso baseado no tempo (M73); a diferença podia chegar a vários pontos (ex.: 27 % no Stellio contra 19 % no Mainsail)",
+        "Edição servidor / LXC: uma análise grande (ex.: uma fonte SMB com ~2000 ficheiros) já não consegue sobrecarregar a máquina: são detetados os núcleos realmente atribuídos ao contentor (não os do anfitrião Proxmox), a geração de miniaturas é limitada em conformidade e desce para 1 quando a memória livre está quase esgotada, e o Stellio corre com prioridade baixa de CPU e disco",
+        "Edição Proxmox (LXC): o script de instalação limita agora o serviço Stellio a 75 % da RAM (abrandamento progressivo, paragem a 85 %) e a 75 % do CPU do contentor; as miniaturas também fazem pausa quando a memória do contentor está quase esgotada, em vez de serem terminadas repetidamente pelo kernel (OOM)"
+      ],
+      "it": [
+        "Stampanti Klipper / Moonraker: l'avanzamento mostrato ora coincide con Mainsail (posizione nel file G-code) invece di quello basato sul tempo (M73); la differenza poteva arrivare a diversi punti (es. 27 % in Stellio contro 19 % in Mainsail)",
+        "Edizione server / LXC: una scansione grande (es. una sorgente SMB di ~2000 file) non può più saturare la macchina: vengono rilevati i core realmente assegnati al container (non quelli dell'host Proxmox), il rendering delle miniature è limitato di conseguenza e scende a 1 se la memoria libera è quasi esaurita, e Stellio gira con priorità bassa di CPU e disco",
+        "Edizione Proxmox (LXC): lo script di installazione limita ora il servizio Stellio al 75 % della RAM (rallentamento progressivo, arresto all'85 %) e al 75 % della CPU del container; le miniature si mettono anche in pausa quando la memoria del container è quasi esaurita, invece di essere terminate ripetutamente dal kernel (OOM)"
+      ],
+      "zh": [
+        "Klipper / Moonraker 打印机：显示的进度现在与 Mainsail 一致（基于 G-code 文件中的位置），而不是基于时间的进度（M73）；两者差距可达数个百分点（例如 Stellio 显示 27%，Mainsail 显示 19%）",
+        "服务器 / LXC 版：大规模扫描（例如约 2000 个文件的 SMB 来源）不再会拖垮机器：现在会检测容器实际分配的 CPU 核心（而非 Proxmox 主机的核心），缩略图渲染相应受限，可用内存几乎耗尽时降为 1 个，并且 Stellio 以较低的 CPU 和磁盘优先级运行",
+        "Proxmox（LXC）版：安装脚本现在将 Stellio 服务限制在容器内存的 75%（逐步限速，达 85% 时强制停止）和 CPU 的 75%；容器内存几乎耗尽时，缩略图生成也会暂停，而不是被内核（OOM）反复终止"
+      ],
+      "ja": [
+        "Klipper / Moonraker プリンター：表示される進捗を、時間ベース（M73）ではなく Mainsail と同じ G-code ファイル内の位置ベースに変更しました。差が数ポイントになることがありました（例：Stellio 27％、Mainsail 19％）",
+        "サーバー / LXC 版：大規模なスキャン（例：約2,000ファイルのSMBソース）でマシンが過負荷にならないようにしました。コンテナに実際に割り当てられたコア数（Proxmoxホストのコア数ではなく）を検出してサムネイル生成を制限し、空きメモリが少ない場合は1つに絞り、Stellio をCPU・ディスクとも低優先度で実行します",
+        "Proxmox（LXC）版：インストールスクリプトが Stellio サービスをコンテナのRAMの75％（段階的に抑制、85％で強制停止）とCPUの75％に制限するようになりました。コンテナのメモリが残りわずかになると、カーネル（OOM）に何度も強制終了される代わりにサムネイル生成を一時停止します"
+      ]
+    }
+  },
+  {
+    "version": "0.9.1",
+    "items": {
+      "fr": [
+        "Script Proxmox : correction de l'erreur « storage_type : command not found » au choix du stockage du conteneur",
+        "Première installation : la fenêtre « Quoi de neuf » n'apparaît plus par-dessus la visite guidée ; elle s'affiche après la visite (et pas du tout sur une bibliothèque vide, où l'invite d'ajout de source la remplace)",
+        "Version serveur (Proxmox, Docker, Raspberry Pi…) : le réglage « Démarrage » (lancer Stellio au démarrage de Windows) n'est plus affiché, car il ne sert qu'à la version Windows",
+        "Version serveur : « Envoyer au slicer » ouvre maintenant le fichier dans le slicer installé sur votre PC (OrcaSlicer, Bambu Studio, PrusaSlicer), y compris pour les fichiers d'une source réseau (SMB) ; pour les autres slicers, le fichier est téléchargé"
+      ],
+      "en": [
+        "Proxmox script: fixed the \"storage_type: command not found\" error when choosing the container storage",
+        "First install: the \"What's new\" window no longer appears over the guided tour; it shows after the tour (and not at all on an empty library, where the add-source prompt replaces it)",
+        "Server edition (Proxmox, Docker, Raspberry Pi…): the \"Startup\" setting (launch Stellio when Windows starts) is no longer shown, as it only applies to the Windows version",
+        "Server edition: \"Send to slicer\" now opens the file in the slicer installed on your PC (OrcaSlicer, Bambu Studio, PrusaSlicer), including files from a network (SMB) source; for other slicers, the file is downloaded"
+      ],
+      "de": [
+        "Proxmox-Skript: Der Fehler „storage_type: command not found“ bei der Speicherauswahl für den Container wurde behoben",
+        "Erstinstallation: Das Fenster „Neuigkeiten“ erscheint nicht mehr über der geführten Tour; es wird nach der Tour angezeigt (bei leerer Bibliothek gar nicht, dort ersetzt es die Aufforderung zum Hinzufügen einer Quelle)",
+        "Server-Edition (Proxmox, Docker, Raspberry Pi …): Die Einstellung „Start“ (Stellio beim Windows-Start starten) wird nicht mehr angezeigt, da sie nur für die Windows-Version gilt",
+        "Server-Edition: „An Slicer senden“ öffnet die Datei jetzt im auf Ihrem PC installierten Slicer (OrcaSlicer, Bambu Studio, PrusaSlicer), auch bei Dateien aus einer Netzwerkquelle (SMB); bei anderen Slicern wird die Datei heruntergeladen"
+      ],
+      "es": [
+        "Script de Proxmox: corregido el error «storage_type: command not found» al elegir el almacenamiento del contenedor",
+        "Primera instalación: la ventana «Novedades» ya no aparece sobre la visita guiada; se muestra después (y no se muestra con una biblioteca vacía, donde la sustituye la invitación a añadir una fuente)",
+        "Edición de servidor (Proxmox, Docker, Raspberry Pi…): el ajuste «Inicio» (iniciar Stellio al arrancar Windows) ya no se muestra, porque solo sirve para la versión de Windows",
+        "Edición de servidor: «Enviar al slicer» ahora abre el archivo en el slicer instalado en tu PC (OrcaSlicer, Bambu Studio, PrusaSlicer), también para archivos de una fuente de red (SMB); con otros slicers se descarga el archivo"
+      ],
+      "pt": [
+        "Script do Proxmox: corrigido o erro «storage_type: command not found» ao escolher o armazenamento do contentor",
+        "Primeira instalação: a janela «Novidades» já não aparece por cima da visita guiada; é mostrada depois (e não aparece numa biblioteca vazia, onde é substituída pelo convite para adicionar uma fonte)",
+        "Edição de servidor (Proxmox, Docker, Raspberry Pi…): a definição «Arranque» (iniciar o Stellio com o Windows) já não é mostrada, pois só serve para a versão Windows",
+        "Edição de servidor: «Enviar para o slicer» abre agora o ficheiro no slicer instalado no seu PC (OrcaSlicer, Bambu Studio, PrusaSlicer), incluindo ficheiros de uma fonte de rede (SMB); com outros slicers o ficheiro é transferido"
+      ],
+      "it": [
+        "Script Proxmox: corretto l'errore «storage_type: command not found» nella scelta dello storage del container",
+        "Prima installazione: la finestra «Novità» non appare più sopra il tour guidato; compare dopo il tour (e per niente con una libreria vuota, dove la sostituisce l'invito ad aggiungere una sorgente)",
+        "Edizione server (Proxmox, Docker, Raspberry Pi…): l'impostazione «Avvio» (avviare Stellio con Windows) non viene più mostrata, perché riguarda solo la versione Windows",
+        "Edizione server: «Invia allo slicer» ora apre il file nello slicer installato sul tuo PC (OrcaSlicer, Bambu Studio, PrusaSlicer), anche per i file di una sorgente di rete (SMB); con altri slicer il file viene scaricato"
+      ],
+      "zh": [
+        "Proxmox 脚本：修复选择容器存储时出现的“storage_type: command not found”错误",
+        "首次安装：“新功能”窗口不再覆盖在引导教程之上，而是在教程结束后显示（文件库为空时不显示，由添加来源的提示取代）",
+        "服务器版（Proxmox、Docker、树莓派等）：不再显示“启动”设置（随 Windows 启动 Stellio），因为它只适用于 Windows 版",
+        "服务器版：“发送到切片软件”现在会在您电脑上安装的切片软件（OrcaSlicer、Bambu Studio、PrusaSlicer）中打开文件，也适用于网络（SMB）来源的文件；其他切片软件则下载文件"
+      ],
+      "ja": [
+        "Proxmox スクリプト：コンテナのストレージ選択時に出る「storage_type: command not found」エラーを修正",
+        "初回インストール：「新機能」ウィンドウがガイドツアーの上に表示されなくなり、ツアー終了後に表示されます（ライブラリが空の場合は表示されず、ソース追加の案内に置き換わります）",
+        "サーバー版（Proxmox、Docker、Raspberry Pi など）：Windows 版専用の「起動」設定（Windows 起動時に Stellio を起動）を表示しないようにしました",
+        "サーバー版：「スライサーに送信」で、PCにインストールされたスライサー（OrcaSlicer、Bambu Studio、PrusaSlicer）でファイルが開くようになりました（ネットワーク(SMB)ソースのファイルも対象）。それ以外のスライサーではファイルをダウンロードします"
+      ]
+    }
+  },
+  {
+    "version": "0.9.0",
+    "items": {
+      "fr": [
+        "Projets : un clic sur l'image d'une pièce de la liste des fichiers du projet l'ouvre dans le viewer 3D",
+        "MQTT / Home Assistant : les capteurs de bobine utilisent l'icône de Spoolman (imprimante 3D et buse) et l'ancienne icône inexistante est corrigée",
+        "Script Proxmox : le disque du conteneur passe de 8 à 32 Go par défaut (évite le disque plein avec les miniatures et les sauvegardes)",
+        "Bibliothèque : quand la source d'un fichier est indisponible, sa miniature reste affichée mais nettement plus sombre (dès le chargement de la liste)",
+        "Première utilisation : après la visite guidée, si la bibliothèque est vide, une fenêtre invite à ajouter une source ou des fichiers, avec un bouton « Ajouter » qui ouvre l'ajout de source",
+        "Sources : l'état est surveillé en deux temps, d'abord le réseau puis la source (serveur, puis partage), avec réaction immédiate aux coupures et reconnexions et dernier état connu affiché dès l'ouverture, pour que les miniatures s'assombrissent sans attendre un scan",
+        "Viewer : si le réseau est coupé ou la source indisponible, un clic sur la miniature affiche une fenêtre avec la raison au lieu d'ouvrir le viewer en erreur, et le bouton « Ouvrir dans le viewer » est masqué dans la fenêtre de détails (clic droit)",
+        "Bibliothèque : quand une source est inaccessible pendant le scan automatique (réseau coupé, disque débranché, connexion perdue en cours d'analyse), ses fichiers et leurs miniatures restent dans la bibliothèque au lieu d'être retirés",
+        "Détails du fichier (clic droit) : si la source est indisponible, le fichier n'est plus analysé ; la raison est affichée à la place",
+        "Nouveau : archive G-code dans chaque projet (suggestion GitHub). Archivez les G-code aux réglages précis, par exemple pour des pièces techniques ou des prototypes en filaments techniques : matière, buse, hauteur de couche, températures, durée et poids sont lus dans le fichier, avec des notes libres, téléchargement et suppression",
+        "Nouveau : menu Actions d'un fichier > « Mes G-code » pour importer vos propres G-code rattachés à ce fichier (réglages lus dans le fichier, notes, téléchargement, suppression), conservés même si la source est indisponible",
+        "Nouveau widget « G-code » sur le tableau de bord : les G-code archivés (de projets et de fichiers) avec leurs réglages ; un clic ouvre le détail dans la même présentation que le clic droit sur un fichier, avec la miniature du fichier et le G-code"
+      ],
+      "en": [
+        "Projects: clicking a part's image in the project file list opens it in the 3D viewer",
+        "MQTT / Home Assistant: spool sensors use the Spoolman icon (3D printer nozzle), replacing a non-existent icon",
+        "Proxmox script: the container disk now defaults to 32 GB instead of 8 GB (avoids a full disk with thumbnails and backups)",
+        "Library: when a file's source is unavailable, its thumbnail stays visible but is clearly darker (from the moment the list loads)",
+        "First run: after the guided tour, if the library is empty, a window invites you to add a source or files, with an \"Add\" button that opens the add-source window",
+        "Sources: availability is now checked in two steps, network first and then the source (server, then share), reacting immediately to disconnections and reconnections and showing the last known state at startup, so thumbnails darken without waiting for a scan",
+        "Viewer: when the network is down or the source is unavailable, clicking a thumbnail shows a window with the reason instead of opening the viewer with an error, and the \"Open in viewer\" button is hidden in the details window (right-click)",
+        "Library: when a source is unreachable during the automatic scan (network down, drive unplugged, connection lost mid-scan), its files and thumbnails stay in the library instead of being removed",
+        "File details (right-click): when the source is unavailable the file is no longer analysed; the reason is shown instead",
+        "New: G-code archive in each project (GitHub suggestion). Keep G-code with precise settings, for example for technical parts or prototypes in engineering filaments: material, nozzle, layer height, temperatures, time and weight are read from the file, with free notes, download and delete",
+        "New: a file's Actions menu > \"My G-code\" to upload your own G-code attached to that file (settings read from the file, notes, download, delete), kept even when the source is unavailable",
+        "New \"G-code\" dashboard widget: archived G-code (from projects and files) with their settings; a click opens the details in the same layout as right-clicking a file, with the file's thumbnail and the G-code"
+      ],
+      "de": [
+        "Projekte: Ein Klick auf das Bild eines Teils in der Dateiliste des Projekts öffnet es im 3D-Viewer",
+        "MQTT / Home Assistant: Spulen-Sensoren verwenden das Spoolman-Symbol (3D-Drucker-Düse); ein nicht vorhandenes Symbol wurde ersetzt",
+        "Proxmox-Skript: Die Container-Festplatte beträgt jetzt standardmäßig 32 statt 8 GB (verhindert eine volle Festplatte durch Vorschaubilder und Sicherungen)",
+        "Bibliothek: Ist die Quelle einer Datei nicht verfügbar, bleibt ihr Vorschaubild sichtbar, ist aber deutlich dunkler (schon beim Laden der Liste)",
+        "Erster Start: Ist die Bibliothek nach der Tour leer, fordert ein Fenster zum Hinzufügen einer Quelle oder von Dateien auf; die Schaltfläche „Hinzufügen“ öffnet das Fenster zum Hinzufügen einer Quelle",
+        "Quellen: Die Verfügbarkeit wird jetzt in zwei Schritten geprüft, zuerst das Netzwerk, dann die Quelle (Server, dann Freigabe); auf Trennungen und Wiederverbindungen wird sofort reagiert und der zuletzt bekannte Zustand beim Start angezeigt, damit Vorschaubilder ohne Scan abdunkeln",
+        "Viewer: Bei fehlendem Netzwerk oder nicht verfügbarer Quelle zeigt ein Klick auf das Vorschaubild ein Fenster mit dem Grund statt den Viewer mit Fehler zu öffnen; die Schaltfläche „Im Viewer öffnen“ wird im Detailfenster (Rechtsklick) ausgeblendet",
+        "Bibliothek: Ist eine Quelle beim automatischen Scan nicht erreichbar (Netzwerk getrennt, Laufwerk abgezogen, Verbindung während des Scans verloren), bleiben ihre Dateien und Vorschaubilder in der Bibliothek, statt entfernt zu werden",
+        "Dateidetails (Rechtsklick): Ist die Quelle nicht verfügbar, wird die Datei nicht mehr analysiert; stattdessen wird der Grund angezeigt",
+        "Neu: G-Code-Archiv in jedem Projekt (GitHub-Vorschlag). Bewahren Sie G-Code mit präzisen Einstellungen auf, z. B. für technische Teile oder Prototypen aus technischen Filamenten: Material, Düse, Schichthöhe, Temperaturen, Zeit und Gewicht werden aus der Datei gelesen, dazu freie Notizen, Download und Löschen",
+        "Neu: Aktionsmenü einer Datei > „Meine G-Codes“, um eigene G-Codes für diese Datei hochzuladen (Einstellungen aus der Datei gelesen, Notizen, Download, Löschen); sie bleiben auch bei nicht verfügbarer Quelle erhalten",
+        "Neues Dashboard-Widget „G-Code“: archivierte G-Codes (aus Projekten und Dateien) mit ihren Einstellungen; ein Klick öffnet die Details im gleichen Layout wie der Rechtsklick auf eine Datei, mit Vorschaubild der Datei und dem G-Code"
+      ],
+      "es": [
+        "Proyectos: al hacer clic en la imagen de una pieza de la lista de archivos del proyecto se abre en el visor 3D",
+        "MQTT / Home Assistant: los sensores de bobina usan el icono de Spoolman (boquilla de impresora 3D) y se corrige un icono inexistente",
+        "Script de Proxmox: el disco del contenedor pasa de 8 a 32 GB por defecto (evita un disco lleno por las miniaturas y las copias de seguridad)",
+        "Biblioteca: cuando la fuente de un archivo no está disponible, su miniatura sigue visible pero mucho más oscura (desde que se carga la lista)",
+        "Primer uso: tras la visita guiada, si la biblioteca está vacía, una ventana invita a añadir una fuente o archivos, con un botón «Añadir» que abre la ventana de añadir fuente",
+        "Fuentes: la disponibilidad se comprueba ahora en dos pasos, primero la red y luego la fuente (servidor y después recurso compartido), con reacción inmediata a desconexiones y reconexiones y mostrando el último estado conocido al abrir, para que las miniaturas se oscurezcan sin esperar a un análisis",
+        "Visor: si la red está caída o la fuente no está disponible, al hacer clic en la miniatura se muestra una ventana con el motivo en lugar de abrir el visor con un error, y el botón «Abrir en el visor» se oculta en la ventana de detalles (clic derecho)",
+        "Biblioteca: cuando una fuente no es accesible durante el análisis automático (red caída, disco desconectado, conexión perdida durante el análisis), sus archivos y miniaturas se conservan en la biblioteca en lugar de eliminarse",
+        "Detalles del archivo (clic derecho): si la fuente no está disponible, el archivo ya no se analiza; se muestra el motivo",
+        "Nuevo: archivo de G-code en cada proyecto (sugerencia de GitHub). Conserve G-code con ajustes precisos, por ejemplo para piezas técnicas o prototipos con filamentos técnicos: material, boquilla, altura de capa, temperaturas, tiempo y peso se leen del archivo, con notas libres, descarga y eliminación",
+        "Nuevo: menú Acciones de un archivo > «Mis G-code» para subir sus propios G-code asociados a ese archivo (ajustes leídos del archivo, notas, descarga, eliminación), conservados aunque la fuente no esté disponible",
+        "Nuevo widget «G-code» en el panel: los G-code archivados (de proyectos y archivos) con sus ajustes; un clic abre el detalle con la misma presentación que el clic derecho en un archivo, con la miniatura del archivo y el G-code"
+      ],
+      "pt": [
+        "Projetos: clicar na imagem de uma peça na lista de ficheiros do projeto abre-a no visualizador 3D",
+        "MQTT / Home Assistant: os sensores de bobina usam o ícone do Spoolman (bico de impressora 3D) e corrige-se um ícone inexistente",
+        "Script do Proxmox: o disco do contêiner passa de 8 para 32 GB por padrão (evita disco cheio com miniaturas e cópias de segurança)",
+        "Biblioteca: quando a fonte de um ficheiro não está disponível, a miniatura continua visível, mas bem mais escura (desde o carregamento da lista)",
+        "Primeira utilização: após a visita guiada, se a biblioteca estiver vazia, uma janela convida a adicionar uma fonte ou ficheiros, com um botão «Adicionar» que abre a janela de adicionar fonte",
+        "Fontes: a disponibilidade é agora verificada em duas etapas, primeiro a rede e depois a fonte (servidor, depois partilha), com reação imediata a desligações e religações e mostrando o último estado conhecido ao abrir, para que as miniaturas escureçam sem esperar por uma análise",
+        "Visualizador: se a rede estiver em baixo ou a fonte indisponível, clicar na miniatura mostra uma janela com o motivo em vez de abrir o visualizador com erro, e o botão «Abrir no visualizador» fica oculto na janela de detalhes (clique direito)",
+        "Biblioteca: quando uma fonte está inacessível durante a análise automática (rede em baixo, disco desligado, ligação perdida durante a análise), os seus ficheiros e miniaturas permanecem na biblioteca em vez de serem removidos",
+        "Detalhes do ficheiro (clique direito): se a fonte estiver indisponível, o ficheiro deixa de ser analisado; é mostrado o motivo",
+        "Novo: arquivo de G-code em cada projeto (sugestão do GitHub). Guarde G-code com definições precisas, por exemplo para peças técnicas ou protótipos em filamentos técnicos: material, bico, altura de camada, temperaturas, tempo e peso são lidos do ficheiro, com notas livres, transferência e eliminação",
+        "Novo: menu Ações de um ficheiro > «Os meus G-code» para carregar os seus próprios G-code associados a esse ficheiro (definições lidas do ficheiro, notas, transferência, eliminação), mantidos mesmo com a fonte indisponível",
+        "Novo widget «G-code» no painel: os G-code arquivados (de projetos e ficheiros) com as suas definições; um clique abre o detalhe com a mesma apresentação do clique direito num ficheiro, com a miniatura do ficheiro e o G-code"
+      ],
+      "it": [
+        "Progetti: un clic sull'immagine di un pezzo nell'elenco file del progetto lo apre nel visualizzatore 3D",
+        "MQTT / Home Assistant: i sensori delle bobine usano l'icona di Spoolman (ugello della stampante 3D) e viene corretta un'icona inesistente",
+        "Script Proxmox: il disco del container passa da 8 a 32 GB di default (evita il disco pieno con miniature e backup)",
+        "Libreria: quando la sorgente di un file non è disponibile, la miniatura resta visibile ma molto più scura (fin dal caricamento dell'elenco)",
+        "Primo avvio: dopo il tour guidato, se la libreria è vuota, una finestra invita ad aggiungere una sorgente o dei file, con un pulsante «Aggiungi» che apre la finestra di aggiunta sorgente",
+        "Sorgenti: la disponibilità viene ora verificata in due fasi, prima la rete e poi la sorgente (server, poi condivisione), con reazione immediata a disconnessioni e riconnessioni e ultimo stato noto mostrato all'avvio, così le miniature si scuriscono senza attendere una scansione",
+        "Visualizzatore: se la rete è assente o la sorgente non è disponibile, cliccando sulla miniatura compare una finestra con il motivo invece di aprire il visualizzatore con un errore, e il pulsante «Apri nel visualizzatore» è nascosto nella finestra dei dettagli (clic destro)",
+        "Libreria: quando una sorgente non è raggiungibile durante la scansione automatica (rete assente, disco scollegato, connessione persa durante l'analisi), i suoi file e le sue miniature restano nella libreria invece di essere rimossi",
+        "Dettagli del file (clic destro): se la sorgente non è disponibile, il file non viene più analizzato; viene mostrato il motivo",
+        "Novità: archivio G-code in ogni progetto (suggerimento GitHub). Conservate G-code con impostazioni precise, ad esempio per parti tecniche o prototipi in filamenti tecnici: materiale, ugello, altezza dello strato, temperature, tempo e peso vengono letti dal file, con note libere, download ed eliminazione",
+        "Novità: menu Azioni di un file > «I miei G-code» per caricare i vostri G-code associati a quel file (impostazioni lette dal file, note, download, eliminazione), conservati anche se la sorgente non è disponibile",
+        "Nuovo widget «G-code» nella dashboard: i G-code archiviati (di progetti e file) con le loro impostazioni; un clic apre il dettaglio con la stessa presentazione del clic destro su un file, con la miniatura del file e il G-code"
+      ],
+      "zh": [
+        "项目：点击项目文件列表中零件的图片，即可在 3D 查看器中打开",
+        "MQTT / Home Assistant：耗材传感器改用 Spoolman 的图标（3D 打印机喷嘴），并修正了一个不存在的图标",
+        "Proxmox 脚本：容器磁盘默认由 8 GB 改为 32 GB（避免缩略图和备份占满磁盘）",
+        "文件库：文件来源不可用时，缩略图仍会显示，但明显更暗（列表加载时即生效）",
+        "首次使用：引导教程结束后，如果文件库为空，会弹出窗口提示添加来源或文件，点击“添加”按钮即可打开添加来源窗口",
+        "来源：现在分两步检测可用性，先检测网络，再检测来源（服务器，然后共享），对断开和重连立即响应，并在启动时显示上次已知状态，因此缩略图无需等待扫描即可变暗",
+        "查看器：网络断开或来源不可用时，点击缩略图会弹出说明原因的窗口，而不是打开报错的查看器；详情窗口（右键）中的“在查看器中打开”按钮也会隐藏",
+        "文件库：自动扫描期间来源无法访问（网络断开、磁盘拔出、扫描中连接中断）时，其文件和缩略图会保留在文件库中，而不是被移除",
+        "文件详情（右键）：来源不可用时不再分析文件，改为显示原因",
+        "新增：每个项目都有 G-code 归档（来自 GitHub 的建议）。可保存带有精确参数的 G-code，例如技术零件或使用工程耗材的原型：材料、喷嘴、层高、温度、时间和重量会从文件中读取，并支持自由备注、下载和删除",
+        "新增：文件的“操作”菜单 > “我的 G-code”，可上传与该文件关联的自有 G-code（从文件读取参数，支持备注、下载、删除），即使来源不可用也会保留",
+        "仪表板新增“G-code”小组件：显示已归档的 G-code（来自项目和文件）及其参数；点击后以与右键单击文件相同的版式显示详情，包含文件缩略图和 G-code"
+      ],
+      "ja": [
+        "プロジェクト：プロジェクトのファイル一覧で部品の画像をクリックすると、3D ビューアーで開きます",
+        "MQTT / Home Assistant：スプールのセンサーに Spoolman と同じアイコン（3D プリンターのノズル）を使用し、存在しないアイコンを修正",
+        "Proxmox スクリプト：コンテナのディスクの既定値を 8 GB から 32 GB に変更（サムネイルやバックアップでディスクが満杯になるのを防止）",
+        "ライブラリ：ファイルのソースが利用できない場合、サムネイルは表示されたままですが、はっきり暗くなります（一覧の読み込み時から）",
+        "初回起動：ガイドツアーの後、ライブラリが空の場合、ソースまたはファイルの追加を促すウィンドウが開き、「追加」ボタンでソース追加画面が開きます",
+        "ソース：利用可否を2段階で確認するようになりました。まずネットワーク、次にソース（サーバー、続いて共有）を確認し、切断・再接続に即座に反応し、起動時には前回の状態を表示するため、スキャンを待たずにサムネイルが暗くなります",
+        "ビューアー：ネットワーク切断やソース利用不可の場合、サムネイルをクリックするとエラー付きでビューアーを開く代わりに理由を示すウィンドウを表示し、詳細ウィンドウ（右クリック）の「ビューアーで開く」ボタンを非表示にします",
+        "ライブラリ：自動スキャン中にソースへアクセスできない場合（ネットワーク切断、ドライブの取り外し、スキャン中の接続断）、そのファイルとサムネイルは削除されずライブラリに残ります",
+        "ファイル詳細（右クリック）：ソースが利用できない場合はファイルを分析せず、代わりに理由を表示します",
+        "新機能：各プロジェクトに G-code アーカイブを追加（GitHub からの提案）。技術部品やエンジニアリングフィラメントの試作品など、精密な設定の G-code を保存できます。素材、ノズル、積層ピッチ、温度、時間、重量はファイルから読み取られ、自由なメモ、ダウンロード、削除にも対応します",
+        "新機能：ファイルの「アクション」メニュー >「マイ G-code」で、そのファイルに紐づく独自の G-code をアップロードできます（設定をファイルから読み取り、メモ、ダウンロード、削除に対応）。ソースが利用できなくても保持されます",
+        "ダッシュボードに「G-code」ウィジェットを追加：アーカイブ済みの G-code（プロジェクトとファイル）を設定とともに表示し、クリックするとファイルを右クリックしたときと同じ表示で、ファイルのサムネイルと G-code の詳細を開きます"
+      ]
+    }
+  },
+  {
+    "version": "0.8.9",
+    "items": {
+      "fr": [
+        "Nouveau : MQTT / Home Assistant crée aussi un appareil « Stellio » (en plus des imprimantes) avec une quarantaine de capteurs : nombre de fichiers (total, STL, 3MF, G-code, nouveaux du mois), taille de la bibliothèque, favoris, projets, sources, impressions (total, jour, 7 et 30 jours, échecs, taux de réussite, heures), imprimantes en ligne ou en cours, bobines, maintenances à faire, notifications non lues, coûts, devis en attente, factures impayées et en retard, clients, commandes, version, durée de fonctionnement et taille de la base. Les capteurs de coût, devis et commandes suivent l'interrupteur « Coûts, devis et facturation »",
+        "Nouveau : le MQTT / Home Assistant gagne de nouveaux capteurs. Par imprimante : température de la chambre, couche actuelle et totale, heures d'impression cumulées, jours avant la prochaine maintenance, alertes « bobine presque vide » et « dérive d'impression ». Appareil Stellio : mêmes alertes en binaire, une entité par bobine Spoolman, TigerTag ou manuelle (poids restant), prochaine livraison, pièces restantes à imprimer, marge prévue et réelle, date de la dernière sauvegarde, mise à jour disponible (vérifiée toutes les 6 h) et dernière version"
+      ],
+      "en": [
+        "New: MQTT / Home Assistant also creates a \"Stellio\" device (in addition to the printers) with about forty sensors: file counts (total, STL, 3MF, G-code, new this month), library size, favorites, projects, sources, prints (total, today, 7 and 30 days, failures, success rate, hours), printers online or printing, spools, maintenance due, unread notifications, costs, pending quotes, unpaid and overdue invoices, customers, orders, version, uptime and database size. Cost, quote and order sensors follow the \"Costs, quotes and invoicing\" switch",
+        "New: MQTT / Home Assistant gets more sensors. Per printer: chamber temperature, current and total layer, cumulated print hours, days until next maintenance, \"spool almost empty\" and \"print drift\" alerts. Stellio device: the same alerts as binary sensors, one entity per Spoolman, TigerTag or manual spool (remaining weight), next delivery, parts left to print, expected and actual margin, last backup date, update available (checked every 6 h) and latest version"
+      ],
+      "de": [
+        "Neu: MQTT / Home Assistant erstellt zusätzlich zu den Druckern ein Gerät „Stellio“ mit rund vierzig Sensoren: Dateianzahl (gesamt, STL, 3MF, G-Code, neu im Monat), Bibliotheksgröße, Favoriten, Projekte, Quellen, Drucke (gesamt, heute, 7 und 30 Tage, Fehlschläge, Erfolgsquote, Stunden), Drucker online oder im Druck, Spulen, fällige Wartungen, ungelesene Benachrichtigungen, Kosten, offene Angebote, unbezahlte und überfällige Rechnungen, Kunden, Aufträge, Version, Laufzeit und Datenbankgröße. Kosten-, Angebots- und Auftragssensoren folgen dem Schalter „Kosten, Angebote und Rechnungen“",
+        "Neu: MQTT / Home Assistant erhält weitere Sensoren. Pro Drucker: Kammertemperatur, aktuelle und gesamte Schicht, kumulierte Druckstunden, Tage bis zur nächsten Wartung, Warnungen „Spule fast leer“ und „Druckabweichung“. Gerät Stellio: dieselben Warnungen als Binärsensoren, eine Entität pro Spoolman-, TigerTag- oder manueller Spule (Restgewicht), nächste Lieferung, noch zu druckende Teile, geplante und tatsächliche Marge, Datum der letzten Sicherung, verfügbares Update (alle 6 h geprüft) und neueste Version"
+      ],
+      "es": [
+        "Nuevo: MQTT / Home Assistant crea también un dispositivo «Stellio» (además de las impresoras) con unos cuarenta sensores: número de archivos (total, STL, 3MF, G-code, nuevos del mes), tamaño de la biblioteca, favoritos, proyectos, fuentes, impresiones (total, hoy, 7 y 30 días, fallos, tasa de éxito, horas), impresoras en línea o imprimiendo, bobinas, mantenimientos pendientes, notificaciones sin leer, costes, presupuestos pendientes, facturas impagadas y vencidas, clientes, pedidos, versión, tiempo activo y tamaño de la base de datos. Los sensores de costes, presupuestos y pedidos siguen el interruptor «Costes, presupuestos y facturación»",
+        "Nuevo: MQTT / Home Assistant añade más sensores. Por impresora: temperatura de la cámara, capa actual y total, horas de impresión acumuladas, días hasta el próximo mantenimiento, alertas «bobina casi vacía» y «deriva de impresión». Dispositivo Stellio: las mismas alertas como sensores binarios, una entidad por bobina de Spoolman, TigerTag o manual (peso restante), próxima entrega, piezas pendientes de imprimir, margen previsto y real, fecha de la última copia de seguridad, actualización disponible (comprobada cada 6 h) y última versión"
+      ],
+      "pt": [
+        "Novo: MQTT / Home Assistant cria também um dispositivo «Stellio» (além das impressoras) com cerca de quarenta sensores: número de ficheiros (total, STL, 3MF, G-code, novos do mês), tamanho da biblioteca, favoritos, projetos, fontes, impressões (total, hoje, 7 e 30 dias, falhas, taxa de sucesso, horas), impressoras online ou a imprimir, bobinas, manutenções em falta, notificações por ler, custos, orçamentos pendentes, faturas por pagar e em atraso, clientes, encomendas, versão, tempo de atividade e tamanho da base de dados. Os sensores de custos, orçamentos e encomendas seguem o interruptor «Custos, orçamentos e faturação»",
+        "Novo: o MQTT / Home Assistant ganha mais sensores. Por impressora: temperatura da câmara, camada atual e total, horas de impressão acumuladas, dias até à próxima manutenção, alertas «bobina quase vazia» e «desvio de impressão». Dispositivo Stellio: os mesmos alertas como sensores binários, uma entidade por bobina Spoolman, TigerTag ou manual (peso restante), próxima entrega, peças por imprimir, margem prevista e real, data da última cópia de segurança, atualização disponível (verificada a cada 6 h) e última versão"
+      ],
+      "it": [
+        "Novità: MQTT / Home Assistant crea anche un dispositivo «Stellio» (oltre alle stampanti) con una quarantina di sensori: numero di file (totale, STL, 3MF, G-code, nuovi del mese), dimensione della libreria, preferiti, progetti, sorgenti, stampe (totale, oggi, 7 e 30 giorni, fallimenti, tasso di successo, ore), stampanti online o in stampa, bobine, manutenzioni da fare, notifiche non lette, costi, preventivi in attesa, fatture non pagate e scadute, clienti, ordini, versione, tempo di attività e dimensione del database. I sensori di costi, preventivi e ordini seguono l'interruttore «Costi, preventivi e fatturazione»",
+        "Novità: MQTT / Home Assistant aggiunge altri sensori. Per stampante: temperatura della camera, strato attuale e totale, ore di stampa cumulate, giorni alla prossima manutenzione, avvisi «bobina quasi vuota» e «deriva di stampa». Dispositivo Stellio: gli stessi avvisi come sensori binari, un'entità per ogni bobina Spoolman, TigerTag o manuale (peso residuo), prossima consegna, pezzi ancora da stampare, margine previsto e reale, data dell'ultimo backup, aggiornamento disponibile (verificato ogni 6 h) e ultima versione"
+      ],
+      "zh": [
+        "新增：MQTT / Home Assistant 除打印机外还会创建“Stellio”设备，含约四十个传感器：文件数量（总数、STL、3MF、G-code、本月新增）、库大小、收藏、项目、来源、打印（总数、今日、7 天和 30 天、失败、成功率、小时数）、在线或打印中的打印机、耗材盘、待维护、未读通知、成本、待回复报价、未付和逾期发票、客户、订单、版本、运行时长和数据库大小。成本、报价和订单传感器受“成本、报价与开票”开关控制",
+        "新增：MQTT / Home Assistant 增加更多传感器。每台打印机：腔体温度、当前层与总层数、累计打印小时数、距下次保养的天数、“耗材即将用完”和“打印偏差”警报。Stellio 设备：以上警报的二进制传感器、每个 Spoolman、TigerTag 或手动耗材盘一个实体（剩余重量）、下次交付日期、待打印件数、预计与实际利润、上次备份日期、可用更新（每 6 小时检查一次）及最新版本"
+      ],
+      "ja": [
+        "新機能：MQTT / Home Assistant にプリンターに加えて「Stellio」デバイスを作成し、約40個のセンサーを提供：ファイル数（合計、STL、3MF、G-code、今月の新規）、ライブラリサイズ、お気に入り、プロジェクト、ソース、印刷（合計、今日、7日・30日、失敗、成功率、時間）、オンライン／印刷中のプリンター、スプール、要メンテナンス、未読通知、コスト、未回答の見積、未払い・期限超過の請求書、顧客、注文、バージョン、稼働時間、データベースサイズ。コスト・見積・注文のセンサーは「コスト・見積・請求」スイッチに連動します",
+        "新機能：MQTT / Home Assistant にセンサーを追加。プリンターごと：チャンバー温度、現在・総レイヤー数、累計印刷時間、次のメンテナンスまでの日数、「スプール残量わずか」と「印刷ずれ」の警告。Stellio デバイス：同じ警告のバイナリセンサー、Spoolman・TigerTag・手動スプールごとのエンティティ（残量）、次の納期、残りの印刷部品数、予定・実際の利益、最終バックアップ日時、更新の有無（6 時間ごとに確認）と最新バージョン"
+      ]
+    }
+  },
+  {
+    "version": "0.8.8",
+    "items": {
+      "fr": [
+        "Nouveau : section « Coûts, devis et facturation » dans les paramètres, qui regroupe les tarifs d'impression, les devis et le SMTP, avec un interrupteur général : désactivé, tout ce qui touche au coût, aux devis, aux factures, aux clients et aux commandes est masqué (menus d'actions, fiches, projets, historique, statistiques, tableau de bord). Les données sont conservées",
+        "Nouveau : contrôle et choix de la bobine à l'envoi au slicer. La fenêtre d'envoi liste tout l'inventaire (Spoolman, TigerTag, manuel, AMS) avec la quantité restante et un voyant suffisant / insuffisant ; la bobine choisie est assignée au fichier, et si elle ne suffit pas l'envoi demande confirmation en indiquant ce qu'il manque ; l'envoi groupé permet aussi de choisir la bobine fichier par fichier, avec contrôle de la quantité cumulée",
+        "Nouveau : marge réelle sur les commandes. Chaque commande issue d'un devis compare la marge prévue à la marge réelle à ce jour (heures d'impression mesurées, pièces ratées comptées en rebut, matière), avec un total dans la file de commandes",
+        "Nouveau : file de commandes. Un devis passé en « accepté » crée automatiquement une tâche d'impression (pièce, quantité, matière) assignée à l'imprimante la moins chargée, avec date de livraison prévue, suivi des pièces imprimées et retards signalés ; option d'avancement automatique à chaque impression terminée",
+        "Nouveau : alertes proactives. Notification (et push) quand une bobine est presque vide (seuil réglable), quand la température dérive de la consigne ou quand l'avancement d'une impression est bloqué",
+        "Nouveau : maintenance prédictive. Chaque tâche affiche la date d'échéance estimée d'après ton rythme réel d'impression (heures par jour sur 30 jours) et une notification arrive 3 jours avant",
+        "Nouveau : suivi des paiements. Chaque devis et facture a un statut (brouillon, envoyé, accepté, payé, en retard), une échéance, et le tableau de bord signale les factures en retard avec le montant à encaisser (notification push « Factures en retard » en option)",
+        "Nouveau : carnet de clients. Fiches (coordonnées, SIRET, notes), historique et totaux facturé / encaissé / reste dû par client, import depuis l'historique des devis, auto-complétion et pré-remplissage des coordonnées dans les devis et factures",
+        "Nouveau : envoi des devis et factures par e-mail (serveur SMTP configurable dans les paramètres, e-mail de test) et export comptable CSV (période et types de documents au choix, compatible Excel)",
+        "Nouveau : factures d'acompte et avoirs. Une facture d'acompte (en % ou en montant) peut être émise d'après un devis ; la facture finale déduit les acomptes déjà facturés ; un avoir total ou partiel peut être émis sur toute facture (numérotation AV-AAAA-NNNN)",
+        "MQTT : le bouton Tester publie maintenant les entités vers Home Assistant, préfixe de découverte configurable et message si MQTT n'est pas activé/enregistré"
+      ],
+      "en": [
+        "New: \"Costs, quotes and invoicing\" section in settings grouping print pricing, quotes and SMTP, with a master switch: when off, everything about costs, quotes, invoices, customers and orders is hidden (action menus, file details, projects, history, statistics, dashboard). Data is kept",
+        "New: spool check and choice when sending to the slicer. The send window lists the whole inventory (Spoolman, TigerTag, manual, AMS) with remaining quantity and an enough / not enough indicator; the chosen spool is assigned to the file, and if it isn't enough the send asks for confirmation and shows what is missing; group sends also let you pick the spool file by file, with a check on the cumulative quantity",
+        "New: real margin on orders. Each order created from a quote compares the expected margin with the actual margin so far (measured print hours, failed parts counted as scrap, material), with a total in the order queue",
+        "New: order queue. A quote set to \"accepted\" automatically creates a print task (part, quantity, material) assigned to the least busy printer, with a planned delivery date, printed-part tracking and late flags; optional automatic progress on every finished print",
+        "New: proactive alerts. Notification (and push) when a spool is almost empty (adjustable threshold), when the temperature drifts from its target or when a print's progress is stuck",
+        "New: predictive maintenance. Each task shows its estimated due date based on your real printing pace (hours per day over 30 days), with a notification 3 days ahead",
+        "New: payment tracking. Every quote and invoice has a status (draft, sent, accepted, paid, overdue) and a due date; the dashboard flags overdue invoices with the amount left to collect (optional \"Overdue invoices\" push notification)",
+        "New: customer book. Customer records (contact details, tax ID, notes), history and invoiced / collected / outstanding totals per customer, import from the quote history, auto-complete and automatic contact details on quotes and invoices",
+        "New: send quotes and invoices by e-mail (SMTP server configurable in settings, test e-mail) and CSV accounting export (period and document types of your choice, Excel-friendly)",
+        "New: deposit invoices and credit notes. A deposit invoice (percentage or amount) can be issued from a quote; the final invoice deducts deposits already invoiced; a full or partial credit note can be issued on any invoice (numbering AV-YYYY-NNNN)",
+        "MQTT: the Test button now publishes the entities to Home Assistant, configurable discovery prefix and a hint when MQTT isn't enabled/saved"
+      ],
+      "de": [
+        "Neu: Bereich „Kosten, Angebote und Rechnungen“ in den Einstellungen, der Druckpreise, Angebote und SMTP bündelt, mit Hauptschalter: Deaktiviert werden alle Kosten-, Angebots-, Rechnungs-, Kunden- und Auftragsfunktionen ausgeblendet (Aktionsmenüs, Dateidetails, Projekte, Verlauf, Statistiken, Dashboard). Die Daten bleiben erhalten",
+        "Neu: Spulenprüfung und -auswahl beim Senden an den Slicer. Das Sendefenster listet das gesamte Inventar (Spoolman, TigerTag, manuell, AMS) mit Restmenge und Anzeige „reicht / reicht nicht“; die gewählte Spule wird der Datei zugewiesen, und reicht sie nicht, fragt der Versand mit Angabe der fehlenden Menge nach; auch beim Sammelversand lässt sich die Spule pro Datei wählen, mit Prüfung der Gesamtmenge",
+        "Neu: tatsächliche Marge bei Aufträgen. Jeder aus einem Angebot erzeugte Auftrag vergleicht die geplante mit der bisher tatsächlichen Marge (gemessene Druckstunden, misslungene Teile als Ausschuss, Material), mit Summe in der Warteschlange",
+        "Neu: Auftragswarteschlange. Ein auf „angenommen“ gesetztes Angebot erstellt automatisch eine Druckaufgabe (Teil, Menge, Material) für den am wenigsten ausgelasteten Drucker, mit geplantem Liefertermin, Zählung gedruckter Teile und Verspätungshinweisen; optional automatischer Fortschritt bei jedem fertigen Druck",
+        "Neu: proaktive Warnungen. Benachrichtigung (und Push), wenn eine Spule fast leer ist (einstellbare Schwelle), die Temperatur von der Solltemperatur abweicht oder der Druckfortschritt stockt",
+        "Neu: vorausschauende Wartung. Jede Aufgabe zeigt das geschätzte Fälligkeitsdatum anhand deines tatsächlichen Druckpensums (Stunden pro Tag über 30 Tage); 3 Tage vorher kommt eine Benachrichtigung",
+        "Neu: Zahlungsverfolgung. Jedes Angebot und jede Rechnung hat einen Status (Entwurf, gesendet, angenommen, bezahlt, überfällig) und ein Fälligkeitsdatum; das Dashboard zeigt überfällige Rechnungen mit dem offenen Betrag (optionale Push-Benachrichtigung „Überfällige Rechnungen“)",
+        "Neu: Kundenverzeichnis. Kundenkarten (Kontakt, Steuernummer, Notizen), Verlauf sowie Summen berechnet / eingegangen / offen pro Kunde, Import aus dem Angebotsverlauf, Autovervollständigung und automatische Kontaktdaten in Angeboten und Rechnungen",
+        "Neu: Versand von Angeboten und Rechnungen per E-Mail (SMTP-Server in den Einstellungen, Test-E-Mail) und CSV-Buchhaltungsexport (Zeitraum und Dokumenttypen wählbar, Excel-kompatibel)",
+        "Neu: Anzahlungsrechnungen und Gutschriften. Aus einem Angebot kann eine Anzahlungsrechnung (in % oder Betrag) erstellt werden; die Schlussrechnung zieht bereits berechnete Anzahlungen ab; auf jede Rechnung kann eine volle oder teilweise Gutschrift ausgestellt werden (Nummerierung GS-JJJJ-NNNN)",
+        "MQTT: Der Test-Button veröffentlicht jetzt die Entitäten an Home Assistant, konfigurierbares Discovery-Präfix und Hinweis, wenn MQTT nicht aktiviert/gespeichert ist"
+      ],
+      "es": [
+        "Nuevo: sección «Costes, presupuestos y facturación» en los ajustes, que agrupa tarifas de impresión, presupuestos y SMTP, con un interruptor general: desactivado, se oculta todo lo relativo a costes, presupuestos, facturas, clientes y pedidos (menús de acciones, fichas, proyectos, historial, estadísticas, panel). Los datos se conservan",
+        "Nuevo: control y elección de bobina al enviar al slicer. La ventana de envío lista todo el inventario (Spoolman, TigerTag, manual, AMS) con la cantidad restante y un indicador suficiente / insuficiente; la bobina elegida se asigna al archivo y, si no basta, el envío pide confirmación indicando lo que falta; el envío grupal también permite elegir la bobina archivo por archivo, con control de la cantidad acumulada",
+        "Nuevo: margen real en los pedidos. Cada pedido creado desde un presupuesto compara el margen previsto con el real hasta ahora (horas de impresión medidas, piezas fallidas como desecho, material), con un total en la cola de pedidos",
+        "Nuevo: cola de pedidos. Un presupuesto marcado como «aceptado» crea automáticamente una tarea de impresión (pieza, cantidad, material) asignada a la impresora menos ocupada, con fecha de entrega prevista, seguimiento de piezas impresas y avisos de retraso; avance automático opcional con cada impresión terminada",
+        "Nuevo: alertas proactivas. Notificación (y push) cuando una bobina está casi vacía (umbral ajustable), cuando la temperatura se desvía de la consigna o cuando el avance de una impresión se detiene",
+        "Nuevo: mantenimiento predictivo. Cada tarea muestra su fecha estimada según tu ritmo real de impresión (horas por día en 30 días) y llega una notificación 3 días antes",
+        "Nuevo: seguimiento de pagos. Cada presupuesto y factura tiene un estado (borrador, enviado, aceptado, pagado, vencido) y una fecha de vencimiento; el panel señala las facturas vencidas con el importe por cobrar (notificación push opcional «Facturas vencidas»)",
+        "Nuevo: libreta de clientes. Fichas (datos de contacto, NIF, notas), historial y totales facturado / cobrado / pendiente por cliente, importación desde el historial de presupuestos, autocompletado y datos del cliente en presupuestos y facturas",
+        "Nuevo: envío de presupuestos y facturas por correo (servidor SMTP configurable en ajustes, correo de prueba) y exportación contable CSV (periodo y tipos de documento a elegir, compatible con Excel)",
+        "Nuevo: facturas de anticipo y abonos. Se puede emitir una factura de anticipo (en % o importe) desde un presupuesto; la factura final descuenta los anticipos ya facturados; se puede emitir un abono total o parcial sobre cualquier factura (numeración AB-AAAA-NNNN)",
+        "MQTT: el botón de prueba ahora publica las entidades en Home Assistant, prefijo de descubrimiento configurable y aviso si MQTT no está activado/guardado"
+      ],
+      "pt": [
+        "Novo: secção «Custos, orçamentos e faturação» nas definições, que agrupa tarifas de impressão, orçamentos e SMTP, com um interruptor geral: desativado, oculta-se tudo o que diz respeito a custos, orçamentos, faturas, clientes e encomendas (menus de ações, fichas, projetos, histórico, estatísticas, painel). Os dados são mantidos",
+        "Novo: verificação e escolha da bobina ao enviar para o slicer. A janela de envio lista todo o inventário (Spoolman, TigerTag, manual, AMS) com a quantidade restante e um indicador suficiente / insuficiente; a bobina escolhida é atribuída ao ficheiro e, se não chegar, o envio pede confirmação indicando o que falta; o envio em grupo também permite escolher a bobina ficheiro a ficheiro, com verificação da quantidade acumulada",
+        "Novo: margem real nas encomendas. Cada encomenda criada a partir de um orçamento compara a margem prevista com a real até agora (horas de impressão medidas, peças falhadas como refugo, material), com um total na fila de encomendas",
+        "Novo: fila de encomendas. Um orçamento marcado como «aceite» cria automaticamente uma tarefa de impressão (peça, quantidade, material) atribuída à impressora menos ocupada, com data de entrega prevista, contagem de peças impressas e avisos de atraso; avanço automático opcional a cada impressão concluída",
+        "Novo: alertas proativos. Notificação (e push) quando uma bobina está quase vazia (limiar ajustável), quando a temperatura se desvia do alvo ou quando o progresso de uma impressão fica parado",
+        "Novo: manutenção preditiva. Cada tarefa mostra a data estimada com base no teu ritmo real de impressão (horas por dia em 30 dias) e chega uma notificação 3 dias antes",
+        "Novo: acompanhamento de pagamentos. Cada orçamento e fatura tem um estado (rascunho, enviado, aceite, pago, em atraso) e uma data de vencimento; o painel assinala as faturas em atraso com o valor a receber (notificação push opcional «Faturas em atraso»)",
+        "Novo: livro de clientes. Fichas (contactos, NIF, notas), histórico e totais faturado / recebido / em dívida por cliente, importação do histórico de orçamentos, preenchimento automático e dados do cliente nos orçamentos e faturas",
+        "Novo: envio de orçamentos e faturas por e-mail (servidor SMTP configurável nas definições, e-mail de teste) e exportação contabilística CSV (período e tipos de documento à escolha, compatível com Excel)",
+        "Novo: faturas de adiantamento e notas de crédito. Pode emitir-se uma fatura de adiantamento (em % ou valor) a partir de um orçamento; a fatura final deduz os adiantamentos já faturados; pode emitir-se uma nota de crédito total ou parcial sobre qualquer fatura (numeração NC-AAAA-NNNN)",
+        "MQTT: o botão de teste agora publica as entidades no Home Assistant, prefixo de descoberta configurável e aviso se o MQTT não estiver ativado/guardado"
+      ],
+      "it": [
+        "Novità: sezione «Costi, preventivi e fatturazione» nelle impostazioni, che raggruppa tariffe di stampa, preventivi e SMTP, con un interruttore generale: disattivato, tutto ciò che riguarda costi, preventivi, fatture, clienti e ordini viene nascosto (menu azioni, schede, progetti, cronologia, statistiche, dashboard). I dati vengono conservati",
+        "Novità: controllo e scelta della bobina all'invio allo slicer. La finestra di invio elenca tutto l'inventario (Spoolman, TigerTag, manuale, AMS) con la quantità residua e un indicatore sufficiente / insufficiente; la bobina scelta viene assegnata al file e, se non basta, l'invio chiede conferma indicando quanto manca; anche l'invio multiplo permette di scegliere la bobina file per file, con controllo della quantità cumulata",
+        "Novità: margine reale sugli ordini. Ogni ordine creato da un preventivo confronta il margine previsto con quello reale finora (ore di stampa misurate, pezzi falliti come scarto, materiale), con un totale nella coda ordini",
+        "Novità: coda ordini. Un preventivo impostato su «accettato» crea automaticamente un'attività di stampa (pezzo, quantità, materiale) assegnata alla stampante meno carica, con data di consegna prevista, conteggio dei pezzi stampati e segnalazione dei ritardi; avanzamento automatico opzionale a ogni stampa completata",
+        "Novità: avvisi proattivi. Notifica (e push) quando una bobina è quasi vuota (soglia regolabile), quando la temperatura devia dal valore impostato o quando l'avanzamento di una stampa si blocca",
+        "Novità: manutenzione predittiva. Ogni attività mostra la data stimata in base al tuo ritmo reale di stampa (ore al giorno su 30 giorni) e una notifica arriva 3 giorni prima",
+        "Novo: monitoraggio dei pagamenti. Ogni preventivo e fattura ha uno stato (bozza, inviato, accettato, pagato, scaduto) e una scadenza; la dashboard segnala le fatture scadute con l'importo da incassare (notifica push facoltativa «Fatture scadute»)",
+        "Novità: rubrica clienti. Schede (contatti, P. IVA, note), cronologia e totali fatturato / incassato / da incassare per cliente, importazione dalla cronologia dei preventivi, completamento automatico e dati del cliente nei preventivi e nelle fatture",
+        "Novità: invio di preventivi e fatture via e-mail (server SMTP configurabile nelle impostazioni, e-mail di prova) ed esportazione contabile CSV (periodo e tipi di documento a scelta, compatibile con Excel)",
+        "Novità: fatture di acconto e note di credito. Da un preventivo si può emettere una fattura di acconto (in % o importo); la fattura finale detrae gli acconti già fatturati; su ogni fattura si può emettere una nota di credito totale o parziale (numerazione NC-AAAA-NNNN)",
+        "MQTT: il pulsante di test ora pubblica le entità su Home Assistant, prefisso di discovery configurabile e avviso se MQTT non è attivato/salvato"
+      ],
+      "zh": [
+        "新增：设置中的“成本、报价与开票”分组，汇集打印价格、报价单和 SMTP，并带总开关：关闭后，所有与成本、报价、发票、客户和订单相关的内容都会隐藏（操作菜单、文件详情、项目、历史、统计、仪表盘），数据保留",
+        "新增：发送到切片软件时检查并选择耗材盘。发送窗口列出全部库存（Spoolman、TigerTag、手动、AMS）及剩余量和“足够/不足”指示；所选耗材盘会分配给该文件，若不足，发送前会提示缺少的克数并请求确认；批量发送时也可逐个文件选择耗材盘，并检查累计用量",
+        "新增：订单实际利润。由报价单生成的订单会对比预计利润与截至目前的实际利润（实测打印小时、失败件计为废品、材料），并在订单队列中显示合计",
+        "新增：订单队列。将报价单设为“已接受”会自动创建打印任务（零件、数量、材料），分配给最空闲的打印机，并带有计划交付日期、已打印件数跟踪和延误提示；可选每次打印完成后自动推进",
+        "新增：主动提醒。耗材盘即将用完（阈值可调）、温度偏离设定值或打印进度停滞时，发送通知（及推送）",
+        "新增：预测性维护。每个维护任务会根据你的实际打印节奏（30 天内每天的打印小时数）显示预计到期日，并提前 3 天通知",
+        "新增：付款跟踪。每份报价单和发票都有状态（草稿、已发送、已接受、已付款、已逾期）和到期日；仪表盘会提示逾期发票及待收金额（可选“逾期发票”推送通知）",
+        "新增：客户簿。客户档案（联系方式、税号、备注）、每位客户的开票 / 已收 / 未结金额与历史记录，可从报价历史导入，并在报价单和发票中自动补全客户信息",
+        "新增：通过邮件发送报价单和发票（在设置中配置 SMTP 服务器，支持测试邮件），以及 CSV 会计导出（可选时间范围和文档类型，兼容 Excel）",
+        "新增：预付款发票和贷项通知单。可根据报价单开具预付款发票（按百分比或金额）；最终发票自动扣除已开具的预付款；可对任何发票开具全额或部分贷项通知单（编号 CN-YYYY-NNNN）",
+        "MQTT：测试按钮现在会向 Home Assistant 发布实体，可配置发现前缀，未启用/未保存 MQTT 时给出提示"
+      ],
+      "ja": [
+        "新機能：設定に「コスト・見積・請求」セクションを追加し、印刷料金・見積書・SMTP をまとめ、全体スイッチを用意。オフにするとコスト・見積・請求書・顧客・注文に関するすべて（操作メニュー、ファイル詳細、プロジェクト、履歴、統計、ダッシュボード）が非表示になります（データは保持）",
+        "新機能：スライサー送信時のスプール確認と選択。送信ウィンドウに在庫全体（Spoolman、TigerTag、手動、AMS）を残量と「十分／不足」表示付きで一覧し、選んだスプールをファイルに割り当てます。不足の場合は不足量を示して確認を求めます。一括送信でもファイルごとにスプールを選べ、累計使用量も確認します",
+        "新機能：注文の実績利益。見積書から作成した注文で、予定利益と現時点の実績利益（実測の印刷時間、失敗品は廃棄として計上、材料）を比較し、注文キューに合計を表示",
+        "新機能：注文キュー。見積書を「承諾済み」にすると、最も空いているプリンターに割り当てられた印刷タスク（部品・数量・材料）が自動作成され、納期予定・印刷済み数の管理・遅延表示に対応。印刷完了ごとの自動進行（任意）も可能",
+        "新機能：先回りアラート。スプール残りわずか（しきい値は変更可）、温度が設定値からずれた場合、印刷の進行が止まった場合に通知（プッシュも）",
+        "新機能：予知保全。各タスクに、実際の印刷ペース（30日間の1日あたり時間）に基づく予定期限を表示し、3日前に通知",
+        "新機能：入金管理。見積書と請求書にステータス（下書き、送信済み、承諾済み、支払済み、期限超過）と支払期限を設定でき、ダッシュボードに期限超過の請求書と未回収額を表示（「期限超過の請求書」プッシュ通知は任意）",
+        "新機能：顧客リスト。顧客情報（連絡先、税番号、メモ）、顧客ごとの請求額・入金額・未払い残高と履歴、見積履歴からのインポート、見積書・請求書への自動補完",
+        "新機能：見積書・請求書のメール送信（設定でSMTPサーバーを構成、テストメールあり）と、CSV形式の会計エクスポート（期間と書類の種類を選択可、Excel対応）",
+        "新機能：前受金請求書とクレジットノート。見積書から前受金請求書（％または金額）を発行でき、最終請求書は請求済みの前受金を差し引きます。任意の請求書に全額または一部のクレジットノートを発行可能（番号 CN-YYYY-NNNN）",
+        "MQTT：テストボタンでエンティティをHome Assistantに公開、ディスカバリープレフィックスを設定可能、MQTTが未有効・未保存の場合は案内を表示"
+      ]
+    }
+  },
+  {
+    "version": "0.8.7",
+    "items": {
+      "fr": [
+        "Nouveau : imprimantes Bambuddy. Ajoute une imprimante Bambu Lab gérée par ton serveur Bambuddy (adresse, clé API, choix de l'imprimante dans la liste) : état, progression, températures, nom du fichier, caméra et timelapse sont disponibles dans Stellio",
+        "Nouveau : prévision de consommation du filament. L'inventaire estime pour chaque bobine combien de jours il reste au rythme de tes impressions récentes, et le widget « À commander » te prévient avant la rupture (seuil en jours réglable dans les paramètres de stock bas)",
+        "Nouveau : intégration MQTT / Home Assistant. Stellio publie l'état de tes imprimantes (statut, progression, temps restant, températures, fichier) sur ton broker MQTT et déclare automatiquement les entités dans Home Assistant ; événements de fin et d'échec d'impression inclus (Paramètres › MQTT / Home Assistant) (édition serveur : Raspberry Pi, Proxmox, Linux)",
+        "Nouveau : collections intelligentes dans la bibliothèque. Des pastilles avec compteur en direct (ajoutés cette semaine, jamais imprimés, déjà réussis, à retenter, rapides, gros projets) filtrent la bibliothèque en un clic, à côté de tes filtres sauvegardés",
+        "Amélioration : les fenêtres qui contiennent un formulaire ne se ferment plus quand on clique à côté, pour ne plus perdre une saisie en cours (la croix, Annuler et Échap fonctionnent toujours)",
+        "Correction : dans la fenêtre de calcul du coût, le libellé « Prix électricité » n'affiche plus l'unité en double et les champs prix et puissance sont alignés à la même hauteur",
+        "Amélioration : un clic sur un devis (tableau de bord ou historique des devis) ouvre maintenant directement son PDF dans une fenêtre d'aperçu, avec un bouton pour le télécharger",
+        "Amélioration : les deux colonnes de la page Paramètres sont équilibrées, avec le même nombre de sections à gauche et à droite",
+        "Nouveau : deux widgets sur le tableau de bord. « Timelapses » liste les derniers timelapses (un clic ouvre la vidéo), et « MQTT / Home Assistant » (édition serveur) affiche l'état de la connexion au broker ; un clic montre la liste des entités visibles dans Home Assistant avec leurs valeurs et leurs topics",
+        "Devis : remise (en % ou en montant), modification d'un devis existant et création d'une facture définitive numérotée d'après un devis",
+        "Devis : PDF verrouillé contre la modification, case « Bon pour accord » à cocher et encadré de signature du client",
+        "Devis : copie du texte désormais interdite dans le PDF, conditions générales de vente en page 2 (texte par défaut dans les 8 langues, modifiable dans Paramètres > Devis)",
+        "Devis : l'ouverture depuis le tableau de bord ne demande plus de code (aperçu non chiffré ; le PDF téléchargé reste verrouillé)"
+      ],
+      "en": [
+        "New: Bambuddy printers. Add a Bambu Lab printer managed by your Bambuddy server (address, API key, pick the printer from the list): status, progress, temperatures, file name, camera and timelapse are available in Stellio",
+        "New: filament consumption forecast. The inventory estimates how many days each spool will last at the pace of your recent prints, and the “To order” widget warns you before you run out (threshold in days adjustable in the low-stock settings)",
+        "New: MQTT / Home Assistant integration. Stellio publishes your printers' state (status, progress, time left, temperatures, file) to your MQTT broker and automatically declares the entities in Home Assistant; print finished and failed events included (Settings › MQTT / Home Assistant) (server edition: Raspberry Pi, Proxmox, Linux)",
+        "New: smart collections in the library. Chips with live counts (added this week, never printed, already succeeded, to retry, quick prints, big projects) filter the library in one click, next to your saved filters",
+        "Improvement: windows containing a form no longer close when you click outside them, so you never lose what you were typing (the close button, Cancel and Esc still work)",
+        "Fix: in the cost calculation window, the “Electricity price” label no longer shows the unit twice and the price and power fields are aligned at the same height",
+        "Improvement: clicking a quote (dashboard or quote history) now opens its PDF directly in a preview window, with a button to download it",
+        "Improvement: the two columns of the Settings page are balanced, with the same number of sections on the left and on the right",
+        "New: two dashboard widgets. “Timelapses” lists the latest timelapses (click to open the video), and “MQTT / Home Assistant” (server edition) shows the broker connection status; clicking it lists the entities visible in Home Assistant with their values and topics",
+        "Quotes: discount (percent or amount), editing of existing quotes and creation of a final numbered invoice from a quote",
+        "Quotes: PDF locked against modification, tick-box \"Approved\" mention and customer signature box",
+        "Quotes: text copying now disabled in the PDF, general terms and conditions on page 2 (default text in all 8 languages, editable in Settings > Quotes)",
+        "Quotes: opening a quote from the dashboard no longer asks for a code (unencrypted preview; the downloaded PDF stays locked)"
+      ],
+      "de": [
+        "Neu: Bambuddy-Drucker. Füge einen von deinem Bambuddy-Server verwalteten Bambu-Lab-Drucker hinzu (Adresse, API-Schlüssel, Drucker aus der Liste wählen): Status, Fortschritt, Temperaturen, Dateiname, Kamera und Zeitraffer stehen in Stellio zur Verfügung",
+        "Neu: Prognose des Filamentverbrauchs. Das Inventar schätzt für jede Spule, wie viele Tage sie im Tempo deiner letzten Drucke reicht, und das Widget „Nachbestellen“ warnt vor dem Ende (Schwelle in Tagen in den Einstellungen für niedrigen Bestand einstellbar)",
+        "Neu: MQTT-/Home-Assistant-Integration. Stellio veröffentlicht den Status deiner Drucker (Status, Fortschritt, Restzeit, Temperaturen, Datei) auf deinem MQTT-Broker und legt die Entitäten in Home Assistant automatisch an; inklusive Ereignissen für beendete und fehlgeschlagene Drucke (Einstellungen › MQTT / Home Assistant) (Server-Edition: Raspberry Pi, Proxmox, Linux)",
+        "Neu: intelligente Sammlungen in der Bibliothek. Chips mit Live-Zähler (diese Woche hinzugefügt, nie gedruckt, bereits erfolgreich, nochmal versuchen, schnelle Drucke, große Projekte) filtern die Bibliothek mit einem Klick, neben deinen gespeicherten Filtern",
+        "Verbesserung: Fenster mit Formular schließen sich nicht mehr beim Klick daneben, damit keine Eingabe verloren geht (Schließen-Kreuz, Abbrechen und Esc funktionieren weiterhin)",
+        "Fix: Im Kostenberechnungsfenster zeigt die Beschriftung „Strompreis“ die Einheit nicht mehr doppelt an, und die Felder Preis und Leistung stehen auf gleicher Höhe",
+        "Verbesserung: Ein Klick auf ein Angebot (Dashboard oder Angebotsverlauf) öffnet jetzt direkt dessen PDF in einem Vorschaufenster, mit Download-Schaltfläche",
+        "Verbesserung: Die beiden Spalten der Einstellungsseite sind ausgeglichen, mit gleich vielen Bereichen links und rechts",
+        "Neu: zwei Dashboard-Widgets. „Zeitraffer“ listet die neuesten Zeitraffer (Klick öffnet das Video), und „MQTT / Home Assistant“ (Server-Edition) zeigt den Verbindungsstatus zum Broker; ein Klick zeigt die in Home Assistant sichtbaren Entitäten mit Werten und Topics",
+        "Angebote: Rabatt (in % oder Betrag), Bearbeiten bestehender Angebote und Erstellung einer endgültigen, nummerierten Rechnung aus einem Angebot",
+        "Angebote: PDF gegen Änderungen gesperrt, Ankreuzfeld „Einverstanden“ und Unterschriftsfeld des Kunden",
+        "Angebote: Textkopieren im PDF jetzt gesperrt, AGB auf Seite 2 (Standardtext in allen 8 Sprachen, in den Einstellungen anpassbar)",
+        "Angebote: Das Öffnen aus dem Dashboard fragt keinen Code mehr ab (unverschlüsselte Vorschau; das heruntergeladene PDF bleibt gesperrt)"
+      ],
+      "es": [
+        "Novedad: impresoras Bambuddy. Añade una impresora Bambu Lab gestionada por tu servidor Bambuddy (dirección, clave API, elige la impresora de la lista): estado, progreso, temperaturas, nombre del archivo, cámara y timelapse disponibles en Stellio",
+        "Novedad: previsión de consumo de filamento. El inventario estima cuántos días durará cada bobina al ritmo de tus impresiones recientes y el widget «Por pedir» avisa antes de quedarte sin (umbral en días ajustable en los ajustes de stock bajo)",
+        "Novedad: integración MQTT / Home Assistant. Stellio publica el estado de tus impresoras (estado, progreso, tiempo restante, temperaturas, archivo) en tu broker MQTT y declara automáticamente las entidades en Home Assistant; incluye eventos de impresión terminada y fallida (Ajustes › MQTT / Home Assistant) (edición servidor: Raspberry Pi, Proxmox, Linux)",
+        "Novedad: colecciones inteligentes en la biblioteca. Etiquetas con contador en vivo (añadidos esta semana, nunca impresos, ya logrados, para reintentar, rápidos, grandes proyectos) filtran la biblioteca con un clic, junto a tus filtros guardados",
+        "Mejora: las ventanas que contienen un formulario ya no se cierran al hacer clic fuera, para no perder lo que estabas escribiendo (la cruz, Cancelar y Esc siguen funcionando)",
+        "Corrección: en la ventana de cálculo de costes, la etiqueta «Precio de la electricidad» ya no muestra la unidad duplicada y los campos de precio y potencia quedan alineados a la misma altura",
+        "Mejora: al hacer clic en un presupuesto (panel o historial de presupuestos) se abre directamente su PDF en una ventana de vista previa, con un botón para descargarlo",
+        "Mejora: las dos columnas de la página de Ajustes están equilibradas, con el mismo número de secciones a la izquierda y a la derecha",
+        "Novedad: dos widgets en el panel. «Timelapses» muestra los últimos timelapses (un clic abre el vídeo) y «MQTT / Home Assistant» (edición servidor) muestra el estado de la conexión con el broker; al hacer clic se listan las entidades visibles en Home Assistant con sus valores y topics",
+        "Presupuestos: descuento (en % o importe), edición de presupuestos existentes y creación de una factura definitiva numerada a partir de un presupuesto",
+        "Presupuestos: PDF bloqueado contra modificaciones, casilla «Conforme» y recuadro de firma del cliente",
+        "Presupuestos: copia de texto desactivada en el PDF, condiciones generales en la página 2 (texto por defecto en 8 idiomas, editable en Ajustes)",
+        "Presupuestos: abrir un presupuesto desde el panel ya no pide ningún código (vista previa sin cifrar; el PDF descargado sigue bloqueado)"
+      ],
+      "pt": [
+        "Novo: impressoras Bambuddy. Adiciona uma impressora Bambu Lab gerida pelo teu servidor Bambuddy (endereço, chave API, escolhe a impressora na lista): estado, progresso, temperaturas, nome do ficheiro, câmara e timelapse disponíveis no Stellio",
+        "Novo: previsão de consumo de filamento. O inventário estima quantos dias dura cada bobina ao ritmo das tuas impressões recentes e o widget «Por encomendar» avisa antes de acabar (limiar em dias ajustável nas definições de stock baixo)",
+        "Novo: integração MQTT / Home Assistant. O Stellio publica o estado das tuas impressoras (estado, progresso, tempo restante, temperaturas, ficheiro) no teu broker MQTT e declara automaticamente as entidades no Home Assistant; inclui eventos de impressão concluída e falhada (Definições › MQTT / Home Assistant) (edição servidor: Raspberry Pi, Proxmox, Linux)",
+        "Novo: coleções inteligentes na biblioteca. Etiquetas com contador em direto (adicionados esta semana, nunca impressos, já bem-sucedidos, a repetir, rápidos, grandes projetos) filtram a biblioteca com um clique, ao lado dos teus filtros guardados",
+        "Melhoria: as janelas que contêm um formulário já não fecham ao clicar fora, para não perderes o que estavas a escrever (a cruz, Cancelar e Esc continuam a funcionar)",
+        "Correção: na janela de cálculo de custos, a etiqueta «Preço da eletricidade» já não mostra a unidade duplicada e os campos de preço e potência ficam alinhados à mesma altura",
+        "Melhoria: ao clicar num orçamento (painel ou histórico de orçamentos) abre-se diretamente o seu PDF numa janela de pré-visualização, com um botão para o transferir",
+        "Melhoria: as duas colunas da página de Definições estão equilibradas, com o mesmo número de secções à esquerda e à direita",
+        "Novo: dois widgets no painel. «Timelapses» lista os últimos timelapses (um clique abre o vídeo) e «MQTT / Home Assistant» (edição servidor) mostra o estado da ligação ao broker; ao clicar, vês as entidades visíveis no Home Assistant com os seus valores e topics",
+        "Orçamentos: desconto (em % ou valor), edição de orçamentos existentes e criação de uma fatura definitiva numerada a partir de um orçamento",
+        "Orçamentos: PDF bloqueado contra alterações, caixa «De acordo» e campo de assinatura do cliente",
+        "Orçamentos: cópia de texto desativada no PDF, condições gerais na página 2 (texto predefinido em 8 idiomas, editável nas Definições)",
+        "Orçamentos: abrir um orçamento a partir do painel já não pede código (pré-visualização sem cifra; o PDF descarregado continua bloqueado)"
+      ],
+      "it": [
+        "Novità: stampanti Bambuddy. Aggiungi una stampante Bambu Lab gestita dal tuo server Bambuddy (indirizzo, chiave API, scegli la stampante dall'elenco): stato, avanzamento, temperature, nome del file, fotocamera e timelapse disponibili in Stellio",
+        "Novità: previsione del consumo di filamento. L'inventario stima quanti giorni durerà ogni bobina al ritmo delle tue stampe recenti e il widget «Da ordinare» avvisa prima che finisca (soglia in giorni regolabile nelle impostazioni di scorta bassa)",
+        "Novità: integrazione MQTT / Home Assistant. Stellio pubblica lo stato delle tue stampanti (stato, avanzamento, tempo rimanente, temperature, file) sul tuo broker MQTT e dichiara automaticamente le entità in Home Assistant; inclusi gli eventi di stampa terminata e fallita (Impostazioni › MQTT / Home Assistant) (edizione server: Raspberry Pi, Proxmox, Linux)",
+        "Novità: raccolte intelligenti nella libreria. Chip con contatore in tempo reale (aggiunti questa settimana, mai stampati, già riusciti, da riprovare, veloci, grandi progetti) filtrano la libreria con un clic, accanto ai filtri salvati",
+        "Miglioramento: le finestre che contengono un modulo non si chiudono più cliccando all'esterno, così non perdi quello che stavi scrivendo (la croce, Annulla ed Esc funzionano ancora)",
+        "Correzione: nella finestra di calcolo dei costi, l'etichetta «Prezzo elettricità» non mostra più l'unità due volte e i campi prezzo e potenza sono allineati alla stessa altezza",
+        "Miglioramento: cliccando su un preventivo (dashboard o cronologia dei preventivi) si apre direttamente il suo PDF in una finestra di anteprima, con un pulsante per scaricarlo",
+        "Miglioramento: le due colonne della pagina Impostazioni sono bilanciate, con lo stesso numero di sezioni a sinistra e a destra",
+        "Novità: due widget nella dashboard. «Timelapse» elenca gli ultimi timelapse (un clic apre il video) e «MQTT / Home Assistant» (edizione server) mostra lo stato della connessione al broker; cliccando si vede l'elenco delle entità visibili in Home Assistant con valori e topic",
+        "Preventivi: sconto (in % o importo), modifica dei preventivi esistenti e creazione di una fattura definitiva numerata da un preventivo",
+        "Preventivi: PDF protetto da modifiche, casella «Per accettazione» e riquadro per la firma del cliente",
+        "Preventivi: copia del testo disattivata nel PDF, condizioni generali a pagina 2 (testo predefinito in 8 lingue, modificabile nelle Impostazioni)",
+        "Preventivi: aprire un preventivo dalla dashboard non richiede più alcun codice (anteprima non cifrata; il PDF scaricato resta protetto)"
+      ],
+      "zh": [
+        "新增:Bambuddy 打印机。添加由你的 Bambuddy 服务器管理的 Bambu Lab 打印机(地址、API 密钥、从列表中选择打印机):Stellio 中可查看状态、进度、温度、文件名、摄像头和延时摄影",
+        "新增:耗材消耗预测。库存会按你近期的打印速度估算每卷还能用几天,“待订购”小组件会在用完前提醒你(天数阈值可在低库存设置中调整)",
+        "新增:MQTT / Home Assistant 集成。Stellio 会把打印机状态(状态、进度、剩余时间、温度、文件)发布到你的 MQTT 服务器,并自动在 Home Assistant 中创建实体;包含打印完成和失败事件(设置 › MQTT / Home Assistant)(服务器版:树莓派、Proxmox、Linux)",
+        "新增:资料库智能集合。带实时计数的标签(本周新增、从未打印、已成功、待重试、快速打印、大型项目)可一键筛选资料库,与已保存的筛选器并列显示",
+        "改进:包含表单的窗口在点击窗口外部时不再关闭,避免丢失正在输入的内容(关闭按钮、取消和 Esc 仍然可用)",
+        "修复:在成本计算窗口中,“电价”标签不再重复显示单位,电价和功率输入框对齐到同一高度",
+        "改进:点击报价单(仪表盘或报价历史)现在会在预览窗口中直接打开其 PDF,并提供下载按钮",
+        "改进:设置页面的两列已均衡,左右两侧的分组数量相同",
+        "新增:仪表盘新增两个小组件。“延时摄影”列出最新的延时视频(点击即可播放),“MQTT / Home Assistant”(服务器版)显示与服务器的连接状态,点击可查看 Home Assistant 中可见的实体及其数值和主题",
+        "报价单：支持折扣（百分比或金额）、修改已有报价单，并可根据报价单创建带编号的正式发票",
+        "报价单：PDF 禁止修改，新增“同意”勾选框和客户签名栏",
+        "报价单：PDF 禁止复制文本，第 2 页新增一般销售条款（8 种语言默认文本，可在设置中修改）",
+        "报价单：从仪表盘打开报价单不再要求输入密码（预览为未加密版本，下载的 PDF 仍受保护）"
+      ],
+      "ja": [
+        "新機能:Bambuddy プリンター。Bambuddy サーバーが管理する Bambu Lab プリンターを追加できます(アドレス、API キー、一覧から選択)。状態、進捗、温度、ファイル名、カメラ、タイムラプスを Stellio で利用できます",
+        "新機能:フィラメント消費予測。直近の印刷ペースから各スプールがあと何日もつかを推定し、「要発注」ウィジェットが無くなる前に知らせます(日数のしきい値は在庫少設定で変更可能)",
+        "新機能:MQTT / Home Assistant 連携。プリンターの状態(ステータス、進捗、残り時間、温度、ファイル)を MQTT ブローカーに送信し、Home Assistant にエンティティを自動登録します。印刷完了・失敗イベントにも対応(設定 › MQTT / Home Assistant)(サーバー版:Raspberry Pi、Proxmox、Linux)",
+        "新機能:ライブラリのスマートコレクション。リアルタイム件数付きのチップ(今週追加、未印刷、成功済み、再挑戦、短時間、大型プロジェクト)でワンクリック絞り込み。保存済みフィルターの横に表示されます",
+        "改善:フォームを含むウィンドウは、外側をクリックしても閉じなくなりました。入力中の内容が失われません(閉じるボタン、キャンセル、Esc は従来どおり使えます)",
+        "修正:コスト計算ウィンドウで「電気料金」ラベルの単位が重複して表示されなくなり、料金と出力の入力欄が同じ高さに揃いました",
+        "改善:見積書(ダッシュボードまたは見積履歴)をクリックすると、PDF がプレビューウィンドウで直接開き、ダウンロードボタンも使えます",
+        "改善:設定ページの2列のバランスを調整し、左右のセクション数を揃えました",
+        "新機能:ダッシュボードに2つのウィジェットを追加。「タイムラプス」は最新の動画を一覧表示(クリックで再生)、「MQTT / Home Assistant」(サーバー版)はブローカーの接続状態を表示し、クリックすると Home Assistant に表示されるエンティティを値とトピック付きで確認できます",
+        "見積書：値引き（％または金額）、既存の見積書の編集、見積書から番号付きの確定請求書の作成",
+        "見積書：PDFの編集を禁止し、「承諾」チェック欄とお客様署名欄を追加",
+        "見積書：PDFのテキストコピーを禁止し、2ページ目に一般取引条件を追加（8言語の既定文面、設定で編集可）",
+        "見積書：ダッシュボードから開く際にコードを求められなくなりました（プレビューは暗号化なし、ダウンロードしたPDFは保護されたまま）"
+      ]
+    }
+  },
+  {
+    "version": "0.8.6",
+    "items": {
+      "fr": [
+        "Nouveau : timelapse automatique. Active-le dans la fiche d'une imprimante : Stellio prend des photos avec sa caméra pendant l'impression et crée une vidéo MP4 à la fin (liste, lecture, téléchargement et suppression depuis la page Imprimantes ; intervalle réglable, ffmpeg requis)",
+        "Nouveau : liens de partage en lecture seule. Depuis le mode atelier, crée un lien secret vers une page sans compte qui montre l'état des imprimantes (progression, temps restant, températures, noms de fichiers en option), révocable à tout moment",
+        "Nouveau : alertes de dérive de qualité. Le tableau de bord signale quand le taux d'échec d'une imprimante, d'un matériau ou d'un profil augmente nettement sur les 30 derniers jours",
+        "Correction : le modèle Bambu Lab choisi à l'ajout d'une imprimante est maintenant bien enregistré (la caméra des X1/X2/P2/H2 utilisait le mode de l'A1 par erreur)"
+      ],
+      "en": [
+        "New: automatic timelapse. Turn it on in a printer's settings: Stellio takes photos with its camera while printing and builds an MP4 video at the end (list, playback, download and delete from the Printers page; adjustable interval, ffmpeg required)",
+        "New: read-only share links. From workshop mode, create a secret link to a no-account page showing the printers' status (progress, time left, temperatures, optional file names), revocable at any time",
+        "New: quality drift alerts. The dashboard flags when the failure rate of a printer, material or profile rises noticeably over the last 30 days",
+        "Fix: the Bambu Lab model chosen when adding a printer is now saved correctly (X1/X2/P2/H2 cameras were wrongly using the A1 mode)"
+      ],
+      "de": [
+        "Neu: automatischer Zeitraffer. In den Druckereinstellungen aktivieren: Stellio macht während des Drucks Fotos mit der Druckerkamera und erstellt am Ende ein MP4-Video (Liste, Wiedergabe, Download und Löschen auf der Druckerseite; einstellbares Intervall, ffmpeg erforderlich)",
+        "Neu: schreibgeschützte Freigabelinks. Im Werkstattmodus einen geheimen Link zu einer Seite ohne Konto erstellen, die den Druckerstatus zeigt (Fortschritt, Restzeit, Temperaturen, optional Dateinamen); jederzeit widerrufbar",
+        "Neu: Warnungen bei Qualitätsverschlechterung. Das Dashboard meldet, wenn die Fehlerquote eines Druckers, Materials oder Profils in den letzten 30 Tagen deutlich steigt",
+        "Fix: Das beim Hinzufügen gewählte Bambu-Lab-Modell wird jetzt korrekt gespeichert (Kameras von X1/X2/P2/H2 nutzten fälschlich den A1-Modus)"
+      ],
+      "es": [
+        "Novedad: timelapse automático. Actívalo en los ajustes de una impresora: Stellio toma fotos con su cámara durante la impresión y crea un vídeo MP4 al final (lista, reproducción, descarga y eliminación desde la página Impresoras; intervalo ajustable, requiere ffmpeg)",
+        "Novedad: enlaces para compartir en solo lectura. Desde el modo taller, crea un enlace secreto a una página sin cuenta que muestra el estado de las impresoras (progreso, tiempo restante, temperaturas, nombres de archivo opcionales), revocable en cualquier momento",
+        "Novedad: alertas de deriva de calidad. El panel avisa cuando la tasa de fallos de una impresora, material o perfil aumenta claramente en los últimos 30 días",
+        "Corrección: el modelo Bambu Lab elegido al añadir una impresora ahora se guarda correctamente (la cámara de X1/X2/P2/H2 usaba por error el modo del A1)"
+      ],
+      "pt": [
+        "Novo: timelapse automático. Ativa-o nas definições de uma impressora: o Stellio tira fotos com a câmara durante a impressão e cria um vídeo MP4 no fim (lista, reprodução, transferência e eliminação a partir da página Impressoras; intervalo ajustável, requer ffmpeg)",
+        "Novo: ligações de partilha só de leitura. No modo oficina, cria uma ligação secreta para uma página sem conta que mostra o estado das impressoras (progresso, tempo restante, temperaturas, nomes de ficheiros opcionais), revogável a qualquer momento",
+        "Novo: alertas de desvio de qualidade. O painel assinala quando a taxa de falhas de uma impressora, material ou perfil aumenta claramente nos últimos 30 dias",
+        "Correção: o modelo Bambu Lab escolhido ao adicionar uma impressora é agora guardado corretamente (a câmara das X1/X2/P2/H2 usava por engano o modo da A1)"
+      ],
+      "it": [
+        "Novità: timelapse automatico. Attivalo nelle impostazioni di una stampante: Stellio scatta foto con la sua fotocamera durante la stampa e crea un video MP4 alla fine (elenco, riproduzione, download ed eliminazione dalla pagina Stampanti; intervallo regolabile, richiede ffmpeg)",
+        "Novità: link di condivisione in sola lettura. Dalla modalità officina, crea un link segreto a una pagina senza account che mostra lo stato delle stampanti (avanzamento, tempo rimanente, temperature, nomi dei file facoltativi), revocabile in qualsiasi momento",
+        "Novità: avvisi di deriva della qualità. La dashboard segnala quando il tasso di fallimento di una stampante, materiale o profilo aumenta nettamente negli ultimi 30 giorni",
+        "Correzione: il modello Bambu Lab scelto all'aggiunta di una stampante ora viene salvato correttamente (la fotocamera di X1/X2/P2/H2 usava per errore la modalità dell'A1)"
+      ],
+      "zh": [
+        "新功能：自动延时摄影。在打印机设置中开启后，打印期间 Stellio 会用打印机摄像头拍照，并在结束时生成 MP4 视频（可在“打印机”页面查看、播放、下载和删除；间隔可调，需要 ffmpeg）",
+        "新功能：只读分享链接。在工坊模式中创建保密链接，打开无需账号的页面即可查看打印机状态（进度、剩余时间、温度，可选显示文件名），可随时撤销",
+        "新功能：质量漂移提醒。当某台打印机、某种材料或某个配置在最近 30 天的失败率明显上升时，仪表板会提示",
+        "修复：添加打印机时选择的 Bambu Lab 型号现在能正确保存（此前 X1/X2/P2/H2 的摄像头被错误地按 A1 模式处理）"
+      ],
+      "ja": [
+        "新機能：自動タイムラプス。プリンター設定で有効にすると、印刷中にカメラで撮影し、終了時に MP4 動画を作成します（プリンターページで一覧・再生・ダウンロード・削除。間隔は変更可能、ffmpeg が必要）",
+        "新機能：閲覧専用の共有リンク。ワークショップモードから秘密のリンクを作成すると、アカウント不要のページでプリンターの状態（進捗・残り時間・温度、ファイル名は任意）を確認できます。いつでも無効化できます",
+        "新機能：品質低下アラート。プリンター・素材・プロファイルの失敗率が直近30日で大きく上昇すると、ダッシュボードで知らせます",
+        "修正：プリンター追加時に選んだ Bambu Lab のモデルが正しく保存されるようになりました（X1/X2/P2/H2 のカメラが誤って A1 のモードを使っていました）"
+      ]
+    }
+  },
+  {
+    "version": "0.8.5",
+    "items": {
+      "fr": [
+        "Tableau de bord : un clic sur « Mise à jour disponible » ouvre directement la fenêtre de mise à jour (au lieu des paramètres)",
+        "Envoi au slicer : la vérification avant impression indique maintenant si la pièce tient sur le plateau (et sur quelles autres imprimantes elle tient si elle est trop grande), ou signale que le volume d'impression n'est pas renseigné",
+        "Imprimantes : le volume d'impression est suggéré automatiquement d'après le modèle (Bambu, Creality, Prusa, Elegoo, FlashForge…), modifiable",
+        "Historique : nouveau bouton pour créer un rapport d'impression partageable (image PNG avec miniature, durée, filament, imprimante et coût en option) à télécharger ou copier",
+        "Nouveau « Mode atelier » : affichage plein écran des imprimantes (progression, temps restant, températures) pensé pour tablette et téléphone, écran maintenu allumé, accessible aussi via #workshop"
+      ],
+      "en": [
+        "Dashboard: clicking “Update available” now opens the update window directly (instead of Settings)",
+        "Send to slicer: the pre-print check now tells you if the part fits on the bed (and which other printers it fits on if it is too big), or flags that the build volume is not set",
+        "Printers: the build volume is now suggested automatically from the model (Bambu, Creality, Prusa, Elegoo, FlashForge…) and stays editable",
+        "History: new button to create a shareable print report (PNG image with thumbnail, duration, filament, printer and optional cost) to download or copy",
+        "New “Workshop mode”: full-screen printer display (progress, time left, temperatures) designed for tablets and phones, keeps the screen awake, also reachable via #workshop"
+      ],
+      "de": [
+        "Dashboard: Ein Klick auf „Update verfügbar“ öffnet jetzt direkt das Update-Fenster (statt der Einstellungen)",
+        "Senden an den Slicer: Die Prüfung vor dem Druck zeigt jetzt, ob das Teil aufs Druckbett passt (und auf welche anderen Drucker, falls es zu groß ist) oder weist auf einen nicht angegebenen Bauraum hin",
+        "Drucker: Der Bauraum wird automatisch aus dem Modell vorgeschlagen (Bambu, Creality, Prusa, Elegoo, FlashForge …) und bleibt änderbar",
+        "Verlauf: Neuer Button für einen teilbaren Druckbericht (PNG mit Vorschaubild, Dauer, Filament, Drucker und optional Kosten) zum Herunterladen oder Kopieren",
+        "Neuer „Werkstattmodus“: Vollbildanzeige der Drucker (Fortschritt, Restzeit, Temperaturen) für Tablet und Smartphone, hält den Bildschirm wach, auch über #workshop erreichbar"
+      ],
+      "es": [
+        "Panel: al hacer clic en «Actualización disponible» se abre directamente la ventana de actualización (en vez de Ajustes)",
+        "Envío al slicer: la comprobación previa indica ahora si la pieza cabe en la cama (y en qué otras impresoras cabe si es demasiado grande) o avisa de que no se ha indicado el volumen de impresión",
+        "Impresoras: el volumen de impresión se sugiere automáticamente según el modelo (Bambu, Creality, Prusa, Elegoo, FlashForge…) y sigue siendo editable",
+        "Historial: nuevo botón para crear un informe de impresión para compartir (imagen PNG con miniatura, duración, filamento, impresora y coste opcional) para descargar o copiar",
+        "Nuevo «Modo taller»: pantalla completa de las impresoras (progreso, tiempo restante, temperaturas) pensada para tableta y móvil, mantiene la pantalla encendida y también se abre con #workshop"
+      ],
+      "pt": [
+        "Painel: ao clicar em «Atualização disponível» abre-se diretamente a janela de atualização (em vez das Definições)",
+        "Envio para o slicer: a verificação antes da impressão indica agora se a peça cabe na mesa (e em que outras impressoras cabe, se for demasiado grande) ou avisa que o volume de impressão não está indicado",
+        "Impressoras: o volume de impressão é sugerido automaticamente com base no modelo (Bambu, Creality, Prusa, Elegoo, FlashForge…) e continua editável",
+        "Histórico: novo botão para criar um relatório de impressão partilhável (imagem PNG com miniatura, duração, filamento, impressora e custo opcional) para transferir ou copiar",
+        "Novo «Modo oficina»: ecrã completo das impressoras (progresso, tempo restante, temperaturas) pensado para tablet e telemóvel, mantém o ecrã ligado e abre também com #workshop"
+      ],
+      "it": [
+        "Dashboard: facendo clic su «Aggiornamento disponibile» si apre direttamente la finestra di aggiornamento (invece delle Impostazioni)",
+        "Invio allo slicer: il controllo prima della stampa indica ora se il pezzo sta sul piatto (e su quali altre stampanti sta, se è troppo grande) oppure segnala che il volume di stampa non è indicato",
+        "Stampanti: il volume di stampa viene suggerito automaticamente in base al modello (Bambu, Creality, Prusa, Elegoo, FlashForge…) e resta modificabile",
+        "Cronologia: nuovo pulsante per creare un rapporto di stampa condivisibile (immagine PNG con miniatura, durata, filamento, stampante e costo facoltativo) da scaricare o copiare",
+        "Nuova «Modalità officina»: visualizzazione a schermo intero delle stampanti (avanzamento, tempo rimanente, temperature) pensata per tablet e smartphone, mantiene lo schermo acceso e si apre anche con #workshop"
+      ],
+      "zh": [
+        "仪表板：点击“有可用更新”现在会直接打开更新窗口（而不是跳转到设置）",
+        "发送到切片软件：打印前检查现在会提示模型能否放入打印平台（过大时还会列出能放得下的其他打印机），或提醒尚未设置打印体积",
+        "打印机：会根据型号自动建议打印体积（Bambu、Creality、Prusa、Elegoo、FlashForge 等），仍可手动修改",
+        "历史记录：新增按钮，可生成便于分享的打印报告（PNG 图片，含缩略图、时长、耗材、打印机，成本可选），支持下载或复制",
+        "新增“工坊模式”：全屏显示打印机（进度、剩余时间、温度），适合平板和手机，保持屏幕常亮，也可通过 #workshop 打开"
+      ],
+      "ja": [
+        "ダッシュボード：「アップデートあり」をクリックすると、設定ではなくアップデートのウィンドウが直接開くようになりました",
+        "スライサーへ送信：印刷前チェックで、モデルがベッドに収まるか（大きすぎる場合は収まる他のプリンターも）表示し、造形サイズ未設定の場合も通知します",
+        "プリンター：モデルに合わせて造形サイズを自動で提案します（Bambu、Creality、Prusa、Elegoo、FlashForge など）。手動で変更もできます",
+        "履歴：共有用のプリントレポート（サムネイル、所要時間、フィラメント、プリンター、任意でコストを含む PNG 画像）を作成してダウンロード／コピーできるボタンを追加",
+        "新しい「ワークショップモード」：プリンターを全画面で表示（進捗・残り時間・温度）。タブレット／スマートフォン向けで画面を点灯したままにし、#workshop でも開けます"
+      ]
+    }
+  },
+  {
+    "version": "0.8.4",
+    "items": {
+      "fr": [
+        "Ajout d'imprimante : la vérification de compatibilité est à jour (Bambu X2D/P2S/H2, Elegoo Centauri Carbon 1 et 2 et résines Saturn/Mars, FlashForge 5M/5M Pro/AD5X, Creality K1/K2/Ender-3 V3/Hi sont reconnues comme compatibles et sélectionnent le bon type)",
+        "Ajout d'imprimante : le libellé Bambu Lab du sélecteur de type liste toutes les familles prises en charge (X1, X2D, P1, P2S, A1, H2)",
+        "Bibliothèque : le badge « Nouveau » des fichiers récents est maintenant traduit dans toutes les langues",
+        "Documentation : les README (8 langues) montrent davantage de captures d'écran des fonctions clés et listent les marques et modèles d'imprimantes pris en charge",
+        "Inventaires (Spoolman / manuel / TigerTag) : chaque section est repliable comme dans les paramètres, l'état est mémorisé"
+      ],
+      "en": [
+        "Add printer: the compatibility check is up to date (Bambu X2D/P2S/H2, Elegoo Centauri Carbon 1 & 2 and Saturn/Mars resin, FlashForge 5M/5M Pro/AD5X, Creality K1/K2/Ender-3 V3/Hi are recognised as compatible and pick the right type)",
+        "Add printer: the Bambu Lab label in the type selector now lists every supported family (X1, X2D, P1, P2S, A1, H2)",
+        "Library: the “New” badge on recent files is now translated in every language",
+        "Documentation: the READMEs (8 languages) show more screenshots of key features and list the supported printer brands and models",
+        "Inventories (Spoolman / manual / TigerTag): each section can be collapsed like the Settings sections, state is remembered"
+      ],
+      "de": [
+        "Drucker hinzufügen: Die Kompatibilitätsprüfung ist aktuell (Bambu X2D/P2S/H2, Elegoo Centauri Carbon 1 und 2 sowie Saturn/Mars-Resin, FlashForge 5M/5M Pro/AD5X, Creality K1/K2/Ender-3 V3/Hi werden als kompatibel erkannt und wählen den passenden Typ)",
+        "Drucker hinzufügen: Die Bambu-Lab-Bezeichnung in der Typauswahl nennt jetzt alle unterstützten Familien (X1, X2D, P1, P2S, A1, H2)",
+        "Bibliothek: Das Label „Neu“ bei neuen Dateien ist jetzt in allen Sprachen übersetzt",
+        "Dokumentation: Die READMEs (8 Sprachen) zeigen mehr Screenshots der Kernfunktionen und listen die unterstützten Druckermarken und -modelle auf",
+        "Inventare (Spoolman / manuell / TigerTag): jeder Bereich lässt sich wie in den Einstellungen einklappen, der Zustand wird gespeichert"
+      ],
+      "es": [
+        "Añadir impresora: la comprobación de compatibilidad está actualizada (Bambu X2D/P2S/H2, Elegoo Centauri Carbon 1 y 2 y resinas Saturn/Mars, FlashForge 5M/5M Pro/AD5X, Creality K1/K2/Ender-3 V3/Hi se reconocen como compatibles y eligen el tipo correcto)",
+        "Añadir impresora: la etiqueta de Bambu Lab del selector de tipo enumera ahora todas las familias compatibles (X1, X2D, P1, P2S, A1, H2)",
+        "Biblioteca: la etiqueta «Nuevo» de los archivos recientes ahora está traducida a todos los idiomas",
+        "Documentación: los README (8 idiomas) muestran más capturas de las funciones clave y enumeran las marcas y modelos de impresoras compatibles",
+        "Inventarios (Spoolman / manual / TigerTag): cada sección se puede contraer como en Ajustes y se recuerda su estado"
+      ],
+      "pt": [
+        "Adicionar impressora: a verificação de compatibilidade está atualizada (Bambu X2D/P2S/H2, Elegoo Centauri Carbon 1 e 2 e resinas Saturn/Mars, FlashForge 5M/5M Pro/AD5X, Creality K1/K2/Ender-3 V3/Hi são reconhecidas como compatíveis e escolhem o tipo certo)",
+        "Adicionar impressora: o rótulo da Bambu Lab no seletor de tipo agora lista todas as famílias compatíveis (X1, X2D, P1, P2S, A1, H2)",
+        "Biblioteca: o selo «Novo» dos arquivos recentes agora está traduzido para todos os idiomas",
+        "Documentação: os README (8 idiomas) mostram mais capturas das funções principais e listam as marcas e modelos de impressoras compatíveis",
+        "Inventários (Spoolman / manual / TigerTag): cada secção pode ser recolhida como nas Definições e o estado é memorizado"
+      ],
+      "it": [
+        "Aggiunta stampante: il controllo di compatibilità è aggiornato (Bambu X2D/P2S/H2, Elegoo Centauri Carbon 1 e 2 e resina Saturn/Mars, FlashForge 5M/5M Pro/AD5X, Creality K1/K2/Ender-3 V3/Hi sono riconosciute come compatibili e scelgono il tipo giusto)",
+        "Aggiunta stampante: l'etichetta Bambu Lab nel selettore del tipo elenca ora tutte le famiglie supportate (X1, X2D, P1, P2S, A1, H2)",
+        "Libreria: il badge «Nuovo» dei file recenti è ora tradotto in tutte le lingue",
+        "Documentazione: i README (8 lingue) mostrano più screenshot delle funzioni chiave ed elencano marche e modelli di stampanti supportati",
+        "Inventari (Spoolman / manuale / TigerTag): ogni sezione si può comprimere come nelle Impostazioni e lo stato viene ricordato"
+      ],
+      "zh": [
+        "添加打印机：兼容性检查已更新（Bambu X2D/P2S/H2、Elegoo Centauri Carbon 1 和 2 及 Saturn/Mars 光固化、FlashForge 5M/5M Pro/AD5X、Creality K1/K2/Ender-3 V3/Hi 均被识别为兼容并自动选择正确类型）",
+        "添加打印机：类型选择器中的 Bambu Lab 标签现在列出所有受支持的系列（X1、X2D、P1、P2S、A1、H2）",
+        "文件库：近期文件的“新”标记现已翻译成所有语言",
+        "文档：README（8 种语言）新增更多关键功能截图，并列出支持的打印机品牌和型号",
+        "库存（Spoolman / 手动 / TigerTag）：每个分区都可像设置页一样折叠，并会记住状态"
+      ],
+      "ja": [
+        "プリンター追加：互換性チェックを更新しました（Bambu X2D/P2S/H2、Elegoo Centauri Carbon 1・2 と Saturn/Mars レジン、FlashForge 5M/5M Pro/AD5X、Creality K1/K2/Ender-3 V3/Hi を互換として認識し、正しいタイプを自動選択）",
+        "プリンター追加：タイプ選択の Bambu Lab 表記に、対応するすべてのシリーズ（X1、X2D、P1、P2S、A1、H2）を表示するようにしました",
+        "ライブラリ：新しいファイルの「新着」バッジをすべての言語に翻訳しました",
+        "ドキュメント：README（8言語）に主要機能のスクリーンショットを追加し、対応プリンターのブランドとモデルの一覧を掲載しました",
+        "在庫（Spoolman / 手動 / TigerTag）：設定のセクションと同様に各セクションを折りたたみ可能にし、状態を記憶します"
+      ]
+    }
+  },
+  {
     "version": "0.8.3",
     "items": {
       "fr": [
