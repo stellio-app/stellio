@@ -77,3 +77,26 @@ def test_main_py_parses(main_src):
 def test_script_js_syntax():
     r = subprocess.run(['node', '--check', os.path.join(ROOT, 'script.js')], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
+
+
+def test_main_py_compiles_on_old_python():
+    """main.py doit rester lisible par Python 3.11 (celui de Debian 12 / des conteneurs) : pas d'antislash dans une f-string.
+    Sous Python 3.12+, l'analyseur accepte ce code : on le détecte donc par les jetons."""
+    import io, tokenize
+    src = open(os.path.join(ROOT, 'main.py'), encoding='utf-8').read()
+    if not hasattr(tokenize, 'FSTRING_START'):
+        compile(src, 'main.py', 'exec')           # Python < 3.12 : le compilateur refuse lui-même
+        return
+    stack, bad = [], []                          # une pile de profondeurs d'accolades, une par f-string ouverte
+    for tok in tokenize.generate_tokens(io.StringIO(src).readline):
+        if tok.type == tokenize.FSTRING_START:
+            stack.append(0)
+        elif tok.type == tokenize.FSTRING_END:
+            stack.pop()
+        elif stack and tok.type == tokenize.OP and tok.string == '{':
+            stack[-1] += 1
+        elif stack and tok.type == tokenize.OP and tok.string == '}':
+            stack[-1] -= 1
+        elif stack and stack[-1] > 0 and tok.type == tokenize.STRING and '\\' in tok.string:
+            bad.append(tok.start[0])
+    assert not bad, f"antislash dans une expression de f-string (illégal avant Python 3.12), lignes : {bad[:10]}"

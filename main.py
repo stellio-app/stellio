@@ -42,6 +42,10 @@ def _early_extra_libs_dir():
 
 _EXTRA_LIBS_DIR = _early_extra_libs_dir()
 
+# ── Splash précoce ───────────────────────────────────────────────────────────
+# Affiché dès les premières millisecondes, AVANT la vérification des modules et les gros
+# imports (trimesh, numpy, pyrender...). Il tourne dans son propre thread : tous les objets Tk y
+# sont créés ET détruits, pendant que le reste du démarrage continue dans le thread principal.
 import threading as _early_threading
 import queue as _early_queue
 
@@ -12953,7 +12957,8 @@ def trash_record(conn, user_id, kind, label, payload, detail='', files=()):
             continue
         try:
             os.makedirs(dest_dir, exist_ok=True)
-            stored = os.path.join(dest_dir, f"{i}_{os.path.basename(p.rstrip('/\\'))}")
+            _base = os.path.basename(p.rstrip('/\\'))   # hors de l'f-string : un antislash y est interdit avant Python 3.12
+            stored = os.path.join(dest_dir, f"{i}_{_base}")
             shutil.move(p, stored)
             moved.append({'orig': p, 'stored': stored})
         except Exception as e:
