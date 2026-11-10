@@ -2868,7 +2868,7 @@ if (!IS_VIEWER) checkSlicerDefaultDiscovery();
 if (!IS_VIEWER) checkWhatsNew();
 if (window.UpdateManager) window.UpdateManager.onAppShown();
 refreshTrashBadge();
-if (!IS_VIEWER) refreshAcctModelsNav();
+if (!IS_VIEWER || window.STELLIO_DEMO) refreshAcctModelsNav();
 if (!IS_VIEWER) checkMissedBackupOnStartup();
 if (!IS_VIEWER) checkFeedbackUpdatesOnStartup();
 if (!IS_VIEWER) checkModulesOnStartup();
@@ -26100,7 +26100,7 @@ function _acctCollapsedState() { try { return JSON.parse(localStorage.getItem(_a
 function _acctSaveCollapsed(o) { try { localStorage.setItem(_acctKey, JSON.stringify(o)); } catch (_) {} }
 
 async function refreshAcctModelsNav(force) {
-    if (typeof IS_VIEWER !== 'undefined' && IS_VIEWER) return null;
+    if (typeof IS_VIEWER !== 'undefined' && IS_VIEWER && !window.STELLIO_DEMO) return null;   // invité : rien, sauf sur la démo (données fictives)
     try {
         const res = await fetch(`${API}/api/account-models/overview${force ? '?force=1' : ''}`);
         if (!res.ok) return null;
@@ -26144,7 +26144,7 @@ function _acctCard(kind, p, it) {
         ? `<span class="acct-badge acct-in"><i class="fa-solid fa-check"></i> ${e(_t3('acct.in_library', 'Dans la bibliothèque'))}</span>` : '';
     const who = (kind === 'likes' && it.creator)
         ? `${e(_t3('acct.by', 'par'))} ${it.creator_url ? `<a href="${e(it.creator_url)}" target="_blank" rel="noopener noreferrer">${e(it.creator)}</a>` : e(it.creator)}`
-        : (kind === 'creations' ? e(_t3('acct.published_on', 'Publié sur {platform}', { platform: p.label })) : '');
+        : (kind === 'creations' ? e(_t3('acct.published_on', 'Publié sur {{platform}}', { platform: p.label })) : '');
     const action = it.in_library
         ? `<button class="btn btn-primary btn-sm" data-acct-open="${e(it.file_path)}" data-acct-name="${e(it.file_name)}"><i class="fa-solid fa-folder-open"></i> ${e(_t3('acct.open', 'Ouvrir'))}</button>`
         : `<button class="btn btn-primary btn-sm" data-acct-dl="${e(it.url)}"><i class="fa-solid fa-download"></i> ${e(_t3('acct.download', 'Télécharger'))}</button>`;
@@ -26194,10 +26194,10 @@ async function loadAcctModels(kind) {
                 <div class="source-banner-icon" style="background:${brand.color}30; color:${brand.color};"><i class="fa-solid ${brand.icon}"></i></div>
                 <div style="flex:1; min-width:0;">
                     <div style="font-weight:600; font-size:14px;">${escapeHtml(p.label)}</div>
-                    <div class="source-banner-sub">${escapeHtml(_t3('acct.count', '{n} modèles', { n: p.items.length }))}${synced ? ' · ' + escapeHtml(_t3('acct.synced', 'synchronisé le {date}', { date: synced })) : ''}${meta.syncing ? ' · ' + escapeHtml(_t3('acct.syncing', 'synchronisation…')) : ''}${meta.error ? ' · <span style="color:var(--warning)">' + escapeHtml(meta.error) + '</span>' : ''}</div>
+                    <div class="source-banner-sub">${escapeHtml(_t3('acct.count', '{{n}} modèles', { n: p.items.length }))}${synced ? ' · ' + escapeHtml(_t3('acct.synced', 'synchronisé le {{date}}', { date: synced })) : ''}${meta.syncing ? ' · ' + escapeHtml(_t3('acct.syncing', 'synchronisation…')) : ''}${meta.error ? ' · <span style="color:var(--warning)">' + escapeHtml(meta.error) + '</span>' : ''}</div>
                 </div>
-                <button class="btn btn-ghost btn-sm" data-acct-sync="${p.platform}"><i class="fa-solid fa-rotate"></i> <span class="acct-hide-sm">${escapeHtml(_t3('actions.refresh', 'Rafraîchir'))}</span></button>
-                ${missing ? `<button class="btn btn-primary btn-sm viewer-hide" data-acct-all="${p.platform}"><i class="fa-solid fa-download"></i> <span class="acct-hide-sm">${escapeHtml(_t3('acct.download_all', 'Tout télécharger ({n})', { n: missing }))}</span></button>` : ''}
+                <button class="btn btn-ghost btn-sm viewer-hide" data-acct-sync="${p.platform}"><i class="fa-solid fa-rotate"></i> <span class="acct-hide-sm">${escapeHtml(_t3('actions.refresh', 'Rafraîchir'))}</span></button>
+                ${missing ? `<button class="btn btn-primary btn-sm viewer-hide" data-acct-all="${p.platform}"><i class="fa-solid fa-download"></i> <span class="acct-hide-sm">${escapeHtml(_t3('acct.download_all', 'Tout télécharger ({{n}})', { n: missing }))}</span></button>` : ''}
             </div>
             <div class="acct-grid">${items.map(i => _acctCard(kind, p, i)).join('') || `<div class="acct-empty">${escapeHtml(_t3('acct.no_match', 'Aucun résultat'))}</div>`}</div>
         </div>`);
@@ -26231,7 +26231,7 @@ async function _acctDownloadUrls(urls) {
 document.addEventListener('click', async (ev) => {
     const t = ev.target;
     const dl = t.closest('[data-acct-dl]');
-    if (dl) { await _acctDownloadUrls([dl.dataset.acctDl]); return; }
+    if (dl) { if (IS_VIEWER) { showToast(_readonlyToastText(), 'warning'); return; } await _acctDownloadUrls([dl.dataset.acctDl]); return; }
     const op = t.closest('[data-acct-open]');
     if (op) { open3DViewer(op.dataset.acctName, op.dataset.acctOpen, 1); return; }
     const sy = t.closest('[data-acct-sync]');
@@ -26250,7 +26250,7 @@ document.addEventListener('click', async (ev) => {
         const p = data?.platforms.find(x => x.platform === all.dataset.acctAll);
         const urls = (p?.items || []).filter(i => !i.in_library).map(i => i.url);
         if (!urls.length) return;
-        if (!confirm(_t3('acct.confirm_all', 'Télécharger {n} modèles depuis {platform} dans le dossier sélectionné ?', { n: urls.length, platform: p.label }))) return;
+        if (!confirm(_t3('acct.confirm_all', 'Télécharger {{n}} modèles depuis {{platform}} dans le dossier sélectionné ?', { n: urls.length, platform: p.label }))) return;
         await _acctDownloadUrls(urls);
         return;
     }
