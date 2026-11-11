@@ -229,7 +229,7 @@ const overlay = document.createElement('div');
 overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 100000; backdrop-filter: blur(5px);`;
 const popup = document.createElement('div');
 popup.style.cssText = `background: var(--bg-secondary, #1e2129); color: var(--text-primary, #e6e6e6); padding: 28px; border-radius: 14px; max-width: 380px; width: 90%; box-shadow: 0 12px 35px rgba(0,0,0,0.6); text-align: center; border: 1px solid var(--border, #2a2f3a); animation: popIn 0.25s ease;`;
-popup.innerHTML = `<h3 style="margin: 0 0 10px 0; font-size: 19px; font-weight: 600;">${title}</h3><p style="color: var(--text-muted, #9ca3af); margin: 0 0 24px 0; line-height: 1.5; font-size: 14px;">${message}</p><button id="restart-lang-btn" style="padding: 11px 28px; border: none; border-radius: 8px; background: var(--accent, #4ea1d3); color: #fff; font-weight: 600; cursor: pointer; transition: all 0.2s; font-size: 15px;">${btnText}</button>`;
+popup.innerHTML = `<h3 style="margin: 0 0 10px 0; font-size: calc(19px * var(--fs, 1)); font-weight: 600;">${title}</h3><p style="color: var(--text-muted, #9ca3af); margin: 0 0 24px 0; line-height: 1.5; font-size: calc(14px * var(--fs, 1));">${message}</p><button id="restart-lang-btn" style="padding: 11px 28px; border: none; border-radius: 8px; background: var(--accent, #4ea1d3); color: #fff; font-weight: 600; cursor: pointer; transition: all 0.2s; font-size: calc(15px * var(--fs, 1));">${btnText}</button>`;
 overlay.appendChild(popup);
 document.body.appendChild(overlay);
 if (!document.getElementById('restart-popup-style')) {
@@ -606,7 +606,7 @@ function applyAllowedSourceTypes(allowedTypes) {
         if (!note) {
             note = document.createElement('p');
             note.id = 'source-types-restricted-note';
-            note.style.cssText = 'font-size:11.5px;color:var(--text-muted);text-align:center;margin-top:12px;line-height:1.5;';
+            note.style.cssText = 'font-size:calc(11.5px * var(--fs, 1));color:var(--text-muted);text-align:center;margin-top:12px;line-height:1.5;';
             document.querySelector('#modal-select-type .modal-body')?.appendChild(note);
         }
         note.textContent = I18N.t('source.types_restricted_note') ||
@@ -781,8 +781,8 @@ function showConfirmDialog(message, options = {}) {
         const popup = document.createElement('div');
         popup.style.cssText = `background: var(--bg-secondary); color: var(--text-primary); padding: 28px; border-radius: 14px; max-width: 420px; width: 90%; box-shadow: 0 12px 35px rgba(0,0,0,0.6); text-align: center; border: 1px solid var(--border);`;
         popup.innerHTML = `
-            ${title ? `<h3 style="margin:0 0 10px 0; font-size:19px; font-weight:600;"><i class="fa-solid ${icon}" style="color:${danger ? 'var(--danger)' : 'var(--accent, #4f8cff)'};"></i> ${escapeHtml(title)}</h3>` : ''}
-            <p style="color:var(--text-muted); margin:0 0 24px 0; line-height:1.5; font-size:14px;">${escapeHtml(message)}</p>
+            ${title ? `<h3 style="margin:0 0 10px 0; font-size:calc(19px * var(--fs, 1)); font-weight:600;"><i class="fa-solid ${icon}" style="color:${danger ? 'var(--danger)' : 'var(--accent, #4f8cff)'};"></i> ${escapeHtml(title)}</h3>` : ''}
+            <p style="color:var(--text-muted); margin:0 0 24px 0; line-height:1.5; font-size:calc(14px * var(--fs, 1));">${escapeHtml(message)}</p>
             <div style="display:flex; gap:10px; justify-content:center;">
                 <button id="confirm-dialog-cancel" class="btn btn-ghost">${escapeHtml(cancelLabel)}</button>
                 <button id="confirm-dialog-ok" class="btn ${danger ? 'btn-danger' : 'btn-primary'}">${escapeHtml(confirmLabel)}</button>
@@ -814,8 +814,8 @@ function showBackupRestartPopup() {
     const popup = document.createElement('div');
     popup.style.cssText = `background: var(--bg-secondary); color: var(--text-primary); padding: 28px; border-radius: 14px; max-width: 400px; width: 90%; box-shadow: 0 12px 35px rgba(0,0,0,0.6); text-align: center; border: 1px solid var(--border);`;
     popup.innerHTML = `
-        <h3 style="margin:0 0 10px 0; font-size:19px; font-weight:600;"><i class="fa-solid fa-circle-check" style="color:var(--success);"></i> ${I18N.t('settings.backup_import_success') || 'Sauvegarde restaurée'}</h3>
-        <p style="color:var(--text-muted); margin:0 0 24px 0; line-height:1.5; font-size:14px;">${I18N.t('settings.backup_restart_message') || 'Redémarrez Stellio pour finaliser la restauration de vos données.'}</p>
+        <h3 style="margin:0 0 10px 0; font-size:calc(19px * var(--fs, 1)); font-weight:600;"><i class="fa-solid fa-circle-check" style="color:var(--success);"></i> ${I18N.t('settings.backup_import_success') || 'Sauvegarde restaurée'}</h3>
+        <p style="color:var(--text-muted); margin:0 0 24px 0; line-height:1.5; font-size:calc(14px * var(--fs, 1));">${I18N.t('settings.backup_restart_message') || 'Redémarrez Stellio pour finaliser la restauration de vos données.'}</p>
         <button id="backup-restart-btn" class="btn btn-primary">${I18N.t('settings.close_and_restart') || 'Fermer Stellio maintenant'}</button>
     `;
     overlay.appendChild(popup);
@@ -1279,7 +1279,7 @@ async function _loadDashboardIssues() {
             <div class="dashboard-row" style="cursor:pointer;" onclick="dashboardOpenIssue(${r.number})" title="${escapeHtml(_fbStatusLabel(r.status))}">
                 <div class="dashboard-row-icon" style="background:${color}22;color:${color};"><i class="fa-solid ${icon}"></i></div>
                 <div class="dashboard-row-body">
-                    <div class="dashboard-row-title">${r.unread ? '<i class="fa-solid fa-circle" style="font-size:7px;color:var(--accent);vertical-align:middle;"></i> ' : ''}#${r.number} · ${escapeHtml(r.title || '')}</div>
+                    <div class="dashboard-row-title">${r.unread ? '<i class="fa-solid fa-circle" style="font-size:calc(7px * var(--fs, 1));color:var(--accent);vertical-align:middle;"></i> ' : ''}#${r.number} · ${escapeHtml(r.title || '')}</div>
                     <div class="dashboard-row-sub">${escapeHtml(_fbStatusLabel(r.status))} · ${escapeHtml(_fbTypeLabel(r.type))} · ${escapeHtml(_fbFmtDate(r.created_at))}${r.comments ? ` · <i class="fa-solid fa-comment"></i> ${r.comments}` : ''}</div>
                 </div>
                 ${_fbNewReplyBadge(r)}
@@ -2010,7 +2010,7 @@ if (loader && loader.classList.contains('file-loading')) {
     if (filePath && !loader.classList.contains('thumb-pending')) {
         loader.classList.add('thumb-pending');
         loader.dataset.path = filePath;
-        loader.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:32px; color:var(--text-muted); opacity:0.6;"></i>';
+        loader.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:calc(32px * var(--fs, 1)); color:var(--text-muted); opacity:0.6;"></i>';
         loader.style.setProperty('display', 'flex', 'important');
         img.dataset.loaded = 'false';
         startPendingThumbPolling();
@@ -2057,7 +2057,7 @@ cards.forEach(card => observer.observe(card));
 
 
 // ---- Palettes : constantes déclarées avant leur premier usage (applyThemeOnLoad)
-const STELLIO_PALETTES = [{"id":"midnight","mode":"dark","swatch":["#0f131f","#1c243b","#5b8cff"]},{"id":"ocean","mode":"dark","swatch":["#0e1c20","#1a343d","#0ea5b7"]},{"id":"forest","mode":"dark","swatch":["#121c15","#223528","#22a55b"]},{"id":"dusk","mode":"dark","swatch":["#16111d","#291f37","#8b5cf6"]},{"id":"rose","mode":"dark","swatch":["#1d1116","#36212a","#db2777"]},{"id":"ember","mode":"dark","swatch":["#1d1511","#362821","#ea6a0a"]},{"id":"nord","mode":"dark","swatch":["#13161b","#242932","#5e81ac"]},{"id":"paper","mode":"light","swatch":["#f8f6f1","#fdfdfc","#b45309"]},{"id":"mint","mode":"light","swatch":["#f2f8f5","#fcfdfc","#059669"]},{"id":"sky","mode":"light","swatch":["#f0f4f9","#fbfcfe","#2563eb"]},{"id":"lavender","mode":"light","swatch":["#f4f1f8","#fcfcfd","#7c3aed"]},{"id":"sakura","mode":"light","swatch":["#f9f1f4","#fdfbfc","#db2777"]}];
+const STELLIO_PALETTES = [{"id":"midnight","mode":"dark","swatch":["#0f131f","#1c243b","#5b8cff"]},{"id":"ocean","mode":"dark","swatch":["#0e1c20","#1a343d","#0ea5b7"]},{"id":"forest","mode":"dark","swatch":["#121c15","#223528","#22a55b"]},{"id":"dusk","mode":"dark","swatch":["#16111d","#291f37","#8b5cf6"]},{"id":"rose","mode":"dark","swatch":["#1d1116","#36212a","#db2777"]},{"id":"ember","mode":"dark","swatch":["#1d1511","#362821","#ea6a0a"]},{"id":"nord","mode":"dark","swatch":["#13161b","#242932","#5e81ac"]},{"id":"paper","mode":"light","swatch":["#f8f6f1","#fdfdfc","#b45309"]},{"id":"mint","mode":"light","swatch":["#f2f8f5","#fcfdfc","#059669"]},{"id":"sky","mode":"light","swatch":["#f0f4f9","#fbfcfe","#2563eb"]},{"id":"lavender","mode":"light","swatch":["#f4f1f8","#fcfcfd","#7c3aed"]},{"id":"sakura","mode":"light","swatch":["#f9f1f4","#fdfbfc","#db2777"]},{"id":"ruby","mode":"dark","swatch":["#1d1111","#3e2323","#dc2626"]},{"id":"gold","mode":"dark","swatch":["#1d1a11","#3e3623","#eab308"]},{"id":"lime","mode":"dark","swatch":["#171d11","#303d24","#84cc16"]},{"id":"graphite","mode":"dark","swatch":["#161618","#2e2f33","#9ca3af"]},{"id":"coral","mode":"light","swatch":["#f9efee","#fdfcfc","#dc2626"]},{"id":"lemon","mode":"light","swatch":["#f9f7ee","#fdfdfc","#a16207"]},{"id":"aqua","mode":"light","swatch":["#eff7f8","#fcfdfd","#0e7490"]},{"id":"slate","mode":"light","swatch":["#f1f3f6","#fcfcfd","#475569"]},{"id":"blackred","mode":"dark","swatch":["#080707","#1e1c1c","#ff2020"]},{"id":"blackyellow","mode":"dark","swatch":["#080807","#1e1e1c","#ffd60a"]},{"id":"blackgreen","mode":"dark","swatch":["#070808","#1c1e1d","#1ed760"]},{"id":"blackblue","mode":"dark","swatch":["#070808","#1c1d1e","#2f80ff"]},{"id":"mono","mode":"dark","swatch":["#080808","#1d1d1d","#e5e7eb"]},{"id":"greyred","mode":"dark","swatch":["#282424","#433d3d","#f05252"]},{"id":"greyyellow","mode":"dark","swatch":["#282724","#43413d","#fbbf24"]},{"id":"silverred","mode":"light","swatch":["#f4f3f3","#fdfcfc","#dc2626"]},{"id":"silveryellow","mode":"light","swatch":["#f4f4f3","#fdfdfc","#a16207"]},{"id":"blackviolet","mode":"dark","swatch":["#080708","#1d1c1e","#9d5cff"]},{"id":"blackorange","mode":"dark","swatch":["#080807","#1e1d1c","#ff7a00"]},{"id":"greyorange","mode":"dark","swatch":["#282624","#433f3d","#fb923c"]},{"id":"greyviolet","mode":"dark","swatch":["#262428","#403d43","#a78bfa"]}];
 const THEME_COLOR_GROUPS = [
     { key: 'settings.colors_group_bg', vars: [['--bg-primary', 'settings.color_bg_primary'], ['--bg-secondary', 'settings.color_bg_secondary'], ['--bg-tertiary', 'settings.color_bg_tertiary'], ['--bg-card', 'settings.color_bg_card'], ['--bg-hover', 'settings.color_bg_hover'], ['--bg-input', 'settings.color_bg_input']] },
     { key: 'settings.colors_group_text', vars: [['--text-primary', 'settings.color_text_primary'], ['--text-secondary', 'settings.color_text_secondary'], ['--text-muted', 'settings.color_text_muted']] },
@@ -2086,7 +2086,28 @@ console.log('[Theme] ✅ Appliqué:', savedTheme, savedFabricant);
 (function applyAccessibilityOnLoad() {
     document.documentElement.classList.toggle('high-contrast', localStorage.getItem('stellio-high-contrast') === '1');
     document.documentElement.classList.toggle('reduce-motion', localStorage.getItem('stellio-reduce-motion') === '1');
+    try { _applyTextSize(localStorage.getItem('stellio-text-size') || 'normal'); _applyColorblind(localStorage.getItem('stellio-colorblind') || 'off'); } catch (_) {}
 })();
+
+function _applyTextSize(v) {
+    const c = document.documentElement.classList;
+    c.toggle('text-large', v === 'large');
+    c.toggle('text-xlarge', v === 'xlarge');
+}
+function _applyColorblind(v) {
+    if (v === 'rg' || v === 'by') document.documentElement.setAttribute('data-colorblind', v);
+    else document.documentElement.removeAttribute('data-colorblind');
+}
+window.setTextSize = function (v) {
+    if (!['normal', 'large', 'xlarge'].includes(v)) v = 'normal';
+    _applyTextSize(v);
+    try { localStorage.setItem('stellio-text-size', v); } catch (_) {}
+};
+window.setColorblindMode = function (v) {
+    if (!['off', 'rg', 'by'].includes(v)) v = 'off';
+    _applyColorblind(v);
+    try { localStorage.setItem('stellio-colorblind', v); } catch (_) {}
+};
 
 window.toggleHighContrast = function (enabled) {
     document.documentElement.classList.toggle('high-contrast', enabled);
@@ -2130,6 +2151,7 @@ window.undoLastSettingsChange = async function () {
 window.requestThumbGeneration = async function (filePath) {
 if (generatingThumbs.has(filePath) || pendingThumbRequests.has(filePath)) return;
 if (window.permanentlyIgnoredThumbs && window.permanentlyIgnoredThumbs.has(filePath)) return;
+if (typeof _thumbPaused !== 'undefined' && _thumbPaused) return;   // génération en pause : la grille ne relance rien
 pendingThumbRequests.add(filePath);
 generatingThumbs.add(filePath);
 const ext = filePath.split('.').pop().toLowerCase();
@@ -2137,9 +2159,14 @@ try {
 const res = await fetch(`${API}/api/thumb/generate-now`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ path: filePath })
+body: JSON.stringify({ path: filePath, auto: true })
 });
 const data = await res.json();
+if (data.paused) {
+    generatingThumbs.delete(filePath);
+    pendingThumbRequests.delete(filePath);
+    return;
+}
 if (data.ignored) {
     if (!window.permanentlyIgnoredThumbs) window.permanentlyIgnoredThumbs = new Set();
     window.permanentlyIgnoredThumbs.add(filePath);
@@ -3722,7 +3749,7 @@ function _quoteBaseValues(row, p) {
 }
 
 const _qfField = 'width:100%; padding:8px 10px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary);';
-const _qfLabel = 'display:block; font-size:12px; color:var(--text-secondary); margin-bottom:4px;';
+const _qfLabel = 'display:block; font-size:calc(12px * var(--fs, 1)); color:var(--text-secondary); margin-bottom:4px;';
 
 window.openQuoteEditModal = async function (id) {
     let info;
@@ -4387,11 +4414,11 @@ window._orderTrack = async function (id) {
         <div class="modal-header"><h3><i class="fa-solid fa-link"></i> ${escapeHtml(_t3('orders.track', 'Lien de suivi client'))}</h3>
         <button class="modal-close" id="otd-x">×</button></div>
         <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
-            <p style="margin:0;opacity:.75;font-size:14px">${escapeHtml(_t3('orders.track_help', 'Votre client voit l’avancement (en file, en cours, prête à retirer). Aucun prix ni détail interne n’est affiché.'))}</p>
-            <label style="font-size:13px">${escapeHtml(_t3('orders.track_note', 'Message pour le client (optionnel)'))}</label>
+            <p style="margin:0;opacity:.75;font-size:calc(14px * var(--fs, 1))">${escapeHtml(_t3('orders.track_help', 'Votre client voit l’avancement (en file, en cours, prête à retirer). Aucun prix ni détail interne n’est affiché.'))}</p>
+            <label style="font-size:calc(13px * var(--fs, 1))">${escapeHtml(_t3('orders.track_note', 'Message pour le client (optionnel)'))}</label>
             <textarea id="otd-note" class="settings-input" rows="3" maxlength="300">${escapeHtml(job.client_note || '')}</textarea>
             <input id="otd-url" class="settings-input" readonly style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border-color,#3a4254);background:var(--bg-input,#0f131b);color:inherit">
-            <div id="otd-remote" style="display:flex;flex-direction:column;gap:8px;font-size:13px"></div>
+            <div id="otd-remote" style="display:flex;flex-direction:column;gap:8px;font-size:calc(13px * var(--fs, 1))"></div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
                 <button type="button" class="btn btn-ghost btn-sm" id="otd-revoke"><i class="fa-solid fa-ban"></i> ${escapeHtml(_t3('orders.track_revoke', 'Révoquer le lien'))}</button>
                 <button type="button" class="btn btn-primary btn-sm" id="otd-copy"><i class="fa-solid fa-copy"></i> ${escapeHtml(_t3('orders.track_copy', 'Copier le lien'))}</button>
@@ -4410,7 +4437,7 @@ window._orderTrack = async function (id) {
         } else if (d.remote_status === 'starting') {
             box.innerHTML = `<div><i class="fa-solid fa-spinner fa-spin"></i> ${escapeHtml(_t3('orders.track_starting', 'Création du lien Cloudflare…'))}</div>`;
         } else {
-            box.innerHTML = `<div style="color:#f59e0b"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(d.remote_status === 'error' ? _t3('orders.track_remote_error', 'Le tunnel Cloudflare n’a pas pu démarrer.') : _t3('orders.track_local_only', 'Ce lien ne fonctionne que sur votre réseau local (adresse IP).'))}</div>
+            box.innerHTML = `<div style="color:var(--cb-warn, #f59e0b)"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(d.remote_status === 'error' ? _t3('orders.track_remote_error', 'Le tunnel Cloudflare n’a pas pu démarrer.') : _t3('orders.track_local_only', 'Ce lien ne fonctionne que sur votre réseau local (adresse IP).'))}</div>
                 <button type="button" class="btn btn-primary btn-sm" id="otd-enable" style="align-self:flex-start"><i class="fa-brands fa-cloudflare"></i> ${escapeHtml(_t3('orders.track_enable', 'Créer un lien Cloudflare'))}</button>
                 <div style="opacity:.7">${escapeHtml(_t3('orders.track_enable_hint', 'Active l’accès à distance de Stellio (tunnel Cloudflare, connexion toujours protégée par mot de passe) ; seule la page de suivi de cette commande est publique grâce à son lien secret.'))}</div>`;
             const b = box.querySelector('#otd-enable');
@@ -4627,7 +4654,7 @@ async function _loadDashboardTimelapses() {
         const list = (data.timelapses || []).slice(0, 4);
         const rec = (data.recording || []).map(r => `
             <div class="dashboard-row" style="cursor:pointer;" onclick="openTimelapseModal()">
-                <div class="dashboard-row-icon" style="background:#ef444422;color:#ef4444;"><i class="fa-solid fa-circle fa-beat-fade"></i></div>
+                <div class="dashboard-row-icon" style="background:#ef444422;color:var(--cb-bad, #ef4444);"><i class="fa-solid fa-circle fa-beat-fade"></i></div>
                 <div class="dashboard-row-body">
                     <div class="dashboard-row-title">${escapeHtml(_t3('timelapse.recording', 'Enregistrement en cours'))}</div>
                     <div class="dashboard-row-sub">${escapeHtml(r.printer_name || '')} — ${escapeHtml(_tf('dashboard.timelapse_frames', '{{n}} images', { n: r.frames || 0 }))}</div>
@@ -4828,7 +4855,7 @@ async function _loadDashboardQueue() {
             const name = file ? file.name : item.path.split(/[\\/]/).pop();
             return `
             <div class="dashboard-row" onclick="document.querySelector('.nav-btn[data-page=&quot;print-queue&quot;]')?.click();" style="cursor:pointer;">
-                <div class="dashboard-row-icon"><span style="font-size:11px; font-weight:700;">${idx + 1}</span></div>
+                <div class="dashboard-row-icon"><span style="font-size:calc(11px * var(--fs, 1)); font-weight:700;">${idx + 1}</span></div>
                 <div class="dashboard-row-body">
                     <div class="dashboard-row-title" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
                 </div>
@@ -4969,6 +4996,17 @@ async function _loadDashboardUpdate() {
     }
 }
 
+// Pastille de couleur d'une bobine : une couleur très sombre (noir) ou très claire (blanc) reste visible sur le fond du widget
+function _filamentSwatchStyle(hex) {
+    const h = /^#[0-9a-fA-F]{6}$/.test(hex || '') ? hex : '#888888';
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+    const lin = c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    const lum = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    let bg = h + '22';
+    if (lum < 0.06) bg = '#d1d5db';          // noir : pastille claire derrière le point
+    else if (lum > 0.7) bg = '#4b5563';      // blanc / très clair : pastille sombre
+    return `background:${bg};color:${h};box-shadow:inset 0 0 0 1px rgba(160,160,160,.45);`;
+}
 function _renderDashboardUpdate(body, data) {
     if (!data.update_available) {
         body.innerHTML = `<div class="dashboard-widget-empty dashboard-widget-empty--ok"><i class="fa-solid fa-circle-check"></i><p>${_t2('dashboard.up_to_date', 'Stellio est à jour')} (v${data.current_version})</p></div>`;
@@ -5612,7 +5650,7 @@ async function maybePromptAddSource() {
                 <button class="modal-close" onclick="closeAddSourcePrompt()" aria-label="${escapeHtml(I18N.t('actions.close'))}">&times;</button>
             </div>
             <div class="modal-body">
-                <p style="font-size:14px; line-height:1.6; margin:6px 0 18px;">${escapeHtml(I18N.t('onboarding.add_source_desc'))}</p>
+                <p style="font-size:calc(14px * var(--fs, 1)); line-height:1.6; margin:6px 0 18px;">${escapeHtml(I18N.t('onboarding.add_source_desc'))}</p>
                 <button class="btn btn-primary" onclick="confirmAddSourcePrompt()"><i class="fa-solid fa-plus"></i> ${escapeHtml(I18N.t('onboarding.add_source_btn'))}</button>
             </div>
         </div>`;
@@ -6086,7 +6124,7 @@ async function _loadDashboardStock() {
         });
         body.innerHTML = low.map((s, i) => `
             <div class="dashboard-row">
-                <div class="dashboard-row-icon" style="background:${s.color_hex}22;color:${s.color_hex};"><i class="fa-solid fa-circle"></i></div>
+                <div class="dashboard-row-icon" style="${_filamentSwatchStyle(s.color_hex)}"><i class="fa-solid fa-circle"></i></div>
                 <div class="dashboard-row-body">
                     <div class="dashboard-row-title">${escapeHtml(s.name)}</div>
                     <div class="dashboard-row-sub">${s.material || ''} — ${Math.round(s.remaining_g)}g ${_t2('dashboard.stock_remaining', 'restants')}</div>
@@ -6161,7 +6199,7 @@ async function _loadDashboardRestock() {
             if (it.days_left != null) left += ` · ≈ ${_t2('dashboard.restock_days_left', '{{n}} j au rythme actuel').replace('{{n}}', Math.max(1, Math.round(it.days_left)))}`;
             return `
             <div class="dashboard-row restock-row">
-                <div class="dashboard-row-icon" style="background:${escapeHtml(color)}22;color:${escapeHtml(color)};"><i class="fa-solid fa-circle"></i></div>
+                <div class="dashboard-row-icon" style="${_filamentSwatchStyle(color)}"><i class="fa-solid fa-circle"></i></div>
                 <div class="dashboard-row-body">
                     <div class="dashboard-row-title" title="${escapeHtml(_restockLabel(it))}">${escapeHtml(_restockLabel(it))}</div>
                     <div class="dashboard-row-sub">${escapeHtml(left)} — ${escapeHtml(spools)}${it.manual ? ` — <i class="fa-solid fa-hand-pointer" aria-hidden="true"></i> ${escapeHtml(_t2('dashboard.restock_manual', 'ajouté à la main'))}` : ''}</div>
@@ -6520,18 +6558,18 @@ function showSlicerDefaultPopup(data) {
     const popup = document.createElement('div');
     popup.style.cssText = `background: var(--bg-secondary); color: var(--text-primary); padding: 28px; border-radius: 14px; max-width: 460px; width: 90%; box-shadow: 0 12px 35px rgba(0,0,0,0.6); text-align: left; border: 1px solid var(--border);`;
     popup.innerHTML = `
-        <h3 style="margin:0 0 10px 0; font-size:19px; font-weight:600; text-align:center;"><i class="fa-solid fa-cube" style="color:var(--accent, #4f8cff);"></i> ${I18N.t('settings.slicer_discover_title') || 'Slicers détectés'}</h3>
-        <p style="color:var(--text-muted); margin:0 0 20px 0; line-height:1.5; font-size:14px; text-align:center;">${I18N.t('settings.slicer_discover_message') || `${data.slicers.length} slicer(s) trouvé(s) sur cette machine — configure tes préférences :`}</p>
+        <h3 style="margin:0 0 10px 0; font-size:calc(19px * var(--fs, 1)); font-weight:600; text-align:center;"><i class="fa-solid fa-cube" style="color:var(--accent, #4f8cff);"></i> ${I18N.t('settings.slicer_discover_title') || 'Slicers détectés'}</h3>
+        <p style="color:var(--text-muted); margin:0 0 20px 0; line-height:1.5; font-size:calc(14px * var(--fs, 1)); text-align:center;">${I18N.t('settings.slicer_discover_message') || `${data.slicers.length} slicer(s) trouvé(s) sur cette machine — configure tes préférences :`}</p>
 
         <div style="margin-bottom:14px;">
-            <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:4px;">${I18N.t('settings.default_slicer') || 'Application par défaut (ouverture de fichier)'}</label>
+            <label style="display:block; font-size:calc(12px * var(--fs, 1)); color:var(--text-muted); margin-bottom:4px;">${I18N.t('settings.default_slicer') || 'Application par défaut (ouverture de fichier)'}</label>
             <select id="slicer-discover-default" class="settings-select" style="width:100%;">
                 <option value="system_default">${I18N.t('settings.slicer_select') || 'Sélectionnez un slicer'}</option>
                 ${openOptions}
             </select>
         </div>
         <div style="margin-bottom:22px;">
-            <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:4px;">${I18N.t('settings.preferred_slicer') || 'Slicer préféré (pré-slicing / estimation auto)'}</label>
+            <label style="display:block; font-size:calc(12px * var(--fs, 1)); color:var(--text-muted); margin-bottom:4px;">${I18N.t('settings.preferred_slicer') || 'Slicer préféré (pré-slicing / estimation auto)'}</label>
             <select id="slicer-discover-preferred" class="settings-select" style="width:100%;">
                 <option value="">${I18N.t('settings.slicer_select') || 'Sélectionnez un slicer'}</option>
                 ${preslicedOptions}
@@ -7091,7 +7129,7 @@ function _openRemoteFolderPicker(target, onPick) {
                     <button class="modal-close" onclick="closeModal('modal-remote-folder')">×</button>
                 </div>
                 <div class="modal-body">
-                    <div id="remote-folder-current" style="font-size:12px; opacity:.7; margin-bottom:8px; word-break:break-all;"></div>
+                    <div id="remote-folder-current" style="font-size:calc(12px * var(--fs, 1)); opacity:.7; margin-bottom:8px; word-break:break-all;"></div>
                     <div id="remote-folder-list" style="max-height:320px; overflow-y:auto; display:flex; flex-direction:column; gap:4px;"></div>
                     <button id="remote-folder-confirm" class="btn btn-primary" style="width:100%; margin-top:12px;">
                         <i class="fa-solid fa-paper-plane"></i> <span id="remote-folder-confirm-label"></span>
@@ -7441,7 +7479,7 @@ function showScanBadge(text, type = 'info') {
 if (!scanBadgeElement) {
 scanBadgeElement = document.createElement('div');
 scanBadgeElement.id = 'scan-progress-badge';
-scanBadgeElement.style.cssText = `background: var(--bg-secondary); color: var(--text-primary); padding: 12px 18px; border-radius: 12px; font-size: 13px; font-weight: 500; box-shadow: 0 4px 20px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 10px; border: 1px solid var(--accent); animation: slideUp 0.3s ease; max-width: 350px; align-self: flex-end; transition: opacity 0.3s ease;`;
+scanBadgeElement.style.cssText = `background: var(--bg-secondary); color: var(--text-primary); padding: 12px 18px; border-radius: 12px; font-size: calc(13px * var(--fs, 1)); font-weight: 500; box-shadow: 0 4px 20px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 10px; border: 1px solid var(--accent); animation: slideUp 0.3s ease; max-width: 350px; align-self: flex-end; transition: opacity 0.3s ease;`;
 const container = document.getElementById('toast-container');
 (container || document.body).appendChild(scanBadgeElement);
 }
@@ -7515,7 +7553,12 @@ let thumbProgressInterval = null;
 let thumbProgressCompleted = false;
 let _thumbPaused = false;
 function _applyThumbPausedUI(paused) {
+    const wasPaused = _thumbPaused;
     _thumbPaused = paused;
+    if (wasPaused && !paused) {   // reprise : les cartes visibles sans miniature repartent
+        try { if (typeof generateVisibleThumbnails === 'function') generateVisibleThumbnails(); } catch (_) {}
+    }
+    document.documentElement.classList.toggle('thumbs-paused', !!paused);   // coupe l'effet de vague des cadres en attente
     const btn = document.getElementById('thumb-pause-btn');
     const container = document.getElementById('thumb-progress-container');
     if (container) container.classList.toggle('paused', paused);
@@ -7818,7 +7861,7 @@ window.openFileInfoModal = async function (path, opts) {
                 </label>
             </div>
             <table class="file-info-table"><tbody id="file-info-rows"></tbody></table>
-            <div id="file-info-status" style="margin-top:8px; font-size:12px; color:var(--text-muted); min-height:16px;"></div>
+            <div id="file-info-status" style="margin-top:8px; font-size:calc(12px * var(--fs, 1)); color:var(--text-muted); min-height:16px;"></div>
             <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
                 <button type="button" class="btn btn-primary btn-sm" id="file-info-slicer"><i class="fa-solid fa-paper-plane"></i> ${e(_t3('fileinfo.send_slicer', 'Envoyer au slicer'))}</button>
                 <button type="button" class="btn btn-ghost btn-sm" id="file-info-open"><i class="fa-solid fa-cube"></i> ${e(_t3('fileinfo.open_viewer', 'Ouvrir dans le viewer'))}</button>
@@ -7972,7 +8015,7 @@ window.openFileInfoModal = async function (path, opts) {
     const downReason = demo ? null : _sourceUnavailableReason(path);
     if (downReason) {
         $('file-info-rows').innerHTML = baseRows.join('')
-            + row(_t3('fileinfo.analysis', 'Analyse'), `<span style="color:#f87171"><i class="fa-solid fa-triangle-exclamation"></i> ${e(_t3('fileinfo.source_down_row', 'Source indisponible : analyse impossible'))}</span>`)
+            + row(_t3('fileinfo.analysis', 'Analyse'), `<span style="color:var(--cb-bad, #f87171)"><i class="fa-solid fa-triangle-exclamation"></i> ${e(_t3('fileinfo.source_down_row', 'Source indisponible : analyse impossible'))}</span>`)
             + tailRows;
         setStatus(`<i class="fa-solid fa-circle-info"></i> ${e(downReason)}`);
         body.querySelector('.file-info-controls')?.classList.add('hidden');
@@ -8046,7 +8089,7 @@ const _printedOk = _ps === 'success';
 const _yn = (ok) => `<span class="meta-val ${ok ? 'meta-yes' : 'meta-no'}"><i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${ok ? _t2('card.yes', 'Oui') : _t2('card.no', 'Non')}</span>`;
 const tooltipHtml = `<div class="file-metadata-tooltip" id="tooltip-${f.path.replace(/[^\w]/g, '-')}"><div class="meta-row"><i class="fa-solid fa-paper-plane"></i><span class="meta-label">${_t2('card.tooltip_sent_slicer', 'Envoyé au slicer')}</span>${_yn(_sentToSlicer)}</div><div class="meta-row"><i class="fa-solid fa-print"></i><span class="meta-label">${_t2('card.tooltip_printed', 'Imprimé')}</span>${_yn(_printedOk)}</div><div class="meta-row meta-source-row" data-source="${escapeHtml(f.source || '')}"><i class="fa-solid fa-hard-drive"></i><span class="meta-label">${_t2('card.tooltip_source', 'Source')}</span>${_sourceStateHtml(_sourceAvailability[f.source] !== false)}</div></div>`;
 const thumbContent = f.has_thumb
-    ? `<img src="${thumbUrl}" data-loaded="pending" onload="this.dataset.loaded='true'; this.style.display='block'; this.nextElementSibling?.style.setProperty('display','none','important');" onerror="window.handleThumbnailError(this)" style="width:100%; height:100%; object-fit:cover; display:block;"><div class="file-loading" style="display:none; align-items:center; justify-content:center;"><i class="fa-solid ${icon} thumb-icon" style="font-size:48px; color:var(--text-muted);"></i></div>`
+    ? `<img src="${thumbUrl}" data-loaded="pending" onload="this.dataset.loaded='true'; this.style.display='block'; this.nextElementSibling?.style.setProperty('display','none','important');" onerror="window.handleThumbnailError(this)" style="width:100%; height:100%; object-fit:cover; display:block;"><div class="file-loading" style="display:none; align-items:center; justify-content:center;"><i class="fa-solid ${icon} thumb-icon" style="font-size:calc(48px * var(--fs, 1)); color:var(--text-muted);"></i></div>`
     : `<img src="" data-loaded="false" style="display:none; width:100%; height:100%; object-fit:cover;"><div class="file-loading thumb-pending" data-path="${escapeHtml(f.path)}"><div class="skeleton-thumb"><i class="fa-solid ${icon} skeleton-thumb-icon"></i></div></div>`;
 const checkboxHtml = isSelectionMode ? `<div class="file-checkbox" onclick="event.stopPropagation(); toggleFileSelection('${escapeJs(f.path)}', event)" title="${isSelected ? I18N.t('actions.cancel') : I18N.t('actions.select')}"><i class="fa-solid ${isSelected ? 'fa-check-square' : 'fa-square'}"></i></div>` : '';
 const fileMenuBtnHtml = isSelectionMode ? '' : `<button type="button" class="file-menu-btn" onclick="event.stopPropagation(); openFileCtxMenu(event, '${escapeJs(f.path)}', '${escapeJs(f.name)}')" title="${I18N.t('actions.more') || 'Actions'}"><i class="fa-solid fa-bars"></i></button>`;
@@ -8169,12 +8212,12 @@ async function _batchSpoolStep(paths) {
             <div class="modal-header"><h3><i class="fa-solid fa-spool"></i> ${escapeHtml(_t3('slicer.batch_spool_title', 'Bobines des fichiers'))}</h3>
             <button class="modal-close" id="bsp-x">×</button></div>
             <div class="modal-body">
-                <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:3px;">${escapeHtml(_t3('slicer.batch_spool_all', 'Même bobine pour tous'))}</label>
+                <label style="display:block; font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); margin-bottom:3px;">${escapeHtml(_t3('slicer.batch_spool_all', 'Même bobine pour tous'))}</label>
                 <select id="bsp-all" class="settings-select" style="width:100%; max-width:none; margin-bottom:12px;"><option value="__keep">—</option>${options}</select>
                 <div id="bsp-rows">${rows.map((r, i) => `<div style="display:flex; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);">
                     <div style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(r.path)}">${escapeHtml(r.name)}${r.required != null ? ` <span style="color:var(--text-muted);">· ${Math.round(r.required)} g</span>` : ''}</div>
                     <select class="settings-select bsp-sel" data-i="${i}" style="width:55%; max-width:none;">${options}</select></div>`).join('')}</div>
-                <div id="bsp-hint" style="margin-top:10px; font-size:12px; color:var(--danger, #e5484d);"></div>
+                <div id="bsp-hint" style="margin-top:10px; font-size:calc(12px * var(--fs, 1)); color:var(--danger, #e5484d);"></div>
                 <div class="quote-form-foot"><button type="button" class="btn btn-ghost" id="bsp-cancel">${escapeHtml(_t3('actions.cancel', 'Annuler'))}</button>
                 <button type="button" class="btn btn-primary" id="bsp-ok"><i class="fa-solid fa-paper-plane"></i> ${escapeHtml(_t3('actions.send', 'Envoyer'))}</button></div>
             </div></div>`;
@@ -8732,11 +8775,11 @@ if (!modal) {
 const failed = summary.failed || [];
 const failedListHtml = failed.length
     ? `<details style="margin-top:12px;" open>
-        <summary style="cursor:pointer; color:var(--warning); font-size:13px;">
+        <summary style="cursor:pointer; color:var(--warning); font-size:calc(13px * var(--fs, 1));">
             <i class="fa-solid fa-triangle-exclamation"></i> ${failed.length} fichier(s) en erreur — voir la liste
         </summary>
         <ul style="margin:10px 0 0 0; padding-left:0; list-style:none; max-height:260px; overflow-y:auto; display:flex; flex-direction:column; gap:4px;">
-            ${failed.map(f => `<li id="thumb-fail-${(f.path || f.name).replace(/[^\w]/g, '-')}" style="display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; color:var(--text-secondary); padding:6px 10px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);">
+            ${failed.map(f => `<li id="thumb-fail-${(f.path || f.name).replace(/[^\w]/g, '-')}" style="display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:calc(12px * var(--fs, 1)); color:var(--text-secondary); padding:6px 10px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);">
                 <span title="${escapeHtml(f.path || f.name)}" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(f.name)}${f.reason === 'timeout' ? ` <span style="color:var(--warning);">(${I18N.t('repair.timeout_badge')})</span>` : ''}</span>
                 ${f.path ? `<button type="button" class="btn btn-ghost btn-sm" style="flex-shrink:0;" onclick="repairAndRegenThumb('${escapeJs(f.path)}', this)"><i class="fa-solid fa-wrench"></i> ${I18N.t('actions.repair')}</button>` : ''}
             </li>`).join('')}
@@ -8751,15 +8794,15 @@ modal.innerHTML = `<div class="modal-content">
     </div>
     <div class="modal-body">
         <div style="display:flex; flex-direction:column; gap:8px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:14px;">
-            <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+            <div style="display:flex; justify-content:space-between; font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary);">
                 <span data-i18n="thumbs.summary_processed">Fichiers traités cette session</span>
                 <strong style="color:var(--text-primary);">${summary.total}</strong>
             </div>
-            <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+            <div style="display:flex; justify-content:space-between; font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary);">
                 <span data-i18n="thumbs.summary_generated">Miniatures générées</span>
                 <strong style="color:var(--success);">${summary.generated}</strong>
             </div>
-            <div style="display:flex; justify-content:space-between; font-size:13px; color:${failed.length ? 'var(--warning)' : 'var(--text-secondary)'};">
+            <div style="display:flex; justify-content:space-between; font-size:calc(13px * var(--fs, 1)); color:${failed.length ? 'var(--warning)' : 'var(--text-secondary)'};">
                 <span data-i18n="thumbs.summary_errors">Erreurs</span>
                 <strong>${failed.length}</strong>
             </div>
@@ -8787,7 +8830,7 @@ function renderTagFilters() {
 const container = document.getElementById('filter-tags');
 if (!container) return;
 if (!allTags.length) {
-container.innerHTML = `<p style="color:var(--text-muted);font-size:13px">${I18N.t('toast.tag_empty')}</p>`;
+container.innerHTML = `<p style="color:var(--text-muted);font-size:calc(13px * var(--fs, 1))">${I18N.t('toast.tag_empty')}</p>`;
 return;
 }
 container.innerHTML = allTags.map(t => `<label class="checkbox-label"><input type="checkbox" value="${escapeHtml(t.name)}" class="filter-tag" ${activeTagFilters.has(t.name) ? 'checked' : ''}><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${t.color};margin-right:6px;"></span>${escapeHtml(t.name)} <span class="tag-count" style="color:var(--text-muted)">(${t.count})</span></label>`).join('');
@@ -8827,9 +8870,9 @@ if (mode === 'global') {
     if (ollamaSection) ollamaSection.style.display = 'none';
     if (tagsListEl) {
         if (allTags.length === 0) {
-            tagsListEl.innerHTML = `<p style="color:var(--text-muted);font-size:12px;padding:10px">${I18N.t('toast.tag_empty')}</p>`;
+            tagsListEl.innerHTML = `<p style="color:var(--text-muted);font-size:calc(12px * var(--fs, 1));padding:10px">${I18N.t('toast.tag_empty')}</p>`;
         } else {
-            tagsListEl.innerHTML = allTags.map(t => `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border);"><div style="display:flex;align-items:center;gap:10px;"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${t.color};"></span><strong>${escapeHtml(t.name)}</strong><span style="color:var(--text-muted);font-size:12px">(${t.count} ${I18N.t('library.no_files').toLowerCase()})</span></div><div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="editTag(${t.id}, '${escapeJs(t.name)}', '${t.color}')" title="${I18N.t('actions.rename')}" style="color:var(--accent)"><i class="fa-solid fa-pen"></i></button><button class="btn btn-ghost btn-sm" onclick="deleteTag(${t.id}, '${escapeJs(t.name)}')" title="${I18N.t('actions.delete')}" style="color:var(--danger)"><i class="fa-solid fa-trash"></i></button></div></div>`).join('');
+            tagsListEl.innerHTML = allTags.map(t => `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border);"><div style="display:flex;align-items:center;gap:10px;"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${t.color};"></span><strong>${escapeHtml(t.name)}</strong><span style="color:var(--text-muted);font-size:calc(12px * var(--fs, 1))">(${t.count} ${I18N.t('library.no_files').toLowerCase()})</span></div><div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="editTag(${t.id}, '${escapeJs(t.name)}', '${t.color}')" title="${I18N.t('actions.rename')}" style="color:var(--accent)"><i class="fa-solid fa-pen"></i></button><button class="btn btn-ghost btn-sm" onclick="deleteTag(${t.id}, '${escapeJs(t.name)}')" title="${I18N.t('actions.delete')}" style="color:var(--danger)"><i class="fa-solid fa-trash"></i></button></div></div>`).join('');
         }
     }
     if (newTagGroup) newTagGroup.style.display = 'flex';
@@ -8853,7 +8896,7 @@ if (mode === 'global') {
         currentTagsEl.parentElement.style.display = 'block';
         const file = allFiles.find(f => f.path === filePath);
         const currentTags = file?.tags?.map(t => t.name) || [];
-        currentTagsEl.innerHTML = currentTags.length ? currentTags.map(t => `<span class="tag-badge">${escapeHtml(t)}</span>`).join('') : `<span style="color:var(--text-muted);font-size:12px">${I18N.t('toast.file_not_selected')}</span>`;
+        currentTagsEl.innerHTML = currentTags.length ? currentTags.map(t => `<span class="tag-badge">${escapeHtml(t)}</span>`).join('') : `<span style="color:var(--text-muted);font-size:calc(12px * var(--fs, 1))">${I18N.t('toast.file_not_selected')}</span>`;
     }
     if (tagsListEl) {
         const file = allFiles.find(f => f.path === filePath);
@@ -8938,7 +8981,7 @@ function openBulkTagModal() {
     if (listEl) {
         listEl.innerHTML = allTags.length
             ? allTags.map(t => `<label class="checkbox-label" style="margin:6px 0;"><input type="checkbox" value="${escapeHtml(t.name)}" class="bulk-tag-select"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${t.color};margin-right:8px;"></span>${escapeHtml(t.name)}</label>`).join('')
-            : `<p style="color:var(--text-muted);font-size:12px;">${I18N.t('toast.tag_empty')}</p>`;
+            : `<p style="color:var(--text-muted);font-size:calc(12px * var(--fs, 1));">${I18N.t('toast.tag_empty')}</p>`;
     }
     const newTagInput = document.getElementById('bulk-tag-new-tag');
     if (newTagInput) newTagInput.value = '';
@@ -9014,7 +9057,7 @@ window.updateBulkRenamePreview = function () {
         const newBase = _computeBulkRenameName(base, mode, idx);
         return `<div style="display:flex; align-items:center; gap:6px; white-space:nowrap; overflow:hidden;">
             <span style="color:var(--text-muted); text-overflow:ellipsis; overflow:hidden;">${escapeHtml(f.name)}</span>
-            <i class="fa-solid fa-arrow-right" style="flex-shrink:0; font-size:10px;"></i>
+            <i class="fa-solid fa-arrow-right" style="flex-shrink:0; font-size:calc(10px * var(--fs, 1));"></i>
             <span style="color:var(--accent); font-weight:600;">${escapeHtml(newBase + ext)}</span>
         </div>`;
     });
@@ -9296,7 +9339,7 @@ const toast = document.createElement('div');
 toast.id = `download-toast-${downloadInfo.id}`;
 toast.className = 'toast info';
 toast.style.cssText = `min-width: 350px; pointer-events: auto; margin-bottom: 8px; transition: all 0.3s ease;`;
-toast.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--accent)"></i><div style="flex: 1; min-width: 0;"><div style="font-weight: 600; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;"><span><i class="fa-solid fa-download"></i> ${I18N.t('download.title')} #${downloadInfo.id}</span><button onclick="cancelDownload(${downloadInfo.id})" class="btn btn-ghost btn-sm" style="padding: 2px 6px; font-size: 11px;"><i class="fa-solid fa-times"></i></button></div><div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;" id="toast-filename-${downloadInfo.id}">${I18N.t('download.connecting')}</div><div class="progress-track" style="height: 4px; margin-top: 4px;"><div id="toast-bar-${downloadInfo.id}" class="progress-bar" style="width: 0%"></div></div><div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; text-align: right;" id="toast-progress-${downloadInfo.id}">0%</div></div>`;
+toast.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--accent)"></i><div style="flex: 1; min-width: 0;"><div style="font-weight: 600; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;"><span><i class="fa-solid fa-download"></i> ${I18N.t('download.title')} #${downloadInfo.id}</span><button onclick="cancelDownload(${downloadInfo.id})" class="btn btn-ghost btn-sm" style="padding: 2px 6px; font-size: calc(11px * var(--fs, 1));"><i class="fa-solid fa-times"></i></button></div><div style="font-size: calc(12px * var(--fs, 1)); color: var(--text-muted); margin-bottom: 6px;" id="toast-filename-${downloadInfo.id}">${I18N.t('download.connecting')}</div><div class="progress-track" style="height: 4px; margin-top: 4px;"><div id="toast-bar-${downloadInfo.id}" class="progress-bar" style="width: 0%"></div></div><div style="font-size: calc(11px * var(--fs, 1)); color: var(--text-muted); margin-top: 4px; text-align: right;" id="toast-progress-${downloadInfo.id}">0%</div></div>`;
 container.appendChild(toast);
 downloadInfo.toastElement = toast;
 downloadToastElements[downloadInfo.id] = toast;
@@ -9404,16 +9447,16 @@ const modal = document.createElement('div');
 modal.style.cssText = `background: var(--bg-secondary, #1e2129); border-radius: 16px; padding: 28px; max-width: 450px; width: 90%; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6); border: 1px solid var(--border, #2a2f3a); animation: slideIn 0.3s ease;`;
 modal.innerHTML = `
      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
-         <i class="fa-solid fa-folder-plus" style="font-size: 24px; color: var(--accent, #4ea1d3);"></i>
-         <h3 style="margin: 0; color: var(--text-primary, #e6e6e6); font-size: 18px; font-weight: 600;">${I18N.t('download.create_folder') || 'Créer un dossier'}</h3>
+         <i class="fa-solid fa-folder-plus" style="font-size: calc(24px * var(--fs, 1)); color: var(--accent, #4ea1d3);"></i>
+         <h3 style="margin: 0; color: var(--text-primary, #e6e6e6); font-size: calc(18px * var(--fs, 1)); font-weight: 600;">${I18N.t('download.create_folder') || 'Créer un dossier'}</h3>
      </div>
-     <p style="color: var(--text-muted, #9ca3af); margin-bottom: 20px; line-height: 1.5; font-size: 14px;">
+     <p style="color: var(--text-muted, #9ca3af); margin-bottom: 20px; line-height: 1.5; font-size: calc(14px * var(--fs, 1));">
         ${I18N.t('download.enter_folder_name') || 'Entrez le nom du nouveau dossier'}
      </p>
-     <input type="text" id="folder-name-input" placeholder="${I18N.t('download.folder_name_placeholder') || 'Nom du dossier'}" maxlength="50" style="width: 100%; padding: 12px 16px; border: 2px solid var(--border, #2a2f3a); border-radius: 10px; background: var(--bg-primary, #15181e); color: var(--text-primary, #e6e6e6); font-size: 15px; margin-bottom: 24px; box-sizing: border-box; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent, #4ea1d3)'" onblur="this.style.borderColor='var(--border, #2a2f3a)'">
+     <input type="text" id="folder-name-input" placeholder="${I18N.t('download.folder_name_placeholder') || 'Nom du dossier'}" maxlength="50" style="width: 100%; padding: 12px 16px; border: 2px solid var(--border, #2a2f3a); border-radius: 10px; background: var(--bg-primary, #15181e); color: var(--text-primary, #e6e6e6); font-size: calc(15px * var(--fs, 1)); margin-bottom: 24px; box-sizing: border-box; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent, #4ea1d3)'" onblur="this.style.borderColor='var(--border, #2a2f3a)'">
      <div style="display: flex; gap: 12px; justify-content: flex-end;">
-         <button id="folder-cancel-btn" style="padding: 11px 24px; border: none; border-radius: 10px; background: var(--bg-tertiary, #2a2f3a); color: var(--text-primary, #e6e6e6); cursor: pointer; font-weight: 500; transition: all 0.2s; font-size: 14px;" onmouseover="this.style.background='#3a3f4a'" onmouseout="this.style.background='var(--bg-tertiary, #2a2f3a)'">${I18N.t('actions.cancel') || 'Annuler'}</button>
-         <button id="folder-ok-btn" style="padding: 11px 24px; border: none; border-radius: 10px; background: var(--accent, #4ea1d3); color: white; cursor: pointer; font-weight: 600; transition: all 0.2s; font-size: 14px;" onmouseover="this.style.background='#3d8fb8'" onmouseout="this.style.background='var(--accent, #4ea1d3)'">${I18N.t('actions.create') || 'Créer'}</button>
+         <button id="folder-cancel-btn" style="padding: 11px 24px; border: none; border-radius: 10px; background: var(--bg-tertiary, #2a2f3a); color: var(--text-primary, #e6e6e6); cursor: pointer; font-weight: 500; transition: all 0.2s; font-size: calc(14px * var(--fs, 1));" onmouseover="this.style.background='#3a3f4a'" onmouseout="this.style.background='var(--bg-tertiary, #2a2f3a)'">${I18N.t('actions.cancel') || 'Annuler'}</button>
+         <button id="folder-ok-btn" style="padding: 11px 24px; border: none; border-radius: 10px; background: var(--accent, #4ea1d3); color: white; cursor: pointer; font-weight: 600; transition: all 0.2s; font-size: calc(14px * var(--fs, 1));" onmouseover="this.style.background='#3d8fb8'" onmouseout="this.style.background='var(--accent, #4ea1d3)'">${I18N.t('actions.create') || 'Créer'}</button>
      </div>
 `;
 overlay.appendChild(modal);
@@ -9697,7 +9740,7 @@ function renderSavedFiltersList() {
     if (!container) return;
     const list = _loadSavedFilters();
     if (!list.length) {
-        container.innerHTML = `<p style="color:var(--text-muted); font-size:12px; margin:0;">${_t2('filters.no_saved', "Aucun filtre sauvegardé pour l'instant.")}</p>`;
+        container.innerHTML = `<p style="color:var(--text-muted); font-size:calc(12px * var(--fs, 1)); margin:0;">${_t2('filters.no_saved', "Aucun filtre sauvegardé pour l'instant.")}</p>`;
         return;
     }
     container.innerHTML = list.map(f => `
@@ -9764,7 +9807,7 @@ function renderFilterTagsModal() {
 const container = document.getElementById('filter-tags-modal');
 if (!container) return;
 if (!allTags.length) {
-container.innerHTML = `<p style="color:var(--text-muted);font-size:13px">${I18N.t('toast.tag_empty')}</p>`;
+container.innerHTML = `<p style="color:var(--text-muted);font-size:calc(13px * var(--fs, 1))">${I18N.t('toast.tag_empty')}</p>`;
 return;
 }
 container.innerHTML = allTags.map(t => `<label class="checkbox-label" style="margin-bottom: 8px;"><input type="checkbox" value="${escapeHtml(t.name)}" class="filter-tag-modal" ${activeTagFilters.has(t.name) ? 'checked' : ''}><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${t.color};margin-right:6px;"></span>${escapeHtml(t.name)} <span style="color:var(--text-muted)">(${t.count})</span></label>`).join('');
@@ -10103,11 +10146,11 @@ function showSourceUnavailablePopup(message) {
     modal.style.zIndex = '10050';
     modal.innerHTML = `<div class="modal-content small" style="text-align:center;">
         <div class="modal-header">
-            <h3><i class="fa-solid fa-triangle-exclamation" style="color:#f87171;"></i> ${escapeHtml(I18N.t('viewer.source_down_title'))}</h3>
+            <h3><i class="fa-solid fa-triangle-exclamation" style="color:var(--cb-bad, #f87171);"></i> ${escapeHtml(I18N.t('viewer.source_down_title'))}</h3>
             <button class="modal-close" aria-label="${escapeHtml(I18N.t('actions.close'))}">&times;</button>
         </div>
         <div class="modal-body">
-            <p style="font-size:14px; line-height:1.6; margin:6px 0 18px;">${escapeHtml(message)}</p>
+            <p style="font-size:calc(14px * var(--fs, 1)); line-height:1.6; margin:6px 0 18px;">${escapeHtml(message)}</p>
             <button class="btn btn-primary">${escapeHtml(I18N.t('actions.close'))}</button>
         </div>
     </div>`;
@@ -10414,26 +10457,26 @@ function suggestBestOrientation() {
 
     const top = results.slice(0, 3);
     panel.innerHTML = `
-        <div style="font-size:11px; color:var(--text-secondary); margin-bottom:6px; font-weight:600;">
+        <div style="font-size:calc(11px * var(--fs, 1)); color:var(--text-secondary); margin-bottom:6px; font-weight:600;">
             <i class="fa-solid fa-wand-magic-sparkles"></i> ${_t2('viewer.orientation_suggest_title', 'Orientations suggérées (moins de surplombs)')}
         </div>
         ${top.map((r, i) => `
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:5px 0; ${i > 0 ? 'border-top:1px solid var(--border);' : ''}">
-                <div style="font-size:11px; color:var(--text-secondary);">
+                <div style="font-size:calc(11px * var(--fs, 1)); color:var(--text-secondary);">
                     <strong style="color:var(--text-primary);">${i + 1}.</strong>
                     ${_t2(ORIENTATION_LABEL_KEYS[r.key], ORIENTATION_LABEL_FALLBACKS[r.key])}
-                    <div style="color:var(--text-muted); font-size:10px;">
+                    <div style="color:var(--text-muted); font-size:calc(10px * var(--fs, 1));">
                         ${_t2('viewer.orientation_suggest_stats', `surplomb ${r.overhangPct}% · contact plateau ${r.contactPct}%`, { overhang: r.overhangPct, contact: r.contactPct })}
                     </div>
                 </div>
-                <button type="button" class="btn btn-ghost btn-sm" style="font-size:11px; padding:4px 8px;"
+                <button type="button" class="btn btn-ghost btn-sm" style="font-size:calc(11px * var(--fs, 1)); padding:4px 8px;"
                     onclick="_applySuggestedOrientation('${r.key}')">
                     ${_t2('viewer.orientation_suggest_apply', 'Appliquer')}
                 </button>
             </div>
         `).join('')}
-        <div id="viewer-orientation-explain" style="margin-top:6px; font-size:11px; color:var(--text-secondary);"></div>
-        <button type="button" class="btn btn-ghost btn-sm" style="font-size:11px; padding:4px 8px; margin-top:4px; width:100%;"
+        <div id="viewer-orientation-explain" style="margin-top:6px; font-size:calc(11px * var(--fs, 1)); color:var(--text-secondary);"></div>
+        <button type="button" class="btn btn-ghost btn-sm" style="font-size:calc(11px * var(--fs, 1)); padding:4px 8px; margin-top:4px; width:100%;"
             onclick="_explainOrientationSuggestion()">
             <i class="fa-solid fa-comment-dots"></i> ${_t2('viewer.orientation_suggest_explain', 'Explique-moi pourquoi')}
         </button>
@@ -10763,9 +10806,9 @@ function showSlicerAutoImportPopup(newlyImported) {
     const popup = document.createElement('div');
     popup.style.cssText = `background: var(--bg-secondary); color: var(--text-primary); padding: 28px; border-radius: 14px; max-width: 440px; width: 90%; box-shadow: 0 12px 35px rgba(0,0,0,0.6); text-align: center; border: 1px solid var(--border);`;
     popup.innerHTML = `
-        <h3 style="margin:0 0 10px 0; font-size:19px; font-weight:600;"><i class="fa-solid fa-file-import" style="color:var(--accent, #4f8cff);"></i> ${I18N.t('settings.slicer_autoimport_title') || 'Profils slicer importés'}</h3>
-        <p style="color:var(--text-muted); margin:0 0 10px 0; line-height:1.5; font-size:14px;">${(I18N.t('settings.slicer_autoimport_message') || 'Stellio a détecté et importé automatiquement : {{list}}.').replace('{{list}}', escapeHtml(listText))}</p>
-        <p style="color:var(--text-muted); margin:0 0 24px 0; line-height:1.4; font-size:12px; opacity:0.85;">${namesPreview}</p>
+        <h3 style="margin:0 0 10px 0; font-size:calc(19px * var(--fs, 1)); font-weight:600;"><i class="fa-solid fa-file-import" style="color:var(--accent, #4f8cff);"></i> ${I18N.t('settings.slicer_autoimport_title') || 'Profils slicer importés'}</h3>
+        <p style="color:var(--text-muted); margin:0 0 10px 0; line-height:1.5; font-size:calc(14px * var(--fs, 1));">${(I18N.t('settings.slicer_autoimport_message') || 'Stellio a détecté et importé automatiquement : {{list}}.').replace('{{list}}', escapeHtml(listText))}</p>
+        <p style="color:var(--text-muted); margin:0 0 24px 0; line-height:1.4; font-size:calc(12px * var(--fs, 1)); opacity:0.85;">${namesPreview}</p>
         <div style="display:flex; gap:10px; justify-content:center;">
             <button id="slicer-autoimport-dismiss" class="btn btn-ghost">${I18N.t('actions.close') || 'Fermer'}</button>
             <button id="slicer-autoimport-view" class="btn btn-primary">${I18N.t('settings.slicer_autoimport_view') || 'Importer les profils'}</button>
@@ -10903,21 +10946,21 @@ list.innerHTML = filtered.map(p => {
         const m = _profileTypeMeta(t);
         return `<option value="${t}" ${t === p.profile_type ? 'selected' : ''}>${escapeHtml(_t3(m.i18nKey, m.fallback))}</option>`;
     }).join('');
-    const typeBadge = `<select onchange="reassignSlicerProfileType('${p.id}', this.value)" style="flex-shrink:0; appearance:none; -webkit-appearance:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; padding:2px 18px 2px 7px; border-radius:999px; font-size:10px; font-weight:600; color:${typeMeta.color}; background:color-mix(in srgb, ${typeMeta.color} 16%, transparent) url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 10 6%22><path fill=%22${encodeURIComponent(typeMeta.color)}%22 d=%22M0 0l5 6 5-6z%22/></svg>') no-repeat right 6px center/8px 5px; border:1px solid color-mix(in srgb, ${typeMeta.color} 40%, transparent);" title="${_t3('settings.slicer_profiles_type_hint', 'Nature du profil — corrige si la détection auto s’est trompée')}">
+    const typeBadge = `<select onchange="reassignSlicerProfileType('${p.id}', this.value)" style="flex-shrink:0; appearance:none; -webkit-appearance:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; padding:2px 18px 2px 7px; border-radius:999px; font-size:calc(10px * var(--fs, 1)); font-weight:600; color:${typeMeta.color}; background:color-mix(in srgb, ${typeMeta.color} 16%, transparent) url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 10 6%22><path fill=%22${encodeURIComponent(typeMeta.color)}%22 d=%22M0 0l5 6 5-6z%22/></svg>') no-repeat right 6px center/8px 5px; border:1px solid color-mix(in srgb, ${typeMeta.color} 40%, transparent);" title="${_t3('settings.slicer_profiles_type_hint', 'Nature du profil — corrige si la détection auto s’est trompée')}">
         ${typeOptions}
     </select>`;
     return `
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; background:var(--bg-input); border:1px solid ${isSuggested ? 'var(--warning, #d9a441)' : 'var(--border)'}; border-radius:var(--radius); font-size:12.5px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; background:var(--bg-input); border:1px solid ${isSuggested ? 'var(--warning, #d9a441)' : 'var(--border)'}; border-radius:var(--radius); font-size:calc(12.5px * var(--fs, 1));">
         <div style="min-width:0; flex:1;">
             <div style="display:flex; align-items:center; gap:6px; min-width:0;">
                 ${typeBadge}
                 <div style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.name)}</div>
             </div>
-            <div style="color:var(--text-muted); font-size:11px; margin-top:2px;">
+            <div style="color:var(--text-muted); font-size:calc(11px * var(--fs, 1)); margin-top:2px;">
                 ${escapeHtml(SLICER_NAME_LABELS[p.slicer] || p.slicer)}${p.material_type ? ' · ' + escapeHtml(p.material_type) : ''}${p.layer_height ? ' · ' + p.layer_height + 'mm' : ''}
             </div>
-            ${isSuggested ? `<div style="color:var(--warning, #d9a441); font-size:10.5px; margin-top:2px;"><i class="fa-solid fa-wand-magic-sparkles"></i> ${_t3('settings.slicer_profiles_suggested_match', 'Imprimante suggérée — à confirmer')}</div>` : ''}
-            ${rawDetected ? `<div style="color:var(--text-muted); font-size:10.5px; margin-top:2px; font-style:italic;"><i class="fa-solid fa-tag"></i> ${_t3('settings.slicer_profiles_raw_detected', 'Nom détecté')} : ${escapeHtml(rawDetected)}</div>` : ''}
+            ${isSuggested ? `<div style="color:var(--warning, #d9a441); font-size:calc(10.5px * var(--fs, 1)); margin-top:2px;"><i class="fa-solid fa-wand-magic-sparkles"></i> ${_t3('settings.slicer_profiles_suggested_match', 'Imprimante suggérée — à confirmer')}</div>` : ''}
+            ${rawDetected ? `<div style="color:var(--text-muted); font-size:calc(10.5px * var(--fs, 1)); margin-top:2px; font-style:italic;"><i class="fa-solid fa-tag"></i> ${_t3('settings.slicer_profiles_raw_detected', 'Nom détecté')} : ${escapeHtml(rawDetected)}</div>` : ''}
         </div>
         ${isSuggested ? `<button class="btn btn-ghost btn-sm" style="flex-shrink:0; color:var(--success, #4caf50);" onclick="confirmSlicerProfileMatch('${p.id}', '${p.printer_id}')" data-i18n-title="settings.slicer_profiles_confirm_match" title="${_t3('settings.slicer_profiles_confirm_match', 'Confirmer cette imprimante')}">
             <i class="fa-solid fa-check"></i>
@@ -11025,7 +11068,7 @@ window.openSlicerImportAssignModal = function (fileList) {
     ).join('');
 
     list.innerHTML = _pendingSlicerImportFiles.map((file, idx) => `
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); font-size:12.5px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); font-size:calc(12.5px * var(--fs, 1));">
             <span style="min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(file.name)}</span>
             <select class="settings-select settings-select-sm" data-file-index="${idx}" style="flex-shrink:0; min-width:150px;">
                 <option value="" ${!defaultPrinterId ? 'selected' : ''}>${_t3('settings.slicer_profiles_no_printer', 'Non assigné')}</option>
@@ -11293,23 +11336,23 @@ function renderProfileSuggestions(box, data) {
         if (s.wall_count != null) chips.push(_t3('modal.ai_suggest_walls', '{{n}} parois', { n: s.wall_count }).replace('{{n}}', s.wall_count));
         if (s.print_speed) chips.push(`${Math.round(s.print_speed)} mm/s`);
         if (s.supports_enabled) chips.push(_t3('modal.ai_suggest_supports', 'supports'));
-        const chipsHtml = chips.map(c => `<span style="display:inline-block; font-size:11px; padding:1px 7px; margin:0 4px 4px 0; border-radius:20px; border:1px solid var(--border); color:var(--text-muted);">${escapeHtml(c)}</span>`).join('');
+        const chipsHtml = chips.map(c => `<span style="display:inline-block; font-size:calc(11px * var(--fs, 1)); padding:1px 7px; margin:0 4px 4px 0; border-radius:20px; border:1px solid var(--border); color:var(--text-muted);">${escapeHtml(c)}</span>`).join('');
         const timeHtml = s.estimated_seconds
             ? `<i class="fa-solid fa-clock"></i> <strong>≈ ${escapeHtml(_fmtDurationSec(s.estimated_seconds))}</strong> <span style="color:var(--text-muted);">${_t3('modal.ai_suggest_time_approx', '(estimation approximative)')}</span> <i class="fa-solid fa-spinner fa-spin ai-suggest-spin" style="color:var(--text-muted);" title="${escapeHtml(_t3('modal.ai_suggest_computing', 'Calcul précis par le slicer…'))}"></i>`
             : `<i class="fa-solid fa-spinner fa-spin ai-suggest-spin" style="color:var(--text-muted);"></i> <span style="color:var(--text-muted);">${_t3('modal.ai_suggest_computing', 'Calcul précis par le slicer…')}</span>`;
         return `
         <div class="ai-suggest-card" data-id="${escapeHtml(s.id)}" style="padding:8px 10px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-secondary); margin-bottom:6px;">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                <div style="flex:1; min-width:0; font-size:13.5px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${i === 0 ? '<i class="fa-solid fa-star" style="color:#f5a623;"></i> ' : ''}${escapeHtml(s.name || '—')}</div>
+                <div style="flex:1; min-width:0; font-size:calc(13.5px * var(--fs, 1)); font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${i === 0 ? '<i class="fa-solid fa-star" style="color:#f5a623;"></i> ' : ''}${escapeHtml(s.name || '—')}</div>
                 <button type="button" class="btn btn-ghost btn-sm ai-suggest-use" data-id="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name || '')}">${_t3('modal.ai_suggest_use', 'Utiliser')}</button>
             </div>
             <div>${chipsHtml}</div>
             ${s.reason ? `<div style="color:var(--text-muted); margin:2px 0 4px;">${escapeHtml(s.reason)}</div>` : ''}
-            <div class="ai-suggest-time" data-id="${escapeHtml(s.id)}" style="font-size:12.5px;">${timeHtml}</div>
+            <div class="ai-suggest-time" data-id="${escapeHtml(s.id)}" style="font-size:calc(12.5px * var(--fs, 1));">${timeHtml}</div>
         </div>`;
     }).join('');
     box.innerHTML = `
-        <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.03em; margin-bottom:6px;">${_t3('modal.ai_suggest_title', 'Réglages slicer suggérés')}</div>
+        <div style="font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); text-transform:uppercase; letter-spacing:0.03em; margin-bottom:6px;">${_t3('modal.ai_suggest_title', 'Réglages slicer suggérés')}</div>
         ${cards}`;
     box.querySelectorAll('.ai-suggest-use').forEach(btn => {
         btn.addEventListener('click', () => _useSuggestedProfile(btn.dataset.id, btn.dataset.name, box));
@@ -11391,8 +11434,8 @@ const modsHtml = mods.length
 
 box.innerHTML = `
     <div style="padding:8px 10px; background:var(--bg-secondary); border-radius:var(--radius); border:1px solid var(--border);">
-        <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.03em;">${_t3('modal.ai_recommend_profile_label', 'Profil recommandé')}</div>
-        <div style="font-size:15px; font-weight:700; margin-top:2px;"><i class="fa-solid fa-star" style="color:#f5a623;"></i> ${escapeHtml(data.profil_recommande || '—')}</div>
+        <div style="font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); text-transform:uppercase; letter-spacing:0.03em;">${_t3('modal.ai_recommend_profile_label', 'Profil recommandé')}</div>
+        <div style="font-size:calc(15px * var(--fs, 1)); font-weight:700; margin-top:2px;"><i class="fa-solid fa-star" style="color:#f5a623;"></i> ${escapeHtml(data.profil_recommande || '—')}</div>
         ${modsHtml}
     </div>
 `;
@@ -11459,7 +11502,7 @@ const colors = ['#4f8cff', '#38c172', '#f5a623', '#e85d75', '#9b6bff', '#20c9c9'
 const placed = data.placed || [];
 bedEl.innerHTML = placed.map((p, i) => `
     <div title="${escapeHtml(p.filename)}" style="position:absolute; left:${Math.round(p.x * scale)}px; top:${Math.round((bedH - p.y - p.h) * scale)}px; width:${Math.max(Math.round(p.w * scale), 4)}px; height:${Math.max(Math.round(p.h * scale), 4)}px; background:${colors[i % colors.length]}55; border:1.5px solid ${colors[i % colors.length]}; border-radius:3px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
-        <span style="font-size:9px; color:var(--text-primary); padding:2px; text-align:center; line-height:1.1; word-break:break-word;">${escapeHtml(p.filename.length > 14 ? p.filename.slice(0, 12) + '…' : p.filename)}</span>
+        <span style="font-size:calc(9px * var(--fs, 1)); color:var(--text-primary); padding:2px; text-align:center; line-height:1.1; word-break:break-word;">${escapeHtml(p.filename.length > 14 ? p.filename.slice(0, 12) + '…' : p.filename)}</span>
     </div>
 `).join('');
 
@@ -11603,8 +11646,9 @@ function _cssColorToHex(val) {
 // ---- Image de fond (0.9.9) : stockée sur l'appareil (localStorage), réduite à 1920 px max
 const BG_IMG_KEY = 'stellio-bg-image', BG_OPT_KEY = 'stellio-bg-opts';
 function _getBgOpts() {
-    const d = { dim: 50, blur: 0, alpha: 80 };
-    try { const o = JSON.parse(localStorage.getItem(BG_OPT_KEY) || '{}') || {}; ['dim', 'blur', 'alpha'].forEach(k => { if (Number.isFinite(+o[k])) d[k] = +o[k]; }); } catch (_) {}
+    const d = { dim: 50, blur: 0, alpha: 80, fit: 'cover', zoom: 100, x: 50, y: 50 };
+    try { const o = JSON.parse(localStorage.getItem(BG_OPT_KEY) || '{}') || {}; ['dim', 'blur', 'alpha', 'zoom', 'x', 'y'].forEach(k => { if (Number.isFinite(+o[k])) d[k] = +o[k]; }); if (['cover', 'contain', 'tile'].includes(o.fit)) d.fit = o.fit; } catch (_) {}
+    d.zoom = Math.max(50, Math.min(300, d.zoom)); d.x = Math.max(0, Math.min(100, d.x)); d.y = Math.max(0, Math.min(100, d.y));
     d.dim = Math.max(0, Math.min(90, d.dim)); d.blur = Math.max(0, Math.min(20, d.blur)); d.alpha = Math.max(40, Math.min(100, d.alpha));
     return d;
 }
@@ -11622,6 +11666,12 @@ function applyBackgroundImage() {
     if (!layer) { layer = document.createElement('div'); layer.id = 'app-bg'; layer.setAttribute('aria-hidden', 'true'); document.body.prepend(layer); }
     layer.style.backgroundImage = `url("${url}")`;
     layer.style.filter = o.blur ? `blur(${o.blur}px)` : 'none';
+    // cadrage : mode (remplir / ajuster / mosaïque), zoom, position
+    layer.style.backgroundPosition = `${o.x}% ${o.y}%`;
+    layer.style.backgroundRepeat = o.fit === 'tile' ? 'repeat' : 'no-repeat';
+    layer.style.backgroundSize = o.fit === 'tile' ? `${Math.max(5, Math.round(o.zoom / 4))}vw auto` : (o.fit === 'contain' ? 'contain' : 'cover');
+    layer.style.transformOrigin = `${o.x}% ${o.y}%`;
+    layer.style.transform = (o.fit !== 'tile' && o.zoom !== 100) ? `scale(${o.zoom / 100})` : 'none';
     layer.style.setProperty('--bg-image-dim', String(o.dim / 100));
     root.style.setProperty('--bg-surface-alpha', o.alpha + '%');
     root.classList.add('has-bg-image');
@@ -11669,13 +11719,24 @@ function refreshBackgroundControls() {
     if (prev) { prev.style.backgroundImage = has ? `url("${localStorage.getItem(BG_IMG_KEY)}")` : 'none'; prev.classList.toggle('hidden', !has); }
     document.getElementById('bg-image-remove')?.classList.toggle('hidden', !has);
     document.getElementById('bg-image-opts')?.classList.toggle('hidden', !has);
-    [['bg-dim', o.dim], ['bg-blur', o.blur], ['bg-alpha', o.alpha]].forEach(([id, v]) => { const el = document.getElementById(id); if (el) { el.value = v; const out = document.getElementById(id + '-val'); if (out) out.textContent = v; } });
+    const _fit = document.getElementById('bg-fit'); if (_fit) _fit.value = o.fit;
+    [['bg-dim', o.dim], ['bg-blur', o.blur], ['bg-alpha', o.alpha], ['bg-zoom', o.zoom], ['bg-x', o.x], ['bg-y', o.y]].forEach(([id, v]) => { const el = document.getElementById(id); if (el) { el.value = v; const out = document.getElementById(id + '-val'); if (out) out.textContent = v; } });
 }
 function _wireBackgroundControls() {
     document.getElementById('bg-image-pick')?.addEventListener('click', () => document.getElementById('bg-image-file')?.click());
     document.getElementById('bg-image-file')?.addEventListener('change', async (e) => { const f = e.target.files?.[0]; e.target.value = ''; await setBackgroundImageFromFile(f); });
     document.getElementById('bg-image-remove')?.addEventListener('click', removeBackgroundImage);
-    [['bg-dim', 'dim'], ['bg-blur', 'blur'], ['bg-alpha', 'alpha']].forEach(([id, key]) => {
+    document.getElementById('bg-fit')?.addEventListener('change', (e) => {
+        const o = _getBgOpts(); o.fit = e.target.value;
+        try { localStorage.setItem(BG_OPT_KEY, JSON.stringify(o)); } catch (_) {}
+        applyBackgroundImage();
+    });
+    document.getElementById('bg-frame-reset')?.addEventListener('click', () => {
+        const o = _getBgOpts(); o.fit = 'cover'; o.zoom = 100; o.x = 50; o.y = 50;
+        try { localStorage.setItem(BG_OPT_KEY, JSON.stringify(o)); } catch (_) {}
+        applyBackgroundImage(); refreshBackgroundControls();
+    });
+    [['bg-dim', 'dim'], ['bg-blur', 'blur'], ['bg-alpha', 'alpha'], ['bg-zoom', 'zoom'], ['bg-x', 'x'], ['bg-y', 'y']].forEach(([id, key]) => {
         document.getElementById(id)?.addEventListener('input', (e) => {
             const o = _getBgOpts(); o[key] = +e.target.value;
             try { localStorage.setItem(BG_OPT_KEY, JSON.stringify(o)); } catch (_) {}
@@ -11690,11 +11751,11 @@ function buildThemeEditor() {
     if (!host) return;
     const T = (k, f) => escapeHtml(_t3(k, f));
     host.innerHTML = `
-        <div class="settings-row" style="flex-direction:column; align-items:stretch;">
-            <label data-i18n="settings.palette_title">Palettes de couleurs</label>
-            <p class="settings-hint" style="margin-top:2px;" data-i18n="settings.palette_hint">Choisir une palette remplace le fond, le texte et les bordures (et l'accent, sauf si une couleur de marque est sélectionnée ci-dessus). Elle impose son mode clair ou sombre.</p>
+        <details class="settings-row" style="display:block;" id="palette-details">
+            <summary data-i18n="settings.palette_title">Palettes de couleurs</summary>
+            <p class="settings-hint" style="margin-top:6px;" data-i18n="settings.palette_hint">Choisir une palette remplace le fond, le texte et les bordures (et l'accent, sauf si une couleur de marque est sélectionnée ci-dessus). Elle impose son mode clair ou sombre.</p>
             <div class="palette-grid" id="palette-grid"></div>
-        </div>
+        </details>
         <div class="settings-row" style="flex-direction:column; align-items:stretch;">
             <label data-i18n="settings.bg_title">Image de fond</label>
             <p class="settings-hint" style="margin-top:2px;" data-i18n="settings.bg_hint">Affiche une image derrière l'application (enregistrée sur cet appareil, réduite à 1920 px). Les fenêtres restent opaques pour rester lisibles.</p>
@@ -11708,6 +11769,16 @@ function buildThemeEditor() {
                 <label><span data-i18n="settings.bg_dim">Assombrissement</span> <output id="bg-dim-val"></output> %<input type="range" id="bg-dim" min="0" max="90" step="5"></label>
                 <label><span data-i18n="settings.bg_blur">Flou</span> <output id="bg-blur-val"></output> px<input type="range" id="bg-blur" min="0" max="20" step="1"></label>
                 <label><span data-i18n="settings.bg_panels">Opacité des panneaux</span> <output id="bg-alpha-val"></output> %<input type="range" id="bg-alpha" min="40" max="100" step="5"></label>
+                <label><span data-i18n="settings.bg_fit">Affichage</span>
+                    <select id="bg-fit" class="settings-select">
+                        <option value="cover" data-i18n="settings.bg_fit_cover">Remplir l'écran</option>
+                        <option value="contain" data-i18n="settings.bg_fit_contain">Image entière</option>
+                        <option value="tile" data-i18n="settings.bg_fit_tile">Mosaïque</option>
+                    </select></label>
+                <label><span data-i18n="settings.bg_zoom">Taille</span> <output id="bg-zoom-val"></output> %<input type="range" id="bg-zoom" min="50" max="300" step="5"></label>
+                <label><span data-i18n="settings.bg_pos_x">Position horizontale</span> <output id="bg-x-val"></output> %<input type="range" id="bg-x" min="0" max="100" step="1"></label>
+                <label><span data-i18n="settings.bg_pos_y">Position verticale</span> <output id="bg-y-val"></output> %<input type="range" id="bg-y" min="0" max="100" step="1"></label>
+                <button type="button" class="btn btn-ghost btn-sm" id="bg-frame-reset" style="align-self:end;"><i class="fa-solid fa-crosshairs"></i> <span data-i18n="settings.bg_frame_reset">Recentrer</span></button>
             </div>
         </div>
         <details class="settings-row" style="display:block;" id="color-editor-details">
@@ -11736,6 +11807,8 @@ function buildThemeEditor() {
         applyCustomColors({});
         applyPalette(id);
         refreshThemeEditor();
+        _followThumbColor();
+        _syncSplashTheme();
     }));
     const ed = document.getElementById('color-editor');
     ed.innerHTML = THEME_COLOR_GROUPS.map(g => `<div class="color-editor-group" data-i18n="${g.key}"></div>` + g.vars.map(([v, lk]) => `
@@ -11820,7 +11893,9 @@ updateBrowserNotifStatus();
 _checkSettingsUndoAvailable();
 const highContrastToggle = document.getElementById('high-contrast-toggle');
 if (highContrastToggle) highContrastToggle.checked = localStorage.getItem('stellio-high-contrast') === '1';
+{ const _ts = document.getElementById('text-size-selector'); if (_ts) _ts.value = localStorage.getItem('stellio-text-size') || 'normal'; const _cb = document.getElementById('colorblind-selector'); if (_cb) _cb.value = localStorage.getItem('stellio-colorblind') || 'off'; }
 const reduceMotionToggle = document.getElementById('reduce-motion-toggle');
+_syncThumbColorControls();
 if (reduceMotionToggle) reduceMotionToggle.checked = localStorage.getItem('stellio-reduce-motion') === '1';
 const themeSelector = document.getElementById('theme-selector');
 const fabricantSelector = document.getElementById('fabricant-selector');
@@ -11835,6 +11910,7 @@ fabricantSelector.value = savedFabricant;
 applyTheme(savedTheme);
 applyFabricant(savedFabricant);
 buildThemeEditor();
+_syncSplashTheme();   // une fois au démarrage : le splash reprend les couleurs déjà choisies
 
 let savedCustomAccent = localStorage.getItem('stellio-custom-accent') || null;
 const accentPicker = document.getElementById('custom-accent-picker');
@@ -11847,11 +11923,14 @@ const hex = e.target.value;
 applyCustomAccent(hex);
 localStorage.setItem('stellio-custom-accent', hex);
 });
+accentPicker?.addEventListener('change', () => { _followThumbColor(); _syncSplashTheme(); });
 document.getElementById('custom-accent-reset-btn')?.addEventListener('click', () => {
 clearCustomAccent();
 localStorage.removeItem('stellio-custom-accent');
 if (accentPicker) accentPicker.value = '#4ea1d3';
 showToast(I18N.t('toast.custom_accent_reset') || 'Couleur réinitialisée', 'info');
+_followThumbColor();
+_syncSplashTheme();
 });
 themeSelector.addEventListener('change', (e) => {
 const mode = e.target.value;
@@ -11859,8 +11938,11 @@ localStorage.setItem('stellio-theme', mode);
 applyTheme(mode);
 refreshThemeEditor();
 _syncThemeColorMeta();
+_syncSplashTheme();
 });
 fabricantSelector.addEventListener('change', (e) => {
+setTimeout(_followThumbColor, 50);
+setTimeout(_syncSplashTheme, 50);
 const fabricant = e.target.value;
 localStorage.setItem('stellio-fabricant', fabricant);
 clearCustomAccent();
@@ -12204,6 +12286,60 @@ window.applyThumbPerf = async function (mode) {
     } catch (_) { showToast(I18N.t('toast.network_error'), 'error'); }
 };
 
+// Splash de démarrage : mémorise les couleurs de la palette côté serveur (le splash est une fenêtre à part, sans accès au navigateur)
+let _splashSyncTimer = null;
+function _syncSplashTheme() {
+    if (typeof IS_VIEWER !== 'undefined' && IS_VIEWER) return;
+    clearTimeout(_splashSyncTimer);
+    _splashSyncTimer = setTimeout(async () => {
+        try {
+            const cs = getComputedStyle(document.documentElement);
+            const g = n => _cssColorToHex(cs.getPropertyValue(n));
+            const theme = { bg: g('--bg-primary'), fg: g('--text-primary'), muted: g('--text-muted'), trough: g('--bg-tertiary'), accent: g('--accent') };
+            const key = JSON.stringify(theme);
+            let last = null; try { last = localStorage.getItem('stellio-splash-theme'); } catch (_) {}
+            if (key === last) return;
+            const res = await fetch(`${API}/api/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ splash_theme: theme }) });
+            if (res.ok) { try { localStorage.setItem('stellio-splash-theme', key); } catch (_) {} }
+        } catch (_) {}
+    }, 1500);
+}
+
+let _thumbFollowTimer = null;
+function _thumbIsManual() { try { return localStorage.getItem('stellio-thumb-manual') === '1'; } catch (_) { return false; } }
+function _syncThumbColorControls() {
+    const manual = _thumbIsManual();
+    ['thumb-color-input', 'thumb-color-reset-btn', 'thumb-color-apply-btn'].forEach(id => {
+        const el = document.getElementById(id); if (!el) return;
+        el.disabled = !manual; el.style.opacity = manual ? '' : '.45'; el.style.cursor = manual ? '' : 'not-allowed';
+    });
+    const t = document.getElementById('thumb-manual-toggle'); if (t) t.checked = manual;
+}
+// Couleur manuelle désactivée (par défaut) : les miniatures prennent la couleur d'accent du thème. Activée : la couleur choisie à la main reste prioritaire.
+window.setThumbManual = function (on) {
+    try { localStorage.setItem('stellio-thumb-manual', on ? '1' : '0'); } catch (_) {}
+    _syncThumbColorControls();
+    if (on) {
+        let c = null; try { c = localStorage.getItem('stellio-thumb-manual-color'); } catch (_) {}
+        const input = document.getElementById('thumb-color-input');
+        if (input && _HEX_RE.test(c || '')) input.value = c;
+        applyThumbColor();
+    } else {
+        _followThumbColor(true);
+    }
+};
+function _followThumbColor(immediate) {
+    if (_thumbIsManual()) return;
+    clearTimeout(_thumbFollowTimer);
+    _thumbFollowTimer = setTimeout(() => {   // laisse le temps de finir de choisir une couleur avant de régénérer les miniatures
+        const hex = _cssColorToHex(getComputedStyle(document.documentElement).getPropertyValue('--accent'));
+        if (!_HEX_RE.test(hex) || hex === (_thumbColorHex || '').toLowerCase()) return;
+        const input = document.getElementById('thumb-color-input');
+        if (input) input.value = hex;
+        applyThumbColor(true);
+    }, immediate === true ? 0 : 1200);
+}
+
 function resetThumbColor() {
     const input = document.getElementById('thumb-color-input');
     if (input) input.value = '#4ea1d3';
@@ -12211,9 +12347,10 @@ function resetThumbColor() {
 }
 window.resetThumbColor = resetThumbColor;
 
-async function applyThumbColor() {
+async function applyThumbColor(auto) {
     const input = document.getElementById('thumb-color-input');
     if (!input) return;
+    if (auto !== true) { try { localStorage.setItem('stellio-thumb-manual-color', input.value); } catch (_) {} }   // choix manuel : on le garde pour le retrouver
     try {
         const res = await fetch(`${API}/api/settings`, {
             method: 'POST',
@@ -12407,12 +12544,12 @@ function renderSpoolsList() {
             </button>
             <span style="width:14px; height:14px; border-radius:50%; flex-shrink:0; background:${escapeHtml(s.color || '#888888')}; border:1px solid var(--border);"></span>
             <div style="flex:1; min-width:0;">
-                <div style="font-size:13px; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.name)}</div>
-                <div style="font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(metaParts.filter(Boolean).join(' · '))}</div>
+                <div style="font-size:calc(13px * var(--fs, 1)); color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.name)}</div>
+                <div style="font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(metaParts.filter(Boolean).join(' · '))}</div>
             </div>
             <input type="number" min="0" step="0.01" value="${s.price || ''}" placeholder="${I18N.t('cost.spool_price_placeholder') || 'Prix'} (${printCostCurrency === 'USD' ? '$' : '€'})"
                 oninput="updateSpoolPrice('${s.id}', this.value)"
-                style="width:90px; padding:8px 10px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:13px;">
+                style="width:90px; padding:8px 10px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:calc(13px * var(--fs, 1));">
         </div>`;
     }).join('');
 }
@@ -13022,11 +13159,11 @@ async function recommendOllamaModel() {
             ? `<div style="margin-top:6px; color:var(--text-secondary);"><i class="fa-solid fa-camera"></i> ${I18N.t('settings.ollama_rec_vision_note')}</div>`
             : '';
         const installedNote = rec.already_installed
-            ? `<div style="margin-top:8px; color:#16a34a;"><i class="fa-solid fa-circle-check"></i> ${I18N.t('settings.ollama_rec_already_installed')}</div>`
+            ? `<div style="margin-top:8px; color:var(--cb-ok, #16a34a);"><i class="fa-solid fa-circle-check"></i> ${I18N.t('settings.ollama_rec_already_installed')}</div>`
             : `<div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
                  <div style="color:var(--text-secondary); margin-bottom:6px;">${I18N.t('settings.ollama_rec_install_hint')}</div>
                  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                   <code style="background:var(--bg-secondary); padding:4px 8px; border-radius:6px; font-size:11px;">${escapeHtml(rec.pull_command)}</code>
+                   <code style="background:var(--bg-secondary); padding:4px 8px; border-radius:6px; font-size:calc(11px * var(--fs, 1));">${escapeHtml(rec.pull_command)}</code>
                    <button type="button" class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${escapeJs(rec.pull_command)}').then(() => showToast(I18N.t('toast.copied'), 'success'))"><i class="fa-solid fa-copy"></i> ${I18N.t('actions.copy')}</button>
                  </div>
                  <p class="settings-hint" style="margin-top:6px;">${I18N.t('settings.ollama_rec_install_next')}</p>
@@ -13036,7 +13173,7 @@ async function recommendOllamaModel() {
             <div style="display:flex; gap:14px; flex-wrap:wrap; color:var(--text-secondary); margin-bottom:10px;">
                 ${hwParts.map(p => `<span>${p}</span>`).join('')}
             </div>
-            <div style="font-size:14px; font-weight:600; color:var(--accent);">
+            <div style="font-size:calc(14px * var(--fs, 1)); font-weight:600; color:var(--accent);">
                 <i class="fa-solid fa-star"></i> ${escapeHtml(rec.model)}
             </div>
             <div style="margin-top:4px; color:var(--text-secondary);">${I18N.t(rec.label_key) || ''}</div>
@@ -13110,8 +13247,8 @@ async function ollamaAutoTag() {
                 const color = alreadyExists ? (allTags.find(t => t.name.toLowerCase() === tag.toLowerCase())?.color || 'var(--accent)') : 'var(--accent)';
                 return `<button type="button"
                     onclick="ollamaAddSuggestedTag('${escapeJs(tag)}')"
-                    style="padding:4px 10px; border-radius:20px; border:1px solid ${color}; background:${color}20; color:${color}; font-size:12px; cursor:pointer;">
-                    <i class="fa-solid fa-plus" style="font-size:10px;"></i> ${escapeHtml(tag)}
+                    style="padding:4px 10px; border-radius:20px; border:1px solid ${color}; background:${color}20; color:${color}; font-size:calc(12px * var(--fs, 1)); cursor:pointer;">
+                    <i class="fa-solid fa-plus" style="font-size:calc(10px * var(--fs, 1));"></i> ${escapeHtml(tag)}
                 </button>`;
             }).join('');
         }
@@ -13457,15 +13594,15 @@ async function runSosprintDiagnosis(material, description, answers) {
         if (data.conversation_id) sosprintConversationId = data.conversation_id;
         sosprintLastCauses = causes.map(c => c.split(/\s*:\s*/)[0].trim()).filter(Boolean);
 
-        const sourceBadge = `<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#22c55e;background:#22c55e15;padding:3px 8px;border-radius:20px;margin-bottom:10px;">
+        const sourceBadge = `<span style="display:inline-flex;align-items:center;gap:5px;font-size:calc(11px * var(--fs, 1));color:var(--cb-ok, #22c55e);background:#22c55e15;padding:3px 8px;border-radius:20px;margin-bottom:10px;">
                 <i class="fa-solid fa-server"></i> ${I18N.t('sosprint.source_local')}
                </span>`;
         const photoBadge = data.had_photo
-            ? `<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#a855f7;background:#a855f715;padding:3px 8px;border-radius:20px;margin-bottom:10px;margin-left:6px;">
+            ? `<span style="display:inline-flex;align-items:center;gap:5px;font-size:calc(11px * var(--fs, 1));color:#a855f7;background:#a855f715;padding:3px 8px;border-radius:20px;margin-bottom:10px;margin-left:6px;">
                 <i class="fa-solid fa-camera"></i> ${I18N.t('sosprint.photo_analyzed')}
                </span>`
             : (data.photo_ignored
-                ? `<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#f59e0b;background:#f59e0b15;padding:3px 8px;border-radius:20px;margin-bottom:10px;margin-left:6px;">
+                ? `<span style="display:inline-flex;align-items:center;gap:5px;font-size:calc(11px * var(--fs, 1));color:var(--cb-warn, #f59e0b);background:#f59e0b15;padding:3px 8px;border-radius:20px;margin-bottom:10px;margin-left:6px;">
                 <i class="fa-solid fa-triangle-exclamation"></i> ${I18N.t('sosprint.photo_ignored')}
                </span>`
                 : '');
@@ -14897,7 +15034,7 @@ async function loadParts() {
         const data = await res.json();
         _partsCache = data.parts || [];
     } catch (e) {
-        list.innerHTML = `<div style="color:var(--danger); font-size:12.5px;">${escapeHtml(_t3('toast.connection_error', 'Erreur de connexion'))}</div>`;
+        list.innerHTML = `<div style="color:var(--danger); font-size:calc(12.5px * var(--fs, 1));">${escapeHtml(_t3('toast.connection_error', 'Erreur de connexion'))}</div>`;
         return;
     }
     if (!_partsCache.length) {
@@ -14907,7 +15044,7 @@ async function loadParts() {
     list.innerHTML = _partsCache.map(p => `
         <div class="spool-extra-row part-row ${p.low ? 'part-low' : ''}">
             <div style="min-width:0; flex:1;">
-                <div style="font-weight:600; font-size:13px;">${p.low ? '<i class="fa-solid fa-triangle-exclamation" style="color:var(--danger);"></i> ' : ''}${escapeHtml(p.name)}</div>
+                <div style="font-weight:600; font-size:calc(13px * var(--fs, 1));">${p.low ? '<i class="fa-solid fa-triangle-exclamation" style="color:var(--danger);"></i> ' : ''}${escapeHtml(p.name)}</div>
                 <div class="spool-extra-hint" style="margin:2px 0 0;">${escapeHtml(_partCatLabel(p.category))}${p.printer_name ? ` · ${escapeHtml(p.printer_name)}` : ''} · ${escapeHtml(_tf('parts.alert_at', 'alerte à {{n}}', { n: p.alert_qty }))}</div>
             </div>
             <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
@@ -15115,7 +15252,7 @@ function _prePrintWarningHtml(w) {
     };
     const [bg, border, color, icon] = styles[level];
     const text = (w.code && w.params) ? _tf('preprint.' + w.code, w.message, w.params) : w.message;
-    return `<div style="display:flex; gap:8px; align-items:flex-start; padding:8px 10px; border-radius:var(--radius); font-size:12px; background:${bg}; border:1px solid ${border}; color:${color};">
+    return `<div style="display:flex; gap:8px; align-items:flex-start; padding:8px 10px; border-radius:var(--radius); font-size:calc(12px * var(--fs, 1)); background:${bg}; border:1px solid ${border}; color:${color};">
             <i class="fa-solid ${icon}" style="margin-top:1px;"></i>
             <span>${escapeHtml(text)}</span>
         </div>`;
@@ -15423,7 +15560,7 @@ async function loadReport() {
             <p class="settings-hint" style="margin-top:12px;">${escapeHtml(_t3('report.hint_estimated', "Durées et CO₂ : estimations d'après les données enregistrées à l'envoi."))}</p>`;
     } catch (e) {
         if (reqId !== _reportReqId) return;
-        body.innerHTML = `<p style="color:var(--danger); font-size:13px;">${escapeHtml(_t3('toast.connection_error', 'Erreur de connexion'))}</p>`;
+        body.innerHTML = `<p style="color:var(--danger); font-size:calc(13px * var(--fs, 1));">${escapeHtml(_t3('toast.connection_error', 'Erreur de connexion'))}</p>`;
     }
 }
 
@@ -15496,7 +15633,7 @@ async function _loadSpoolReport(d) {
         const tops = (r.top_models || []).length ? `<div class="spool-extra-hint" style="margin-top:6px;">${escapeHtml(_t3('spoolreport.top', 'Modèles les plus imprimés'))} : ${escapeHtml(r.top_models.map(m => `${m.name} ×${m.prints}`).join(', '))}</div>` : '';
         box.innerHTML = `
             <details class="spool-extra-details" ${finished ? 'open' : ''}>
-                <summary style="font-size:13.5px; font-weight:600; color:var(--text);"><i class="fa-solid fa-flag-checkered" style="color:var(--accent);"></i> ${escapeHtml(_t3('spoolreport.title', 'Bilan de la bobine'))}${finished ? ` <span class="dry-pill dry-pill-ok" style="margin-left:6px;">${escapeHtml(_t3('spoolreport.finished', 'Terminée'))}</span>` : ''}</summary>
+                <summary style="font-size:calc(13.5px * var(--fs, 1)); font-weight:600; color:var(--text);"><i class="fa-solid fa-flag-checkered" style="color:var(--accent);"></i> ${escapeHtml(_t3('spoolreport.title', 'Bilan de la bobine'))}${finished ? ` <span class="dry-pill dry-pill-ok" style="margin-left:6px;">${escapeHtml(_t3('spoolreport.finished', 'Terminée'))}</span>` : ''}</summary>
                 ${rows.join('')}${gapHint}${tops}
             </details>`;
     } catch (e) { box.innerHTML = ''; }
@@ -15537,7 +15674,7 @@ function _renderModelUpdates(card, data) {
     const list = updates.map(u => `
         <div class="spool-extra-row model-update-row" style="align-items:flex-start;">
             <div style="min-width:0; flex:1;">
-                <div style="font-weight:600; font-size:13px;">${escapeHtml(u.title || u.model_id)} <span class="dry-pill dry-pill-due">${escapeHtml(u.platform)}</span></div>
+                <div style="font-weight:600; font-size:calc(13px * var(--fs, 1));">${escapeHtml(u.title || u.model_id)} <span class="dry-pill dry-pill-due">${escapeHtml(u.platform)}</span></div>
                 <div class="spool-extra-hint" style="margin:2px 0 0;">${escapeHtml(u.reason === 'date' ? _tf('modelupdate.reason_date', 'Mis à jour le {{date}}', { date: fmtDate(u.remote_modified_at) }) : _t3('modelupdate.reason_files', 'Les fichiers ont changé'))}</div>
             </div>
             <div style="display:flex; gap:4px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end;">
@@ -15706,12 +15843,12 @@ function showSpoolDetailPopup(d) {
         const bed = d.bed_temp ? String(d.bed_temp) : (!own && typical ? typical[1] : '');
         const cell = (labelKey, fallback, v) => `<div class="spool-detail-cell"><div class="spool-detail-cell-label">${_t3(labelKey, fallback)}</div><div class="spool-detail-cell-value">${v ? `${escapeHtml(v)} °C` : '—'}</div></div>`;
         tempsHtml = `
-        <div style="display:flex; align-items:center; gap:8px; margin:18px 0 8px; font-size:13.5px; font-weight:600;">
+        <div style="display:flex; align-items:center; gap:8px; margin:18px 0 8px; font-size:calc(13.5px * var(--fs, 1)); font-weight:600;">
             <i class="fa-solid fa-temperature-half" style="color:var(--accent);"></i>
             <span>${_t3('spoolman.detail_temps_title', "Températures d'impression recommandées")}</span>
         </div>
         <div class="spool-detail-grid">${cell('spoolman.detail_nozzle_temp', 'Buse', nozzle)}${cell('spoolman.detail_bed_temp', 'Plateau', bed)}</div>
-        <div style="font-size:11.5px; color:var(--text-muted); margin-top:8px;">${own
+        <div style="font-size:calc(11.5px * var(--fs, 1)); color:var(--text-muted); margin-top:8px;">${own
             ? _t3('spoolman.detail_temps_hint_set', "Valeurs définies dans l'inventaire pour cette bobine.")
             : _t3('spoolman.detail_temps_hint', "Valeurs typiques pour cette matière — vérifie l'étiquette de la bobine.")}</div>`;
     }
@@ -15727,15 +15864,15 @@ function showSpoolDetailPopup(d) {
                 <span style="width:16px; height:16px; border-radius:50%; background:var(--bg-secondary);"></span>
             </div>
             <div style="min-width:0; flex:1;">
-                <div style="font-size:17px; font-weight:700; word-break:break-word;">${escapeHtml(d.name || '')}</div>
-                ${subtitle ? `<div style="font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.3px;">${subtitle}</div>` : ''}
+                <div style="font-size:calc(17px * var(--fs, 1)); font-weight:700; word-break:break-word;">${escapeHtml(d.name || '')}</div>
+                ${subtitle ? `<div style="font-size:calc(12px * var(--fs, 1)); color:var(--text-muted); text-transform:uppercase; letter-spacing:0.3px;">${subtitle}</div>` : ''}
             </div>
-            <button id="spool-detail-x" type="button" aria-label="${_t3('actions.close', 'Fermer')}" style="background:none; border:none; color:var(--text-muted); font-size:24px; line-height:1; cursor:pointer; align-self:flex-start;">&times;</button>
+            <button id="spool-detail-x" type="button" aria-label="${_t3('actions.close', 'Fermer')}" style="background:none; border:none; color:var(--text-muted); font-size:calc(24px * var(--fs, 1)); line-height:1; cursor:pointer; align-self:flex-start;">&times;</button>
         </div>
         ${hasRemaining ? `
         <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:8px;">
-            <span style="font-size:20px; font-weight:700;">${g(d.remaining_g)}</span>
-            ${pct !== null ? `<span style="font-size:12px; color:var(--text-muted);">${Math.round(pct)}% · ${_t3('spoolman.detail_new_weight', 'Poids bobine neuve')} ${g(d.capacity_g)}</span>` : ''}
+            <span style="font-size:calc(20px * var(--fs, 1)); font-weight:700;">${g(d.remaining_g)}</span>
+            ${pct !== null ? `<span style="font-size:calc(12px * var(--fs, 1)); color:var(--text-muted);">${Math.round(pct)}% · ${_t3('spoolman.detail_new_weight', 'Poids bobine neuve')} ${g(d.capacity_g)}</span>` : ''}
         </div>
         ${pct !== null ? `<div class="spool-progress-track" style="margin-bottom:16px;"><div class="spool-progress-bar" style="width:${pct}%; background:${escapeHtml(color)};"></div></div>` : '<div style="margin-bottom:16px;"></div>'}` : ''}
         <div class="spool-detail-grid">${cells.join('')}</div>
@@ -17105,7 +17242,7 @@ async function _photoRefreshIndex() {
     const box = document.getElementById('photo-index-box'); if (!box) { clearInterval(_photoPoll); _photoPoll = null; return; }
     let d; try { d = await (await fetch(`${API}/api/ai/photo-index`)).json(); } catch (e) { return; }
     const pct = d.total ? Math.round(100 * d.indexed / d.total) : 0;
-    const waitTxt = d.running && d.waiting ? `<div style="font-size:13px;opacity:.75"><i class="fa-solid fa-hourglass-half"></i> ${escapeHtml(d.waiting === 'active' ? _t3('photosearch.wait_active', 'En pause pendant que vous utilisez Stellio : reprise dès que vous arrêtez.') : d.waiting === 'load' ? _t3('photosearch.wait_load', 'En pause : la machine est occupée.') : _t3('photosearch.wait_paused', 'En pause (génération de miniatures suspendue).'))}</div>` : '';
+    const waitTxt = d.running && d.waiting ? `<div style="font-size:calc(13px * var(--fs, 1));opacity:.75"><i class="fa-solid fa-hourglass-half"></i> ${escapeHtml(d.waiting === 'active' ? _t3('photosearch.wait_active', 'En pause pendant que vous utilisez Stellio : reprise dès que vous arrêtez.') : d.waiting === 'load' ? _t3('photosearch.wait_load', 'En pause : la machine est occupée.') : _t3('photosearch.wait_paused', 'En pause (génération de miniatures suspendue).'))}</div>` : '';
     const label = _tf('photosearch.indexed', '{{n}} / {{total}} modèles indexés', { n: d.indexed, total: d.total });
     _photoBlocked = d.blocked || '';
     const dlgEl = document.getElementById('photo-search-dlg');
@@ -17114,10 +17251,10 @@ async function _photoRefreshIndex() {
         if (go) go.disabled = !!_photoBlocked || !_photoDataUrl;
         if (drop) { drop.style.opacity = _photoBlocked ? '.4' : ''; drop.style.pointerEvents = _photoBlocked ? 'none' : ''; }
     }
-    const err = d.error ? `<div style="color:#f59e0b;font-size:13px">${escapeHtml(_photoErr(d.error))}</div>` : (d.blocked ? `<div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;background:rgba(245,158,11,.12);border:1px solid #f59e0b;color:#f59e0b;font-size:14px"><i class="fa-solid fa-lock" style="margin-top:3px"></i><span>${escapeHtml(_photoErr(d.blocked))}</span></div>` : '');
-    box.innerHTML = `<div style="display:flex;justify-content:space-between;font-size:13px"><span>${escapeHtml(label)}</span><span>${pct}%</span></div>
+    const err = d.error ? `<div style="color:var(--cb-warn, #f59e0b);font-size:calc(13px * var(--fs, 1))">${escapeHtml(_photoErr(d.error))}</div>` : (d.blocked ? `<div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;background:rgba(245,158,11,.12);border:1px solid #f59e0b;color:var(--cb-warn, #f59e0b);font-size:calc(14px * var(--fs, 1))"><i class="fa-solid fa-lock" style="margin-top:3px"></i><span>${escapeHtml(_photoErr(d.blocked))}</span></div>` : '');
+    box.innerHTML = `<div style="display:flex;justify-content:space-between;font-size:calc(13px * var(--fs, 1))"><span>${escapeHtml(label)}</span><span>${pct}%</span></div>
         <div class="photo-index-bar"><span style="width:${pct}%"></span></div>${waitTxt}${err}
-        ${!d.running && d.indexed < d.total && !d.blocked ? `<label style="display:flex;gap:8px;align-items:center;font-size:13px;opacity:.85"><input type="checkbox" id="ps-fast"${window._photoFast ? ' checked' : ''} onchange="window._photoFast=this.checked"> ${escapeHtml(_t3('photosearch.fast', 'Aller plus vite (continue même quand j’utilise Stellio, charge le processeur davantage)'))}</label>` : ''}
+        ${!d.running && d.indexed < d.total && !d.blocked ? `<label style="display:flex;gap:8px;align-items:center;font-size:calc(13px * var(--fs, 1));opacity:.85"><input type="checkbox" id="ps-fast"${window._photoFast ? ' checked' : ''} onchange="window._photoFast=this.checked"> ${escapeHtml(_t3('photosearch.fast', 'Aller plus vite (continue même quand j’utilise Stellio, charge le processeur davantage)'))}</label>` : ''}
         <div style="display:flex;gap:8px;justify-content:flex-end">
         ${d.running ? `<button type="button" class="btn btn-ghost btn-sm" onclick="_photoIndexCtl('stop')"><i class="fa-solid fa-pause"></i> ${escapeHtml(_t3('photosearch.stop', 'Pause'))}</button>`
                     : (d.indexed < d.total && !d.blocked ? `<button type="button" class="btn btn-primary btn-sm" onclick="_photoIndexCtl('start')"><i class="fa-solid fa-wand-magic-sparkles"></i> ${escapeHtml(_t3('photosearch.index', 'Indexer la bibliothèque'))}</button>` : '')}
@@ -17136,7 +17273,7 @@ window.openPhotoSearch = function () {
     dlg.innerHTML = `<div class="modal-content" style="max-width:520px">
         <div class="modal-header"><h3><i class="fa-solid fa-camera"></i> ${escapeHtml(_t3('photosearch.title', 'Recherche par photo'))}</h3><button class="modal-close" id="ps-x">×</button></div>
         <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
-            <p style="margin:0;opacity:.75;font-size:14px">${escapeHtml(_t3('photosearch.help', 'Envoyez une photo : Stellio trouve dans votre bibliothèque les modèles qui lui ressemblent, avec un modèle de vision local (rien ne quitte votre machine). L’indexation tourne en arrière-plan, une image à la fois, et se met en pause si la mémoire manque.'))}</p>
+            <p style="margin:0;opacity:.75;font-size:calc(14px * var(--fs, 1))">${escapeHtml(_t3('photosearch.help', 'Envoyez une photo : Stellio trouve dans votre bibliothèque les modèles qui lui ressemblent, avec un modèle de vision local (rien ne quitte votre machine). L’indexation tourne en arrière-plan, une image à la fois, et se met en pause si la mémoire manque.'))}</p>
             <div id="photo-index-box" style="display:flex;flex-direction:column;gap:8px"></div>
             <label class="photo-drop" id="ps-drop"><input type="file" accept="image/*" id="ps-file" hidden><span id="ps-drop-text"><i class="fa-solid fa-image"></i> ${escapeHtml(_t3('photosearch.drop', 'Choisir, glisser ou coller une photo'))}</span></label>
             <div style="display:flex;justify-content:flex-end"><button type="button" class="btn btn-primary btn-sm" id="ps-go" disabled><i class="fa-solid fa-magnifying-glass"></i> ${escapeHtml(_t3('photosearch.search', 'Chercher'))}</button></div>
@@ -17788,7 +17925,7 @@ bar = document.createElement('div');
 bar.id = 'folder-selection-bar';
 bar.className = 'folder-selection-bar';
 bar.style.display = 'flex';
-bar.innerHTML = `<span id="folder-selection-count">${_fileCountLabel(count)} ${I18N.t('actions.select').toLowerCase()}</span><select id="folder-batch-printer-select" class="settings-select" style="min-width:0; width:auto; max-width:150px; font-size:12px; padding:6px 8px;"><option value="" data-i18n="modal.ai_all_printers">Toutes les imprimantes</option></select><button onclick="sendFolderSelectionToSlicer()" class="btn btn-primary btn-sm"><i class="fa-solid fa-scissors"></i> ${I18N.t('actions.send_to_slicer')}</button><button onclick="clearFolderSelection()" class="btn btn-ghost btn-sm"><i class="fa-solid fa-times"></i> ${I18N.t('actions.cancel')}</button>`;
+bar.innerHTML = `<span id="folder-selection-count">${_fileCountLabel(count)} ${I18N.t('actions.select').toLowerCase()}</span><select id="folder-batch-printer-select" class="settings-select" style="min-width:0; width:auto; max-width:150px; font-size:calc(12px * var(--fs, 1)); padding:6px 8px;"><option value="" data-i18n="modal.ai_all_printers">Toutes les imprimantes</option></select><button onclick="sendFolderSelectionToSlicer()" class="btn btn-primary btn-sm"><i class="fa-solid fa-scissors"></i> ${I18N.t('actions.send_to_slicer')}</button><button onclick="clearFolderSelection()" class="btn btn-ghost btn-sm"><i class="fa-solid fa-times"></i> ${I18N.t('actions.cancel')}</button>`;
 document.querySelector('.main-content').appendChild(bar);
 _populatePrinterSelects();
 } else {
@@ -18847,9 +18984,9 @@ window.loadStats = async function () {
                     <div class="stat-fmt-bar-wrap">
                         <div class="stat-fmt-bar" style="width:${pct}%;background:${col};"></div>
                     </div>
-                    <span class="stat-fmt-count">${cnt} <span style="color:var(--text-muted);font-size:11px;">(${pct}%)</span></span>
+                    <span class="stat-fmt-count">${cnt} <span style="color:var(--text-muted);font-size:calc(11px * var(--fs, 1));">(${pct}%)</span></span>
                 </div>`;
-            }).join('') || `<p style="color:var(--text-muted);font-size:13px;">${I18N.t('library.no_files')}</p>`;
+            }).join('') || `<p style="color:var(--text-muted);font-size:calc(13px * var(--fs, 1));">${I18N.t('library.no_files')}</p>`;
 
         const topEl = document.getElementById('stat-top-printed');
         if (data.top_printed?.length) {
@@ -18861,7 +18998,7 @@ window.loadStats = async function () {
                     <span class="stat-top-count">${f.count}×</span>
                 </div>`).join('');
         } else {
-            topEl.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${I18N.t('stats.no_slicer_sends')}</p>`;
+            topEl.innerHTML = `<p style="color:var(--text-muted);font-size:calc(13px * var(--fs, 1));">${I18N.t('stats.no_slicer_sends')}</p>`;
         }
 
         const platEl = document.getElementById('stat-platforms');
@@ -18880,11 +19017,11 @@ window.loadStats = async function () {
                         <div class="stat-fmt-bar-wrap">
                             <div class="stat-fmt-bar" style="width:${pct}%;background:${col};"></div>
                         </div>
-                        <span class="stat-fmt-count">${cnt} <span style="color:var(--text-muted);font-size:11px;">(${pct}%)</span></span>
+                        <span class="stat-fmt-count">${cnt} <span style="color:var(--text-muted);font-size:calc(11px * var(--fs, 1));">(${pct}%)</span></span>
                     </div>`;
                 }).join('');
             } else {
-                platEl.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${I18N.t('stats.no_platform')}<br><span style="font-size:11px;">${I18N.t('stats.platform_hint')}</span></p>`;
+                platEl.innerHTML = `<p style="color:var(--text-muted);font-size:calc(13px * var(--fs, 1));">${I18N.t('stats.no_platform')}<br><span style="font-size:calc(11px * var(--fs, 1));">${I18N.t('stats.platform_hint')}</span></p>`;
             }
         }
 
@@ -18904,7 +19041,7 @@ window.loadStats = async function () {
                     </div>`;
                 }).join('');
             } else {
-                relEl.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${I18N.t('stats.profile_reliability_empty') || "Note tes impressions dans l'Historique pour voir apparaître ce classement."}</p>`;
+                relEl.innerHTML = `<p style="color:var(--text-muted);font-size:calc(13px * var(--fs, 1));">${I18N.t('stats.profile_reliability_empty') || "Note tes impressions dans l'Historique pour voir apparaître ce classement."}</p>`;
             }
         }
 
@@ -18966,10 +19103,10 @@ function toggleCostEditor(id) {
         <span style="display:inline-flex; align-items:center; gap:4px;" onclick="event.stopPropagation();">
             <input type="number" id="cost-mat-${id}" min="0" step="0.01" placeholder="${I18N.t('cost.material_label') || 'Matière'}"
                 value="${entry.material_cost ?? ''}"
-                style="width:64px; padding:3px 6px; background:var(--bg-input); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-size:12px;">
+                style="width:64px; padding:3px 6px; background:var(--bg-input); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-size:calc(12px * var(--fs, 1));">
             <input type="number" id="cost-elec-${id}" min="0" step="0.01" placeholder="${I18N.t('cost.elec_price_label') || 'Élec'}"
                 value="${entry.elec_cost ?? ''}"
-                style="width:64px; padding:3px 6px; background:var(--bg-input); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-size:12px;">
+                style="width:64px; padding:3px 6px; background:var(--bg-input); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-size:calc(12px * var(--fs, 1));">
             <button class="history-rate-btn" onclick="saveHistoryCost(${id})" title="${I18N.t('actions.confirm') || 'Confirmer'}"><i class="fa-solid fa-check"></i></button>
         </span>`;
 }
@@ -19522,13 +19659,13 @@ function renderPrinters() {
     grid.innerHTML = printersList.map(p => `
         <div class="printer-card${p.is_connected ? '' : ' is-offline'}" data-id="${p.id}" onclick="if (!this.classList.contains('is-offline')) openPrinterMonitor(${p.id})">
             <div class="printer-header">
-                <i class="mdi ${getPrinterIcon(p.type)}" style="font-size:22px;"></i>
+                <i class="mdi ${getPrinterIcon(p.type)}" style="font-size:calc(22px * var(--fs, 1));"></i>
                 <span class="printer-name">${escapeHtml(p.name)}</span>
                 <span id="printer-status-${p.id}" class="printer-status ${p.is_connected ? 'connected' : 'disconnected'}">${p.is_connected ? I18N.t('printers.online') : I18N.t('printers.offline')}</span>
             </div>
             <div class="printer-body">
-                <p style="font-size: 12px; color: var(--text-muted); margin-bottom:6px;">${p.ip}</p>
-                <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted);">
+                <p style="font-size: calc(12px * var(--fs, 1)); color: var(--text-muted); margin-bottom:6px;">${p.ip}</p>
+                <div style="display:flex; justify-content:space-between; font-size:calc(11px * var(--fs, 1)); color:var(--text-muted);">
                     <span id="card-status-${p.id}">—</span>
                     <span id="card-progress-${p.id}">0%</span>
                 </div>
@@ -19536,12 +19673,12 @@ function renderPrinters() {
                     <div class="progress-bar" id="progress-${p.id}" style="width: 0%;"></div>
                 </div>
                 <div id="card-job-${p.id}" class="printer-card-job" style="display:none;"></div>
-                <div style="display:flex; gap:10px; margin-top:8px; font-size:11px; color:var(--text-secondary);">
+                <div style="display:flex; gap:10px; margin-top:8px; font-size:calc(11px * var(--fs, 1)); color:var(--text-secondary);">
                     <span title="${I18N.t('printers.extruder')}">🔥 <span id="card-ext-${p.id}">--°C</span></span>
                     <span title="${I18N.t('printers.bed')}">🛏️ <span id="card-bed-${p.id}">--°C</span></span>
                 </div>
                 <div id="card-spools-${p.id}" class="printer-card-spools"></div>
-                <div class="printer-card-camera${p.is_connected ? '' : ' is-offline'}" data-pid="${p.id}" data-ptype="${escapeHtml(p.type || '')}" ${p.is_connected ? '' : 'data-offline="1"'} style="margin-top:8px; border-radius:8px; overflow:hidden; background:#000; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center;">${p.is_connected ? '<i class="fa-solid fa-video" style="color:var(--text-muted); font-size:16px;"></i>' : _printerOfflineLogoHtml(p.type)}</div>
+                <div class="printer-card-camera${p.is_connected ? '' : ' is-offline'}" data-pid="${p.id}" data-ptype="${escapeHtml(p.type || '')}" ${p.is_connected ? '' : 'data-offline="1"'} style="margin-top:8px; border-radius:8px; overflow:hidden; background:#000; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center;">${p.is_connected ? '<i class="fa-solid fa-video" style="color:var(--text-muted); font-size:calc(16px * var(--fs, 1));"></i>' : _printerOfflineLogoHtml(p.type)}</div>
             </div>
             <div class="printer-actions" onclick="event.stopPropagation()">
                 <button class="btn btn-ghost btn-sm printer-action-live" onclick="openPrinterMonitor(${p.id})" title="${I18N.t('printers.monitoring')}"><i class="fa-solid fa-chart-line"></i></button>
@@ -19589,12 +19726,12 @@ async function _startPrinterCardCamera(el, pid) {
         const data = await res.json();
         if (!el.isConnected || el.dataset.active !== 'true') return;
         if (data.available && data.stream_url) {
-            el.innerHTML = `<img src="${data.stream_url}" alt="${I18N.t('printers.camera')}" style="width:100%; height:100%; object-fit:cover; display:block;" onerror="this.parentElement.innerHTML='<i class=\\'fa-solid fa-video-slash\\' style=\\'color:var(--text-muted); font-size:16px;\\'></i>';">`;
+            el.innerHTML = `<img src="${data.stream_url}" alt="${I18N.t('printers.camera')}" style="width:100%; height:100%; object-fit:cover; display:block;" onerror="this.parentElement.innerHTML='<i class=\\'fa-solid fa-video-slash\\' style=\\'color:var(--text-muted); font-size:calc(16px * var(--fs, 1));\\'></i>';">`;
         } else {
-            el.innerHTML = `<i class="fa-solid fa-video-slash" style="color:var(--text-muted); font-size:16px;"></i>`;
+            el.innerHTML = `<i class="fa-solid fa-video-slash" style="color:var(--text-muted); font-size:calc(16px * var(--fs, 1));"></i>`;
         }
     } catch (e) {
-        el.innerHTML = `<i class="fa-solid fa-video-slash" style="color:var(--text-muted); font-size:16px;"></i>`;
+        el.innerHTML = `<i class="fa-solid fa-video-slash" style="color:var(--text-muted); font-size:calc(16px * var(--fs, 1));"></i>`;
     }
 }
 
@@ -19604,7 +19741,7 @@ function _stopPrinterCardCamera(el) {
     if (el.dataset.offline === '1') return;   // hors ligne : on garde le logo de l'imprimante
     const img = el.querySelector('img');
     if (img) img.src = '';
-    el.innerHTML = `<i class="fa-solid fa-video" style="color:var(--text-muted); font-size:16px;"></i>`;
+    el.innerHTML = `<i class="fa-solid fa-video" style="color:var(--text-muted); font-size:calc(16px * var(--fs, 1));"></i>`;
 }
 
 // Imprimante hors ligne : logo à la place de la caméra (un carré noir n'apprend rien), boutons « live » masqués, pas d'agrandissement
@@ -19632,7 +19769,7 @@ function _setPrinterCardOffline(pid, offline) {
     } else {
         delete cam.dataset.offline;
         cam.dataset.active = 'false';
-        cam.innerHTML = `<i class="fa-solid fa-video" style="color:var(--text-muted); font-size:16px;"></i>`;
+        cam.innerHTML = `<i class="fa-solid fa-video" style="color:var(--text-muted); font-size:calc(16px * var(--fs, 1));"></i>`;
         if (_printerCardCameraObserver) { _printerCardCameraObserver.unobserve(cam); _printerCardCameraObserver.observe(cam); }
     }
 }
@@ -19946,7 +20083,7 @@ function openMaintenanceModal(pid, printerName, brand) {
                 </div>
                 <div class="modal-body">
                     <div style="margin-bottom:14px; padding:12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius);">
-                        <label style="font-size:12px; font-weight:600; display:block; margin-bottom:6px;">
+                        <label style="font-size:calc(12px * var(--fs, 1)); font-weight:600; display:block; margin-bottom:6px;">
                             <i class="fa-solid fa-industry"></i> <span data-i18n="printers.maintenance_brand_label">Marque de l'imprimante</span>
                         </label>
                         <select id="maintenance-brand-select" class="settings-select" style="width:100%; margin-bottom:4px;" onchange="onMaintenanceBrandChange()">
@@ -19963,13 +20100,13 @@ function openMaintenanceModal(pid, printerName, brand) {
                     </div>
 
                     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; padding:10px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius);">
-                        <div style="font-size:13px;">
+                        <div style="font-size:calc(13px * var(--fs, 1));">
                             <i class="fa-solid fa-clock"></i> <span data-i18n="printers.maintenance_total_hours">Heures d'impression cumulées</span> :
                             <strong id="maintenance-total-hours">—</strong>
-                            <span id="maintenance-hours-source" style="font-size:10.5px; color:var(--text-muted); margin-left:4px;"></span>
+                            <span id="maintenance-hours-source" style="font-size:calc(10.5px * var(--fs, 1)); color:var(--text-muted); margin-left:4px;"></span>
                         </div>
                         <div style="display:flex; gap:6px; align-items:center;">
-                            <input type="number" id="maintenance-add-hours-input" placeholder="+h" min="0.1" step="0.5" style="width:70px; font-size:12px;">
+                            <input type="number" id="maintenance-add-hours-input" placeholder="+h" min="0.1" step="0.5" style="width:70px; font-size:calc(12px * var(--fs, 1));">
                             <button class="btn btn-ghost btn-sm" onclick="addManualHours()" title="${_t3('printers.maintenance_add_hours', 'Ajouter des heures manuellement')}">
                                 <i class="fa-solid fa-plus"></i>
                             </button>
@@ -19979,21 +20116,21 @@ function openMaintenanceModal(pid, printerName, brand) {
                     <div id="maintenance-tasks-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;"></div>
 
                     <div style="padding-top:14px; border-top:1px solid var(--border);">
-                        <label style="font-size:13px; font-weight:500;" data-i18n="printers.maintenance_new_task">Nouvelle tâche</label>
+                        <label style="font-size:calc(13px * var(--fs, 1)); font-weight:500;" data-i18n="printers.maintenance_new_task">Nouvelle tâche</label>
                         <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:flex-end;">
-                            <label style="display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--text-muted); flex:1; min-width:140px;">
+                            <label style="display:flex; flex-direction:column; gap:3px; font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); flex:1; min-width:140px;">
                                 <span data-i18n="printers.maintenance_task_name">Nom (ex: Changer la buse)</span>
                                 <input type="text" id="maintenance-new-name" maxlength="100">
                             </label>
-                            <label style="display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--text-muted);">
+                            <label style="display:flex; flex-direction:column; gap:3px; font-size:calc(11px * var(--fs, 1)); color:var(--text-muted);">
                                 <span data-i18n="printers.maintenance_every_hours">Tous les (h)</span>
                                 <input type="number" id="maintenance-new-hours" min="1" step="1" style="width:80px;">
                             </label>
-                            <label style="display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--text-muted);">
+                            <label style="display:flex; flex-direction:column; gap:3px; font-size:calc(11px * var(--fs, 1)); color:var(--text-muted);">
                                 <span data-i18n="printers.maintenance_every_days">Tous les (jours)</span>
                                 <input type="number" id="maintenance-new-days" min="1" step="1" style="width:80px;">
                             </label>
-                            <label style="display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--text-muted); min-width:150px;">
+                            <label style="display:flex; flex-direction:column; gap:3px; font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); min-width:150px;">
                                 <span>${_t3('parts.linked_part', 'Pièce consommée (optionnel)')}</span>
                                 <select id="maintenance-new-part" class="settings-select"></select>
                             </label>
@@ -20079,8 +20216,8 @@ function renderMaintenanceBrandRecommendations(brand) {
     box.innerHTML = `
         <div style="display:flex; flex-direction:column; gap:5px; margin-top:6px;">
             ${items.map(it => { const taskName = I18N.t(it.nameKey); const interval = it.intervalKey ? I18N.t(it.intervalKey, it.intervalParams || {}) : it.interval; return `
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; padding:5px 8px; background:var(--bg-secondary); border-radius:6px;">
-                    <span>${escapeHtml(taskName)} <span style="color:var(--text-muted); font-size:11px;">— ${escapeHtml(interval)}</span></span>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:calc(12px * var(--fs, 1)); padding:5px 8px; background:var(--bg-secondary); border-radius:6px;">
+                    <span>${escapeHtml(taskName)} <span style="color:var(--text-muted); font-size:calc(11px * var(--fs, 1));">— ${escapeHtml(interval)}</span></span>
                     <button class="btn btn-ghost btn-sm" style="padding:2px 8px;" onclick="quickAddRecommendedTask('${escapeHtml(taskName).replace(/'/g, "\\'")}', ${it.hours || 'null'}, ${it.days || 'null'})" title="${_t3('printers.maintenance_brand_add_task', 'Ajouter à mon suivi')}">
                         <i class="fa-solid fa-plus"></i>
                     </button>
@@ -20132,7 +20269,7 @@ async function loadMaintenanceTasks(pid) {
         const res = await fetch(`${API}/api/printers/${pid}/maintenance`);
         const data = await res.json();
         if (!res.ok) {
-            list.innerHTML = `<div style="color:var(--danger); font-size:12.5px;">${escapeHtml(data.error || _t3('toast.error', 'Erreur'))}</div>`;
+            list.innerHTML = `<div style="color:var(--danger); font-size:calc(12.5px * var(--fs, 1));">${escapeHtml(data.error || _t3('toast.error', 'Erreur'))}</div>`;
             return;
         }
         document.getElementById('maintenance-total-hours').textContent = `${data.total_print_hours}h`;
@@ -20148,7 +20285,7 @@ async function loadMaintenanceTasks(pid) {
         renderMaintenanceTasks(data.tasks || []);
         _refreshMaintenancePartSelect();
     } catch (err) {
-        list.innerHTML = `<div style="color:var(--danger); font-size:12.5px;">${_t3('toast.connection_error', 'Erreur de connexion')}</div>`;
+        list.innerHTML = `<div style="color:var(--danger); font-size:calc(12.5px * var(--fs, 1));">${_t3('toast.connection_error', 'Erreur de connexion')}</div>`;
     }
 }
 
@@ -20169,7 +20306,7 @@ function renderMaintenanceTasks(tasks) {
         return `
             <div id="maintenance-task-row-${t.id}" style="padding:8px 10px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius);">
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                    <div style="font-size:13px; font-weight:600;">
+                    <div style="font-size:calc(13px * var(--fs, 1)); font-weight:600;">
                         ${t.due ? '<i class="fa-solid fa-triangle-exclamation" style="color:var(--danger);"></i> ' : ''}${escapeHtml(t.name)}
                     </div>
                     <div style="display:flex; gap:4px; flex-shrink:0;">
@@ -20184,9 +20321,9 @@ function renderMaintenanceTasks(tasks) {
                         </button>
                     </div>
                 </div>
-                <div id="maintenance-task-info-${t.id}" style="font-size:11px; color:var(--text-muted); margin-top:4px;">${parts.join(' · ')}</div>
+                <div id="maintenance-task-info-${t.id}" style="font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); margin-top:4px;">${parts.join(' · ')}</div>
                 ${(!t.due && t.eta_days != null) ? `<div class="maint-eta${t.eta_days <= 7 ? ' soon' : ''}"><i class="fa-solid fa-hourglass-half"></i> ${escapeHtml(_tf('printers.maintenance_eta', 'Prévu dans ~{{n}} j', { n: Math.max(1, Math.round(t.eta_days)) }))}${window._maintenanceRate && t.interval_hours ? ` · ${escapeHtml(_tf('printers.maintenance_rate', 'rythme réel : {{h}} h/jour', { h: window._maintenanceRate }))}` : ''}</div>` : ''}
-                ${t.part_name ? `<div style="font-size:11px; margin-top:3px; color:${t.part_low ? 'var(--danger)' : 'var(--text-muted)'};"><i class="fa-solid fa-toolbox"></i> ${escapeHtml(t.part_name)} · ${escapeHtml(_tf('parts.stock_n', 'stock : {{n}}', { n: t.part_stock }))}${t.part_low ? ' ⚠' : ''}</div>` : ''}
+                ${t.part_name ? `<div style="font-size:calc(11px * var(--fs, 1)); margin-top:3px; color:${t.part_low ? 'var(--danger)' : 'var(--text-muted)'};"><i class="fa-solid fa-toolbox"></i> ${escapeHtml(t.part_name)} · ${escapeHtml(_tf('parts.stock_n', 'stock : {{n}}', { n: t.part_stock }))}${t.part_low ? ' ⚠' : ''}</div>` : ''}
                 <div class="progress-track" style="margin-top:6px;">
                     <div class="progress-bar" style="width:${Math.round(ratio*100)}%; background:${barColor};"></div>
                 </div>
@@ -20348,9 +20485,9 @@ function showMaintenanceAlertPopup(printerName, taskName) {
     const message = _t3('printers.maintenance_popup_message', 'La maintenance pour l\'imprimante "{{name}}" est requise', { name: printerName })
         .replace('{{name}}', escapeHtml(printerName));
     popup.innerHTML = `
-        <h3 style="margin:0 0 10px 0; font-size:19px; font-weight:600;"><i class="fa-solid fa-wrench" style="color:var(--danger);"></i> ${_t3('printers.maintenance_popup_title', 'Maintenance requise')}</h3>
-        <p style="color:var(--text-muted); margin:0 0 6px 0; line-height:1.5; font-size:14px;">${message}</p>
-        <p style="color:var(--text-secondary); margin:0 0 24px 0; font-size:13px;">${escapeHtml(taskName)}</p>
+        <h3 style="margin:0 0 10px 0; font-size:calc(19px * var(--fs, 1)); font-weight:600;"><i class="fa-solid fa-wrench" style="color:var(--danger);"></i> ${_t3('printers.maintenance_popup_title', 'Maintenance requise')}</h3>
+        <p style="color:var(--text-muted); margin:0 0 6px 0; line-height:1.5; font-size:calc(14px * var(--fs, 1));">${message}</p>
+        <p style="color:var(--text-secondary); margin:0 0 24px 0; font-size:calc(13px * var(--fs, 1));">${escapeHtml(taskName)}</p>
         <div style="display:flex; gap:10px; justify-content:center;">
             <button id="maintenance-alert-ok" class="btn btn-primary">${_t3('actions.confirm', 'Compris')}</button>
         </div>
@@ -20423,13 +20560,13 @@ function showLowStockListPopup(spools) {
         return `
         <button class="low-stock-row" data-idx="${i}" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary); cursor:pointer; margin-bottom:8px;">
             <span style="width:14px; height:14px; border-radius:4px; background:${escapeHtml(color)}; flex-shrink:0;"></span>
-            <span style="flex:1; font-size:14px; font-weight:500;">${escapeHtml(spool.name || spool.material || '—')}</span>
-            <span style="font-size:12.5px; color:var(--text-muted);">${remaining !== null ? _t3('spoolman.low_stock_remaining', '{{g}} g restants', { g: remaining }).replace('{{g}}', remaining) : ''}</span>
-            <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
+            <span style="flex:1; font-size:calc(14px * var(--fs, 1)); font-weight:500;">${escapeHtml(spool.name || spool.material || '—')}</span>
+            <span style="font-size:calc(12.5px * var(--fs, 1)); color:var(--text-muted);">${remaining !== null ? _t3('spoolman.low_stock_remaining', '{{g}} g restants', { g: remaining }).replace('{{g}}', remaining) : ''}</span>
+            <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:calc(12px * var(--fs, 1));"></i>
         </button>`;
     }).join('');
     popup.innerHTML = `
-        <h3 style="margin:0 0 14px 0; font-size:18px; font-weight:600; flex-shrink:0;"><i class="fa-solid fa-cart-shopping" style="color:var(--accent);"></i> ${_t3('spoolman.low_stock_list_title', 'Bobines à racheter')}</h3>
+        <h3 style="margin:0 0 14px 0; font-size:calc(18px * var(--fs, 1)); font-weight:600; flex-shrink:0;"><i class="fa-solid fa-cart-shopping" style="color:var(--accent);"></i> ${_t3('spoolman.low_stock_list_title', 'Bobines à racheter')}</h3>
         <div style="overflow-y:auto; margin-bottom:16px;">${rows}</div>
         <button id="low-stock-list-close" class="btn btn-ghost" style="flex-shrink:0;">${_t3('actions.close', 'Fermer')}</button>
     `;
@@ -20462,10 +20599,10 @@ function showLowStockShopPopup(spool) {
 
     // Liste simple (boutiques sans vérification de stock : recherche manuelle)
     const manualRows = (shops) => shops.map(shop => `
-        <button class="low-stock-shop-btn" data-url="${escapeHtml(shop.url || '')}" style="${rowStyle} font-size:14px; font-weight:500;">
+        <button class="low-stock-shop-btn" data-url="${escapeHtml(shop.url || '')}" style="${rowStyle} font-size:calc(14px * var(--fs, 1)); font-weight:500;">
             <i class="fa-solid ${shop.brand ? 'fa-industry' : 'fa-store'}" style="color:var(--accent); width:18px; text-align:center;"></i>
-            <span style="flex:1;">${escapeHtml(shop.name)}${shop.brand ? ` <span style="display:inline-block; margin-left:4px; font-size:11px; padding:1px 7px; border-radius:20px; border:1px solid var(--border); color:var(--text-muted); font-weight:400;">${escapeHtml(_t3('spoolman.low_stock_brand_title', 'Boutique du fabricant'))}</span>` : ''}</span>
-            <i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--text-muted); font-size:12px;"></i>
+            <span style="flex:1;">${escapeHtml(shop.name)}${shop.brand ? ` <span style="display:inline-block; margin-left:4px; font-size:calc(11px * var(--fs, 1)); padding:1px 7px; border-radius:20px; border:1px solid var(--border); color:var(--text-muted); font-weight:400;">${escapeHtml(_t3('spoolman.low_stock_brand_title', 'Boutique du fabricant'))}</span>` : ''}</span>
+            <i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--text-muted); font-size:calc(12px * var(--fs, 1));"></i>
         </button>`).join('');
 
     // Liste de produits réellement trouvés en stock
@@ -20477,18 +20614,18 @@ function showLowStockShopPopup(spool) {
         <button class="low-stock-shop-btn" data-url="${escapeHtml(r.url || '')}" style="${rowStyle}">
             <i class="fa-solid fa-store" style="color:var(--accent); width:18px; text-align:center;"></i>
             <span style="flex:1; min-width:0;">
-                <span style="display:block; font-size:14px; font-weight:600;">${escapeHtml(r.shop)}</span>
-                <span style="display:block; font-size:12.5px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(r.title)}</span>
-                ${badge ? `<span style="display:inline-block; margin-top:3px; font-size:11px; padding:1px 7px; border-radius:20px; border:1px solid var(--border); color:var(--text-muted);">${escapeHtml(badge)}</span>` : ''}
+                <span style="display:block; font-size:calc(14px * var(--fs, 1)); font-weight:600;">${escapeHtml(r.shop)}</span>
+                <span style="display:block; font-size:calc(12.5px * var(--fs, 1)); color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(r.title)}</span>
+                ${badge ? `<span style="display:inline-block; margin-top:3px; font-size:calc(11px * var(--fs, 1)); padding:1px 7px; border-radius:20px; border:1px solid var(--border); color:var(--text-muted);">${escapeHtml(badge)}</span>` : ''}
             </span>
-            ${r.price ? `<span style="font-size:13px; font-weight:600; white-space:nowrap;">${escapeHtml(r.price)} €</span>` : ''}
-            <i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--text-muted); font-size:12px;"></i>
+            ${r.price ? `<span style="font-size:calc(13px * var(--fs, 1)); font-weight:600; white-space:nowrap;">${escapeHtml(r.price)} €</span>` : ''}
+            <i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--text-muted); font-size:calc(12px * var(--fs, 1));"></i>
         </button>`;
     }).join('');
 
     // Boutique du fabricant de la bobine : toujours proposée, avec le stock trouvé si la boutique a pu être vérifiée
     const brandSection = (rows) => rows.length ? `
-        <div style="font-size:12.5px; color:var(--text-muted); margin:0 0 8px;"><i class="fa-solid fa-industry"></i> ${_t3('spoolman.low_stock_brand_title', 'Boutique du fabricant')}</div>
+        <div style="font-size:calc(12.5px * var(--fs, 1)); color:var(--text-muted); margin:0 0 8px;"><i class="fa-solid fa-industry"></i> ${_t3('spoolman.low_stock_brand_title', 'Boutique du fabricant')}</div>
         ${rows.map(b => {
             const sub = b.status === 'in_stock'
                 ? _t3('spoolman.low_stock_brand_in_stock', '{{n}} produit(s) en stock trouvé(s)', { n: b.in_stock }).replace('{{n}}', b.in_stock)
@@ -20499,26 +20636,26 @@ function showLowStockShopPopup(spool) {
         <button class="low-stock-shop-btn" data-url="${escapeHtml(b.url || '')}" style="${rowStyle}">
             <i class="fa-solid fa-industry" style="color:var(--accent); width:18px; text-align:center;"></i>
             <span style="flex:1; min-width:0;">
-                <span style="display:block; font-size:14px; font-weight:600;">${escapeHtml(b.name)}</span>
-                <span style="display:block; font-size:12.5px; color:var(--text-muted);">${escapeHtml(sub)}</span>
+                <span style="display:block; font-size:calc(14px * var(--fs, 1)); font-weight:600;">${escapeHtml(b.name)}</span>
+                <span style="display:block; font-size:calc(12.5px * var(--fs, 1)); color:var(--text-muted);">${escapeHtml(sub)}</span>
             </span>
-            <i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--text-muted); font-size:12px;"></i>
+            <i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--text-muted); font-size:calc(12px * var(--fs, 1));"></i>
         </button>`;
         }).join('')}
         <div style="height:12px;"></div>` : '';
 
     const manualSection = (shops) => shops.length ? `
-        <div style="font-size:12.5px; color:var(--text-muted); margin:12px 0 8px;">${_t3('spoolman.low_stock_manual_title', 'Autres boutiques (recherche manuelle, stock non vérifié)')}</div>
+        <div style="font-size:calc(12.5px * var(--fs, 1)); color:var(--text-muted); margin:12px 0 8px;">${_t3('spoolman.low_stock_manual_title', 'Autres boutiques (recherche manuelle, stock non vérifié)')}</div>
         ${manualRows(shops)}` : '';
 
     popup.innerHTML = `
-        <h3 style="margin:0 0 8px 0; font-size:18px; font-weight:600;"><i class="fa-solid fa-store" style="color:var(--accent);"></i> ${_t3('spoolman.low_stock_shop_title', 'Où racheter cette bobine ?')}</h3>
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; color:var(--text-muted); font-size:13px;">
+        <h3 style="margin:0 0 8px 0; font-size:calc(18px * var(--fs, 1)); font-weight:600;"><i class="fa-solid fa-store" style="color:var(--accent);"></i> ${_t3('spoolman.low_stock_shop_title', 'Où racheter cette bobine ?')}</h3>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; color:var(--text-muted); font-size:calc(13px * var(--fs, 1));">
             <span style="width:12px; height:12px; border-radius:4px; background:${escapeHtml(color)}; flex-shrink:0;"></span>
-            <span><i class="fa-solid fa-magnifying-glass" style="font-size:11px;"></i> ${escapeHtml(query)}</span>
+            <span><i class="fa-solid fa-magnifying-glass" style="font-size:calc(11px * var(--fs, 1));"></i> ${escapeHtml(query)}</span>
         </div>
         <div id="low-stock-shop-body" style="overflow-y:auto; min-height:60px;">
-            <div style="display:flex; align-items:center; gap:10px; color:var(--text-muted); font-size:13.5px; padding:8px 0;">
+            <div style="display:flex; align-items:center; gap:10px; color:var(--text-muted); font-size:calc(13.5px * var(--fs, 1)); padding:8px 0;">
                 <i class="fa-solid fa-spinner fa-spin"></i> ${_t3('spoolman.low_stock_searching', 'Recherche de la bobine dans les boutiques…')}
             </div>
         </div>
@@ -20555,10 +20692,10 @@ function showLowStockShopPopup(spool) {
             }
             return `<div style="padding:2px 0;"><i class="fa-solid ${icon}" style="width:16px;"></i> ${escapeHtml(r.shop)} <span style="opacity:.7;">(${escapeHtml(r.platform)})</span> — ${escapeHtml(txt)}</div>`;
         }).join('');
-        return `<details style="margin-top:10px; font-size:12px; color:var(--text-muted);"><summary style="cursor:pointer;">${_t3('spoolman.low_stock_details_title', 'Détails de la recherche')}</summary>${lines}</details>`;
+        return `<details style="margin-top:10px; font-size:calc(12px * var(--fs, 1)); color:var(--text-muted);"><summary style="cursor:pointer;">${_t3('spoolman.low_stock_details_title', 'Détails de la recherche')}</summary>${lines}</details>`;
     };
 
-    const noteStyle = 'font-size:13.5px; line-height:1.45; margin-bottom:12px; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--bg-primary);';
+    const noteStyle = 'font-size:calc(13.5px * var(--fs, 1)); line-height:1.45; margin-bottom:12px; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--bg-primary);';
     (async () => {
         try {
             const qs = new URLSearchParams({
@@ -20575,7 +20712,7 @@ function showLowStockShopPopup(spool) {
             const brandShops = data.brand_shops || [];
             let html;
             if (exact.length) {
-                html = `<div style="font-size:13px; color:var(--text-muted); margin-bottom:8px;"><i class="fa-solid fa-circle-check" style="color:var(--success, #4caf50);"></i> ${_t3('spoolman.low_stock_in_stock_title', 'Disponible dans ces boutiques')}</div>${productRows(exact)}`;
+                html = `<div style="font-size:calc(13px * var(--fs, 1)); color:var(--text-muted); margin-bottom:8px;"><i class="fa-solid fa-circle-check" style="color:var(--success, #4caf50);"></i> ${_t3('spoolman.low_stock_in_stock_title', 'Disponible dans ces boutiques')}</div>${productRows(exact)}`;
             } else if (alts.length) {
                 html = `<div style="${noteStyle}"><i class="fa-solid fa-circle-info" style="color:var(--accent);"></i> ${_t3('spoolman.low_stock_not_found', "La bobine exacte n'a pas été trouvée, mais voici une sélection pour la remplacer :")}</div>${productRows(alts)}`;
             } else {
@@ -20586,7 +20723,7 @@ function showLowStockShopPopup(spool) {
             if (!overlay.isConnected) return;
             body.innerHTML = `<div style="${noteStyle}">${_t3('spoolman.low_stock_search_error', 'Recherche automatique indisponible : utilisez les liens de recherche ci-dessous.')}</div>`
                 + (fallbackShops.length ? manualRows(fallbackShops)
-                    : `<div style="font-size:13px; color:var(--text-muted);">${_t3('spoolman.low_stock_no_shop', 'Aucune boutique avec recherche configurée (champ search_url dans useful_links.json).')}</div>`);
+                    : `<div style="font-size:calc(13px * var(--fs, 1)); color:var(--text-muted);">${_t3('spoolman.low_stock_no_shop', 'Aucune boutique avec recherche configurée (champ search_url dans useful_links.json).')}</div>`);
         }
     })();
 }
@@ -20666,7 +20803,7 @@ function initMonitorUI(printer) {
          <div class="monitor-card full">
              <h4><i class="fa-solid fa-history"></i> ${I18N.t('printers.last_print')}</h4>
              <div id="monitor-last-print-container">
-                 <p style="color:var(--text-muted); font-size:13px">${I18N.t('common.loading')}</p>
+                 <p style="color:var(--text-muted); font-size:calc(13px * var(--fs, 1))">${I18N.t('common.loading')}</p>
              </div>
          </div>
      </div>
@@ -20723,10 +20860,10 @@ function updateMonitorUI(data) {
             extrasHtml += `<div class="stat-row"><span class="stat-label">📐 ${I18N.t('printer.layer_label')}</span><span class="stat-value">${data.layers.current} / ${data.layers.total}</span></div>`;
         }
         if (data.ams && data.ams.length > 0) {
-            extrasHtml += `<h4 style="margin:10px 0 6px;font-size:13px;">🎨 ${I18N.t('printer.multimaterial_label') || 'Multi-matière'} — ${I18N.t('printer.filaments_label')}</h4><div style="display:flex;gap:8px;flex-wrap:wrap;">`;
+            extrasHtml += `<h4 style="margin:10px 0 6px;font-size:calc(13px * var(--fs, 1));">🎨 ${I18N.t('printer.multimaterial_label') || 'Multi-matière'} — ${I18N.t('printer.filaments_label')}</h4><div style="display:flex;gap:8px;flex-wrap:wrap;">`;
             data.ams.forEach(t => {
                 const color = t.color ? `#${t.color.substring(0,6)}` : 'var(--text-muted)';
-                extrasHtml += `<div style="display:flex;align-items:center;gap:5px;font-size:12px;background:var(--bg-card);border-radius:6px;padding:4px 8px;"><span style="width:12px;height:12px;border-radius:50%;background:${color};display:inline-block;border:1px solid rgba(255,255,255,0.2);"></span><span>${t.material || '—'}</span></div>`;
+                extrasHtml += `<div style="display:flex;align-items:center;gap:5px;font-size:calc(12px * var(--fs, 1));background:var(--bg-card);border-radius:6px;padding:4px 8px;"><span style="width:12px;height:12px;border-radius:50%;background:${color};display:inline-block;border:1px solid rgba(255,255,255,0.2);"></span><span>${t.material || '—'}</span></div>`;
             });
             extrasHtml += '</div>';
         }
@@ -20745,13 +20882,13 @@ function updateMonitorUI(data) {
     const lastPrintContainer = document.getElementById('monitor-last-print-container');
     if (lastPrintContainer && data.last_print) {
         if (data.last_print.filename) {
-            let lpHtml = `<div class="stat-row"><span class="stat-label">${I18N.t('printers.last_print_file')}</span><span class="stat-value" style="font-size:12px">${escapeHtml(data.last_print.filename)}</span></div><div class="stat-row"><span class="stat-label">${I18N.t('printers.duration')}</span><span class="stat-value">${formatDuration(data.last_print.duration)}</span></div>`;
+            let lpHtml = `<div class="stat-row"><span class="stat-label">${I18N.t('printers.last_print_file')}</span><span class="stat-value" style="font-size:calc(12px * var(--fs, 1))">${escapeHtml(data.last_print.filename)}</span></div><div class="stat-row"><span class="stat-label">${I18N.t('printers.duration')}</span><span class="stat-value">${formatDuration(data.last_print.duration)}</span></div>`;
             if (data.last_print.finished_at) {
-                lpHtml += `<div class="stat-row"><span class="stat-label">${I18N.t('printers.finished_at')}</span><span class="stat-value" style="font-size:12px">${_formatPrinterFinishedAt(data.last_print.finished_at)}</span></div>`;
+                lpHtml += `<div class="stat-row"><span class="stat-label">${I18N.t('printers.finished_at')}</span><span class="stat-value" style="font-size:calc(12px * var(--fs, 1))">${_formatPrinterFinishedAt(data.last_print.finished_at)}</span></div>`;
             }
             lastPrintContainer.innerHTML = lpHtml;
         } else {
-            lastPrintContainer.innerHTML = `<p style="color:var(--text-muted); font-size:13px">${I18N.t('printers.no_recent_print')}</p>`;
+            lastPrintContainer.innerHTML = `<p style="color:var(--text-muted); font-size:calc(13px * var(--fs, 1))">${I18N.t('printers.no_recent_print')}</p>`;
         }
     }
 }
@@ -20795,7 +20932,7 @@ async function loadPrinterCamera(pid) {
             if (window.cameraRefreshInterval) clearInterval(window.cameraRefreshInterval);
             window.cameraRefreshInterval = setInterval(refreshSnapshot, 2000);
         } else {
-            content.innerHTML = `<div style="color:var(--text-muted); padding:20px; text-align:center;"><i class="fa-solid fa-video-slash" style="font-size:32px; margin-bottom:10px;"></i><p>${I18N.t('printers.no_video_stream')}</p></div>`;
+            content.innerHTML = `<div style="color:var(--text-muted); padding:20px; text-align:center;"><i class="fa-solid fa-video-slash" style="font-size:calc(32px * var(--fs, 1)); margin-bottom:10px;"></i><p>${I18N.t('printers.no_video_stream')}</p></div>`;
         }
     } catch (err) {
         console.error('[Camera] Erreur:', err);
@@ -20887,14 +21024,14 @@ window.discoverPrinters = async function() {
         const printers = data.printers || [];
 
         if (printers.length === 0) {
-            resultsDiv.innerHTML = `<div style="padding:10px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; font-size:12px; color:var(--text-secondary);">${I18N.t('printers.discover_none') || "Aucune imprimante détectée automatiquement. Vous pouvez toujours l'ajouter manuellement ci-dessous."}</div>`;
+            resultsDiv.innerHTML = `<div style="padding:10px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; font-size:calc(12px * var(--fs, 1)); color:var(--text-secondary);">${I18N.t('printers.discover_none') || "Aucune imprimante détectée automatiquement. Vous pouvez toujours l'ajouter manuellement ci-dessous."}</div>`;
         } else {
             window._discoveredPrinters = printers;
             resultsDiv.innerHTML = printers.map((p, i) => `
                 <div onclick="applyDiscoveredPrinter(${i})" style="cursor:pointer; padding:10px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
                     <div>
                         <strong>${escapeHtml(p.name || p.ip)}</strong>
-                        <div style="font-size:11px; color:var(--text-secondary);">${escapeHtml(p.model || '')} — ${escapeHtml(p.ip)} — ${escapeHtml(_printerTypeLabel(p.type))}</div>
+                        <div style="font-size:calc(11px * var(--fs, 1)); color:var(--text-secondary);">${escapeHtml(p.model || '')} — ${escapeHtml(p.ip)} — ${escapeHtml(_printerTypeLabel(p.type))}</div>
                     </div>
                     <i class="fa-solid fa-chevron-right" style="color:var(--text-muted);"></i>
                 </div>
@@ -20903,7 +21040,7 @@ window.discoverPrinters = async function() {
         resultsDiv.style.display = 'block';
     } catch (e) {
         console.error('[Discover Printers]', e);
-        resultsDiv.innerHTML = `<div style="padding:10px 12px; color:var(--danger); font-size:12px;">${I18N.t('printers.discover_error') || 'Erreur lors de la détection réseau.'}</div>`;
+        resultsDiv.innerHTML = `<div style="padding:10px 12px; color:var(--danger); font-size:calc(12px * var(--fs, 1));">${I18N.t('printers.discover_error') || 'Erreur lors de la détection réseau.'}</div>`;
         resultsDiv.style.display = 'block';
     } finally {
         btn.disabled = false;
@@ -20976,7 +21113,7 @@ window.manualCheckUpdate = async function () {
             showToast(I18N.t('toast.up_to_date', { version: vd.version || '' }), 'info');
             return;
         }
-        const res = await fetch(`${API}/api/update/check`);
+        const res = await fetch(`${API}/api/update/check?force=1`);
         const data = await res.json();
 
         if (data.update_available) {
@@ -21101,7 +21238,7 @@ modal.style.cssText = `background: var(--bg-secondary, #1e2129); border-radius: 
 const releaseNotes = this.parseMarkdown(updateInfo.release_notes || I18N.t('update.default_notes'));
 const hasInstaller = !!updateInfo.download_url;
 const releaseUrl = updateInfo.release_url || `https://github.com/stellio-app/stellio/releases/latest`;
-modal.innerHTML = `<div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;"><div style="width: 56px; height: 56px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #00d9ff); border-radius: 12px; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-download" style="font-size: 28px; color: white;"></i></div><div style="flex: 1;"><h3 style="margin: 0; color: var(--text-primary, #e6e6e6); font-size: 22px; font-weight: 700;">${I18N.t('update.available_title')}</h3><p style="margin: 4px 0 0 0; color: var(--text-muted, #9ca3af); font-size: 14px;">${I18N.t('update.version_transition', { from: updateInfo.current_version, to: updateInfo.version })}</p></div></div><div style="background: var(--bg-primary, #15181e); padding: 20px; border-radius: 12px; margin-bottom: 24px; max-height: 300px; overflow-y: auto; border: 1px solid var(--border, #2a2f3a);"><h4 style="margin: 0 0 12px 0; color: var(--accent, #4ea1d3); font-size: 14px; text-transform: uppercase; letter-spacing: 1px;"><i class="fa-solid fa-list-check"></i> ${I18N.t('update.release_notes')}</h4><div style="color: var(--text-secondary, #b0b3b8); font-size: 14px; line-height: 1.7;" class="release-notes-content">${releaseNotes}</div></div><div id="update-progress-container" style="display: none; margin-bottom: 24px; padding: 16px; background: var(--bg-primary, #15181e); border-radius: 12px; border: 1px solid var(--border, #2a2f3a);"><div style="display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center;"><span style="color: var(--text-secondary, #b0b3b8); font-size: 13px; font-weight: 500;"><i class="fa-solid fa-download"></i> ${I18N.t('update.downloading')}</span><span id="update-percent" style="color: var(--accent, #4ea1d3); font-size: 14px; font-weight: 700;">0%</span></div><div style="height: 8px; background: var(--bg-tertiary, #2a2f3a); border-radius: 4px; overflow: hidden;"><div id="update-bar" style="height: 100%; background: linear-gradient(90deg, var(--accent, #4ea1d3), #00d9ff); width: 0%; transition: width 0.3s ease; border-radius: 4px;"></div></div></div><div style="display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap;">${!hasInstaller ? `<a href="${releaseUrl}" target="_blank" style="padding: 12px 24px; border: none; border-radius: 10px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #3d8fb8); color: white; cursor: pointer; font-weight: 600; font-size: 14px; box-shadow: 0 4px 12px rgba(78, 161, 211, 0.3); text-decoration: none; display: inline-flex; align-items: center; gap: 8px;"><i class="fa-solid fa-external-link-alt"></i> ${I18N.t('update.download_github')}</a>` : ''}<button id="update-later-btn" style="padding: 12px 24px; border: 1px solid var(--border, #363c4a); border-radius: 10px; background: var(--bg-tertiary, #2a2f3a); color: var(--text-primary, #e6e6e6); cursor: pointer; font-weight: 500; font-size: 14px;">${I18N.t('update.later')}</button>${hasInstaller ? `<button id="update-now-btn" style="padding: 12px 28px; border: none; border-radius: 10px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #3d8fb8); color: white; cursor: pointer; font-weight: 600; font-size: 14px; box-shadow: 0 4px 12px rgba(78, 161, 211, 0.3);"><i class="fa-solid fa-download"></i> ${I18N.t('update.update_now')}</button>` : ''}</div>`;
+modal.innerHTML = `<div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;"><div style="width: 56px; height: 56px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #00d9ff); border-radius: 12px; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-download" style="font-size: calc(28px * var(--fs, 1)); color: white;"></i></div><div style="flex: 1;"><h3 style="margin: 0; color: var(--text-primary, #e6e6e6); font-size: calc(22px * var(--fs, 1)); font-weight: 700;">${I18N.t('update.available_title')}</h3><p style="margin: 4px 0 0 0; color: var(--text-muted, #9ca3af); font-size: calc(14px * var(--fs, 1));">${I18N.t('update.version_transition', { from: updateInfo.current_version, to: updateInfo.version })}</p></div></div><div style="background: var(--bg-primary, #15181e); padding: 20px; border-radius: 12px; margin-bottom: 24px; max-height: 300px; overflow-y: auto; border: 1px solid var(--border, #2a2f3a);"><h4 style="margin: 0 0 12px 0; color: var(--accent, #4ea1d3); font-size: calc(14px * var(--fs, 1)); text-transform: uppercase; letter-spacing: 1px;"><i class="fa-solid fa-list-check"></i> ${I18N.t('update.release_notes')}</h4><div style="color: var(--text-secondary, #b0b3b8); font-size: calc(14px * var(--fs, 1)); line-height: 1.7;" class="release-notes-content">${releaseNotes}</div></div><div id="update-progress-container" style="display: none; margin-bottom: 24px; padding: 16px; background: var(--bg-primary, #15181e); border-radius: 12px; border: 1px solid var(--border, #2a2f3a);"><div style="display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center;"><span style="color: var(--text-secondary, #b0b3b8); font-size: calc(13px * var(--fs, 1)); font-weight: 500;"><i class="fa-solid fa-download"></i> ${I18N.t('update.downloading')}</span><span id="update-percent" style="color: var(--accent, #4ea1d3); font-size: calc(14px * var(--fs, 1)); font-weight: 700;">0%</span></div><div style="height: 8px; background: var(--bg-tertiary, #2a2f3a); border-radius: 4px; overflow: hidden;"><div id="update-bar" style="height: 100%; background: linear-gradient(90deg, var(--accent, #4ea1d3), #00d9ff); width: 0%; transition: width 0.3s ease; border-radius: 4px;"></div></div></div><div style="display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap;">${!hasInstaller ? `<a href="${releaseUrl}" target="_blank" style="padding: 12px 24px; border: none; border-radius: 10px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #3d8fb8); color: white; cursor: pointer; font-weight: 600; font-size: calc(14px * var(--fs, 1)); box-shadow: 0 4px 12px rgba(78, 161, 211, 0.3); text-decoration: none; display: inline-flex; align-items: center; gap: 8px;"><i class="fa-solid fa-external-link-alt"></i> ${I18N.t('update.download_github')}</a>` : ''}<button id="update-later-btn" style="padding: 12px 24px; border: 1px solid var(--border, #363c4a); border-radius: 10px; background: var(--bg-tertiary, #2a2f3a); color: var(--text-primary, #e6e6e6); cursor: pointer; font-weight: 500; font-size: calc(14px * var(--fs, 1));">${I18N.t('update.later')}</button>${hasInstaller ? `<button id="update-now-btn" style="padding: 12px 28px; border: none; border-radius: 10px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #3d8fb8); color: white; cursor: pointer; font-weight: 600; font-size: calc(14px * var(--fs, 1)); box-shadow: 0 4px 12px rgba(78, 161, 211, 0.3);"><i class="fa-solid fa-download"></i> ${I18N.t('update.update_now')}</button>` : ''}</div>`;
 overlay.appendChild(modal);
 document.body.appendChild(overlay);
 const _closeUpdateOverlay = () => {
@@ -21162,7 +21299,7 @@ if (document.querySelector('.update-modal-overlay') || document.querySelector('.
 const toast = document.createElement('div');
 toast.className = 'toast info update-toast';
 toast.style.cssText = `background: var(--bg-secondary, #1e2129); border: 1px solid var(--accent, #4ea1d3); padding: 16px 20px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); cursor: pointer; z-index: 9999; animation: slideInRight 0.3s ease; max-width: 350px;`;
-toast.innerHTML = `<div style="display: flex; align-items: center; gap: 12px;"><div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #00d9ff); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><i class="fa-solid fa-download" style="font-size: 18px; color: white;"></i></div><div style="flex: 1; min-width: 0;"><div style="font-weight: 600; color: var(--text-primary, #e6e6e6); font-size: 14px;">${I18N.t('update.available_title')}</div><div style="font-size: 12px; color: var(--text-muted, #9ca3af); margin-top: 2px;">${I18N.t('update.toast_subtitle', { version: updateInfo.version })}</div></div></div>`;
+toast.innerHTML = `<div style="display: flex; align-items: center; gap: 12px;"><div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #00d9ff); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><i class="fa-solid fa-download" style="font-size: calc(18px * var(--fs, 1)); color: white;"></i></div><div style="flex: 1; min-width: 0;"><div style="font-weight: 600; color: var(--text-primary, #e6e6e6); font-size: calc(14px * var(--fs, 1));">${I18N.t('update.available_title')}</div><div style="font-size: calc(12px * var(--fs, 1)); color: var(--text-muted, #9ca3af); margin-top: 2px;">${I18N.t('update.toast_subtitle', { version: updateInfo.version })}</div></div></div>`;
 toast.addEventListener('click', () => {
 toast.remove();
 this.showUpdateModal(updateInfo);
@@ -21184,7 +21321,7 @@ modal.style.cssText = `background: var(--bg-secondary, #1e2129); border-radius: 
 const version = release.tag_name || this.currentVersion;
 const changelog = this.parseMarkdown(release.body || I18N.t('update.default_notes'));
 const publishedDate = new Date(release.published_at).toLocaleDateString(I18N.lang, { year: 'numeric', month: 'long', day: 'numeric' });
-modal.innerHTML = `<div style="text-align: center; margin-bottom: 28px;"><div style="display: inline-flex; align-items: center; justify-content: center; width: 72px; height: 72px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 50%; margin-bottom: 16px; box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);"><i class="fa-solid fa-party-horn" style="font-size: 32px; color: white;"></i></div><h2 style="margin: 0 0 8px 0; color: var(--text-primary, #e6e6e6); font-size: 26px; font-weight: 700;">${I18N.t('update.updated_title')}</h2><p style="margin: 0; color: var(--text-muted, #9ca3af); font-size: 15px;">${I18N.t('update.version_date', { version, date: publishedDate })}</p></div><div style="background: var(--bg-primary, #15181e); padding: 24px; border-radius: 12px; margin-bottom: 24px; border: 1px solid var(--border, #2a2f3a);"><h3 style="margin: 0 0 16px 0; color: var(--accent, #4ea1d3); font-size: 16px; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-sparkles"></i> ${I18N.t('update.whats_new')}</h3><div style="color: var(--text-secondary, #b0b3b8); font-size: 14px; line-height: 1.8;" class="changelog-content">${changelog}</div></div><div style="text-align: center;"><button id="changelog-close-btn" style="padding: 14px 32px; border: none; border-radius: 10px; background: linear-gradient(135deg, #10b981, #059669); color: white; cursor: pointer; font-weight: 600; font-size: 15px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"><i class="fa-solid fa-thumbs-up"></i> ${I18N.t('update.lets_go')}</button></div>`;
+modal.innerHTML = `<div style="text-align: center; margin-bottom: 28px;"><div style="display: inline-flex; align-items: center; justify-content: center; width: 72px; height: 72px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 50%; margin-bottom: 16px; box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);"><i class="fa-solid fa-party-horn" style="font-size: calc(32px * var(--fs, 1)); color: white;"></i></div><h2 style="margin: 0 0 8px 0; color: var(--text-primary, #e6e6e6); font-size: calc(26px * var(--fs, 1)); font-weight: 700;">${I18N.t('update.updated_title')}</h2><p style="margin: 0; color: var(--text-muted, #9ca3af); font-size: calc(15px * var(--fs, 1));">${I18N.t('update.version_date', { version, date: publishedDate })}</p></div><div style="background: var(--bg-primary, #15181e); padding: 24px; border-radius: 12px; margin-bottom: 24px; border: 1px solid var(--border, #2a2f3a);"><h3 style="margin: 0 0 16px 0; color: var(--accent, #4ea1d3); font-size: calc(16px * var(--fs, 1)); text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-sparkles"></i> ${I18N.t('update.whats_new')}</h3><div style="color: var(--text-secondary, #b0b3b8); font-size: calc(14px * var(--fs, 1)); line-height: 1.8;" class="changelog-content">${changelog}</div></div><div style="text-align: center;"><button id="changelog-close-btn" style="padding: 14px 32px; border: none; border-radius: 10px; background: linear-gradient(135deg, #10b981, #059669); color: white; cursor: pointer; font-weight: 600; font-size: calc(15px * var(--fs, 1)); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"><i class="fa-solid fa-thumbs-up"></i> ${I18N.t('update.lets_go')}</button></div>`;
 overlay.appendChild(modal);
 document.body.appendChild(overlay);
 document.getElementById('changelog-close-btn').addEventListener('click', () => {
@@ -21200,14 +21337,14 @@ setTimeout(() => overlay.remove(), 300);
 },
 parseMarkdown(text) {
 return text
-.replace(/^### (.*$)/gim, '<h4 style="color: var(--accent, #4ea1d3); margin: 16px 0 8px 0; font-size: 15px;">$1</h4>')
-.replace(/^## (.*$)/gim, '<h3 style="color: var(--accent, #4ea1d3); margin: 20px 0 10px 0; font-size: 17px;">$1</h3>')
-.replace(/^# (.*$)/gim, '<h2 style="color: var(--accent, #4ea1d3); margin: 24px 0 12px 0; font-size: 19px;">$1</h2>')
-.replace(/^\- (.*$)/gim, '<div style="display: flex; align-items: flex-start; gap: 8px; margin: 6px 0;"><span style="color: #10b981; flex-shrink: 0;">✓</span><span>$1</span></div>')
-.replace(/^\* (.*$)/gim, '<div style="display: flex; align-items: flex-start; gap: 8px; margin: 6px 0;"><span style="color: #10b981; flex-shrink: 0;">✓</span><span>$1</span></div>')
+.replace(/^### (.*$)/gim, '<h4 style="color: var(--accent, #4ea1d3); margin: 16px 0 8px 0; font-size: calc(15px * var(--fs, 1));">$1</h4>')
+.replace(/^## (.*$)/gim, '<h3 style="color: var(--accent, #4ea1d3); margin: 20px 0 10px 0; font-size: calc(17px * var(--fs, 1));">$1</h3>')
+.replace(/^# (.*$)/gim, '<h2 style="color: var(--accent, #4ea1d3); margin: 24px 0 12px 0; font-size: calc(19px * var(--fs, 1));">$1</h2>')
+.replace(/^\- (.*$)/gim, '<div style="display: flex; align-items: flex-start; gap: 8px; margin: 6px 0;"><span style="color: var(--cb-ok, #10b981); flex-shrink: 0;">✓</span><span>$1</span></div>')
+.replace(/^\* (.*$)/gim, '<div style="display: flex; align-items: flex-start; gap: 8px; margin: 6px 0;"><span style="color: var(--cb-ok, #10b981); flex-shrink: 0;">✓</span><span>$1</span></div>')
 .replace(/\*\*(.*?)\*\*/g, '<strong style="color: var(--text-primary, #e6e6e6);">$1</strong>')
 .replace(/\*(.*?)\*/g, '<em>$1</em>')
-.replace(/`(.*?)`/g, '<code style="background: var(--bg-tertiary, #2a2f3a); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 13px;">$1</code>')
+.replace(/`(.*?)`/g, '<code style="background: var(--bg-tertiary, #2a2f3a); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: calc(13px * var(--fs, 1));">$1</code>')
 .replace(/\n\n/g, '<br><br>')
 .replace(/\n/g, '<br>');
 }
@@ -21229,7 +21366,7 @@ overlay.id = 'quit-confirmation-overlay';
 overlay.style.cssText = `position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 999999; animation: fadeIn 0.2s ease;`;
 const modal = document.createElement('div');
 modal.style.cssText = `background: var(--bg-secondary, #22262e); border: 1px solid var(--border, #363c4a); border-radius: 16px; padding: 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); text-align: center; animation: slideUp 0.3s ease;`;
-modal.innerHTML = `<div style="margin-bottom: 20px;"><div style="width: 64px; height: 64px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #3d8fb8); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; box-shadow: 0 8px 24px rgba(78, 161, 211, 0.3);"><i class="fa-solid fa-power-off" style="font-size: 28px; color: white;"></i></div><h3 style="margin: 0 0 8px 0; color: var(--text-primary, #e8e9eb); font-size: 20px; font-weight: 600;">${I18N.t('app.quit_title') || 'Quitter Stellio'}</h3><p style="margin: 0 0 24px 0; color: var(--text-secondary, #9ca0ab); font-size: 14px; line-height: 1.5;">${I18N.t('app.quit_message') || 'Voulez-vous vraiment quitter l\'application ?'}</p></div><div style="display: flex; gap: 12px; justify-content: center;"><button id="quit-cancel-btn" style="padding: 12px 28px; border: 1px solid var(--border, #363c4a); border-radius: 8px; background: var(--bg-tertiary, #2a2e38); color: var(--text-primary, #e8e9eb); cursor: pointer; font-weight: 500; font-size: 14px; transition: all 0.2s;">${I18N.t('actions.cancel') || 'Annuler'}</button><button id="quit-confirm-btn" style="padding: 12px 28px; border: none; border-radius: 8px; background: linear-gradient(135deg, var(--danger, #f87171), #ef4444); color: white; cursor: pointer; font-weight: 600; font-size: 14px; box-shadow: 0 4px 12px rgba(248, 113, 113, 0.3); transition: all 0.2s; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-power-off"></i>${I18N.t('actions.quit') || 'Quitter'}</button></div>`;
+modal.innerHTML = `<div style="margin-bottom: 20px;"><div style="width: 64px; height: 64px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #3d8fb8); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; box-shadow: 0 8px 24px rgba(78, 161, 211, 0.3);"><i class="fa-solid fa-power-off" style="font-size: calc(28px * var(--fs, 1)); color: white;"></i></div><h3 style="margin: 0 0 8px 0; color: var(--text-primary, #e8e9eb); font-size: calc(20px * var(--fs, 1)); font-weight: 600;">${I18N.t('app.quit_title') || 'Quitter Stellio'}</h3><p style="margin: 0 0 24px 0; color: var(--text-secondary, #9ca0ab); font-size: calc(14px * var(--fs, 1)); line-height: 1.5;">${I18N.t('app.quit_message') || 'Voulez-vous vraiment quitter l\'application ?'}</p></div><div style="display: flex; gap: 12px; justify-content: center;"><button id="quit-cancel-btn" style="padding: 12px 28px; border: 1px solid var(--border, #363c4a); border-radius: 8px; background: var(--bg-tertiary, #2a2e38); color: var(--text-primary, #e8e9eb); cursor: pointer; font-weight: 500; font-size: calc(14px * var(--fs, 1)); transition: all 0.2s;">${I18N.t('actions.cancel') || 'Annuler'}</button><button id="quit-confirm-btn" style="padding: 12px 28px; border: none; border-radius: 8px; background: linear-gradient(135deg, var(--danger, #f87171), #ef4444); color: white; cursor: pointer; font-weight: 600; font-size: calc(14px * var(--fs, 1)); box-shadow: 0 4px 12px rgba(248, 113, 113, 0.3); transition: all 0.2s; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-power-off"></i>${I18N.t('actions.quit') || 'Quitter'}</button></div>`;
 overlay.appendChild(modal);
 document.body.appendChild(overlay);
 document.getElementById('quit-cancel-btn').addEventListener('click', () => {
@@ -22201,9 +22338,9 @@ startThumbAutoRefresh();
                 return;
             }
 
-            let html = `<p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">${I18N.t('duplicates.groups_found', { count: data.total_groups })}</p>`;
+            let html = `<p style="font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary); margin-bottom:16px;">${I18N.t('duplicates.groups_found', { count: data.total_groups })}</p>`;
             if (mode === 'similar' && data.truncated) {
-                html += `<p style="font-size:12px; color:var(--warning); margin-bottom:16px;"><i class="fa-solid fa-triangle-exclamation"></i> ${I18N.t('duplicates.truncated_notice', `Analyse limitée aux ${data.candidate_count} plus gros fichiers pour préserver les performances.`, { count: data.candidate_count })}</p>`;
+                html += `<p style="font-size:calc(12px * var(--fs, 1)); color:var(--warning); margin-bottom:16px;"><i class="fa-solid fa-triangle-exclamation"></i> ${I18N.t('duplicates.truncated_notice', `Analyse limitée aux ${data.candidate_count} plus gros fichiers pour préserver les performances.`, { count: data.candidate_count })}</p>`;
             }
 
             data.groups.forEach(group => {
@@ -22213,8 +22350,8 @@ startThumbAutoRefresh();
                 html += `<div style="border:1px solid var(--border); border-radius:var(--radius); margin-bottom:12px; overflow:hidden;">
                     <div style="background:var(--bg-card); padding:10px 14px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border);">
                         <i class="fa-solid ${mode === 'similar' ? 'fa-shapes' : 'fa-copy'}" style="color:var(--accent);"></i>
-                        <strong style="font-size:13px; color:var(--text-primary); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(group.name)}">${escapeHtml(group.name)}</strong>
-                        <span style="font-size:12px; color:var(--text-muted); white-space:nowrap;">${sizeOrVolume}</span>
+                        <strong style="font-size:calc(13px * var(--fs, 1)); color:var(--text-primary); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(group.name)}">${escapeHtml(group.name)}</strong>
+                        <span style="font-size:calc(12px * var(--fs, 1)); color:var(--text-muted); white-space:nowrap;">${sizeOrVolume}</span>
                     </div>`;
                 group.files.forEach((f, i) => {
                     const dims = mode === 'similar' && f.dimensions
@@ -22224,16 +22361,16 @@ startThumbAutoRefresh();
                         ? ` <span style="color:var(--warning);" title="${escapeHtml(I18N.t('duplicates.in_archive_tooltip', `Dans l'archive ${f.archive_name || ''} — suppression non disponible`, { archive: f.archive_name || '' }))}"><i class="fa-solid fa-file-zipper"></i> ${escapeHtml(I18N.t('duplicates.in_archive_badge', 'Dans une archive'))}</span>`
                         : '';
                     const actionBtn = f.in_archive
-                        ? `<span class="btn btn-ghost btn-sm" style="font-size:11px; padding:3px 8px; color:var(--text-muted); cursor:default;" title="${escapeHtml(I18N.t('duplicates.in_archive_no_delete', "Suppression impossible : fichier situé dans une archive"))}">
+                        ? `<span class="btn btn-ghost btn-sm" style="font-size:calc(11px * var(--fs, 1)); padding:3px 8px; color:var(--text-muted); cursor:default;" title="${escapeHtml(I18N.t('duplicates.in_archive_no_delete', "Suppression impossible : fichier situé dans une archive"))}">
                                <i class="fa-solid fa-lock"></i>
                            </span>`
-                        : `<button class="btn btn-ghost btn-sm" style="font-size:11px; padding:3px 8px; color:var(--danger);"
+                        : `<button class="btn btn-ghost btn-sm" style="font-size:calc(11px * var(--fs, 1)); padding:3px 8px; color:var(--danger);"
                             onclick="deleteDuplicate('${escapeJs(f.path)}', this)">
                             <i class="fa-solid fa-trash"></i>
                         </button>`;
                     html += `<div style="padding:8px 14px; display:flex; align-items:center; gap:10px; ${i < group.files.length-1 ? 'border-bottom:1px solid var(--border);' : ''}">
-                        <i class="fa-solid fa-folder" style="color:var(--text-muted); font-size:12px;"></i>
-                        <span style="font-size:12px; color:var(--text-secondary); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(f.path)}">${escapeHtml(f.name || f.path)}${dims}${archiveBadge}</span>
+                        <i class="fa-solid fa-folder" style="color:var(--text-muted); font-size:calc(12px * var(--fs, 1));"></i>
+                        <span style="font-size:calc(12px * var(--fs, 1)); color:var(--text-secondary); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(f.path)}">${escapeHtml(f.name || f.path)}${dims}${archiveBadge}</span>
                         ${actionBtn}
                     </div>`;
                 });
@@ -22359,7 +22496,7 @@ startThumbAutoRefresh();
         _deletePath = filePath;
         const msg = document.getElementById('delete-file-msg');
         if (msg) {
-            msg.innerHTML = `${I18N.t('modal.delete_confirm_text')}<br><strong style="color:var(--text-primary);">${escapeHtml(fileName)}</strong><br><br><span style="color:var(--danger); font-size:12px;"><i class="fa-solid fa-triangle-exclamation"></i> ${I18N.t('modal.delete_irreversible')}</span>`;
+            msg.innerHTML = `${I18N.t('modal.delete_confirm_text')}<br><strong style="color:var(--text-primary);">${escapeHtml(fileName)}</strong><br><br><span style="color:var(--danger); font-size:calc(12px * var(--fs, 1));"><i class="fa-solid fa-triangle-exclamation"></i> ${I18N.t('modal.delete_irreversible')}</span>`;
         }
         openModal('modal-delete-file');
     };
@@ -22557,10 +22694,10 @@ startThumbAutoRefresh();
         _lastQuote = { ...q, material_key: material, weightG, timeFormatted, timeHours };
 
         const preciseBadgeHtml = {
-            done: `<div style="display:flex; align-items:center; gap:6px; font-size:11px; color:#68d391; margin-bottom:10px;"><i class="fa-solid fa-circle-check"></i> ${I18N.t('cost.precise_via_slicer', { slicer: escapeHtml((_preciseEstimate?.slicer_name || '') + _costProfileSuffix()) })}</div>`,
-            pending: `<div style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); margin-bottom:10px;"><i class="fa-solid fa-spinner fa-spin"></i> ${I18N.t('cost.precise_searching')}</div>`,
-            unavailable: `<div style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); margin-bottom:10px;"><i class="fa-solid fa-circle-info"></i> ${I18N.t('cost.precise_no_slicer')}</div>`,
-            error: `<div style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); margin-bottom:10px;"><i class="fa-solid fa-circle-info"></i> ${I18N.t('cost.precise_failed')}</div>`,
+            done: `<div style="display:flex; align-items:center; gap:6px; font-size:calc(11px * var(--fs, 1)); color:#68d391; margin-bottom:10px;"><i class="fa-solid fa-circle-check"></i> ${I18N.t('cost.precise_via_slicer', { slicer: escapeHtml((_preciseEstimate?.slicer_name || '') + _costProfileSuffix()) })}</div>`,
+            pending: `<div style="display:flex; align-items:center; gap:6px; font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); margin-bottom:10px;"><i class="fa-solid fa-spinner fa-spin"></i> ${I18N.t('cost.precise_searching')}</div>`,
+            unavailable: `<div style="display:flex; align-items:center; gap:6px; font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); margin-bottom:10px;"><i class="fa-solid fa-circle-info"></i> ${I18N.t('cost.precise_no_slicer')}</div>`,
+            error: `<div style="display:flex; align-items:center; gap:6px; font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); margin-bottom:10px;"><i class="fa-solid fa-circle-info"></i> ${I18N.t('cost.precise_failed')}</div>`,
             idle: ''
         }[_preciseEstimateStatus] || '';
         // Explication de l'échec (profil introuvable, sortie du slicer…) pour comprendre pourquoi l'estimation reste approximative
@@ -22572,76 +22709,76 @@ startThumbAutoRefresh();
             };
             const known = reasonKeys[_preciseEstimateReason];
             const txt = known ? _t2(known[0], known[1]) : (_preciseEstimateDetail || '');
-            if (txt) preciseExtraHtml = `<div style="font-size:11px; color:var(--text-muted); margin:-4px 0 10px 18px; word-break:break-word; user-select:text;">${known ? '' : escapeHtml(_t2('cost.precise_detail_label', 'Détail du slicer :')) + ' '}${escapeHtml(txt)}</div>`;
+            if (txt) preciseExtraHtml = `<div style="font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); margin:-4px 0 10px 18px; word-break:break-word; user-select:text;">${known ? '' : escapeHtml(_t2('cost.precise_detail_label', 'Détail du slicer :')) + ' '}${escapeHtml(txt)}</div>`;
         }
 
         resultsEl.innerHTML = `
             <div style="display:flex; flex-direction:column; gap:8px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:14px; margin-top:14px;">
                 ${preciseBadgeHtml}${preciseExtraHtml}
-                <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+                <div style="display:flex; justify-content:space-between; font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary);">
                     <span><i class="fa-solid fa-weight-hanging" style="width:16px;"></i> ${I18N.t('cost.estimated_weight_label', { material: material.toUpperCase() })}</span>
                     <strong style="color:var(--text-primary);">${weightG.toFixed(1)} g</strong>
                 </div>
-                <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+                <div style="display:flex; justify-content:space-between; font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary);">
                     <span><i class="fa-solid fa-clock" style="width:16px;"></i> ${I18N.t('cost.estimated_time_label')}</span>
                     <strong style="color:var(--text-primary);">${timeFormatted}</strong>
                 </div>
                 ${_aiTimePrediction && ['medium', 'high'].includes(_aiTimePrediction.confidence) ? `
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--text-muted); margin-top:-4px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:calc(12px * var(--fs, 1)); color:var(--text-muted); margin-top:-4px;">
                     <span><i class="fa-solid fa-brain" style="width:16px;"></i> ${_t2('cost.ai_corrected_time_label', 'Estimation ajustée (historique local)')}</span>
                     <strong style="color:var(--accent);">${_aiTimePrediction.corrected_formatted}</strong>
                 </div>
-                <div style="font-size:10px; color:var(--text-muted); text-align:right; margin-top:-6px;">
+                <div style="font-size:calc(10px * var(--fs, 1)); color:var(--text-muted); text-align:right; margin-top:-6px;">
                     ${_t2('cost.ai_corrected_time_hint', `Basé sur ${_aiTimePrediction.sample_size} impression(s) précédente(s) — facteur x${_aiTimePrediction.correction_factor}`, { n: _aiTimePrediction.sample_size, f: _aiTimePrediction.correction_factor })}
                 </div>` : ''}
                 <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
-                <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+                <div style="display:flex; justify-content:space-between; font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary);">
                     <span><i class="fa-solid fa-spool" style="width:16px;"></i> ${I18N.t('cost.material_cost_label')}</span>
                     <strong style="color:var(--text-primary);">${formatCost(materialCost)}</strong>
                 </div>
-                <div style="display:flex; justify-content:space-between; font-size:13px; color:${hasElec ? 'var(--text-secondary)' : 'var(--text-muted)'};">
+                <div style="display:flex; justify-content:space-between; font-size:calc(13px * var(--fs, 1)); color:${hasElec ? 'var(--text-secondary)' : 'var(--text-muted)'};">
                     <span><i class="fa-solid fa-bolt" style="width:16px;"></i> ${I18N.t('cost.electricity_cost_label')}</span>
                     <strong style="color:${hasElec ? 'var(--text-primary)' : 'var(--text-muted)'};">${hasElec ? formatCost(elecCost) : I18N.t('printers.no_value_set')}</strong>
                 </div>
                 ${q.wear > 0 ? `
-                <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+                <div style="display:flex; justify-content:space-between; font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary);">
                     <span><i class="fa-solid fa-screwdriver-wrench" style="width:16px;"></i> ${I18N.t('cost.wear_cost_label')}</span>
                     <strong style="color:var(--text-primary);">${formatCost(q.wear)}</strong>
                 </div>` : ''}
                 ${q.fixed > 0 ? `
-                <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+                <div style="display:flex; justify-content:space-between; font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary);">
                     <span><i class="fa-solid fa-hand" style="width:16px;"></i> ${I18N.t('cost.fixed_fee_cost_label')}</span>
                     <strong style="color:var(--text-primary);">${formatCost(q.fixed)}</strong>
                 </div>` : ''}
                 <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:15px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:calc(15px * var(--fs, 1));">
                     <span style="color:var(--text-primary); font-weight:600;">${I18N.t('cost.total_estimated_label')}</span>
-                    <strong style="color:var(--accent); font-size:18px;">${formatCost(total)}</strong>
+                    <strong style="color:var(--accent); font-size:calc(18px * var(--fs, 1));">${formatCost(total)}</strong>
                 </div>
                 ${q.marginPct > 0 ? `
-                <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+                <div style="display:flex; justify-content:space-between; font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary);">
                     <span><i class="fa-solid fa-percent" style="width:16px;"></i> ${I18N.t('cost.margin_line_label', { pct: q.marginPct })}</span>
                     <strong style="color:var(--text-primary);">+ ${formatCost(q.margin)}</strong>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:15px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:calc(15px * var(--fs, 1));">
                     <span style="color:var(--text-primary); font-weight:600;">${I18N.t('cost.unit_price_label')}</span>
-                    <strong style="color:var(--accent); font-size:18px;">${formatCost(q.unit)}</strong>
+                    <strong style="color:var(--accent); font-size:calc(18px * var(--fs, 1));">${formatCost(q.unit)}</strong>
                 </div>` : ''}
                 ${q.qty > 1 ? `
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:15px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:calc(15px * var(--fs, 1));">
                     <span style="color:var(--text-primary); font-weight:600;">${I18N.t('cost.total_for_qty_label', { n: q.qty })}</span>
-                    <strong style="color:var(--accent); font-size:18px;">${formatCost(q.total)}</strong>
+                    <strong style="color:var(--accent); font-size:calc(18px * var(--fs, 1));">${formatCost(q.total)}</strong>
                 </div>` : ''}
-				<div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+				<div style="display:flex; justify-content:space-between; font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary);">
 					<span>${I18N.t('cost.slicer_estimate_note')}</span>
 				</div>
                 ${_ecoEstimate ? `
                 <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; color:var(--text-secondary);">
-                    <span><i class="fa-solid fa-leaf" style="width:16px; color:#4ade80;"></i> ${_t2('cost.eco_score_label', 'Empreinte carbone estimée')}</span>
-                    <strong style="color:#4ade80;">${_ecoEstimate.total_co2_g} g CO₂e</strong>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary);">
+                    <span><i class="fa-solid fa-leaf" style="width:16px; color:var(--cb-ok, #4ade80);"></i> ${_t2('cost.eco_score_label', 'Empreinte carbone estimée')}</span>
+                    <strong style="color:var(--cb-ok, #4ade80);">${_ecoEstimate.total_co2_g} g CO₂e</strong>
                 </div>
-                <div style="font-size:10px; color:var(--text-muted); text-align:right; margin-top:-4px;">
+                <div style="font-size:calc(10px * var(--fs, 1)); color:var(--text-muted); text-align:right; margin-top:-4px;">
                     ${_t2('cost.eco_score_hint', 'Estimation indicative (matériau' + (_ecoEstimate.elec_co2_g != null ? ' + électricité' : '') + '), pas une mesure certifiée')}
                 </div>` : ''}
             </div>
@@ -22790,17 +22927,17 @@ startThumbAutoRefresh();
         const container = document.getElementById('cost-filament-compat');
         if (!container) return;
         container.innerHTML = `<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">
-            <p style="font-size:13px; font-weight:600; margin-bottom:4px; display:flex; align-items:center; justify-content:space-between;">
+            <p style="font-size:calc(13px * var(--fs, 1)); font-weight:600; margin-bottom:4px; display:flex; align-items:center; justify-content:space-between;">
                 <span><i class="fa-solid fa-layer-group"></i> ${_t2('spoolman.compat_title', 'Compatibilité filament')}</span>
-                <button class="btn btn-ghost btn-sm" style="padding:2px 8px; font-size:11px;" onclick="openManualSpoolModal('${escapeJs(filePath)}')"><i class="fa-solid fa-plus"></i> ${_t2('spoolman.add_manual', 'Bobine manuelle')}</button>
+                <button class="btn btn-ghost btn-sm" style="padding:2px 8px; font-size:calc(11px * var(--fs, 1));" onclick="openManualSpoolModal('${escapeJs(filePath)}')"><i class="fa-solid fa-plus"></i> ${_t2('spoolman.add_manual', 'Bobine manuelle')}</button>
             </p>
-            <p style="font-size:10px; color:var(--text-muted); margin-bottom:8px;">
+            <p style="font-size:calc(10px * var(--fs, 1)); color:var(--text-muted); margin-bottom:8px;">
                 ${_t2('spoolman.legend_source', '🔵 Spoolman · 🟠 AMS · 🟢 CFS · ⚪ Manuel')}
                 &nbsp;—&nbsp;
                 ${_t2('spoolman.legend_compat', '🟢 quantité suffisante · 🔴 insuffisante · ⚪ poids inconnu')}
             </p>
             <div id="cost-filament-compat-list" style="display:flex; flex-direction:column; gap:6px;">
-                <p style="font-size:12px; color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> ${_t2('spoolman.compat_loading', 'Recherche des bobines compatibles...')}</p>
+                <p style="font-size:calc(12px * var(--fs, 1)); color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> ${_t2('spoolman.compat_loading', 'Recherche des bobines compatibles...')}</p>
             </div>
         </div>`;
 
@@ -22810,25 +22947,25 @@ startThumbAutoRefresh();
             const list = document.getElementById('cost-filament-compat-list');
             if (!list || filePath !== _costCurrentFilePath) return;
             if (!res.ok) {
-                list.innerHTML = `<p style="font-size:12px; color:var(--text-muted);">${escapeHtml(data.error || _t2('spoolman.compat_error', 'Erreur lors de la vérification de compatibilité'))}</p>`;
+                list.innerHTML = `<p style="font-size:calc(12px * var(--fs, 1)); color:var(--text-muted);">${escapeHtml(data.error || _t2('spoolman.compat_error', 'Erreur lors de la vérification de compatibilité'))}</p>`;
                 return;
             }
             const slots = data.slots || [];
             if (!slots.length) {
-                list.innerHTML = `<p style="font-size:12px; color:var(--text-muted);">${_t2('spoolman.no_spools', 'Aucune bobine trouvée')}</p>
-                    <p style="font-size:11px; color:var(--text-muted); margin-top:4px;">${_t2('spoolman.no_source_hint', 'Configurez Spoolman, connectez une imprimante AMS Bambu, ou ajoutez une bobine manuelle.')}</p>`;
+                list.innerHTML = `<p style="font-size:calc(12px * var(--fs, 1)); color:var(--text-muted);">${_t2('spoolman.no_spools', 'Aucune bobine trouvée')}</p>
+                    <p style="font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); margin-top:4px;">${_t2('spoolman.no_source_hint', 'Configurez Spoolman, connectez une imprimante AMS Bambu, ou ajoutez une bobine manuelle.')}</p>`;
                 return;
             }
             const assignedKey = data.assigned ? `${data.assigned.source_type}:${data.assigned.source_id}` : null;
             const rows = `<div style="display:flex; flex-direction:column; gap:6px; max-height:404px; overflow-y:auto; padding-right:4px;">${slots.map(s => _renderCompatSlotRow(s, filePath, assignedKey)).join('')}</div>`;
             const noWeightNote = data.required_weight_g == null
-                ? `<p style="font-size:11px; color:var(--text-muted); margin-bottom:6px;">${_t2('spoolman.compat_no_weight', 'Poids non estimé pour ce fichier — la compatibilité ne peut pas être calculée précisément.')}</p>` : '';
+                ? `<p style="font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); margin-bottom:6px;">${_t2('spoolman.compat_no_weight', 'Poids non estimé pour ce fichier — la compatibilité ne peut pas être calculée précisément.')}</p>` : '';
             const errorsNote = (data.errors || []).length
-                ? `<p style="font-size:11px; color:var(--text-muted); margin-bottom:6px;"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(data.errors.join(' · '))}</p>` : '';
+                ? `<p style="font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); margin-bottom:6px;"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(data.errors.join(' · '))}</p>` : '';
             list.innerHTML = noWeightNote + errorsNote + rows;
         } catch (e) {
             const list = document.getElementById('cost-filament-compat-list');
-            if (list) list.innerHTML = `<p style="font-size:12px; color:var(--text-muted);">${_t2('spoolman.server_unreachable', 'Serveur injoignable')}</p>`;
+            if (list) list.innerHTML = `<p style="font-size:calc(12px * var(--fs, 1)); color:var(--text-muted);">${_t2('spoolman.server_unreachable', 'Serveur injoignable')}</p>`;
         }
     }
 
@@ -22853,15 +22990,15 @@ startThumbAutoRefresh();
 
         let actionHtml;
         if (isAssigned) {
-            actionHtml = `<span style="color:#68d391; font-size:11px; white-space:nowrap;"><i class="fa-solid fa-check"></i> ${_t2('spoolman.assigned', 'Assignée')}</span>
+            actionHtml = `<span style="color:#68d391; font-size:calc(11px * var(--fs, 1)); white-space:nowrap;"><i class="fa-solid fa-check"></i> ${_t2('spoolman.assigned', 'Assignée')}</span>
                 <button class="btn btn-ghost btn-sm" style="padding:3px 8px;" onclick="unassignFilamentFromFile('${escapeJs(filePath)}')">${_t2('spoolman.unassign', 'Retirer')}</button>`;
         } else if (compatible === false) {
-            actionHtml = `<span style="color:#fc8181; white-space:nowrap; font-size:11px;">${_t2('spoolman.insufficient', 'Quantité insuffisante')}</span>`;
+            actionHtml = `<span style="color:#fc8181; white-space:nowrap; font-size:calc(11px * var(--fs, 1));">${_t2('spoolman.insufficient', 'Quantité insuffisante')}</span>`;
         } else {
             actionHtml = `<button class="btn btn-ghost btn-sm" style="padding:3px 8px;" onclick="assignFilamentToFile('${escapeJs(filePath)}', '${escapeJs(s.source_type)}', '${escapeJs(s.source_id)}')">${_t2('spoolman.assign', 'Assigner')}</button>`;
         }
 
-        return `<div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--radius); background:var(--bg-card); border:1px solid ${isAssigned ? '#68d391' : 'var(--border)'}; font-size:12px;">
+        return `<div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--radius); background:var(--bg-card); border:1px solid ${isAssigned ? '#68d391' : 'var(--border)'}; font-size:calc(12px * var(--fs, 1));">
             <span title="${escapeHtml(_t2('spoolman.source_title', 'Source') + ' : ' + sourceLabel)}">${sourceBadge}</span>
             <span title="${escapeHtml(compatTitle)}">${compatIcon}</span>
             <span title="${escapeHtml(_t2('spoolman.color_title', 'Couleur du filament'))}" style="background:${color}; width:10px; height:10px; border-radius:50%; flex-shrink:0; display:inline-block; border:1px solid rgba(255,255,255,0.15);"></span>
@@ -22915,7 +23052,7 @@ startThumbAutoRefresh();
                     <button class="modal-close" onclick="closeModal('modal-manual-spool')">×</button>
                 </div>
                 <div class="modal-body" style="display:flex; flex-direction:column; gap:10px;">
-                    <p style="font-size:12px; color:var(--text-muted);">${_t2('spoolman.manual_hint', "Pour les systèmes multicolores non connectés nativement (ex: Creality CFS) — déclarez la bobine à la main.")}</p>
+                    <p style="font-size:calc(12px * var(--fs, 1)); color:var(--text-muted);">${_t2('spoolman.manual_hint', "Pour les systèmes multicolores non connectés nativement (ex: Creality CFS) — déclarez la bobine à la main.")}</p>
                     <input type="text" id="manual-spool-name" class="form-input" placeholder="${_t2('spoolman.name', 'Nom')} (ex: PLA Noir CFS)">
                     <div style="display:flex; gap:8px;">
                         <input type="text" id="manual-spool-material" class="form-input" placeholder="${_t2('spoolman.material', 'Matière')} (PLA, PETG...)" style="flex:1;">
@@ -22940,23 +23077,23 @@ startThumbAutoRefresh();
     async function _refreshManualSpoolList() {
         const box = document.getElementById('manual-spool-existing-list');
         if (!box) return;
-        box.innerHTML = `<p style="font-size:11px; color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i></p>`;
+        box.innerHTML = `<p style="font-size:calc(11px * var(--fs, 1)); color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i></p>`;
         try {
             const res = await fetch(`${API}/api/filament/manual`);
             const spools = await res.json();
             if (!Array.isArray(spools) || !spools.length) {
-                box.innerHTML = `<p style="font-size:11px; color:var(--text-muted);">${_t2('spoolman.no_spools', 'Aucune bobine trouvée')}</p>`;
+                box.innerHTML = `<p style="font-size:calc(11px * var(--fs, 1)); color:var(--text-muted);">${_t2('spoolman.no_spools', 'Aucune bobine trouvée')}</p>`;
                 return;
             }
             box.innerHTML = spools.map(s => `
-                <div style="display:flex; align-items:center; gap:8px; font-size:12px;">
+                <div style="display:flex; align-items:center; gap:8px; font-size:calc(12px * var(--fs, 1));">
                     <span style="background:${s.color_hex || '#888'}; width:10px; height:10px; border-radius:50%; display:inline-block; flex-shrink:0;"></span>
                     <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(s.name)} <span style="color:var(--text-muted);">(${escapeHtml(s.material || '')})</span></span>
                     <span style="color:var(--text-muted);">${s.remaining_g != null ? Math.round(s.remaining_g) + 'g' : '—'}</span>
                     <button class="btn btn-ghost btn-sm" style="padding:2px 6px;" onclick="deleteManualSpool(${s.id})"><i class="fa-solid fa-trash"></i></button>
                 </div>`).join('');
         } catch (e) {
-            box.innerHTML = `<p style="font-size:11px; color:var(--text-muted);">${_t2('spoolman.server_unreachable', 'Serveur injoignable')}</p>`;
+            box.innerHTML = `<p style="font-size:calc(11px * var(--fs, 1)); color:var(--text-muted);">${_t2('spoolman.server_unreachable', 'Serveur injoignable')}</p>`;
         }
     }
 
@@ -23032,13 +23169,13 @@ startThumbAutoRefresh();
         return `
             <div style="position:relative; border-radius:var(--radius); overflow:hidden; background:var(--bg-card); border:1px solid var(--border);">
                 <img src="${API}${p.url}" loading="lazy" style="width:100%; aspect-ratio:1; object-fit:cover; display:block; cursor:pointer;" onclick="openPhotoLightbox('${API}${p.url}', '${escapeHtml(p.file_name)}')">
-                <span style="position:absolute; top:4px; left:4px; padding:2px 7px; border-radius:10px; font-size:10px; font-weight:600; color:#fff; background:${isFailed ? 'rgba(220,53,69,0.85)' : 'rgba(40,167,69,0.85)'};">
+                <span style="position:absolute; top:4px; left:4px; padding:2px 7px; border-radius:10px; font-size:calc(10px * var(--fs, 1)); font-weight:600; color:#fff; background:${isFailed ? 'rgba(220,53,69,0.85)' : 'rgba(40,167,69,0.85)'};">
                     <i class="fa-solid ${isFailed ? 'fa-xmark' : 'fa-check'}"></i> ${isFailed ? (I18N.t('modal.print_photos_failed') || 'Raté') : (I18N.t('modal.print_photos_success') || 'Réussi')}
                 </span>
                 <button onclick="deletePrintPhoto(${p.id})" title="${I18N.t('actions.delete') || 'Supprimer'}" style="position:absolute; top:4px; right:4px; width:24px; height:24px; border-radius:50%; background:rgba(0,0,0,0.6); color:#fff; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;">
-                    <i class="fa-solid fa-xmark" style="font-size:11px;"></i>
+                    <i class="fa-solid fa-xmark" style="font-size:calc(11px * var(--fs, 1));"></i>
                 </button>
-                ${p.note ? `<div style="padding:6px 8px; font-size:11px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(p.note)}">${escapeHtml(p.note)}</div>` : ''}
+                ${p.note ? `<div style="padding:6px 8px; font-size:calc(11px * var(--fs, 1)); color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(p.note)}">${escapeHtml(p.note)}</div>` : ''}
             </div>
         `;
     }
@@ -23052,12 +23189,12 @@ startThumbAutoRefresh();
             const res = await fetch(url);
             const photos = await res.json();
             if (!res.ok || !Array.isArray(photos) || !photos.length) {
-                grid.innerHTML = `<p style="grid-column:1/-1; color:var(--text-muted); font-size:13px; text-align:center; padding:20px;">${I18N.t('modal.print_photos_empty') || "Aucune photo pour ce fichier. Ajoute la première !"}</p>`;
+                grid.innerHTML = `<p style="grid-column:1/-1; color:var(--text-muted); font-size:calc(13px * var(--fs, 1)); text-align:center; padding:20px;">${I18N.t('modal.print_photos_empty') || "Aucune photo pour ce fichier. Ajoute la première !"}</p>`;
                 return;
             }
             grid.innerHTML = photos.map(_photoCardHtml).join('');
         } catch (e) {
-            grid.innerHTML = `<p style="grid-column:1/-1; color:var(--danger); font-size:13px; text-align:center; padding:20px;">${I18N.t('toast.connection_error')}</p>`;
+            grid.innerHTML = `<p style="grid-column:1/-1; color:var(--danger); font-size:calc(13px * var(--fs, 1)); text-align:center; padding:20px;">${I18N.t('toast.connection_error')}</p>`;
         }
     }
 
@@ -23105,22 +23242,22 @@ startThumbAutoRefresh();
                 return `
                 <div style="position:relative; border-radius:var(--radius); overflow:hidden; background:var(--bg-card); border:1px solid var(--border);">
                     <img src="${API}${p.url}" loading="lazy" style="width:100%; aspect-ratio:1; object-fit:cover; display:block; cursor:pointer;" onclick="openPhotoLightbox('${API}${p.url}', '${escapeHtml(p.file_name)}')">
-                    <span style="position:absolute; top:4px; left:4px; padding:2px 7px; border-radius:10px; font-size:10px; font-weight:600; color:#fff; background:${isFailed ? 'rgba(220,53,69,0.85)' : 'rgba(40,167,69,0.85)'};">
+                    <span style="position:absolute; top:4px; left:4px; padding:2px 7px; border-radius:10px; font-size:calc(10px * var(--fs, 1)); font-weight:600; color:#fff; background:${isFailed ? 'rgba(220,53,69,0.85)' : 'rgba(40,167,69,0.85)'};">
                         <i class="fa-solid ${isFailed ? 'fa-xmark' : 'fa-check'}"></i> ${isFailed ? (I18N.t('modal.print_photos_failed') || 'Raté') : (I18N.t('modal.print_photos_success') || 'Réussi')}
                     </span>
                     <button onclick="deletePrintPhoto(${p.id})" title="${I18N.t('actions.delete') || 'Supprimer'}" style="position:absolute; top:4px; right:4px; width:24px; height:24px; border-radius:50%; background:rgba(0,0,0,0.6); color:#fff; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;">
-                        <i class="fa-solid fa-xmark" style="font-size:11px;"></i>
+                        <i class="fa-solid fa-xmark" style="font-size:calc(11px * var(--fs, 1));"></i>
                     </button>
                     <div style="padding:6px 8px;">
                         <div style="display:flex; align-items:center; gap:6px;">
-                            <div style="flex:1; min-width:0; font-size:11px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;" title="${escapeHtml(p.file_name)}" onclick="openPrintPhotosModal('${escapeJs(p.file_path)}', '${escapeJs(p.file_name)}')">
+                            <div style="flex:1; min-width:0; font-size:calc(11px * var(--fs, 1)); font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;" title="${escapeHtml(p.file_name)}" onclick="openPrintPhotosModal('${escapeJs(p.file_path)}', '${escapeJs(p.file_name)}')">
                                 <i class="fa-solid fa-cube" style="color:var(--text-muted);"></i> ${escapeHtml(p.file_name)}
                             </div>
                             <button type="button" class="gallery-file-link" title="${escapeHtml(_t3('history.view_file', 'Voir le fichier'))}" aria-label="${escapeHtml(_t3('history.view_file', 'Voir le fichier'))}" onclick="event.stopPropagation(); viewHistoryFile('${escapeJs(p.file_path)}', '${escapeJs(p.file_name)}')">
                                 <i class="fa-solid fa-arrow-up-right-from-square"></i>
                             </button>
                         </div>
-                        ${p.note ? `<div style="font-size:11px; color:var(--text-secondary); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(p.note)}">${escapeHtml(p.note)}</div>` : ''}
+                        ${p.note ? `<div style="font-size:calc(11px * var(--fs, 1)); color:var(--text-secondary); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(p.note)}">${escapeHtml(p.note)}</div>` : ''}
                     </div>
                 </div>
             `;
@@ -23165,7 +23302,7 @@ startThumbAutoRefresh();
 			caption.style.cssText = `
 				position: absolute; bottom: 20px; left: 50%;
 				transform: translateX(-50%);
-				color: #fff; font-size: 13px;
+				color: #fff; font-size: calc(13px * var(--fs, 1));
 				background: rgba(0,0,0,0.6);
 				padding: 6px 16px; border-radius: 20px;
 				white-space: nowrap; max-width: 80vw;
@@ -23180,7 +23317,7 @@ startThumbAutoRefresh();
 				background: rgba(0,0,0,0.5); color: #fff;
 				border: none; border-radius: 50%;
 				width: 40px; height: 40px;
-				font-size: 22px; cursor: pointer;
+				font-size: calc(22px * var(--fs, 1)); cursor: pointer;
 				display: flex; align-items: center; justify-content: center;
 				transition: background 0.2s;
 			`;
@@ -23275,7 +23412,7 @@ startThumbAutoRefresh();
 
         const f = (allFiles || []).find(x => x.path === filePath) || {};
         const row = (label, value) => value === null || value === undefined || value === '' ? '' :
-            `<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); font-size:13px;">
+            `<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); font-size:calc(13px * var(--fs, 1));">
                 <span style="color:var(--text-muted);">${escapeHtml(label)}</span>
                 <span style="font-weight:500; text-align:right; max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(String(value))}">${escapeHtml(String(value))}</span>
             </div>`;
@@ -23295,10 +23432,10 @@ startThumbAutoRefresh();
         const weight = metadata?.weights?.pla ? `${metadata.weights.pla} g (PLA)` : null;
 
         body.innerHTML = `
-            <p style="font-size:13px; color:var(--text-secondary); margin-bottom:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(fileName)}">
+            <p style="font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary); margin-bottom:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(fileName)}">
                 <i class="fa-solid fa-cube"></i> ${escapeHtml(fileName)}
             </p>
-            <h4 style="font-size:12px; text-transform:uppercase; color:var(--text-muted); margin:14px 0 4px;" data-i18n="modal.metadata_file_section">Fichier</h4>
+            <h4 style="font-size:calc(12px * var(--fs, 1)); text-transform:uppercase; color:var(--text-muted); margin:14px 0 4px;" data-i18n="modal.metadata_file_section">Fichier</h4>
             ${row(I18N.t('modal.metadata_path') || 'Chemin', f.path)}
             ${row(I18N.t('modal.metadata_size') || 'Taille', formatSize(f.size || 0))}
             ${row(I18N.t('modal.metadata_extension') || 'Format', (f.extension || '').replace('.', '').toUpperCase())}
@@ -23308,7 +23445,7 @@ startThumbAutoRefresh();
 
             <div id="file-origin-box"></div>
 
-            <h4 style="font-size:12px; text-transform:uppercase; color:var(--text-muted); margin:16px 0 4px;" data-i18n="modal.metadata_geometry_section">Géométrie</h4>
+            <h4 style="font-size:calc(12px * var(--fs, 1)); text-transform:uppercase; color:var(--text-muted); margin:16px 0 4px;" data-i18n="modal.metadata_geometry_section">Géométrie</h4>
             ${metadata ? `
                 ${row(I18N.t('modal.metadata_dimensions') || 'Dimensions', dims)}
                 ${row(I18N.t('modal.metadata_volume') || 'Volume', metadata.volume_cm3 ? `${metadata.volume_cm3} cm³` : null)}
@@ -23317,15 +23454,15 @@ startThumbAutoRefresh();
                 ${row(I18N.t('modal.metadata_triangles') || 'Triangles', metadata.triangle_count?.toLocaleString())}
                 ${row(I18N.t('modal.metadata_manifold') || 'Maillage', metadata.is_manifold ? (I18N.t('modal.metadata_manifold_ok') || '✅ Sain (watertight)') : (I18N.t('modal.metadata_manifold_ko') || '⚠️ Non-manifold'))}
                 ${row(I18N.t('modal.metadata_print_time') || 'Temps estimé', metadata.estimated_time?.formatted)}
-            ` : `<p style="color:var(--text-muted); font-size:13px;">${I18N.t('cost.analyze_error') || "Analyse impossible pour ce fichier."}</p>`}
+            ` : `<p style="color:var(--text-muted); font-size:calc(13px * var(--fs, 1));">${I18N.t('cost.analyze_error') || "Analyse impossible pour ce fichier."}</p>`}
 
-            <h4 style="font-size:12px; text-transform:uppercase; color:var(--text-muted); margin:16px 0 4px; display:flex; justify-content:space-between; align-items:center;">
+            <h4 style="font-size:calc(12px * var(--fs, 1)); text-transform:uppercase; color:var(--text-muted); margin:16px 0 4px; display:flex; justify-content:space-between; align-items:center;">
                 <span data-i18n="modal.metadata_ai_description_section">Description IA</span>
-                <button class="btn btn-ghost btn-sm" id="ai-describe-btn" onclick="generateFileDescription('${escapeJs(filePath)}')" style="font-size:11px; padding:3px 8px;">
+                <button class="btn btn-ghost btn-sm" id="ai-describe-btn" onclick="generateFileDescription('${escapeJs(filePath)}')" style="font-size:calc(11px * var(--fs, 1)); padding:3px 8px;">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="modal.metadata_ai_generate">Générer</span>
                 </button>
             </h4>
-            <p id="ai-description-text" style="font-size:13px; color:var(--text-secondary); line-height:1.5; font-style:italic;">${I18N.t('common.loading_ellipsis') || 'Chargement...'}</p>
+            <p id="ai-description-text" style="font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary); line-height:1.5; font-style:italic;">${I18N.t('common.loading_ellipsis') || 'Chargement...'}</p>
         `;
 
         _loadFileOrigin(filePath);
@@ -23365,12 +23502,12 @@ startThumbAutoRefresh();
         const linkRow = safeUrl
             ? `<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:6px 0 12px;">
                     <a class="btn btn-ghost btn-sm" href="${_originAttr(safeUrl)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i> ${escapeHtml(o.platform || I18N.t('modal.origin_open'))}</a>
-                    ${dateTxt ? `<span style="font-size:12px; color:var(--text-muted);">${escapeHtml(I18N.t('modal.origin_downloaded_on', { date: dateTxt }))}</span>` : ''}
+                    ${dateTxt ? `<span style="font-size:calc(12px * var(--fs, 1)); color:var(--text-muted);">${escapeHtml(I18N.t('modal.origin_downloaded_on', { date: dateTxt }))}</span>` : ''}
                </div>`
-            : `<p style="font-size:12px; color:var(--text-muted); margin:6px 0 12px;">${escapeHtml(I18N.t('modal.origin_none'))}</p>`;
+            : `<p style="font-size:calc(12px * var(--fs, 1)); color:var(--text-muted); margin:6px 0 12px;">${escapeHtml(I18N.t('modal.origin_none'))}</p>`;
 
         box.innerHTML = `
-            <h4 style="font-size:12px; text-transform:uppercase; color:var(--text-muted); margin:16px 0 4px;">${escapeHtml(I18N.t('modal.origin_title'))}</h4>
+            <h4 style="font-size:calc(12px * var(--fs, 1)); text-transform:uppercase; color:var(--text-muted); margin:16px 0 4px;">${escapeHtml(I18N.t('modal.origin_title'))}</h4>
             ${linkRow}
             <div class="input-group" style="margin-bottom:10px;"><i class="fa-solid fa-link"></i>
                 <input type="text" id="origin-url" maxlength="500" value="${_originAttr(o.source_url)}" placeholder="${_originAttr(I18N.t('modal.origin_url_placeholder'))}" autocomplete="off">
@@ -23485,18 +23622,18 @@ window._applyCostPrinterSelection = _applyCostPrinterSelection;
 <title>${e(t('cost.quote_title'))} ${e(ctx.number)}</title>
 <style>
   body { font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; color: #1a1d2e; max-width: 780px; margin: 32px auto; padding: 0 24px; line-height: 1.5; }
-  h1 { font-size: 28px; margin: 0 0 4px; }
-  .meta { color: #555; font-size: 14px; margin-bottom: 28px; }
+  h1 { font-size: calc(28px * var(--fs, 1)); margin: 0 0 4px; }
+  .meta { color: #555; font-size: calc(14px * var(--fs, 1)); margin-bottom: 28px; }
   .parties { display: flex; gap: 32px; margin-bottom: 28px; }
   .parties > div { flex: 1; }
-  .label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #777; margin-bottom: 4px; }
+  .label { font-size: calc(11px * var(--fs, 1)); text-transform: uppercase; letter-spacing: .06em; color: #777; margin-bottom: 4px; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #555; border-bottom: 2px solid #1a1d2e; padding: 8px 6px; }
+  th { text-align: left; font-size: calc(12px * var(--fs, 1)); text-transform: uppercase; letter-spacing: .05em; color: #555; border-bottom: 2px solid #1a1d2e; padding: 8px 6px; }
   td { padding: 12px 6px; border-bottom: 1px solid #ddd; vertical-align: top; }
   th.num, td.num { text-align: right; white-space: nowrap; }
-  .sub { color: #666; font-size: 12.5px; }
-  .total { text-align: right; font-size: 20px; font-weight: 700; margin-top: 8px; }
-  .notes { margin-top: 28px; font-size: 13px; color: #444; border-top: 1px solid #ddd; padding-top: 12px; }
+  .sub { color: #666; font-size: calc(12.5px * var(--fs, 1)); }
+  .total { text-align: right; font-size: calc(20px * var(--fs, 1)); font-weight: 700; margin-top: 8px; }
+  .notes { margin-top: 28px; font-size: calc(13px * var(--fs, 1)); color: #444; border-top: 1px solid #ddd; padding-top: 12px; }
   .actions { margin-bottom: 24px; }
   .actions button { font: inherit; padding: 8px 16px; border-radius: 8px; border: 1px solid #1a1d2e; background: #1a1d2e; color: #fff; cursor: pointer; }
   @media print { .actions { display: none; } body { margin: 0; } }
@@ -23542,7 +23679,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
     function _quoteThumbsChecked(id) {
         let on = false;
         try { on = localStorage.getItem('stellio_quote_thumbs') === '1'; } catch (e) { /* stockage indisponible */ }
-        return `<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-primary); cursor:pointer;">
+        return `<label style="display:flex; align-items:center; gap:8px; font-size:calc(13px * var(--fs, 1)); color:var(--text-primary); cursor:pointer;">
             <input type="checkbox" id="${id}" ${on ? 'checked' : ''} onchange="try{localStorage.setItem('stellio_quote_thumbs', this.checked ? '1' : '0')}catch(e){}">
             <span>${escapeHtml(_t3('cost.quote_show_thumbs', 'Afficher les miniatures des objets sur le devis'))}</span></label>`;
     }
@@ -23856,7 +23993,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             fixedFee: val('pcost-fixed'), marginPct: val('pcost-margin'), qty: val('pcost-quantity') });
         _pc.quote = { ...q, material_key: mat, weightG: totalW, timeFormatted: _pcDuration(totalS), timeHours: totalS / 3600 };
 
-        const badge = (icon, color, txt) => `<div style="display:flex; align-items:center; gap:6px; font-size:11px; color:${color}; margin-bottom:10px;"><i class="fa-solid ${icon}"></i> ${txt}</div>`;
+        const badge = (icon, color, txt) => `<div style="display:flex; align-items:center; gap:6px; font-size:calc(11px * var(--fs, 1)); color:${color}; margin-bottom:10px;"><i class="fa-solid ${icon}"></i> ${txt}</div>`;
         let preciseHtml = '';
         if (nOk > 0) {
             if (nPending > 0) preciseHtml = badge('fa-spinner fa-spin', 'var(--text-muted)', `${I18N.t('cost.precise_searching')} (${nPrecise}/${nOk})`);
@@ -23867,11 +24004,11 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             else if (nFailed > 0 || nUnavailable > 0) preciseHtml = badge('fa-circle-info', 'var(--text-muted)', I18N.t('cost.precise_failed'));
         }
 
-        const line = (icon, label, value, color) => `<div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+        const line = (icon, label, value, color) => `<div style="display:flex; justify-content:space-between; font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary);">
             <span><i class="fa-solid ${icon}" style="width:16px;"></i> ${label}</span><strong style="color:${color || 'var(--text-primary)'};">${value}</strong></div>`;
-        const big = (label, value) => `<div style="display:flex; justify-content:space-between; align-items:center; font-size:15px;">
-            <span style="color:var(--text-primary); font-weight:600;">${label}</span><strong style="color:var(--accent); font-size:18px;">${value}</strong></div>`;
-        const fileRows = rows.map(r => `<div style="display:flex; align-items:center; gap:8px; font-size:12.5px; padding:5px 0; border-bottom:1px solid var(--border); ${r.f.ok ? '' : 'opacity:.6;'}">
+        const big = (label, value) => `<div style="display:flex; justify-content:space-between; align-items:center; font-size:calc(15px * var(--fs, 1));">
+            <span style="color:var(--text-primary); font-weight:600;">${label}</span><strong style="color:var(--accent); font-size:calc(18px * var(--fs, 1));">${value}</strong></div>`;
+        const fileRows = rows.map(r => `<div style="display:flex; align-items:center; gap:8px; font-size:calc(12.5px * var(--fs, 1)); padding:5px 0; border-bottom:1px solid var(--border); ${r.f.ok ? '' : 'opacity:.6;'}">
             <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(r.f.path)}">${r.f.ok ? (r.precise ? '<i class="fa-solid fa-circle-check" style="color:#68d391;"></i> ' : '') : '<i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i> '}${escapeHtml(r.f.name)}</span>
             <span style="color:var(--text-muted); white-space:nowrap;">× ${r.qty}</span>
             <span style="color:var(--text-muted); white-space:nowrap;">${r.w.toFixed(1)} g</span>
@@ -23893,14 +24030,14 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                 ${q.marginPct > 0 ? `${line('fa-percent', I18N.t('cost.margin_line_label', { pct: q.marginPct }), `+ ${formatCost(q.margin)}`)}
                     ${big(_t2('projects.cost_sale_price', 'Prix de vente du projet'), formatCost(q.unit))}` : ''}
                 ${q.qty > 1 ? big(_t2('projects.cost_total_copies', 'Total pour {{n}} exemplaire(s)', { n: q.qty }).replace('{{n}}', q.qty), formatCost(q.total)) : ''}
-                <div style="font-size:13px; color:var(--text-secondary);">${I18N.t('cost.slicer_estimate_note')}</div>
+                <div style="font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary);">${I18N.t('cost.slicer_estimate_note')}</div>
                 ${hasCo2 ? `<div style="border-top:1px solid var(--border); margin:4px 0;"></div>
                 ${line('fa-leaf', _t2('cost.eco_score_label', 'Empreinte carbone estimée'), `${Math.round(co2 * q.qty * 10) / 10} g CO₂e`, '#4ade80')}` : ''}
             </div>
             <div style="margin-top:14px;">
-                <div style="font-size:12px; color:var(--text-secondary); margin-bottom:4px;"><i class="fa-solid fa-list"></i> ${escapeHtml(_t2('projects.cost_files_title', 'Détail par fichier'))}</div>
+                <div style="font-size:calc(12px * var(--fs, 1)); color:var(--text-secondary); margin-bottom:4px;"><i class="fa-solid fa-list"></i> ${escapeHtml(_t2('projects.cost_files_title', 'Détail par fichier'))}</div>
                 ${fileRows}
-                ${ignored ? `<div style="font-size:12px; color:var(--warning); margin-top:8px;"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(_t2('projects.cost_ignored', '{{n}} fichier(s) ignoré(s) : analyse impossible').replace('{{n}}', ignored))}</div>` : ''}
+                ${ignored ? `<div style="font-size:calc(12px * var(--fs, 1)); color:var(--warning); margin-top:8px;"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(_t2('projects.cost_ignored', '{{n}} fichier(s) ignoré(s) : analyse impossible').replace('{{n}}', ignored))}</div>` : ''}
             </div>`;
     }
 
@@ -23927,7 +24064,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
         body.innerHTML = `<div style="text-align:center; padding:40px; color:var(--text-muted)"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p id="project-cost-progress" style="margin-top:10px">${escapeHtml(I18N.t('cost.analyzing'))}</p></div>`;
         openModal('modal-project-cost');
 
-        const failBox = (msg) => `<div style="text-align:center; padding:30px; color:var(--text-muted)"><i class="fa-solid fa-triangle-exclamation" style="font-size:28px; color:var(--danger);"></i><p style="margin-top:10px;">${escapeHtml(msg)}</p></div>`;
+        const failBox = (msg) => `<div style="text-align:center; padding:30px; color:var(--text-muted)"><i class="fa-solid fa-triangle-exclamation" style="font-size:calc(28px * var(--fs, 1)); color:var(--danger);"></i><p style="margin-top:10px;">${escapeHtml(msg)}</p></div>`;
         try {
             const [pRes, sRes] = await Promise.all([
                 fetch(`${API}/api/projects/${projectId}`, { cache: 'no-store' }),
@@ -23982,7 +24119,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             const material = settings.print_cost_material || 'pla';
             const cur = printCostCurrency === 'USD' ? '$' : '€';
             const fieldStyle = 'width:100%; padding:8px 10px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary);';
-            const labelStyle = 'display:block; font-size:12px; color:var(--text-secondary); margin-bottom:4px;';
+            const labelStyle = 'display:block; font-size:calc(12px * var(--fs, 1)); color:var(--text-secondary); margin-bottom:4px;';
             const opt = (v, label, sel, extra = '') => `<option value="${escapeHtml(String(v))}" ${extra} ${sel ? 'selected' : ''}>${escapeHtml(label)}</option>`;
             const projectItemName = escapeHtml(String(project.name || '')).replace(/"/g, '&quot;');
 
@@ -24000,7 +24137,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                         <select id="pcost-process" style="${fieldStyle}">
                             <option value="">${_t2('cost.slicer_settings_default', "Réglages par défaut de l'application")}</option>
                         </select>
-                        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${_t2('cost.slicer_settings_hint', "L'estimation précise du slicer utilisera ce profil.")}</div>
+                        <div style="font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); margin-top:4px;">${_t2('cost.slicer_settings_hint', "L'estimation précise du slicer utilisera ce profil.")}</div>
                     </div>
                     <div>
                         <label style="${labelStyle}">${I18N.t('cost.material_label')}</label>
@@ -24068,10 +24205,10 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                         <textarea id="pcost-quote-notes" rows="2" maxlength="500" style="${fieldStyle} resize:vertical;"></textarea>
                     </div>
                     ${_quoteThumbsChecked('pcost-quote-thumbs')}
-                    <p style="margin:0; font-size:12px; color:var(--text-muted);"><i class="fa-solid fa-circle-info"></i> ${I18N.t('cost.quote_header_hint')}</p>
+                    <p style="margin:0; font-size:calc(12px * var(--fs, 1)); color:var(--text-muted);"><i class="fa-solid fa-circle-info"></i> ${I18N.t('cost.quote_header_hint')}</p>
                     <button type="button" class="btn btn-primary btn-sm" id="pcost-quote-btn"><i class="fa-solid fa-file-invoice"></i> ${I18N.t('cost.quote_generate')}</button>
                 </div>
-                <p style="display:flex; align-items:flex-start; gap:8px; font-size:12px; color:var(--text-muted); margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
+                <p style="display:flex; align-items:flex-start; gap:8px; font-size:calc(12px * var(--fs, 1)); color:var(--text-muted); margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
                     <i class="fa-solid fa-triangle-exclamation" style="margin-top:1px; color:var(--warning);"></i>
                     <span>${I18N.t('cost.slicer_settings_disclaimer')}</span>
                 </p>`;
@@ -24168,7 +24305,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             const data = await res.json();
             if (!res.ok || !data.metadata) {
                 body.innerHTML = `<div style="text-align:center; padding:30px; color:var(--text-muted)">
-                    <i class="fa-solid fa-triangle-exclamation" style="font-size:28px; color:var(--danger);"></i>
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size:calc(28px * var(--fs, 1)); color:var(--danger);"></i>
                     <p style="margin-top:10px;">${I18N.t('cost.analyze_error')}</p>
                 </div>`;
                 return;
@@ -24219,10 +24356,10 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             const spoolOptions = settingsSpools.length > 0 ? settingsSpools : [{ id: '__legacy', name: I18N.t('cost.spool_default_name') || 'Bobine', price: spoolPrice, weight: spoolWeight }];
             const materials = ['pla', 'petg', 'abs', 'tpu', 'nylon'];
             const fieldStyle = 'width:100%; padding:8px 10px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary);';
-            const labelStyle = 'display:block; font-size:12px; color:var(--text-secondary); margin-bottom:4px;';
+            const labelStyle = 'display:block; font-size:calc(12px * var(--fs, 1)); color:var(--text-secondary); margin-bottom:4px;';
 
             body.innerHTML = `
-                <p style="font-size:13px; color:var(--text-secondary); margin-bottom:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(fileName)}">
+                <p style="font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary); margin-bottom:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(fileName)}">
                     <i class="fa-solid fa-cube"></i> ${escapeHtml(fileName)}
                 </p>
                 <div style="display:flex; flex-direction:column; gap:12px;">
@@ -24238,7 +24375,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                         <select id="cost-process-select" style="${fieldStyle}">
                             <option value="">${_t2('cost.slicer_settings_default', "Réglages par défaut de l'application")}</option>
                         </select>
-                        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${_t2('cost.slicer_settings_hint', "L'estimation précise du slicer utilisera ce profil.")}</div>
+                        <div style="font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); margin-top:4px;">${_t2('cost.slicer_settings_hint', "L'estimation précise du slicer utilisera ce profil.")}</div>
                     </div>
                     <div>
                         <label style="${labelStyle}">${I18N.t('cost.material_label')}</label>
@@ -24315,11 +24452,11 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                         <textarea id="cost-quote-notes" rows="2" maxlength="500" style="${fieldStyle} resize:vertical;"></textarea>
                     </div>
                     ${_quoteThumbsChecked('cost-quote-thumbs')}
-                    <p style="margin:0; font-size:12px; color:var(--text-muted);"><i class="fa-solid fa-circle-info"></i> ${I18N.t('cost.quote_header_hint')}</p>
+                    <p style="margin:0; font-size:calc(12px * var(--fs, 1)); color:var(--text-muted);"><i class="fa-solid fa-circle-info"></i> ${I18N.t('cost.quote_header_hint')}</p>
                     <button type="button" class="btn btn-primary btn-sm" id="cost-quote-btn"><i class="fa-solid fa-file-invoice"></i> ${I18N.t('cost.quote_generate')}</button>
                 </div>
                 <div id="cost-filament-compat"></div>
-                <p style="display:flex; align-items:flex-start; gap:8px; font-size:12px; color:var(--text-muted); margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
+                <p style="display:flex; align-items:flex-start; gap:8px; font-size:calc(12px * var(--fs, 1)); color:var(--text-muted); margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
                     <i class="fa-solid fa-triangle-exclamation" style="margin-top:1px; color:var(--warning);"></i>
                     <span>${I18N.t('cost.slicer_settings_disclaimer')}</span>
                 </p>
@@ -24352,7 +24489,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
             _loadFilamentCompatibility(filePath);
         } catch (err) {
             body.innerHTML = `<div style="text-align:center; padding:30px; color:var(--text-muted)">
-                <i class="fa-solid fa-triangle-exclamation" style="font-size:28px; color:var(--danger);"></i>
+                <i class="fa-solid fa-triangle-exclamation" style="font-size:calc(28px * var(--fs, 1)); color:var(--danger);"></i>
                 <p style="margin-top:10px;" data-i18n="toast.connection_error">Erreur de connexion.</p>
             </div>`;
             I18N.apply(body);
@@ -24686,7 +24823,7 @@ function _projectGcodeSectionHtml(projectId, gcodes) {
     return `<div class="gcode-archive">
         <h4 class="gcode-archive-title"><i class="fa-solid fa-box-archive"></i> ${escapeHtml(I18N.t('projects.gcode_title'))}</h4>
         <p class="gcode-archive-hint">${escapeHtml(I18N.t('projects.gcode_hint'))}</p>
-        ${items || `<p style="color:var(--text-muted); font-size:13px; margin:8px 0;">${escapeHtml(I18N.t('projects.gcode_empty'))}</p>`}
+        ${items || `<p style="color:var(--text-muted); font-size:calc(13px * var(--fs, 1)); margin:8px 0;">${escapeHtml(I18N.t('projects.gcode_empty'))}</p>`}
         <input type="file" id="project-gcode-input" accept=".gcode,.gco,.gc,.bgcode" multiple style="display:none" onchange="uploadProjectGcodes(${projectId}, this)">
         <button class="btn btn-ghost" style="width:100%; margin-top:10px;" onclick="document.getElementById('project-gcode-input').click()">
             <i class="fa-solid fa-plus"></i> ${escapeHtml(I18N.t('projects.gcode_add'))}
@@ -24748,7 +24885,7 @@ async function _renderFileGcodes() {
     } catch (err) { showToast(I18N.t('toast.connection_error'), 'error'); }
     body.innerHTML = `<div class="gcode-archive" style="margin-top:0; padding-top:0; border-top:0;">
         <p class="gcode-archive-hint">${escapeHtml(I18N.t('projects.gcode_file_hint'))}</p>
-        ${list.map(g => _gcodeItemHtml(g, `deleteFileGcode(${g.id})`)).join('') || `<p style="color:var(--text-muted); font-size:13px; margin:8px 0;">${escapeHtml(I18N.t('projects.gcode_file_empty'))}</p>`}
+        ${list.map(g => _gcodeItemHtml(g, `deleteFileGcode(${g.id})`)).join('') || `<p style="color:var(--text-muted); font-size:calc(13px * var(--fs, 1)); margin:8px 0;">${escapeHtml(I18N.t('projects.gcode_file_empty'))}</p>`}
         <input type="file" id="file-gcode-input" accept=".gcode,.gco,.gc,.bgcode" multiple style="display:none" onchange="uploadFileGcodes(this)">
         <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="document.getElementById('file-gcode-input').click()">
             <i class="fa-solid fa-upload"></i> ${escapeHtml(I18N.t('projects.gcode_upload'))}
@@ -24839,8 +24976,8 @@ async function refreshProjectDetail(projectId) {
 
         body.innerHTML = `
             <div class="project-progress-bar" style="margin-bottom:14px;"><div class="project-progress-fill" style="width:${progress}%; background:${p.color}"></div></div>
-            <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">${totalPrinted}/${totalNeeded} ${I18N.t('projects.pieces_printed')} · ${p.files.length} ${I18N.t('projects.parts')}</p>
-            <div class="project-file-list">${rows || `<p style="color:var(--text-muted); font-size:13px;">${I18N.t('projects.no_files_yet')}</p>`}</div>
+            <p style="font-size:calc(12px * var(--fs, 1)); color:var(--text-muted); margin-bottom:14px;">${totalPrinted}/${totalNeeded} ${I18N.t('projects.pieces_printed')} · ${p.files.length} ${I18N.t('projects.parts')}</p>
+            <div class="project-file-list">${rows || `<p style="color:var(--text-muted); font-size:calc(13px * var(--fs, 1));">${I18N.t('projects.no_files_yet')}</p>`}</div>
             <button class="btn btn-ghost" style="width:100%; margin-top:14px;" onclick="openProjectFilePicker(${projectId})">
                 <i class="fa-solid fa-plus"></i> ${I18N.t('projects.add_files')}
             </button>
@@ -24966,7 +25103,7 @@ window.openAddToProjectModal = async function (filePath, fileName, forceProjectI
                 <label class="checkbox-label" style="display:flex; align-items:center; gap:8px; padding:6px 4px; border-bottom:1px solid var(--border);">
                     <input type="checkbox" value="${escapeHtml(f.path)}" class="project-picker-checkbox">
                     <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(f.name)}</span>
-                </label>`).join('') || `<p style="color:var(--text-muted); font-size:13px; padding:10px;">${I18N.t('library.no_files')}</p>`;
+                </label>`).join('') || `<p style="color:var(--text-muted); font-size:calc(13px * var(--fs, 1)); padding:10px;">${I18N.t('library.no_files')}</p>`;
         };
         renderList();
         document.getElementById('project-picker-search')?.addEventListener('input', (e) => renderList(e.target.value));
@@ -24982,11 +25119,11 @@ window.openAddToProjectModal = async function (filePath, fileName, forceProjectI
                 <input type="checkbox" value="${p.id}" class="project-picker-project-checkbox">
                 <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};"></span>
                 <span style="flex:1;">${escapeHtml(p.name)}</span>
-                <span style="color:var(--text-muted); font-size:12px;">${p.file_count} ${I18N.t('projects.parts')}</span>
+                <span style="color:var(--text-muted); font-size:calc(12px * var(--fs, 1));">${p.file_count} ${I18N.t('projects.parts')}</span>
             </label>`).join('')
-        : `<p style="color:var(--text-muted); font-size:13px; padding:10px 0;">${I18N.t('projects.no_projects_yet')}</p>`;
+        : `<p style="color:var(--text-muted); font-size:calc(13px * var(--fs, 1)); padding:10px 0;">${I18N.t('projects.no_projects_yet')}</p>`;
     body.innerHTML = `
-        <p style="font-size:12px; color:var(--text-muted); margin-bottom:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(fileName || '')}</p>
+        <p style="font-size:calc(12px * var(--fs, 1)); color:var(--text-muted); margin-bottom:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(fileName || '')}</p>
         <p class="picker-hint">${_t3('projects.select_project_hint', 'Veuillez sélectionner le projet')}</p>
         <p id="add-to-project-error" class="picker-error"></p>
         <div style="max-height:260px; overflow-y:auto; margin-bottom:12px;" onchange="_pickerClearError('add-to-project-error')">${listHtml}</div>
@@ -25094,7 +25231,7 @@ window.selectionOpenNewProject = function () {
 
 window.selectionOpenExistingProjectList = async function () {
     const body = document.getElementById('selection-project-body');
-    body.innerHTML = `<p style="color:var(--text-muted); font-size:13px; padding:10px 0;">${I18N.t('common.loading') || 'Chargement...'}</p>`;
+    body.innerHTML = `<p style="color:var(--text-muted); font-size:calc(13px * var(--fs, 1)); padding:10px 0;">${I18N.t('common.loading') || 'Chargement...'}</p>`;
     await loadProjects();
     const listHtml = allProjects.length
         ? allProjects.map(p => `
@@ -25102,9 +25239,9 @@ window.selectionOpenExistingProjectList = async function () {
                 <input type="checkbox" value="${p.id}" class="selection-project-checkbox">
                 <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};"></span>
                 <span style="flex:1;">${escapeHtml(p.name)}</span>
-                <span style="color:var(--text-muted); font-size:12px;">${p.file_count} ${I18N.t('projects.parts')}</span>
+                <span style="color:var(--text-muted); font-size:calc(12px * var(--fs, 1));">${p.file_count} ${I18N.t('projects.parts')}</span>
             </label>`).join('')
-        : `<p style="color:var(--text-muted); font-size:13px; padding:10px 0;">${I18N.t('projects.no_projects_yet')}</p>`;
+        : `<p style="color:var(--text-muted); font-size:calc(13px * var(--fs, 1)); padding:10px 0;">${I18N.t('projects.no_projects_yet')}</p>`;
     body.innerHTML = `
         <p class="picker-hint">${_t3('projects.select_project_hint', 'Veuillez sélectionner le projet')}</p>
         <p id="selection-project-error" class="picker-error"></p>
@@ -25167,21 +25304,21 @@ function _renderPwaBrowserHint(elId, targetUrl, isRemote) {
     let html = '';
     if (!ctx.isSecureTarget) {
         html = `<div style="background:var(--warning, #d9822b)15; border:1px solid var(--warning, #d9822b)30; border-radius:8px; padding:12px; margin-top:12px; text-align:left;">
-            <p style="font-size:11px; color:var(--text-secondary); margin:0;">
+            <p style="font-size:calc(11px * var(--fs, 1)); color:var(--text-secondary); margin:0;">
                 <i class="fa-solid fa-triangle-exclamation" style="color:var(--warning, #d9822b);"></i>
                 ${_t3('qr.hint_http_shortcut_only', "Cette adresse locale est en HTTP : Chrome ne pourra créer qu'un simple raccourci (avec barre d'adresse), pas une installation plein écran. Pour une vraie installation, utilise plutôt le QR « Accès à distance » (en HTTPS), puis l'app basculera automatiquement sur le réseau local une fois chez toi.")}
             </p>
         </div>`;
     } else if (ctx.isFirefox) {
         html = `<div style="background:var(--warning, #d9822b)15; border:1px solid var(--warning, #d9822b)30; border-radius:8px; padding:12px; margin-top:12px; text-align:left;">
-            <p style="font-size:11px; color:var(--text-secondary); margin:0;">
+            <p style="font-size:calc(11px * var(--fs, 1)); color:var(--text-secondary); margin:0;">
                 <i class="fa-brands fa-firefox"></i>
                 ${_t3('qr.hint_firefox', "Sur Firefox, cherche une option « Installer » dans le menu ⋮ (différente de « Ajouter à l'écran d'accueil », qui ne crée qu'un simple raccourci). Si elle n'existe pas, utilise plutôt Chrome pour une installation plein écran fiable.")}
             </p>
         </div>`;
     } else if (ctx.isChrome && isRemote) {
         html = `<div style="background:var(--success, #2e9e5b)15; border:1px solid var(--success, #2e9e5b)30; border-radius:8px; padding:12px; margin-top:12px; text-align:left;">
-            <p style="font-size:11px; color:var(--text-secondary); margin:0;">
+            <p style="font-size:calc(11px * var(--fs, 1)); color:var(--text-secondary); margin:0;">
                 <i class="fa-brands fa-chrome"></i>
                 ${_t3('qr.hint_chrome_https_ok', "Sur Chrome, cette adresse HTTPS permet une vraie installation en plein écran : cherche « Installer l'application » dans le menu ⋮.")}
             </p>
@@ -25256,7 +25393,7 @@ async function _loadQrCode(which, format) {
         document.getElementById(`${prefix}-url-display`).textContent = data.url;
         if (format === 'app') {
             document.getElementById(`${prefix}-browser-hint`).innerHTML = `<div style="background:var(--accent)15; border:1px solid var(--accent)30; border-radius:8px; padding:12px; margin-top:12px; text-align:left;">
-                <p style="font-size:11px; color:var(--text-secondary); margin:0;">
+                <p style="font-size:calc(11px * var(--fs, 1)); color:var(--text-secondary); margin:0;">
                     <i class="fa-solid fa-mobile-screen-button"></i>
                     ${_t3('qr.hint_app_format', "Ce QR n'est reconnu que par l'app compagnon Stellio installée sur le téléphone — il ne s'ouvre pas dans un navigateur. Installe d'abord l'app, puis scanne ce code pour la connecter automatiquement.")}
                 </p>
@@ -25326,21 +25463,21 @@ window.loadRemoteAccess = async function () {
             const isFixed = data.mode === 'fixed';
             const isCustom = data.mode === 'custom';
             const badge = isCustom
-                ? `<span style="background:var(--success)20;color:var(--success);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;"><i class="fa-solid fa-link"></i> <span data-i18n="settings.remote_mode_custom">Adresse personnalisée</span></span>`
+                ? `<span style="background:var(--success)20;color:var(--success);padding:2px 8px;border-radius:6px;font-size:calc(11px * var(--fs, 1));font-weight:600;"><i class="fa-solid fa-link"></i> <span data-i18n="settings.remote_mode_custom">Adresse personnalisée</span></span>`
                 : isFixed
-                ? `<span style="background:var(--success)20;color:var(--success);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;"><i class="fa-solid fa-lock"></i> <span data-i18n="settings.remote_mode_fixed">URL fixe</span></span>`
-                : `<span style="background:var(--accent)20;color:var(--accent);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;"><i class="fa-solid fa-shuffle"></i> <span data-i18n="settings.remote_mode_quick">URL aléatoire</span></span>`;
+                ? `<span style="background:var(--success)20;color:var(--success);padding:2px 8px;border-radius:6px;font-size:calc(11px * var(--fs, 1));font-weight:600;"><i class="fa-solid fa-lock"></i> <span data-i18n="settings.remote_mode_fixed">URL fixe</span></span>`
+                : `<span style="background:var(--accent)20;color:var(--accent);padding:2px 8px;border-radius:6px;font-size:calc(11px * var(--fs, 1));font-weight:600;"><i class="fa-solid fa-shuffle"></i> <span data-i18n="settings.remote_mode_quick">URL aléatoire</span></span>`;
 
             const warning = isCustom
-                ? `<p class="settings-hint" style="margin-top:12px;font-size:12px;text-align:left;color:var(--text-muted);">
+                ? `<p class="settings-hint" style="margin-top:12px;font-size:calc(12px * var(--fs, 1));text-align:left;color:var(--text-muted);">
                        <i class="fa-solid fa-circle-info"></i> <span data-i18n="settings.remote_custom_notice">Adresse saisie manuellement : Stellio ne la vérifie pas et n'utilise pas Cloudflare. Assurez-vous qu'elle redirige bien vers ce PC.</span>
                    </p>`
                 : isFixed
-                ? `<p class="settings-hint" style="margin-top:12px;font-size:12px;text-align:left;color:var(--text-muted);">
+                ? `<p class="settings-hint" style="margin-top:12px;font-size:calc(12px * var(--fs, 1));text-align:left;color:var(--text-muted);">
                        <i class="fa-solid fa-circle-info"></i> <span data-i18n="settings.remote_fixed_notice">Cette adresse reste la même à chaque redémarrage (configurée via votre compte Cloudflare).</span>
                    </p>`
                 : `<div style="background:var(--danger)15;border:1px solid var(--danger)30;border-radius:8px;padding:10px 12px;margin-top:12px;text-align:left;">
-                       <p class="settings-hint" style="font-size:12px;margin:0;color:var(--text-secondary);">
+                       <p class="settings-hint" style="font-size:calc(12px * var(--fs, 1));margin:0;color:var(--text-secondary);">
                            <i class="fa-solid fa-triangle-exclamation" style="color:var(--danger);"></i>
                            <span data-i18n="settings.remote_dynamic_warning"><strong>Cette adresse changera au prochain redémarrage de Stellio.</strong> Pensez à consulter à nouveau cette page pour récupérer la nouvelle adresse, ou configurez une URL fixe ci-dessous.</span>
                        </p>
@@ -26042,7 +26179,7 @@ window.openStatusLinksModal = async function () {
                 <h3><i class="fa-solid fa-link"></i> ${escapeHtml(_t3('statuslink.title', 'Liens de partage en lecture seule'))}</h3>
                 <button type="button" class="print-report-close" aria-label="${escapeHtml(_t3('actions.close', 'Fermer'))}"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <p style="font-size:13px;color:var(--text-muted);margin:0;">${escapeHtml(_t3('statuslink.intro', "Une page sans compte qui montre l'état des imprimantes (progression, temps restant, températures). Les liens sont secrets : révoque-les quand tu veux."))}</p>
+            <p style="font-size:calc(13px * var(--fs, 1));color:var(--text-muted);margin:0;">${escapeHtml(_t3('statuslink.intro', "Une page sans compte qui montre l'état des imprimantes (progression, temps restant, températures). Les liens sont secrets : révoque-les quand tu veux."))}</p>
             <div id="sl-list"><i class="fa-solid fa-spinner fa-spin"></i></div>
             <div class="sl-create">
                 <input type="text" id="sl-label" maxlength="60" placeholder="${escapeHtml(_t3('statuslink.label_ph', 'Nom du lien (ex. Atelier, Client)'))}">
@@ -26067,8 +26204,8 @@ window.openStatusLinksModal = async function () {
                         <span>${escapeHtml(l.url)}</span></div>
                     <button type="button" class="btn btn-ghost" data-copy="${escapeHtml(l.url)}" title="${escapeHtml(_t3('history.share_copy', 'Copier'))}"><i class="fa-solid fa-copy"></i></button>
                     <button type="button" class="btn btn-ghost" data-del="${l.id}" title="${escapeHtml(_t3('statuslink.revoke', 'Révoquer'))}"><i class="fa-solid fa-trash"></i></button>
-                </div>`).join('') : `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(_t3('statuslink.none', 'Aucun lien pour le moment.'))}</p>`;
-            if (!d.remote && links.length) box.insertAdjacentHTML('beforeend', `<p style="color:var(--text-muted);font-size:12px;"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(_t3('statuslink.lan_note', "Ces liens fonctionnent sur ton réseau local. Pour les ouvrir depuis Internet, active l'accès distant de Stellio."))}</p>`);
+                </div>`).join('') : `<p style="color:var(--text-muted);font-size:calc(13px * var(--fs, 1));">${escapeHtml(_t3('statuslink.none', 'Aucun lien pour le moment.'))}</p>`;
+            if (!d.remote && links.length) box.insertAdjacentHTML('beforeend', `<p style="color:var(--text-muted);font-size:calc(12px * var(--fs, 1));"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(_t3('statuslink.lan_note', "Ces liens fonctionnent sur ton réseau local. Pour les ouvrir depuis Internet, active l'accès distant de Stellio."))}</p>`);
             box.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', async () => {
                 try { await navigator.clipboard.writeText(b.dataset.copy); showToast(_t3('statuslink.copied', 'Lien copié'), 'success'); }
                 catch (_) { window.prompt(_t3('statuslink.copy_manual', 'Copie ce lien :'), b.dataset.copy); }
@@ -26202,7 +26339,7 @@ async function loadAcctModels(kind) {
                 <button type="button" class="inv-toggle" aria-expanded="${!isCol}"><i class="fa-solid fa-chevron-down"></i></button>
                 <div class="source-banner-icon" style="background:${brand.color}30; color:${brand.color};"><i class="fa-solid ${brand.icon}"></i></div>
                 <div style="flex:1; min-width:0;">
-                    <div style="font-weight:600; font-size:14px;">${escapeHtml(p.label)}</div>
+                    <div style="font-weight:600; font-size:calc(14px * var(--fs, 1));">${escapeHtml(p.label)}</div>
                     <div class="source-banner-sub">${escapeHtml(_t3('acct.count', '{{n}} modèles', { n: p.items.length }))}${synced ? ' · ' + escapeHtml(_t3('acct.synced', 'synchronisé le {{date}}', { date: synced })) : ''}${meta.syncing ? ' · ' + escapeHtml(_t3('acct.syncing', 'synchronisation…')) : ''}${meta.error ? ' · <span style="color:var(--warning)">' + escapeHtml(meta.error) + '</span>' : ''}</div>
                 </div>
                 <button class="btn btn-ghost btn-sm viewer-hide" data-acct-sync="${p.platform}"><i class="fa-solid fa-rotate"></i> <span class="acct-hide-sm">${escapeHtml(_t3('actions.refresh', 'Rafraîchir'))}</span></button>
@@ -26236,13 +26373,19 @@ function _acctDestPopup(title) {
                 <button type="button" class="modal-close" data-dest-cancel aria-label="${escapeHtml(I18N.t('actions.cancel'))}">&times;</button>
             </div>
             <div class="modal-body">
-                <label style="display:block; margin-bottom:6px; font-size:13px; color:var(--text-secondary);">${escapeHtml(I18N.t('form.save_to'))}</label>
-                <select id="acct-dest-select" style="width:100%;"></select>
-                <div class="acct-dest-actions">
-                    <button type="button" class="btn btn-ghost btn-sm" data-dest-create><span class="acct-dest-ico">＋</span> ${escapeHtml(I18N.t('download.create_folder'))}</button>
-                    <button type="button" class="btn btn-ghost btn-sm" data-dest-addsource><span class="acct-dest-ico">📁</span> ${escapeHtml(_t3('acct.dest_add_source', 'Ajouter un dossier source'))}</button>
+                <div class="input-group">
+                    <label>${escapeHtml(I18N.t('form.save_to'))}</label>
+                    <select id="acct-dest-select"></select>
+                    <div class="input-group" style="margin-top: 8px; display: flex; gap: 8px; align-items: center;">
+                        <button type="button" class="btn btn-ghost btn-sm" data-dest-create style="flex: 1;">
+                            <span>${escapeHtml(I18N.t('download.create_folder'))}</span>
+                        </button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-dest-browse title="${escapeHtml(I18N.t('actions.browse'))}">
+                            <i class="fa-solid fa-folder-open"></i>
+                        </button>
+                    </div>
+                    <small style="color: var(--text-muted);">${escapeHtml(I18N.t('form.save_hint'))}</small>
                 </div>
-                <small style="color:var(--text-muted); display:block; margin-top:8px;">${escapeHtml(I18N.t('form.save_hint'))}</small>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-ghost" data-dest-cancel>${escapeHtml(I18N.t('actions.cancel'))}</button>
@@ -26264,12 +26407,11 @@ function _acctDestPopup(title) {
         const obs = new MutationObserver(refresh);
         obs.observe(hidden, { childList: true });
         refresh();
-        let done = false, poll = null;
+        let done = false;
         const finish = (val) => {
             if (done) return;
             done = true;
             obs.disconnect();
-            if (poll) clearInterval(poll);
             document.removeEventListener('keydown', onKey, true);
             modal.remove();
             resolve(val);
@@ -26280,19 +26422,7 @@ function _acctDestPopup(title) {
         modal.addEventListener('click', (e) => {
             if (e.target === modal || e.target.closest('[data-dest-cancel]')) { finish(null); return; }
             if (e.target.closest('[data-dest-create]')) { openCreateFolderModal(); return; }
-            if (e.target.closest('[data-dest-addsource]')) {
-                // la fenêtre d'ajout de source passe devant : on masque ce popup le temps de l'ajout, puis on le réaffiche
-                modal.style.display = 'none';
-                openModal('modal-select-type');
-                if (poll) clearInterval(poll);
-                poll = setInterval(() => {
-                    if (document.querySelector('.modal:not(.hidden):not(#modal-acct-dest)')) return;
-                    clearInterval(poll); poll = null;
-                    modal.style.display = '';
-                    loadDownloadSources();
-                }, 500);
-                return;
-            }
+            if (e.target.closest('[data-dest-browse]')) { browseDownloadLocation(); return; }
             if (e.target.closest('[data-dest-go]')) {
                 const opt = sel.options[sel.selectedIndex];
                 if (!sel.value || !opt) { showToast(_t3('acct.no_source', 'Ajoute d\'abord un dossier source.'), 'warning'); return; }

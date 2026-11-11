@@ -104,6 +104,22 @@ def _early_splash_texts(base_dir, data_dir):
     return texts
 
 
+def _early_splash_theme(data_dir):
+    """Couleurs du splash : reprises de la palette choisie dans l'application (enregistrées dans app_settings.json par l'interface)."""
+    import json as _json, re as _re
+    theme = {'bg': '#1a1d23', 'fg': '#e6e6e6', 'muted': '#9ca3af', 'trough': '#2a2f3a', 'accent': '#4ea1d3'}
+    try:
+        with open(os.path.join(data_dir, 'app_settings.json'), 'r', encoding='utf-8') as f:
+            saved = _json.load(f).get('splash_theme') or {}
+        for k in theme:
+            v = str(saved.get(k, '')).strip()
+            if _re.fullmatch(r'#[0-9a-fA-F]{6}', v):
+                theme[k] = v
+    except Exception:
+        pass
+    return theme
+
+
 def _early_splash_run(q, ready, base_dir, data_dir):
     root = lbl_status = progress = style = logo = poll = None
     try:
@@ -111,10 +127,11 @@ def _early_splash_run(q, ready, base_dir, data_dir):
         from tkinter import ttk
 
         texts = _early_splash_texts(base_dir, data_dir)
+        th = _early_splash_theme(data_dir)
         root = tk.Tk()
         root.overrideredirect(True)
         root.attributes('-topmost', True)
-        root.configure(bg='#1a1d23')
+        root.configure(bg=th['bg'])
         width, height = 650, 500
         x = (root.winfo_screenwidth() - width) // 2
         y = (root.winfo_screenheight() - height) // 2
@@ -132,15 +149,15 @@ def _early_splash_run(q, ready, base_dir, data_dir):
                 except Exception:
                     logo = None
             if logo is not None:
-                tk.Label(root, image=logo, bg='#1a1d23').pack(pady=(40, 10))
+                tk.Label(root, image=logo, bg=th['bg']).pack(pady=(40, 10))
 
         tk.Label(root, text=texts['version'].format(version=_early_splash_version()),
-                 font=("Segoe UI", 10), fg="#9ca3af", bg='#1a1d23').pack(pady=(5, 20))
-        lbl_status = tk.Label(root, text=texts['init'], font=("Segoe UI", 11), fg="#e6e6e6", bg='#1a1d23')
+                 font=("Segoe UI", 10), fg=th['muted'], bg=th['bg']).pack(pady=(5, 20))
+        lbl_status = tk.Label(root, text=texts['init'], font=("Segoe UI", 11), fg=th['fg'], bg=th['bg'])
         lbl_status.pack(pady=10)
         style = ttk.Style()
         style.theme_use('clam')
-        style.configure("Custom.Horizontal.TProgressbar", troughcolor='#2a2f3a', background='#4ea1d3', thickness=8)
+        style.configure("Custom.Horizontal.TProgressbar", troughcolor=th['trough'], background=th['accent'], thickness=8)
         progress = ttk.Progressbar(root, style="Custom.Horizontal.TProgressbar", mode='indeterminate', length=400)
         progress.pack(pady=15)
         progress.start(20)
@@ -10864,6 +10881,11 @@ def api_generate_thumb_now():
 
     if not file_path:
         return jsonify({"error": "Chemin requis"}), 400
+
+    # Génération en pause : les demandes automatiques de la grille (cartes visibles à l'écran) ne passent plus en prioritaire.
+    # Seule l'ouverture explicite d'un fichier (visionneuse, fiche…) reste servie.
+    if _thumb_paused and data.get('auto') and not force:
+        return jsonify({"success": False, "paused": True})
 
     normalized_path = file_path.replace('\\', '/')
     thumb_filename = hashlib.md5(normalized_path.encode()).hexdigest()
@@ -23202,6 +23224,16 @@ def api_save_settings():
                     return jsonify({"error": "Nom de modèle invalide", "code": "invalid_model"}), 400
                 data[_mk] = _mv
 
+        if 'splash_theme' in data:
+            _st = data.get('splash_theme')
+            _clean = {}
+            if isinstance(_st, dict):
+                for _k in ('bg', 'fg', 'muted', 'trough', 'accent'):
+                    _v = str(_st.get(_k, '')).strip()
+                    if re.fullmatch(r'#[0-9a-fA-F]{6}', _v):
+                        _clean[_k] = _v.lower()
+            data['splash_theme'] = _clean if len(_clean) == 5 else {}
+
         if 'thumb_color' in data:
             _tc = str(data.get('thumb_color') or '').strip()
             if not re.fullmatch(r'#[0-9a-fA-F]{6}', _tc):
@@ -23285,7 +23317,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.0.1"
+CURRENT_VERSION = "1.0.2"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -23527,7 +23559,20 @@ def get_current_app_language():
 def get_current_version():
     return CURRENT_VERSION
 
-def check_for_updates():
+UPDATE_MIN_RELEASE_AGE_MIN = 10   # garde-fou : une release publiée depuis moins de 10 min n'est pas proposée automatiquement (laisse le temps de la corriger / de voir passer les builds)
+
+
+def _release_age_minutes(published_at):
+    """Âge en minutes d'une release GitHub (champ published_at ISO 8601), ou None si illisible."""
+    try:
+        dt = datetime.datetime.strptime(str(published_at).strip(), '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc)
+        return (datetime.datetime.now(datetime.timezone.utc) - dt).total_seconds() / 60.0
+    except Exception:
+        return None
+
+
+def check_for_updates(force=False):
+    """force=True : vérification demandée par l'utilisateur (bouton « Vérifier les mises à jour ») → pas de délai minimal."""
     try:
         app_logger.info("[UPDATE] 🔍 Vérification des mises à jour...")
         response = requests.get(GITHUB_API_URL, timeout=10, headers={
@@ -23547,6 +23592,12 @@ def check_for_updates():
         if version.parse(latest_version) <= version.parse(current_version):
             app_logger.info("[UPDATE] ✅ Application à jour")
             return None
+
+        if not force:
+            age = _release_age_minutes(release_data.get('published_at', ''))
+            if age is not None and age < UPDATE_MIN_RELEASE_AGE_MIN:
+                app_logger.info(f"[UPDATE] ⏳ Version {latest_version} publiée il y a {age:.0f} min : pas proposée avant {UPDATE_MIN_RELEASE_AGE_MIN} min (sauf vérification manuelle)")
+                return None
 
         download_url = None
         update_type = 'full'
@@ -23937,7 +23988,7 @@ def download_update(download_url, progress_callback=None, expected_sha256=None):
 @app.route('/api/update/check', methods=['GET'])
 @login_required
 def api_check_update():
-    update_info = check_for_updates()
+    update_info = check_for_updates(force=request.args.get('force') == '1')
     if update_info:
         return jsonify({
             'update_available': True,
@@ -23975,7 +24026,7 @@ def api_download_update():
         return jsonify({'error': 'URL manquante'}), 400
 
     expected_sha256 = None
-    current_update = check_for_updates()
+    current_update = check_for_updates(force=True)   # l'utilisateur a déjà vu la proposition : pas de délai ici
     if current_update and current_update.get('download_url') == download_url:
         expected_sha256 = current_update.get('expected_sha256')
     else:
