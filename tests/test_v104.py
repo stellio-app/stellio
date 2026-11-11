@@ -6,7 +6,10 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 
 import pytest
-import requests
+
+# Dépendances facultatives en CI minimale (pip install pytest numpy) : sans elles, ces tests sont ignorés, pas en erreur.
+requests = pytest.importorskip('requests')
+pytest.importorskip('PIL')
 from PIL import Image
 
 import importlib.util

@@ -15,7 +15,10 @@ MODULES = _discover()
 def _load(name):
     spec = importlib.util.spec_from_file_location(name + '_under_test', os.path.join(ROOT, name + '.py'))
     mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    try:
+        spec.loader.exec_module(mod)
+    except ImportError as e:      # dépendance absente de l'environnement de test (ex. requests en CI minimale)
+        pytest.skip(f'{name} : dépendance manquante ({e})')
     return mod
 
 
