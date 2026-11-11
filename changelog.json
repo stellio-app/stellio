@@ -1,5 +1,42 @@
 [
   {
+    "version": "1.0.3",
+    "items": {
+      "fr": [
+        "Tableau de bord : le widget « Comptes externes » s'affiche aussi pour les comptes invités (seulement connecté / non connecté, jamais d'identifiant)",
+        "Mes likes : les modèles Creality Cloud s'affichent avec leur titre et leur image, sans avoir à tester dans les paramètres ; une erreur partielle (créations introuvables) n'est plus affichée quand des modèles existent"
+      ],
+      "en": [
+        "Dashboard: the “External accounts” widget now also works for guest accounts (connected / not connected only, never any credentials)",
+        "My likes: Creality Cloud models now show their title and image without having to run the test in Settings; a partial error (creations not found) is no longer shown when models exist"
+      ],
+      "de": [
+        "Dashboard: Das Widget „Externe Konten“ funktioniert jetzt auch für Gastkonten (nur verbunden / nicht verbunden, nie Zugangsdaten)",
+        "Meine Likes: Creality-Cloud-Modelle zeigen jetzt Titel und Bild, ohne Test in den Einstellungen; ein Teilfehler (Kreationen nicht gefunden) wird nicht mehr angezeigt, wenn Modelle vorhanden sind"
+      ],
+      "es": [
+        "Panel: el widget «Cuentas externas» ahora también funciona para cuentas de invitado (solo conectado / no conectado, nunca credenciales)",
+        "Mis me gusta: los modelos de Creality Cloud muestran ahora título e imagen sin tener que probar en los ajustes; un error parcial (creaciones no encontradas) ya no se muestra si hay modelos"
+      ],
+      "pt": [
+        "Painel: o widget «Contas externas» também funciona para contas de convidado (apenas ligado / não ligado, nunca credenciais)",
+        "Os meus likes: os modelos do Creality Cloud mostram agora título e imagem sem ser preciso testar nas definições; um erro parcial (criações não encontradas) já não aparece quando existem modelos"
+      ],
+      "it": [
+        "Dashboard: il widget «Account esterni» funziona ora anche per gli account ospite (solo connesso / non connesso, mai credenziali)",
+        "I miei like: i modelli di Creality Cloud mostrano ora titolo e immagine senza dover fare il test nelle impostazioni; un errore parziale (creazioni non trovate) non viene più mostrato se esistono modelli"
+      ],
+      "zh": [
+        "仪表盘：“外部账户”小组件现在也适用于访客账户（仅显示已连接 / 未连接，绝不显示凭据）",
+        "我的点赞：Creality Cloud 模型现在直接显示标题和图片，无需在设置中测试；已有模型时不再显示部分错误（找不到作品）"
+      ],
+      "ja": [
+        "ダッシュボード：「外部アカウント」ウィジェットがゲストアカウントでも動作します（接続済み／未接続のみ表示し、認証情報は表示しません）",
+        "「いいね」：Creality Cloud のモデルがタイトルと画像付きで表示されます（設定でのテスト不要）。モデルがある場合、一部のエラー（作品が見つからない）は表示されません"
+      ]
+    }
+  },
+  {
     "version": "1.0.2",
     "items": {
       "fr": [

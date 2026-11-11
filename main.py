@@ -5057,7 +5057,7 @@ def _viewer_guard():
         return jsonify({"error": "non authentifié"}), 401
     path = request.path
     if request.method in ('GET', 'HEAD', 'OPTIONS'):
-        if path == '/api/update/version':      # simple numéro de version : sans risque, affiché dans « À propos »
+        if path in ('/api/update/version', '/api/accounts/status'):   # numéro de version / état « connecté ou non » des comptes (sans identifiant : voir api_accounts_status) : sans risque
             return
         if path.startswith(_VIEWER_BLOCKED_GET_PREFIXES):
             return jsonify({"error": "Accès réservé au propriétaire du compte", "code": "viewer_forbidden"}), 403
@@ -19022,6 +19022,8 @@ def api_accounts_status():
             status['tigertag'] = True
             status['tigertag_email'] = acc['email'] or ''
 
+    if _is_viewer():   # invité : seulement « connecté / non connecté », jamais d'adresse e-mail ni d'identifiant
+        status = {k: bool(v) for k, v in status.items() if isinstance(v, bool) and not k.endswith('_has_password') and not k.endswith('_has_token')}
     return jsonify(status)
 
 
@@ -19034,6 +19036,7 @@ def api_accounts_status():
 #  Une plateforme n'apparaît dans l'interface que si son compte est connecté ET qu'elle a au moins un modèle.
 # ═══════════════════════════════════════════════════════════════════════════
 ACCT_MODELS_KINDS = ('likes', 'creations')
+_acct_blank_resynced = set()
 ACCT_MODELS_MAX_ITEMS = 600
 ACCT_MODELS_PAGE_SIZE = 30
 ACCT_MODELS_AUTO_SYNC_SECONDS = 6 * 3600
@@ -19115,7 +19118,7 @@ def _acct_extract_list(js):
 
 
 _ACCT_ID_KEYS = ('id', 'modelId', 'model_id', 'designId', 'bizId', 'modelID', 'groupId')
-_ACCT_TITLE_KEYS = ('name', 'title', 'modelName', 'modelTitle', 'model_name', 'designTitle')
+_ACCT_TITLE_KEYS = ('name', 'title', 'modelName', 'modelTitle', 'model_name', 'designTitle', 'groupName')   # groupName : Creality Cloud
 
 
 def _acct_deep_items(js, depth=0):
@@ -19213,6 +19216,19 @@ def _acct_norm_generic(it, url_builder):
         thumb = _acct_first(thumb, ('url', 'src', 'path'))
     if isinstance(thumb, list):
         thumb = (thumb[0].get('url') if thumb and isinstance(thumb[0], dict) else (thumb[0] if thumb else ''))
+    if not thumb:   # Creality Cloud : covers / appCovers / editCovers (liste d'images, objets ou simples adresses)
+        for _ck in ('covers', 'appCovers', 'editCovers', 'coverList', 'images'):
+            _cv = d.get(_ck)
+            if isinstance(_cv, dict):
+                _cv = [_cv]
+            if isinstance(_cv, list):
+                for _e in _cv:
+                    _u = _e if isinstance(_e, str) else (_acct_first(_e, ('url', 'src', 'path', 'cover', 'imgUrl', 'imageUrl'), '') if isinstance(_e, dict) else '')
+                    if isinstance(_u, str) and _u.startswith(('http://', 'https://', '//')):
+                        thumb = _u if not _u.startswith('//') else 'https:' + _u
+                        break
+            if thumb:
+                break
     au = _acct_first(d, ('user', 'author', 'creator', 'owner', 'userInfo', 'authorInfo'), {})
     creator = _acct_first(au, ('nickName', 'nickname', 'name', 'userName', 'username'), '') if isinstance(au, dict) else ''
     if not creator:
@@ -19787,14 +19803,27 @@ def api_account_models_overview():
             "SELECT platform, kind, synced_at, error FROM account_models_sync WHERE user_id = ?", (uid,))}
     finally:
         conn.close()
-    started = _acct_sync_async(uid, connected, force=request.args.get('force') == '1') if connected else []
+    blank = []
+    try:   # fiches enregistrées sans titre ni image (ancienne lecture incomplète) : une seule resynchronisation automatique par plateforme et par lancement
+        conn = get_db()
+        try:
+            blank = [p for p in connected if (uid, p) not in _acct_blank_resynced and conn.execute(
+                "SELECT 1 FROM account_models WHERE user_id = ? AND platform = ? AND title = '' AND thumb = '' LIMIT 1", (uid, p)).fetchone()]
+        finally:
+            conn.close()
+        for p in blank:
+            _acct_blank_resynced.add((uid, p))
+    except Exception:
+        blank = []
+    started = _acct_sync_async(uid, connected, force=(request.args.get('force') == '1') or bool(blank)) if connected else []
     platforms = []
     for p in connected:
         platforms.append({
             'platform': p, 'label': ACCT_MODELS_PLATFORMS[p]['label'],
             'likes': counts.get((p, 'likes'), 0), 'creations': counts.get((p, 'creations'), 0),
             'synced_at': max([(sync.get((p, k)) or {'synced_at': 0})['synced_at'] or 0 for k in ACCT_MODELS_KINDS] or [0]),
-            'error': next((sync[(p, k)]['error'] for k in ACCT_MODELS_KINDS if sync.get((p, k)) and sync[(p, k)]['error']), ''),
+            'error': ('' if (counts.get((p, 'likes'), 0) + counts.get((p, 'creations'), 0)) > 0 else
+                      next((sync[(p, k)]['error'] for k in ACCT_MODELS_KINDS if sync.get((p, k)) and sync[(p, k)]['error']), '')),   # erreur partielle (ex. « créations » introuvables) : pas affichée si des modèles existent
             'syncing': (uid, p) in _acct_models_running or p in started,
         })
     return jsonify({'platforms': platforms,
@@ -23317,7 +23346,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.0.2"
+CURRENT_VERSION = "1.0.3"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
