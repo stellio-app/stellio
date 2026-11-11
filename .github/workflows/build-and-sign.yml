@@ -610,6 +610,7 @@ jobs:
   build-linux:
     needs: check-version
     runs-on: ubuntu-latest
+    timeout-minutes: 45   # un job qui bloque (réseau du runner) est arrêté au lieu de tourner des heures
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -620,14 +621,22 @@ jobs:
           python-version: '3.11'
 
       - name: Install system dependencies (GTK/WebKit pour pywebview + OSMesa pour le rendu 3D)
+        # Les miroirs Ubuntu des runners GitHub ont parfois des pannes DNS passagères : sans limite, apt réessayait
+        # pendant des dizaines de minutes. On borne chaque tentative (20 s), on retente 3 fois, et l'étape échoue en 10 min.
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgtk-3-dev libwebkit2gtk-4.1-dev gir1.2-webkit2-4.1 \
-            python3-gi python3-gi-cairo gobject-introspection \
-            libgirepository1.0-dev libgirepository-2.0-dev libcairo2-dev pkg-config python3-dev \
-            libosmesa6-dev libgl1-mesa-dev \
-            patchelf libfuse2
+          APT_OPTS="-o Acquire::Retries=3 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20"
+          ok=0
+          for attempt in 1 2 3; do
+            if sudo apt-get $APT_OPTS update && sudo apt-get $APT_OPTS install -y \
+              libgtk-3-dev libwebkit2gtk-4.1-dev gir1.2-webkit2-4.1 \
+              python3-gi python3-gi-cairo gobject-introspection \
+              libgirepository1.0-dev libgirepository-2.0-dev libcairo2-dev pkg-config python3-dev \
+              libosmesa6-dev libgl1-mesa-dev \
+              patchelf libfuse2; then ok=1; break; fi
+            echo "apt a échoué (tentative $attempt/3), nouvel essai dans 20 s"; sleep 20
+          done
+          [ "$ok" = 1 ] || { echo "Installation des dépendances système impossible (réseau des runners ?)"; exit 1; }
 
       - name: Install dependencies
         run: |
@@ -754,8 +763,9 @@ jobs:
           # unrar (le vrai, freeware RARLAB, pas unrar-free) est disponible dans le depot "multiverse"
           # d'Ubuntu, deja active par defaut sur les runners GitHub. Rien a compiler ni a versionner a la main.
           # Integrite : le paquet est authentifie par la signature du depot apt (pas de SHA-256 epingle possible ici).
-          sudo apt-get update -qq
-          sudo apt-get install -y unrar
+          APT_OPTS="-o Acquire::Retries=3 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20"
+          sudo apt-get $APT_OPTS update -qq
+          sudo apt-get $APT_OPTS install -y unrar
           cp "$(command -v unrar)" "$APP_DIR/bin/unrar"
           chmod +x "$APP_DIR/bin/unrar"
 

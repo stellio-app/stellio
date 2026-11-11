@@ -97,7 +97,6 @@ def _early_splash_texts(base_dir, data_dir):
 
 
 def _early_splash_theme(data_dir):
-    """Couleurs du splash : reprises de la palette choisie dans l'application (enregistrées dans app_settings.json par l'interface)."""
     import json as _json, re as _re
     theme = {'bg': '#1a1d23', 'fg': '#e6e6e6', 'muted': '#9ca3af', 'trough': '#2a2f3a', 'accent': '#4ea1d3'}
     try:
