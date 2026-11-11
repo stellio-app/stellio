@@ -196,12 +196,17 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "dist\Stellio\app\bin" | Out-Null
-          # Version epinglee (tag date + SHA-256 calcule sur le fichier). Pour mettre a jour : choisir un tag
-          # "autobuild-..." sur https://github.com/BtbN/FFmpeg-Builds/releases, telecharger le zip, calculer son
-          # SHA-256 soi-meme, puis modifier ces deux valeurs. NB : BtbN purge ses anciens tags apres quelques semaines.
-          $ffUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-18-13-01/ffmpeg-N-127650-geceaa54a38-win64-gpl-shared.zip"
-          $ffSha = "8ebf4def186017a1cf3ac1e0065ad19c405628ec52b50f144b727e8def64928d"
-          Invoke-WebRequest -Uri $ffUrl -OutFile ffmpeg.zip
+          # Branche stable ffmpeg 8.1 (build GPL "shared") de la release "latest" de FFmpeg-Builds. Les tags datés
+          # (autobuild-AAAA-MM-JJ-...) sont supprimés après quelques semaines, ce qui cassait le build avec un 404 :
+          # on n'épingle donc plus un tag. Intégrité : somme SHA-256 du zip comparée à celle publiée dans le fichier
+          # checksums.sha256 de la même release ; le build échoue si elle manque, ne correspond pas ou si ffmpeg.exe est absent.
+          $ffName = "ffmpeg-n8.1-latest-win64-gpl-shared-8.1.zip"
+          $ffBase = "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/latest"
+          Invoke-WebRequest -Uri "$ffBase/$ffName" -OutFile ffmpeg.zip -MaximumRetryCount 3 -RetryIntervalSec 5
+          Invoke-WebRequest -Uri "$ffBase/checksums.sha256" -OutFile ffmpeg-checksums.txt -MaximumRetryCount 3 -RetryIntervalSec 5
+          $ffLine = Get-Content ffmpeg-checksums.txt | Where-Object { $_ -match ([regex]::Escape($ffName) + '$') } | Select-Object -First 1
+          if (-not $ffLine) { throw "Somme SHA-256 de $ffName introuvable dans checksums.sha256. Build annule." }
+          $ffSha = ($ffLine -split '\s+')[0].ToLower()
           $ffActual = (Get-FileHash -Algorithm SHA256 ffmpeg.zip).Hash.ToLower()
           if ($ffActual -ne $ffSha) { throw "SHA-256 ffmpeg (Windows) incorrect : attendu $ffSha, obtenu $ffActual. Build annule." }
           Write-Host "SHA-256 ffmpeg (Windows) verifie : $ffActual"
@@ -724,10 +729,14 @@ jobs:
         run: |
           APP_DIR="dist/Stellio/app"
           mkdir -p "$APP_DIR/bin"
-          # Version epinglee (tag date + SHA-256 calcule sur le fichier), voir le step Windows pour la mise a jour.
-          FF_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-18-13-01/ffmpeg-N-127651-gb60ab6c9a4-linux64-gpl.tar.xz"
-          FF_SHA="a5f2aed198efa8ef4c12d9112f42e7cefbdf11dced1b59a87503ca689bc52277"
-          curl -fL --retry 3 -o ffmpeg.tar.xz "$FF_URL"
+          # Branche stable ffmpeg 8.1 (build GPL statique) de la release "latest" de FFmpeg-Builds, vérifiée avec le
+          # fichier checksums.sha256 de la même release (les tags datés sont supprimés après quelques semaines : voir le step Windows).
+          FF_NAME="ffmpeg-n8.1-latest-linux64-gpl-8.1.tar.xz"
+          FF_BASE="https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/latest"
+          curl -fL --retry 3 -o ffmpeg.tar.xz "$FF_BASE/$FF_NAME"
+          curl -fL --retry 3 -o ffmpeg-checksums.txt "$FF_BASE/checksums.sha256"
+          FF_SHA=$(awk -v n="$FF_NAME" '$2==n {print $1}' ffmpeg-checksums.txt)
+          if [ -z "$FF_SHA" ]; then echo "Somme SHA-256 de $FF_NAME introuvable dans checksums.sha256. Build annule."; exit 1; fi
           FF_ACTUAL=$(sha256sum ffmpeg.tar.xz | cut -d' ' -f1)
           if [ "$FF_ACTUAL" != "$FF_SHA" ]; then
             echo "SHA-256 ffmpeg (Linux) incorrect : attendu $FF_SHA, obtenu $FF_ACTUAL. Build annule."
