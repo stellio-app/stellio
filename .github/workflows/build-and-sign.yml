@@ -621,20 +621,26 @@ jobs:
           python-version: '3.11'
 
       - name: Install system dependencies (GTK/WebKit pour pywebview + OSMesa pour le rendu 3D)
-        # Les miroirs Ubuntu des runners GitHub ont parfois des pannes DNS passagères : sans limite, apt réessayait
-        # pendant des dizaines de minutes. On borne chaque tentative (20 s), on retente 3 fois, et l'étape échoue en 10 min.
-        timeout-minutes: 10
+        # Le miroir Azure d'Ubuntu (par défaut sur les runners) a des pannes (DNS, téléchargements ignorés). Chaque
+        # tentative est bornée (timeout) ; aux essais suivants on change de miroir (archive.ubuntu.com, puis mirrors.kernel.org).
+        timeout-minutes: 20
         run: |
-          APT_OPTS="-o Acquire::Retries=3 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20"
+          APT_OPTS="-o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20"
+          MIRRORS=("" "http://archive.ubuntu.com/ubuntu/" "http://mirrors.kernel.org/ubuntu/")
           ok=0
-          for attempt in 1 2 3; do
-            if sudo apt-get $APT_OPTS update && sudo apt-get $APT_OPTS install -y \
+          for attempt in 0 1 2; do
+            if [ -n "${MIRRORS[$attempt]}" ]; then
+              echo "Essai $((attempt+1))/3 avec le miroir ${MIRRORS[$attempt]}"
+              echo "${MIRRORS[$attempt]}" | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+              sudo rm -rf /var/lib/apt/lists/*
+            fi
+            if timeout 240 sudo apt-get $APT_OPTS update && timeout 360 sudo apt-get $APT_OPTS install -y --fix-missing \
               libgtk-3-dev libwebkit2gtk-4.1-dev gir1.2-webkit2-4.1 \
               python3-gi python3-gi-cairo gobject-introspection \
               libgirepository1.0-dev libgirepository-2.0-dev libcairo2-dev pkg-config python3-dev \
               libosmesa6-dev libgl1-mesa-dev \
               patchelf libfuse2; then ok=1; break; fi
-            echo "apt a échoué (tentative $attempt/3), nouvel essai dans 20 s"; sleep 20
+            echo "apt a échoué (essai $((attempt+1))/3)"; sleep 10
           done
           [ "$ok" = 1 ] || { echo "Installation des dépendances système impossible (réseau des runners ?)"; exit 1; }
 
