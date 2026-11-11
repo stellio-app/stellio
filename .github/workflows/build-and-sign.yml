@@ -621,12 +621,13 @@ jobs:
           python-version: '3.11'
 
       - name: Install system dependencies (GTK/WebKit pour pywebview + OSMesa pour le rendu 3D)
-        # Le miroir Azure d'Ubuntu (par défaut sur les runners) a des pannes (DNS, téléchargements ignorés). Chaque
-        # tentative est bornée (timeout) ; aux essais suivants on change de miroir (archive.ubuntu.com, puis mirrors.kernel.org).
+        # Le miroir Azure d'Ubuntu (HTTP, par défaut sur les runners) a des pannes. Chaque tentative est bornée (timeout) ;
+        # aux essais suivants on passe en HTTPS sur archive.ubuntu.com, puis mirrors.kernel.org, en IPv4.
         timeout-minutes: 20
         run: |
-          APT_OPTS="-o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20"
-          MIRRORS=("" "http://archive.ubuntu.com/ubuntu/" "http://mirrors.kernel.org/ubuntu/")
+          APT_OPTS="-o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o Acquire::ForceIPv4=true"
+          # Observé : le port 80 (HTTP) vers les miroirs Ubuntu expire sur certains runners alors que le HTTPS passe.
+          MIRRORS=("" "https://archive.ubuntu.com/ubuntu/" "https://mirrors.kernel.org/ubuntu/")
           ok=0
           for attempt in 0 1 2; do
             if [ -n "${MIRRORS[$attempt]}" ]; then

@@ -223,9 +223,6 @@ if _early_splash_wanted():
     except Exception:
         _EARLY_SPLASH = None
 # ─────────────────────────────────────────────────────────────────────────────
-
-# Version empaquetée (PyInstaller) : les modules réparés au lancement sont lus depuis ce dossier.
-# Ajouté EN FIN de sys.path : un module déjà embarqué dans l'exécutable reste prioritaire.
 if getattr(sys, 'frozen', False) and os.path.isdir(_EXTRA_LIBS_DIR) and _EXTRA_LIBS_DIR not in sys.path:
     sys.path.append(_EXTRA_LIBS_DIR)
 
