@@ -18820,6 +18820,10 @@ window.addPrinter = async function() {
     if (bedY > 0) config.bed_y = bedY;
     if (bedZ > 0) config.bed_z = bedZ;
     if (document.getElementById('printer-timelapse')?.checked) config.timelapse = true;
+    if (document.getElementById('printer-end-photo')?.checked) config.end_photo = true;
+    if (document.getElementById('printer-ai-watch')?.checked) config.ai_watch = true;
+    const _meterCfg = _collectMeterConfig();
+    if (_meterCfg) config.meter = _meterCfg;
 
     const isEdit = !!editId;
     const btn = document.getElementById('add-printer-submit-btn');
@@ -18926,6 +18930,9 @@ window.editPrinter = function(pid) {
     ['printer-bed-x','printer-bed-y','printer-bed-z'].forEach(i => { const e = document.getElementById(i); if (e) e.dataset.auto = '0'; });
     const _bedHint = document.getElementById('printer-bed-suggest'); if (_bedHint) _bedHint.style.display = 'none';
     const _tlField = document.getElementById('printer-timelapse'); if (_tlField) _tlField.checked = !!cfg.timelapse;
+    const _epField = document.getElementById('printer-end-photo'); if (_epField) _epField.checked = !!cfg.end_photo;
+    const _awField = document.getElementById('printer-ai-watch'); if (_awField) _awField.checked = !!cfg.ai_watch;
+    _fillMeterFields(cfg.meter);
     if (bedXField) bedXField.value = cfg.bed_x || '';
     const bedYField = document.getElementById('printer-bed-y');
     if (bedYField) bedYField.value = cfg.bed_y || '';
@@ -19388,7 +19395,10 @@ window.loadHistory = async function (reset = true) {
                        <i class="fa-solid ${platformIcons[entry.source_platform] || 'fa-download'}"></i> ${entry.source_platform}
                    </span>`
                 : '';
-            const costBadge = `<span class="history-entry-cost" id="hcost-${entry.id}">${_renderHistoryCostBadge(entry)}</span>`;
+            const energyChip = (entry.energy_wh > 0)
+                ? `<span class="history-energy-chip" title="${escapeHtml(_t3('history.energy_title', 'Énergie réellement mesurée par la prise connectée'))}"><i class="fa-solid fa-bolt"></i> ${(entry.energy_wh / 1000).toFixed(2)} kWh</span> `
+                : '';
+            const costBadge = `${energyChip}<span class="history-entry-cost" id="hcost-${entry.id}">${_renderHistoryCostBadge(entry)}</span>`;
             dayBody.insertAdjacentHTML('beforeend', `
                 <div class="history-entry" id="hentry-${entry.id}">
                     <div class="history-entry-icon" style="background:${extColor}22;color:${extColor};">
@@ -19676,6 +19686,7 @@ function renderPrinters() {
                 <div style="display:flex; gap:10px; margin-top:8px; font-size:calc(11px * var(--fs, 1)); color:var(--text-secondary);">
                     <span title="${I18N.t('printers.extruder')}">🔥 <span id="card-ext-${p.id}">--°C</span></span>
                     <span title="${I18N.t('printers.bed')}">🛏️ <span id="card-bed-${p.id}">--°C</span></span>
+                    ${(p.config && p.config.meter) ? `<span id="card-watts-${p.id}" class="printer-card-watts" title="${escapeHtml(_t3('printers.live_watts_title', 'Consommation en direct (prise connectée)'))}">⚡ <span>--</span> W</span>` : ''}
                 </div>
                 <div id="card-spools-${p.id}" class="printer-card-spools"></div>
                 <div class="printer-card-camera${p.is_connected ? '' : ' is-offline'}" data-pid="${p.id}" data-ptype="${escapeHtml(p.type || '')}" ${p.is_connected ? '' : 'data-offline="1"'} style="margin-top:8px; border-radius:8px; overflow:hidden; background:#000; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center;">${p.is_connected ? '<i class="fa-solid fa-video" style="color:var(--text-muted); font-size:calc(16px * var(--fs, 1));"></i>' : _printerOfflineLogoHtml(p.type)}</div>
@@ -19696,6 +19707,7 @@ function renderPrinters() {
     printersList.forEach(p => _checkMaintenanceBadge(p.id));
     _populatePrinterSelects();
     _setupPrinterCardCameras();
+    _startMeterPolling();
 }
 
 let _printerCardCameraObserver = null;
@@ -21096,6 +21108,7 @@ window.togglePrinterFields = function() {
     }
     const help = document.getElementById('printer-type-help');
     if (help && type === 'bambu') help.textContent = I18N.t('printers.bambu_access_found_hint');
+    if (typeof onPrinterMeterKindChange === 'function') onPrinterMeterKindChange();
 }
 
 
@@ -26092,6 +26105,162 @@ window.openWorkshopMode = function () {
 // Lien direct : http://…/#workshop ouvre le mode atelier (pratique pour un écran dédié dans l'atelier)
 window.addEventListener('load', () => { if (location.hash === '#workshop') setTimeout(() => window.openWorkshopMode(), 1200); });
 
+
+// ── Prise connectée (consommation électrique) : champs de la fiche imprimante, test, watts en direct ──
+window.onPrinterMeterKindChange = function () {
+    const kind = document.getElementById('printer-meter-kind')?.value || '';
+    const wrap = document.getElementById('meter-fields');
+    if (!wrap) return;
+    wrap.style.display = kind ? 'flex' : 'none';
+    const ha = document.getElementById('meter-ha-fields'); if (ha) ha.style.display = kind === 'homeassistant' ? 'flex' : 'none';
+    const ch = document.getElementById('meter-channel-wrap'); if (ch) ch.style.display = (kind === 'shelly' || kind === 'tasmota') ? 'flex' : 'none';
+    const host = document.getElementById('printer-meter-host');
+    if (host) host.placeholder = kind === 'homeassistant'
+        ? _t3('printers.meter_host_ph_ha', 'http://homeassistant.local:8123')
+        : _t3('printers.meter_host_ph', 'Adresse IP de la prise (ex : 192.168.1.50)');
+    const res = document.getElementById('printer-meter-test-result'); if (res) res.textContent = '';
+};
+function _collectMeterConfig() {
+    const kind = document.getElementById('printer-meter-kind')?.value || '';
+    const host = (document.getElementById('printer-meter-host')?.value || '').trim();
+    if (!kind || !host) return null;
+    const m = { kind, host };
+    m.channel = parseInt(document.getElementById('printer-meter-channel')?.value, 10) || 0;
+    if (kind === 'homeassistant') {
+        m.entity = (document.getElementById('printer-meter-entity')?.value || '').trim();
+        m.energy_entity = (document.getElementById('printer-meter-energy-entity')?.value || '').trim();
+        m.token = (document.getElementById('printer-meter-token')?.value || '').trim();
+    }
+    return m;
+}
+function _fillMeterFields(meter) {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
+    const m = meter || {};
+    set('printer-meter-kind', m.kind || '');
+    set('printer-meter-host', m.host || '');
+    set('printer-meter-entity', m.entity || '');
+    set('printer-meter-energy-entity', m.energy_entity || '');
+    set('printer-meter-channel', m.channel || 0);
+    set('printer-meter-token', '');
+    const tok = document.getElementById('printer-meter-token');
+    if (tok) tok.placeholder = m.has_token ? _t3('printers.meter_token_kept', 'Jeton enregistré (laisser vide pour le conserver)') : _t3('printers.meter_token_ph', "Jeton d'accès longue durée");
+    onPrinterMeterKindChange();
+}
+window.testPrinterMeter = async function () {
+    const out = document.getElementById('printer-meter-test-result');
+    const btn = document.getElementById('printer-meter-test-btn');
+    const meter = _collectMeterConfig();
+    if (!out) return;
+    if (!meter) { out.style.color = 'var(--warning, #f6ad55)'; out.textContent = _t3('printers.meter_err_config', "Renseignez l'adresse de la prise"); return; }
+    if (btn) btn.disabled = true;
+    out.style.color = 'var(--text-muted)'; out.textContent = _t3('printers.meter_testing', 'Test en cours…');
+    try {
+        const pid = document.getElementById('printer-edit-id')?.value.trim() || '0';
+        const res = await fetch(`${API}/api/printers/${encodeURIComponent(pid)}/meter/test`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ meter }) });
+        const d = await res.json();
+        if (d.ok) {
+            out.style.color = 'var(--success, #48bb78)';
+            let txt = d.power_w != null ? _tf('printers.meter_ok', 'Prise joignable : {{w}} W', { w: Math.round(d.power_w * 10) / 10 }) : _t3('printers.meter_ok_nopower', 'Prise joignable');
+            if (d.energy_wh != null) txt += ' · ' + _tf('printers.meter_ok_total', 'compteur {{kwh}} kWh', { kwh: (d.energy_wh / 1000).toFixed(2) });
+            out.textContent = '✅ ' + txt;
+        } else {
+            const key = { config: 'config', auth: 'auth', timeout: 'timeout', unreachable: 'unreachable', unavailable: 'unavailable' }[d.error] || 'invalid';
+            const fb = { config: "Renseignez l'adresse de la prise", auth: 'Accès refusé : vérifiez le jeton ou le mot de passe',
+                timeout: 'La prise ne répond pas (délai dépassé)', unreachable: 'Prise injoignable : vérifiez l\'adresse et le réseau',
+                unavailable: 'Le capteur est indisponible dans Home Assistant', invalid: 'Réponse inattendue : vérifiez le type de prise et les noms des capteurs' }[key];
+            out.style.color = 'var(--danger, #e85d75)';
+            out.textContent = '❌ ' + _t3('printers.meter_err_' + key, fb);
+        }
+    } catch (e) {
+        out.style.color = 'var(--danger, #e85d75)'; out.textContent = '❌ ' + _t3('toast.connection_error', 'Erreur de connexion');
+    } finally { if (btn) btn.disabled = false; }
+};
+let _meterTimer = null;
+async function _refreshMeters() {
+    const withMeter = (printersList || []).filter(p => p.config && p.config.meter);
+    if (!withMeter.length || !document.querySelector('.printer-card-watts')) return;
+    try {
+        const r = await fetch(`${API}/api/printers/meters/live`, { cache: 'no-store' });
+        if (!r.ok) return;
+        const data = await r.json();
+        withMeter.forEach(p => {
+            const el = document.getElementById(`card-watts-${p.id}`);
+            if (!el) return;
+            const m = data[String(p.id)];
+            const val = el.querySelector('span');
+            if (m && m.ok && m.power_w != null) { val.textContent = Math.round(m.power_w); el.classList.toggle('is-printing', !!m.printing); el.classList.remove('is-error'); }
+            else if (m && !m.ok) { val.textContent = '?'; el.classList.add('is-error'); }
+        });
+    } catch (e) { /* hors ligne : on réessaie au prochain passage */ }
+}
+function _startMeterPolling() {
+    _refreshMeters();
+    if (!_meterTimer) _meterTimer = setInterval(_refreshMeters, 10000);
+}
+
+// ── Fenêtre « Consommation » : kWh, coût et puissance moyenne mesurés par imprimante ──────────────
+window.openEnergyModal = async function () {
+    document.getElementById('energy-overlay')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'energy-overlay'; ov.className = 'print-report-overlay';
+    ov.innerHTML = `
+        <div class="print-report-modal" role="dialog" aria-modal="true">
+            <div class="print-report-head">
+                <h3><i class="fa-solid fa-bolt"></i> ${escapeHtml(_t3('energy.title', 'Consommation électrique'))}</h3>
+                <button type="button" class="print-report-close" aria-label="${escapeHtml(_t3('actions.close', 'Fermer'))}"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="energy-body"><div class="print-report-preview"><i class="fa-solid fa-spinner fa-spin"></i></div></div>
+        </div>`;
+    document.body.appendChild(ov);
+    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = e => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+    ov.querySelector('.print-report-close').addEventListener('click', close);
+    await _renderEnergy(30);
+};
+async function _renderEnergy(days) {
+    const body = document.getElementById('energy-body');
+    if (!body) return;
+    let d;
+    try { d = await (await fetch(`${API}/api/energy/summary?days=${days}`, { cache: 'no-store' })).json(); }
+    catch (e) { body.innerHTML = `<div class="tl-warn">${escapeHtml(_t3('toast.connection_error', 'Erreur de connexion'))}</div>`; return; }
+    const fmtDate = s => { try { return new Date(String(s).replace(' ', 'T')).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }); } catch (e) { return s || ''; } };
+    const hasCost = (d.cost || 0) > 0;
+    const sel = [7, 30, 90, 365].map(n => `<option value="${n}" ${n === d.days ? 'selected' : ''}>${escapeHtml(_tf('energy.period_days', '{{n}} derniers jours', { n }))}</option>`).join('');
+    const kpi = (label, value) => `<div class="energy-kpi"><div class="energy-kpi-value">${value}</div><div class="energy-kpi-label">${escapeHtml(label)}</div></div>`;
+    const printers = (d.printers || []).map(p => `
+        <tr><td>${escapeHtml(p.name || '—')}</td><td>${p.sessions}</td><td>${p.hours} h</td><td>${p.kwh} kWh</td>
+            <td>${p.avg_w != null ? Math.round(p.avg_w) + ' W' : '—'}</td><td>${hasCost ? formatCost(p.cost) : '—'}</td></tr>`).join('');
+    const recent = (d.recent || []).map(s => `
+        <tr><td>${escapeHtml(fmtDate(s.ended_at))}</td><td>${escapeHtml(s.printer_name || '')}</td>
+            <td class="energy-file" title="${escapeHtml(s.file_name || '')}">${escapeHtml(s.file_name || '—')}</td>
+            <td>${(s.energy_wh / 1000).toFixed(3)} kWh</td><td>${s.avg_w != null ? Math.round(s.avg_w) + ' W' : '—'}</td>
+            <td>${s.cost != null ? formatCost(s.cost) : '—'}</td>
+            <td><button type="button" class="btn btn-ghost btn-sm viewer-hide" onclick="deleteEnergySession(${s.id})" title="${escapeHtml(_t3('actions.delete', 'Supprimer'))}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
+    body.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+            <select id="energy-days" onchange="_renderEnergy(parseInt(this.value, 10))">${sel}</select>
+        </div>
+        <div class="energy-kpis">${kpi(_t3('energy.kwh', 'Énergie'), `${d.kwh} kWh`)}${kpi(_t3('energy.cost', 'Coût'), hasCost ? formatCost(d.cost) : '—')}${kpi(_t3('energy.sessions', 'Impressions mesurées'), d.sessions)}${kpi(_t3('energy.hours', "Heures d'impression"), `${d.hours} h`)}</div>
+        ${d.sessions ? `
+        <h4 class="energy-h">${escapeHtml(_t3('energy.by_printer', 'Par imprimante'))}</h4>
+        <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th>${escapeHtml(_t3('energy.col_printer', 'Imprimante'))}</th><th>${escapeHtml(_t3('energy.sessions_short', 'Impr.'))}</th><th>${escapeHtml(_t3('energy.hours_short', 'Durée'))}</th><th>${escapeHtml(_t3('energy.kwh', 'Énergie'))}</th><th>${escapeHtml(_t3('energy.avg_w', 'Puissance moyenne'))}</th><th>${escapeHtml(_t3('energy.cost', 'Coût'))}</th></tr></thead><tbody>${printers}</tbody></table></div>
+        <h4 class="energy-h">${escapeHtml(_t3('energy.recent', 'Dernières impressions'))}</h4>
+        <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th>${escapeHtml(_t3('energy.col_date', 'Date'))}</th><th>${escapeHtml(_t3('energy.col_printer', 'Imprimante'))}</th><th>${escapeHtml(_t3('energy.col_file', 'Fichier'))}</th><th>${escapeHtml(_t3('energy.kwh', 'Énergie'))}</th><th>${escapeHtml(_t3('energy.avg_w', 'Puissance moyenne'))}</th><th>${escapeHtml(_t3('energy.cost', 'Coût'))}</th><th></th></tr></thead><tbody>${recent}</tbody></table></div>
+        <p class="energy-note">${escapeHtml(_t3('energy.note', 'La puissance moyenne mesurée remplace la puissance estimée dans les devis dès que deux impressions de plus de 15 minutes sont enregistrées.'))}</p>`
+        : `<div class="ws-empty" style="color:var(--text-muted);padding:30px 10px;text-align:center;"><i class="fa-solid fa-bolt"></i><p>${escapeHtml(_t3('energy.empty', "Aucune mesure pour l'instant. Ajoutez une prise connectée dans la fiche d'une imprimante."))}</p></div>`}`;
+}
+window._renderEnergy = _renderEnergy;
+window.deleteEnergySession = function (id) {
+    showConfirmModal(_t3('energy.confirm_delete', 'Supprimer cette mesure ?'), async () => {
+        try {
+            const r = await fetch(`${API}/api/energy/sessions/${id}`, { method: 'DELETE' });
+            if (r.ok) _renderEnergy(parseInt(document.getElementById('energy-days')?.value, 10) || 30);
+        } catch (e) { showToast(_t3('toast.connection_error', 'Erreur de connexion'), 'error'); }
+    });
+};
 
 // ── Timelapses : liste, lecture, téléchargement, suppression ────────────────────────────────────
 function _fmtBytes(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' Mo' : Math.max(1, Math.round(n / 1024)) + ' Ko'; }

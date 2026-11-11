@@ -375,6 +375,20 @@ stellio/
 ├── style.css           # Stili
 ├── launcher.py         # Launcher leggero / bootstrap del runtime
 ├── check_deps.py       # Verifica dipendenze auto-riparante
+├── print_session.py    # v1.0.4 : prise connectée, photo de fin, surveillance IA (module de main.py)
+├── share_link.py       # lien d'état partageable (module de main.py)
+├── order_tracking.py   # page de suivi client (module de main.py)
+├── timelapse.py        # module de main.py (timelapse des impressions (images, assemblage vidéo))
+├── mqtt_publisher.py   # module de main.py (publication MQTT / Home Assistant)
+├── tigertag.py         # module de main.py (inventaire TigerTag (Firebase, références, étiquettes))
+├── push_notify.py      # module de main.py (notifications push (ntfy, Telegram, Discord, webhook))
+├── auto_backup_routes.py# module de main.py (sauvegarde automatique (configuration, liste, restauration))
+├── feedback.py         # module de main.py (suggestions / signalements → issues GitHub)
+├── sosprint_helpers.py # module de main.py (S.O.S Print : conversations, cas de référence, réglages)
+├── remote_instances.py # module de main.py (instances Stellio distantes, envoi, découverte LAN)
+├── slicer_profiles.py  # module de main.py (profils de slicer (import, affectation, autodétection))
+├── clients.py          # module de main.py (carnet de clients (CRM, import))
+├── trash_routes.py     # module de main.py (corbeille (liste, restauration, purge))
 ├── worker.py           # Scheletro di worker 3MF non utilizzato (provvisorio)
 ├── assets/             # Loghi, icone
 ├── languages/          # File di traduzione (JSON)

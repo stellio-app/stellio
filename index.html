@@ -1088,6 +1088,9 @@
                                 <button class="btn btn-ghost btn-sm" onclick="openMonthlyReport()">
                                     <i class="fa-solid fa-file-lines"></i> <span data-i18n="report.btn">Bilan</span>
                                 </button>
+                                <button class="btn btn-ghost btn-sm" onclick="openEnergyModal()">
+                                    <i class="fa-solid fa-bolt"></i> <span data-i18n="energy.button">Consommation</span>
+                                </button>
                                 <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="clearAllHistory()" data-i18n-title="history.clear" title="Vider l'historique">
                                     <i class="fa-solid fa-trash"></i> <span data-i18n="history.clear">Vider</span>
                                 </button>
@@ -3035,6 +3038,9 @@
 					<button onclick="openTimelapseModal()" class="btn btn-ghost" style="margin-left:8px;">
 						<i class="fa-solid fa-film"></i> <span data-i18n="timelapse.open_btn">Timelapses</span>
 					</button>
+					<button onclick="openEnergyModal()" class="btn btn-ghost" style="margin-left:8px;">
+						<i class="fa-solid fa-bolt"></i> <span data-i18n="energy.button">Consommation</span>
+					</button>
 					<button onclick="openPartsModal()" class="btn btn-ghost" style="margin-left:8px;">
 						<i class="fa-solid fa-toolbox"></i> <span data-i18n="parts.open_btn">Pièces &amp; consommables</span>
 					</button>
@@ -4506,6 +4512,46 @@
 							<span data-i18n="printers.timelapse_label">Timelapse automatique</span>
 						</label>
 						<small style="color:var(--text-muted);font-size:calc(11px * var(--fs, 1));" data-i18n="printers.timelapse_hint">Stellio prend des photos avec la caméra de l'imprimante pendant l'impression et crée une vidéo à la fin (ffmpeg requis).</small>
+					</div>
+					<div class="input-group" id="group-endphoto">
+						<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+							<input type="checkbox" id="printer-end-photo" style="width:auto;margin:0;">
+							<span data-i18n="printers.end_photo_label">Photo de fin d'impression</span>
+						</label>
+						<small style="color:var(--text-muted);font-size:calc(11px * var(--fs, 1));" data-i18n="printers.end_photo_hint">À la fin de chaque impression, Stellio prend une photo avec la caméra et l'ajoute à la galerie du fichier.</small>
+					</div>
+					<div class="input-group" id="group-aiwatch">
+						<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+							<input type="checkbox" id="printer-ai-watch" style="width:auto;margin:0;">
+							<span data-i18n="printers.ai_watch_label">Surveillance IA des échecs</span>
+						</label>
+						<small style="color:var(--text-muted);font-size:calc(11px * var(--fs, 1));" data-i18n="printers.ai_watch_hint">Pendant l'impression, un modèle de vision Ollama (local, les images ne quittent jamais votre machine) regarde la caméra toutes les 5 minutes et vous alerte en cas de spaghetti ou de pièce décollée. L'impression n'est jamais arrêtée automatiquement.</small>
+					</div>
+					<div class="input-group" id="group-meter">
+						<label data-i18n="printers.meter_label">Prise connectée (consommation électrique)</label>
+						<select id="printer-meter-kind" onchange="onPrinterMeterKindChange()">
+							<option value="" data-i18n="printers.meter_none">Aucune</option>
+							<option value="shelly" data-i18n="printers.meter_shelly">Shelly</option>
+							<option value="tasmota" data-i18n="printers.meter_tasmota">Tasmota</option>
+							<option value="homeassistant" data-i18n="printers.meter_ha">Home Assistant</option>
+						</select>
+						<div id="meter-fields" style="display:none; margin-top:8px; flex-direction:column; gap:8px;">
+							<input type="text" id="printer-meter-host" autocomplete="off" placeholder="192.168.1.50">
+							<div id="meter-ha-fields" style="display:none; flex-direction:column; gap:8px;">
+								<input type="text" id="printer-meter-entity" autocomplete="off" placeholder="sensor.imprimante_puissance" data-i18n-placeholder="printers.meter_entity_ph">
+								<input type="text" id="printer-meter-energy-entity" autocomplete="off" placeholder="sensor.imprimante_energie (kWh)" data-i18n-placeholder="printers.meter_energy_entity_ph">
+								<input type="password" id="printer-meter-token" autocomplete="off" placeholder="Jeton d'accès longue durée" data-i18n-placeholder="printers.meter_token_ph">
+							</div>
+							<div id="meter-channel-wrap" style="display:none; align-items:center; gap:8px;">
+								<span style="font-size:calc(12px * var(--fs, 1));color:var(--text-muted);" data-i18n="printers.meter_channel">Voie</span>
+								<input type="number" id="printer-meter-channel" min="0" max="7" step="1" value="0" style="width:80px;">
+							</div>
+							<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+								<button type="button" class="btn btn-ghost btn-sm" id="printer-meter-test-btn" onclick="testPrinterMeter()"><i class="fa-solid fa-plug-circle-bolt"></i> <span data-i18n="printers.meter_test">Tester la prise</span></button>
+								<span id="printer-meter-test-result" style="font-size:calc(12px * var(--fs, 1));"></span>
+							</div>
+						</div>
+						<small style="color:var(--text-muted);font-size:calc(11px * var(--fs, 1));" data-i18n="printers.meter_hint">Stellio lit les watts de la prise pendant l'impression et enregistre l'énergie réellement consommée (kWh) et son coût dans l'historique. Cette mesure remplace ensuite la puissance estimée dans les devis.</small>
 					</div>
 				</form>
 			</div>

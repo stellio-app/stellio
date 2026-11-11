@@ -12056,367 +12056,27 @@ def require_peer_key(f):
     return wrapper
 
 
-@app.route('/api/remote-instances', methods=['GET'])
-@login_required
-def api_remote_instances_list():
-    conn = get_db()
-    try:
-        rows = conn.execute(
-            "SELECT id, name, url, inbox_folder, last_status, last_seen_at, created_at FROM remote_instances WHERE user_id=? ORDER BY created_at ASC",
-            (session['user_id'],)
-        ).fetchall()
-        return jsonify({"instances": [dict(r) for r in rows], "local_peer_key": _get_or_create_local_peer_key()}), 200
-    finally:
-        conn.close()
+# ── instances Stellio distantes (liste, envoi de fichiers, découverte du réseau local) : module séparé `remote_instances.py` (services fournis par `remote_instances.init(globals())`) ──
+import remote_instances
+from remote_instances import (
+    _LAN_SCAN_CACHE,
+    _LAN_SCAN_CACHE_SECONDS,
+    _is_lan_request,
+    _lan_scan_lock,
+    _scan_lan_for_stellio,
+    _scan_lan_for_stellio_uncached,
+    api_peer_folders,
+    api_peer_identify,
+    api_remote_instances_add,
+    api_remote_instances_delete,
+    api_remote_instances_discover,
+    api_remote_instances_folders,
+    api_remote_instances_list,
+    api_remote_instances_ping,
+    api_remote_instances_send,
+    api_remote_instances_status,
+)
 
-
-@app.route('/api/remote-instances', methods=['POST'])
-@login_required
-def api_remote_instances_add():
-    data = request.json or {}
-    name = (data.get('name') or '').strip()
-    url = (data.get('url') or '').strip().rstrip('/')
-    peer_key = (data.get('peer_key') or '').strip()
-    inbox_folder = (data.get('inbox_folder') or '').strip() or None
-
-    if not name or not url or not peer_key:
-        return jsonify({"error": "Nom, adresse et clé d'appairage requis"}), 400
-    if not url.startswith('http://') and not url.startswith('https://'):
-        url = f"http://{url}"
-
-    conn = get_db()
-    try:
-        cur = conn.execute(
-            "INSERT INTO remote_instances (user_id, name, url, peer_key, inbox_folder) VALUES (?,?,?,?,?)",
-            (session['user_id'], name, url, peer_key, inbox_folder)
-        )
-        conn.commit()
-        return jsonify({"success": True, "id": cur.lastrowid}), 200
-    finally:
-        conn.close()
-
-
-@app.route('/api/remote-instances/<int:instance_id>', methods=['DELETE'])
-@login_required
-def api_remote_instances_delete(instance_id):
-    conn = get_db()
-    try:
-        conn.execute("DELETE FROM remote_instances WHERE id=? AND user_id=?", (instance_id, session['user_id']))
-        conn.commit()
-        return jsonify({"success": True}), 200
-    finally:
-        conn.close()
-
-
-@app.route('/api/remote-instances/<int:instance_id>/ping', methods=['POST'])
-@login_required
-def api_remote_instances_ping(instance_id):
-    conn = get_db()
-    try:
-        row = conn.execute(
-            "SELECT * FROM remote_instances WHERE id=? AND user_id=?", (instance_id, session['user_id'])
-        ).fetchone()
-        if not row:
-            return jsonify({"error": "Instance introuvable"}), 404
-
-        try:
-            r = requests.get(
-                f"{row['url']}/api/peer/handshake", timeout=5,
-                headers={"X-Stellio-Peer-Key": row['peer_key']}
-            )
-            if r.ok:
-                remote_info = r.json()
-                conn.execute(
-                    "UPDATE remote_instances SET last_status='online', last_seen_at=CURRENT_TIMESTAMP WHERE id=?",
-                    (instance_id,)
-                )
-                conn.commit()
-                return jsonify({"status": "online", "remote": remote_info}), 200
-            conn.execute("UPDATE remote_instances SET last_status='error' WHERE id=?", (instance_id,))
-            conn.commit()
-            if r.status_code == 403:
-                return jsonify({"status": "error", "error": "Clé d'appairage refusée par l'autre instance"}), 200
-            return jsonify({"status": "error", "error": f"Réponse HTTP {r.status_code}"}), 200
-        except Exception as e:
-            conn.execute("UPDATE remote_instances SET last_status='offline' WHERE id=?", (instance_id,))
-            conn.commit()
-            return jsonify({"status": "offline", "error": "Instance injoignable"}), 200
-    finally:
-        conn.close()
-
-
-@app.route('/api/remote-instances/<int:instance_id>/send', methods=['POST'])
-@login_required
-def api_remote_instances_send(instance_id):
-    data = request.json or {}
-    file_path = (data.get('file_path') or '').strip()
-    if not file_path or not os.path.isfile(file_path):
-        return jsonify({"error": "Fichier introuvable"}), 404
-    if not _is_path_within_sources(file_path, session['user_id']):
-        return jsonify({"error": "Ce fichier n'appartient à aucune source configurée"}), 403
-
-    conn = get_db()
-    try:
-        row = conn.execute(
-            "SELECT * FROM remote_instances WHERE id=? AND user_id=?", (instance_id, session['user_id'])
-        ).fetchone()
-    finally:
-        conn.close()
-    if not row:
-        return jsonify({"error": "Instance introuvable"}), 404
-
-    _cleanup_expired_shares()
-    token = secrets.token_urlsafe(24)
-    with _share_lock:
-        _share_links[token] = {
-            'path': file_path, 'name': os.path.basename(file_path), 'created': time.time(),
-        }
-    local_ip = get_local_ip()
-    share_url = f"http://{local_ip}:5000/share/{token}"
-
-    try:
-        r = requests.post(
-            f"{row['url']}/api/peer/receive-file", timeout=20,
-            headers={"X-Stellio-Peer-Key": row['peer_key']},
-            json={"url": share_url, "filename": os.path.basename(file_path),
-                  "dest_folder": (data.get('dest_folder') or '').strip()}
-        )
-        if r.ok:
-            app_logger.info(f"[RemoteInstance] Fichier {os.path.basename(file_path)} envoyé vers '{row['name']}'")
-            return jsonify({"success": True}), 200
-        with _share_lock:
-            _share_links.pop(token, None)
-        if r.status_code == 403:
-            return jsonify({"error": "Clé d'appairage refusée par l'autre instance"}), 502
-        try:
-            remote_reason = (r.json() or {}).get('error') or ''
-        except Exception:
-            remote_reason = ''
-        app_logger.warning(f"[RemoteInstance] '{row['name']}' a répondu HTTP {r.status_code}: {remote_reason}")
-        if remote_reason:
-            return jsonify({"error": f"L'autre instance a refusé le fichier (HTTP {r.status_code}) : {remote_reason}"}), 502
-        return jsonify({"error": f"L'autre instance a refusé le fichier (HTTP {r.status_code})"}), 502
-    except Exception as e:
-        with _share_lock:
-            _share_links.pop(token, None)
-        app_logger.warning(f"[RemoteInstance] Envoi échoué vers '{row['name']}': {e}")
-        return jsonify({"error": "Instance injoignable"}), 503
-
-
-@app.route('/api/remote-instances/<int:instance_id>/folders', methods=['GET'])
-@login_required
-def api_remote_instances_folders(instance_id):
-    conn = get_db()
-    try:
-        row = conn.execute(
-            "SELECT * FROM remote_instances WHERE id=? AND user_id=?", (instance_id, session['user_id'])
-        ).fetchone()
-    finally:
-        conn.close()
-    if not row:
-        return jsonify({"error": "Instance introuvable"}), 404
-    try:
-        r = requests.get(
-            f"{row['url']}/api/peer/folders", timeout=15,
-            headers={"X-Stellio-Peer-Key": row['peer_key']},
-            params={"path": request.args.get('path', '')}
-        )
-        if r.status_code == 404:
-            return jsonify({"error": "L'autre instance n'est pas à jour (version sans choix de dossier)", "code": "peer_outdated"}), 502
-        try:
-            body = r.json()
-        except Exception:
-            body = {"error": f"Réponse invalide de l'autre instance (HTTP {r.status_code})"}
-        if r.status_code == 403:
-            return jsonify({"error": "Clé d'appairage refusée par l'autre instance"}), 502
-        return jsonify(body), (200 if r.ok else 502)
-    except Exception as e:
-        app_logger.warning(f"[RemoteInstance] Liste des dossiers échouée vers '{row['name']}': {e}")
-        return jsonify({"error": "Instance injoignable"}), 503
-
-
-@app.route('/api/peer/folders', methods=['GET'])
-@require_peer_key
-def api_peer_folders():
-    user_id = _get_primary_user_id()
-    if not user_id:
-        return jsonify({"error": "Aucun utilisateur configuré sur cette instance"}), 500
-    req_path = (request.args.get('path') or '').strip()
-
-    roots = []
-    conn = get_db()
-    try:
-        rows = conn.execute("SELECT name, path FROM sources WHERE user_id=? AND type='folder' ORDER BY id", (user_id,)).fetchall()
-    finally:
-        conn.close()
-    for r_ in rows:
-        if r_['path'] and os.path.isdir(r_['path']) and os.access(r_['path'], os.W_OK):
-            roots.append({"name": r_['name'] or os.path.basename(r_['path'].rstrip('/\\')) or r_['path'], "path": r_['path']})
-
-    if not req_path:
-        return jsonify({"path": "", "parent": None, "folders": roots}), 200
-
-    if not os.path.isdir(req_path) or not _is_path_within_sources(req_path, user_id):
-        return jsonify({"error": "Dossier hors des sources de cette instance"}), 403
-
-    norm = lambda p: os.path.realpath(p).replace('\\', '/').rstrip('/').lower()
-    cur = norm(req_path)
-    parent = None
-    if not any(cur == norm(x['path']) for x in roots):
-        par = os.path.dirname(req_path.rstrip('/\\'))
-        if par and _is_path_within_sources(par, user_id):
-            parent = par
-    folders = []
-    try:
-        with os.scandir(req_path) as it:
-            for e in it:
-                if e.is_dir(follow_symlinks=False) and not e.name.startswith('.') and os.access(e.path, os.W_OK):
-                    folders.append({"name": e.name, "path": e.path})
-                if len(folders) >= 500:
-                    break
-    except Exception as e:
-        return jsonify({"error": f"Lecture du dossier impossible : {e}"}), 500
-    folders.sort(key=lambda x: x['name'].lower())
-    return jsonify({"path": req_path, "parent": parent, "folders": folders}), 200
-
-
-def _is_lan_request():
-    import ipaddress
-    if request.headers.get('Cf-Connecting-Ip') or request.headers.get('X-Forwarded-For'):
-        return False
-    try:
-        ip = ipaddress.ip_address(request.remote_addr or '')
-    except ValueError:
-        return False
-    return ip.is_private or ip.is_loopback or ip.is_link_local
-
-
-@app.route('/api/peer/identify', methods=['GET'])
-def api_peer_identify():
-    if not _is_lan_request():
-        return jsonify({"error": "Réseau local uniquement"}), 403
-    settings = load_settings() or {}
-    return jsonify({
-        "stellio": True,
-        "name": settings.get('instance_name') or platform.node(),
-        "version": get_current_version(),
-    }), 200
-
-
-_LAN_SCAN_CACHE = {"at": 0.0, "found": []}
-_LAN_SCAN_CACHE_SECONDS = 60
-_lan_scan_lock = threading.Lock()
-
-
-def _scan_lan_for_stellio(timeout=0.4, port=None, max_parallel=64, force=False):
-    if port is None:
-        port = globals().get('SERVER_PORT') or int(os.environ.get('STELLIO_PORT', '5000'))
-    with _lan_scan_lock:
-        if not force and time.time() - _LAN_SCAN_CACHE["at"] < _LAN_SCAN_CACHE_SECONDS:
-            return list(_LAN_SCAN_CACHE["found"])
-        found = _scan_lan_for_stellio_uncached(timeout, port, max_parallel)
-        _LAN_SCAN_CACHE["at"] = time.time()
-        _LAN_SCAN_CACHE["found"] = list(found)
-        return found
-
-
-def _scan_lan_for_stellio_uncached(timeout, port, max_parallel):
-    local_ip = get_local_ip()
-    if local_ip == '127.0.0.1' or local_ip.count('.') != 3:
-        return []
-    prefix = '.'.join(local_ip.split('.')[:3])
-    found = []
-    lock = threading.Lock()
-
-    def _check(ip):
-        try:
-            r = requests.get(f"http://{ip}:{port}/api/peer/identify", timeout=timeout)
-            if r.ok:
-                d = r.json()
-                if isinstance(d, dict) and d.get('stellio'):
-                    with lock:
-                        found.append({"name": d.get('name') or ip, "version": d.get('version') or '',
-                                      "url": f"http://{ip}:{port}"})
-        except Exception:
-            pass
-
-    batch = []
-    for i in range(1, 255):
-        ip = f"{prefix}.{i}"
-        if ip == local_ip:
-            continue
-        t = threading.Thread(target=_check, args=(ip,), daemon=True)
-        batch.append(t)
-        t.start()
-        if len(batch) >= max_parallel:
-            for th in batch:
-                th.join(timeout=timeout + 0.5)
-            batch = []
-    for th in batch:
-        th.join(timeout=timeout + 0.5)
-    return found
-
-
-@app.route('/api/remote-instances/status', methods=['GET'])
-@login_required
-def api_remote_instances_status():
-    conn = get_db()
-    try:
-        rows = [dict(r) for r in conn.execute(
-            "SELECT id, name, url, peer_key FROM remote_instances WHERE user_id=? ORDER BY created_at ASC",
-            (session['user_id'],)).fetchall()]
-    finally:
-        conn.close()
-
-    results = {}
-
-    def _probe(row):
-        try:
-            r = requests.get(f"{row['url']}/api/peer/handshake", timeout=3,
-                             headers={"X-Stellio-Peer-Key": row['peer_key']})
-            results[row['id']] = 'online' if r.ok else 'error'
-        except Exception:
-            results[row['id']] = 'offline'
-
-    threads = [threading.Thread(target=_probe, args=(r,), daemon=True) for r in rows]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join(timeout=4)
-
-    out = []
-    try:
-        conn = get_db()
-        try:
-            for r in rows:
-                st = results.get(r['id'], 'offline')
-                if st == 'online':
-                    conn.execute("UPDATE remote_instances SET last_status='online', last_seen_at=CURRENT_TIMESTAMP WHERE id=?", (r['id'],))
-                else:
-                    conn.execute("UPDATE remote_instances SET last_status=? WHERE id=?", (st, r['id']))
-                out.append({"id": r['id'], "name": r['name'], "url": r['url'], "status": st, "online": st == 'online'})
-            conn.commit()
-        finally:
-            conn.close()
-    except Exception:
-        out = [{"id": r['id'], "name": r['name'], "url": r['url'],
-                "status": results.get(r['id'], 'offline'), "online": results.get(r['id']) == 'online'} for r in rows]
-    return jsonify({"instances": out}), 200
-
-
-@app.route('/api/remote-instances/discover', methods=['GET'])
-@login_required
-def api_remote_instances_discover():
-    found = _scan_lan_for_stellio(force=request.args.get('refresh') == '1')
-    conn = get_db()
-    try:
-        known = {(r['url'] or '').rstrip('/').lower() for r in conn.execute(
-            "SELECT url FROM remote_instances WHERE user_id=?", (session['user_id'],)).fetchall()}
-    finally:
-        conn.close()
-    found = [f for f in found if f['url'].lower() not in known]
-    found.sort(key=lambda f: f['name'].lower())
-    return jsonify({"instances": found}), 200
 
 
 @app.route('/api/peer/handshake', methods=['GET'])
@@ -13209,133 +12869,18 @@ def _trash_list_for_user(uid):
     return out
 
 
-@app.route('/api/trash/items', methods=['GET'])
-@login_required
-def api_trash_items():
-    try:
-        _purge_expired_trash()
-        _trash_purge_expired_rows()
-        items = _trash_list_for_user(session['user_id'])
-        return jsonify({'items': items, 'retention_days': _trash_retention_seconds() // 86400}), 200
-    except Exception as e:
-        app_logger.error(f"[API] Erreur api_trash_items: {e}")
-        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+# ── corbeille (liste, restauration, purge) : module séparé `trash_routes.py` (services fournis par `trash_routes.init(globals())`) ──
+import trash_routes
+from trash_routes import (
+    _trash_parse_key,
+    _trash_purge_batch,
+    _trash_purge_key,
+    api_trash_items,
+    api_trash_list,
+    api_trash_purge,
+    api_trash_restore,
+)
 
-
-def _trash_parse_key(key):
-    kind, _, ident = (key or '').partition(':')
-    return kind, ident
-
-
-@app.route('/api/trash/restore', methods=['POST'])
-@login_required
-def api_trash_restore():
-    try:
-        key = (request.get_json(silent=True) or {}).get('key', '')
-        kind, ident = _trash_parse_key(key)
-        uid = session['user_id']
-        if kind == 'files':
-            return api_restore_trash_batch_core(ident)
-        if kind != 'row' or not ident.isdigit():
-            return jsonify({'error': 'Élément invalide'}), 400
-        _ensure_trash_table()
-        conn = get_db()
-        try:
-            item = conn.execute("SELECT * FROM trash_items WHERE id = ? AND user_id = ?", (int(ident), uid)).fetchone()
-            if not item:
-                return jsonify({'error': "Cet élément n'est plus dans la corbeille"}), 404
-            ok, err = _trash_restore_row(conn, item)
-            if not ok:
-                conn.rollback()
-                return jsonify({'error': err}), 400
-            conn.execute("DELETE FROM trash_items WHERE id = ?", (item['id'],))
-            conn.commit()
-            try:
-                os.rmdir(os.path.join(TRASH_ITEMS_DIR, str(item['id'])))
-            except OSError:
-                pass
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
-        return jsonify({'success': True, 'kind': item['kind'], 'label': item['label']}), 200
-    except Exception as e:
-        app_logger.error(f"[Trash] Restauration impossible: {e}")
-        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
-
-
-def _trash_purge_batch(batch_id):
-    with _trash_registry_lock:
-        _trash_registry.pop(batch_id, None)
-    shutil.rmtree(os.path.join(TRASH_DIR, batch_id), ignore_errors=True)
-
-
-def _trash_purge_key(conn, uid, key):
-    kind, ident = _trash_parse_key(key)
-    if kind == 'files':
-        with _trash_registry_lock:
-            entry = _trash_registry.get(ident)
-        if not entry or entry.get('user_id') != uid:
-            return False
-        _trash_purge_batch(ident)
-        return True
-    if kind == 'row' and ident.isdigit():
-        r = conn.execute("SELECT id FROM trash_items WHERE id = ? AND user_id = ?", (int(ident), uid)).fetchone()
-        if not r:
-            return False
-        _trash_purge_row(conn, r['id'])
-        return True
-    return False
-
-
-@app.route('/api/trash/purge', methods=['POST'])
-@login_required
-def api_trash_purge():
-    """Supprime définitivement un élément de la corbeille (ou tous : {"all": true})."""
-    try:
-        data = request.get_json(silent=True) or {}
-        uid = session['user_id']
-        _ensure_trash_table()
-        conn = get_db()
-        try:
-            keys = [i['key'] for i in _trash_list_for_user(uid)] if data.get('all') else [data.get('key', '')]
-            n = sum(1 for k in keys if _trash_purge_key(conn, uid, k))
-            conn.commit()
-        finally:
-            conn.close()
-        if n:
-            journal_log('purge', f'{n} élément(s)', detail='suppression définitive depuis la corbeille')
-        return jsonify({'success': True, 'purged': n}), 200
-    except Exception as e:
-        app_logger.error(f"[Trash] Suppression définitive impossible: {e}")
-        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
-
-
-@app.route('/api/trash', methods=['GET'])
-@login_required
-def api_trash_list():
-    """Lots présents dans la corbeille (restaurables pendant TRASH_RETENTION_SECONDS) pour l'utilisateur courant."""
-    try:
-        _purge_expired_trash()
-        now = time.time()
-        uid = session.get('user_id')
-        out = []
-        with _trash_registry_lock:
-            items = list(_trash_registry.items())
-        for bid, entry in items:
-            if entry.get('user_id') != uid:
-                continue
-            names = [os.path.basename(e.get('original', '')) for e in entry.get('entries', [])]
-            left = int(TRASH_RETENTION_SECONDS - (now - entry.get('created_at', now)))
-            if left <= 0 or not names:
-                continue
-            out.append({'batch_id': bid, 'count': len(names), 'names': names[:3], 'seconds_left': left})
-        out.sort(key=lambda b: -b['seconds_left'])
-        return jsonify({'batches': out, 'retention_seconds': TRASH_RETENTION_SECONDS}), 200
-    except Exception as e:
-        app_logger.error(f"[API] Erreur api_trash_list: {e}")
-        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 
 @app.route('/api/files/restore-batch', methods=['POST'])
@@ -13772,6 +13317,7 @@ def api_get_stats():
 @app.route('/api/print-history', methods=['GET'])
 @login_required
 def api_get_print_history():
+    _ensure_v104_tables()
     try:
         limit_raw = request.args.get('limit', 50)
         offset_raw = request.args.get('offset', 0)
@@ -13841,7 +13387,7 @@ def api_get_print_history():
             rows = conn.execute(
                 f"""SELECT id, file_path, file_name, file_size, file_ext, slicer, sent_at, source_platform,
                           result, failure_reason, rating_notes, slicer_profile_id, slicer_profile_name, rated_at,
-                          material_cost, elec_cost, total_cost,
+                          material_cost, elec_cost, total_cost, energy_wh, energy_measured,
                           printer_id, estimated_seconds, actual_seconds, spool_weight_used_g, filament_material, filament_label,
                           (SELECT p.name FROM printers p WHERE p.id = print_history.printer_id) AS printer_name
                    FROM print_history WHERE {where_sql}
@@ -18113,127 +17659,18 @@ def _server_t(key, default):
     return data.get(key) or default
 
 
-def _push_http_post(url, body, headers=None):
-    if not re.match(r'^https?://', url or '', re.I):
-        raise ValueError("URL invalide (http/https attendu)")
-    r = requests.post(url, json=body, headers=headers or {}, timeout=8)
-    if r.status_code >= 300:
-        raise RuntimeError(f"HTTP {r.status_code}")
+# ── notifications push (ntfy, Telegram, Discord, webhook) : module séparé `push_notify.py` (services fournis par `push_notify.init(globals())`) ──
+import push_notify
+from push_notify import (
+    _push_deliver,
+    _push_http_post,
+    _push_notify_async,
+    _push_watch_once,
+    _push_watch_state,
+    _push_watcher_loop,
+    api_push_test,
+)
 
-
-def _push_deliver(cfg, title, message, notif_type='info'):
-    provider = (cfg.get('push_provider') or 'ntfy').strip()
-    title = str(title or 'Stellio')[:120]
-    message = str(message or '')[:900]
-    if provider == 'ntfy':
-        server = (cfg.get('push_ntfy_server') or 'https://ntfy.sh').strip().rstrip('/')
-        topic = (cfg.get('push_ntfy_topic') or '').strip()
-        if not topic:
-            raise ValueError("Sujet ntfy manquant")
-        headers = {}
-        if (cfg.get('push_ntfy_token') or '').strip():
-            headers['Authorization'] = f"Bearer {cfg['push_ntfy_token'].strip()}"
-        body = {"topic": topic, "title": title, "message": message,
-                "tags": _PUSH_TAGS.get(notif_type, ['bell']), "priority": 4 if notif_type == 'print_failed' else 3}
-        _push_http_post(server, body, headers)
-    elif provider == 'telegram':
-        token = (cfg.get('push_telegram_token') or '').strip()
-        chat = str(cfg.get('push_telegram_chat_id') or '').strip()
-        if not token or not chat:
-            raise ValueError("Jeton ou identifiant de conversation Telegram manquant")
-        _push_http_post(f"https://api.telegram.org/bot{token}/sendMessage", {"chat_id": chat, "text": f"{title}\n{message}"})
-    elif provider == 'discord':
-        url = (cfg.get('push_discord_url') or '').strip()
-        if not url:
-            raise ValueError("URL du webhook Discord manquante")
-        _push_http_post(url, {"username": "Stellio", "content": f"**{title}**\n{message}"[:1900]})
-    elif provider == 'webhook':
-        url = (cfg.get('push_webhook_url') or '').strip()
-        if not url:
-            raise ValueError("URL du webhook manquante")
-        _push_http_post(url, {"source": "stellio", "type": notif_type, "title": title, "message": message,
-                              "timestamp": datetime.datetime.now().isoformat(timespec='seconds')})
-    else:
-        raise ValueError("Service inconnu")
-
-
-def _push_notify_async(notif_type, title, message):
-    cfg = load_settings() or {}
-    if not cfg.get('push_enabled'):
-        return
-    types = cfg.get('push_types') if isinstance(cfg.get('push_types'), list) else _PUSH_DEFAULT_TYPES
-    if notif_type not in types:
-        return
-
-    def _run():
-        try:
-            _push_deliver(cfg, title, message, notif_type)
-        except Exception as e:
-            app_logger.warning(f"[Push] Envoi échoué ({type(e).__name__}: {str(e)[:80]})")
-    threading.Thread(target=_run, daemon=True).start()
-
-
-@app.route('/api/push/test', methods=['POST'])
-@login_required
-def api_push_test():
-    cfg = dict(load_settings() or {})
-    for k, v in (request.json or {}).items():
-        if str(k).startswith('push_'):
-            cfg[k] = v
-    try:
-        _push_deliver(cfg, _server_t('push.test_title', 'Stellio — test'),
-                      _server_t('push.test_message', 'Les notifications push fonctionnent.'), 'info')
-        return jsonify({"success": True}), 200
-    except requests.exceptions.RequestException as e:
-        return jsonify({"success": False, "error": f"Connexion impossible ({type(e).__name__})"}), 200
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)[:120]}), 200
-
-
-_push_watch_state = {}
-
-
-def _push_watch_once(cfg):
-    types = cfg.get('push_types') if isinstance(cfg.get('push_types'), list) else _PUSH_DEFAULT_TYPES
-    conn = get_db()
-    try:
-        rows = conn.execute("SELECT * FROM printers").fetchall()
-    finally:
-        conn.close()
-    now = time.time()
-    for p in rows:
-        try:
-            status = printer_hub.get_status(parse_printer_config(p)) or {}
-        except Exception:
-            continue
-        st, pid = status.get('status'), p['id']
-        prev = _push_watch_state.get(pid)
-        if st == 'printing':
-            _push_watch_state[pid] = {'status': 'printing', 'ts': now}
-        elif st in ('idle', 'error'):
-            if prev and prev['status'] == 'printing' and now - prev['ts'] < 600:
-                if st == 'idle' and 'print_finished' in types:
-                    _push_notify_async('print_finished', _server_t('notif.print_finished_title', 'Impression terminée'), p['name'])
-                elif st == 'error' and 'print_failed' in types:
-                    _push_notify_async('print_failed', _server_t('notif.print_failed_title', "Échec d'impression"), p['name'])
-            _push_watch_state[pid] = {'status': st, 'ts': now}
-        elif st == 'paused':
-            if prev and prev['status'] == 'printing':
-                prev['ts'] = now
-        elif not prev:
-            _push_watch_state[pid] = {'status': st, 'ts': now}
-
-
-def _push_watcher_loop():
-    time.sleep(30)
-    while True:
-        try:
-            cfg = load_settings() or {}
-            if cfg.get('push_enabled'):
-                _push_watch_once(cfg)
-        except Exception as e:
-            app_logger.debug(f"[Push] Surveillance imprimantes: {e}")
-        time.sleep(20)
 
 
 _notif_create_lock = threading.Lock()
@@ -21028,133 +20465,19 @@ def _resolve_backup_file(name):
     return path if os.path.isfile(path) else None
 
 
-@app.route('/api/backup/auto/config', methods=['GET'])
-@login_required
-def api_auto_backup_get_config():
-    with _auto_backup_lock:
-        return jsonify(_auto_backup_config_response(_load_auto_backup_config())), 200
+# ── sauvegarde automatique : routes de configuration, liste, restauration : module séparé `auto_backup_routes.py` (services fournis par `auto_backup_routes.init(globals())`) ──
+import auto_backup_routes
+from auto_backup_routes import (
+    api_auto_backup_delete,
+    api_auto_backup_get_config,
+    api_auto_backup_list,
+    api_auto_backup_missed,
+    api_auto_backup_missed_answer,
+    api_auto_backup_restore,
+    api_auto_backup_run_now,
+    api_auto_backup_set_config,
+)
 
-
-@app.route('/api/backup/auto/config', methods=['POST'])
-@login_required
-def api_auto_backup_set_config():
-    data = request.get_json(silent=True) or {}
-    with _auto_backup_lock:
-        cfg = _load_auto_backup_config()
-        was_enabled = cfg['enabled']
-        for key in ('enabled', 'frequency', 'time', 'weekday', 'day_of_month', 'keep', 'include', 'folder'):
-            if key in data:
-                cfg[key] = data[key]
-        cfg = _sanitize_auto_backup_config(cfg)
-        if cfg['folder']:
-            try:
-                if not os.path.isabs(cfg['folder']):
-                    return jsonify({"error": "Le dossier de sauvegarde doit être un chemin absolu."}), 400
-                os.makedirs(cfg['folder'], exist_ok=True)
-                probe = os.path.join(cfg['folder'], f'.stellio_write_test_{secrets.token_hex(4)}')
-                with open(probe, 'w') as f:
-                    f.write('ok')
-                os.remove(probe)
-            except Exception as e:
-                return jsonify({"error": f"Dossier inaccessible en écriture : {e}"}), 400
-        if cfg['enabled'] and not was_enabled:
-            cfg['last_run'] = datetime.datetime.now().isoformat(timespec='seconds')   
-        _save_auto_backup_config(cfg)
-        if cfg['enabled']:
-            _prune_auto_backups(_auto_backup_folder(cfg, create=False), cfg['keep'])
-        return jsonify(_auto_backup_config_response(cfg)), 200
-
-
-@app.route('/api/backup/auto/missed', methods=['GET'])
-@login_required
-def api_auto_backup_missed():
-    with _auto_backup_lock:
-        cfg = _load_auto_backup_config()
-        now = datetime.datetime.now()
-        scheduled = _auto_backup_missed_info(cfg, now)
-        return jsonify({
-            'missed': scheduled is not None,
-            'scheduled': scheduled.isoformat(timespec='minutes') if scheduled else None,
-            'next_run': _next_scheduled_run(cfg, now).isoformat(timespec='minutes') if cfg['enabled'] else None,
-        }), 200
-
-
-@app.route('/api/backup/auto/missed', methods=['POST'])
-@login_required
-def api_auto_backup_missed_answer():
-    data = request.get_json(silent=True) or {}
-    action = data.get('action')
-    with _auto_backup_lock:
-        if action == 'run':
-            path, err = run_auto_backup('auto')
-            if err:
-                return jsonify({"error": err}), 500
-            return jsonify({"success": True, "name": os.path.basename(path)}), 200
-        if action == 'skip':
-            cfg = _load_auto_backup_config()
-            cfg['last_run'] = datetime.datetime.now().isoformat(timespec='seconds')   
-            _save_auto_backup_config(cfg)
-            return jsonify({"success": True, "next_run": _next_scheduled_run(cfg, datetime.datetime.now()).isoformat(timespec='minutes')}), 200
-    return jsonify({"error": "Action inconnue"}), 400
-
-
-@app.route('/api/backup/auto/list', methods=['GET'])
-@login_required
-def api_auto_backup_list():
-    with _auto_backup_lock:
-        cfg = _load_auto_backup_config()
-        return jsonify({'backups': _list_backups(_auto_backup_folder(cfg, create=False)),
-                        'folder': _auto_backup_folder(cfg, create=False)}), 200
-
-
-@app.route('/api/backup/auto/run', methods=['POST'])
-@login_required
-def api_auto_backup_run_now():
-    data = request.get_json(silent=True) or {}
-    include = data.get('include')
-    if isinstance(include, dict):
-        include = {c: bool(include.get(c, True)) for c in BACKUP_DEFAULT_INCLUDE}
-    else:
-        include = None
-    path, err = run_auto_backup('manual', include_override=include)
-    if err:
-        return jsonify({"error": err}), 500
-    return jsonify({"success": True, "name": os.path.basename(path)}), 200
-
-
-@app.route('/api/backup/auto/restore', methods=['POST'])
-@login_required
-def api_auto_backup_restore():
-    data = request.get_json(silent=True) or {}
-    path = _resolve_backup_file(data.get('name'))
-    if not path:
-        return jsonify({"error": "Sauvegarde introuvable"}), 404
-    try:
-        with _auto_backup_lock:
-            info, err = _restore_backup_zip(path)
-        if err:
-            return jsonify({"error": err[0]}), err[1]
-        return jsonify({"success": True, "restart_required": True, **info}), 200
-    except zipfile.BadZipFile:
-        return jsonify({"error": "Fichier .zip invalide ou corrompu"}), 400
-    except Exception as e:
-        app_logger.error(f"[BACKUP] Échec restauration depuis la liste : {e}")
-        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
-
-
-@app.route('/api/backup/auto/delete', methods=['POST'])
-@login_required
-def api_auto_backup_delete():
-    data = request.get_json(silent=True) or {}
-    path = _resolve_backup_file(data.get('name'))
-    if not path:
-        return jsonify({"error": "Sauvegarde introuvable"}), 404
-    try:
-        os.remove(path)
-        return jsonify({"success": True}), 200
-    except Exception as e:
-        app_logger.error(f"[BACKUP] Suppression impossible : {e}")
-        return jsonify({"error": "Suppression impossible"}), 500
 
 
 FEEDBACK_RELAY_URL = "https://stellio-issue-relay.app-stellio.workers.dev" 
@@ -21289,152 +20612,16 @@ def api_system_modules():
                     'still_missing': _MODULES_STARTUP_REPORT['still_missing']}), 200
 
 
-@app.route('/api/feedback/submit', methods=['POST'])
-@login_required
-def api_feedback_submit():
-    global _feedback_last_submit
-    d = request.get_json(silent=True) or {}
-    ftype = d.get('type')
-    title = re.sub(r'\s+', ' ', str(d.get('title') or '')).strip()
-    desc = str(d.get('description') or '').strip()
-    L = FEEDBACK_LIMITS
-    if ftype not in FEEDBACK_TYPES:
-        return jsonify({"error": "invalid_type"}), 400
-    if not (L['title_min'] <= len(title) <= L['title_max']):
-        return jsonify({"error": "invalid_title"}), 400
-    if not (L['desc_min'] <= len(desc) <= L['desc_max']):
-        return jsonify({"error": "invalid_description"}), 400
-    if d.get('consent') is not True:
-        return jsonify({"error": "consent_required"}), 400
-    relay = _feedback_relay()
-    if not relay:
-        return jsonify({"error": "relay_not_configured"}), 503
+# ── suggestions et signalements envoyés comme issues GitHub : module séparé `feedback.py` (services fournis par `feedback.init(globals())`) ──
+import feedback
+from feedback import (
+    api_feedback_close,
+    api_feedback_detail,
+    api_feedback_remove,
+    api_feedback_requests,
+    api_feedback_submit,
+)
 
-    with _feedback_lock:
-        if time.time() - _feedback_last_submit < FEEDBACK_MIN_SUBMIT_INTERVAL:
-            return jsonify({"error": "too_fast"}), 429
-        _feedback_last_submit = time.time()
-
-    include_tech = bool(d.get('include_tech'))
-    payload = {'type': ftype, 'title': title, 'description': desc, 'consent': True,
-               'include_tech': include_tech, 'website': ''}
-    if include_tech:
-        payload.update({'version': CURRENT_VERSION, 'os': f"{platform.system()} {platform.release()}".strip(),
-                        'lang': get_user_lang()})
-    try:
-        res = requests.post(f"{relay}/issue", json=payload, timeout=25,
-                            headers={'User-Agent': f'Stellio-App/{CURRENT_VERSION}'})
-    except Exception as e:
-        app_logger.warning(f"[FEEDBACK] Relais injoignable : {e}")
-        return jsonify({"error": "relay_unreachable"}), 502
-    if res.status_code == 429:
-        return jsonify({"error": "too_fast"}), 429
-    if res.status_code != 201:
-        app_logger.warning(f"[FEEDBACK] Le relais a répondu {res.status_code} : {res.text[:200]}")
-        return jsonify({"error": "relay_error"}), 502
-    issue = res.json()
-    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
-    entry = {'number': int(issue['number']), 'title': title, 'type': ftype, 'url': issue.get('url'),
-             'manage_token': issue.get('manage_token'), 'created_at': now_iso, 'updated_at': now_iso,
-             'state': 'open', 'state_reason': None, 'labels': [], 'comments': 0,
-             'seen_status': 'sent', 'seen_comments': 0, 'checked_at': time.time()}
-    with _feedback_lock:
-        entries = _feedback_load()
-        entries.insert(0, entry)
-        _feedback_save(entries)
-    app_logger.info(f"[FEEDBACK] Demande #{entry['number']} créée ({ftype})")
-    return jsonify({"success": True, "request": _feedback_public(entry)}), 201
-
-
-@app.route('/api/feedback/requests', methods=['GET'])
-@login_required
-def api_feedback_requests():
-    with _feedback_lock:
-        entries = _feedback_load()
-        changed, limited = [], False
-        if request.args.get('refresh') == '1' and entries:
-            changed, limited = _feedback_refresh(entries)
-            _feedback_save(entries)
-        return jsonify({'requests': [_feedback_public(e) for e in entries], 'changed': changed,
-                        'rate_limited': limited}), 200
-
-
-@app.route('/api/feedback/request/<int:number>', methods=['GET'])
-@login_required
-def api_feedback_detail(number):
-    with _feedback_lock:
-        entries = _feedback_load()
-        e = _feedback_find(entries, number)
-        if not e:
-            return jsonify({"error": "not_found"}), 404
-    body, comments = '', []
-    try:
-        base = f"https://api.github.com/repos/{_feedback_repo()}/issues/{number}"
-        r1 = requests.get(base, headers=_gh_headers(), timeout=10)
-        if r1.status_code == 200:
-            body = (r1.json().get('body') or '')
-            body = body.split('\n---\n')[0].strip()   
-        r2 = requests.get(base + '/comments?per_page=50', headers=_gh_headers(), timeout=10)
-        if r2.status_code == 200:
-            for c in r2.json():
-                comments.append({'author': (c.get('user') or {}).get('login', ''),
-                                 'is_team': c.get('author_association') in ('OWNER', 'MEMBER', 'COLLABORATOR'),
-                                 'body': c.get('body') or '', 'created_at': c.get('created_at')})
-    except Exception as ex:
-        app_logger.debug(f"[FEEDBACK] Détail indisponible (#{number}) : {ex}")
-    with _feedback_lock:
-        entries = _feedback_load()
-        e = _feedback_find(entries, number)
-        if e:
-            if comments:
-                e['comments'] = max(e.get('comments', 0), len(comments))
-            e['seen_status'] = _feedback_status(e)
-            e['seen_comments'] = e.get('comments', 0)
-            _feedback_save(entries)
-            return jsonify({'request': _feedback_public(e), 'body': body, 'comments': comments}), 200
-    return jsonify({"error": "not_found"}), 404
-
-
-@app.route('/api/feedback/close', methods=['POST'])
-@login_required
-def api_feedback_close():
-    number = (request.get_json(silent=True) or {}).get('number')
-    with _feedback_lock:
-        entries = _feedback_load()
-        e = _feedback_find(entries, number)
-        if not e or not e.get('manage_token'):
-            return jsonify({"error": "not_found"}), 404
-    relay = _feedback_relay()
-    if not relay:
-        return jsonify({"error": "relay_not_configured"}), 503
-    try:
-        res = requests.post(f"{relay}/issue/close", json={'number': number, 'manage_token': e['manage_token']},
-                            timeout=20, headers={'User-Agent': f'Stellio-App/{CURRENT_VERSION}'})
-    except Exception as ex:
-        app_logger.warning(f"[FEEDBACK] Fermeture impossible : {ex}")
-        return jsonify({"error": "relay_unreachable"}), 502
-    if res.status_code != 200:
-        return jsonify({"error": "relay_error"}), 502
-    with _feedback_lock:
-        entries = _feedback_load()
-        e = _feedback_find(entries, number)
-        if e:
-            e.update({'state': 'closed', 'state_reason': 'not_planned', 'closed_by_user': True,
-                      'etag': None, 'checked_at': 0, 'seen_status': 'closed_by_you',
-                      'seen_comments': e.get('comments', 0) + 1, 'comments': e.get('comments', 0) + 1})
-            _feedback_save(entries)
-            return jsonify({'request': _feedback_public(e)}), 200
-    return jsonify({"error": "not_found"}), 404
-
-
-@app.route('/api/feedback/remove', methods=['POST'])
-@login_required
-def api_feedback_remove():
-    number = (request.get_json(silent=True) or {}).get('number')
-    with _feedback_lock:
-        entries = [e for e in _feedback_load() if e.get('number') != number]
-        _feedback_save(entries)
-    return jsonify({"success": True}), 200
 
 
 _SENSITIVE_SETTINGS_KEYS = (
@@ -22644,137 +21831,17 @@ def _client_clean(data):
     return out
 
 
-@app.route('/api/clients', methods=['GET'])
-@login_required
-def api_clients_list():
-    _ensure_quote_columns()
-    conn = get_db()
-    try:
-        rows = conn.execute("SELECT * FROM clients WHERE user_id = ? ORDER BY name COLLATE NOCASE", (session['user_id'],)).fetchall()
-        stats = {}
-        for r in conn.execute("""SELECT client_id, COUNT(*) AS n, COALESCE(SUM(CASE WHEN doc_type IN ('invoice','deposit','credit') THEN total_value ELSE 0 END),0) AS billed
-                                 FROM quotes WHERE user_id = ? AND client_id > 0 GROUP BY client_id""", (session['user_id'],)).fetchall():
-            stats[r['client_id']] = (r['n'], r['billed'])
-    finally:
-        conn.close()
-    out = []
-    for r in rows:
-        d = dict(r)
-        d['docs'], d['billed'] = stats.get(r['id'], (0, 0))
-        out.append(d)
-    return jsonify({"clients": out})
+# ── clients (carnet de clients, import) : module séparé `clients.py` (services fournis par `clients.init(globals())`) ──
+import clients
+from clients import (
+    api_client_delete,
+    api_client_detail,
+    api_client_update,
+    api_clients_create,
+    api_clients_import,
+    api_clients_list,
+)
 
-
-@app.route('/api/clients', methods=['POST'])
-@login_required
-def api_clients_create():
-    _ensure_quote_columns()
-    c = _client_clean(request.get_json(silent=True) or {})
-    if not c['name']:
-        return jsonify({"success": False, "error": "name_required"}), 400
-    conn = get_db()
-    try:
-        if conn.execute("SELECT 1 FROM clients WHERE user_id = ? AND lower(name) = lower(?)", (session['user_id'], c['name'])).fetchone():
-            return jsonify({"success": False, "error": "exists"}), 409
-        cur = conn.execute("INSERT INTO clients (user_id, name, email, phone, address, tax_id, notes) VALUES (?,?,?,?,?,?,?)",
-                           (session['user_id'], c['name'], c['email'], c['phone'], c['address'], c['tax_id'], c['notes']))
-        conn.commit()
-        return jsonify({"success": True, "id": cur.lastrowid})
-    finally:
-        conn.close()
-
-
-@app.route('/api/clients/<int:cid>', methods=['GET'])
-@login_required
-def api_client_detail(cid):
-    _ensure_quote_columns()
-    conn = get_db()
-    try:
-        cl = conn.execute("SELECT * FROM clients WHERE id = ? AND user_id = ?", (cid, session['user_id'])).fetchone()
-        if not cl:
-            return jsonify({"error": "not_found"}), 404
-        docs = conn.execute("""SELECT * FROM quotes WHERE user_id = ? AND (client_id = ? OR (client_id = 0 AND lower(client) = lower(?)))
-                               ORDER BY id DESC LIMIT 200""", (session['user_id'], cid, cl['name'])).fetchall()
-    finally:
-        conn.close()
-    history, billed, paid, outstanding = [], 0.0, 0.0, 0.0
-    for r in docs:
-        dt = r['doc_type'] or 'quote'
-        st = _quote_eff_status(r)
-        history.append({"id": r['id'], "number": r['number'], "doc_type": dt, "status": st, "total": r['total'],
-                        "created_at": r['created_at'], "due_date": r['due_date'], "item_desc": r['item_desc']})
-        if dt in ('invoice', 'deposit', 'credit'):
-            v = float(r['total_value'] or 0)
-            billed += v
-            if dt == 'credit':
-                continue
-            if (r['status'] or 'draft') == 'paid':
-                paid += v
-            else:
-                outstanding += v
-    return jsonify({"client": dict(cl), "history": history, "billed": round(billed, 2), "paid": round(paid, 2), "outstanding": round(outstanding, 2)})
-
-
-@app.route('/api/clients/<int:cid>', methods=['PUT'])
-@login_required
-def api_client_update(cid):
-    c = _client_clean(request.get_json(silent=True) or {})
-    if not c['name']:
-        return jsonify({"success": False, "error": "name_required"}), 400
-    conn = get_db()
-    try:
-        dup = conn.execute("SELECT 1 FROM clients WHERE user_id = ? AND lower(name) = lower(?) AND id != ?", (session['user_id'], c['name'], cid)).fetchone()
-        if dup:
-            return jsonify({"success": False, "error": "exists"}), 409
-        conn.execute("UPDATE clients SET name=?, email=?, phone=?, address=?, tax_id=?, notes=? WHERE id=? AND user_id=?",
-                     (c['name'], c['email'], c['phone'], c['address'], c['tax_id'], c['notes'], cid, session['user_id']))
-        conn.commit()
-    finally:
-        conn.close()
-    return jsonify({"success": True})
-
-
-@app.route('/api/clients/<int:cid>', methods=['DELETE'])
-@login_required
-def api_client_delete(cid):
-    conn = get_db()
-    try:
-        _ensure_quote_columns()
-        rows = _trash_snapshot(conn, 'clients', 'id = ? AND user_id = ?', (cid, session['user_id']))
-        tid = None
-        if rows:
-            qids = [r[0] for r in conn.execute("SELECT id FROM quotes WHERE client_id = ? AND user_id = ?", (cid, session['user_id'])).fetchall()]
-            tid = trash_record(conn, session['user_id'], 'client', rows[0].get('name') or f"#{cid}", {'row': rows[0], 'quote_ids': qids})
-        conn.execute("DELETE FROM clients WHERE id = ? AND user_id = ?", (cid, session['user_id']))
-        conn.execute("UPDATE quotes SET client_id = 0 WHERE client_id = ? AND user_id = ?", (cid, session['user_id']))
-        conn.commit()
-    finally:
-        conn.close()
-    return jsonify({"success": True, "trash_key": f"row:{tid}" if tid else None})
-
-
-@app.route('/api/clients/import-from-quotes', methods=['POST'])
-@login_required
-def api_clients_import():
-    """Crée une fiche pour chaque nom de client déjà utilisé dans l'historique et rattache les documents."""
-    _ensure_quote_columns()
-    uid = session['user_id']
-    conn = get_db()
-    try:
-        names = [r[0] for r in conn.execute("SELECT DISTINCT trim(client) FROM quotes WHERE user_id = ? AND trim(client) != '' AND client_id = 0", (uid,)).fetchall()]
-        created = 0
-        for n in names:
-            ex = conn.execute("SELECT id FROM clients WHERE user_id = ? AND lower(name) = lower(?)", (uid, n)).fetchone()
-            if ex:
-                cid = ex['id']
-            else:
-                cid = conn.execute("INSERT INTO clients (user_id, name) VALUES (?, ?)", (uid, n[:120])).lastrowid
-                created += 1
-            conn.execute("UPDATE quotes SET client_id = ? WHERE user_id = ? AND client_id = 0 AND lower(trim(client)) = lower(?)", (cid, uid, n))
-        conn.commit()
-    finally:
-        conn.close()
-    return jsonify({"success": True, "created": created})
 
 
 # ---- Export comptable (CSV) ----
@@ -23346,7 +22413,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.0.3"
+CURRENT_VERSION = "1.0.4"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -24102,6 +23169,9 @@ def api_get_printers():
         pc = parse_printer_config(p)
         if pc.get('api_key'):
             pc['api_key'] = '••••••••'
+        pc['config'] = _v104_public_config(pc.get('config'))
+        if (pc.get('config') or {}).get('meter'):
+            pc['measured_avg_w'] = _measured_avg_power_w(pc['id'])
         result.append(pc)
     if _is_viewer():
         result = _viewer_sanitize(result)
@@ -24152,6 +23222,7 @@ def api_add_printer():
         raw_config = {'code': code, 'serial': serial}
 
     raw_config.update(_extract_bed_config(data.get('config')))
+    _v104_apply_config(raw_config, data.get('config'), {})
     _ext = _clean_external_url((data.get('config') or {}).get('external_url'))
     raw_config.pop('external_url', None)
     if ptype in HTTP_PRINTER_TYPES:
@@ -24500,6 +23571,11 @@ def api_edit_printer(pid):
                 data['api_key'] = code
 
         raw_config.update(_extract_bed_config(data.get('config')))
+        try:
+            _old_cfg = json.loads(existing['config']) if existing['config'] else {}
+        except (TypeError, ValueError):
+            _old_cfg = {}
+        _v104_apply_config(raw_config, data.get('config'), _old_cfg)
         _ext = _clean_external_url((data.get('config') or {}).get('external_url'))
         raw_config.pop('external_url', None)
         if ptype in HTTP_PRINTER_TYPES:
@@ -24934,413 +24010,55 @@ def _printer_status_cached(printer, ttl=5.0):
     return status
 
 
-# ── Timelapse ───────────────────────────────────────────────────────────────────────────────
-TIMELAPSE_DIR = os.path.join(DATA_DIR, 'timelapse')
-TIMELAPSE_MAX_FRAMES = 6000
-TIMELAPSE_MIN_FRAMES = 10
-_TL_STATE = {}   # printer_id -> {dir, frames, started, file, last_capture, user_id, name}
+# ── timelapse des impressions (images périodiques, assemblage vidéo, lecture, suppression) : module séparé `timelapse.py` (services fournis par `timelapse.init(globals())`) ──
+import timelapse
+from timelapse import (
+    TIMELAPSE_MAX_FRAMES,
+    TIMELAPSE_MIN_FRAMES,
+    _TL_STATE,
+    _extract_jpeg,
+    _start_timelapse_worker,
+    _timelapse_assemble,
+    _timelapse_grab_frame,
+    _timelapse_interval,
+    _timelapse_loop,
+    _timelapse_row,
+    _timelapse_safe_name,
+    _timelapse_tick,
+    api_delete_timelapse,
+    api_list_timelapses,
+    api_timelapse_settings,
+    api_timelapse_video,
+)
 
 
-def _timelapse_interval():
-    try:
-        v = int((load_settings() or {}).get('timelapse_interval', 30))
-    except (TypeError, ValueError):
-        v = 30
-    return max(5, min(300, v))
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# v1.0.4 — Suivi des sessions d'impression : module séparé `print_session.py`
+# (prise connectée / consommation réelle, photo de fin d'impression, surveillance IA).
+# Les services de main.py lui sont fournis par `print_session.init(globals())` (juste avant le démarrage).
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+_APP_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
+import print_session
+from print_session import (
+    _ensure_v104_tables, _v104_apply_config, _v104_public_config, _measured_avg_power_w, _start_v104_worker,
+)
 
 
-def _extract_jpeg(data):
-    if not data:
-        return None
-    s = data.find(b'\xff\xd8')
-    if s == -1:
-        return None
-    e = data.rfind(b'\xff\xd9')
-    return bytes(data[s:e + 2]) if e > s else None
-
-
-def _timelapse_grab_frame(printer):
-    """Une image JPEG de la caméra de l'imprimante (octets) ou None."""
-    pid = printer.get('id')
-    ptype = printer.get('type')
-    cfg = printer.get('config') or {}
-    ip = printer.get('ip')
-    if ptype == 'bambu':
-        code = cfg.get('code') or printer.get('api_key') or ''
-        if not code or not ip:
-            return None
-        model = (cfg.get('model') or 'A1').upper()
-        gen = _generate_bambu_rtsp_mjpeg_stream(ip, code) if model in BAMBU_RTSP_PORT322_MODELS else _generate_bambu_mjpeg_stream(ip, code)
-        try:
-            return _extract_jpeg(next(gen, None))
-        finally:
-            try:
-                gen.close()
-            except Exception:
-                pass
-    if ptype == 'bambuddy':
-        try:
-            r = _bambuddy_get(ip, printer.get('api_key'), cfg, f"/printers/{_bambuddy_printer_id(cfg)}/camera/snapshot", timeout=8)
-            return _extract_jpeg(r.content) if r.status_code == 200 else None
-        except Exception:
-            return None
-    cam = _resolve_printer_camera(printer, pid, '')
-    if not cam.get('available'):
-        return None
-    snap = cam.get('snapshot_url')
-    if snap:
-        try:
-            r = requests.get(snap, timeout=6)
-            if r.status_code == 200:
-                jpg = _extract_jpeg(r.content)
-                if jpg:
-                    return jpg
-        except Exception:
-            pass
-    stream = cam.get('stream_url')
-    if stream and FFMPEG_TOOL:
-        try:
-            out = subprocess.run(
-                [FFMPEG_TOOL, '-loglevel', 'error', '-i', stream, '-frames:v', '1', '-f', 'image2pipe', '-vcodec', 'mjpeg', 'pipe:1'],
-                capture_output=True, timeout=20, **_popen_kwargs_silent())
-            return _extract_jpeg(out.stdout)
-        except Exception:
-            return None
-    return None
-
-
-def _timelapse_safe_name(text):
-    return re.sub(r'[^\w\-]+', '_', os.path.splitext(str(text or 'impression'))[0])[:60] or 'impression'
-
-
-def _timelapse_assemble(state):
-    """Assemble les images en MP4 puis supprime les images ; enregistre le résultat en base."""
-    frames_dir, n = state['dir'], state['frames']
-    try:
-        if n < TIMELAPSE_MIN_FRAMES or not FFMPEG_TOOL:
-            if n >= TIMELAPSE_MIN_FRAMES:
-                app_logger.warning("[Timelapse] ffmpeg introuvable : vidéo non générée")
-            return
-        out_dir = os.path.join(TIMELAPSE_DIR, str(state['printer_id']))
-        os.makedirs(out_dir, exist_ok=True)
-        stamp = datetime.datetime.fromtimestamp(state['started']).strftime('%Y%m%d_%H%M%S')
-        out_path = os.path.join(out_dir, f"{stamp}_{_timelapse_safe_name(state['file'])}.mp4")
-        cmd = [FFMPEG_TOOL, '-y', '-loglevel', 'error', '-framerate', '30', '-i', os.path.join(frames_dir, 'frame_%06d.jpg'),
-               '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-               '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out_path]
-        res = subprocess.run(cmd, capture_output=True, timeout=1800, **_popen_kwargs_silent())
-        if res.returncode != 0 or not os.path.isfile(out_path):
-            app_logger.warning(f"[Timelapse] Assemblage échoué: {(res.stderr or b'')[-300:]!r}")
-            return
-        _ensure_v086_tables()
-        conn = get_db()
-        try:
-            conn.execute(
-                "INSERT INTO timelapses (user_id, printer_id, printer_name, file_name, started_at, frames, duration_s, size, path) VALUES (?,?,?,?,?,?,?,?,?)",
-                (state['user_id'], state['printer_id'], state['name'], state['file'],
-                 datetime.datetime.fromtimestamp(state['started']).strftime('%Y-%m-%d %H:%M:%S'),
-                 n, n / 30.0, os.path.getsize(out_path), out_path))
-            conn.commit()
-        finally:
-            conn.close()
-        app_logger.info(f"[Timelapse] Vidéo créée : {out_path} ({n} images)")
-    except Exception as e:
-        app_logger.warning(f"[Timelapse] Erreur assemblage: {e}")
-    finally:
-        shutil.rmtree(frames_dir, ignore_errors=True)
-
-
-def _timelapse_tick():
-    conn = get_db()
-    try:
-        rows = conn.execute("SELECT * FROM printers").fetchall()
-    finally:
-        conn.close()
-    interval = _timelapse_interval()
-    now = time.time()
-    active_ids = set()
-    for row in rows:
-        printer = parse_printer_config(row)
-        if not (printer.get('config') or {}).get('timelapse'):
-            continue
-        pid = printer['id']
-        active_ids.add(pid)
-        st = _TL_STATE.get(pid)
-        if st and now - st['last_poll'] < (interval if st.get('printing') else 15):
-            continue
-        status = _printer_status_cached(printer, ttl=2.0)
-        phase = status.get('status')
-        if st:
-            st['last_poll'] = now
-        if phase in ('printing', 'paused'):
-            if not st:
-                d = os.path.join(TIMELAPSE_DIR, f"tmp_{pid}")
-                shutil.rmtree(d, ignore_errors=True)
-                os.makedirs(d, exist_ok=True)
-                st = _TL_STATE[pid] = {'dir': d, 'frames': 0, 'started': now, 'file': str(status.get('file') or ''),
-                                       'last_poll': 0, 'printing': True, 'user_id': printer.get('user_id'),
-                                       'printer_id': pid, 'name': printer.get('name') or ''}
-                app_logger.info(f"[Timelapse] Début de capture : {printer.get('name')}")
-            st['printing'] = True
-            if status.get('file'):
-                st['file'] = str(status.get('file'))
-            if phase == 'printing' and st['frames'] < TIMELAPSE_MAX_FRAMES and now - st['last_poll'] >= 0:
-                jpg = _timelapse_grab_frame(printer)
-                if jpg:
-                    st['frames'] += 1
-                    with open(os.path.join(st['dir'], f"frame_{st['frames']:06d}.jpg"), 'wb') as f:
-                        f.write(jpg)
-            st['last_poll'] = time.time()
-        elif st:
-            _TL_STATE.pop(pid, None)
-            threading.Thread(target=_timelapse_assemble, args=(st,), daemon=True, name='stellio-timelapse-encode').start()
-    # imprimante dont le timelapse a été désactivé pendant une capture : on assemble ce qu'on a
-    for pid in list(_TL_STATE.keys()):
-        if pid not in active_ids:
-            st = _TL_STATE.pop(pid)
-            threading.Thread(target=_timelapse_assemble, args=(st,), daemon=True).start()
-
-
-def _timelapse_loop():
-    os.makedirs(TIMELAPSE_DIR, exist_ok=True)
-    time.sleep(20)
-    while True:
-        try:
-            _timelapse_tick()
-        except Exception as e:
-            app_logger.info(f"[Timelapse] Erreur boucle: {e}")
-        time.sleep(3)
-
-
-def _start_timelapse_worker():
-    _ensure_v086_tables()
-    threading.Thread(target=_timelapse_loop, daemon=True, name='stellio-timelapse').start()
-
-
-@app.route('/api/timelapses', methods=['GET'])
-@login_required
-def api_list_timelapses():
-    _ensure_v086_tables()
-    conn = get_db()
-    try:
-        rows = conn.execute(
-            "SELECT id, printer_id, printer_name, file_name, started_at, ended_at, frames, duration_s, size FROM timelapses WHERE user_id=? ORDER BY id DESC LIMIT 200",
-            (session['user_id'],)).fetchall()
-    finally:
-        conn.close()
-    recording = [{"printer_id": v['printer_id'], "printer_name": v['name'], "file": v['file'], "frames": v['frames']}
-                 for v in list(_TL_STATE.values()) if v.get('user_id') == session['user_id']]
-    return jsonify({"timelapses": [dict(r) for r in rows], "recording": recording,
-                    "interval": _timelapse_interval(), "ffmpeg": bool(FFMPEG_TOOL)})
-
-
-def _timelapse_row(tid):
-    _ensure_v086_tables()
-    conn = get_db()
-    try:
-        return conn.execute("SELECT * FROM timelapses WHERE id=? AND user_id=?", (tid, session['user_id'])).fetchone()
-    finally:
-        conn.close()
-
-
-@app.route('/api/timelapses/<int:tid>/video', methods=['GET'])
-@login_required
-def api_timelapse_video(tid):
-    row = _timelapse_row(tid)
-    if not row or not os.path.isfile(row['path']):
-        return jsonify({"error": "Introuvable"}), 404
-    return send_file(row['path'], mimetype='video/mp4', conditional=True,
-                     as_attachment=request.args.get('download') == '1',
-                     download_name=os.path.basename(row['path']))
-
-
-@app.route('/api/timelapses/<int:tid>', methods=['DELETE'])
-@login_required
-def api_delete_timelapse(tid):
-    row = _timelapse_row(tid)
-    if not row:
-        return jsonify({"error": "Introuvable"}), 404
-    try:
-        if os.path.isfile(row['path']):
-            os.remove(row['path'])
-    except Exception as e:
-        app_logger.info(f"[Timelapse] Suppression fichier impossible: {e}")
-    conn = get_db()
-    try:
-        conn.execute("DELETE FROM timelapses WHERE id=? AND user_id=?", (tid, session['user_id']))
-        conn.commit()
-    finally:
-        conn.close()
-    return jsonify({"message": "Supprimé"})
-
-
-@app.route('/api/timelapse/settings', methods=['PUT'])
-@login_required
-def api_timelapse_settings():
-    data = request.json or {}
-    try:
-        iv = max(5, min(300, int(data.get('interval', 30))))
-    except (TypeError, ValueError):
-        return jsonify({"error": "Intervalle invalide"}), 400
-    settings = load_settings() or {}
-    settings['timelapse_interval'] = iv
-    save_settings(settings)
-    return jsonify({"interval": iv})
-
-
-# ── Lien d'état partageable (lecture seule, sans compte) ────────────────────────────────────
-STATUS_MAX_LINKS = 10
-
-
-@app.route('/api/status-links', methods=['GET'])
-@login_required
-def api_list_status_links():
-    _ensure_v086_tables()
-    conn = get_db()
-    try:
-        rows = conn.execute("SELECT id, token, label, show_files, created_at, last_view_at FROM share_links WHERE user_id=? ORDER BY id DESC",
-                            (session['user_id'],)).fetchall()
-    finally:
-        conn.close()
-    remote_state = get_remote_state()
-    if remote_state.get('status') == 'ready' and remote_state.get('url'):
-        base_url, remote = remote_state['url'].rstrip('/'), True
-    else:
-        base_url, remote = f"http://{get_local_ip()}:{SERVER_PORT}", False
-    return jsonify({"links": [{**dict(r), "url": f"{base_url}/status/{r['token']}"} for r in rows], "remote": remote})
-
-
-@app.route('/api/status-links', methods=['POST'])
-@login_required
-def api_create_status_link():
-    _ensure_v086_tables()
-    data = request.json or {}
-    label = str(data.get('label') or '').strip()[:60]
-    show_files = 1 if data.get('show_files') else 0
-    conn = get_db()
-    try:
-        n = conn.execute("SELECT COUNT(*) FROM share_links WHERE user_id=?", (session['user_id'],)).fetchone()[0]
-        if n >= STATUS_MAX_LINKS:
-            return jsonify({"error": f"Maximum {STATUS_MAX_LINKS} liens"}), 400
-        token = secrets.token_urlsafe(24)
-        conn.execute("INSERT INTO share_links (user_id, token, label, show_files) VALUES (?,?,?,?)",
-                     (session['user_id'], token, label, show_files))
-        conn.commit()
-    finally:
-        conn.close()
-    return jsonify({"token": token}), 200
-
-
-@app.route('/api/status-links/<int:lid>', methods=['DELETE'])
-@login_required
-def api_delete_status_link(lid):
-    _ensure_v086_tables()
-    conn = get_db()
-    try:
-        conn.execute("DELETE FROM share_links WHERE id=? AND user_id=?", (lid, session['user_id']))
-        conn.commit()
-    finally:
-        conn.close()
-    return jsonify({"message": "Lien révoqué"})
-
-
-def _status_link_by_token(token):
-    _ensure_v086_tables()
-    if not token or len(token) > 80:
-        return None
-    conn = get_db()
-    try:
-        row = conn.execute("SELECT * FROM share_links WHERE token=?", (token,)).fetchone()
-        if row:
-            conn.execute("UPDATE share_links SET last_view_at=CURRENT_TIMESTAMP WHERE id=?", (row['id'],))
-            conn.commit()
-        return row
-    finally:
-        conn.close()
-
-
-@app.route('/status/<token>/data', methods=['GET'])
-def api_status_share_data(token):
-    link = _status_link_by_token(token)
-    if not link:
-        return jsonify({"error": "Lien invalide"}), 404
-    conn = get_db()
-    try:
-        rows = conn.execute("SELECT * FROM printers WHERE user_id=? ORDER BY id", (link['user_id'],)).fetchall()
-    finally:
-        conn.close()
-    out = []
-    for row in rows:
-        p = parse_printer_config(row)
-        st = _printer_status_cached(p)
-        active = st.get('status') in ('printing', 'paused')
-        t = st.get('time') or {}
-        temps = st.get('temps') or {}
-        item = {
-            "name": p.get('name') or '', "status": st.get('status') or 'offline',
-            "progress": round(float(st.get('progress') or 0), 1) if active else 0,
-            "remaining": t.get('remaining') if active else None,
-            "extruder": (temps.get('extruder') or {}).get('current'),
-            "bed": (temps.get('bed') or {}).get('current'),
-        }
-        if link['show_files'] and active and st.get('file'):
-            item["file"] = os.path.basename(str(st.get('file')).replace('\\', '/'))
-        out.append(item)
-    resp = jsonify({"label": link['label'] or '', "printers": out, "now": int(time.time())})
-    resp.headers['Cache-Control'] = 'no-store'
-    return resp
-
-
-_STATUS_SHARE_PAGE = r"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
-<title>Stellio</title><style>
-*{box-sizing:border-box}body{margin:0;background:#0b0e13;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:18px 20px 30px}
-header{display:flex;align-items:center;gap:12px;margin-bottom:18px}h1{font-size:20px;margin:0;flex:1}.clock{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
-.tile{background:#151a23;border:2px solid #232a38;border-radius:20px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
-.printing{border-color:#4ea1d3}.paused{border-color:#f5a623}.error{border-color:#e85d75}.offline{opacity:.5}
-.head{display:flex;justify-content:space-between;gap:10px;align-items:center}.name{font-size:20px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pill{font-size:13px;font-weight:600;padding:4px 11px;border-radius:999px;background:#232a38;color:#cbd5e1;white-space:nowrap}
-.printing .pill{background:rgba(78,161,211,.2);color:#4ea1d3}.paused .pill{background:rgba(245,166,35,.2);color:#f5a623}.idle .pill{background:rgba(56,193,114,.18);color:#38c172}.error .pill{background:rgba(232,93,117,.2);color:#e85d75}
-.pct{font-size:60px;font-weight:800;line-height:1}.pct small{font-size:24px;color:#8b95a8}.rem{font-size:20px;color:#cbd5e1}
-.bar{height:12px;background:#232a38;border-radius:8px;overflow:hidden}.bar div{height:100%;background:#4ea1d3;border-radius:8px;transition:width .6s}
-.paused .bar div{background:#f5a623}.file{font-size:14px;color:#8b95a8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.temps{display:flex;gap:18px;font-size:16px;color:#cbd5e1}
-.msg{text-align:center;color:#8b95a8;padding:50px 10px}footer{margin-top:22px;text-align:center;color:#5b6577;font-size:12px}
-</style></head><body><header><h1 id="t">Stellio</h1><div class="clock" id="c"></div></header><div class="grid" id="g"><div class="msg">…</div></div>
-<footer id="f"></footer><script>
-const L={fr:{printing:'Impression',paused:'En pause',idle:'Disponible',complete:'Terminée',error:'Erreur',offline:'Hors ligne',none:'Aucune imprimante',err:'Lien invalide ou révoqué',foot:'Affichage en lecture seule'},
-en:{printing:'Printing',paused:'Paused',idle:'Available',complete:'Done',error:'Error',offline:'Offline',none:'No printer',err:'Invalid or revoked link',foot:'Read-only view'},
-de:{printing:'Druckt',paused:'Pausiert',idle:'Verfügbar',complete:'Fertig',error:'Fehler',offline:'Offline',none:'Kein Drucker',err:'Ungültiger oder widerrufener Link',foot:'Nur-Lese-Ansicht'},
-es:{printing:'Imprimiendo',paused:'En pausa',idle:'Disponible',complete:'Terminada',error:'Error',offline:'Sin conexión',none:'Sin impresoras',err:'Enlace no válido o revocado',foot:'Vista de solo lectura'},
-pt:{printing:'A imprimir',paused:'Em pausa',idle:'Disponível',complete:'Concluída',error:'Erro',offline:'Offline',none:'Sem impressoras',err:'Ligação inválida ou revogada',foot:'Vista só de leitura'},
-it:{printing:'In stampa',paused:'In pausa',idle:'Disponibile',complete:'Completata',error:'Errore',offline:'Offline',none:'Nessuna stampante',err:'Link non valido o revocato',foot:'Vista in sola lettura'},
-zh:{printing:'打印中',paused:'已暂停',idle:'空闲',complete:'已完成',error:'错误',offline:'离线',none:'没有打印机',err:'链接无效或已撤销',foot:'只读视图'},
-ja:{printing:'印刷中',paused:'一時停止',idle:'待機中',complete:'完了',error:'エラー',offline:'オフライン',none:'プリンターなし',err:'リンクが無効か取り消されました',foot:'閲覧専用'}};
-const lg=(navigator.language||'fr').slice(0,2),T=L[lg]||L.en,$=id=>document.getElementById(id);
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function dur(s){if(!s||s<=0)return'';const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?h+'h '+String(m).padStart(2,'0')+'m':m+'m'}
-async function load(){try{const r=await fetch(location.pathname.replace(/\/$/,'')+'/data',{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();
-$('t').textContent=d.label||'Stellio';$('f').textContent=T.foot+' · Stellio';
-$('g').innerHTML=d.printers.length?d.printers.map(p=>{const st=['printing','paused','idle','complete','error'].includes(p.status)?p.status:'offline';const act=st==='printing'||st==='paused';
-return '<div class="tile '+st+'"><div class="head"><span class="name">'+esc(p.name)+'</span><span class="pill">'+T[st]+'</span></div>'+
-(act?'<div class="pct">'+Math.round(p.progress)+'<small>%</small></div>'+(p.remaining>0?'<div class="rem">⏱ '+dur(p.remaining)+'</div>':'')+'<div class="bar"><div style="width:'+Math.round(p.progress)+'%"></div></div>'+(p.file?'<div class="file">'+esc(p.file)+'</div>':''):'')+
-(p.extruder!=null?'<div class="temps"><span>🔥 '+Math.round(p.extruder)+'°C</span><span>🛏️ '+Math.round(p.bed||0)+'°C</span></div>':'')+'</div>'}).join(''):'<div class="msg">'+T.none+'</div>'}
-catch(e){$('g').innerHTML='<div class="msg">'+T.err+'</div>'}}
-setInterval(()=>{$('c').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})},10000);$('c').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-load();setInterval(load,6000);
-</script></body></html>"""
-
-
-@app.route('/status/<token>', methods=['GET'])
-def status_share_page(token):
-    if not _status_link_by_token(token):
-        return Response("Lien invalide ou révoqué", status=404, mimetype='text/plain; charset=utf-8')
-    resp = Response(_STATUS_SHARE_PAGE, mimetype='text/html')
-    resp.headers['Cache-Control'] = 'no-store'
-    resp.headers['X-Robots-Tag'] = 'noindex, nofollow'
-    resp.headers['Referrer-Policy'] = 'no-referrer'
-    return resp
-
+# ── lien d'état partageable (lecture seule, sans compte) : module séparé `share_link.py` (services fournis par `share_link.init(globals())`) ──
+import share_link
+from share_link import (
+    STATUS_MAX_LINKS,
+    _STATUS_SHARE_PAGE,
+    _status_link_by_token,
+    api_create_status_link,
+    api_delete_status_link,
+    api_list_status_links,
+    api_status_share_data,
+    status_share_page,
+)
 
 # ── Alertes de dérive de qualité ────────────────────────────────────────────────────────────
 def _compute_quality_drift(user_id, recent_days=30, baseline_days=120):
@@ -25392,711 +24110,42 @@ def _compute_quality_drift(user_id, recent_days=30, baseline_days=120):
     return out[:3]
 
 
-# ══════════════════════════════════════════════════════════════════════════════════════════════
-# v0.8.7 — Intégration MQTT / Home Assistant (publication d'état + découverte automatique)
-# ══════════════════════════════════════════════════════════════════════════════════════════════
-_MQTT_PUB = {'client': None, 'sig': None, 'connected': False, 'error': '', 'discovered': set(),
-             'prev': {}, 'last_publish': 0.0, 'count': 0}
-_MQTT_PUB_LOCK = threading.Lock()
-HA_DISCOVERY_PREFIX = 'homeassistant'
+# ── publication MQTT / Home Assistant (imprimantes, bobines, état de l'application) : module séparé `mqtt_publisher.py` (services fournis par `mqtt_publisher.init(globals())`) ──
+import mqtt_publisher
+from mqtt_publisher import (
+    HA_DISCOVERY_PREFIX,
+    _APP_STARTED,
+    _MQTT_APP_CACHE,
+    _MQTT_APP_ENTITIES,
+    _MQTT_APP_STATE_TOPIC,
+    _MQTT_PUB,
+    _MQTT_PUB_LOCK,
+    _MQTT_SPOOLS,
+    _MQTT_UPDATE,
+    _mqtt_app_discovery,
+    _mqtt_app_entities,
+    _mqtt_app_metrics,
+    _mqtt_app_publish,
+    _mqtt_app_state,
+    _mqtt_app_wanted,
+    _mqtt_discovery_configs,
+    _mqtt_last_backup_iso,
+    _mqtt_new_client,
+    _mqtt_pub_cfg,
+    _mqtt_pub_disconnect,
+    _mqtt_pub_loop,
+    _mqtt_pub_tick,
+    _mqtt_publish_all,
+    _mqtt_spool_key,
+    _mqtt_spool_slots,
+    _mqtt_state_payload,
+    _mqtt_update_probe,
+    _start_mqtt_publisher,
+    api_mqtt_entities,
+    api_mqtt_status,
+    api_mqtt_test,
+)
 
-
-def _mqtt_pub_cfg(override=None):
-    s = dict(load_settings() or {})
-    if override:
-        for k, v in override.items():
-            if str(k).startswith('mqtt_'):
-                s[k] = v
-    host = str(s.get('mqtt_host') or '').strip()
-    if not host:
-        return None
-    tls = bool(s.get('mqtt_tls'))
-    try:
-        port = int(s.get('mqtt_port') or (8883 if tls else 1883))
-    except (TypeError, ValueError):
-        port = 8883 if tls else 1883
-    base = re.sub(r'[^\w\-/]+', '_', str(s.get('mqtt_base') or 'stellio').strip('/ ')) or 'stellio'
-    try:
-        interval = max(5, min(300, int(s.get('mqtt_interval') or 15)))
-    except (TypeError, ValueError):
-        interval = 15
-    return {'enabled': bool(s.get('mqtt_enabled')), 'host': host, 'port': port, 'user': str(s.get('mqtt_user') or ''),
-            'password': str(s.get('mqtt_password') or ''), 'tls': tls, 'tls_insecure': bool(s.get('mqtt_tls_insecure')),
-            'base': base, 'discovery': s.get('mqtt_discovery', True) is not False, 'interval': interval,
-            'prefix': re.sub(r'[^\w\-/]+', '_', str(s.get('mqtt_discovery_prefix') or HA_DISCOVERY_PREFIX).strip('/ ')) or HA_DISCOVERY_PREFIX}
-
-
-def _mqtt_new_client(cfg, tag):
-    cid = f"stellio_{tag}_{uuid.uuid4().hex[:6]}"
-    try:
-        client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION1, client_id=cid, protocol=mqtt.MQTTv311, clean_session=True)
-    except TypeError:
-        client = mqtt.Client(client_id=cid, protocol=mqtt.MQTTv311, clean_session=True)
-    if cfg['user']:
-        client.username_pw_set(cfg['user'], cfg['password'])
-    if cfg['tls']:
-        client.tls_set(cert_reqs=ssl.CERT_NONE if cfg['tls_insecure'] else ssl.CERT_REQUIRED)
-        if cfg['tls_insecure']:
-            client.tls_insecure_set(True)
-    return client
-
-
-def _mqtt_state_payload(p, st):
-    t = st.get('time') or {}
-    temps = st.get('temps') or {}
-    active = st.get('status') in ('printing', 'paused')
-    return {
-        'name': p.get('name') or '', 'status': st.get('status') or 'offline',
-        'progress': round(float(st.get('progress') or 0), 1) if active else 0,
-        'file': os.path.basename(str(st.get('file') or '').replace('\\', '/')) if active else '',
-        'remaining': int(t.get('remaining') or 0) if active else 0,
-        'elapsed': int(t.get('elapsed') or 0) if active else 0,
-        'extruder': (temps.get('extruder') or {}).get('current'),
-        'bed': (temps.get('bed') or {}).get('current'),
-        'chamber': (temps.get('chamber') or {}).get('current'),
-        'layer': int((st.get('layers') or {}).get('current') or 0) if active else 0,
-        'layers_total': int((st.get('layers') or {}).get('total') or 0) if active else 0,
-        'hours': round(float(p.get('total_print_hours') or 0), 1),
-        'maintenance_days': (_MQTT_APP_CACHE['data'].get('maint_by_printer') or {}).get(p.get('id')),
-        'spool_low': bool((_ws_state.get(p.get('id')) or {}).get('low')),
-        'drift': bool((_ws_state.get(p.get('id')) or {}).get('drift')),
-    }
-
-
-def _mqtt_discovery_configs(cfg, p):
-    pid, base = p['id'], cfg['base']
-    state = f"{base}/printer/{pid}/state"
-    dev = {'identifiers': [f"stellio_{pid}"], 'name': p.get('name') or f"Imprimante {pid}", 'manufacturer': 'Stellio', 'model': str(p.get('type') or '')}
-    common = {'state_topic': state, 'device': dev, 'availability_topic': f"{base}/status",
-              'payload_available': 'online', 'payload_not_available': 'offline'}
-    ents = [
-        ('sensor', 'status', {'name': 'Status', 'value_template': '{{ value_json.status }}', 'icon': 'mdi:printer-3d'}),
-        ('sensor', 'progress', {'name': 'Progress', 'value_template': '{{ value_json.progress }}', 'unit_of_measurement': '%', 'state_class': 'measurement', 'icon': 'mdi:progress-clock'}),
-        ('sensor', 'remaining', {'name': 'Time remaining', 'value_template': '{{ (value_json.remaining | float(0) / 60) | round(0) }}', 'unit_of_measurement': 'min', 'icon': 'mdi:timer-sand'}),
-        ('sensor', 'file', {'name': 'File', 'value_template': '{{ value_json.file }}', 'icon': 'mdi:file-cad'}),
-        ('sensor', 'nozzle', {'name': 'Nozzle temperature', 'value_template': '{{ value_json.extruder }}', 'unit_of_measurement': '°C', 'device_class': 'temperature', 'state_class': 'measurement'}),
-        ('sensor', 'bed', {'name': 'Bed temperature', 'value_template': '{{ value_json.bed }}', 'unit_of_measurement': '°C', 'device_class': 'temperature', 'state_class': 'measurement'}),
-        ('binary_sensor', 'printing', {'name': 'Printing', 'value_template': "{{ 'ON' if value_json.status == 'printing' else 'OFF' }}", 'device_class': 'running'}),
-        ('sensor', 'chamber', {'name': 'Chamber temperature', 'value_template': '{{ value_json.chamber }}', 'unit_of_measurement': '°C', 'device_class': 'temperature', 'state_class': 'measurement'}),
-        ('sensor', 'layer', {'name': 'Current layer', 'value_template': '{{ value_json.layer }}', 'state_class': 'measurement', 'icon': 'mdi:layers'}),
-        ('sensor', 'layers_total', {'name': 'Total layers', 'value_template': '{{ value_json.layers_total }}', 'state_class': 'measurement', 'icon': 'mdi:layers-triple'}),
-        ('sensor', 'hours', {'name': 'Print hours', 'value_template': '{{ value_json.hours }}', 'unit_of_measurement': 'h', 'device_class': 'duration', 'state_class': 'total_increasing', 'icon': 'mdi:clock-outline'}),
-        ('sensor', 'maintenance_days', {'name': 'Next maintenance', 'value_template': "{{ 'unknown' if value_json.maintenance_days is none else value_json.maintenance_days }}", 'unit_of_measurement': 'd', 'icon': 'mdi:wrench-clock'}),
-        ('binary_sensor', 'spool_low', {'name': 'Spool almost empty', 'value_template': "{{ 'ON' if value_json.spool_low else 'OFF' }}", 'device_class': 'problem', 'icon': 'mdi:printer-3d-nozzle'}),
-        ('binary_sensor', 'drift', {'name': 'Print drift', 'value_template': "{{ 'ON' if value_json.drift else 'OFF' }}", 'device_class': 'problem', 'icon': 'mdi:alert-circle'}),
-    ]
-    out = []
-    for comp, key, extra in ents:
-        topic = f"{cfg['prefix']}/{comp}/stellio_{pid}/{key}/config"
-        out.append((topic, {**common, **extra, 'unique_id': f"stellio_{pid}_{key}", 'object_id': f"stellio_{pid}_{key}"}))
-    return out
-
-
-def _mqtt_publish_all(client, cfg):
-    conn = get_db()
-    try:
-        rows = conn.execute("SELECT * FROM printers").fetchall()
-    finally:
-        conn.close()
-    seen = set()
-    states = []
-    for row in rows:
-        p = parse_printer_config(row)
-        pid = p['id']
-        seen.add(pid)
-        st = _printer_status_cached(p, ttl=2.0)
-        payload = _mqtt_state_payload(p, st)
-        states.append(payload['status'])
-        if cfg['discovery'] and pid not in _MQTT_PUB['discovered']:
-            for topic, conf in _mqtt_discovery_configs(cfg, p):
-                client.publish(topic, json.dumps(conf, ensure_ascii=False), qos=1, retain=True)
-            _MQTT_PUB['discovered'].add(pid)
-        client.publish(f"{cfg['base']}/printer/{pid}/state", json.dumps(payload, ensure_ascii=False), qos=0, retain=True)
-        _MQTT_PUB['count'] += 1
-        prev = _MQTT_PUB['prev'].get(pid)
-        cur = payload['status']
-        if prev == 'printing' and cur in ('idle', 'complete', 'error'):
-            ev = 'print_failed' if cur == 'error' else 'print_finished'
-            client.publish(f"{cfg['base']}/printer/{pid}/event", json.dumps({'event': ev, 'printer': payload['name'], 'file': _MQTT_PUB.get('last_file', {}).get(pid, '')}, ensure_ascii=False), qos=1, retain=False)
-        _MQTT_PUB['prev'][pid] = cur
-        if payload['file']:
-            _MQTT_PUB.setdefault('last_file', {})[pid] = payload['file']
-    try:
-        _mqtt_app_publish(client, cfg, states)
-    except Exception as e:
-        app_logger.info(f"[MQTT] Appareil Stellio: {e}")
-    # imprimantes supprimées : on retire leurs entités de Home Assistant
-    for pid in list(_MQTT_PUB['discovered'] - seen):
-        for topic, _conf in _mqtt_discovery_configs(cfg, {'id': pid, 'name': '', 'type': ''}):
-            client.publish(topic, '', qos=1, retain=True)
-        _MQTT_PUB['discovered'].discard(pid)
-
-
-
-# ── Appareil « Stellio » : l'application elle-même (bibliothèque, impressions, atelier, commerce…) ──
-_APP_STARTED = time.time()
-_MQTT_APP_CACHE = {'t': 0.0, 'data': {}}
-_MQTT_APP_STATE_TOPIC = '{base}/app/state'
-
-# (composant, clé, nom, extras, réservé au commerce)
-_MQTT_APP_ENTITIES = [
-    ('sensor', 'files_total', 'Files', {'icon': 'mdi:file-multiple', 'state_class': 'measurement'}, False),
-    ('sensor', 'files_stl', 'STL files', {'icon': 'mdi:cube-outline', 'state_class': 'measurement'}, False),
-    ('sensor', 'files_3mf', '3MF files', {'icon': 'mdi:cube-scan', 'state_class': 'measurement'}, False),
-    ('sensor', 'files_gcode', 'G-code files', {'icon': 'mdi:code-braces', 'state_class': 'measurement'}, False),
-    ('sensor', 'files_other', 'Other files', {'icon': 'mdi:file-question-outline', 'state_class': 'measurement'}, False),
-    ('sensor', 'files_new_month', 'New files this month', {'icon': 'mdi:file-plus', 'state_class': 'measurement'}, False),
-    ('sensor', 'library_size', 'Library size', {'unit_of_measurement': 'GB', 'device_class': 'data_size', 'state_class': 'measurement', 'icon': 'mdi:harddisk'}, False),
-    ('sensor', 'sources', 'File sources', {'icon': 'mdi:folder-network', 'state_class': 'measurement'}, False),
-    ('sensor', 'favorites', 'Favorites', {'icon': 'mdi:star', 'state_class': 'measurement'}, False),
-    ('sensor', 'projects', 'Projects', {'icon': 'mdi:folder-star-multiple', 'state_class': 'measurement'}, False),
-    ('sensor', 'photos', 'Print photos', {'icon': 'mdi:image-multiple', 'state_class': 'measurement'}, False),
-    ('sensor', 'print_queue', 'Print queue', {'icon': 'mdi:format-list-numbered', 'state_class': 'measurement'}, False),
-    ('sensor', 'prints_total', 'Prints sent', {'icon': 'mdi:printer-3d', 'state_class': 'total_increasing'}, False),
-    ('sensor', 'prints_today', 'Prints today', {'icon': 'mdi:calendar-today', 'state_class': 'measurement'}, False),
-    ('sensor', 'prints_7d', 'Prints (7 days)', {'icon': 'mdi:calendar-week', 'state_class': 'measurement'}, False),
-    ('sensor', 'prints_30d', 'Prints (30 days)', {'icon': 'mdi:calendar-month', 'state_class': 'measurement'}, False),
-    ('sensor', 'prints_failed', 'Failed prints', {'icon': 'mdi:alert-octagon', 'state_class': 'total_increasing'}, False),
-    ('sensor', 'success_rate', 'Success rate', {'unit_of_measurement': '%', 'icon': 'mdi:check-decagram', 'state_class': 'measurement'}, False),
-    ('sensor', 'print_hours', 'Print hours', {'unit_of_measurement': 'h', 'icon': 'mdi:clock-outline', 'state_class': 'total_increasing'}, False),
-    ('sensor', 'printers_total', 'Printers', {'icon': 'mdi:printer-3d-nozzle', 'state_class': 'measurement'}, False),
-    ('sensor', 'printers_online', 'Printers online', {'icon': 'mdi:lan-connect', 'state_class': 'measurement'}, False),
-    ('sensor', 'printers_printing', 'Printers printing', {'icon': 'mdi:printer-3d', 'state_class': 'measurement'}, False),
-    ('sensor', 'spools', 'Manual spools', {'icon': 'mdi:circle-slice-8', 'state_class': 'measurement'}, False),
-    ('sensor', 'spools_remaining', 'Manual spools remaining', {'unit_of_measurement': 'kg', 'device_class': 'weight', 'icon': 'mdi:weight-kilogram', 'state_class': 'measurement'}, False),
-    ('sensor', 'maintenance_due', 'Maintenance due', {'icon': 'mdi:wrench-clock', 'state_class': 'measurement'}, False),
-    ('sensor', 'notifications', 'Unread notifications', {'icon': 'mdi:bell-badge', 'state_class': 'measurement'}, False),
-    ('sensor', 'spent_total', 'Print cost (total)', {'icon': 'mdi:cash', 'state_class': 'total_increasing'}, True),
-    ('sensor', 'spent_month', 'Print cost (this month)', {'icon': 'mdi:cash-clock', 'state_class': 'measurement'}, True),
-    ('sensor', 'quotes_pending', 'Quotes awaiting answer', {'icon': 'mdi:file-document-outline', 'state_class': 'measurement'}, True),
-    ('sensor', 'invoices_unpaid', 'Unpaid invoices', {'icon': 'mdi:file-document-alert', 'state_class': 'measurement'}, True),
-    ('sensor', 'invoices_unpaid_total', 'Unpaid amount', {'icon': 'mdi:cash-remove', 'state_class': 'measurement'}, True),
-    ('sensor', 'invoices_overdue', 'Overdue invoices', {'icon': 'mdi:calendar-alert', 'state_class': 'measurement'}, True),
-    ('sensor', 'clients', 'Customers', {'icon': 'mdi:account-group', 'state_class': 'measurement'}, True),
-    ('sensor', 'orders_open', 'Open orders', {'icon': 'mdi:clipboard-list', 'state_class': 'measurement'}, True),
-    ('sensor', 'orders_late', 'Late orders', {'icon': 'mdi:clipboard-alert', 'state_class': 'measurement'}, True),
-    ('binary_sensor', 'has_overdue', 'Overdue invoice', {'device_class': 'problem', 'icon': 'mdi:cash-clock', 'bool_of': 'invoices_overdue'}, True),
-    ('binary_sensor', 'has_maintenance', 'Maintenance needed', {'device_class': 'problem', 'icon': 'mdi:wrench', 'bool_of': 'maintenance_due'}, False),
-    ('sensor', 'orders_next_due', 'Next order delivery', {'device_class': 'date', 'icon': 'mdi:truck-delivery'}, True),
-    ('sensor', 'orders_pieces_left', 'Parts left to print', {'icon': 'mdi:cube-send', 'state_class': 'measurement'}, True),
-    ('sensor', 'margin_est', 'Expected order margin', {'icon': 'mdi:chart-line', 'state_class': 'measurement'}, True),
-    ('sensor', 'margin_real', 'Actual order margin', {'icon': 'mdi:chart-areaspline', 'state_class': 'measurement'}, True),
-    ('binary_sensor', 'alert_spool_low', 'Spool almost empty', {'device_class': 'problem', 'icon': 'mdi:printer-3d-nozzle', 'bool_of': 'alerts_spool_low'}, False),
-    ('binary_sensor', 'alert_drift', 'Print drift', {'device_class': 'problem', 'icon': 'mdi:alert-circle', 'bool_of': 'alerts_drift'}, False),
-    ('sensor', 'last_backup', 'Last backup', {'device_class': 'timestamp', 'icon': 'mdi:backup-restore', 'entity_category': 'diagnostic'}, False),
-    ('binary_sensor', 'update_available', 'Update available', {'device_class': 'update', 'icon': 'mdi:update', 'bool_of': 'update_flag', 'entity_category': 'diagnostic'}, False),
-    ('sensor', 'latest_version', 'Latest version', {'icon': 'mdi:tag-arrow-up', 'entity_category': 'diagnostic'}, False),
-    ('sensor', 'version', 'Version', {'icon': 'mdi:tag', 'entity_category': 'diagnostic'}, False),
-    ('sensor', 'uptime', 'Uptime', {'unit_of_measurement': 'h', 'device_class': 'duration', 'icon': 'mdi:timer-outline', 'entity_category': 'diagnostic'}, False),
-    ('sensor', 'db_size', 'Database size', {'unit_of_measurement': 'MB', 'device_class': 'data_size', 'icon': 'mdi:database', 'entity_category': 'diagnostic'}, False),
-    ('sensor', 'users', 'Accounts', {'icon': 'mdi:account', 'entity_category': 'diagnostic'}, False),
-]
-
-
-_MQTT_SPOOLS = {'t': 0.0, 'slots': []}
-_MQTT_UPDATE = {'t': 0.0, 'latest': '', 'avail': None, 'busy': False}
-
-
-def _mqtt_spool_key(slot):
-    return re.sub(r'\W+', '_', f"spool_{slot.get('source_type')}_{slot.get('source_id')}").strip('_')[:60]
-
-
-def _mqtt_spool_slots():
-    """Bobines Spoolman, TigerTag et manuelles (une entité chacune). Relues toutes les 5 min : Spoolman et TigerTag sont des appels réseau."""
-    if time.time() - _MQTT_SPOOLS['t'] < 300:
-        return _MQTT_SPOOLS['slots']
-    slots, ok = [], True
-    try:
-        conn = get_db()
-        try:
-            uids = [r['id'] for r in conn.execute("SELECT id FROM users").fetchall()]
-        finally:
-            conn.close()
-        url = str((load_settings() or {}).get('spoolman_url') or '').strip().rstrip('/')
-        if url:
-            sm, err = _get_spoolman_slots(url)
-            if err:
-                ok = False
-            slots.extend(sm)
-        for uid in uids:
-            slots.extend(_get_manual_filament_slots(uid))
-            slots.extend(_get_tigertag_slots(uid))
-    except Exception as e:
-        ok = False
-        app_logger.info(f"[MQTT] Bobines: {e}")
-    if ok or not _MQTT_SPOOLS['slots']:
-        seen, out = set(), []
-        for sl in slots:
-            if sl.get('source_type') not in ('spoolman', 'tigertag', 'manual'):
-                continue
-            k = _mqtt_spool_key(sl)
-            if k in seen:
-                continue
-            seen.add(k)
-            out.append({'key': k, 'name': str(sl.get('name') or k)[:60], 'material': str(sl.get('material') or ''),
-                        'remaining_g': sl.get('remaining_g')})
-        _MQTT_SPOOLS['slots'] = out
-    _MQTT_SPOOLS['t'] = time.time()
-    return _MQTT_SPOOLS['slots']
-
-
-def _mqtt_update_probe():
-    """Vérifie la dernière version publiée au plus toutes les 6 h, dans un fil à part (appel réseau)."""
-    if _MQTT_UPDATE['busy'] or time.time() - _MQTT_UPDATE['t'] < 6 * 3600:
-        return
-    _MQTT_UPDATE['busy'] = True
-
-    def _run():
-        try:
-            r = requests.get(GITHUB_API_URL, timeout=10, headers={'User-Agent': f'Stellio-App/{CURRENT_VERSION}'})
-            if r.status_code == 200:
-                latest = str(r.json().get('tag_name', '')).lstrip('vV')
-                _MQTT_UPDATE['latest'] = latest
-                _MQTT_UPDATE['avail'] = bool(latest) and version.parse(latest) > version.parse(get_current_version())
-        except Exception:
-            pass
-        finally:
-            _MQTT_UPDATE['t'] = time.time()
-            _MQTT_UPDATE['busy'] = False
-    threading.Thread(target=_run, daemon=True, name='stellio-mqtt-update').start()
-
-
-def _mqtt_last_backup_iso():
-    try:
-        folder = _auto_backup_folder(_load_auto_backup_config(), create=False)
-        best = 0.0
-        for n in os.listdir(folder):
-            if AUTO_BACKUP_NAME_RE.match(n):
-                best = max(best, os.stat(os.path.join(folder, n)).st_mtime)
-        return datetime.datetime.fromtimestamp(best).astimezone().isoformat(timespec='seconds') if best else None
-    except Exception:
-        return None
-
-
-def _mqtt_app_entities():
-    """Entités existantes : fixes (sans celles du commerce si désactivé) + une par bobine."""
-    commercial = (load_settings() or {}).get('commercial_enabled', True) is not False
-    ents = [e for e in _MQTT_APP_ENTITIES if commercial or not e[4]]
-    for sl in _mqtt_spool_slots():
-        label = sl['name'] + (f" ({sl['material']})" if sl['material'] else '')
-        ents.append(('sensor', sl['key'], f"Spool {label}", {'unit_of_measurement': 'g', 'device_class': 'weight', 'state_class': 'measurement',
-                                                           'icon': 'mdi:printer-3d-nozzle', 'spool': True}, False))
-    return ents
-
-
-def _mqtt_app_wanted():
-    return _mqtt_app_entities()
-
-
-def _mqtt_app_metrics(force=False):
-    """Instantané de l'application (mis en cache 60 s : on ne relit pas toute la base à chaque publication)."""
-    if not force and time.time() - _MQTT_APP_CACHE['t'] < 60 and _MQTT_APP_CACHE['data']:
-        return _MQTT_APP_CACHE['data']
-    m = {}
-    now = datetime.datetime.now()
-    fmt = lambda d: d.strftime('%Y-%m-%d %H:%M:%S')
-
-    def q1(conn, sql, args=(), default=0):
-        try:
-            r = conn.execute(sql, args).fetchone()
-            return (r[0] if r and r[0] is not None else default)
-        except Exception:
-            return default
-
-    try:
-        cached = load_file_cache() or []
-        m['files_total'] = len(cached)
-        counts = {'stl': 0, '3mf': 0, 'gcode': 0, 'other': 0}
-        month_ts = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).timestamp()
-        size = 0
-        new_month = 0
-        for f in cached:
-            ext = (f.get('extension') or '').lower().lstrip('.')
-            counts['gcode' if ext in ('gcode', 'bgcode', 'gco') else ext if ext in ('stl', '3mf') else 'other'] += 1
-            size += f.get('size', 0) or 0
-            if (f.get('mtime') or 0) >= month_ts:
-                new_month += 1
-        m.update(files_stl=counts['stl'], files_3mf=counts['3mf'], files_gcode=counts['gcode'], files_other=counts['other'],
-                 files_new_month=new_month, library_size=round(size / 1e9, 2))
-    except Exception:
-        pass
-    conn = get_db()
-    try:
-        today = fmt(now.replace(hour=0, minute=0, second=0, microsecond=0))
-        m['sources'] = q1(conn, "SELECT COUNT(*) FROM sources")
-        m['favorites'] = q1(conn, "SELECT COUNT(*) FROM favorites")
-        m['projects'] = q1(conn, "SELECT COUNT(*) FROM projects")
-        m['photos'] = q1(conn, "SELECT COUNT(*) FROM print_photos")
-        m['print_queue'] = q1(conn, "SELECT COUNT(*) FROM print_queue")
-        m['prints_total'] = q1(conn, "SELECT COUNT(*) FROM print_history")
-        m['prints_today'] = q1(conn, "SELECT COUNT(*) FROM print_history WHERE sent_at>=?", (today,))
-        m['prints_7d'] = q1(conn, "SELECT COUNT(*) FROM print_history WHERE sent_at>=?", (fmt(now - datetime.timedelta(days=7)),))
-        m['prints_30d'] = q1(conn, "SELECT COUNT(*) FROM print_history WHERE sent_at>=?", (fmt(now - datetime.timedelta(days=30)),))
-        ok = q1(conn, "SELECT COUNT(*) FROM print_history WHERE result='success'")
-        failed = q1(conn, "SELECT COUNT(*) FROM print_history WHERE result='failed'")
-        m['prints_failed'] = failed
-        m['success_rate'] = round(100 * ok / (ok + failed), 1) if (ok + failed) else None
-        m['print_hours'] = round(q1(conn, "SELECT COALESCE(SUM(actual_seconds),0) FROM print_history") / 3600, 1)
-        m['spools'] = q1(conn, "SELECT COUNT(*) FROM manual_filament_spools WHERE COALESCE(archived,0)=0")
-        m['spools_remaining'] = round(q1(conn, "SELECT COALESCE(SUM(remaining_g),0) FROM manual_filament_spools WHERE COALESCE(archived,0)=0") / 1000, 2)
-        m['notifications'] = q1(conn, "SELECT COUNT(*) FROM notifications WHERE is_read=0")
-        m['users'] = q1(conn, "SELECT COUNT(*) FROM users")
-        m['spent_total'] = round(q1(conn, "SELECT COALESCE(SUM(total_cost),0) FROM print_history WHERE total_cost IS NOT NULL"), 2)
-        m['spent_month'] = round(q1(conn, "SELECT COALESCE(SUM(total_cost),0) FROM print_history WHERE total_cost IS NOT NULL AND sent_at>=?",
-                                    (fmt(now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)),)), 2)
-        # commerce
-        todayd = datetime.date.today().isoformat()
-        try:
-            qrows = conn.execute("SELECT doc_type, status, due_date, total_value FROM quotes").fetchall()
-        except Exception:
-            qrows = []
-        pend = unpaid = overdue = 0
-        unpaid_total = 0.0
-        for r in qrows:
-            dt = r['doc_type'] or 'quote'
-            st = r['status'] or 'draft'
-            if dt == 'quote' and st in ('draft', 'sent'):
-                pend += 1
-            elif dt in ('invoice', 'deposit') and st != 'paid':
-                unpaid += 1
-                unpaid_total += float(r['total_value'] or 0)
-                if r['due_date'] and r['due_date'] < todayd:
-                    overdue += 1
-        m.update(quotes_pending=pend, invoices_unpaid=unpaid, invoices_unpaid_total=round(unpaid_total, 2), invoices_overdue=overdue)
-        m['clients'] = q1(conn, "SELECT COUNT(*) FROM clients")
-        m['orders_open'] = q1(conn, "SELECT COUNT(*) FROM print_jobs WHERE status IN ('queued','printing')")
-        m['orders_late'] = q1(conn, "SELECT COUNT(*) FROM print_jobs WHERE status IN ('queued','printing') AND due_date!='' AND due_date<?", (todayd,))
-        # maintenance
-        due = 0
-        try:
-            tasks = conn.execute("SELECT t.*, p.total_print_hours AS total FROM printer_maintenance_tasks t JOIN printers p ON p.id=t.printer_id").fetchall()
-            rates = {}
-            for t in tasks:
-                if t['printer_id'] not in rates:
-                    rates[t['printer_id']] = _printer_hours_per_day(conn, t['printer_id'])
-                if _maintenance_eta(t, t['total'] or 0, rates[t['printer_id']]) == 0.0:
-                    due += 1
-        except Exception:
-            pass
-        m['maintenance_due'] = due
-        eta_by = {}
-        try:
-            for t in tasks:
-                e = _maintenance_eta(t, t['total'] or 0, rates.get(t['printer_id']))
-                if e is not None:
-                    eta_by[t['printer_id']] = min(e, eta_by.get(t['printer_id'], e))
-        except Exception:
-            pass
-        m['maint_by_printer'] = {k: round(v, 1) for k, v in eta_by.items()}
-        # commandes
-        m['orders_next_due'] = q1(conn, "SELECT MIN(due_date) FROM print_jobs WHERE status IN ('queued','printing') AND due_date!=''", default=None)
-        m['orders_pieces_left'] = q1(conn, "SELECT COALESCE(SUM(MAX(quantity-qty_done,0)),0) FROM print_jobs WHERE status IN ('queued','printing')")
-        try:
-            totals = {r['id']: r['total_value'] or 0 for r in conn.execute("SELECT id, total_value FROM quotes").fetchall()}
-            est = real = 0.0
-            for r in conn.execute("SELECT * FROM print_jobs WHERE status!='cancelled'").fetchall():
-                mg = _job_margin(r, totals.get(r['quote_id'], 0))
-                if mg:
-                    est += mg['est_margin']
-                    if r['qty_done']:
-                        real += mg['real_margin']
-            m['margin_est'], m['margin_real'] = round(est, 2), round(real, 2)
-        except Exception:
-            m['margin_est'] = m['margin_real'] = None
-    finally:
-        conn.close()
-    try:
-        m['db_size'] = round(os.path.getsize(DB_PATH) / 1e6, 1)
-    except Exception:
-        m['db_size'] = None
-    m['last_backup'] = _mqtt_last_backup_iso()
-    _mqtt_update_probe()
-    m['version'] = CURRENT_VERSION
-    m['uptime'] = round((time.time() - _APP_STARTED) / 3600, 2)
-    _MQTT_APP_CACHE.update(t=time.time(), data=m)
-    return m
-
-
-def _mqtt_app_state(m, printers_state):
-    out = dict(m)
-    out['printers_total'] = len(printers_state)
-    out['printers_online'] = sum(1 for s in printers_state if s not in ('offline', 'error', 'timeout', None))
-    out['printers_printing'] = sum(1 for s in printers_state if s == 'printing')
-    out['alerts_spool_low'] = sum(1 for v in _ws_state.values() if v.get('low'))
-    out['alerts_drift'] = sum(1 for v in _ws_state.values() if v.get('drift'))
-    out['update_flag'] = 1 if _MQTT_UPDATE['avail'] else 0
-    out['latest_version'] = _MQTT_UPDATE['latest'] or None
-    out['spools_detail'] = {sl['key']: sl['remaining_g'] for sl in _mqtt_spool_slots()}
-    out.pop('maint_by_printer', None)
-    return out
-
-
-def _mqtt_app_discovery(cfg, ents=None):
-    base = cfg['base']
-    dev = {'identifiers': ['stellio_app'], 'name': 'Stellio', 'manufacturer': 'Stellio', 'model': 'Application', 'sw_version': CURRENT_VERSION}
-    common = {'state_topic': _MQTT_APP_STATE_TOPIC.format(base=base), 'device': dev, 'availability_topic': f"{base}/status",
-              'payload_available': 'online', 'payload_not_available': 'offline'}
-    out = []
-    for comp, key, name, extra, _commerce in (ents if ents is not None else _MQTT_APP_ENTITIES):
-        extra = dict(extra)
-        boolof = extra.pop('bool_of', None)
-        spool = extra.pop('spool', False)
-        conf = {**common, **extra, 'name': name, 'unique_id': f"stellio_app_{key}", 'object_id': f"stellio_app_{key}"}
-        if comp == 'binary_sensor':
-            conf['value_template'] = "{{ 'ON' if (value_json.%s | int(0)) > 0 else 'OFF' }}" % boolof
-        elif spool:
-            conf['value_template'] = "{%% set v = value_json.spools_detail.get('%s') %%}{{ 'unknown' if v is none else v }}" % key
-        else:
-            conf['value_template'] = "{{ 'unknown' if value_json.%s is none else value_json.%s }}" % (key, key)
-        out.append((f"{cfg['prefix']}/{comp}/stellio_app/{key}/config", key, conf))
-    return out
-
-
-def _mqtt_app_publish(client, cfg, printers_state, qos=0, wait=None):
-    """Publie l'appareil Stellio : configs de découverte (seulement si elles ont changé) puis l'état."""
-    ents = _mqtt_app_entities()
-    wanted = {e[1]: e[0] for e in ents}
-    prev = _MQTT_PUB.get('app_keys')
-    if cfg['discovery'] and prev != wanted:
-        for topic, key, conf in _mqtt_app_discovery(cfg, ents):
-            r = client.publish(topic, json.dumps(conf, ensure_ascii=False), qos=1, retain=True)
-            if wait is not None:
-                wait.append(r)
-        # entités disparues (commerce désactivé, bobine retirée) : on vide leur configuration retenue
-        gone = {k: c for k, c in (prev or {}).items() if k not in wanted}
-        if prev is None:
-            gone.update({e[1]: e[0] for e in _MQTT_APP_ENTITIES if e[1] not in wanted})
-        for key, comp in gone.items():
-            r = client.publish(f"{cfg['prefix']}/{comp}/stellio_app/{key}/config", '', qos=1, retain=True)
-            if wait is not None:
-                wait.append(r)
-        _MQTT_PUB['app_keys'] = wanted
-    state = _mqtt_app_state(_mqtt_app_metrics(), printers_state)
-    r = client.publish(_MQTT_APP_STATE_TOPIC.format(base=cfg['base']), json.dumps(state, ensure_ascii=False), qos=qos, retain=True)
-    if wait is not None:
-        wait.append(r)
-    return state
-
-
-def _mqtt_pub_disconnect():
-    c = _MQTT_PUB.get('client')
-    _MQTT_PUB['client'] = None
-    _MQTT_PUB['connected'] = False
-    if c:
-        try:
-            c.publish(f"{(_MQTT_PUB.get('sig') or ('',))[0]}/status", 'offline', qos=1, retain=True)
-        except Exception:
-            pass
-        try:
-            c.loop_stop()
-            c.disconnect()
-        except Exception:
-            pass
-
-
-def _mqtt_pub_tick():
-    cfg = _mqtt_pub_cfg()
-    if not IS_SERVER_EDITION or not HAS_MQTT or not cfg or not cfg['enabled']:
-        if _MQTT_PUB['client']:
-            with _MQTT_PUB_LOCK:
-                _mqtt_pub_disconnect()
-                _MQTT_PUB['sig'] = None
-        return
-    sig = (cfg['base'], cfg['host'], cfg['port'], cfg['user'], cfg['password'], cfg['tls'], cfg['tls_insecure'], cfg['discovery'], cfg['prefix'])
-    with _MQTT_PUB_LOCK:
-        if _MQTT_PUB['client'] is None or _MQTT_PUB['sig'] != sig:
-            if _MQTT_PUB['client']:
-                _mqtt_pub_disconnect()
-            _MQTT_PUB['discovered'] = set()
-            _MQTT_PUB['app_keys'] = None
-            client = _mqtt_new_client(cfg, 'pub')
-            client.will_set(f"{cfg['base']}/status", 'offline', qos=1, retain=True)
-
-            def _on_connect(c, userdata, flags, rc, *a):
-                if rc == 0:
-                    _MQTT_PUB['connected'] = True
-                    _MQTT_PUB['error'] = ''
-                    _MQTT_PUB['discovered'] = set()
-                    _MQTT_PUB['app_keys'] = None
-                    c.publish(f"{cfg['base']}/status", 'online', qos=1, retain=True)
-                else:
-                    _MQTT_PUB['connected'] = False
-                    _MQTT_PUB['error'] = {4: 'identifiants refusés', 5: 'non autorisé'}.get(rc, f'code {rc}')
-
-            def _on_disconnect(c, userdata, rc, *a):
-                _MQTT_PUB['connected'] = False
-
-            client.on_connect = _on_connect
-            client.on_disconnect = _on_disconnect
-            try:
-                client.reconnect_delay_set(min_delay=2, max_delay=60)
-                client.connect_async(cfg['host'], cfg['port'], keepalive=60)
-                client.loop_start()
-                _MQTT_PUB['client'] = client
-                _MQTT_PUB['sig'] = sig
-            except Exception as e:
-                _MQTT_PUB['error'] = str(e)[:120]
-                return
-        client = _MQTT_PUB['client']
-    if client is not None and _MQTT_PUB['connected'] and time.time() - _MQTT_PUB['last_publish'] >= cfg['interval']:
-        _MQTT_PUB['last_publish'] = time.time()
-        _mqtt_publish_all(client, cfg)
-
-
-def _mqtt_pub_loop():
-    time.sleep(25)
-    while True:
-        try:
-            _mqtt_pub_tick()
-        except Exception as e:
-            _MQTT_PUB['error'] = str(e)[:120]
-            app_logger.info(f"[MQTT] Erreur boucle: {e}")
-        time.sleep(3)
-
-
-def _start_mqtt_publisher():
-    threading.Thread(target=_mqtt_pub_loop, daemon=True, name='stellio-mqtt-ha').start()
-
-
-@app.route('/api/mqtt/status', methods=['GET'])
-@login_required
-def api_mqtt_status():
-    blocked = _server_edition_only()
-    if blocked:
-        return blocked
-    cfg = _mqtt_pub_cfg()
-    return jsonify({"available": bool(HAS_MQTT), "enabled": bool(cfg and cfg['enabled']),
-                    "connected": bool(_MQTT_PUB['connected']), "error": _MQTT_PUB['error'],
-                    "published": _MQTT_PUB['count'], "host": (cfg or {}).get('host', ''), "discovery": bool(cfg and cfg['discovery'])})
-
-
-@app.route('/api/mqtt/entities', methods=['GET'])
-@login_required
-def api_mqtt_entities():
-    """Liste des entités publiées vers Home Assistant (avec leur valeur actuelle)."""
-    blocked = _server_edition_only()
-    if blocked:
-        return blocked
-    cfg = _mqtt_pub_cfg()
-    out = {"enabled": bool(cfg and cfg['enabled']), "connected": bool(_MQTT_PUB['connected']),
-           "discovery": bool(cfg and cfg['discovery']), "base": cfg['base'] if cfg else 'stellio', "printers": []}
-    if not cfg:
-        return jsonify(out)
-    conn = get_db()
-    try:
-        rows = conn.execute("SELECT * FROM printers").fetchall()
-    finally:
-        conn.close()
-    for row in rows:
-        p = parse_printer_config(row)
-        try:
-            payload = _mqtt_state_payload(p, _printer_status_cached(p, ttl=5.0))
-        except Exception:
-            payload = _mqtt_state_payload(p, {})
-        values = {'status': payload['status'], 'progress': payload['progress'], 'remaining': round(payload['remaining'] / 60),
-                  'file': payload['file'], 'nozzle': payload['extruder'], 'bed': payload['bed'],
-                  'printing': 'ON' if payload['status'] == 'printing' else 'OFF',
-                  'chamber': payload['chamber'], 'layer': payload['layer'], 'layers_total': payload['layers_total'],
-                  'hours': payload['hours'], 'maintenance_days': payload['maintenance_days'],
-                  'spool_low': 'ON' if payload['spool_low'] else 'OFF', 'drift': 'ON' if payload['drift'] else 'OFF'}
-        ents = []
-        for topic, conf in _mqtt_discovery_configs(cfg, p):
-            key = conf['unique_id'].split('_', 2)[2]
-            ents.append({"key": key, "name": conf['name'], "component": topic.split('/')[1], "unique_id": conf['unique_id'],
-                         "unit": conf.get('unit_of_measurement', ''), "value": values.get(key)})
-        out["printers"].append({"id": p['id'], "name": p.get('name') or f"#{p['id']}", "state_topic": f"{cfg['base']}/printer/{p['id']}/state",
-                                "event_topic": f"{cfg['base']}/printer/{p['id']}/event", "entities": ents})
-    try:
-        pstates = [pr['entities'][0]['value'] for pr in out['printers'] if pr['entities']]
-        values = _mqtt_app_state(_mqtt_app_metrics(), pstates)
-        app_ents = []
-        for comp, key, name, extra, _c in _mqtt_app_entities():
-            if comp == 'binary_sensor':
-                val = 'ON' if (values.get(extra.get('bool_of')) or 0) > 0 else 'OFF'
-            elif extra.get('spool'):
-                val = values.get('spools_detail', {}).get(key)
-            else:
-                val = values.get(key)
-            app_ents.append({"key": key, "name": name, "component": comp, "unique_id": f"stellio_app_{key}",
-                             "unit": extra.get('unit_of_measurement', ''), "value": val})
-        out["app"] = {"name": "Stellio", "state_topic": _MQTT_APP_STATE_TOPIC.format(base=cfg['base']), "entities": app_ents}
-    except Exception as e:
-        app_logger.info(f"[MQTT] Entités Stellio: {e}")
-    return jsonify(out)
-
-
-@app.route('/api/mqtt/test', methods=['POST'])
-@login_required
-def api_mqtt_test():
-    blocked = _server_edition_only()
-    if blocked:
-        return blocked
-    if not HAS_MQTT:
-        return jsonify({"success": False, "error": "paho-mqtt n'est pas installé"}), 200
-    cfg = _mqtt_pub_cfg(request.json or {})
-    if not cfg:
-        return jsonify({"success": False, "error": "Adresse du broker manquante"}), 200
-    result = {'rc': None}
-    done = threading.Event()
-    client = _mqtt_new_client(cfg, 'test')
-
-    def _on_connect(c, userdata, flags, rc, *a):
-        result['rc'] = rc
-        done.set()
-    client.on_connect = _on_connect
-    published = 0
-    try:
-        client.connect_async(cfg['host'], cfg['port'], keepalive=20)
-        client.loop_start()
-        ok = done.wait(7)
-        if ok and result['rc'] == 0:
-            # Le test publie réellement les entités (comme le ferait la publication normale),
-            # pour qu'elles apparaissent tout de suite dans Home Assistant.
-            infos = []
-            test_states = []
-            conn = get_db()
-            try:
-                rows = conn.execute("SELECT * FROM printers").fetchall()
-            finally:
-                conn.close()
-            if cfg['enabled']:
-                infos.append(client.publish(f"{cfg['base']}/status", 'online', qos=1, retain=True))
-            for row in rows:
-                p = parse_printer_config(row)
-                try:
-                    st = _printer_status_cached(p, ttl=5.0)
-                except Exception:
-                    st = {}
-                if cfg['discovery']:
-                    for topic, conf in _mqtt_discovery_configs(cfg, p):
-                        infos.append(client.publish(topic, json.dumps(conf, ensure_ascii=False), qos=1, retain=True))
-                infos.append(client.publish(f"{cfg['base']}/printer/{p['id']}/state", json.dumps(_mqtt_state_payload(p, st), ensure_ascii=False), qos=1, retain=True))
-                published += 1
-                test_states.append((st or {}).get('status'))
-            try:
-                _MQTT_PUB['app_keys'] = None
-                _mqtt_app_publish(client, cfg, test_states, qos=1, wait=infos)
-                published += 1
-            except Exception as e:
-                app_logger.info(f"[MQTT] Test appareil Stellio: {e}")
-            for i in infos:
-                try:
-                    i.wait_for_publish(3)
-                except Exception:
-                    pass
-    except Exception as e:
-        return jsonify({"success": False, "error": f"{type(e).__name__}: {str(e)[:100]}"}), 200
-    finally:
-        try:
-            client.loop_stop()
-            client.disconnect()
-        except Exception:
-            pass
-    if not ok:
-        return jsonify({"success": False, "error": "Aucune réponse du broker (adresse, port ou pare-feu ?)"}), 200
-    if result['rc'] != 0:
-        return jsonify({"success": False, "error": {4: 'Identifiant ou mot de passe refusé', 5: 'Non autorisé'}.get(result['rc'], f"Connexion refusée (code {result['rc']})")}), 200
-    return jsonify({"success": True, "printers": published, "discovery": cfg['discovery'], "prefix": cfg['prefix'], "enabled": cfg['enabled']}), 200
 
 
 @app.route('/api/printers/<int:pid>/camera', methods=['GET'])
@@ -26719,156 +24768,17 @@ def api_orders_from_quote(qid):
     return jsonify({'success': True, 'created': _create_jobs_from_quote(session['user_id'], row)})
 
 
-# ── Page de suivi client : un lien public par commande ──────────────────────────────────────
-def _share_base_url():
-    remote_state = get_remote_state()
-    if remote_state.get('status') == 'ready' and remote_state.get('url'):
-        return remote_state['url'].rstrip('/'), True
-    return f"http://{get_local_ip()}:{SERVER_PORT}", False
-
-
-@app.route('/api/orders/<int:jid>/track', methods=['POST'])
-@login_required
-def api_orders_track_create(jid):
-    """Crée (ou renvoie) le lien de suivi public d'une commande ; enregistre au passage le message au client."""
-    data = request.get_json(silent=True) or {}
-    conn = get_db()
-    try:
-        row = conn.execute("SELECT track_token FROM print_jobs WHERE id=? AND user_id=?", (jid, session['user_id'])).fetchone()
-        if not row:
-            return jsonify({'success': False, 'error': 'not_found'}), 404
-        token = row['track_token'] or secrets.token_urlsafe(18)
-        if 'client_note' in data:
-            conn.execute("UPDATE print_jobs SET track_token=?, client_note=? WHERE id=?",
-                         (token, str(data.get('client_note') or '').strip()[:300], jid))
-        else:
-            conn.execute("UPDATE print_jobs SET track_token=? WHERE id=?", (token, jid))
-        conn.commit()
-    finally:
-        conn.close()
-    base, remote = _share_base_url()
-    rs = get_remote_state()
-    return jsonify({'success': True, 'token': token, 'url': f"{base}/order/{token}", 'remote': remote,
-                    'remote_status': rs.get('status'), 'remote_mode': rs.get('mode'), 'remote_error': rs.get('error')})
-
-
-@app.route('/api/orders/<int:jid>/track', methods=['DELETE'])
-@login_required
-def api_orders_track_revoke(jid):
-    conn = get_db()
-    try:
-        conn.execute("UPDATE print_jobs SET track_token='' WHERE id=? AND user_id=?", (jid, session['user_id']))
-        conn.commit()
-    finally:
-        conn.close()
-    return jsonify({'success': True})
-
-
-def _order_by_track_token(token):
-    # Un jeton vide ne doit jamais correspondre : les commandes sans lien ont track_token = ''
-    if not token or len(token) < 10 or len(token) > 80:
-        return None
-    conn = get_db()
-    try:
-        return conn.execute("SELECT * FROM print_jobs WHERE track_token=? AND track_token!=''", (token,)).fetchone()
-    finally:
-        conn.close()
-
-
-@app.route('/order/<token>/data', methods=['GET'])
-def api_order_track_data(token):
-    """Données publiques minimales : jamais de prix, de marge, de notes internes ni de nom d'imprimante."""
-    job = _order_by_track_token(token)
-    if not job:
-        return jsonify({"error": "Lien invalide"}), 404
-    try:
-        settings = load_settings() or {}
-    except Exception:
-        settings = {}
-    shop = str(settings.get('quote_company') or settings.get('print_cost_quote_company') or '').strip()[:120]
-    qty = max(1, int(job['quantity'] or 1))
-    done = max(0, min(int(job['qty_done'] or 0), qty))
-    status = job['status'] if job['status'] in _JOB_STATUSES else 'queued'
-    live = None
-    if status == 'printing' and job['printer_id']:
-        try:
-            conn = get_db()
-            try:
-                prow = conn.execute("SELECT * FROM printers WHERE id=? AND user_id=?", (job['printer_id'], job['user_id'])).fetchone()
-            finally:
-                conn.close()
-            if prow:
-                st = _printer_status_cached(parse_printer_config(prow))
-                if st.get('status') in ('printing', 'paused'):
-                    live = round(float(st.get('progress') or 0), 1)
-        except Exception:
-            live = None
-    resp = jsonify({
-        "shop": shop, "part": job['part'], "quantity": qty, "qty_done": done, "status": status,
-        "due_date": job['due_date'] or '', "created_at": (job['created_at'] or '')[:10], "done_at": job['done_at'] or '',
-        "note": job['client_note'] or '', "live_progress": live, "now": int(time.time()),
-    })
-    resp.headers['Cache-Control'] = 'no-store'
-    return resp
-
-
-_ORDER_TRACK_PAGE = r"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
-<title>Suivi de commande</title><style>
-*{box-sizing:border-box}body{margin:0;background:#0b0e13;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:24px 18px 40px;display:flex;justify-content:center}
-.card{width:100%;max-width:520px;background:#151a23;border:2px solid #232a38;border-radius:22px;padding:26px 24px;display:flex;flex-direction:column;gap:18px}
-.shop{font-size:13px;color:#8b95a8;letter-spacing:.04em;text-transform:uppercase}h1{font-size:24px;margin:0;word-break:break-word}
-.pill{display:inline-block;font-size:15px;font-weight:700;padding:6px 14px;border-radius:999px;background:#232a38;color:#cbd5e1}
-.s-printing .pill{background:rgba(78,161,211,.2);color:#4ea1d3}.s-done .pill{background:rgba(56,193,114,.2);color:#38c172}.s-cancelled .pill{background:rgba(232,93,117,.2);color:#e85d75}
-.steps{display:flex;align-items:flex-start;gap:0}.step{flex:1;text-align:center;font-size:12px;color:#5b6577;position:relative}
-.dot{width:22px;height:22px;border-radius:50%;background:#232a38;margin:0 auto 6px;border:2px solid #232a38;position:relative;z-index:1}
-.step:not(:last-child):after{content:"";position:absolute;top:10px;left:50%;width:100%;height:3px;background:#232a38}
-.step.on{color:#e2e8f0}.step.on .dot{background:#4ea1d3;border-color:#4ea1d3}.step.on:not(:last-child):after{background:#4ea1d3}
-.s-done .step.on .dot{background:#38c172;border-color:#38c172}.s-done .step.on:not(:last-child):after{background:#38c172}
-.bar{height:12px;background:#232a38;border-radius:8px;overflow:hidden}.bar div{height:100%;background:#4ea1d3;border-radius:8px;transition:width .6s}.s-done .bar div{background:#38c172}
-.row{display:flex;justify-content:space-between;gap:10px;font-size:15px;color:#cbd5e1}.row b{color:#fff}
-.note{background:#0f131b;border-left:3px solid #4ea1d3;border-radius:8px;padding:12px 14px;font-size:15px;color:#e2e8f0;white-space:pre-wrap}
-.ready{background:rgba(56,193,114,.15);border:1px solid #38c172;color:#7ee2a8;border-radius:12px;padding:14px;font-size:17px;font-weight:700;text-align:center}
-.msg{text-align:center;color:#8b95a8;padding:40px 10px}footer{text-align:center;color:#5b6577;font-size:12px}
-</style></head><body><div class="card" id="c"><div class="msg">…</div></div><script>
-const L={fr:{st:{queued:'En file d’attente',printing:'En cours d’impression',done:'Terminée',cancelled:'Annulée'},s1:'Reçue',s2:'Impression',s3:'Prête',ready:'Votre commande est prête à être retirée',qty:'Quantité',done:'Pièces terminées',due:'Livraison prévue',since:'Commande du',doneat:'Terminée le',err:'Lien invalide ou révoqué',foot:'Suivi en lecture seule'},
-en:{st:{queued:'Queued',printing:'Printing',done:'Done',cancelled:'Cancelled'},s1:'Received',s2:'Printing',s3:'Ready',ready:'Your order is ready for pickup',qty:'Quantity',done:'Parts finished',due:'Expected on',since:'Ordered on',doneat:'Finished on',err:'Invalid or revoked link',foot:'Read-only tracking'},
-de:{st:{queued:'In der Warteschlange',printing:'Wird gedruckt',done:'Fertig',cancelled:'Storniert'},s1:'Erhalten',s2:'Druck',s3:'Bereit',ready:'Ihre Bestellung ist abholbereit',qty:'Menge',done:'Fertige Teile',due:'Voraussichtlich am',since:'Bestellt am',doneat:'Fertig am',err:'Ungültiger oder widerrufener Link',foot:'Nur-Lese-Verfolgung'},
-es:{st:{queued:'En cola',printing:'Imprimiendo',done:'Terminado',cancelled:'Cancelado'},s1:'Recibido',s2:'Impresión',s3:'Listo',ready:'Su pedido está listo para recoger',qty:'Cantidad',done:'Piezas terminadas',due:'Entrega prevista',since:'Pedido el',doneat:'Terminado el',err:'Enlace no válido o revocado',foot:'Seguimiento de solo lectura'},
-pt:{st:{queued:'Em fila',printing:'A imprimir',done:'Concluído',cancelled:'Cancelado'},s1:'Recebido',s2:'Impressão',s3:'Pronto',ready:'A sua encomenda está pronta para levantamento',qty:'Quantidade',done:'Peças concluídas',due:'Entrega prevista',since:'Encomendado em',doneat:'Concluído em',err:'Ligação inválida ou revogada',foot:'Acompanhamento só de leitura'},
-it:{st:{queued:'In coda',printing:'In stampa',done:'Completato',cancelled:'Annullato'},s1:'Ricevuto',s2:'Stampa',s3:'Pronto',ready:'Il suo ordine è pronto per il ritiro',qty:'Quantità',done:'Pezzi completati',due:'Consegna prevista',since:'Ordinato il',doneat:'Completato il',err:'Link non valido o revocato',foot:'Monitoraggio in sola lettura'},
-zh:{st:{queued:'排队中',printing:'打印中',done:'已完成',cancelled:'已取消'},s1:'已接收',s2:'打印',s3:'可取',ready:'您的订单已可取货',qty:'数量',done:'已完成件数',due:'预计交付',since:'下单日期',doneat:'完成日期',err:'链接无效或已撤销',foot:'只读跟踪'},
-ja:{st:{queued:'順番待ち',printing:'印刷中',done:'完了',cancelled:'キャンセル'},s1:'受付',s2:'印刷',s3:'受取可',ready:'ご注文の品はお受け取りいただけます',qty:'数量',done:'完成数',due:'お渡し予定',since:'注文日',doneat:'完了日',err:'リンクが無効か取り消されました',foot:'閲覧専用の追跡'}};
-const T=L[(navigator.language||'fr').slice(0,2)]||L.en,$=id=>document.getElementById(id);
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fd=s=>{if(!s)return'';const d=new Date(s+'T00:00:00');return isNaN(d)?esc(s):d.toLocaleDateString()};
-async function load(){try{const r=await fetch(location.pathname.replace(/\/$/,'')+'/data',{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();
-document.title=d.part;const st=d.status,step=st==='done'?3:st==='printing'?2:1;
-let pct=Math.round(100*d.qty_done/d.quantity);if(st==='printing'&&d.live_progress!=null&&d.qty_done<d.quantity)pct=Math.round(100*(d.qty_done+d.live_progress/100)/d.quantity);if(st==='done')pct=100;
-$('c').className='card s-'+st;
-$('c').innerHTML=(d.shop?'<div class="shop">'+esc(d.shop)+'</div>':'')+'<h1>'+esc(d.part)+'</h1><div><span class="pill">'+T.st[st]+'</span></div>'+
-(st==='done'?'<div class="ready">✓ '+T.ready+'</div>':'')+
-(st!=='cancelled'?'<div class="steps"><div class="step on"><div class="dot"></div>'+T.s1+'</div><div class="step '+(step>=2?'on':'')+'"><div class="dot"></div>'+T.s2+'</div><div class="step '+(step>=3?'on':'')+'"><div class="dot"></div>'+T.s3+'</div></div><div class="bar"><div style="width:'+pct+'%"></div></div>':'')+
-'<div class="row"><span>'+T.done+'</span><b>'+d.qty_done+' / '+d.quantity+'</b></div>'+
-(d.due_date&&st!=='done'&&st!=='cancelled'?'<div class="row"><span>'+T.due+'</span><b>'+fd(d.due_date)+'</b></div>':'')+
-(d.created_at?'<div class="row"><span>'+T.since+'</span><b>'+fd(d.created_at)+'</b></div>':'')+
-(st==='done'&&d.done_at?'<div class="row"><span>'+T.doneat+'</span><b>'+fd(d.done_at)+'</b></div>':'')+
-(d.note?'<div class="note">'+esc(d.note)+'</div>':'')+'<footer>'+T.foot+'</footer>'}
-catch(e){$('c').innerHTML='<div class="msg">'+T.err+'</div>'}}
-load();setInterval(load,15000);
-</script></body></html>"""
-
-
-@app.route('/order/<token>', methods=['GET'])
-def order_track_page(token):
-    if not _order_by_track_token(token):
-        return Response("Lien invalide ou révoqué", status=404, mimetype='text/plain; charset=utf-8')
-    resp = Response(_ORDER_TRACK_PAGE, mimetype='text/html')
-    resp.headers['Cache-Control'] = 'no-store'
-    resp.headers['X-Robots-Tag'] = 'noindex, nofollow'
-    resp.headers['Referrer-Policy'] = 'no-referrer'
-    return resp
-
+# ── page de suivi client (un lien public par commande) : module séparé `order_tracking.py` (services fournis par `order_tracking.init(globals())`) ──
+import order_tracking
+from order_tracking import (
+    _ORDER_TRACK_PAGE,
+    _order_by_track_token,
+    _share_base_url,
+    api_order_track_data,
+    api_orders_track_create,
+    api_orders_track_revoke,
+    order_track_page,
+)
 
 # ── Maintenance prédictive : rythme réel d'impression par imprimante ──
 
@@ -28024,263 +25934,26 @@ def _material_ref_block(material: str) -> str:
                 f"bed {ref['plateau']}, speed {ref['vitesse']}, fan {ref['ventilation']}.")
     return f"No known reference ranges for {material}: use general knowledge of this material."
 
-SOSPRINT_SOFT_QUESTIONS = 4
-SOSPRINT_HARD_MAX_QUESTIONS = 30
+# ── S.O.S Print : conversations, cas de référence, réglages : module séparé `sosprint_helpers.py` (services fournis par `sosprint_helpers.init(globals())`) ──
+import sosprint_helpers
+from sosprint_helpers import (
+    SOSPRINT_HARD_MAX_QUESTIONS,
+    SOSPRINT_SETTING_FIELDS,
+    SOSPRINT_SOFT_QUESTIONS,
+    _sosprint_add_message,
+    _sosprint_clean_settings,
+    _sosprint_conversation_photos_b64,
+    _sosprint_conversation_settings_block,
+    _sosprint_get_conversation,
+    _sosprint_parse_causes,
+    _sosprint_parse_eliminated,
+    _sosprint_reference_cases_block,
+    _sosprint_resolved_reference_cases,
+    _sosprint_section,
+    _sosprint_settings_block,
+    _sosprint_touch_conversation,
+)
 
-def _sosprint_get_conversation(conv_id, user_id):
-    conn = get_db()
-    try:
-        conv = conn.execute(
-            "SELECT * FROM sos_print_conversations WHERE id=? AND user_id=?",
-            (conv_id, user_id)
-        ).fetchone()
-        if not conv:
-            return None, []
-        messages = conn.execute(
-            "SELECT * FROM sos_print_messages WHERE conversation_id=? ORDER BY created_at ASC, id ASC",
-            (conv_id,)
-        ).fetchall()
-        return conv, messages
-    finally:
-        conn.close()
-
-def _sosprint_touch_conversation(conv_id, **fields):
-    if not fields:
-        return
-    sets = ", ".join(f"{k}=?" for k in fields.keys())
-    values = list(fields.values()) + [conv_id]
-    conn = get_db()
-    try:
-        conn.execute(
-            f"UPDATE sos_print_conversations SET {sets}, updated_at=CURRENT_TIMESTAMP WHERE id=?",
-            values
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-def _sosprint_add_message(conv_id, role, content='', image_filename=None):
-    conn = get_db()
-    try:
-        conn.execute(
-            "INSERT INTO sos_print_messages (conversation_id, role, content, image_filename) VALUES (?, ?, ?, ?)",
-            (conv_id, role, content, image_filename)
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-def _sosprint_conversation_photos_b64(conv_id, max_photos=3):
-    conn = get_db()
-    try:
-        rows = conn.execute(
-            """SELECT image_filename FROM sos_print_messages
-               WHERE conversation_id=? AND image_filename IS NOT NULL
-               ORDER BY created_at DESC, id DESC LIMIT ?""",
-            (conv_id, max_photos)
-        ).fetchall()
-    finally:
-        conn.close()
-    out = []
-    for r in rows:
-        path = os.path.join(SOSPRINT_CONV_PHOTOS_DIR, r['image_filename'])
-        try:
-            with open(path, 'rb') as f:
-                out.append(base64.b64encode(f.read()).decode('utf-8'))
-        except Exception:
-            continue
-    return out
-
-def _sosprint_resolved_reference_cases(user_id, material, description, exclude_conv_id=None, limit=3):
-    conn = get_db()
-    try:
-        rows = conn.execute(
-            """SELECT id, material, description, resolution_note, last_causes, updated_at
-               FROM sos_print_conversations
-               WHERE user_id=? AND status='resolved' AND resolution_note != ''
-               ORDER BY updated_at DESC LIMIT 40""",
-            (user_id,)
-        ).fetchall()
-    finally:
-        conn.close()
-
-    stopwords = {
-        'le','la','les','de','des','du','un','une','et','ou','a','au','aux','en','sur','dans',
-        'mon','ma','mes','avec','pour','ce','cette','ces','est','sont','plus','moins','tres',
-        'the','and','with','for','has','have','this','that'
-    }
-    desc_words = {
-        re.sub(r'[^a-zà-ÿ0-9]', '', w.lower())
-        for w in (description or '').split()
-    }
-    desc_words = {w for w in desc_words if len(w) >= 4 and w not in stopwords}
-
-    scored = []
-    for r in rows:
-        if exclude_conv_id and r['id'] == exclude_conv_id:
-            continue
-        score = 0
-        if (r['material'] or '').upper() == (material or '').upper():
-            score += 2
-        row_words = {
-            re.sub(r'[^a-zà-ÿ0-9]', '', w.lower())
-            for w in (r['description'] or '').split()
-        }
-        score += len(desc_words & row_words)
-        if score > 0:
-            scored.append((score, r))
-
-    scored.sort(key=lambda x: x[0], reverse=True)
-    out = []
-    for score, r in scored[:limit]:
-        try:
-            causes = json.loads(r['last_causes']) if r['last_causes'] else []
-        except Exception:
-            causes = []
-        out.append({
-            "description": r['description'],
-            "resolution_note": r['resolution_note'],
-            "causes": causes,
-        })
-    return out
-
-def _sosprint_reference_cases_block(cases: list) -> str:
-    if not cases:
-        return ""
-    lines = []
-    for c in cases:
-        lines.append(
-            f"- Problem: \"{(c['description'] or '')[:150]}\" → Confirmed working fix: "
-            f"\"{(c['resolution_note'] or '')[:200]}\""
-        )
-    return (
-        "Reference: this user has already SOLVED these similar problems before (confirmed fixes, "
-        "not just hypotheses). Give them real weight if they match the current case:\n"
-        + "\n".join(lines) + "\n"
-    )
-
-def _sosprint_section(raw_text: str, start_marker: str, end_marker: str = None) -> str:
-    idx = raw_text.upper().find(start_marker.upper())
-    if idx == -1:
-        return ""
-    start = idx + len(start_marker)
-    if end_marker:
-        end_idx = raw_text.upper().find(end_marker.upper(), start)
-        if end_idx != -1:
-            return raw_text[start:end_idx].strip()
-    return raw_text[start:].strip()
-
-def _sosprint_parse_causes(block: str, max_items: int = 6) -> list:
-    causes = []
-    for line in block.splitlines():
-        line = line.strip()
-        line = re.sub(r'^[-*•]\s*', '', line)
-        line = re.sub(r'^\d+[\.\)]\s*', '', line)
-        line = line.strip(' .')
-        if line:
-            causes.append(line)
-        if len(causes) >= max_items:
-            break
-    return causes
-
-def _sosprint_parse_eliminated(block: str) -> list:
-    first_line = block.splitlines()[0].strip() if block.strip() else ''
-    if not first_line or first_line.strip('. ').lower() in ('none', 'aucun', 'aucune'):
-        return []
-    return [e.strip(' .') for e in first_line.split(',') if e.strip(' .')]
-
-# Réglages d'impression renseignés par l'utilisateur pour le S.O.S Print : valeurs bornées, champs connus uniquement
-SOSPRINT_SETTING_FIELDS = {
-    'nozzle_temp':         ('Nozzle temperature', '°C', 120, 450),
-    'bed_temp':            ('Bed temperature', '°C', 0, 150),
-    'layer_height':        ('Layer height', 'mm', 0.04, 1.5),
-    'print_speed':         ('Print speed', 'mm/s', 1, 1000),
-    'first_layer_speed':   ('First layer speed', 'mm/s', 1, 500),
-    'retraction_distance': ('Retraction distance', 'mm', 0, 20),
-    'retraction_speed':    ('Retraction speed', 'mm/s', 1, 200),
-    'fan_speed':           ('Cooling fan speed', '%', 0, 100),
-    'infill':              ('Infill density', '%', 0, 100),
-}
-
-
-def _sosprint_clean_settings(raw) -> dict:
-    if isinstance(raw, str):
-        try:
-            raw = json.loads(raw) if raw.strip() else {}
-        except Exception:
-            return {}
-    if not isinstance(raw, dict):
-        return {}
-    out = {}
-    for key, (_label, _unit, low, high) in SOSPRINT_SETTING_FIELDS.items():
-        value = raw.get(key)
-        if value in (None, ''):
-            continue
-        try:
-            num = float(str(value).replace(',', '.'))
-        except (TypeError, ValueError):
-            continue
-        if not (low <= num <= high):      # écarte aussi NaN et l'infini
-            continue
-        out[key] = int(num) if num == int(num) else round(num, 3)
-    notes = re.sub(r'\s+', ' ', str(raw.get('notes') or '')).strip()[:500]
-    if notes:
-        out['notes'] = notes
-    profile_name = re.sub(r'\s+', ' ', str(raw.get('profile_name') or '')).strip()[:120]
-    if profile_name:
-        out['profile_name'] = profile_name
-        profile_slicer = re.sub(r'[^A-Za-z0-9 _.-]+', '', str(raw.get('profile_slicer') or '')).strip()[:40]
-        if profile_slicer:
-            out['profile_slicer'] = profile_slicer
-        state = str(raw.get('profile_state') or '').strip().lower()
-        if state in ('unchanged', 'modified'):
-            out['profile_state'] = state
-            changes = re.sub(r'\s+', ' ', str(raw.get('profile_changes') or '')).strip()[:500]
-            if state == 'modified' and changes:
-                out['profile_changes'] = changes
-    return out
-
-
-def _sosprint_settings_block(settings) -> str:
-    cleaned = _sosprint_clean_settings(settings)
-    if not cleaned:
-        return ''
-    parts = [f"{label}: {cleaned[key]} {unit}" for key, (label, unit, _lo, _hi) in SOSPRINT_SETTING_FIELDS.items() if key in cleaned]
-    block = ""
-    if cleaned.get('profile_name'):
-        slicer_txt = f" ({cleaned['profile_slicer']})" if cleaned.get('profile_slicer') else ""
-        block += f"The user printed with the slicer profile \"{cleaned['profile_name']}\"{slicer_txt}. "
-        state = cleaned.get('profile_state')
-        if state == 'unchanged':
-            block += "They confirm they used it unchanged, so the values below are the real print settings.\n"
-        elif state == 'modified':
-            block += "They changed some settings compared to this profile; the values below are the ones they entered and are the real print settings."
-            if cleaned.get('profile_changes'):
-                block += f" What they say they changed: \"{cleaned['profile_changes']}\"."
-            block += "\n"
-        else:
-            block += ("They did not say whether they changed anything compared to this profile: the values below come from the profile "
-                      "and may differ from what was really used; if it matters, you may ask once whether some settings were modified.\n")
-    block += "Print settings used when the print failed (entered by the user, treat them as facts): " + \
-            ("; ".join(parts) if parts else "none given besides the remarks below") + ".\n"
-    if cleaned.get('notes'):
-        block += f"Other settings or remarks from the user: \"{cleaned['notes']}\"\n"
-    block += (
-        "Use these values to target your answer: name the exact slicer setting to change and a concrete value "
-        "to try, relative to the current value (for example \"nozzle 215 °C → 205 °C\"); do not suggest changing "
-        "a setting that already looks appropriate for this material; do not ask about a setting already given.\n"
-    )
-    return block
-
-
-def _sosprint_conversation_settings_block(conversation_id) -> str:
-    try:
-        conv, _msgs = _sosprint_get_conversation(int(conversation_id), session['user_id'])
-        if conv and 'print_settings' in conv.keys():
-            return _sosprint_settings_block(conv['print_settings'])
-    except Exception:
-        pass
-    return ''
 
 
 @app.route('/api/ollama/sos-print/questions', methods=['POST'])
@@ -29798,338 +27471,29 @@ def _refresh_stale_slicer_profiles(profiles):
     return updated_count, errors
 
 
-@app.route('/api/slicer-profiles', methods=['GET'])
-@login_required
-def api_slicer_profiles_list():
-    profiles = load_slicer_profiles()
-    _refresh_stale_slicer_profiles(profiles)  
-    newly_imported = []
-    try:
-        newly_imported = _autodetect_new_slicer_profiles(profiles, session['user_id'])  
-    except Exception as e:
-        app_logger.debug(f"[SlicerProfiles] Auto-détection silencieuse ignorée: {e}")
-    return jsonify({"profiles": profiles, "newly_imported": newly_imported}), 200
+# ── profils de slicer (import, affectation, détection automatique, synchronisation) : module séparé `slicer_profiles.py` (services fournis par `slicer_profiles.init(globals())`) ──
+import slicer_profiles
+from slicer_profiles import (
+    PROFILE_SYNC_MIN_INTERVAL,
+    SLICER_AUTODETECT_DIRS,
+    SLICER_CURA_FAMILY_DIRS,
+    SLICER_VERSIONED_USER_DIRS,
+    _autodetect_new_slicer_profiles,
+    _profile_sync_lock,
+    _scan_creality_print_dir,
+    _scan_versioned_user_dir,
+    _startup_sync_slicer_profiles,
+    _sync_slicer_profiles,
+    api_slicer_profiles_assign_printer,
+    api_slicer_profiles_assign_type,
+    api_slicer_profiles_autodetect,
+    api_slicer_profiles_delete,
+    api_slicer_profiles_import,
+    api_slicer_profiles_import_json,
+    api_slicer_profiles_list,
+    api_slicer_profiles_refresh,
+)
 
-
-@app.route('/api/slicer-profiles/import', methods=['POST'])
-@login_required
-def api_slicer_profiles_import():
-    files = request.files.getlist('profiles')
-    if not files:
-        return jsonify({"error": "Aucun fichier reçu"}), 400
-
-    printer_id_raw = request.form.get('printer_id')
-    printer_id = _safe_int(printer_id_raw)
-
-    profiles = load_slicer_profiles()
-    imported, errors = [], []
-
-    for file in files:
-        if not file or not file.filename:
-            continue
-        try:
-            content = file.read()
-            new_profiles = _parse_slicer_profile_file(file.filename, content)
-            for np in new_profiles:
-                if printer_id:
-                    np['printer_id'] = printer_id
-                    np['printer_match_confirmed'] = True
-            profiles.extend(new_profiles)
-            imported.extend(new_profiles)
-        except Exception as e:
-            errors.append({"filename": file.filename, "error": str(e)})
-
-    if imported:
-        if not printer_id:
-            _apply_printer_autoguess(imported, session['user_id'])
-        save_slicer_profiles(profiles)
-        app_logger.info(f"[SlicerProfiles] {len(imported)} profil(s) importé(s) manuellement")
-
-    if not imported:
-        return jsonify({"error": "Aucun profil valide importé", "errors": errors}), 400
-
-    return jsonify({"imported": imported, "errors": errors, "profiles": profiles}), 200
-
-
-@app.route('/api/slicer-profiles/import-json', methods=['POST'])
-@login_required
-def api_slicer_profiles_import_json():
-    """Édition serveur : importe un profil collé en texte (bouton « Copy raw JSON » du site Orca Cloud)."""
-    blocked = _server_edition_only()
-    if blocked:
-        return blocked
-    data = request.get_json(silent=True) or {}
-    text = str(data.get('json') or '').strip()
-    if not text or len(text) > 2_000_000:
-        return jsonify({"error": "JSON vide ou trop volumineux", "code": "invalid_json"}), 400
-    try:
-        raw = json.loads(text)
-    except ValueError:
-        return jsonify({"error": "JSON invalide", "code": "invalid_json"}), 400
-    if not isinstance(raw, dict):
-        return jsonify({"error": "Ce JSON n'est pas un profil", "code": "invalid_json"}), 400
-    raw_lower = {str(k).lower(): v for k, v in raw.items()}
-    profile_markers = ('layer_height', 'fill_density', 'sparse_infill_density', 'filament_type', 'nozzle_diameter',
-                       'nozzle_temperature', 'temperature', 'wall_loops', 'outer_wall_speed', 'perimeters',
-                       'bed_temperature', 'hot_plate_temp', 'support_enable', 'inherits')
-    if str(raw_lower.get('type') or '').lower() not in ('process', 'filament', 'machine', 'print') \
-            and not any(k in raw_lower for k in profile_markers):
-        return jsonify({"error": "Ce JSON ne ressemble pas à un profil de slicer", "code": "invalid_profile"}), 400
-    name = re.sub(r'\s+', ' ', str(raw.get('name') or '')).strip()[:120] or 'Orca Cloud profile'
-    filename = f"orca-cloud-{re.sub(r'[^A-Za-z0-9._-]+', '_', name)[:70]}.json"
-    try:
-        new_profiles = _parse_slicer_profile_file(filename, text.encode('utf-8'))
-    except Exception as e:
-        return jsonify({"error": f"Profil non reconnu : {e}", "code": "invalid_profile"}), 400
-    if not new_profiles:
-        return jsonify({"error": "Profil non reconnu", "code": "invalid_profile"}), 400
-    profiles = [p for p in load_slicer_profiles() if p.get('source_filename') != filename]
-    profiles.extend(new_profiles)
-    _apply_printer_autoguess(new_profiles, session['user_id'])
-    save_slicer_profiles(profiles)
-    app_logger.info(f"[SlicerProfiles] Profil collé importé ({len(new_profiles)})")
-    return jsonify({"imported": new_profiles, "profiles": profiles}), 200
-
-
-@app.route('/api/slicer-profiles/<profile_id>/printer', methods=['PATCH'])
-@login_required
-def api_slicer_profiles_assign_printer(profile_id):
-    data = request.json or {}
-    printer_id_raw = data.get('printer_id')
-    printer_id = _safe_int(printer_id_raw)
-
-    profiles = load_slicer_profiles()
-    target = None
-    for p in profiles:
-        if p.get('id') == profile_id:
-            p['printer_id'] = printer_id
-            p['printer_match_confirmed'] = bool(printer_id)
-            target = p
-            break
-    if not target:
-        return jsonify({"error": "Profil introuvable"}), 404
-
-    save_slicer_profiles(profiles)
-
-    if printer_id and target.get('compatible_printers'):
-        _remember_printer_alias(printer_id, session['user_id'], target['compatible_printers'])
-
-    return jsonify({"success": True, "profiles": profiles}), 200
-
-
-@app.route('/api/slicer-profiles/<profile_id>/type', methods=['PATCH'])
-@login_required
-def api_slicer_profiles_assign_type(profile_id):
-    data = request.json or {}
-    new_type = str(data.get('profile_type') or '').strip().lower()
-    if new_type not in ('printer', 'filament', 'process'):
-        return jsonify({"error": "Type de profil invalide (attendu : printer, filament ou process)"}), 400
-
-    profiles = load_slicer_profiles()
-    target = None
-    for p in profiles:
-        if p.get('id') == profile_id:
-            p['profile_type'] = new_type
-
-
-            p['profile_type_confirmed'] = True
-            target = p
-            break
-    if not target:
-        return jsonify({"error": "Profil introuvable"}), 404
-
-    save_slicer_profiles(profiles)
-    return jsonify({"success": True, "profiles": profiles}), 200
-
-
-@app.route('/api/slicer-profiles/<profile_id>', methods=['DELETE'])
-@login_required
-def api_slicer_profiles_delete(profile_id):
-    profiles = load_slicer_profiles()
-    new_profiles = [p for p in profiles if p.get('id') != profile_id]
-    if len(new_profiles) == len(profiles):
-        return jsonify({"error": "Profil introuvable"}), 404
-    save_slicer_profiles(new_profiles)
-    return jsonify({"success": True, "profiles": new_profiles}), 200
-
-
-SLICER_AUTODETECT_DIRS = {
-    'prusaslicer': ('PrusaSlicer', ['print', 'filament', 'printer']),
-    'superslicer': ('SuperSlicer', ['print', 'filament', 'printer']),
-}
-
-SLICER_VERSIONED_USER_DIRS = {
-    'orcaslicer':  ('OrcaSlicer\\user', ['process', 'filament', 'machine']),
-    'bambustudio': ('BambuStudio\\user', ['process', 'filament', 'machine']),
-    'qidistudio': ('QIDIStudio\\user', ['process', 'filament', 'machine']),
-}
-
-SLICER_CURA_FAMILY_DIRS = {
-    'cura': 'cura',
-    'anycubic_slicer_next': 'Anycubic Slicer Next',
-}
-
-
-def _scan_versioned_user_dir(base_path, subdirs, already_imported, imported_out, slicer_hint=None):
-    if not os.path.isdir(base_path):
-        return
-    try:
-        entries = os.listdir(base_path)
-    except Exception as e:
-        app_logger.debug(f"[SlicerProfiles] Dossier illisible {base_path}: {e}")
-        return
-    for entry in entries:
-        versioned = os.path.join(base_path, entry)
-        if not os.path.isdir(versioned):
-            continue
-        for sd in subdirs:
-            _scan_dir_for_profiles(os.path.join(versioned, sd), already_imported, imported_out, slicer_hint=slicer_hint,
-                                    type_hint=SLICER_SUBDIR_TYPE_HINTS.get(sd))
-
-
-def _scan_creality_print_dir(base_path, already_imported, imported_out):
-    if not os.path.isdir(base_path):
-        return
-    try:
-        versions = os.listdir(base_path)
-    except Exception as e:
-        app_logger.debug(f"[SlicerProfiles] Dossier illisible {base_path}: {e}")
-        return
-    for version in versions:
-        user_dir = os.path.join(base_path, version, 'user')
-        if not os.path.isdir(user_dir):
-            continue
-        try:
-            user_ids = os.listdir(user_dir)
-        except Exception as e:
-            app_logger.debug(f"[SlicerProfiles] Dossier illisible {user_dir}: {e}")
-            continue
-        for uid in user_ids:
-            uid_dir = os.path.join(user_dir, uid)
-            if not os.path.isdir(uid_dir):
-                continue
-            for sd in ('process', 'filament', 'machine'):
-                _scan_dir_for_profiles(os.path.join(uid_dir, sd), already_imported, imported_out, slicer_hint='creality_print',
-                                        type_hint=SLICER_SUBDIR_TYPE_HINTS.get(sd))
-
-
-@app.route('/api/slicer-profiles/refresh', methods=['POST'])
-@login_required
-def api_slicer_profiles_refresh():
-    profiles = load_slicer_profiles()
-    updated_count, errors = _refresh_stale_slicer_profiles(profiles)
-    return jsonify({"updated": updated_count, "total": len(profiles), "profiles": profiles, "errors": errors}), 200
-
-
-def _autodetect_new_slicer_profiles(profiles, user_id):
-    appdata = os.environ.get('APPDATA')
-    watch_dir = _get_profiles_watch_dir()
-    if not appdata and not watch_dir:
-        return []  
-
-    already_imported = {p.get('source_filename') for p in profiles}
-    imported = []
-
-    for slicer, (base_rel, subdirs) in (SLICER_AUTODETECT_DIRS.items() if appdata else ()):
-        base_path = os.path.join(appdata, base_rel)
-        for sd in subdirs:
-            _scan_dir_for_profiles(os.path.join(base_path, sd), already_imported, imported, slicer_hint=slicer,
-                                    type_hint=SLICER_SUBDIR_TYPE_HINTS.get(sd))
-
-    for slicer, (base_rel, subdirs) in (SLICER_VERSIONED_USER_DIRS.items() if appdata else ()):
-        _scan_versioned_user_dir(os.path.join(appdata, base_rel), subdirs, already_imported, imported, slicer_hint=slicer)
-
-    for slicer, folder_name in (SLICER_CURA_FAMILY_DIRS.items() if appdata else ()):
-        family_base = os.path.join(appdata, folder_name)
-        if not os.path.isdir(family_base):
-            continue
-        try:
-            versions = os.listdir(family_base)
-        except Exception as e:
-            versions = []
-            app_logger.debug(f"[SlicerProfiles] Dossier {folder_name} illisible: {e}")
-        for entry in versions:
-            versioned = os.path.join(family_base, entry)
-            if os.path.isdir(versioned):
-                _scan_dir_for_profiles(os.path.join(versioned, 'quality_changes'), already_imported, imported, slicer_hint=slicer,
-                                        type_hint='process')
-                _scan_dir_for_profiles(os.path.join(versioned, 'user'), already_imported, imported, slicer_hint=slicer)
-
-    if appdata:
-        _scan_creality_print_dir(os.path.join(appdata, 'Creality', 'Creality Print'), already_imported, imported)
-
-    if watch_dir:
-        _scan_watch_dir_for_profiles(watch_dir, already_imported, imported)
-
-    seen_cura_keys = set()
-    deduped = []
-    for p in imported:
-        if p.get('slicer') == 'cura':
-            key = (p.get('name', '').strip().lower(), p.get('profile_type'))
-            if key in seen_cura_keys:
-                continue
-            seen_cura_keys.add(key)
-        deduped.append(p)
-    imported = deduped
-
-    if imported:
-        _apply_printer_autoguess(imported, user_id)
-        profiles.extend(imported)
-        save_slicer_profiles(profiles)
-        app_logger.info(f"[SlicerProfiles] {len(imported)} profil(s) importé(s) automatiquement (tous slicers)")
-
-    return imported
-
-
-_profile_sync_lock = threading.Lock()
-_profile_sync_last = 0.0
-PROFILE_SYNC_MIN_INTERVAL = 15  
-
-
-def _sync_slicer_profiles(user_id, force=False):
-    global _profile_sync_last
-    result = {'updated': 0, 'imported': 0}
-    if user_id is None:
-        return result
-    now = time.time()
-    if not _profile_sync_lock.acquire(blocking=False):
-        return result   
-    try:
-        if not force and now - _profile_sync_last < PROFILE_SYNC_MIN_INTERVAL:
-            return result
-        _profile_sync_last = now
-        profiles = load_slicer_profiles()
-        updated, _errors = _refresh_stale_slicer_profiles(profiles)
-        imported = _autodetect_new_slicer_profiles(profiles, user_id)
-        result = {'updated': updated, 'imported': len(imported)}
-        if updated or imported:
-            app_logger.info(f"[SlicerProfiles] Synchronisation : {updated} actualisé(s), {len(imported)} importé(s)")
-    except Exception as e:
-        app_logger.warning(f"[SlicerProfiles] Synchronisation impossible : {e}")
-    finally:
-        _profile_sync_lock.release()
-    return result
-
-
-def _startup_sync_slicer_profiles():
-    try:
-        _sync_slicer_profiles(_get_primary_user_id(), force=True)
-    except Exception as e:
-        app_logger.debug(f"[SlicerProfiles] Synchronisation au démarrage ignorée : {e}")
-
-
-@app.route('/api/slicer-profiles/auto-detect', methods=['POST'])
-@login_required
-def api_slicer_profiles_autodetect():
-    try:
-        profiles = load_slicer_profiles()
-        if not os.environ.get('APPDATA') and not _get_profiles_watch_dir():
-            return jsonify({"error": "Aucun dossier de slicer à analyser : la détection automatique lit les dossiers du slicer sous Windows. Importez vos fichiers de profils ou indiquez un dossier de profils surveillé.", "code": "no_source"}), 400
-        imported = _autodetect_new_slicer_profiles(profiles, session['user_id'])
-        return jsonify({"imported": imported, "count": len(imported), "profiles": profiles}), 200
-    except Exception as e:
-        app_logger.error(f"[SlicerProfiles] Auto-détection échouée: {e}", exc_info=True)
-        return jsonify({"error": f"Échec de la détection automatique : {e}"}), 500
 
 
 def _analyze_mesh_for_recommendation(mesh):
@@ -30974,6 +28338,9 @@ def _compute_estimated_cost(file_path, weight_g_hint=None):
                                     conn.close()
                                 if row and row['power_w'] is not None:
                                     printer_power = float(row['power_w'])
+                                _measured_w = _measured_avg_power_w(printer_id)   # v1.0.4 : puissance réellement mesurée (prise connectée)
+                                if _measured_w:
+                                    printer_power = _measured_w
                         if printer_power is None:
                             printer_power = float(settings.get('print_cost_printer_power') or 120)
                         time_hours = time_seconds / 3600
@@ -31152,232 +28519,31 @@ def _get_manual_filament_slots(user_id):
     return slots
 
 
-TIGERTAG_FIREBASE_CONFIG_URL  = "https://tigertag-cdn.web.app/__/firebase/init.json"
-TIGERTAG_FIREBASE_REFRESH_URL = "https://securetoken.googleapis.com/v1/token"
-TIGERTAG_FIREBASE_LOOKUP_URL  = "https://identitytoolkit.googleapis.com/v1/accounts:lookup"
-TIGERTAG_FIRESTORE_BASE_URL   = "https://firestore.googleapis.com/v1"
-TIGERTAG_REFERENCES_BASE_URL  = "https://api.tigertag.io/api:tigertag"
-TIGERTAG_REFERENCES_TTL       = 86400  
+# ── inventaire TigerTag (session Firebase, références, étiquettes) : module séparé `tigertag.py` (services fournis par `tigertag.init(globals())`) ──
+import tigertag
+from tigertag import (
+    TIGERTAG_FIREBASE_CONFIG_URL,
+    TIGERTAG_FIREBASE_LOOKUP_URL,
+    TIGERTAG_FIREBASE_REFRESH_URL,
+    TIGERTAG_FIRESTORE_BASE_URL,
+    TIGERTAG_REFERENCES_BASE_URL,
+    TIGERTAG_REFERENCES_TTL,
+    _get_tigertag_slots,
+    _tigertag_ensure_firebase_config,
+    _tigertag_fetch_inventory,
+    _tigertag_firebase_config,
+    _tigertag_fs_value,
+    _tigertag_get_references,
+    _tigertag_get_valid_session,
+    _tigertag_parse_doc,
+    _tigertag_persist_refresh_token,
+    _tigertag_references_cache,
+    _tigertag_refresh_id_token,
+    _tigertag_resolve_reference,
+    _tigertag_token_cache,
+    _tigertag_token_cache_lock,
+)
 
-_tigertag_token_cache = {}
-_tigertag_token_cache_lock = threading.Lock()
-
-_tigertag_firebase_config = {}
-
-_tigertag_references_cache = {"data": None, "fetched_at": 0}
-
-
-def _tigertag_fs_value(field):
-    for ftype in ('stringValue', 'integerValue', 'doubleValue', 'booleanValue'):
-        if ftype in field:
-            val = field[ftype]
-            if ftype in ('integerValue', 'doubleValue'):
-                try:
-                    return int(val) if ftype == 'integerValue' else float(val)
-                except (TypeError, ValueError):
-                    return val
-            return val
-    if 'nullValue' in field:
-        return None
-    if 'mapValue' in field:
-        return {k: _tigertag_fs_value(v) for k, v in field['mapValue'].get('fields', {}).items()}
-    if 'arrayValue' in field:
-        return [_tigertag_fs_value(v) for v in field['arrayValue'].get('values', [])]
-    if 'timestampValue' in field:
-        return field['timestampValue']
-    return None
-
-
-def _tigertag_parse_doc(doc):
-    return {k: _tigertag_fs_value(v) for k, v in doc.get('fields', {}).items()}
-
-
-def _tigertag_ensure_firebase_config():
-    if _tigertag_firebase_config.get('project_id') and _tigertag_firebase_config.get('api_key'):
-        return
-    resp = requests.get(TIGERTAG_FIREBASE_CONFIG_URL, timeout=10)
-    resp.raise_for_status()
-    data = resp.json()
-    _tigertag_firebase_config['project_id'] = data.get('projectId', '')
-    _tigertag_firebase_config['api_key'] = data.get('apiKey', '')
-
-
-def _tigertag_refresh_id_token(refresh_token):
-    _tigertag_ensure_firebase_config()
-    url = f"{TIGERTAG_FIREBASE_REFRESH_URL}?key={_tigertag_firebase_config['api_key']}"
-    resp = requests.post(url, json={
-        "grant_type": "refresh_token", "refresh_token": refresh_token,
-    }, timeout=15)
-    resp.raise_for_status()
-    data = resp.json()
-    if 'id_token' not in data:
-        raise ValueError("Refresh token TigerTag invalide")
-    expires_at = time.time() + 3600
-    return data['id_token'], data['refresh_token'], expires_at, data.get('user_id')
-
-
-def _tigertag_get_valid_session(user_id):
-    with _tigertag_token_cache_lock:
-        cached = _tigertag_token_cache.get(user_id)
-
-    if cached and time.time() < cached['expires_at'] - 300:
-        return cached['id_token'], cached['firebase_uid']
-
-    if cached and cached.get('refresh_token'):
-        try:
-            id_token, refresh_token, expires_at, refreshed_uid = _tigertag_refresh_id_token(cached['refresh_token'])
-            firebase_uid = refreshed_uid or cached['firebase_uid']
-            with _tigertag_token_cache_lock:
-                _tigertag_token_cache[user_id] = {
-                    'id_token': id_token, 'refresh_token': refresh_token,
-                    'firebase_uid': firebase_uid, 'expires_at': expires_at,
-                }
-            _tigertag_persist_refresh_token(user_id, refresh_token)
-            return id_token, firebase_uid
-        except Exception as e:
-            app_logger.warning(f"[TigerTag] Refresh token échoué (user {user_id}), ré-authentification: {e}")
-
-    conn = get_db()
-    try:
-        account = conn.execute(
-            "SELECT email, password_encrypted, api_key FROM account_credentials WHERE user_id = ? AND platform = 'tigertag'",
-            (user_id,)
-        ).fetchone()
-    finally:
-        conn.close()
-
-    if not account or not account['api_key']:
-        raise ValueError("Compte TigerTag non configuré — relance la détection TigerTag Studio")
-
-    refresh_token = decrypt_account_secret(account['api_key'])
-    id_token, new_refresh_token, expires_at, firebase_uid = _tigertag_refresh_id_token(refresh_token)
-    if not firebase_uid:
-        raise ValueError("Session TigerTag Studio invalide, relance la détection")
-    with _tigertag_token_cache_lock:
-        _tigertag_token_cache[user_id] = {
-            'id_token': id_token, 'refresh_token': new_refresh_token,
-            'firebase_uid': firebase_uid, 'expires_at': expires_at,
-        }
-    _tigertag_persist_refresh_token(user_id, new_refresh_token)
-    return id_token, firebase_uid
-
-
-def _tigertag_persist_refresh_token(user_id, refresh_token):
-    try:
-        conn = get_db()
-        try:
-            conn.execute(
-                "UPDATE account_credentials SET api_key = ? WHERE user_id = ? AND platform = 'tigertag' AND api_key IS NOT NULL",
-                (encrypt_password(refresh_token), user_id)
-            )
-            conn.commit()
-        finally:
-            conn.close()
-    except Exception as e:
-        app_logger.warning(f"[TigerTag] Échec persistance refresh_token Google (user {user_id}): {e}")
-
-
-def _tigertag_get_references():
-    if _tigertag_references_cache['data'] and (time.time() - _tigertag_references_cache['fetched_at'] < TIGERTAG_REFERENCES_TTL):
-        return _tigertag_references_cache['data']
-
-    endpoints = {
-        'material': f"{TIGERTAG_REFERENCES_BASE_URL}/material/filament/get/all",
-        'brand': f"{TIGERTAG_REFERENCES_BASE_URL}/brand/get/all",
-    }
-    references = {}
-    for key, url in endpoints.items():
-        try:
-            resp = requests.get(url, timeout=10)
-            references[key] = resp.json() if resp.ok else None
-        except Exception as e:
-            app_logger.warning(f"[TigerTag] Référence '{key}' non récupérée: {e}")
-            references[key] = None
-
-    _tigertag_references_cache['data'] = references
-    _tigertag_references_cache['fetched_at'] = time.time()
-    return references
-
-
-def _tigertag_resolve_reference(references, ref_type, item_id):
-    if not item_id:
-        return ''
-    refs = references.get(ref_type)
-    if not refs:
-        return str(item_id)
-    target = str(item_id)
-    if isinstance(refs, list):
-        for item in refs:
-            if str(item.get('id', '')) == target:
-                return item.get('label') or item.get('name') or target
-    return target
-
-
-def _tigertag_fetch_inventory(user_id):
-    id_token, firebase_uid = _tigertag_get_valid_session(user_id)
-    url = (
-        f"{TIGERTAG_FIRESTORE_BASE_URL}/projects/{_tigertag_firebase_config['project_id']}"
-        f"/databases/(default)/documents/users/{firebase_uid}/inventory"
-    )
-    resp = requests.get(url, headers={"Authorization": f"Bearer {id_token}"}, timeout=15)
-
-    if resp.status_code in (401, 403):
-        with _tigertag_token_cache_lock:
-            _tigertag_token_cache.pop(user_id, None)
-        id_token, firebase_uid = _tigertag_get_valid_session(user_id)
-        resp = requests.get(url, headers={"Authorization": f"Bearer {id_token}"}, timeout=15)
-
-    resp.raise_for_status()
-    data = resp.json()
-
-    docs = data.get('documents', []) if data else []
-    spools = []
-    for doc in docs:
-        fields = _tigertag_parse_doc(doc)
-        if fields.get('deleted') is True:
-            continue
-        raw_uid = fields.get('uid') or doc['name'].split('/')[-1]
-        fields['uid'] = str(raw_uid).upper()
-        spools.append(fields)
-    return spools
-
-
-def _get_tigertag_slots(user_id):
-    slots = []
-    try:
-        spools = _tigertag_fetch_inventory(user_id)
-    except ValueError:
-        return slots
-    except Exception as e:
-        app_logger.warning(f"[TigerTag] Lecture inventaire impossible: {e}")
-        return slots
-
-    references = _tigertag_get_references() if spools else {}
-
-    for d in spools:
-        brand = _tigertag_resolve_reference(references, 'brand', d.get('id_brand'))
-        material = _tigertag_resolve_reference(references, 'material', d.get('id_material'))
-        color_hex = '#{:02x}{:02x}{:02x}'.format(
-            int(d.get('color_r', 0) or 0), int(d.get('color_g', 0) or 0), int(d.get('color_b', 0) or 0)
-        )
-        name = d.get('name') or d.get('color_name') or f"{brand} {material}".strip() or f"TigerTag {d['uid']}"
-        remaining = d.get('weight_available')
-        if remaining is None:
-            remaining = d.get('weight')
-
-        slots.append({
-            'source_type': 'tigertag',
-            'source_id': d['uid'],
-            'name': name,
-            'vendor': '' if str(brand).strip().isdigit() else (brand or ''), 
-            'color_name': d.get('color_name') or '',
-            'material': material or '',
-            'color_hex': color_hex,
-            'remaining_g': remaining,
-            'capacity_g': 1000,
-            'source_label': 'TigerTag',
-        })
-    return slots
 
 
 def _tigertag_lookup_email(id_token):
@@ -35456,6 +32622,34 @@ def api_remote_access_disable_fixed():
     return jsonify({"message": "Retour au mode rapide, connexion en cours…"}), 200
 
 
+print_session.init(globals())   # v1.0.4 : fournit ses services au module et enregistre ses routes
+
+share_link.init(globals())
+
+order_tracking.init(globals())
+
+globals().update(timelapse.init(globals()))
+
+mqtt_publisher.init(globals())
+
+tigertag.init(globals())
+
+push_notify.init(globals())
+
+auto_backup_routes.init(globals())
+
+feedback.init(globals())
+
+sosprint_helpers.init(globals())
+
+remote_instances.init(globals())
+
+slicer_profiles.init(globals())
+
+clients.init(globals())
+
+trash_routes.init(globals())
+
 if __name__ in ('__main__', 'stellio_main'):
     import sys, os, threading, time, urllib.request, json
 
@@ -35526,6 +32720,7 @@ if __name__ in ('__main__', 'stellio_main'):
             process_generation_queue()
             process_slice_estimate_queue()
             _start_timelapse_worker()
+            _start_v104_worker()
             _start_mqtt_publisher()
             threading.Thread(target=_startup_sync_slicer_profiles, daemon=True).start()
             threading.Thread(target=_auto_backup_scheduler, daemon=True).start()

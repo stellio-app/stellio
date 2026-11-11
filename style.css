@@ -573,6 +573,18 @@ body {
     z-index: 1;
 }
 
+/* Les icônes des boutons placés dans un groupe de champ ne sont pas des icônes de champ (ex. « Tester la prise ») */
+.input-group .btn i,
+.input-group .btn svg,
+.input-group label i {
+    position: static;
+    transform: none;
+    left: auto;
+    top: auto;
+    z-index: auto;
+    color: inherit;
+}
+
 .input-group input,
 .input-group select,
 .input-group textarea {
@@ -8820,6 +8832,21 @@ body.role-viewer .nav-btn[data-page="settings"] {
 .source-type-opt { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: calc(13px * var(--fs, 1)); }
 .source-type-opt:hover { background: var(--bg-tertiary); }
 .history-header-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.history-energy-chip { display: inline-flex; align-items: center; gap: 4px; font-size: calc(12px * var(--fs, 1)); color: var(--accent); margin-right: 8px; white-space: nowrap; }
+.printer-card-watts { margin-left: auto; color: var(--text-muted); white-space: nowrap; }
+.printer-card-watts.is-printing { color: var(--accent); font-weight: 600; }
+.printer-card-watts.is-error { color: var(--danger, #e85d75); }
+.energy-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.energy-kpi { border: 1px solid var(--border-color, rgba(255,255,255,.1)); border-radius: 12px; padding: 12px; text-align: center; }
+.energy-kpi-value { font-size: calc(20px * var(--fs, 1)); font-weight: 700; color: var(--accent); }
+.energy-kpi-label { font-size: calc(11px * var(--fs, 1)); color: var(--text-muted); margin-top: 2px; }
+.energy-h { margin: 14px 0 6px; font-size: calc(14px * var(--fs, 1)); }
+.energy-table-wrap { overflow-x: auto; }
+.energy-table { width: 100%; border-collapse: collapse; font-size: calc(12px * var(--fs, 1)); }
+.energy-table th, .energy-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border-color, rgba(255,255,255,.08)); white-space: nowrap; }
+.energy-table th { color: var(--text-muted); font-weight: 600; }
+.energy-table td.energy-file { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.energy-note { margin-top: 10px; font-size: calc(11px * var(--fs, 1)); color: var(--text-muted); }
 
 /* ===== Bilan : fréquence et navigation entre périodes ===== */
 .report-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
