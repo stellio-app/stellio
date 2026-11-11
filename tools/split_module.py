@@ -168,16 +168,12 @@ assert out.count(mk) == 1
 call = f"{name}.init(globals())" if not late_names else f"globals().update({name}.init(globals()))"
 out = out.replace(mk, f"\n{call}\n" + mk, 1)
 open('main.py', 'w', encoding='utf-8').write(out)
-# empaquetage : build-and-sign.yml copie le module dans app/ (Windows, macOS, Linux) et le déclare comme déclencheur
+# empaquetage : build-and-sign.yml (déclencheur + listes uniques de modules copiés dans app/ : Windows, macOS, Linux)
 y = open('build-and-sign.yml', encoding='utf-8').read()
-if f'{name}.py' not in y:
-    out_y = []
-    for line in y.split('\n'):
-        out_y.append(line)
-        if 'print_session.py' in line and ('Copy-Item' in line or line.strip().startswith(('cp ', "- '"))):
-            out_y.append(line.replace('print_session', name))
-    y = '\n'.join(out_y)
-    y = y.replace('"print_session.py","', f'"print_session.py","{name}.py","').replace('print_session.py ', f'print_session.py {name}.py ')
+if f"- '{name}.py'" not in y:
+    y = y.replace("      - 'check_deps.py'\n", f"      - 'check_deps.py'\n      - '{name}.py'\n", 1)
+    y = re.sub(r'(\$mods = @\([^)]*)\)', lambda m_: m_.group(1) + f',"{name}")', y)
+    y = re.sub(r'(MODULES="[^"]*)"', lambda m_: m_.group(1) + f' {name}"', y)
     open('build-and-sign.yml', 'w', encoding='utf-8').write(y)
 import subprocess
 r = subprocess.run([sys.executable, '-m', 'pyflakes', f'{name}.py'], capture_output=True, text=True).stdout

@@ -13,9 +13,6 @@ if sys.platform.startswith('linux'):
 
 
 def _portable_data_dir():
-    """Mode portable (Windows) : si un fichier « portable.flag » se trouve à côté de Stellio.exe, toutes les données
-    (base, réglages, journaux, bibliothèques ajoutées, profil du navigateur intégré) restent dans le dossier « data »
-    à côté de l'exécutable : on peut copier le dossier sur une clé USB. Sans ce fichier, rien ne change."""
     if os.name != 'nt':
         return None
     try:

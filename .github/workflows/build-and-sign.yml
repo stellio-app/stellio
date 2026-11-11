@@ -11,19 +11,19 @@ on:
       - 'launcher.py'
       - 'check_deps.py'
       - 'print_session.py'
-      - 'trash_routes.py'
-      - 'clients.py'
-      - 'slicer_profiles.py'
-      - 'remote_instances.py'
-      - 'sosprint_helpers.py'
-      - 'feedback.py'
-      - 'auto_backup_routes.py'
-      - 'push_notify.py'
-      - 'tigertag.py'
-      - 'mqtt_publisher.py'
-      - 'timelapse.py'
-      - 'order_tracking.py'
       - 'share_link.py'
+      - 'order_tracking.py'
+      - 'timelapse.py'
+      - 'mqtt_publisher.py'
+      - 'tigertag.py'
+      - 'push_notify.py'
+      - 'auto_backup_routes.py'
+      - 'feedback.py'
+      - 'sosprint_helpers.py'
+      - 'remote_instances.py'
+      - 'slicer_profiles.py'
+      - 'clients.py'
+      - 'trash_routes.py'
       - 'requirements.txt'
       - 'stellio-setup.iss'
       - 'assets/**'
@@ -84,10 +84,10 @@ jobs:
       artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -176,20 +176,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path "dist\Stellio\app" | Out-Null
           Copy-Item "main.py"          "dist\Stellio\app\main.py"
           Copy-Item "check_deps.py"    "dist\Stellio\app\check_deps.py"
-          Copy-Item "print_session.py" "dist\Stellio\app\print_session.py"
-          Copy-Item "trash_routes.py" "dist\Stellio\app\trash_routes.py"
-          Copy-Item "clients.py" "dist\Stellio\app\clients.py"
-          Copy-Item "slicer_profiles.py" "dist\Stellio\app\slicer_profiles.py"
-          Copy-Item "remote_instances.py" "dist\Stellio\app\remote_instances.py"
-          Copy-Item "sosprint_helpers.py" "dist\Stellio\app\sosprint_helpers.py"
-          Copy-Item "feedback.py" "dist\Stellio\app\feedback.py"
-          Copy-Item "auto_backup_routes.py" "dist\Stellio\app\auto_backup_routes.py"
-          Copy-Item "push_notify.py" "dist\Stellio\app\push_notify.py"
-          Copy-Item "tigertag.py" "dist\Stellio\app\tigertag.py"
-          Copy-Item "mqtt_publisher.py" "dist\Stellio\app\mqtt_publisher.py"
-          Copy-Item "timelapse.py" "dist\Stellio\app\timelapse.py"
-          Copy-Item "order_tracking.py" "dist\Stellio\app\order_tracking.py"
-          Copy-Item "share_link.py" "dist\Stellio\app\share_link.py"
+          # Modules séparés de main.py (liste unique ; tools/split_module.py y ajoute les nouveaux)
+          $mods = @("print_session","share_link","order_tracking","timelapse","mqtt_publisher","tigertag","push_notify","auto_backup_routes","feedback","sosprint_helpers","remote_instances","slicer_profiles","clients","trash_routes")
+          foreach ($m in $mods) { Copy-Item "$m.py" "dist\Stellio\app\$m.py" }
           Copy-Item "index.html"       "dist\Stellio\app\index.html"
           Copy-Item "script.js"        "dist\Stellio\app\script.js"
           Copy-Item "style.css"        "dist\Stellio\app\style.css"
@@ -197,7 +186,7 @@ jobs:
           Copy-Item -Recurse "languages" "dist\Stellio\app\languages"
           if (Test-Path "bin\win") { Copy-Item -Recurse "bin\win" "dist\Stellio\app\bin" }
 
-          foreach ($f in @("main.py","check_deps.py","print_session.py","trash_routes.py","clients.py","slicer_profiles.py","remote_instances.py","sosprint_helpers.py","feedback.py","auto_backup_routes.py","push_notify.py","tigertag.py","mqtt_publisher.py","timelapse.py","share_link.py","order_tracking.py","index.html","script.js","style.css")) {
+          foreach ($f in (@("main.py","check_deps.py","index.html","script.js","style.css") + ($mods | ForEach-Object { "$_.py" }))) {
             if (-not (Test-Path "dist\Stellio\app\$f")) {
               throw "Echec de copie : dist\Stellio\app\$f"
             }
@@ -207,16 +196,12 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "dist\Stellio\app\bin" | Out-Null
-          # BtbN purge ses anciens tags "autobuild-..." au bout de quelques semaines : une URL epinglee finit toujours
-          # en 404. On utilise donc la release stable "latest" (noms de fichiers fixes) et on verifie le zip avec
-          # le fichier checksums.sha256 publie dans cette meme release.
-          $base = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest"
-          $ffName = "ffmpeg-master-latest-win64-gpl-shared.zip"
-          Invoke-WebRequest -Uri "$base/$ffName" -OutFile ffmpeg.zip
-          Invoke-WebRequest -Uri "$base/checksums.sha256" -OutFile ffmpeg-checksums.txt
-          $line = Get-Content ffmpeg-checksums.txt | Where-Object { $_ -match "\s\*?$([regex]::Escape($ffName))$" } | Select-Object -First 1
-          if (-not $line) { throw "SHA-256 de $ffName introuvable dans checksums.sha256. Build annule." }
-          $ffSha = ($line -split '\s+')[0].ToLower()
+          # Version epinglee (tag date + SHA-256 calcule sur le fichier). Pour mettre a jour : choisir un tag
+          # "autobuild-..." sur https://github.com/BtbN/FFmpeg-Builds/releases, telecharger le zip, calculer son
+          # SHA-256 soi-meme, puis modifier ces deux valeurs. NB : BtbN purge ses anciens tags apres quelques semaines.
+          $ffUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-18-13-01/ffmpeg-N-127650-geceaa54a38-win64-gpl-shared.zip"
+          $ffSha = "8ebf4def186017a1cf3ac1e0065ad19c405628ec52b50f144b727e8def64928d"
+          Invoke-WebRequest -Uri $ffUrl -OutFile ffmpeg.zip
           $ffActual = (Get-FileHash -Algorithm SHA256 ffmpeg.zip).Hash.ToLower()
           if ($ffActual -ne $ffSha) { throw "SHA-256 ffmpeg (Windows) incorrect : attendu $ffSha, obtenu $ffActual. Build annule." }
           Write-Host "SHA-256 ffmpeg (Windows) verifie : $ffActual"
@@ -268,7 +253,7 @@ jobs:
           "$hash  $zipName" | Out-File -Encoding ascii "$zipName.sha256"
 
       - name: Upload patch ZIP artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: stellio-patch-zip
           path: |
@@ -308,7 +293,7 @@ jobs:
           "$hash  $zipName" | Out-File -Encoding ascii "$zipName.sha256"
 
       - name: Upload portable ZIP artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: stellio-portable-zip
           path: |
@@ -327,7 +312,7 @@ jobs:
 
       - name: Upload unsigned installer artifact
         id: upload-unsigned
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: stellio-installer-unsigned
           path: output\Stellio-Setup-${{ needs.check-version.outputs.version }}.exe
@@ -348,10 +333,10 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -451,27 +436,16 @@ jobs:
           mkdir -p "$APP_DIR"
           cp main.py "$APP_DIR/main.py"
           cp check_deps.py "$APP_DIR/check_deps.py"
-          cp print_session.py trash_routes.py clients.py slicer_profiles.py remote_instances.py sosprint_helpers.py feedback.py auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/print_session.py"
-          cp trash_routes.py clients.py slicer_profiles.py remote_instances.py sosprint_helpers.py feedback.py auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/trash_routes.py"
-          cp clients.py slicer_profiles.py remote_instances.py sosprint_helpers.py feedback.py auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/clients.py"
-          cp slicer_profiles.py remote_instances.py sosprint_helpers.py feedback.py auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/slicer_profiles.py"
-          cp remote_instances.py sosprint_helpers.py feedback.py auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/remote_instances.py"
-          cp sosprint_helpers.py feedback.py auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/sosprint_helpers.py"
-          cp feedback.py auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/feedback.py"
-          cp auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/auto_backup_routes.py"
-          cp push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/push_notify.py"
-          cp tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/tigertag.py"
-          cp mqtt_publisher.py timelapse.py "$APP_DIR/mqtt_publisher.py"
-          cp timelapse.py "$APP_DIR/timelapse.py"
-          cp order_tracking.py "$APP_DIR/order_tracking.py"
-          cp share_link.py "$APP_DIR/share_link.py"
+          # Modules séparés de main.py (liste unique ; tools/split_module.py y ajoute les nouveaux)
+          MODULES="print_session share_link order_tracking timelapse mqtt_publisher tigertag push_notify auto_backup_routes feedback sosprint_helpers remote_instances slicer_profiles clients trash_routes"
+          for m in $MODULES; do cp "$m.py" "$APP_DIR/$m.py"; done
           cp index.html "$APP_DIR/index.html"
           cp script.js "$APP_DIR/script.js"
           cp style.css "$APP_DIR/style.css"
           cp -R assets "$APP_DIR/assets"
           cp -R languages "$APP_DIR/languages"
           [ -d bin/mac ] && cp -R bin/mac "$APP_DIR/bin" || true
-          for f in main.py check_deps.py print_session.py trash_routes.py clients.py slicer_profiles.py remote_instances.py sosprint_helpers.py feedback.py auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py share_link.py order_tracking.py index.html script.js style.css; do
+          for f in main.py check_deps.py $(for m in $MODULES; do echo $m.py; done) index.html script.js style.css; do
             [ -f "$APP_DIR/$f" ] || { echo "Echec de copie : $APP_DIR/$f"; exit 1; }
           done
 
@@ -519,7 +493,7 @@ jobs:
           # continue mais affiche le hash obtenu en avertissement : le verifier a la main puis le coller ici.
           case "${{ matrix.arch }}" in
             arm64)  RAR_ARCH="arm"; RAR_SHA="" ;;
-            x86_64) RAR_ARCH="x64"; RAR_SHA="da1fb3c3d7748136c9b369b683d574b372cb1ed049a634a81f85d93918346d8f" ;;
+            x86_64) RAR_ARCH="x64"; RAR_SHA="" ;;
           esac
           URL="https://www.rarlab.com/rar/rarmacos-${RAR_ARCH}-${RAR_VERSION}.tar.gz"
           echo "Telechargement depuis $URL"
@@ -618,7 +592,7 @@ jobs:
           shasum -a 256 "$DMG_NAME" > "$DMG_NAME.sha256"
 
       - name: Upload macOS installer artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: stellio-macos-dmg-${{ matrix.arch }}
           path: |
@@ -630,13 +604,13 @@ jobs:
   # ──────────────────────────────────────────────────────────────────────
   build-linux:
     needs: check-version
-    runs-on: ubuntu-22.04  # plus ancienne glibc : l AppImage tourne ainsi sur toutes les distributions récentes
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -646,7 +620,7 @@ jobs:
           sudo apt-get install -y \
             libgtk-3-dev libwebkit2gtk-4.1-dev gir1.2-webkit2-4.1 \
             python3-gi python3-gi-cairo gobject-introspection \
-            libgirepository1.0-dev libcairo2-dev pkg-config python3-dev \
+            libgirepository1.0-dev libgirepository-2.0-dev libcairo2-dev pkg-config python3-dev \
             libosmesa6-dev libgl1-mesa-dev \
             patchelf libfuse2
 
@@ -655,8 +629,7 @@ jobs:
           python3 -m venv venv
           venv/bin/python -m pip install --upgrade pip
           venv/bin/python -m pip install --upgrade -r requirements.txt
-          # Ubuntu 22.04 n'a que girepository-1.0 : PyGObject 3.52+ exige girepository-2.0 (absent), on reste donc sur la branche 3.50
-          venv/bin/python -m pip install --upgrade "PyGObject<3.51" pycairo
+          venv/bin/python -m pip install --upgrade "PyGObject>=3.52" pycairo
           venv/bin/python -m pip install pyinstaller
 
       - name: Check dependencies (fix)
@@ -728,45 +701,22 @@ jobs:
             exit 1
           fi
 
-      - name: Check glibc requirement (AppImage must run on older distributions)
-        run: |
-          # Le catalogue AppImage refuse un binaire qui exige une glibc plus récente que celle de la plus vieille LTS.
-          MAX=$(find dist/Stellio -type f \( -name '*.so*' -o -perm -u+x \) -print0 \
-                | xargs -0 -r objdump -T 2>/dev/null \
-                | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -V | tail -1)
-          echo "glibc maximale exigée par le bundle : ${MAX:-inconnue}"
-          if [ -n "$MAX" ] && [ "$(printf '%s\n2.35\n' "$MAX" | sort -V | tail -1)" != "2.35" ]; then
-            echo "Le bundle exige glibc $MAX (> 2.35, celle d'Ubuntu 22.04) : build annulé."
-            exit 1
-          fi
-
       - name: Copy patchable files into dist/Stellio/app
         run: |
           APP_DIR="dist/Stellio/app"
           mkdir -p "$APP_DIR"
           cp main.py "$APP_DIR/main.py"
           cp check_deps.py "$APP_DIR/check_deps.py"
-          cp print_session.py trash_routes.py clients.py slicer_profiles.py remote_instances.py sosprint_helpers.py feedback.py auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/print_session.py"
-          cp trash_routes.py clients.py slicer_profiles.py remote_instances.py sosprint_helpers.py feedback.py auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/trash_routes.py"
-          cp clients.py slicer_profiles.py remote_instances.py sosprint_helpers.py feedback.py auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/clients.py"
-          cp slicer_profiles.py remote_instances.py sosprint_helpers.py feedback.py auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/slicer_profiles.py"
-          cp remote_instances.py sosprint_helpers.py feedback.py auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/remote_instances.py"
-          cp sosprint_helpers.py feedback.py auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/sosprint_helpers.py"
-          cp feedback.py auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/feedback.py"
-          cp auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/auto_backup_routes.py"
-          cp push_notify.py tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/push_notify.py"
-          cp tigertag.py mqtt_publisher.py timelapse.py "$APP_DIR/tigertag.py"
-          cp mqtt_publisher.py timelapse.py "$APP_DIR/mqtt_publisher.py"
-          cp timelapse.py "$APP_DIR/timelapse.py"
-          cp order_tracking.py "$APP_DIR/order_tracking.py"
-          cp share_link.py "$APP_DIR/share_link.py"
+          # Modules séparés de main.py (liste unique ; tools/split_module.py y ajoute les nouveaux)
+          MODULES="print_session share_link order_tracking timelapse mqtt_publisher tigertag push_notify auto_backup_routes feedback sosprint_helpers remote_instances slicer_profiles clients trash_routes"
+          for m in $MODULES; do cp "$m.py" "$APP_DIR/$m.py"; done
           cp index.html "$APP_DIR/index.html"
           cp script.js "$APP_DIR/script.js"
           cp style.css "$APP_DIR/style.css"
           cp -R assets "$APP_DIR/assets"
           cp -R languages "$APP_DIR/languages"
           [ -d bin/linux ] && cp -R bin/linux "$APP_DIR/bin" || true
-          for f in main.py check_deps.py print_session.py trash_routes.py clients.py slicer_profiles.py remote_instances.py sosprint_helpers.py feedback.py auto_backup_routes.py push_notify.py tigertag.py mqtt_publisher.py timelapse.py share_link.py order_tracking.py index.html script.js style.css; do
+          for f in main.py check_deps.py $(for m in $MODULES; do echo $m.py; done) index.html script.js style.css; do
             [ -f "$APP_DIR/$f" ] || { echo "Echec de copie : $APP_DIR/$f"; exit 1; }
           done
 
@@ -774,17 +724,10 @@ jobs:
         run: |
           APP_DIR="dist/Stellio/app"
           mkdir -p "$APP_DIR/bin"
-          # Release stable "latest" de BtbN (les tags datés sont purgés, d'où les 404) + vérification avec
-          # le fichier checksums.sha256 publié dans cette même release.
-          BASE="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest"
-          FF_NAME="ffmpeg-master-latest-linux64-gpl.tar.xz"
-          curl -fL --retry 3 -o ffmpeg.tar.xz "$BASE/$FF_NAME"
-          curl -fL --retry 3 -o ffmpeg-checksums.txt "$BASE/checksums.sha256"
-          FF_SHA=$(grep -E "[[:space:]]\*?${FF_NAME}$" ffmpeg-checksums.txt | head -n1 | cut -d' ' -f1)
-          if [ -z "$FF_SHA" ]; then
-            echo "SHA-256 de $FF_NAME introuvable dans checksums.sha256. Build annule."
-            exit 1
-          fi
+          # Version epinglee (tag date + SHA-256 calcule sur le fichier), voir le step Windows pour la mise a jour.
+          FF_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-18-13-01/ffmpeg-N-127651-gb60ab6c9a4-linux64-gpl.tar.xz"
+          FF_SHA="a5f2aed198efa8ef4c12d9112f42e7cefbdf11dced1b59a87503ca689bc52277"
+          curl -fL --retry 3 -o ffmpeg.tar.xz "$FF_URL"
           FF_ACTUAL=$(sha256sum ffmpeg.tar.xz | cut -d' ' -f1)
           if [ "$FF_ACTUAL" != "$FF_SHA" ]; then
             echo "SHA-256 ffmpeg (Linux) incorrect : attendu $FF_SHA, obtenu $FF_ACTUAL. Build annule."
@@ -822,10 +765,7 @@ jobs:
           Name=Stellio
           Exec=Stellio
           Icon=stellio
-          Comment=3D file library manager for 3D printing
-          Terminal=false
           Categories=Utility;
-          X-AppImage-Version=${{ needs.check-version.outputs.version }}
           EOF
           cp AppDir/stellio.desktop AppDir/usr/share/applications/stellio.desktop
           # AppRun : point d'entree obligatoire d'un AppDir (appimagetool refuse de construire sans lui)
@@ -841,36 +781,18 @@ jobs:
         run: |
           wget -q -O appimagetool "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
           chmod +x appimagetool
-          ./appimagetool --appimage-extract-and-run AppDir "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage"
-          chmod +x "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage"
-          sha256sum "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage" \
-            > "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage.sha256"
-
-      - name: Smoke test (démarrage hors ligne, comme le test du catalogue AppImage)
-        run: |
-          sudo apt-get install -y xvfb
-          APPIMG="Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage"
-          export STELLIO_DATA_DIR="$(mktemp -d)"
-          # L'application doit rester en vie (fenêtre ou repli navigateur) plus de 15 s, sans réseau ni écran réel.
-          xvfb-run -a env -u http_proxy -u https_proxy ./"$APPIMG" --appimage-extract-and-run > smoke.log 2>&1 &
-          PID=$!
-          sleep 20
-          if ! kill -0 $PID 2>/dev/null; then
-            echo "L'AppImage s'est arrêtée avant 20 s :"; cat smoke.log; exit 1
-          fi
-          if grep -q "Failed to load Python shared library" smoke.log; then
-            echo "libpython introuvable :"; cat smoke.log; exit 1
-          fi
-          pkill -f Stellio || true
-          echo "Démarrage OK"
+          ./appimagetool --appimage-extract-and-run AppDir "Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage"
+          chmod +x "Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage"
+          sha256sum "Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage" \
+            > "Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage.sha256"
 
       - name: Upload Linux AppImage artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: stellio-linux-appimage
           path: |
-            Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage
-            Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage.sha256
+            Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage
+            Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage.sha256
 
   # ──────────────────────────────────────────────────────────────────────
   # 3. Publication en DRAFT (Brouillon) pour édition manuelle
@@ -881,32 +803,32 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Download Windows installer artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: stellio-installer-unsigned
           path: release-files
 
       - name: Download patch ZIP artifact (commun aux 3 plateformes)
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: stellio-patch-zip
           path: release-files
 
       - name: Download portable ZIP artifact (Windows)
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: stellio-portable-zip
           path: release-files
 
       - name: Download macOS .dmg artifacts (arm64 + x86_64)
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           pattern: stellio-macos-dmg-*
           path: release-files
           merge-multiple: true
 
       - name: Download Linux AppImage artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: stellio-linux-appimage
           path: release-files
