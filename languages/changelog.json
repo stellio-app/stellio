@@ -1,5 +1,58 @@
 [
   {
+    "version": "1.0.5",
+    "items": {
+      "fr": [
+        "Architecture : le code de main.py est réparti en 14 modules dans le dossier modules/ (impression, prise connectée, timelapse, MQTT, notifications, partage, suivi client, sauvegarde, signalements, instances distantes, profils de slicer, clients, corbeille, TigerTag, S.O.S Print), sans changement de fonctionnement",
+        "Sécurité : les fichiers de code et de configuration (.py, .sh, .yml, .db…) ne sont plus accessibles depuis le navigateur",
+        "Correction : icône de la prise mal placée dans la carte imprimante",
+        "Spoolman : Stellio n'écrit plus la consommation dans Spoolman (elle était débitée deux fois : à l'envoi au slicer, puis après l'impression par Spoolman)"
+      ],
+      "en": [
+        "Architecture: main.py is split into 14 modules in the modules/ folder (printing, smart plug, timelapse, MQTT, notifications, sharing, customer tracking, backup, feedback, remote instances, slicer profiles, clients, trash, TigerTag, S.O.S Print), with no change in behaviour",
+        "Security: code and configuration files (.py, .sh, .yml, .db…) are no longer reachable from the browser",
+        "Fix: misplaced plug icon in the printer card",
+        "Spoolman: Stellio no longer writes consumption to Spoolman (spools were debited twice: when sending to the slicer, then again by Spoolman after the print)"
+      ],
+      "de": [
+        "Architektur: main.py ist in 14 Module im Ordner modules/ aufgeteilt (Druck, smarte Steckdose, Zeitraffer, MQTT, Benachrichtigungen, Teilen, Kundenverfolgung, Backup, Feedback, Remote-Instanzen, Slicer-Profile, Kunden, Papierkorb, TigerTag, S.O.S Print), ohne Funktionsänderung",
+        "Sicherheit: Code- und Konfigurationsdateien (.py, .sh, .yml, .db …) sind vom Browser aus nicht mehr erreichbar",
+        "Korrektur: falsch platziertes Steckdosen-Symbol in der Druckerkarte",
+        "Spoolman: Stellio schreibt den Verbrauch nicht mehr in Spoolman (Spulen wurden doppelt abgebucht: beim Senden an den Slicer und nach dem Druck durch Spoolman)"
+      ],
+      "es": [
+        "Arquitectura: main.py se reparte en 14 módulos dentro de la carpeta modules/ (impresión, enchufe inteligente, timelapse, MQTT, notificaciones, compartir, seguimiento de clientes, copia de seguridad, comentarios, instancias remotas, perfiles de slicer, clientes, papelera, TigerTag, S.O.S Print), sin cambios de funcionamiento",
+        "Seguridad: los archivos de código y configuración (.py, .sh, .yml, .db…) ya no son accesibles desde el navegador",
+        "Corrección: icono del enchufe mal colocado en la tarjeta de la impresora",
+        "Spoolman: Stellio ya no escribe el consumo en Spoolman (la bobina se descontaba dos veces: al enviar al slicer y después de imprimir, por Spoolman)"
+      ],
+      "pt": [
+        "Arquitetura: o main.py foi dividido em 14 módulos na pasta modules/ (impressão, tomada inteligente, timelapse, MQTT, notificações, partilha, acompanhamento de clientes, cópia de segurança, comentários, instâncias remotas, perfis de slicer, clientes, reciclagem, TigerTag, S.O.S Print), sem alteração de funcionamento",
+        "Segurança: os ficheiros de código e configuração (.py, .sh, .yml, .db…) já não são acessíveis a partir do navegador",
+        "Correção: ícone da tomada mal posicionado no cartão da impressora",
+        "Spoolman: o Stellio deixou de escrever o consumo no Spoolman (a bobina era debitada duas vezes: ao enviar ao slicer e depois da impressão, pelo Spoolman)"
+      ],
+      "it": [
+        "Architettura: main.py è suddiviso in 14 moduli nella cartella modules/ (stampa, presa smart, timelapse, MQTT, notifiche, condivisione, tracciamento clienti, backup, segnalazioni, istanze remote, profili slicer, clienti, cestino, TigerTag, S.O.S Print), senza cambiamenti di funzionamento",
+        "Sicurezza: i file di codice e configurazione (.py, .sh, .yml, .db…) non sono più raggiungibili dal browser",
+        "Correzione: icona della presa mal posizionata nella scheda della stampante",
+        "Spoolman: Stellio non scrive più il consumo in Spoolman (la bobina veniva scalata due volte: all'invio allo slicer e dopo la stampa da Spoolman)"
+      ],
+      "zh": [
+        "架构：main.py 已拆分为 modules/ 文件夹中的 14 个模块（打印、智能插座、延时摄影、MQTT、通知、分享、客户跟踪、备份、反馈、远程实例、切片配置、客户、回收站、TigerTag、S.O.S Print），功能不变",
+        "安全：代码和配置文件（.py、.sh、.yml、.db 等）不再能从浏览器访问",
+        "修复：打印机卡片中智能插座图标位置错误",
+        "Spoolman：Stellio 不再向 Spoolman 写入耗材消耗（此前料盘会被扣减两次：发送到切片软件时一次，打印后 Spoolman 又扣一次）"
+      ],
+      "ja": [
+        "アーキテクチャ：main.py を modules/ フォルダ内の 14 モジュール（印刷、スマートプラグ、タイムラプス、MQTT、通知、共有、顧客追跡、バックアップ、フィードバック、リモートインスタンス、スライサープロファイル、顧客、ゴミ箱、TigerTag、S.O.S Print）に分割しました。動作に変更はありません",
+        "セキュリティ：コードや設定ファイル（.py、.sh、.yml、.db など）にブラウザからアクセスできなくなりました",
+        "修正：プリンターカードでスマートプラグのアイコンの位置がずれる問題",
+        "Spoolman：Stellio は Spoolman に消費量を書き込まなくなりました（スライサーへの送信時と、印刷後の Spoolman により二重に差し引かれていました）"
+      ]
+    }
+  },
+  {
     "version": "1.0.4",
     "items": {
       "fr": [

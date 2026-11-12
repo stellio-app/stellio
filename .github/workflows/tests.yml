@@ -9,5 +9,5 @@ jobs:
         with: { python-version: '3.11' }
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
-      - run: pip install pytest numpy
+      - run: pip install pytest numpy requests pillow flask
       - run: python -m pytest tests -q

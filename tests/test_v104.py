@@ -14,7 +14,7 @@ from PIL import Image
 
 import importlib.util
 
-PS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'print_session.py')
+PS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'modules', 'print_session.py')
 
 
 def _load_module():

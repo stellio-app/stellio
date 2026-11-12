@@ -13,6 +13,9 @@ if sys.platform.startswith('linux'):
 
 
 def _portable_data_dir():
+    """Mode portable (Windows) : si un fichier « portable.flag » se trouve à côté de Stellio.exe, toutes les données
+    (base, réglages, journaux, bibliothèques ajoutées, profil du navigateur intégré) restent dans le dossier « data »
+    à côté de l'exécutable : on peut copier le dossier sur une clé USB. Sans ce fichier, rien ne change."""
     if os.name != 'nt':
         return None
     try:
@@ -24,6 +27,7 @@ def _portable_data_dir():
 
 
 def _early_extra_libs_dir():
+    # Même logique que get_data_path() (défini plus bas), sans créer de dossier.
     env_override = os.environ.get('STELLIO_DATA_DIR')
     if env_override:
         base = env_override
@@ -38,6 +42,10 @@ def _early_extra_libs_dir():
 
 _EXTRA_LIBS_DIR = _early_extra_libs_dir()
 
+# ── Splash précoce ───────────────────────────────────────────────────────────
+# Affiché dès les premières millisecondes, AVANT la vérification des modules et les gros
+# imports (trimesh, numpy, pyrender...). Il tourne dans son propre thread : tous les objets Tk y
+# sont créés ET détruits, pendant que le reste du démarrage continue dans le thread principal.
 import threading as _early_threading
 import queue as _early_queue
 
@@ -48,7 +56,7 @@ def _early_splash_wanted():
     if __name__ not in ('__main__', 'stellio_main'):
         return False
     if sys.platform == 'darwin':
-        return False  
+        return False  # conflit Tk/Cocoa avec pywebview : pas de splash Tkinter sur macOS
     if os.environ.get('STELLIO_HEADLESS', '').strip().lower() in ('1', 'true', 'yes'):
         return False
     if sys.platform.startswith('linux') and not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
@@ -97,6 +105,7 @@ def _early_splash_texts(base_dir, data_dir):
 
 
 def _early_splash_theme(data_dir):
+    """Couleurs du splash : reprises de la palette choisie dans l'application (enregistrées dans app_settings.json par l'interface)."""
     import json as _json, re as _re
     theme = {'bg': '#1a1d23', 'fg': '#e6e6e6', 'muted': '#9ca3af', 'trough': '#2a2f3a', 'accent': '#4ea1d3'}
     try:
@@ -173,6 +182,8 @@ def _early_splash_run(q, ready, base_dir, data_dir):
     except Exception:
         pass
     finally:
+        # Tk exige que ses objets soient détruits ET libérés dans le thread qui les a créés,
+        # sinon crash « Tcl_AsyncDelete: async handler deleted by the wrong thread » à la sortie.
         try:
             if root is not None:
                 root.destroy()
@@ -223,6 +234,9 @@ if _early_splash_wanted():
     except Exception:
         _EARLY_SPLASH = None
 # ─────────────────────────────────────────────────────────────────────────────
+
+# Version empaquetée (PyInstaller) : les modules réparés au lancement sont lus depuis ce dossier.
+# Ajouté EN FIN de sys.path : un module déjà embarqué dans l'exécutable reste prioritaire.
 if getattr(sys, 'frozen', False) and os.path.isdir(_EXTRA_LIBS_DIR) and _EXTRA_LIBS_DIR not in sys.path:
     sys.path.append(_EXTRA_LIBS_DIR)
 
@@ -4876,6 +4890,17 @@ def login_required(f):
 STELLIO_COMPANION_APK_URL = "https://www.github.com/stellio-app/stellio/raw/main/apk/stellio.apk"
 
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path='')
+
+
+_STATIC_BLOCKED_EXT = ('.py', '.pyc', '.sh', '.iss', '.bat', '.plist', '.yml', '.yaml', '.spec', '.key', '.db', '.sqlite')
+
+
+@app.before_request
+def _block_source_files():
+    """Le dossier de l'application est servi comme statique : on ne publie ni le code, ni les scripts, ni les données."""
+    p = (request.path or '').lower()
+    if p.endswith(_STATIC_BLOCKED_EXT) or p.startswith('/modules/') or p.startswith('/tests/') or p.startswith('/tools/'):
+        return jsonify({"error": "not found"}), 404
 _SECRET_KEY_FILE = os.path.join(DATA_DIR, 'flask_secret.key')
 if os.path.exists(_SECRET_KEY_FILE):
     with open(_SECRET_KEY_FILE, 'r') as _f:
@@ -8113,9 +8138,37 @@ def api_analyze_file():
 
     return jsonify({"success": True, "metadata": metadata, "cached": False})
 
+INTERFACE_DIR = os.path.join(BASE_DIR, 'interface')
+
+
+def _ui_file(name):
+    """Fichier de l'interface : dans interface/, sinon à la racine (ancienne installation)."""
+    p = os.path.join(INTERFACE_DIR, name)
+    return p if os.path.exists(p) else os.path.join(BASE_DIR, name)
+
+
 @app.route('/')
+@app.route('/index.html')
 def index():
-    return send_file(os.path.join(BASE_DIR, 'index.html'))
+    return send_file(_ui_file('index.html'))
+
+
+@app.route('/script.js')
+def ui_script():
+    return send_file(_ui_file('script.js'), mimetype='application/javascript')
+
+
+@app.route('/style.css')
+def ui_style():
+    return send_file(_ui_file('style.css'), mimetype='text/css')
+
+
+@app.route('/sw.js')
+def ui_service_worker():
+    resp = send_file(_ui_file('sw.js'), mimetype='application/javascript', conditional=False)
+    resp.headers['Service-Worker-Allowed'] = '/'
+    resp.headers['Cache-Control'] = 'no-cache'
+    return resp
 
 
 _SUPPORTED_UI_LANGS = ('fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja')
@@ -12042,9 +12095,9 @@ def require_peer_key(f):
     return wrapper
 
 
-# ── instances Stellio distantes (liste, envoi de fichiers, découverte du réseau local) : module séparé `remote_instances.py` (services fournis par `remote_instances.init(globals())`) ──
-import remote_instances
-from remote_instances import (
+# ── instances Stellio distantes (liste, envoi de fichiers, découverte du réseau local) : module séparé `modules/remote_instances.py` (services fournis par `remote_instances.init(globals())`) ──
+from modules import remote_instances
+from modules.remote_instances import (
     _LAN_SCAN_CACHE,
     _LAN_SCAN_CACHE_SECONDS,
     _is_lan_request,
@@ -12855,9 +12908,9 @@ def _trash_list_for_user(uid):
     return out
 
 
-# ── corbeille (liste, restauration, purge) : module séparé `trash_routes.py` (services fournis par `trash_routes.init(globals())`) ──
-import trash_routes
-from trash_routes import (
+# ── corbeille (liste, restauration, purge) : module séparé `modules/trash_routes.py` (services fournis par `trash_routes.init(globals())`) ──
+from modules import trash_routes
+from modules.trash_routes import (
     _trash_parse_key,
     _trash_purge_batch,
     _trash_purge_key,
@@ -17645,9 +17698,9 @@ def _server_t(key, default):
     return data.get(key) or default
 
 
-# ── notifications push (ntfy, Telegram, Discord, webhook) : module séparé `push_notify.py` (services fournis par `push_notify.init(globals())`) ──
-import push_notify
-from push_notify import (
+# ── notifications push (ntfy, Telegram, Discord, webhook) : module séparé `modules/push_notify.py` (services fournis par `push_notify.init(globals())`) ──
+from modules import push_notify
+from modules.push_notify import (
     _push_deliver,
     _push_http_post,
     _push_notify_async,
@@ -20451,9 +20504,9 @@ def _resolve_backup_file(name):
     return path if os.path.isfile(path) else None
 
 
-# ── sauvegarde automatique : routes de configuration, liste, restauration : module séparé `auto_backup_routes.py` (services fournis par `auto_backup_routes.init(globals())`) ──
-import auto_backup_routes
-from auto_backup_routes import (
+# ── sauvegarde automatique : routes de configuration, liste, restauration : module séparé `modules/auto_backup_routes.py` (services fournis par `auto_backup_routes.init(globals())`) ──
+from modules import auto_backup_routes
+from modules.auto_backup_routes import (
     api_auto_backup_delete,
     api_auto_backup_get_config,
     api_auto_backup_list,
@@ -20598,9 +20651,9 @@ def api_system_modules():
                     'still_missing': _MODULES_STARTUP_REPORT['still_missing']}), 200
 
 
-# ── suggestions et signalements envoyés comme issues GitHub : module séparé `feedback.py` (services fournis par `feedback.init(globals())`) ──
-import feedback
-from feedback import (
+# ── suggestions et signalements envoyés comme issues GitHub : module séparé `modules/feedback.py` (services fournis par `feedback.init(globals())`) ──
+from modules import feedback
+from modules.feedback import (
     api_feedback_close,
     api_feedback_detail,
     api_feedback_remove,
@@ -21817,9 +21870,9 @@ def _client_clean(data):
     return out
 
 
-# ── clients (carnet de clients, import) : module séparé `clients.py` (services fournis par `clients.init(globals())`) ──
-import clients
-from clients import (
+# ── clients (carnet de clients, import) : module séparé `modules/clients.py` (services fournis par `clients.init(globals())`) ──
+from modules import clients
+from modules.clients import (
     api_client_delete,
     api_client_detail,
     api_client_update,
@@ -22399,7 +22452,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.0.4"
+CURRENT_VERSION = "1.0.5"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -22744,7 +22797,7 @@ def check_for_updates(force=False):
         return None
 
 def _find_real_content_dir(base_dir):
-    real_files = {'main.py', 'index.html', 'script.js', 'style.css', 'check_deps.py'}
+    real_files = {'main.py', 'interface', 'modules', 'index.html', 'script.js', 'style.css', 'check_deps.py'}
     for root, dirs, files in os.walk(base_dir):
         entries = set(files) | set(dirs)
         matches = real_files.intersection(entries)
@@ -23996,9 +24049,9 @@ def _printer_status_cached(printer, ttl=5.0):
     return status
 
 
-# ── timelapse des impressions (images périodiques, assemblage vidéo, lecture, suppression) : module séparé `timelapse.py` (services fournis par `timelapse.init(globals())`) ──
-import timelapse
-from timelapse import (
+# ── timelapse des impressions (images périodiques, assemblage vidéo, lecture, suppression) : module séparé `modules/timelapse.py` (services fournis par `timelapse.init(globals())`) ──
+from modules import timelapse
+from modules.timelapse import (
     TIMELAPSE_MAX_FRAMES,
     TIMELAPSE_MIN_FRAMES,
     _TL_STATE,
@@ -24020,22 +24073,22 @@ from timelapse import (
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
-# v1.0.4 — Suivi des sessions d'impression : module séparé `print_session.py`
+# v1.0.4 — Suivi des sessions d'impression : module séparé `modules/print_session.py`
 # (prise connectée / consommation réelle, photo de fin d'impression, surveillance IA).
 # Les services de main.py lui sont fournis par `print_session.init(globals())` (juste avant le démarrage).
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 _APP_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
 if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
-import print_session
-from print_session import (
+from modules import print_session
+from modules.print_session import (
     _ensure_v104_tables, _v104_apply_config, _v104_public_config, _measured_avg_power_w, _start_v104_worker,
 )
 
 
-# ── lien d'état partageable (lecture seule, sans compte) : module séparé `share_link.py` (services fournis par `share_link.init(globals())`) ──
-import share_link
-from share_link import (
+# ── lien d'état partageable (lecture seule, sans compte) : module séparé `modules/share_link.py` (services fournis par `share_link.init(globals())`) ──
+from modules import share_link
+from modules.share_link import (
     STATUS_MAX_LINKS,
     _STATUS_SHARE_PAGE,
     _status_link_by_token,
@@ -24096,9 +24149,9 @@ def _compute_quality_drift(user_id, recent_days=30, baseline_days=120):
     return out[:3]
 
 
-# ── publication MQTT / Home Assistant (imprimantes, bobines, état de l'application) : module séparé `mqtt_publisher.py` (services fournis par `mqtt_publisher.init(globals())`) ──
-import mqtt_publisher
-from mqtt_publisher import (
+# ── publication MQTT / Home Assistant (imprimantes, bobines, état de l'application) : module séparé `modules/mqtt_publisher.py` (services fournis par `mqtt_publisher.init(globals())`) ──
+from modules import mqtt_publisher
+from modules.mqtt_publisher import (
     HA_DISCOVERY_PREFIX,
     _APP_STARTED,
     _MQTT_APP_CACHE,
@@ -24754,9 +24807,9 @@ def api_orders_from_quote(qid):
     return jsonify({'success': True, 'created': _create_jobs_from_quote(session['user_id'], row)})
 
 
-# ── page de suivi client (un lien public par commande) : module séparé `order_tracking.py` (services fournis par `order_tracking.init(globals())`) ──
-import order_tracking
-from order_tracking import (
+# ── page de suivi client (un lien public par commande) : module séparé `modules/order_tracking.py` (services fournis par `order_tracking.init(globals())`) ──
+from modules import order_tracking
+from modules.order_tracking import (
     _ORDER_TRACK_PAGE,
     _order_by_track_token,
     _share_base_url,
@@ -25920,9 +25973,9 @@ def _material_ref_block(material: str) -> str:
                 f"bed {ref['plateau']}, speed {ref['vitesse']}, fan {ref['ventilation']}.")
     return f"No known reference ranges for {material}: use general knowledge of this material."
 
-# ── S.O.S Print : conversations, cas de référence, réglages : module séparé `sosprint_helpers.py` (services fournis par `sosprint_helpers.init(globals())`) ──
-import sosprint_helpers
-from sosprint_helpers import (
+# ── S.O.S Print : conversations, cas de référence, réglages : module séparé `modules/sosprint_helpers.py` (services fournis par `sosprint_helpers.init(globals())`) ──
+from modules import sosprint_helpers
+from modules.sosprint_helpers import (
     SOSPRINT_HARD_MAX_QUESTIONS,
     SOSPRINT_SETTING_FIELDS,
     SOSPRINT_SOFT_QUESTIONS,
@@ -27457,9 +27510,9 @@ def _refresh_stale_slicer_profiles(profiles):
     return updated_count, errors
 
 
-# ── profils de slicer (import, affectation, détection automatique, synchronisation) : module séparé `slicer_profiles.py` (services fournis par `slicer_profiles.init(globals())`) ──
-import slicer_profiles
-from slicer_profiles import (
+# ── profils de slicer (import, affectation, détection automatique, synchronisation) : module séparé `modules/slicer_profiles.py` (services fournis par `slicer_profiles.init(globals())`) ──
+from modules import slicer_profiles
+from modules.slicer_profiles import (
     PROFILE_SYNC_MIN_INTERVAL,
     SLICER_AUTODETECT_DIRS,
     SLICER_CURA_FAMILY_DIRS,
@@ -28419,23 +28472,6 @@ def api_eco_estimate():
     return jsonify({"status": "done", **estimate}), 200
 
 
-def _consume_spool_filament(spoolman_url, spool_id, weight_g):
-    try:
-        res = requests.post(
-            f"{spoolman_url}/api/v1/spool/{spool_id}/use",
-            json={"use_weight": round(float(weight_g), 1)},
-            timeout=8, headers={"Accept": "application/json"}
-        )
-        if res.ok:
-            app_logger.info(f"[Spoolman] Bobine #{spool_id} décrémentée de {weight_g}g")
-            return True
-        app_logger.warning(f"[Spoolman] Échec décrément bobine #{spool_id}: {res.status_code}")
-        return False
-    except Exception as e:
-        app_logger.warning(f"[Spoolman] Erreur décrément bobine #{spool_id}: {e}")
-        return False
-
-
 def _get_bambu_ams_slots(user_id):
     slots = []
     try:
@@ -28505,9 +28541,9 @@ def _get_manual_filament_slots(user_id):
     return slots
 
 
-# ── inventaire TigerTag (session Firebase, références, étiquettes) : module séparé `tigertag.py` (services fournis par `tigertag.init(globals())`) ──
-import tigertag
-from tigertag import (
+# ── inventaire TigerTag (session Firebase, références, étiquettes) : module séparé `modules/tigertag.py` (services fournis par `tigertag.init(globals())`) ──
+from modules import tigertag
+from modules.tigertag import (
     TIGERTAG_FIREBASE_CONFIG_URL,
     TIGERTAG_FIREBASE_LOOKUP_URL,
     TIGERTAG_FIREBASE_REFRESH_URL,
@@ -31943,17 +31979,9 @@ def api_manual_spools_import():
 
 def _consume_filament_slot(source_type, source_id, weight_g, user_id):
     if source_type == 'spoolman':
-        try:
-            conn = get_db()
-            row = conn.execute(
-                "SELECT spoolman_url FROM filament_assignments WHERE source_type='spoolman' AND source_id=? AND user_id=? ORDER BY assigned_at DESC LIMIT 1",
-                (str(source_id), user_id)
-            ).fetchone()
-            conn.close()
-            if row and row[0]:
-                return _consume_spool_filament(row[0], source_id, weight_g)
-        except Exception as e:
-            app_logger.warning(f"[FilamentBridge] Décrément Spoolman impossible: {e}")
+        # Spoolman décompte lui-même la consommation réelle (Moonraker, OctoPrint…) : Stellio n'écrit plus jamais dans son stock,
+        # sinon la bobine serait débitée deux fois (à l'envoi au slicer, puis après l'impression).
+        app_logger.info(f"[FilamentBridge] Spoolman bobine {source_id} : décrément laissé à Spoolman (aucune écriture).")
         return False
     elif source_type == 'manual':
         try:

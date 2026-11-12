@@ -63,7 +63,7 @@ def test_changelog_consistent(main_src):
 
 
 def test_i18n_keys_used_in_html_exist():
-    html = open(os.path.join(ROOT, 'index.html'), encoding='utf-8').read()
+    html = open(os.path.join(ROOT, 'interface', 'index.html'), encoding='utf-8').read()
     fr = _lang('fr')
     missing = sorted({k for k in re.findall(r'data-i18n(?:-[a-z]+)?="([\w.]+)"', html) if k not in fr})
     assert not missing, f'clés data-i18n absentes de fr.json : {missing[:15]}'
@@ -75,7 +75,7 @@ def test_main_py_parses(main_src):
 
 @pytest.mark.skipif(not shutil.which('node'), reason='node absent')
 def test_script_js_syntax():
-    r = subprocess.run(['node', '--check', os.path.join(ROOT, 'script.js')], capture_output=True, text=True)
+    r = subprocess.run(['node', '--check', os.path.join(ROOT, 'interface', 'script.js')], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
 
 

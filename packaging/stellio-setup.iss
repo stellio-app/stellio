@@ -19,14 +19,14 @@ ArchitecturesInstallIn64BitMode=x64compatible
 DefaultDirName={commonappdata}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
-OutputDir={#SourcePath}output
+OutputDir={#SourcePath}..\output
 OutputBaseFilename=Stellio-Setup-{#MyAppVersion}
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=dialog
-SetupIconFile={#SourcePath}assets\logo-nom-stellio.ico
+SetupIconFile={#SourcePath}..\assets\logo-nom-stellio.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 SetupLogging=yes
 ShowLanguageDialog=no
@@ -164,7 +164,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "{app}"; Permissions: users-full
 
 [Files]
-Source: "{#SourcePath}dist\Stellio\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourcePath}..\dist\Stellio\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{commonprograms}\{#MyAppName}";             Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"

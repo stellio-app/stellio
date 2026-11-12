@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extrait un bloc de main.py vers un module `<name>.py` (modèle : print_session.py).
+"""Extrait un bloc de main.py vers un module `modules/<name>.py` (modèle : print_session.py).
 Usage : python tools/split_module.py <name> <ligne_début> <ligne_fin> "<docstring une ligne>" [--dry]
  - routes @app.route(...) (+ autres décorateurs) -> enregistrées dans init() ;
  - services de main.py utilisés par le bloc -> _REQUIRED (injectés par init) ;
@@ -153,14 +153,14 @@ tail += '''def init(ns, routes=True):
 ''' % name
 tail = tail.replace('@@LATE@@', late_code).replace('@@LATEDICT@@', ', '.join(f"'{n}': g['{n}']" for n in late_names))
 for n_ in late_names: head += f"{n_} = None\n"
-open(f'{name}.py', 'w', encoding='utf-8').write(head + body + tail)
+open(f'modules/{name}.py', 'w', encoding='utf-8').write(head + body + tail)
 # main.py : remplace le bloc
 inb = inb - set(late_names)
 imp = ''
 if inb:
     names = sorted(inb)
-    imp = f"from {name} import (\n" + ''.join(f"    {n},\n" for n in names) + ")\n"
-repl = [f"# ── {doc} : module séparé `{name}.py` (services fournis par `{name}.init(globals())`) ──", f"import {name}"] + ([imp.rstrip()] if imp else []) + ['']
+    imp = f"from modules.{name} import (\n" + ''.join(f"    {n},\n" for n in names) + ")\n"
+repl = [f"# ── {doc} : module séparé `modules/{name}.py` (services fournis par `{name}.init(globals())`) ──", f"from modules import {name}"] + ([imp.rstrip()] if imp else []) + ['']
 L[a - 1:b] = repl
 out = '\n'.join(L)
 mk = "\nif __name__ in ('__main__', 'stellio_main'):\n"
@@ -168,15 +168,14 @@ assert out.count(mk) == 1
 call = f"{name}.init(globals())" if not late_names else f"globals().update({name}.init(globals()))"
 out = out.replace(mk, f"\n{call}\n" + mk, 1)
 open('main.py', 'w', encoding='utf-8').write(out)
-# empaquetage : build-and-sign.yml (déclencheur + listes uniques de modules copiés dans app/ : Windows, macOS, Linux)
-y = open('build-and-sign.yml', encoding='utf-8').read()
-if f"- '{name}.py'" not in y:
-    y = y.replace("      - 'check_deps.py'\n", f"      - 'check_deps.py'\n      - '{name}.py'\n", 1)
-    y = re.sub(r'(\$mods = @\([^)]*)\)', lambda m_: m_.group(1) + f',"{name}")', y)
-    y = re.sub(r'(MODULES="[^"]*)"', lambda m_: m_.group(1) + f' {name}"', y)
-    open('build-and-sign.yml', 'w', encoding='utf-8').write(y)
+# empaquetage : build-and-sign.yml copie tout le dossier modules/ (déclencheur « modules/** ») : rien à modifier.
+# __init__.py : ajoute le module à la liste ALL
+ini = open('modules/__init__.py', encoding='utf-8').read()
+if f"'{name}'," not in ini:
+    ini = ini.replace('\n)\n', f"\n    '{name}',\n)\n", 1) if ini.rstrip().endswith(')') else ini
+    open('modules/__init__.py', 'w', encoding='utf-8').write(ini)
 import subprocess
-r = subprocess.run([sys.executable, '-m', 'pyflakes', f'{name}.py'], capture_output=True, text=True).stdout
+r = subprocess.run([sys.executable, '-m', 'pyflakes', f'modules/{name}.py'], capture_output=True, text=True).stdout
 und = [l for l in r.splitlines() if 'undefined name' in l]
 if und: print('⚠ noms indéfinis (définis plus tard dans main.py ? utiliser _MAIN.get) :', *und, sep='\n  ')
 print("ok : main.py mis à jour")

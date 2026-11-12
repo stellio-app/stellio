@@ -13,7 +13,7 @@ MODULES = _discover()
 
 
 def _load(name):
-    spec = importlib.util.spec_from_file_location(name + '_under_test', os.path.join(ROOT, name + '.py'))
+    spec = importlib.util.spec_from_file_location(name + '_under_test', os.path.join(ROOT, 'modules', name + '.py'))
     mod = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(mod)
@@ -24,6 +24,14 @@ def _load(name):
 
 def test_discovery_finds_every_split_module():
     assert {'print_session', 'share_link', 'order_tracking'} <= set(MODULES)
+
+
+def test_modules_package_lists_every_module_file():
+    """modules/__init__.py (ALL) = fichiers du dossier = modules branchés dans main.py."""
+    files = sorted(f[:-3] for f in os.listdir(os.path.join(ROOT, 'modules')) if f.endswith('.py') and f != '__init__.py')
+    spec = importlib.util.spec_from_file_location('modules_pkg_under_test', os.path.join(ROOT, 'modules', '__init__.py'))
+    pkg = importlib.util.module_from_spec(spec); spec.loader.exec_module(pkg)
+    assert sorted(pkg.ALL) == files == sorted(MODULES)
 
 
 @pytest.mark.parametrize('name', MODULES)
@@ -69,4 +77,4 @@ def test_main_provides_every_service_before_init(name, main_src):
 @pytest.mark.parametrize('name', MODULES)
 def test_module_defines_no_route_decorator_left(name):
     """Les routes passent par _ROUTES : aucun @app.route ne doit rester dans le module (il n'y a pas d'app à l'import)."""
-    assert '@app.route' not in open(os.path.join(ROOT, name + '.py'), encoding='utf-8').read()
+    assert '@app.route' not in open(os.path.join(ROOT, 'modules', name + '.py'), encoding='utf-8').read()

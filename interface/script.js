@@ -9981,7 +9981,7 @@ function _slicerSpoolRefresh() {
     if (!sel || !hint || !row || !label) return;
     const s = _slicerSpoolState.slots[sel.value];
     hint.style.display = 'none';
-    row.style.display = s ? 'flex' : 'none';
+    row.style.display = (s && s.source_type !== 'spoolman') ? 'flex' : 'none';   // Spoolman décompte lui-même : pas de case « décompter »
     if (!s) return;
     const badge = FILAMENT_SOURCE_BADGES[s.source_type] || '';
     label.textContent = `${badge} ` + _t2('spoolman.consume_on_send', `Décomptera ${s.name || ('#' + s.source_id)}${s.material ? ' (' + s.material + ')' : ''} au lancement de l'impression`, { name: s.name || `#${s.source_id}`, material: s.material ? ` (${s.material})` : '' });

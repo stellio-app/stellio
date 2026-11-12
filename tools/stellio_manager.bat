@@ -8,7 +8,8 @@ if not defined STELLIO_MANAGER_RELAUNCHED (
 )
 
 chcp 65001 >nul
-cd /d "%~dp0"
+cd /d "%~dp0.."
+for %%I in ("%CD%") do set "ROOT=%%~fI\"
 
 
 cls
@@ -165,7 +166,7 @@ exit /b 0
 
 :DO_LAUNCH_TEST_FOLDER
 setlocal
-set "TEST_DIR=%~dp0test"
+set "TEST_DIR=%ROOT%test"
 
 if not exist "!TEST_DIR!" (
     echo.
@@ -178,7 +179,7 @@ if not exist "!TEST_DIR!" (
 )
 
 set "TEST_MISSING="
-for %%F in (main.py script.js style.css index.html) do (
+for %%F in (main.py modules\__init__.py interface\index.html interface\script.js interface\style.css) do (
     if not exist "!TEST_DIR!\%%F" set "TEST_MISSING=!TEST_MISSING! %%F"
 )
 if not exist "!TEST_DIR!\assets" set "TEST_MISSING=!TEST_MISSING! assets\"
@@ -201,7 +202,7 @@ if errorlevel 1 (endlocal & exit /b 1)
 call :INSTALL_AND_CHECK_DEPS
 if errorlevel 1 (endlocal & exit /b 1)
 
-set "STELLIO_DATA_DIR=%~dp0stellio-data-test"
+set "STELLIO_DATA_DIR=%ROOT%stellio-data-test"
 if not exist "!STELLIO_DATA_DIR!" mkdir "!STELLIO_DATA_DIR!"
 if not exist "!STELLIO_DATA_DIR!\uploads" mkdir "!STELLIO_DATA_DIR!\uploads"
 
@@ -215,7 +216,7 @@ echo [*] Donnees isolees dans : !STELLIO_DATA_DIR!
 echo.
 
 pushd "!TEST_DIR!"
-"%~dp0venv\Scripts\python.exe" main.py
+"%ROOT%venv\Scripts\python.exe" main.py
 popd
 
 echo.
@@ -249,7 +250,7 @@ if errorlevel 1 exit /b 1
 call :INSTALL_AND_CHECK_DEPS
 if errorlevel 1 exit /b 1
 
-set "DATA_DIR=%~dp0stellio-data"
+set "DATA_DIR=%ROOT%stellio-data"
 if not exist "!DATA_DIR!" mkdir "!DATA_DIR!"
 if not exist "!DATA_DIR!\uploads" mkdir "!DATA_DIR!\uploads"
 
@@ -269,7 +270,7 @@ echo [*] Lancement en mode test!TEST_MODE_SUFFIX! : !OUT_NAME!...
 echo.
 
 pushd "!SRC_DIR!"
-"%~dp0venv\Scripts\python.exe" main.py
+"%ROOT%venv\Scripts\python.exe" main.py
 popd
 
 echo.

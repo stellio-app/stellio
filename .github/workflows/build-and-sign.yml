@@ -5,27 +5,11 @@ on:
     branches: [main]
     paths:
       - 'main.py'
-      - 'index.html'
-      - 'script.js'
-      - 'style.css'
-      - 'launcher.py'
+      - 'interface/**'
+      - 'packaging/**'
       - 'check_deps.py'
-      - 'print_session.py'
-      - 'share_link.py'
-      - 'order_tracking.py'
-      - 'timelapse.py'
-      - 'mqtt_publisher.py'
-      - 'tigertag.py'
-      - 'push_notify.py'
-      - 'auto_backup_routes.py'
-      - 'feedback.py'
-      - 'sosprint_helpers.py'
-      - 'remote_instances.py'
-      - 'slicer_profiles.py'
-      - 'clients.py'
-      - 'trash_routes.py'
+      - 'modules/**'
       - 'requirements.txt'
-      - 'stellio-setup.iss'
       - 'assets/**'
       - 'languages/**'
       - 'bin/**'
@@ -160,7 +144,7 @@ jobs:
             --copy-metadata Pillow `
             --copy-metadata PyOpenGL `
             --copy-metadata numpy `
-            --icon="assets\logo-nom-stellio.ico" "launcher.py"
+            --icon="assets\logo-nom-stellio.ico" "packaging/launcher.py"
 
       - name: Verify PyInstaller output exists
         shell: pwsh
@@ -176,17 +160,13 @@ jobs:
           New-Item -ItemType Directory -Force -Path "dist\Stellio\app" | Out-Null
           Copy-Item "main.py"          "dist\Stellio\app\main.py"
           Copy-Item "check_deps.py"    "dist\Stellio\app\check_deps.py"
-          # Modules séparés de main.py (liste unique ; tools/split_module.py y ajoute les nouveaux)
-          $mods = @("print_session","share_link","order_tracking","timelapse","mqtt_publisher","tigertag","push_notify","auto_backup_routes","feedback","sosprint_helpers","remote_instances","slicer_profiles","clients","trash_routes")
-          foreach ($m in $mods) { Copy-Item "$m.py" "dist\Stellio\app\$m.py" }
-          Copy-Item "index.html"       "dist\Stellio\app\index.html"
-          Copy-Item "script.js"        "dist\Stellio\app\script.js"
-          Copy-Item "style.css"        "dist\Stellio\app\style.css"
+          Copy-Item -Recurse "modules" "dist\Stellio\app\modules"   # modules séparés de main.py (dossier copié en bloc)
+          Copy-Item -Recurse "interface" "dist\Stellio\app\interface"
           Copy-Item -Recurse "assets"    "dist\Stellio\app\assets"
           Copy-Item -Recurse "languages" "dist\Stellio\app\languages"
           if (Test-Path "bin\win") { Copy-Item -Recurse "bin\win" "dist\Stellio\app\bin" }
 
-          foreach ($f in (@("main.py","check_deps.py","index.html","script.js","style.css") + ($mods | ForEach-Object { "$_.py" }))) {
+          foreach ($f in @("main.py","check_deps.py","modules\__init__.py","interface\index.html","interface\script.js","interface\style.css")) {
             if (-not (Test-Path "dist\Stellio\app\$f")) {
               throw "Echec de copie : dist\Stellio\app\$f"
             }
@@ -313,7 +293,7 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
             "/DMyAppVersion=${{ needs.check-version.outputs.version }}" `
-            "stellio-setup.iss"
+            "packaging/stellio-setup.iss"
 
       - name: Upload unsigned installer artifact
         id: upload-unsigned
@@ -426,7 +406,7 @@ jobs:
             --copy-metadata Pillow \
             --copy-metadata PyOpenGL \
             --copy-metadata numpy \
-            --icon="assets/logo-nom-stellio.icns" "launcher.py"
+            --icon="assets/logo-nom-stellio.icns" "packaging/launcher.py"
 
       - name: Verify PyInstaller output exists
         run: |
@@ -441,16 +421,12 @@ jobs:
           mkdir -p "$APP_DIR"
           cp main.py "$APP_DIR/main.py"
           cp check_deps.py "$APP_DIR/check_deps.py"
-          # Modules séparés de main.py (liste unique ; tools/split_module.py y ajoute les nouveaux)
-          MODULES="print_session share_link order_tracking timelapse mqtt_publisher tigertag push_notify auto_backup_routes feedback sosprint_helpers remote_instances slicer_profiles clients trash_routes"
-          for m in $MODULES; do cp "$m.py" "$APP_DIR/$m.py"; done
-          cp index.html "$APP_DIR/index.html"
-          cp script.js "$APP_DIR/script.js"
-          cp style.css "$APP_DIR/style.css"
+          cp -R modules "$APP_DIR/modules"   # modules séparés de main.py (dossier copié en bloc)
+          cp -R interface "$APP_DIR/interface"
           cp -R assets "$APP_DIR/assets"
           cp -R languages "$APP_DIR/languages"
           [ -d bin/mac ] && cp -R bin/mac "$APP_DIR/bin" || true
-          for f in main.py check_deps.py $(for m in $MODULES; do echo $m.py; done) index.html script.js style.css; do
+          for f in main.py check_deps.py modules/__init__.py interface/index.html interface/script.js interface/style.css; do
             [ -f "$APP_DIR/$f" ] || { echo "Echec de copie : $APP_DIR/$f"; exit 1; }
           done
 
@@ -521,24 +497,8 @@ jobs:
           cp rar_extracted/rar/unrar "$APP_DIR/bin/unrar"
           chmod +x "$APP_DIR/bin/unrar"
 
-      - name: Write entitlements (requis pour le hardened runtime + bootloader PyInstaller)
-        run: |
-          cat > entitlements.plist << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>com.apple.security.cs.allow-jit</key>
-              <true/>
-              <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-              <true/>
-              <key>com.apple.security.cs.disable-library-validation</key>
-              <true/>
-              <key>com.apple.security.cs.allow-dyld-environment-variables</key>
-              <true/>
-          </dict>
-          </plist>
-          EOF
+      - name: Check entitlements file (requis pour le hardened runtime + bootloader PyInstaller)
+        run: test -f packaging/entitlements.plist
 
       - name: Code sign (Developer ID if available, else ad-hoc)
         env:
@@ -559,15 +519,15 @@ jobs:
             # puis le bundle .app en dernier.
             find "dist/Stellio.app" -type f \( -name "*.so" -o -name "*.dylib" -o -perm -111 \) -print0 | \
               xargs -0 -I{} codesign --force --options runtime --timestamp \
-                --entitlements entitlements.plist --sign "$MACOS_SIGNING_IDENTITY" "{}"
+                --entitlements packaging/entitlements.plist --sign "$MACOS_SIGNING_IDENTITY" "{}"
 
             codesign --force --options runtime --timestamp \
-              --entitlements entitlements.plist --sign "$MACOS_SIGNING_IDENTITY" "dist/Stellio.app"
+              --entitlements packaging/entitlements.plist --sign "$MACOS_SIGNING_IDENTITY" "dist/Stellio.app"
 
             codesign --verify --deep --strict --verbose=2 "dist/Stellio.app"
             echo "Signe avec le certificat Developer ID."
           else
-            codesign --force --deep --sign - --entitlements entitlements.plist "dist/Stellio.app"
+            codesign --force --deep --sign - --entitlements packaging/entitlements.plist "dist/Stellio.app"
             echo "Aucun certificat Developer ID configure — signature ad-hoc uniquement (secrets MACOS_CERTIFICATE / MACOS_CERTIFICATE_PWD / MACOS_SIGNING_IDENTITY absents)."
           fi
 
@@ -713,7 +673,7 @@ jobs:
             --copy-metadata Pillow \
             --copy-metadata PyOpenGL \
             --copy-metadata numpy \
-            "launcher.py"
+            "packaging/launcher.py"
 
       - name: Verify PyInstaller output exists
         run: |
@@ -728,16 +688,12 @@ jobs:
           mkdir -p "$APP_DIR"
           cp main.py "$APP_DIR/main.py"
           cp check_deps.py "$APP_DIR/check_deps.py"
-          # Modules séparés de main.py (liste unique ; tools/split_module.py y ajoute les nouveaux)
-          MODULES="print_session share_link order_tracking timelapse mqtt_publisher tigertag push_notify auto_backup_routes feedback sosprint_helpers remote_instances slicer_profiles clients trash_routes"
-          for m in $MODULES; do cp "$m.py" "$APP_DIR/$m.py"; done
-          cp index.html "$APP_DIR/index.html"
-          cp script.js "$APP_DIR/script.js"
-          cp style.css "$APP_DIR/style.css"
+          cp -R modules "$APP_DIR/modules"   # modules séparés de main.py (dossier copié en bloc)
+          cp -R interface "$APP_DIR/interface"
           cp -R assets "$APP_DIR/assets"
           cp -R languages "$APP_DIR/languages"
           [ -d bin/linux ] && cp -R bin/linux "$APP_DIR/bin" || true
-          for f in main.py check_deps.py $(for m in $MODULES; do echo $m.py; done) index.html script.js style.css; do
+          for f in main.py check_deps.py modules/__init__.py interface/index.html interface/script.js interface/style.css; do
             [ -f "$APP_DIR/$f" ] || { echo "Echec de copie : $APP_DIR/$f"; exit 1; }
           done
 
