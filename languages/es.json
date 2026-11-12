@@ -1505,6 +1505,7 @@
   "toast.undo_success": "{{count}} archivo(s) restaurado(s)",
   "toast.undo_error": "No se pudo deshacer la eliminación",
   "nav.print_queue": "Para imprimir pronto",
+  "nav.management": "Gestión",
   "queue.title": "Para imprimir pronto",
   "queue.open_viewer": "Abrir en el visor 3D",
   "nav.trash": "Papelera",
@@ -2916,5 +2917,6 @@
   "notif.ai_watch_novision_title": "Vigilancia IA no disponible",
   "notif.ai_watch_novision_msg": "El modelo de Ollama elegido no puede leer imágenes: elija un modelo de visión en Ajustes > IA.",
   "photo.auto_end": "Foto automática al terminar la impresión",
-  "photo.ai_failure_note": "Detección IA"
+  "photo.ai_failure_note": "Detección IA",
+  "toast.consume_skipped": "Peso del archivo desconocido: no se descontó la bobina (lamine el archivo para obtener su peso)"
 }

@@ -1505,6 +1505,7 @@
   "toast.undo_success": "已恢复 {{count}} 个文件",
   "toast.undo_error": "无法撤销删除操作",
   "nav.print_queue": "即将打印",
+  "nav.management": "管理",
   "queue.title": "即将打印",
   "queue.open_viewer": "在 3D 查看器中打开",
   "nav.trash": "回收站",
@@ -2916,5 +2917,6 @@
   "notif.ai_watch_novision_title": "AI 监控不可用",
   "notif.ai_watch_novision_msg": "所选的 Ollama 模型无法识别图像：请在“设置 > AI”中选择视觉模型。",
   "photo.auto_end": "打印结束自动拍照",
-  "photo.ai_failure_note": "AI 检测"
+  "photo.ai_failure_note": "AI 检测",
+  "toast.consume_skipped": "文件重量未知：未扣减料盘（请先切片以获得重量）"
 }

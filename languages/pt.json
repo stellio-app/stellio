@@ -1505,6 +1505,7 @@
   "toast.undo_success": "{{count}} arquivo(s) restaurado(s)",
   "toast.undo_error": "Não foi possível desfazer a exclusão",
   "nav.print_queue": "Para imprimir em breve",
+  "nav.management": "Gestão",
   "queue.title": "Para imprimir em breve",
   "queue.open_viewer": "Abrir no visualizador 3D",
   "nav.trash": "Lixeira",
@@ -2916,5 +2917,6 @@
   "notif.ai_watch_novision_title": "Vigilância IA indisponível",
   "notif.ai_watch_novision_msg": "O modelo Ollama escolhido não consegue ler imagens: escolha um modelo de visão em Definições > IA.",
   "photo.auto_end": "Foto automática no fim da impressão",
-  "photo.ai_failure_note": "Deteção IA"
+  "photo.ai_failure_note": "Deteção IA",
+  "toast.consume_skipped": "Peso do arquivo desconhecido: a bobina não foi descontada (fatie o arquivo para obter o peso)"
 }

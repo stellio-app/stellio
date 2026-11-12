@@ -1505,6 +1505,7 @@
   "toast.undo_success": "{{count}} 件のファイルを復元しました",
   "toast.undo_error": "削除を元に戻せませんでした",
   "nav.print_queue": "まもなく印刷",
+  "nav.management": "管理",
   "queue.title": "まもなく印刷",
   "queue.open_viewer": "3Dビューアで開く",
   "nav.trash": "ゴミ箱",
@@ -2916,5 +2917,6 @@
   "notif.ai_watch_novision_title": "AI監視は利用できません",
   "notif.ai_watch_novision_msg": "選択した Ollama モデルは画像を読み取れません。設定 > AI でビジョンモデルを選んでください。",
   "photo.auto_end": "印刷完了時の自動撮影",
-  "photo.ai_failure_note": "AI検出"
+  "photo.ai_failure_note": "AI検出",
+  "toast.consume_skipped": "ファイルの重量が不明なため、スプールは差し引かれませんでした（スライスして重量を取得してください）"
 }

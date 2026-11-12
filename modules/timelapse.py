@@ -69,6 +69,7 @@ TIMELAPSE_DIR = None
 TIMELAPSE_MAX_FRAMES = 6000
 
 TIMELAPSE_MIN_FRAMES = 10
+TIMELAPSE_LOST_GRACE_S = 180   # imprimante injoignable : on garde la capture ouverte ce temps-là avant d'assembler
 
 _TL_STATE = {}   # printer_id -> {dir, frames, started, file, last_capture, user_id, name}
 
@@ -87,6 +88,29 @@ def _extract_jpeg(data):
         return None
     e = data.rfind(b'\xff\xd9')
     return bytes(data[s:e + 2]) if e > s else None
+
+def _grab_mjpeg_frame(url, timeout=10):
+    """Première image JPEG d'un flux MJPEG http(s), lue directement (sans ffmpeg) ; None si le flux ne répond pas."""
+    deadline = time.time() + timeout
+    try:
+        with requests.get(url, stream=True, timeout=(4, 6)) as r:
+            if r.status_code != 200:
+                return None
+            buf = b''
+            for chunk in r.iter_content(4096):
+                if not chunk:
+                    break
+                buf += chunk
+                s = buf.find(b'\xff\xd8')
+                if s != -1:
+                    e = buf.find(b'\xff\xd9', s + 2)
+                    if e != -1:
+                        return bytes(buf[s:e + 2])
+                if len(buf) > 4_000_000 or time.time() > deadline:
+                    break
+    except Exception:
+        return None
+    return None
 
 def _timelapse_grab_frame(printer):
     """Une image JPEG de la caméra de l'imprimante (octets) ou None."""
@@ -117,16 +141,25 @@ def _timelapse_grab_frame(printer):
     if not cam.get('available'):
         return None
     snap = cam.get('snapshot_url')
+    stream = cam.get('stream_url')
+    candidates = []
     if snap:
+        candidates.append(snap)
+    if stream and 'action=stream' in stream:          # mjpg-streamer / crowsnest : l'instantané se déduit du flux
+        candidates.append(stream.replace('action=stream', 'action=snapshot'))
+    for url in dict.fromkeys(candidates):
         try:
-            r = requests.get(snap, timeout=6)
+            r = requests.get(url, timeout=6)
             if r.status_code == 200:
                 jpg = _extract_jpeg(r.content)
                 if jpg:
                     return jpg
         except Exception:
             pass
-    stream = cam.get('stream_url')
+    if stream and re.match(r'^https?://', stream):    # flux MJPEG lu directement : fonctionne même sans ffmpeg
+        jpg = _grab_mjpeg_frame(stream)
+        if jpg:
+            return jpg
     if stream and FFMPEG_TOOL:
         try:
             out = subprocess.run(
@@ -147,6 +180,8 @@ def _timelapse_assemble(state):
         if n < TIMELAPSE_MIN_FRAMES or not FFMPEG_TOOL:
             if n >= TIMELAPSE_MIN_FRAMES:
                 app_logger.warning("[Timelapse] ffmpeg introuvable : vidéo non générée")
+            else:
+                app_logger.info(f"[Timelapse] {n} image(s) seulement (minimum {TIMELAPSE_MIN_FRAMES}) : pas de vidéo")
             return
         out_dir = os.path.join(TIMELAPSE_DIR, str(state['printer_id']))
         os.makedirs(out_dir, exist_ok=True)
@@ -198,6 +233,11 @@ def _timelapse_tick():
         phase = status.get('status')
         if st:
             st['last_poll'] = now
+        if st and phase in ('offline', 'timeout', None, 'unknown', 'unavailable'):
+            # micro-coupure réseau : on ne ferme pas la capture (sinon la vidéo est hachée en morceaux trop courts, jetés)
+            st['lost_since'] = st.get('lost_since') or now
+            if now - st['lost_since'] < TIMELAPSE_LOST_GRACE_S:
+                continue
         if phase in ('printing', 'paused'):
             if not st:
                 d = os.path.join(TIMELAPSE_DIR, f"tmp_{pid}")
@@ -208,14 +248,20 @@ def _timelapse_tick():
                                        'printer_id': pid, 'name': printer.get('name') or ''}
                 app_logger.info(f"[Timelapse] Début de capture : {printer.get('name')}")
             st['printing'] = True
+            st['lost_since'] = None
             if status.get('file'):
                 st['file'] = str(status.get('file'))
             if phase == 'printing' and st['frames'] < TIMELAPSE_MAX_FRAMES and now - st['last_poll'] >= 0:
                 jpg = _timelapse_grab_frame(printer)
                 if jpg:
                     st['frames'] += 1
+                    st['grab_fail'] = 0
                     with open(os.path.join(st['dir'], f"frame_{st['frames']:06d}.jpg"), 'wb') as f:
                         f.write(jpg)
+                else:
+                    st['grab_fail'] = st.get('grab_fail', 0) + 1
+                    if st['grab_fail'] == 3:
+                        app_logger.warning(f"[Timelapse] {printer.get('name')} : aucune image reçue de la caméra (3 essais de suite)")
             st['last_poll'] = time.time()
         elif st:
             _TL_STATE.pop(pid, None)

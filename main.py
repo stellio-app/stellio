@@ -8158,6 +8158,11 @@ def ui_script():
     return send_file(_ui_file('script.js'), mimetype='application/javascript')
 
 
+@app.route('/management.js')
+def ui_management_script():
+    return send_file(_ui_file('management.js'), mimetype='application/javascript')
+
+
 @app.route('/style.css')
 def ui_style():
     return send_file(_ui_file('style.css'), mimetype='text/css')
@@ -15091,6 +15096,7 @@ def api_send_to_slicer():
 
 
         applied_profile_ids = []
+        consume_info = None
         printer_id = data.get('printer_id')
         if pc_mode:
             pass
@@ -15155,11 +15161,16 @@ def api_send_to_slicer():
                 if required_g:
                     if _consume_filament_slot(source_type, source_id, required_g, session['user_id']):
                         weight_used_logged = required_g
+                        consume_info = {'done': True, 'weight_g': round(float(required_g), 1)}
                         if source_type == 'spoolman':
                             try:
                                 spool_id_logged = int(source_id)
                             except (TypeError, ValueError):
                                 spool_id_logged = None
+                    else:
+                        consume_info = {'done': False, 'reason': 'unsupported'}
+                else:
+                    consume_info = {'done': False, 'reason': 'no_weight'}
 
             material_cost, elec_cost, total_cost, _weight_for_cost = _compute_estimated_cost(norm, weight_g_hint=weight_used_logged)
             estimated_seconds_logged = _get_cached_slice_estimate_seconds(norm)
@@ -15182,7 +15193,7 @@ def api_send_to_slicer():
             app_logger.warning(f"[PrintHistory] Log échoué: {log_err}")
             history_id = None
 
-        return jsonify({"message": f"Envoyé via {detected_slicer}", "history_id": history_id, "pc_open": pc_open,
+        return jsonify({"message": f"Envoyé via {detected_slicer}", "history_id": history_id, "pc_open": pc_open, "consume": consume_info,
                          "stock_warning": None if data.get('ignore_stock') else (_check_restock_for_files([file_path], session['user_id']) or [None])[0]}), 200
 
     except Exception as e:
@@ -19263,6 +19274,58 @@ def _acct_sync_async(user_id, platforms, force=False):
     return started
 
 
+ACCT_MODELS_AUTO_DAILY_SECONDS = 24 * 3600
+
+
+def _acct_models_connected_pairs():
+    """(utilisateur, plateforme) de tous les comptes externes connectés."""
+    conn = get_db()
+    try:
+        _acct_models_ensure(conn)
+        rows = conn.execute(
+            "SELECT DISTINCT user_id, platform FROM account_credentials WHERE ((api_key IS NOT NULL AND api_key != '') "
+            "OR (platform = 'printables' AND email IS NOT NULL AND email != ''))").fetchall()
+    finally:
+        conn.close()
+    return [(r['user_id'], r['platform']) for r in rows if r['platform'] in ACCT_MODELS_PLATFORMS]
+
+
+def _acct_models_auto_check(reason=''):
+    """Test automatique de « Mes likes / Mes créations » : resynchronise chaque compte connecté (tous les utilisateurs) et note le moment du test."""
+    by_user = {}
+    for uid, platform in _acct_models_connected_pairs():
+        by_user.setdefault(uid, []).append(platform)
+    started = 0
+    for uid, plats in by_user.items():
+        started += len(_acct_sync_async(uid, plats, force=True))
+    settings = load_settings() or {}
+    settings['acct_models_auto_last'] = time.time()
+    settings['acct_models_auto_reason'] = reason
+    save_settings(settings)
+    app_logger.info(f"[Comptes] Test automatique Mes likes / Mes créations ({reason}) : {started} synchronisation(s) lancée(s)")
+    return started
+
+
+def _acct_models_auto_loop():
+    """Version de bureau : un test à chaque lancement de l'application. Serveur (sans fenêtre) : un test toutes les 24 h ;
+    le moment du dernier test est mémorisé, un redémarrage du serveur n'en relance donc pas un autre avant 24 h."""
+    time.sleep(45)
+    if not globals().get('STELLIO_HEADLESS'):
+        try:
+            _acct_models_auto_check('lancement')
+        except Exception as e:
+            app_logger.info(f"[Comptes] Test automatique impossible : {e}")
+        return
+    while True:
+        try:
+            last = float((load_settings() or {}).get('acct_models_auto_last') or 0)
+            if time.time() - last >= ACCT_MODELS_AUTO_DAILY_SECONDS:
+                _acct_models_auto_check('toutes les 24 h')
+        except Exception as e:
+            app_logger.info(f"[Comptes] Test automatique impossible : {e}")
+        time.sleep(600)
+
+
 @app.route('/api/account-models/overview', methods=['GET'])
 @login_required
 def api_account_models_overview():
@@ -19302,7 +19365,7 @@ def api_account_models_overview():
                       next((sync[(p, k)]['error'] for k in ACCT_MODELS_KINDS if sync.get((p, k)) and sync[(p, k)]['error']), '')),   # erreur partielle (ex. « créations » introuvables) : pas affichée si des modèles existent
             'syncing': (uid, p) in _acct_models_running or p in started,
         })
-    return jsonify({'platforms': platforms,
+    return jsonify({'platforms': platforms, 'auto_checked_at': (load_settings() or {}).get('acct_models_auto_last') or 0,
                     'likes_total': sum(x['likes'] for x in platforms),
                     'creations_total': sum(x['creations'] for x in platforms)})
 
@@ -22452,7 +22515,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.0.5"
+CURRENT_VERSION = "1.0.6"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -28308,6 +28371,15 @@ def _get_required_weight_for_file(file_path):
 
     if is_virtual_archive_path(file_path):
         return None, None
+    try:                                                   # fichier déjà tranché : le poids est écrit dans le G-code
+        _gp = file_path.replace('\\', '/')
+        _gl = _gp.lower()
+        if os.path.isfile(_gp) and (_gl.endswith('.gcode.3mf') or _gl.endswith('.gcode')):
+            _parsed = parse_bambu_orca_gcode3mf(_gp) if _gl.endswith('.3mf') else parse_slic3r_derived_gcode(_gp)
+            if _parsed and _parsed.get('weight_g'):
+                return _parsed['weight_g'], 'gcode'
+    except Exception:
+        pass
     try:
         normalized_path = file_path.replace('\\', '/')
         cache_key = f"analysis_{hashlib.md5(normalized_path.encode()).hexdigest()}"
@@ -32636,6 +32708,12 @@ def api_remote_access_disable_fixed():
     return jsonify({"message": "Retour au mode rapide, connexion en cours…"}), 200
 
 
+
+# ── Version 1.0.6 : nouveaux modules (portail client des devis, export comptable ZIP, stock de pièces, répartition des
+# imprimantes, résumé périodique, pesées de bobines, partage de profils). Leurs services sont fournis par `X.init(globals())`
+# (juste avant le démarrage) ; voir docs/ARCHITECTURE.md. ──
+from modules import quote_portal, accounting_zip, parts_stock, printer_dispatch, digest, filament_weighing, profile_share
+
 print_session.init(globals())   # v1.0.4 : fournit ses services au module et enregistre ses routes
 
 share_link.init(globals())
@@ -32663,6 +32741,20 @@ slicer_profiles.init(globals())
 clients.init(globals())
 
 trash_routes.init(globals())
+
+quote_portal.init(globals())
+
+accounting_zip.init(globals())
+
+parts_stock.init(globals())
+
+printer_dispatch.init(globals())
+
+digest.init(globals())
+
+filament_weighing.init(globals())
+
+profile_share.init(globals())
 
 if __name__ in ('__main__', 'stellio_main'):
     import sys, os, threading, time, urllib.request, json
@@ -32735,6 +32827,8 @@ if __name__ in ('__main__', 'stellio_main'):
             process_slice_estimate_queue()
             _start_timelapse_worker()
             _start_v104_worker()
+            threading.Thread(target=_acct_models_auto_loop, daemon=True, name='stellio-acct-models').start()
+            digest.start_worker()
             _start_mqtt_publisher()
             threading.Thread(target=_startup_sync_slicer_profiles, daemon=True).start()
             threading.Thread(target=_auto_backup_scheduler, daemon=True).start()
@@ -33021,6 +33115,10 @@ if __name__ in ('__main__', 'stellio_main'):
                         app_logger.error(f"[LogsExport] Échec écriture fichier : {e}")
                         return {"success": False, "error": str(e)}
 
+            try:
+                webview.settings['ALLOW_DOWNLOADS'] = True   # sans ce réglage, un lien de téléchargement (G-code, vidéo timelapse…) ne fait rien dans la fenêtre
+            except Exception:
+                pass
             _window_kwargs = dict(
                 width=1280,
                 height=800,

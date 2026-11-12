@@ -1505,6 +1505,7 @@
   "toast.undo_success": "{{count}} Datei(en) wiederhergestellt",
   "toast.undo_error": "Löschen konnte nicht rückgängig gemacht werden",
   "nav.print_queue": "Bald drucken",
+  "nav.management": "Verwaltung",
   "queue.title": "Bald drucken",
   "queue.open_viewer": "Im 3D-Viewer anzeigen",
   "nav.trash": "Papierkorb",
@@ -2916,5 +2917,6 @@
   "notif.ai_watch_novision_title": "KI-Überwachung nicht verfügbar",
   "notif.ai_watch_novision_msg": "Das gewählte Ollama-Modell kann keine Bilder lesen: Wählen Sie unter Einstellungen > KI ein Bildmodell.",
   "photo.auto_end": "Automatisches Foto am Druckende",
-  "photo.ai_failure_note": "KI-Erkennung"
+  "photo.ai_failure_note": "KI-Erkennung",
+  "toast.consume_skipped": "Dateigewicht unbekannt: die Spule wurde nicht abgezogen (Datei slicen, um das Gewicht zu erhalten)"
 }

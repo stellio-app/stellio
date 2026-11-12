@@ -167,9 +167,10 @@ def _v104_clean_config(incoming, old=None):
 
 def _v104_apply_config(raw_config, incoming, old=None):
     """Remplace dans raw_config les clés v1.0.4 par leur version nettoyée (le jeton n'est jamais stocké en clair)."""
+    clean = _v104_clean_config(incoming, old)   # calculé AVANT l'effacement : pour Klipper/OctoPrint/PrusaLink, raw_config EST le dict reçu
     for k in ('end_photo', 'ai_watch', 'meter'):
         raw_config.pop(k, None)
-    raw_config.update(_v104_clean_config(incoming, old))
+    raw_config.update(clean)
     return raw_config
 
 

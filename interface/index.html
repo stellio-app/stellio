@@ -265,6 +265,10 @@
 					<span data-i18n="nav.print_queue">À imprimer bientôt</span>
 					<span class="badge" id="print-queue-count" style="display:none;">0</span>
 				</button>
+				<button class="nav-btn commercial-only" data-page="management" data-nav-id="management" data-icon="fa-briefcase" data-title-key="nav.management">
+					<i class="fa-solid fa-briefcase"></i>
+					<span data-i18n="nav.management">Gestion</span>
+				</button>
 				<button class="nav-btn" data-page="history" data-nav-id="history" data-icon="fa-clock-rotate-left" data-title-key="nav.history">
 				    <i class="fa-solid fa-clock-rotate-left"></i>
 				    <span data-i18n="nav.history">Historique</span>
@@ -1038,6 +1042,14 @@
                     </div>
                 </div>
 
+                <div id="page-management" class="page">
+                    <div class="history-page">
+                        <div class="history-header">
+                            <h2><i class="fa-solid fa-briefcase"></i> <span data-i18n="nav.management" data-mg-title>Gestion</span></h2>
+                        </div>
+                    </div>
+                </div>
+
                 <div id="page-print-queue" class="page">
                     <div class="history-page">
                         <div class="history-header">
@@ -1055,6 +1067,7 @@
                             <p data-i18n="queue.empty">Ajoutez un fichier depuis son menu (⋯) → "Ajouter à imprimer bientôt".</p>
                         </div>
                         <div id="print-queue-list" class="print-queue-list hidden"></div>
+                        <details class="mg-slot-details viewer-hide" style="margin-top:18px;"><summary style="cursor:pointer;font-weight:600;" data-mg-slot-title="disp"></summary><div class="mg-body" data-mg-slot="disp" style="margin-top:10px;"></div></details>
                     </div>
                 </div>
 
@@ -1831,6 +1844,7 @@
                                         <p class="settings-hint" data-i18n="settings.slicer_profiles_empty">Aucun profil importé pour le moment.</p>
                                     </div>
                                 </div>
+                                <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;"><div class="mg-slot viewer-hide" style=""><div class="mg-slot-title" data-mg-slot-title="prof" style="font-weight:600;font-size:calc(14px * var(--fs, 1));margin-bottom:8px;"></div><div class="mg-body" data-mg-slot="prof"></div></div></div>
                             </div>
                         </div>
 
@@ -2183,6 +2197,7 @@
                                     <button type="button" class="btn btn-ghost btn-sm" onclick="testPush()"><i class="fa-solid fa-paper-plane"></i> <span data-i18n="push.test">Envoyer un test</span></button>
                                     <button type="button" class="btn btn-primary btn-sm" onclick="savePushSettings()"><i class="fa-solid fa-check"></i> <span data-i18n="push.save">Enregistrer</span></button>
                                 </div>
+                                <div class="mg-slot viewer-hide" style="border-top:1px solid var(--border);padding-top:12px;"><div class="mg-slot-title" data-mg-slot-title="digest" style="font-weight:600;font-size:calc(14px * var(--fs, 1));margin-bottom:8px;"></div><div class="mg-body" data-mg-slot="digest"></div></div>
                             </div>
                         </div>
                         <div class="accord-section viewer-hide" id="mqtt-server-block" style="display:none;">
@@ -3113,6 +3128,7 @@
 						</div>
 						<div id="tigertag-grid" class="grid-spoolman" style="margin-top:12px;"></div>
 					</div>
+					<details class="mg-slot-details viewer-hide" style="margin-top:24px;"><summary style="cursor:pointer;font-weight:600;" data-mg-slot-title="fil"></summary><div class="mg-body" data-mg-slot="fil" style="margin-top:10px;"></div></details>
 				</div>
             </main>
         </div>
@@ -5158,5 +5174,6 @@
     </div>
 
     <script src="script.js"></script>
+    <script src="management.js"></script>
 </body>
 </html>

@@ -1505,6 +1505,7 @@
   "toast.undo_success": "{{count}} file(s) restored",
   "toast.undo_error": "Couldn't undo the deletion",
   "nav.print_queue": "Print soon",
+  "nav.management": "Management",
   "queue.title": "Print soon",
   "queue.open_viewer": "Open in the 3D viewer",
   "nav.trash": "Trash",
@@ -2916,5 +2917,6 @@
   "notif.ai_watch_novision_title": "AI monitoring unavailable",
   "notif.ai_watch_novision_msg": "The selected Ollama model cannot read images: choose a vision model in Settings > AI.",
   "photo.auto_end": "Automatic end-of-print photo",
-  "photo.ai_failure_note": "AI detection"
+  "photo.ai_failure_note": "AI detection",
+  "toast.consume_skipped": "File weight unknown: the spool was not deducted (slice the file to get its weight)"
 }

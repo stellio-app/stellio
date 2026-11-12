@@ -1,8 +1,8 @@
-const CACHE_VERSION = 'stellio-v6';
+const CACHE_VERSION = 'stellio-v7';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const ASSETS_CACHE = `${CACHE_VERSION}-assets`;
 
-const SHELL_URLS = ['/', '/index.html', '/script.js', '/style.css'];
+const SHELL_URLS = ['/', '/index.html', '/script.js', '/management.js', '/style.css'];
 
 self.addEventListener('install', (event) => {
     event.waitUntil(

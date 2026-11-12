@@ -19,4 +19,11 @@ ALL = (
     'slicer_profiles',
     'clients',
     'trash_routes',
+    'quote_portal',
+    'accounting_zip',
+    'parts_stock',
+    'printer_dispatch',
+    'digest',
+    'filament_weighing',
+    'profile_share',
 )

@@ -1505,6 +1505,7 @@
   "toast.undo_success": "{{count}} file ripristinato/i",
   "toast.undo_error": "Impossibile annullare l'eliminazione",
   "nav.print_queue": "Da stampare presto",
+  "nav.management": "Gestione",
   "queue.title": "Da stampare presto",
   "queue.open_viewer": "Apri nel visualizzatore 3D",
   "nav.trash": "Cestino",
@@ -2916,5 +2917,6 @@
   "notif.ai_watch_novision_title": "Sorveglianza IA non disponibile",
   "notif.ai_watch_novision_msg": "Il modello Ollama scelto non sa leggere le immagini: scegli un modello di visione in Impostazioni > IA.",
   "photo.auto_end": "Foto automatica a fine stampa",
-  "photo.ai_failure_note": "Rilevamento IA"
+  "photo.ai_failure_note": "Rilevamento IA",
+  "toast.consume_skipped": "Peso del file sconosciuto: la bobina non è stata scalata (affetta il file per ottenerne il peso)"
 }

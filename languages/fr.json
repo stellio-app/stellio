@@ -1505,6 +1505,7 @@
   "toast.undo_success": "{{count}} fichier(s) restauré(s)",
   "toast.undo_error": "Impossible d'annuler la suppression",
   "nav.print_queue": "À imprimer bientôt",
+  "nav.management": "Gestion",
   "queue.title": "À imprimer bientôt",
   "queue.open_viewer": "Afficher dans le viewer 3D",
   "nav.trash": "Corbeille",
@@ -2916,5 +2917,6 @@
   "notif.ai_watch_novision_title": "Surveillance IA indisponible",
   "notif.ai_watch_novision_msg": "Le modèle Ollama choisi ne sait pas lire les images : choisissez un modèle de vision dans Paramètres > IA.",
   "photo.auto_end": "Photo automatique de fin d'impression",
-  "photo.ai_failure_note": "Détection IA"
+  "photo.ai_failure_note": "Détection IA",
+  "toast.consume_skipped": "Poids du fichier inconnu : la bobine n'a pas été décomptée (tranchez le fichier pour obtenir son poids)"
 }

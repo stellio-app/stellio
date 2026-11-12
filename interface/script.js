@@ -3424,7 +3424,7 @@ window.openGcodeDetails = function (gid) {
             </tbody></table>
             <textarea class="gcode-notes" rows="3" placeholder="${e(I18N.t('projects.gcode_notes_ph'))}" onchange="saveProjectGcodeNotes(${g.id}, this.value)">${e(g.notes || '')}</textarea>
             <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
-                <a class="btn btn-primary btn-sm" style="text-decoration:none;" href="${API}/api/projects/gcodes/${g.id}/download"><i class="fa-solid fa-download"></i> ${e(I18N.t('projects.gcode_download'))}</a>
+                <button type="button" class="btn btn-primary btn-sm" onclick="downloadProjectGcode(${g.id}, event)"><i class="fa-solid fa-download"></i> ${e(I18N.t('projects.gcode_download'))}</button>
                 ${linkedFile ? `<button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('modal-gcode-details'); openProjectFile3D('${escapeJs(linkedFile.path)}')"><i class="fa-solid fa-cube"></i> ${e(I18N.t('gcode.open_file'))}</button>` : ''}
             </div>
         </div>
@@ -12611,6 +12611,9 @@ function applyCommercialFlag(on) {
     if (cb) cb.checked = !!on;
     const sub = document.getElementById('commercial-sub');
     if (sub) sub.style.display = on ? '' : 'none';
+    if (!on && document.getElementById('page-management')?.classList.contains('active')) {
+        document.querySelector('.nav-btn[data-page="library"]')?.click();   // l'onglet Gestion disparaît : on quitte sa page
+    }
 }
 window.applyCommercialFlag = applyCommercialFlag;
 window.onCommercialToggle = async function (on) {
@@ -16866,6 +16869,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         if (page === 'projects') loadProjects();
         if (page === 'sosprint') loadSosprintProfiles(true);
         if (page === 'print-queue') loadPrintQueue();
+        if (page === 'management') window.StellioManagement?.load();
         if (page === 'dashboard') loadDashboard();
         closeMobileSidebar();
     });
@@ -17794,6 +17798,9 @@ async function _confirmSendToSlicer(force, ignoreStock) {
             showToast(res.ok ? I18N.t('toast.files_sent') : data.error, res.ok ? 'success' : 'error');
         }
         if (res.ok && data.stock_warning) _showStockWarningToast(data.stock_warning);
+        if (res.ok && data.consume && data.consume.done === false && data.consume.reason === 'no_weight') {
+            showToast(_t2('toast.consume_skipped', "Poids du fichier inconnu : la bobine n'a pas été décomptée (tranchez le fichier pour obtenir son poids)"), 'warning');
+        }
     } catch (err) { showToast(I18N.t('toast.send_error'), 'error'); }
     currentSlicerOrientation = 'default';
     closeModal('modal-slicer');
@@ -24823,13 +24830,40 @@ function _gcodeItemHtml(g, deleteCall) {
             <i class="fa-solid fa-file-code"></i>
             <span class="gcode-item-name" title="${escapeHtml(g.name)}">${escapeHtml(g.name)}</span>
             <span class="gcode-item-size">${escapeHtml(formatSize(g.size || 0))}</span>
-            <a class="dv-btn" href="${API}/api/projects/gcodes/${g.id}/download" title="${escapeHtml(I18N.t('projects.gcode_download'))}"><i class="fa-solid fa-download"></i></a>
+            <button type="button" class="dv-btn" onclick="downloadProjectGcode(${g.id}, event)" title="${escapeHtml(I18N.t('projects.gcode_download'))}"><i class="fa-solid fa-download"></i></button>
             <button type="button" class="dv-btn" style="color:var(--danger)" title="${escapeHtml(I18N.t('actions.delete'))}" onclick="${deleteCall}"><i class="fa-solid fa-trash"></i></button>
         </div>
         ${chips ? `<div class="gcode-chips">${chips}</div>` : ''}
         <textarea class="gcode-notes" rows="2" placeholder="${escapeHtml(I18N.t('projects.gcode_notes_ph'))}" onchange="saveProjectGcodeNotes(${g.id}, this.value)">${escapeHtml(g.notes || '')}</textarea>
     </div>`;
 }
+
+// Téléchargement d'un G-code : récupéré puis enregistré par le navigateur (un simple lien ne fait rien dans la fenêtre de l'application de bureau)
+window.downloadProjectGcode = async function (id, ev) {
+    if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+    try {
+        const res = await fetch(`${API}/api/projects/gcodes/${id}/download`);
+        if (!res.ok) {
+            let msg = '';
+            try { msg = (await res.json()).error; } catch (_) { /* pas de JSON */ }
+            showToast(msg || I18N.t('toast.error') || 'Erreur', 'error');
+            return;
+        }
+        const blob = await res.blob();
+        const cd = res.headers.get('Content-Disposition') || '';
+        const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
+        let name = 'fichier.gcode';
+        if (m) { const raw = m[1] || m[2]; try { name = decodeURIComponent(raw); } catch (_) { name = raw; } }
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = name; a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { a.remove(); window.URL.revokeObjectURL(url); }, 4000);
+    } catch (err) {
+        showToast(I18N.t('toast.connection_error') || 'Erreur de connexion', 'error');
+    }
+};
 
 function _projectGcodeSectionHtml(projectId, gcodes) {
     const items = gcodes.map(g => _gcodeItemHtml(g, `deleteProjectGcode(${projectId}, ${g.id})`)).join('');

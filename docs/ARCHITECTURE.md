@@ -12,9 +12,12 @@ stellio/
 │   ├── print_session.py       prise connectée, consommation réelle, photo de fin, surveillance IA
 │   ├── timelapse.py  mqtt_publisher.py  push_notify.py  share_link.py  order_tracking.py
 │   ├── auto_backup_routes.py  feedback.py  remote_instances.py  slicer_profiles.py
-│   └── clients.py  trash_routes.py  tigertag.py  sosprint_helpers.py
+│   ├── clients.py  trash_routes.py  tigertag.py  sosprint_helpers.py
+│   └── quote_portal.py  accounting_zip.py  parts_stock.py  printer_dispatch.py
+│       digest.py  filament_weighing.py  profile_share.py        (v1.0.6, écran « Gestion »)
 ├── interface/               Interface (JavaScript pur, sans compilation)
 │   ├── index.html  script.js  style.css
+│   ├── management.js          écran « Gestion » (v1.0.6)
 │   └── sw.js                  service worker (servi à /sw.js)
 ├── packaging/               Empaquetage de l'application de bureau
 │   ├── launcher.py            lanceur (PyInstaller)
