@@ -375,7 +375,7 @@ stellio/
 ├── release-notes/          # notes_version_X.Y.Z.txt (release texts)
 ├── tests/  tools/          # pytest tests, maintenance tools (incl. stellio_manager.bat)
 ├── check_deps.py           # Self-healing dependency checker
-├── modules/            # modules séparés de main.py (print_session, share_link, timelapse, mqtt_publisher, quote_portal, digest…)
+├── modules/                # separate modules of main.py (print_session, share_link, timelapse, mqtt_publisher, quote_portal, digest…)
 ├── worker.py               # Unused 3MF worker skeleton (placeholder, not wired in yet)
 ├── assets/                 # Logos, icons
 ├── languages/              # Translation files (JSON)
