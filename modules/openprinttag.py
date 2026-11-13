@@ -517,16 +517,25 @@ def build_tag_file(main, aux=None, tag_size=320, aux_size=32):
 
 
 # ── UUID dérivés (spécification §3.2) ───────────────────────────────────────────────────────────────────────────────
+def _uuid5(namespace, name):
+    """UUID v5 avec un nom en octets. uuid.uuid5 n'accepte que du texte avant Python 3.12 (TypeError sur 3.11) : on calcule donc le SHA-1 nous-mêmes."""
+    import hashlib
+    h = bytearray(hashlib.sha1(namespace.bytes + bytes(name)).digest()[:16])
+    h[6] = (h[6] & 0x0F) | 0x50
+    h[8] = (h[8] & 0x3F) | 0x80
+    return _uuid.UUID(bytes=bytes(h))
+
+
 def brand_uuid(brand_name):
-    return _uuid.uuid5(NS_BRAND, brand_name.encode('utf-8'))
+    return _uuid5(NS_BRAND, brand_name.encode('utf-8'))
 
 
 def material_uuid(brand_name, material_name):
-    return _uuid.uuid5(NS_MATERIAL, brand_uuid(brand_name).bytes + material_name.encode('utf-8'))
+    return _uuid5(NS_MATERIAL, brand_uuid(brand_name).bytes + material_name.encode('utf-8'))
 
 
 def instance_uuid_from_tag(tag_uid):
-    return _uuid.uuid5(NS_INSTANCE, bytes(tag_uid))
+    return _uuid5(NS_INSTANCE, bytes(tag_uid))
 
 
 # ── Correspondance bobine Stellio ↔ champs OpenPrintTag ─────────────────────────────────────────────────────────────
