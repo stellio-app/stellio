@@ -400,7 +400,8 @@ def test_ai_ok_resets_counter_and_uses_image_and_progress(env):
     assert '41%' in prompt and kw['images'] and base64.b64decode(kw['images'][0])[:2] == b'\xff\xd8'
 
 
-def test_ai_alert_marks_end_photo_failed(env):
+def test_ai_alert_gives_a_single_end_photo_left_to_the_user(env):
+    # v1.0.7 : une seule photo (celle de fin), « Réussi » par défaut ; la raison IA est dans son commentaire, l'utilisateur tranche
     pr = _printer(ai_watch=True, end_photo=True)
     env['_ai']['text'] = '{"verdict":"failed","reason":"detached"}'
     t = _run_ai(env, 1000.0, pr, 1)
@@ -408,7 +409,9 @@ def test_ai_alert_marks_end_photo_failed(env):
     env['_v104_step'](pr, {'status': 'idle'}, t + 600)
     env['_v104_step'](pr, {'status': 'idle'}, t + 620)
     res = [r['result'] for r in env['_db']().execute("SELECT result FROM print_photos ORDER BY id").fetchall()]
-    assert res == ['failed', 'failed']
+    assert res == ['success']
+    note = env['_db']().execute("SELECT note FROM print_photos").fetchone()['note']
+    assert 'detached' in note
 
 
 def test_ai_privacy_and_guards(env):

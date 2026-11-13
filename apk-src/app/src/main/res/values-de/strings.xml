@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Stellio</string>
+    <string name="setup_title">Mit Ihrem Stellio-Server verbinden</string>
+    <string name="edition_note">Stellio-Server (Raspberry Pi / LXC). Die Windows-App ist vom Handy aus nicht erreichbar.</string>
+    <string name="setup_help">Tragen Sie eine oder beide Adressen ein: Die App nutzt zu Hause die interne Adresse und wechselt unterwegs automatisch zur externen (und zurück). Den Kopplungs-QR-Code finden Sie in Stellio (mobiler Zugriff, Format „App“).</string>
+    <string name="local_label">Interne Adresse (Heimnetz)</string>
+    <string name="local_hint">http://192.168.1.50:5000</string>
+    <string name="remote_label">Externe Adresse (außerhalb)</string>
+    <string name="remote_hint">https://… (optional)</string>
+    <string name="scan_qr">Kopplungs-QR-Code scannen</string>
+    <string name="connect">Speichern und verbinden</string>
+    <string name="connecting">Verbinde…</string>
+    <string name="bad_url">Ungültige Adresse.</string>
+    <string name="need_one">Mindestens eine Adresse eingeben.</string>
+    <string name="not_stellio">Unter diesen Adressen antwortet kein Stellio-Server.</string>
+    <string name="paired">Adressen gespeichert</string>
+    <string name="to_local">Verbunden über die interne Adresse</string>
+    <string name="to_remote">Verbunden über die externe Adresse</string>
+    <string name="offline_title">Server nicht erreichbar</string>
+    <string name="offline_text">Prüfen Sie, ob der Server läuft und die Adressen stimmen. Neuer Versuch alle paar Sekunden.</string>
+    <string name="addr_local">Intern</string>
+    <string name="addr_remote">Extern</string>
+    <string name="retry">Erneut versuchen</string>
+    <string name="edit_addresses">Adressen ändern</string>
+    <string name="press_again">Zum Beenden erneut Zurück drücken</string>
+</resources>

@@ -569,7 +569,9 @@ jobs:
   # ──────────────────────────────────────────────────────────────────────
   build-linux:
     needs: check-version
-    runs-on: ubuntu-latest
+    # Base « old stable » : compiler sur une distribution plus ancienne (glibc 2.35) pour que l'AppImage tourne sur davantage de machines.
+    # (ubuntu-20.04 n'existe plus chez GitHub depuis avril 2025 : ubuntu-22.04 est la plus ancienne image disponible.)
+    runs-on: ubuntu-22.04
     timeout-minutes: 45   # un job qui bloque (réseau du runner) est arrêté au lieu de tourner des heures
     steps:
       - name: Checkout
@@ -759,29 +761,47 @@ jobs:
           EOF
           chmod +x AppDir/AppRun
 
-      - name: Download appimagetool and build the AppImage
+      - name: Download appimagetool and build the AppImage (avec informations de mise à jour + fichier .zsync)
         run: |
+          sudo apt-get install -y zsync || (sudo apt-get update && sudo apt-get install -y zsync)
+          command -v zsyncmake >/dev/null || { echo "zsyncmake introuvable : le fichier .zsync ne serait pas créé"; exit 1; }
           wget -q -O appimagetool "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
           chmod +x appimagetool
-          ./appimagetool --appimage-extract-and-run AppDir "Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage"
-          chmod +x "Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage"
-          sha256sum "Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage" \
-            > "Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage.sha256"
+          # -u : intègre l'information de mise à jour dans l'AppImage et génère le .zsync à côté (suivi des versions, mises à jour delta)
+          ./appimagetool --appimage-extract-and-run \
+            -u "gh-releases-zsync|stellio-app|stellio|latest|Stellio-v*-x86_64.AppImage.zsync" \
+            AppDir "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage"
+          test -f "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage.zsync" || { echo "Le .zsync n'a pas été généré"; exit 1; }
+          chmod +x "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage"
+          sha256sum "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage" \
+            > "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage.sha256"
 
       - name: Upload Linux AppImage artifact
         uses: actions/upload-artifact@v4
         with:
           name: stellio-linux-appimage
           path: |
-            Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage
-            Stellio-v${{ needs.check-version.outputs.version }}-linux-x86_64.AppImage.sha256
+            Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage
+            Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage.sha256
+            Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage.zsync
+
+  # ──────────────────────────────────────────────────────────────────────
+  # 2 bis. Application Android : recompilée seulement si apk-src/ a changé depuis la release précédente
+  # ──────────────────────────────────────────────────────────────────────
+  build-apk:
+    needs: [check-version]
+    if: needs.check-version.outputs.should_release == 'true'
+    uses: ./.github/workflows/build-apk.yml
+    with:
+      only_if_changed: true
+    secrets: inherit
 
   # ──────────────────────────────────────────────────────────────────────
   # 3. Publication en DRAFT (Brouillon) pour édition manuelle
   # ──────────────────────────────────────────────────────────────────────
   release:
-    needs: [check-version, build, build-macos, build-linux]
-    if: needs.check-version.outputs.should_release == 'true'
+    needs: [check-version, build, build-macos, build-linux, build-apk]
+    if: ${{ !cancelled() && needs.check-version.outputs.should_release == 'true' && needs.build.result == 'success' && needs.build-macos.result == 'success' && needs.build-linux.result == 'success' && needs.build-apk.result != 'failure' }}
     runs-on: windows-latest
     steps:
       - name: Download Windows installer artifact
@@ -815,6 +835,13 @@ jobs:
           name: stellio-linux-appimage
           path: release-files
 
+      - name: Download Android APK (si recompilé pour cette release)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: stellio-apk
+          path: release-files
+
       - name: Compute SHA256 checksum of Windows installer
         shell: pwsh
         run: |
@@ -833,5 +860,7 @@ jobs:
             release-files/*.exe
             release-files/*.dmg
             release-files/*.AppImage
+            release-files/*.zsync
             release-files/*.sha256
+            release-files/*.apk
             release-files/*.zip

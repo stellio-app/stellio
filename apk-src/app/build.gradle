@@ -1,0 +1,50 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.stellioapp.companion'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.stellioapp.companion'
+        minSdk 29
+        targetSdk 34
+        versionCode 107
+        versionName '1.0.7'
+        resConfigs 'en', 'fr', 'de', 'es', 'pt', 'it', 'zh', 'ja'
+    }
+
+    signingConfigs {
+        release {
+            // Clé de signature fournie par la CI (secrets GitHub) ; sans elle, la clé de debug est utilisée.
+            def ks = System.getenv('STELLIO_KEYSTORE')
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv('STELLIO_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('STELLIO_KEY_ALIAS')
+                keyPassword System.getenv('STELLIO_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+            signingConfig System.getenv('STELLIO_KEYSTORE') ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    buildFeatures { buildConfig false }
+}
+
+dependencies {
+    // Scanner de QR code fourni par Google Play Services : aucune permission caméra à demander.
+    implementation 'com.google.android.gms:play-services-code-scanner:16.1.0'
+}

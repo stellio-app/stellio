@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Stellio</string>
+    <string name="setup_title">Conectar con su servidor Stellio</string>
+    <string name="edition_note">Servidor Stellio (Raspberry Pi / LXC). La aplicación de Windows no es accesible desde el móvil.</string>
+    <string name="setup_help">Indique una o las dos direcciones: la app usa la interna en casa y cambia a la externa fuera (y viceversa), automáticamente. El código QR de vinculación está en Stellio (acceso móvil, formato «App»).</string>
+    <string name="local_label">Dirección interna (red local)</string>
+    <string name="local_hint">http://192.168.1.50:5000</string>
+    <string name="remote_label">Dirección externa (fuera de casa)</string>
+    <string name="remote_hint">https://… (opcional)</string>
+    <string name="scan_qr">Escanear el QR de vinculación</string>
+    <string name="connect">Guardar y conectar</string>
+    <string name="connecting">Conectando…</string>
+    <string name="bad_url">Dirección no válida.</string>
+    <string name="need_one">Introduzca al menos una dirección.</string>
+    <string name="not_stellio">Ningún servidor Stellio responde en estas direcciones.</string>
+    <string name="paired">Direcciones guardadas</string>
+    <string name="to_local">Conectado por la dirección interna</string>
+    <string name="to_remote">Conectado por la dirección externa</string>
+    <string name="offline_title">Servidor inaccesible</string>
+    <string name="offline_text">Compruebe que el servidor está encendido y que las direcciones son correctas. Nuevo intento cada pocos segundos.</string>
+    <string name="addr_local">Interna</string>
+    <string name="addr_remote">Externa</string>
+    <string name="retry">Reintentar</string>
+    <string name="edit_addresses">Modificar las direcciones</string>
+    <string name="press_again">Pulse atrás otra vez para salir</string>
+</resources>

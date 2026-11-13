@@ -156,7 +156,7 @@ def api_remote_instances_send(instance_id):
             'path': file_path, 'name': os.path.basename(file_path), 'created': time.time(),
         }
     local_ip = get_local_ip()
-    share_url = f"http://{local_ip}:5000/share/{token}"
+    share_url = f"http://{local_ip}:{_MAIN.get('SERVER_PORT') or _MAIN.get('SERVER_PORT_RESOLVED') or 5000}/share/{token}"
 
     try:
         r = requests.post(

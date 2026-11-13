@@ -2071,7 +2071,7 @@ const _HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const savedTheme = localStorage.getItem('stellio-theme') || 'auto';
 const savedFabricant = localStorage.getItem('stellio-fabricant') || 'stellio';
 if (savedTheme === 'auto') {
-const isLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+const isLight = !(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);   // clair par défaut : sombre seulement si le système le demande
 document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
 } else {
 document.documentElement.setAttribute('data-theme', savedTheme);
@@ -3424,7 +3424,8 @@ window.openGcodeDetails = function (gid) {
             </tbody></table>
             <textarea class="gcode-notes" rows="3" placeholder="${e(I18N.t('projects.gcode_notes_ph'))}" onchange="saveProjectGcodeNotes(${g.id}, this.value)">${e(g.notes || '')}</textarea>
             <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
-                <button type="button" class="btn btn-primary btn-sm" onclick="downloadProjectGcode(${g.id}, event)"><i class="fa-solid fa-download"></i> ${e(I18N.t('projects.gcode_download'))}</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="openProjectGcodeInSlicer(${g.id}, event)"><i class="fa-solid fa-paper-plane"></i> ${e(I18N.t('projects.gcode_open_slicer'))}</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="downloadProjectGcode(${g.id}, event)"><i class="fa-solid fa-download"></i> ${e(I18N.t('projects.gcode_download'))}</button>
                 ${linkedFile ? `<button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('modal-gcode-details'); openProjectFile3D('${escapeJs(linkedFile.path)}')"><i class="fa-solid fa-cube"></i> ${e(I18N.t('gcode.open_file'))}</button>` : ''}
             </div>
         </div>
@@ -11879,7 +11880,7 @@ function applyTheme(mode) {
 const _pal = (typeof _getPaletteId === 'function') ? STELLIO_PALETTES.find(p => p.id === _getPaletteId()) : null;
 if (_pal) { document.documentElement.setAttribute('data-theme', _pal.mode); return; }
 if (mode === 'auto') {
-const isLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+const isLight = !(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);   // clair par défaut : sombre seulement si le système le demande
 document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
 } else {
 document.documentElement.setAttribute('data-theme', mode);
@@ -11951,10 +11952,10 @@ if (accentPicker) accentPicker.value = '#4ea1d3';
 applyFabricant(fabricant);
 });
 if (window.matchMedia) {
-window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', e => {
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
 if ((localStorage.getItem('stellio-theme') || 'auto') === 'auto') {
 applyTheme('auto');
-console.log('[Theme] 🔄 Système:', e.matches ? I18N.t('settings.theme_light') : I18N.t('settings.theme_dark'));
+console.log('[Theme] 🔄 Système:', e.matches ? I18N.t('settings.theme_dark') : I18N.t('settings.theme_light'));
 }
 });
 }
@@ -17842,8 +17843,9 @@ const mainContent = document.querySelector('.main-content');
 const scrollToTopBtn = document.getElementById('scroll-to-top');
 if (mainContent && scrollToTopBtn) {
     mainContent.addEventListener('scroll', () => {
-        if (mainContent.scrollTop > 300) scrollToTopBtn.classList.add('visible');
-        else scrollToTopBtn.classList.remove('visible');
+        const show = mainContent.scrollTop > 300;
+        scrollToTopBtn.classList.toggle('visible', show);
+        document.body.classList.toggle('has-scroll-top', show);   // le badge d'impression passe à gauche pour ne pas être masqué
     });
     scrollToTopBtn.addEventListener('click', () => { mainContent.scrollTo({ top: 0, behavior: 'smooth' }); });
 }
@@ -19834,14 +19836,32 @@ let _refreshAllPrintersRunning = false;
 let _lastPrinterStatus = {};
 let _miniWidgetDismissedFor = new Set();
 let _miniWidgetCurrentPid = null;
+let _miniWidgetHasContent = false;
+
+// Le badge de progression est inutile (et gênant) quand on est déjà sur la page des imprimantes ou dans la fenêtre d'une imprimante.
+function _miniWidgetSuppressed() {
+    return !!document.getElementById('page-printers')?.classList.contains('active') || currentMonitorPid != null;
+}
+
+function _applyMiniWidgetVisibility() {
+    const widget = document.getElementById('mini-printer-widget');
+    if (!widget) return;
+    const show = _miniWidgetHasContent && !_miniWidgetSuppressed();
+    widget.classList.toggle('hidden', !show);
+    document.body.classList.toggle('has-mini-printer', show);       // réserve de la place en bas des pages (mobile)
+}
+document.addEventListener('DOMContentLoaded', () => {
+    const pg = document.getElementById('page-printers');
+    if (pg) new MutationObserver(_applyMiniWidgetVisibility).observe(pg, { attributes: true, attributeFilter: ['class'] });
+});
 
 function _updateMiniPrinterWidget(activeList) {
     const widget = document.getElementById('mini-printer-widget');
     if (!widget) return;
     const visible = activeList.filter(({ printer }) => !_miniWidgetDismissedFor.has(printer.id));
-    document.body.classList.toggle('has-mini-printer', visible.length > 0);   // réserve de la place en bas des pages (mobile)
+    _miniWidgetHasContent = visible.length > 0;
     if (!visible.length) {
-        widget.classList.add('hidden');
+        _applyMiniWidgetVisibility();
         _miniWidgetCurrentPid = null;
         return;
     }
@@ -19860,13 +19880,13 @@ function _updateMiniPrinterWidget(activeList) {
     } else {
         extraEl.classList.add('hidden');
     }
-    widget.classList.remove('hidden');
+    _applyMiniWidgetVisibility();
 }
 
 window.dismissMiniPrinterWidget = function () {
     if (_miniWidgetCurrentPid != null) _miniWidgetDismissedFor.add(_miniWidgetCurrentPid);
-    document.getElementById('mini-printer-widget')?.classList.add('hidden');
-    document.body.classList.remove('has-mini-printer');
+    _miniWidgetHasContent = false;
+    _applyMiniWidgetVisibility();
 };
 
 window._openMiniWidgetTarget = function () {
@@ -20751,6 +20771,7 @@ function openPrinterMonitor(pid) {
     const printer = printersList.find(p => p.id === pid);
     if (!printer) return;
     currentMonitorPid = pid;
+    _applyMiniWidgetVisibility();
     const cardCam = document.querySelector(`.printer-card-camera[data-pid="${pid}"]`);
     if (cardCam) _stopPrinterCardCamera(cardCam);
     let modal = document.getElementById('modal-printer-monitor');
@@ -20967,6 +20988,7 @@ function closePrinterMonitor() {
     const closedPid = currentMonitorPid;
     cameraLoadedForPid = null;
     currentMonitorPid = null;
+    _applyMiniWidgetVisibility();
     if (closedPid != null) {
         const cardCam = document.querySelector(`.printer-card-camera[data-pid="${closedPid}"]`);
         if (cardCam) _startPrinterCardCamera(cardCam, closedPid);
@@ -23184,14 +23206,29 @@ startThumbAutoRefresh();
         _reloadPrintPhotos();
     };
 
+    // Badge Raté / Réussi : un clic le bascule (la photo automatique de fin est « Réussi » par défaut, à corriger si besoin).
+    function photoResultBadge(p) {
+        const failed = p.result === 'failed';
+        const label = failed ? (I18N.t('modal.print_photos_failed') || 'Raté') : (I18N.t('modal.print_photos_success') || 'Réussi');
+        return `<button type="button" class="photo-result-badge" data-result="${failed ? 'failed' : 'success'}" title="${escapeHtml(I18N.t('modal.print_photos_toggle') || 'Cliquer pour changer : Raté / Réussi')}" onclick="togglePrintPhotoResult(${p.id}, this)" style="position:absolute; top:4px; left:4px; padding:2px 7px; border-radius:10px; font-size:calc(10px * var(--fs, 1)); font-weight:600; color:#fff; border:none; cursor:pointer; background:${failed ? 'rgba(220,53,69,0.85)' : 'rgba(40,167,69,0.85)'};"><i class="fa-solid ${failed ? 'fa-xmark' : 'fa-check'}"></i> ${label}</button>`;
+    }
+    window.togglePrintPhotoResult = async function (id, btn) {
+        const next = btn.dataset.result === 'failed' ? 'success' : 'failed';
+        try {
+            const res = await fetch(`${API}/api/print-photos/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ result: next }) });
+            if (!res.ok) throw new Error('http ' + res.status);
+            btn.outerHTML = photoResultBadge({ id, result: next });
+        } catch (e) {
+            showToast(I18N.t('toast.connection_error'), 'error');
+        }
+    };
+
     function _photoCardHtml(p) {
         const isFailed = p.result === 'failed';
         return `
             <div style="position:relative; border-radius:var(--radius); overflow:hidden; background:var(--bg-card); border:1px solid var(--border);">
                 <img src="${API}${p.url}" loading="lazy" style="width:100%; aspect-ratio:1; object-fit:cover; display:block; cursor:pointer;" onclick="openPhotoLightbox('${API}${p.url}', '${escapeHtml(p.file_name)}')">
-                <span style="position:absolute; top:4px; left:4px; padding:2px 7px; border-radius:10px; font-size:calc(10px * var(--fs, 1)); font-weight:600; color:#fff; background:${isFailed ? 'rgba(220,53,69,0.85)' : 'rgba(40,167,69,0.85)'};">
-                    <i class="fa-solid ${isFailed ? 'fa-xmark' : 'fa-check'}"></i> ${isFailed ? (I18N.t('modal.print_photos_failed') || 'Raté') : (I18N.t('modal.print_photos_success') || 'Réussi')}
-                </span>
+                ${photoResultBadge(p)}
                 <button onclick="deletePrintPhoto(${p.id})" title="${I18N.t('actions.delete') || 'Supprimer'}" style="position:absolute; top:4px; right:4px; width:24px; height:24px; border-radius:50%; background:rgba(0,0,0,0.6); color:#fff; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;">
                     <i class="fa-solid fa-xmark" style="font-size:calc(11px * var(--fs, 1));"></i>
                 </button>
@@ -23262,9 +23299,7 @@ startThumbAutoRefresh();
                 return `
                 <div style="position:relative; border-radius:var(--radius); overflow:hidden; background:var(--bg-card); border:1px solid var(--border);">
                     <img src="${API}${p.url}" loading="lazy" style="width:100%; aspect-ratio:1; object-fit:cover; display:block; cursor:pointer;" onclick="openPhotoLightbox('${API}${p.url}', '${escapeHtml(p.file_name)}')">
-                    <span style="position:absolute; top:4px; left:4px; padding:2px 7px; border-radius:10px; font-size:calc(10px * var(--fs, 1)); font-weight:600; color:#fff; background:${isFailed ? 'rgba(220,53,69,0.85)' : 'rgba(40,167,69,0.85)'};">
-                        <i class="fa-solid ${isFailed ? 'fa-xmark' : 'fa-check'}"></i> ${isFailed ? (I18N.t('modal.print_photos_failed') || 'Raté') : (I18N.t('modal.print_photos_success') || 'Réussi')}
-                    </span>
+                    ${photoResultBadge(p)}
                     <button onclick="deletePrintPhoto(${p.id})" title="${I18N.t('actions.delete') || 'Supprimer'}" style="position:absolute; top:4px; right:4px; width:24px; height:24px; border-radius:50%; background:rgba(0,0,0,0.6); color:#fff; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;">
                         <i class="fa-solid fa-xmark" style="font-size:calc(11px * var(--fs, 1));"></i>
                     </button>
@@ -24830,6 +24865,7 @@ function _gcodeItemHtml(g, deleteCall) {
             <i class="fa-solid fa-file-code"></i>
             <span class="gcode-item-name" title="${escapeHtml(g.name)}">${escapeHtml(g.name)}</span>
             <span class="gcode-item-size">${escapeHtml(formatSize(g.size || 0))}</span>
+            <button type="button" class="dv-btn" onclick="openProjectGcodeInSlicer(${g.id}, event)" title="${escapeHtml(I18N.t('projects.gcode_open_slicer'))}"><i class="fa-solid fa-paper-plane"></i></button>
             <button type="button" class="dv-btn" onclick="downloadProjectGcode(${g.id}, event)" title="${escapeHtml(I18N.t('projects.gcode_download'))}"><i class="fa-solid fa-download"></i></button>
             <button type="button" class="dv-btn" style="color:var(--danger)" title="${escapeHtml(I18N.t('actions.delete'))}" onclick="${deleteCall}"><i class="fa-solid fa-trash"></i></button>
         </div>
@@ -24837,6 +24873,20 @@ function _gcodeItemHtml(g, deleteCall) {
         <textarea class="gcode-notes" rows="2" placeholder="${escapeHtml(I18N.t('projects.gcode_notes_ph'))}" onchange="saveProjectGcodeNotes(${g.id}, this.value)">${escapeHtml(g.notes || '')}</textarea>
     </div>`;
 }
+
+// Envoi d'un G-code de « Mes G-codes » vers le slicer par défaut
+window.openProjectGcodeInSlicer = async function (id, ev) {
+    if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+    try {
+        const res = await fetch(`${API}/api/projects/gcodes/${id}/open-in-slicer`, { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { showToast(data.error || I18N.t('toast.error') || 'Erreur', 'error'); return; }
+        if (data.pc_open) _openInPcSlicer(data.pc_open);
+        else showToast(I18N.t('toast.files_sent'), 'success');
+    } catch (err) {
+        showToast(I18N.t('toast.connection_error') || 'Erreur de connexion', 'error');
+    }
+};
 
 // Téléchargement d'un G-code : récupéré puis enregistré par le navigateur (un simple lien ne fait rien dans la fenêtre de l'application de bureau)
 window.downloadProjectGcode = async function (id, ev) {

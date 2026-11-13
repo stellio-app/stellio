@@ -1,0 +1,92 @@
+name: Build APK
+
+# Compile l'application Android (apk-src/) et met à jour apk/stellio.apk (lien utilisé par le QR code de Stellio).
+# - Appelé par « Build, sign and release Stellio » à chaque nouvelle release : l'APK n'est recompilé que si apk-src/ a changé
+#   depuis la release précédente.
+# - Lancement manuel (Actions → Build APK → Run workflow) : compile toujours.
+on:
+  workflow_call:
+    inputs:
+      only_if_changed:
+        type: boolean
+        default: false
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Faut-il compiler ?
+        id: decide
+        run: |
+          BUILD=true
+          if [ "${{ inputs.only_if_changed }}" = "true" ]; then
+            LAST=$(git tag --list 'v*' --sort=-v:refname | head -1)
+            if [ -n "$LAST" ] && [ -f apk/stellio.apk ] && git diff --quiet "$LAST" HEAD -- apk-src; then
+              BUILD=false
+              echo "apk-src/ inchangé depuis $LAST : APK non recompilé."
+            fi
+          fi
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        if: steps.decide.outputs.build == 'true'
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.decide.outputs.build == 'true'
+        with:
+          gradle-version: '8.7'
+
+      - name: Clé de signature (secrets facultatifs)
+        if: steps.decide.outputs.build == 'true'
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/stellio.jks"
+            echo "STELLIO_KEYSTORE=$RUNNER_TEMP/stellio.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::ANDROID_KEYSTORE_B64 absent : APK signé avec la clé de debug (la signature peut changer d'un build à l'autre)."
+          fi
+
+      - name: Compiler
+        if: steps.decide.outputs.build == 'true'
+        env:
+          STELLIO_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          STELLIO_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          STELLIO_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: gradle -p apk-src assembleRelease --no-daemon
+
+      - name: Copier vers apk/stellio.apk
+        if: steps.decide.outputs.build == 'true'
+        run: |
+          mkdir -p apk
+          cp apk-src/app/build/outputs/apk/release/app-release.apk apk/stellio.apk
+          ls -l apk/stellio.apk
+
+      - uses: actions/upload-artifact@v4
+        if: steps.decide.outputs.build == 'true'
+        with:
+          name: stellio-apk
+          path: apk/stellio.apk
+
+      - name: Commit de l'APK sur main
+        if: steps.decide.outputs.build == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apk/stellio.apk
+          if git diff --cached --quiet; then echo "APK identique."; exit 0; fi
+          git commit -m "APK mis à jour [skip ci]"
+          git pull --rebase origin main
+          git push origin HEAD:main

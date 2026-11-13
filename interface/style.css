@@ -9910,3 +9910,21 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
 .mg-pre{white-space:pre-wrap;background:var(--bg-input,transparent);border:1px solid var(--border,#444);border-radius:8px;padding:10px;font:inherit;font-size:calc(12px * var(--fs,1));margin:10px 0 0}
 .mg-empty{color:var(--text-muted,inherit);font-size:calc(12.5px * var(--fs,1))}
 .mg-msg{min-height:18px;font-size:calc(12.5px * var(--fs,1));margin:0 0 6px}.mg-msg.ok{color:#22c55e}.mg-msg.bad{color:#ef4444}
+
+.source-banner-forecast { background: linear-gradient(135deg, rgba(168,85,247,0.10), rgba(168,85,247,0.02)); border: 1px solid rgba(168,85,247,0.3); }
+.source-banner-forecast .source-banner-icon { background: rgba(168,85,247,0.15); color: #a855f7; }
+.spool-forecast { font-size: calc(11.5px * var(--fs, 1)); color: var(--text-muted); margin-top: 8px; line-height: 1.4; }
+.spool-forecast b { color: var(--text-primary); font-weight: 600; }
+.spool-forecast.low b { color: var(--danger, #ef4444); }
+.spool-card .spool-auto { font-size: calc(11px * var(--fs, 1)); color: var(--text-muted); margin-top: 6px; }
+.mg-weigh-card { margin-top: 16px; }
+
+/* v1.0.7 : quand la flèche « haut de page » est affichée, le badge d'impression se place juste à sa gauche (même ligne), sur toutes les pages */
+#bottom-stack:has(> .scroll-to-top.visible) > .mini-printer-widget {
+    position: absolute !important;
+    right: 60px !important;
+    bottom: 0 !important;
+}
+@media (max-width: 860px) {
+    #bottom-stack:has(> .scroll-to-top.visible) > .mini-printer-widget { left: 0 !important; right: 60px !important; max-width: none; }
+}

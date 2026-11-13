@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Stellio</string>
+    <string name="setup_title">Stellio サーバーに接続</string>
+    <string name="edition_note">Stellio サーバー（Raspberry Pi / LXC）。Windows 版はスマホから利用できません。</string>
+    <string name="setup_help">アドレスは片方または両方を入力してください。自宅では内部アドレス、外出先では外部アドレスに自動で切り替わります（戻るときも自動）。ペアリング用 QR コードは Stellio 内（モバイルアクセス、「App」形式）にあります。</string>
+    <string name="local_label">内部アドレス（自宅ネットワーク）</string>
+    <string name="local_hint">http://192.168.1.50:5000</string>
+    <string name="remote_label">外部アドレス（外出先）</string>
+    <string name="remote_hint">https://…（任意）</string>
+    <string name="scan_qr">ペアリング QR を読み取る</string>
+    <string name="connect">保存して接続</string>
+    <string name="connecting">接続中…</string>
+    <string name="bad_url">アドレスが正しくありません。</string>
+    <string name="need_one">アドレスを1つ以上入力してください。</string>
+    <string name="not_stellio">これらのアドレスで応答する Stellio サーバーがありません。</string>
+    <string name="paired">アドレスを保存しました</string>
+    <string name="to_local">内部アドレスで接続しました</string>
+    <string name="to_remote">外部アドレスで接続しました</string>
+    <string name="offline_title">サーバーに接続できません</string>
+    <string name="offline_text">サーバーの電源とアドレスを確認してください。数秒ごとに再試行します。</string>
+    <string name="addr_local">内部</string>
+    <string name="addr_remote">外部</string>
+    <string name="retry">再試行</string>
+    <string name="edit_addresses">アドレスを変更</string>
+    <string name="press_again">もう一度戻るで終了</string>
+</resources>

@@ -18,16 +18,16 @@
 </p>
 
 <p align="center">
-  <img src="docs/demo.gif" alt="Stellio demo" width="860">
+  <img src="../demo.gif" alt="Stellio demo" width="860">
 </p>
 
 <table align="center">
   <tr>
-    <td align="center"><a href="docs/screenshots/02-library.png"><img src="docs/screenshots/02-library.png" width="200"><br>库</a></td>
-    <td align="center"><a href="docs/screenshots/03-viewer.png"><img src="docs/screenshots/03-viewer.png" width="200"><br>3D 查看器</a></td>
-    <td align="center"><a href="docs/screenshots/04-filters.png"><img src="docs/screenshots/04-filters.png" width="200"><br>筛选</a></td>
-    <td align="center"><a href="docs/screenshots/05-repair.png"><img src="docs/screenshots/05-repair.png" width="200"><br>修复</a></td>
-    <td align="center"><a href="docs/screenshots/06-converter.png"><img src="docs/screenshots/06-converter.png" width="200"><br>转换器</a></td>
+    <td align="center"><a href="../screenshots/02-library.png"><img src="../screenshots/02-library.png" width="200"><br>库</a></td>
+    <td align="center"><a href="../screenshots/03-viewer.png"><img src="../screenshots/03-viewer.png" width="200"><br>3D 查看器</a></td>
+    <td align="center"><a href="../screenshots/04-filters.png"><img src="../screenshots/04-filters.png" width="200"><br>筛选</a></td>
+    <td align="center"><a href="../screenshots/05-repair.png"><img src="../screenshots/05-repair.png" width="200"><br>修复</a></td>
+    <td align="center"><a href="../screenshots/06-converter.png"><img src="../screenshots/06-converter.png" width="200"><br>转换器</a></td>
   </tr>
 </table>
 
@@ -375,7 +375,7 @@ stellio/
 ├── release-notes/          # notes_version_X.Y.Z.txt (release texts)
 ├── tests/  tools/          # pytest tests, maintenance tools (incl. stellio_manager.bat)
 ├── check_deps.py       # 自我修复式依赖检查工具
-├── modules/            # modules séparés de main.py (print_session, share_link, timelapse, mqtt_publisher…)
+├── modules/            # 从 main.py 拆分出的模块 (print_session, share_link, timelapse, mqtt_publisher…)
 ├── worker.py           # 未使用的 3MF 工作进程骨架（占位）
 ├── assets/             # 标志、图标
 ├── languages/          # 翻译文件（JSON）

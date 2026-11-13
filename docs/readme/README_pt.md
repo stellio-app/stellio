@@ -18,16 +18,16 @@
 </p>
 
 <p align="center">
-  <img src="docs/demo.gif" alt="Stellio demo" width="860">
+  <img src="../demo.gif" alt="Stellio demo" width="860">
 </p>
 
 <table align="center">
   <tr>
-    <td align="center"><a href="docs/screenshots/02-library.png"><img src="docs/screenshots/02-library.png" width="200"><br>Biblioteca</a></td>
-    <td align="center"><a href="docs/screenshots/03-viewer.png"><img src="docs/screenshots/03-viewer.png" width="200"><br>Visualizador 3D</a></td>
-    <td align="center"><a href="docs/screenshots/04-filters.png"><img src="docs/screenshots/04-filters.png" width="200"><br>Filtros</a></td>
-    <td align="center"><a href="docs/screenshots/05-repair.png"><img src="docs/screenshots/05-repair.png" width="200"><br>Reparo</a></td>
-    <td align="center"><a href="docs/screenshots/06-converter.png"><img src="docs/screenshots/06-converter.png" width="200"><br>Conversor</a></td>
+    <td align="center"><a href="../screenshots/02-library.png"><img src="../screenshots/02-library.png" width="200"><br>Biblioteca</a></td>
+    <td align="center"><a href="../screenshots/03-viewer.png"><img src="../screenshots/03-viewer.png" width="200"><br>Visualizador 3D</a></td>
+    <td align="center"><a href="../screenshots/04-filters.png"><img src="../screenshots/04-filters.png" width="200"><br>Filtros</a></td>
+    <td align="center"><a href="../screenshots/05-repair.png"><img src="../screenshots/05-repair.png" width="200"><br>Reparo</a></td>
+    <td align="center"><a href="../screenshots/06-converter.png"><img src="../screenshots/06-converter.png" width="200"><br>Conversor</a></td>
   </tr>
 </table>
 
@@ -375,7 +375,7 @@ stellio/
 ├── release-notes/          # notes_version_X.Y.Z.txt (release texts)
 ├── tests/  tools/          # pytest tests, maintenance tools (incl. stellio_manager.bat)
 ├── check_deps.py       # Verificador de dependências autorreparável
-├── modules/            # modules séparés de main.py (print_session, share_link, timelapse, mqtt_publisher…)
+├── modules/            # Módulos separados do main.py (print_session, share_link, timelapse, mqtt_publisher…)
 ├── worker.py           # Esqueleto de worker 3MF sem uso (provisório)
 ├── assets/             # Logos, ícones
 ├── languages/          # Arquivos de tradução (JSON)

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<script>try{var t=localStorage.getItem('stellio-theme')||'auto';if(t==='auto')t=(window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';var p=localStorage.getItem('stellio-palette')||'';var LP={"paper":1,"mint":1,"sky":1,"lavender":1,"sakura":1};var DP=['midnight','ocean','forest','dusk','rose','ember','nord'];if(LP[p]||DP.indexOf(p)>-1){document.documentElement.setAttribute('data-palette',p);t=LP[p]?'light':'dark';}document.documentElement.setAttribute('data-theme',t);var c=JSON.parse(localStorage.getItem('stellio-custom-colors')||'null');if(c){for(var k in c){if(/^--[a-z-]+$/.test(k)&&/^#[0-9a-f]{6}$/i.test(c[k]))document.documentElement.style.setProperty(k,c[k]);}}}catch(e){}</script>
+<script>try{var t=localStorage.getItem('stellio-theme')||'auto';if(t==='auto')t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';var p=localStorage.getItem('stellio-palette')||'';var LP={"paper":1,"mint":1,"sky":1,"lavender":1,"sakura":1};var DP=['midnight','ocean','forest','dusk','rose','ember','nord'];if(LP[p]||DP.indexOf(p)>-1){document.documentElement.setAttribute('data-palette',p);t=LP[p]?'light':'dark';}document.documentElement.setAttribute('data-theme',t);var c=JSON.parse(localStorage.getItem('stellio-custom-colors')||'null');if(c){for(var k in c){if(/^--[a-z-]+$/.test(k)&&/^#[0-9a-f]{6}$/i.test(c[k]))document.documentElement.style.setProperty(k,c[k]);}}}catch(e){}</script>
     <script>
     (function () {
         try {
@@ -3128,7 +3128,19 @@
 						</div>
 						<div id="tigertag-grid" class="grid-spoolman" style="margin-top:12px;"></div>
 					</div>
-					<details class="mg-slot-details viewer-hide" style="margin-top:24px;"><summary style="cursor:pointer;font-weight:600;" data-mg-slot-title="fil"></summary><div class="mg-body" data-mg-slot="fil" style="margin-top:10px;"></div></details>
+					<div id="filament-forecast-section" class="inv-section viewer-hide" data-inv-key="forecast" style="margin-top:24px;">
+						<div class="source-banner source-banner-forecast">
+							<div class="source-banner-icon"><i class="fa-solid fa-scale-balanced"></i></div>
+							<div style="flex:1; min-width:0;">
+								<div style="font-weight:600; font-size:calc(14px * var(--fs, 1));" data-mg-slot-title="fil"></div>
+								<div class="source-banner-sub" data-mg-slot-sub="fil"></div>
+							</div>
+							<button class="btn btn-ghost btn-sm" onclick="StellioManagement.filRefresh()" data-i18n-title="actions.refresh" title="Rafraîchir">
+								<i class="fa-solid fa-rotate"></i> <span data-i18n="actions.refresh">Rafraîchir</span>
+							</button>
+						</div>
+						<div class="mg-body" data-mg-slot="fil" style="margin-top:12px;"></div>
+					</div>
 				</div>
             </main>
         </div>

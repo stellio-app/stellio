@@ -1495,6 +1495,58 @@ def _detect_server_edition():
 
 
 IS_SERVER_EDITION = _detect_server_edition()
+
+
+def _port_is_free(port):
+    import socket as _s
+    sk = _s.socket(_s.AF_INET, _s.SOCK_STREAM)
+    try:
+        sk.bind(('0.0.0.0', port))
+        return True
+    except OSError:
+        return False
+    finally:
+        sk.close()
+
+
+def _port_held_by_stellio(port):
+    """Vrai si le port est déjà tenu par un Stellio (réponse JSON {"ok": true} de /api/ping)."""
+    try:
+        import urllib.request as _u
+        with _u.urlopen(f'http://127.0.0.1:{port}/api/ping', timeout=1.5) as r:
+            return b'"ok"' in r.read(200)
+    except Exception:
+        return False
+
+
+def _resolve_server_port():
+    """Port du serveur local. 5000 par défaut ; sur macOS/Windows (applications de bureau), si 5000 est pris par autre chose
+    (typiquement « Récepteur AirPlay » de macOS, qui répond 403 et laisse une fenêtre blanche), on prend le premier port libre suivant."""
+    env = os.environ.get('STELLIO_PORT', '').strip()
+    if env:
+        try:
+            return int(env)
+        except ValueError:
+            pass
+    if IS_SERVER_EDITION or __name__ not in ('__main__', 'stellio_main'):
+        return 5000
+    try:
+        if _port_is_free(5000) or _port_held_by_stellio(5000):
+            return 5000
+        for p in range(5001, 5031):
+            if _port_is_free(p):
+                return p
+    except Exception:
+        pass
+    return 5000
+
+
+SERVER_PORT_RESOLVED = _resolve_server_port()
+
+
+def _local_port():
+    return globals().get('SERVER_PORT') or SERVER_PORT_RESOLVED
+
 if IS_SERVER_EDITION and hasattr(os, 'nice'):
     try:
         os.nice(10)   # priorité basse : un gros scan ne doit jamais rendre la machine (ou l'hôte Proxmox) injoignable
@@ -12017,7 +12069,7 @@ def api_create_share_link():
     if remote_state.get('status') == 'ready' and remote_state.get('url'):
         base_url = remote_state['url'].rstrip('/')
     else:
-        base_url = f"http://{get_local_ip()}:5000"
+        base_url = f"http://{get_local_ip()}:{_local_port()}"
 
     share_url = f"{base_url}/share/{token}"
     app_logger.info(f"[SHARE] Lien créé pour {os.path.basename(file_path)} (token={token[:8]}...)")
@@ -13703,6 +13755,24 @@ def api_get_print_photo_image(photo_id):
     if not os.path.exists(img_path):
         return jsonify({"error": "Fichier image manquant"}), 404
     return send_file(img_path)
+
+
+@app.route('/api/print-photos/<int:photo_id>', methods=['PATCH'])
+@login_required
+def api_update_print_photo(photo_id):
+    data = request.get_json(silent=True) or {}
+    result = str(data.get('result') or '').strip().lower()
+    if result not in ('success', 'failed'):
+        return jsonify({"error": "Résultat invalide"}), 400
+    conn = get_db()
+    try:
+        cur = conn.execute("UPDATE print_photos SET result=? WHERE id=? AND user_id=?", (result, photo_id, session['user_id']))
+        conn.commit()
+        if cur.rowcount == 0:
+            return jsonify({"error": "Introuvable"}), 404
+    finally:
+        conn.close()
+    return jsonify({"id": photo_id, "result": result}), 200
 
 
 @app.route('/api/print-photos/<int:photo_id>', methods=['DELETE'])
@@ -18438,6 +18508,42 @@ def api_project_gcode_download(gid):
     return send_file(path, as_attachment=True, download_name=r['name'])
 
 
+@app.route('/api/projects/gcodes/<int:gid>/open-in-slicer', methods=['POST'])
+@login_required
+def api_project_gcode_open_in_slicer(gid):
+    """Ouvre un G-code de « Mes G-codes » dans le slicer par défaut (sur le PC de l'utilisateur en édition serveur)."""
+    r = _gcode_row(gid)
+    if not r:
+        return jsonify({"error": "Introuvable"}), 404
+    path = os.path.join(_gcode_folder(r['project_id'], r['file_path']), r['stored_name'])
+    if not os.path.isfile(path):
+        return jsonify({"error": "Fichier introuvable"}), 404
+    settings = load_settings() or {}
+    slicer_name = settings.get('default_slicer', 'system_default')
+    try:
+        if IS_SERVER_EDITION:
+            _cleanup_slicer_fetch_links()
+            ftoken = secrets.token_urlsafe(24)
+            with _share_lock:
+                _slicer_fetch_links[ftoken] = {'path': path, 'smb': False, 'smb_kwargs': {}, 'name': r['name'], 'created': time.time()}
+            return jsonify({"message": "ok", "pc_open": {
+                "url": f"{request.host_url.rstrip('/')}/api/slicer-fetch/{ftoken}/{urllib.parse.quote(r['name'])}",
+                "slicer": slicer_name or 'system_default', "name": r['name']}}), 200
+        slicer_path = find_slicer_by_name(slicer_name)
+        if slicer_path:
+            subprocess.Popen([slicer_path, path])
+        elif sys.platform == 'win32':
+            os.startfile(path)
+        else:
+            res = subprocess.run(['open' if sys.platform == 'darwin' else 'xdg-open', path], check=False, capture_output=True, text=True)
+            if res.returncode != 0:
+                raise RuntimeError(res.stderr.strip() or f"code {res.returncode}")
+    except Exception as e:
+        app_logger.warning(f"[G-code] Ouverture dans le slicer impossible : {e}")
+        return jsonify({"error": "Aucun slicer n'est renseigné (ou ouverture impossible). Configurez votre slicer dans Paramètres > Slicer."}), 400
+    return jsonify({"message": "ok", "pc_open": None}), 200
+
+
 @app.route('/api/projects/<int:project_id>/files', methods=['DELETE'])
 @login_required
 def api_remove_project_file(project_id):
@@ -20771,6 +20877,29 @@ def _get_ram_info():
     return None
 
 
+def _printers_tech_summary():
+    """Imprimantes configurées dans Stellio, pour les diagnostics : intégration (type), modèle et état — jamais le nom, l'adresse, la clé d'API ni le numéro de série."""
+    out = []
+    try:
+        conn = get_db()
+        try:
+            rows = conn.execute("SELECT type, config, is_connected FROM printers ORDER BY id").fetchall()
+        finally:
+            conn.close()
+        for r in rows:
+            try:
+                cfg = json.loads(r['config']) if r['config'] else {}
+            except Exception:
+                cfg = {}
+            if not isinstance(cfg, dict):
+                cfg = {}
+            model = str(cfg.get('model') or cfg.get('machine_model') or '').strip()[:60]
+            out.append({'type': str(r['type'] or '?')[:30], 'model': model, 'connected': bool(r['is_connected'])})
+    except Exception as e:
+        app_logger.info(f"[DIAG] liste des imprimantes indisponible : {e}")
+    return out
+
+
 def _collect_diagnostic_info():
     info = {'generated_at': datetime.datetime.now().isoformat(timespec='seconds')}
 
@@ -20829,6 +20958,8 @@ def _collect_diagnostic_info():
         }
     except Exception as e:
         info['stellio_db_error'] = str(e)
+
+    info['printers'] = _printers_tech_summary()     # toujours présent (liste vide s'il n'y en a aucune)
 
     try:
         info['settings'] = _redact_secrets(load_settings() or {})
@@ -22515,7 +22646,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.0.6"
+CURRENT_VERSION = "1.0.7"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -32256,7 +32387,7 @@ def pwa_manifest():
 def api_network_info():
     remote = get_remote_state()
     return jsonify({
-        "local_url": f"http://{get_local_ip()}:5000",
+        "local_url": f"http://{get_local_ip()}:{_local_port()}",
         "remote_url": remote.get('url'),
         "remote_ready": remote.get('status') == 'ready',
     }), 200
@@ -32514,7 +32645,7 @@ def api_qrcode():
             return jsonify({'qr_image': b64, 'url': url, 'format': 'apk'}), 200
 
         local_ip = get_local_ip()
-        local_url = f'http://{local_ip}:5000/'
+        local_url = f'http://{local_ip}:{_local_port()}/'
         remote_state = get_remote_state()
         remote_url = remote_state['url'] if remote_state.get('status') == 'ready' else None
 
@@ -32681,7 +32812,7 @@ def api_remote_access_configure():
 
     threading.Thread(
         target=restart_remote_access,
-        args=(DATA_DIR, 5000, app_logger),
+        args=(DATA_DIR, _local_port(), app_logger),
         kwargs={'token': token, 'fixed_url': fixed_url},
         daemon=True
     ).start()
@@ -32700,7 +32831,7 @@ def api_remote_access_disable_fixed():
 
     threading.Thread(
         target=restart_remote_access,
-        args=(DATA_DIR, 5000, app_logger),
+        args=(DATA_DIR, _local_port(), app_logger),
         kwargs={'token': None, 'fixed_url': None},
         daemon=True
     ).start()
@@ -32775,8 +32906,10 @@ if __name__ in ('__main__', 'stellio_main'):
         except Exception:
             pass
 
-    SERVER_URL = os.environ.get('STELLIO_SERVER_URL', 'http://127.0.0.1:5000')
-    SERVER_PORT = int(os.environ.get('STELLIO_PORT', '5000'))
+    SERVER_PORT = SERVER_PORT_RESOLVED
+    SERVER_URL = os.environ.get('STELLIO_SERVER_URL', f'http://127.0.0.1:{SERVER_PORT}')
+    if SERVER_PORT != 5000 and not os.environ.get('STELLIO_PORT'):
+        app_logger.warning(f"[PORT] Le port 5000 est déjà utilisé par une autre application (sous macOS : « Récepteur AirPlay ») — Stellio utilise le port {SERVER_PORT}.")
     app_logger.info("[*] Démarrage Stellio...")
 
     def ensure_ollama_running():

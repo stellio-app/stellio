@@ -489,6 +489,8 @@ def _v104_ai_check(printer, sess, status, now):
                       f"{name} — {sess['file'] or '?'}" + (f" · {reason}" if reason else ''),
                       f"print_failed_ai_{sess['printer_id']}_{int(sess['start'])}")
             try:
+                if (printer.get('config') or {}).get('end_photo'):
+                    raise RuntimeError('photo de fin active : une seule photo, la raison IA est ajoutée à son commentaire')
                 _v104_save_photo(uid, sess['printer_id'], sess['file'], jpg, 'failed',
                                  _server_t('photo.ai_failure_note', 'Détection IA') + (f" : {reason}" if reason else ''))
             except Exception as e:
@@ -502,7 +504,8 @@ def _v104_new_session(printer, status, now):
     return {'printer_id': printer['id'], 'user_id': printer.get('user_id'), 'name': printer.get('name') or '',
             'file': str(status.get('file') or ''), 'start': now, 'last_ts': now, 'last_w': None, 'wh': 0.0, 'peak': 0.0,
             'samples': 0, 'cnt_start': None, 'next_meter': 0, 'ai_next': now + 120, 'ai_fail': 0, 'ai_alerted': False,
-            'ai_reason': '', 'unknown_since': None, 'error_since': None, 'rest_since': None}
+            'ai_reason': '', 'unknown_since': None, 'error_since': None, 'rest_since': None,
+            'photo_jpg': None, 'photo_ts': 0.0, 'photo_busy': False, 'rest_try': False, 'near_end': False}
 
 
 def _v104_sample(pid, meter, sess, now):
@@ -521,6 +524,43 @@ def _v104_sample(pid, meter, sess, now):
         sess['samples'] += 1
 
 
+V104_PHOTO_NEAR_END_PCT = 95.0     # à partir de là, on interroge l'imprimante plus souvent
+V104_PHOTO_DONE_PCT = 99.5         # photo prise à ce moment : l'impression arrive à 100 %
+V104_PHOTO_RETAKE_S = 20           # tant que l'impression reste à 100 %, la photo est renouvelée (on garde la plus récente)
+
+
+def _v104_progress(status):
+    try:
+        return float(status.get('progress') or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _v104_grab_end_photo(printer, sess):
+    try:
+        jpg = _timelapse_grab_frame(printer)
+        if jpg:
+            sess['photo_jpg'] = jpg
+            sess['photo_ts'] = time.time()
+    except Exception as e:
+        app_logger.info(f"[Photo de fin] capture impossible : {e}")
+    finally:
+        sess['photo_busy'] = False
+
+
+def _v104_early_photo(printer, sess):
+    """Capture immédiate (dans un thread : la caméra peut mettre quelques secondes) ; sert de photo de fin."""
+    if sess['photo_busy']:
+        return
+    sess['photo_busy'] = True
+    threading.Thread(target=_v104_grab_end_photo, args=(printer, sess), daemon=True, name='stellio-end-photo').start()
+
+
+def _v104_loop_delay():
+    """Cadence de la boucle : plus serrée quand une impression approche de la fin (photo au bon moment)."""
+    return 1.0 if any(s.get('near_end') for s in list(_V104_SESS.values())) else 5
+
+
 def _v104_finish(printer, sess, end_phase, end_ts):
     """Fin d'une impression (dans un thread) : énergie mesurée, photo de fin."""
     cfg = printer.get('config') or {}
@@ -528,7 +568,7 @@ def _v104_finish(printer, sess, end_phase, end_ts):
     dur = max(0.0, end_ts - sess['start'])
     if dur < V104_MIN_SESSION_S:
         return
-    failed = bool(sess['ai_alerted']) or end_phase == 'error'
+    failed = end_phase == 'error'     # une alerte IA ne suffit pas : l'utilisateur choisit Raté/Réussi dans la galerie
     try:
         meter = cfg.get('meter') if isinstance(cfg.get('meter'), dict) and cfg['meter'].get('kind') in METER_KINDS else None
         if meter:
@@ -545,9 +585,17 @@ def _v104_finish(printer, sess, end_phase, end_ts):
         app_logger.warning(f"[Énergie] enregistrement impossible : {e}")
     try:
         if cfg.get('end_photo'):
-            jpg = _timelapse_grab_frame(printer)
+            jpg = sess.get('photo_jpg')                       # photo prise à 100 % (ou dès l'arrêt) : la pièce est encore sur le plateau
+            if not jpg:
+                for _ in range(16):                           # une capture est peut-être en cours
+                    if not sess.get('photo_busy'):
+                        break
+                    time.sleep(0.5)
+                jpg = sess.get('photo_jpg') or _timelapse_grab_frame(printer)
             if jpg:
                 note = _server_t('photo.auto_end', "Photo automatique de fin d'impression") + f" · {sess['name']}"
+                if sess.get('ai_alerted'):
+                    note += ' · ' + _server_t('photo.ai_failure_note', 'Détection IA') + (f" : {sess['ai_reason']}" if sess.get('ai_reason') else '')
                 _v104_save_photo(sess['user_id'], pid, sess['file'], jpg, 'failed' if failed else 'success', note)
                 app_logger.info(f"[Photo de fin] {sess['name']} : photo enregistrée")
     except Exception as e:
@@ -571,12 +619,21 @@ def _v104_step(printer, status, now):
             sess['file'] = str(status.get('file'))
         if active:
             sess['unknown_since'] = sess['error_since'] = sess['rest_since'] = None
+            if want_photo and phase == 'printing':
+                pct = _v104_progress(status)
+                sess['near_end'] = pct >= V104_PHOTO_NEAR_END_PCT
+                if pct >= V104_PHOTO_DONE_PCT and now - sess['photo_ts'] >= V104_PHOTO_RETAKE_S:
+                    _v104_early_photo(printer, sess)
         elif unknown:
             sess['unknown_since'] = sess['unknown_since'] or now
         elif phase == 'error':
             sess['error_since'] = sess['error_since'] or now
         else:
             sess['rest_since'] = sess['rest_since'] or now
+            sess['near_end'] = False
+            if want_photo and not sess['photo_jpg'] and not sess['rest_try']:
+                sess['rest_try'] = True                       # imprimante sans progression fiable : photo dès l'arrêt, sans attendre 15 s
+                _v104_early_photo(printer, sess)
 
         done = False
         if not active and not unknown and phase != 'error' and now - (sess['rest_since'] or now) >= 15:
@@ -627,7 +684,8 @@ def _v104_tick():
         seen.add(pid)
         if not (cfg.get('meter') or cfg.get('end_photo') or cfg.get('ai_watch') or pid in _V104_SESS):
             continue
-        status = _printer_status_cached(printer, ttl=3.0)
+        near_end = bool((_V104_SESS.get(pid) or {}).get('near_end'))
+        status = _printer_status_cached(printer, ttl=1.0 if near_end else 3.0)
         _v104_step(printer, status, now)
     for pid in list(_V104_SESS.keys()):                      # imprimante supprimée pendant une impression
         if pid not in seen:
@@ -645,7 +703,7 @@ def _v104_loop():
             _v104_tick()
         except Exception as e:
             app_logger.info(f"[v1.0.4] Erreur boucle: {e}")
-        time.sleep(5)
+        time.sleep(_v104_loop_delay())
 
 
 def _start_v104_worker():

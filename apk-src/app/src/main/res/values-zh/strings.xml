@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Stellio</string>
+    <string name="setup_title">连接到您的 Stellio 服务器</string>
+    <string name="edition_note">Stellio 服务器（树莓派 / LXC）。Windows 版无法从手机访问。</string>
+    <string name="setup_help">可填写一个或两个地址：在家时使用内网地址，外出时自动切换到外网地址（回家后再切换回来）。配对二维码位于 Stellio 中（移动访问，“App”格式）。</string>
+    <string name="local_label">内网地址（家庭网络）</string>
+    <string name="local_hint">http://192.168.1.50:5000</string>
+    <string name="remote_label">外网地址（在外时）</string>
+    <string name="remote_hint">https://…（可选）</string>
+    <string name="scan_qr">扫描配对二维码</string>
+    <string name="connect">保存并连接</string>
+    <string name="connecting">正在连接…</string>
+    <string name="bad_url">地址无效。</string>
+    <string name="need_one">请至少输入一个地址。</string>
+    <string name="not_stellio">这些地址上没有 Stellio 服务器响应。</string>
+    <string name="paired">地址已保存</string>
+    <string name="to_local">已通过内网地址连接</string>
+    <string name="to_remote">已通过外网地址连接</string>
+    <string name="offline_title">无法连接服务器</string>
+    <string name="offline_text">请确认服务器已开机且地址正确。每隔几秒会自动重试。</string>
+    <string name="addr_local">内网</string>
+    <string name="addr_remote">外网</string>
+    <string name="retry">重试</string>
+    <string name="edit_addresses">修改地址</string>
+    <string name="press_again">再按一次返回键退出</string>
+</resources>

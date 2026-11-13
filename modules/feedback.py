@@ -89,6 +89,17 @@ def api_feedback_submit():
     payload = {'type': ftype, 'title': title, 'description': desc, 'consent': True,
                'include_tech': include_tech, 'website': ''}
     if include_tech:
+        try:
+            summary = _MAIN.get('_printers_tech_summary')
+            printers = summary() if summary else []
+        except Exception:
+            printers = []
+        block = f"\n\n**Imprimantes ({len(printers)})**\n" + ("\n".join(
+            f"- {p['type']}" + (f" · {p['model']}" if p.get('model') else '') + (" · connectée" if p.get('connected') else " · hors ligne")
+            for p in printers[:20]) if printers else "- aucune")
+        room = max(0, FEEDBACK_LIMITS['desc_max'] - len(desc))
+        if room >= 40:                                    # la liste complète n'est jamais coupée au milieu d'une ligne
+            payload['description'] = desc + block[:room].rsplit('\n', 1)[0] if len(block) > room else desc + block
         payload.update({'version': CURRENT_VERSION, 'os': f"{platform.system()} {platform.release()}".strip(),
                         'lang': get_user_lang()})
     try:
