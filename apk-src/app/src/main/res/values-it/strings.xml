@@ -24,4 +24,11 @@
     <string name="retry">Riprova</string>
     <string name="edit_addresses">Modifica gli indirizzi</string>
     <string name="press_again">Prema ancora indietro per uscire</string>
+    <string name="update_title">Aggiornamento disponibile</string>
+    <string name="update_msg">Stellio %1$s è disponibile (installata: %2$s). Aggiornare ora?</string>
+    <string name="update_now">Aggiorna</string>
+    <string name="update_later">Più tardi</string>
+    <string name="update_need_perm">Consenti a Stellio di installare app, poi torna indietro: l\'aggiornamento partirà da solo.</string>
+    <string name="update_downloading">Download dell\'aggiornamento…</string>
+    <string name="update_failed">Aggiornamento non riuscito. Riprova più tardi o scaricalo da GitHub.</string>
 </resources>

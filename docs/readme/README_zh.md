@@ -9,7 +9,7 @@
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python"></a>
   <a href="https://flask.palletsprojects.com/"><img src="https://img.shields.io/badge/flask-3.0+-green.svg" alt="Flask"></a>
   <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg" alt="License: AGPL v3"></a>
-  <a href="https://github.com/stellio-app/stellio/blob/main"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20Raspberry%20Pi%20%2F%20Linux-lightgrey.svg" alt="Platform"></a>
+  <a href="https://github.com/stellio-app/stellio/blob/main"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Raspberry%20Pi%20%2F%20Linux-lightgrey.svg" alt="Platform"></a>
   <a href="https://github.com/stellio-app/stellio/blob/main"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
 </p>
 
@@ -227,6 +227,16 @@
 
 > 💼 **便携版（免安装）**：从 Releases 下载 `Stellio-v<版本>-portable-win64.zip`，解压到任意位置（硬盘、U 盘），然后运行 `Stellio.exe`。您的数据保存在可执行文件旁边的 `data` 文件夹中（请保留 `portable.flag` 文件）。
 
+### 🍎 macOS
+
+1. 从 [Releases](https://github.com/stellio-app/stellio/releases) 下载适合您 Mac 的 `.dmg`：`Stellio-v<version>-macOS-arm64.dmg`（Apple 芯片：M1、M2、M3…）或 `Stellio-v<version>-macOS-x86_64.dmg`（Intel）。
+2. 打开 `.dmg`，将 **Stellio** 拖入**应用程序**。
+3. 首次启动：右键（或按住 Control 点击）**Stellio → 打开**，然后确认。🎉
+
+> ⚠️ macOS 版本**尚未经过公证**，因此首次启动时 Gatekeeper 会弹出警告（右键 → 打开即可绕过）。每个文件都附带 `.sha256` 校验和，可自行验证。
+>
+> 💡 **窗口空白？** 5000 端口常被 macOS 的“AirPlay 接收器”占用：此时 Stellio 会自动选择另一个空闲端口（5001–5030）。您的数据保存在 `~/.stellio`。
+
 ### 🐧 Raspberry Pi / Linux
 
 以**无图形界面的服务器模式**运行：Stellio 在后台运行，可通过浏览器访问，既可以在 Pi 本机访问，也可以在局域网内的任何设备上访问。
@@ -336,7 +346,7 @@ Stellio 可自动检测：
 | 后端 | Python 3.8+、Flask、Waitress |
 | 前端 | HTML5、CSS3、原生 JavaScript |
 | 数据库 | SQLite（WAL 模式） |
-| 桌面端 | pywebview（Windows）／无图形界面浏览器模式（Raspberry Pi、Linux） |
+| 桌面端 | pywebview（Windows、macOS）／无图形界面浏览器模式（Raspberry Pi、Linux） |
 | 3D渲染 | PyRender、numpy CPU 光栅化器、Three.js |
 | 网格与嵌套排版 | trimesh、pymeshfix、shapely、rectpack |
 | AI | Ollama（本地） |

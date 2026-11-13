@@ -24,4 +24,11 @@
     <string name="retry">重试</string>
     <string name="edit_addresses">修改地址</string>
     <string name="press_again">再按一次返回键退出</string>
+    <string name="update_title">有可用更新</string>
+    <string name="update_msg">Stellio %1$s 已发布（当前版本：%2$s）。现在更新吗？</string>
+    <string name="update_now">立即更新</string>
+    <string name="update_later">稍后</string>
+    <string name="update_need_perm">请允许 Stellio 安装应用，然后返回：更新将自动开始。</string>
+    <string name="update_downloading">正在下载更新…</string>
+    <string name="update_failed">更新失败。请稍后重试，或从 GitHub 下载。</string>
 </resources>

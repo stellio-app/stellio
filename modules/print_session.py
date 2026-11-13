@@ -9,7 +9,7 @@ Un seul « suivi de session d'impression » (_V104_SESS) alimente les trois fonc
 
 Branchement : main.py appelle `print_session.init(globals())` une fois toutes ses fonctions définies ;
 init() reçoit les services de main.py (base de données, journal, IA, caméra, alertes…), puis enregistre les routes.
-Les tests importent ce module directement et lui injectent des faux services (voir tests/test_v104.py).
+Les tests importent ce module directement et lui injectent des faux services (voir tests/test_versions.py).
 """
 import base64
 import datetime
@@ -141,6 +141,9 @@ def _v104_clean_config(incoming, old=None):
         out['end_photo'] = True
     if inc.get('ai_watch'):
         out['ai_watch'] = True
+    ds = str(inc.get('default_slicer') or '').strip()      # v1.0.8 : slicer par défaut de cette imprimante
+    if ds and ds != 'system_default' and re.fullmatch(r'[A-Za-z0-9 ._-]{1,60}', ds):
+        out['default_slicer'] = ds
     m = inc.get('meter')
     om = old.get('meter') if isinstance(old.get('meter'), dict) else {}
     if isinstance(m, dict) and m.get('kind') in METER_KINDS:
@@ -168,7 +171,7 @@ def _v104_clean_config(incoming, old=None):
 def _v104_apply_config(raw_config, incoming, old=None):
     """Remplace dans raw_config les clés v1.0.4 par leur version nettoyée (le jeton n'est jamais stocké en clair)."""
     clean = _v104_clean_config(incoming, old)   # calculé AVANT l'effacement : pour Klipper/OctoPrint/PrusaLink, raw_config EST le dict reçu
-    for k in ('end_photo', 'ai_watch', 'meter'):
+    for k in ('end_photo', 'ai_watch', 'meter', 'default_slicer'):
         raw_config.pop(k, None)
     raw_config.update(clean)
     return raw_config

@@ -9851,6 +9851,38 @@ try {
 }
 }
 
+// v1.0.8 : slicer par défaut propre à chaque imprimante (liste reprise de Paramètres → Slicer)
+function _fillPrinterSlicerSelect(value) {
+    const sel = document.getElementById('printer-default-slicer');
+    if (!sel) return;
+    const src = document.getElementById('default-slicer-select');
+    if (src && sel.options.length <= 1) {
+        [...src.options].filter(o => o.value && o.value !== 'system_default').forEach(o => {
+            const n = document.createElement('option');
+            n.value = o.value; n.textContent = o.textContent;
+            sel.appendChild(n);
+        });
+    }
+    sel.value = [...sel.options].some(o => o.value === value) ? value : '';
+}
+function _slicerLabelFor(value) {
+    const src = document.getElementById('default-slicer-select');
+    const o = src && [...src.options].find(x => x.value === value);
+    return o ? o.textContent : String(value || '').replace(/\.exe$/i, '');
+}
+function _refreshSlicerPrinterHint() {
+    const box = document.getElementById('slicer-printer-slicer-hint');
+    if (!box) return;
+    const pid = document.getElementById('slicer-ai-printer-select')?.value;
+    const p = pid && printersList.find(x => String(x.id) === String(pid));
+    const ds = p && p.config && p.config.default_slicer;
+    if (!ds) { box.classList.add('hidden'); box.textContent = ''; return; }
+    box.textContent = _t3('modal.slicer_for_printer', 'Slicer de cette imprimante : {{name}}', { name: _slicerLabelFor(ds) }).replace('{{name}}', _slicerLabelFor(ds));
+    box.classList.remove('hidden');
+}
+document.getElementById('slicer-ai-printer-select')?.addEventListener('change', _refreshSlicerPrinterHint);
+document.addEventListener('DOMContentLoaded', () => _fillPrinterSlicerSelect(''));
+
 function sendToSlicer(path, name, aiProfile, orientation) {
 currentSlicerFile = path;
 currentSlicerOrientation = orientation || 'default';
@@ -9867,6 +9899,7 @@ _loadSlicerSpoolBox(path);
 _loadSlicerCalibBox(path);
 _runPrePrintCheck(path);
 _loadSlicerQuickEstimate(path, name);
+_refreshSlicerPrinterHint();
 }
 
 async function _loadSlicerQuickEstimate(filePath, fileName) {
@@ -14215,12 +14248,16 @@ async function loadSpoolmanPage() {
         if (addBtn) addBtn.style.display = '';
         const importBtn = document.getElementById('import-manual-spool-btn');
         if (importBtn) importBtn.style.display = '';
+        const catBtn = document.getElementById('catalog-manual-spool-btn');
+        if (catBtn) catBtn.style.display = '';
         if (filtersBar) filtersBar.style.display = 'flex';
         tasks.push(loadManualSpoolInventory());
     } else {
         if (addBtn) addBtn.style.display = 'none';
         const importBtn2 = document.getElementById('import-manual-spool-btn');
         if (importBtn2) importBtn2.style.display = 'none';
+        const catBtn2 = document.getElementById('catalog-manual-spool-btn');
+        if (catBtn2) catBtn2.style.display = 'none';
         if (filtersBar) filtersBar.style.display = 'none';
         if (!url) {
             manualGrid.innerHTML = `
@@ -14465,6 +14502,9 @@ function _renderManualSpoolCards(spools) {
                 <div class="spool-card-actions" style="display:flex; gap:6px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
                     <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="openSpoolInventoryModal(${s.id})">
                         <i class="fa-solid fa-pen"></i> ${_t2('actions.edit', 'Modifier')}
+                    </button>
+                    <button class="btn btn-ghost btn-sm" onclick="exportSpoolTag(${s.id})" title="${_t3('filament.tag_export', 'Étiquette OpenPrintTag (.bin)')}">
+                        <i class="fa-solid fa-tag"></i>
                     </button>
                     <button class="btn btn-ghost btn-sm" onclick="toggleArchiveManualSpool(${s.id}, ${!archived})" data-i18n-title="${archived ? 'spoolman.unarchive' : 'spoolman.archive'}" title="${archived ? _t2('spoolman.unarchive', 'Désarchiver') : _t2('spoolman.archive', 'Archiver')}">
                         <i class="fa-solid ${archived ? 'fa-box-open' : 'fa-box-archive'}"></i>
@@ -18831,6 +18871,8 @@ window.addPrinter = async function() {
     if (document.getElementById('printer-timelapse')?.checked) config.timelapse = true;
     if (document.getElementById('printer-end-photo')?.checked) config.end_photo = true;
     if (document.getElementById('printer-ai-watch')?.checked) config.ai_watch = true;
+    const _dsl = document.getElementById('printer-default-slicer')?.value || '';
+    if (_dsl) config.default_slicer = _dsl;
     const _meterCfg = _collectMeterConfig();
     if (_meterCfg) config.meter = _meterCfg;
 
@@ -18941,6 +18983,7 @@ window.editPrinter = function(pid) {
     const _tlField = document.getElementById('printer-timelapse'); if (_tlField) _tlField.checked = !!cfg.timelapse;
     const _epField = document.getElementById('printer-end-photo'); if (_epField) _epField.checked = !!cfg.end_photo;
     const _awField = document.getElementById('printer-ai-watch'); if (_awField) _awField.checked = !!cfg.ai_watch;
+    _fillPrinterSlicerSelect(cfg.default_slicer || '');
     _fillMeterFields(cfg.meter);
     if (bedXField) bedXField.value = cfg.bed_x || '';
     const bedYField = document.getElementById('printer-bed-y');
@@ -26804,3 +26847,210 @@ async function disconnectPrintables() {
 }
 window.savePrintablesAccount = savePrintablesAccount;
 window.disconnectPrintables = disconnectPrintables;
+
+
+// ── v1.0.8 : catalogue Open Filament Database + étiquettes NFC OpenPrintTag (inventaire manuel) ─────────────────
+function exportSpoolTag(id) {
+    const a = document.createElement('a');
+    a.href = `${API}/api/openprinttag/export/${id}`;
+    a.download = '';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => a.remove(), 1000);
+    showToast(_t3('filament.tag_export_hint', "Pour écrire une étiquette NFC : exportez le .bin d'une bobine (bouton étiquette sur sa carte) ou utilisez l'application Android."), 'info');
+}
+window.exportSpoolTag = exportSpoolTag;
+
+let _ofdTimer = null;
+async function _ofdLoadStatus() {
+    const box = document.getElementById('ofd-status');
+    if (!box) return;
+    try {
+        const r = await fetch(`${API}/api/ofd/status`);
+        const m = await r.json();
+        const n = m.count || 0;
+        box.textContent = n
+            ? _t3('filament.catalog_count', '{{n}} références au catalogue', { n }).replace('{{n}}', n)
+            : _t3('filament.catalog_empty_db', 'Catalogue vide : cliquez sur « Actualiser le catalogue » (connexion Internet requise) ou importez un fichier filaments.json.');
+        if (n) {
+            const b = await (await fetch(`${API}/api/ofd/brands`)).json();
+            const fill = (id, items, key, allKey, allFb) => {
+                const sel = document.getElementById(id);
+                if (!sel || sel.options.length > 1) return;
+                sel.innerHTML = `<option value="">${_t3(allKey, allFb)}</option>` + (items || []).map(x => `<option value="${escapeHtml(x[key])}">${escapeHtml(x[key])}</option>`).join('');
+            };
+            fill('ofd-material', b.materials, 'material', 'filament.catalog_all_materials', 'Toute matière');
+            fill('ofd-brand', b.brands, 'manufacturer', 'filament.catalog_all_brands', 'Toute marque');
+            _ofdSearch();
+        }
+    } catch (e) { box.textContent = _t3('filament.catalog_error', 'Catalogue inaccessible (connexion Internet ?)'); }
+}
+
+async function _ofdSearch() {
+    const list = document.getElementById('ofd-results');
+    if (!list) return;
+    const qs = new URLSearchParams({
+        q: document.getElementById('ofd-q')?.value || '',
+        material: document.getElementById('ofd-material')?.value || '',
+        brand: document.getElementById('ofd-brand')?.value || '',
+        limit: '40',
+    });
+    try {
+        const d = await (await fetch(`${API}/api/ofd/search?${qs}`)).json();
+        const items = d.items || [];
+        if (!items.length) { list.innerHTML = `<p class="settings-hint" style="margin:8px 0;">${_t3('filament.catalog_no_result', 'Aucune référence trouvée')}</p>`; return; }
+        list.innerHTML = items.map(e => {
+            const c = e.color_hex ? '#' + String(e.color_hex).replace('#', '').slice(0, 6) : '#888888';
+            const bits = [e.manufacturer, e.material, e.weight ? `${Math.round(e.weight)} g` : '', e.diameter ? `Ø${e.diameter}` : ''].filter(Boolean).join(' · ');
+            return `<div class="ofd-row" style="display:flex; align-items:center; gap:10px; padding:6px 8px; border-bottom:1px solid var(--border);">
+                <span class="spool-color-dot" style="background:${escapeHtml(c)}; flex:none;"></span>
+                <div style="flex:1; min-width:0;"><div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(e.name || '')}</div>
+                <div style="font-size:calc(11.5px * var(--fs, 1)); color:var(--text-muted);">${escapeHtml(bits)}</div></div>
+                <button class="btn btn-primary btn-sm" onclick="_ofdAdd('${escapeJs(e.id)}')"><i class="fa-solid fa-plus"></i> ${_t3('filament.catalog_add', 'Ajouter')}</button>
+            </div>`;
+        }).join('');
+    } catch (e) { list.innerHTML = ''; }
+}
+
+async function _ofdAdd(id) {
+    const body = { ofd_id: id };
+    const rem = parseFloat(document.getElementById('ofd-remaining')?.value);
+    const price = parseFloat(document.getElementById('ofd-price')?.value);
+    if (!isNaN(rem)) body.remaining_g = rem;
+    if (!isNaN(price)) body.price = price;
+    try {
+        const r = await fetch(`${API}/api/ofd/add`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (!r.ok) { showToast((await r.json()).error || I18N.t('toast.error'), 'error'); return; }
+        showToast(_t3('filament.catalog_added', "Bobine ajoutée à l'inventaire"), 'success');
+        if (typeof loadManualSpoolInventory === 'function') loadManualSpoolInventory();
+    } catch (e) { showToast(I18N.t('toast.connection_error'), 'error'); }
+}
+window._ofdAdd = _ofdAdd;
+
+async function _ofdRefresh(force) {
+    const box = document.getElementById('ofd-status');
+    if (box) box.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    try {
+        const r = await fetch(`${API}/api/ofd/refresh`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: !!force }) });
+        if (!r.ok) throw new Error('refresh');
+        showToast(_t3('filament.catalog_refreshed', 'Catalogue actualisé'), 'success');
+    } catch (e) { showToast(_t3('filament.catalog_error', 'Catalogue inaccessible (connexion Internet ?)'), 'error'); }
+    document.querySelectorAll('#ofd-material option:not(:first-child), #ofd-brand option:not(:first-child)').forEach(o => o.remove());
+    _ofdLoadStatus();
+}
+
+async function _ofdImportFile(input) {
+    const f = input.files && input.files[0];
+    if (!f) return;
+    const fd = new FormData(); fd.append('file', f);
+    try {
+        const r = await fetch(`${API}/api/ofd/import-file`, { method: 'POST', body: fd });
+        const d = await r.json();
+        if (!r.ok) { showToast(d.error || I18N.t('toast.error'), 'error'); return; }
+        showToast(_t3('filament.catalog_refreshed', 'Catalogue actualisé'), 'success');
+        _ofdLoadStatus();
+    } catch (e) { showToast(I18N.t('toast.connection_error'), 'error'); }
+    input.value = '';
+}
+
+let _optFile = null;
+async function _optPick(input) {
+    const f = input.files && input.files[0];
+    const box = document.getElementById('opt-preview');
+    if (!f || !box) return;
+    _optFile = f;
+    const fd = new FormData(); fd.append('file', f);
+    try {
+        const r = await fetch(`${API}/api/openprinttag/decode`, { method: 'POST', body: fd });
+        const d = await r.json();
+        if (!r.ok) { box.innerHTML = `<p style="color:var(--danger);">${escapeHtml(d.error || _t3('filament.tag_unreadable', 'Étiquette illisible'))}</p>`; _optFile = null; return; }
+        const s = d.spool || {};
+        const bits = [s.vendor, s.material, s.remaining_g != null ? `${Math.round(s.remaining_g)} / ${Math.round(s.capacity_g || 0)} g` : ''].filter(Boolean).join(' · ');
+        box.innerHTML = `<div style="display:flex; align-items:center; gap:10px; padding:8px; border:1px solid var(--border); border-radius:var(--radius);">
+            <span class="spool-color-dot" style="background:${escapeHtml(s.color_hex || '#888888')}; flex:none;"></span>
+            <div style="flex:1; min-width:0;"><strong>${escapeHtml(s.name || '')}</strong><div style="font-size:calc(11.5px * var(--fs, 1)); color:var(--text-muted);">${escapeHtml(bits)}</div></div>
+            <button class="btn btn-primary btn-sm" onclick="_optImport()"><i class="fa-solid fa-check"></i> ${_t3('filament.tag_import_btn', 'Ajouter / mettre à jour la bobine')}</button></div>`;
+    } catch (e) { box.innerHTML = `<p style="color:var(--danger);">${_t3('filament.tag_unreadable', 'Étiquette illisible')}</p>`; }
+}
+
+async function _optImport() {
+    if (!_optFile) return;
+    const fd = new FormData(); fd.append('file', _optFile);
+    try {
+        const r = await fetch(`${API}/api/openprinttag/import`, { method: 'POST', body: fd });
+        const d = await r.json();
+        if (!r.ok) { showToast(d.error || _t3('filament.tag_unreadable', 'Étiquette illisible'), 'error'); return; }
+        showToast(d.created ? _t3('filament.tag_imported', "Bobine importée depuis l'étiquette") : _t3('filament.tag_updated', "Bobine mise à jour depuis l'étiquette"), 'success');
+        document.getElementById('opt-preview').innerHTML = '';
+        _optFile = null;
+        if (typeof loadManualSpoolInventory === 'function') loadManualSpoolInventory();
+    } catch (e) { showToast(I18N.t('toast.connection_error'), 'error'); }
+}
+window._optPick = _optPick; window._optImport = _optImport; window._ofdRefresh = _ofdRefresh; window._ofdImportFile = _ofdImportFile;
+
+function _ofdTab(name) {
+    document.getElementById('ofd-pane-catalog').style.display = name === 'catalog' ? '' : 'none';
+    document.getElementById('ofd-pane-tag').style.display = name === 'tag' ? '' : 'none';
+    [['catalog', 'ofd-tab-catalog'], ['tag', 'ofd-tab-tag']].forEach(([n, id]) => {
+        const b = document.getElementById(id);
+        b.classList.toggle('btn-primary', name === n);
+        b.classList.toggle('btn-ghost', name !== n);
+    });
+}
+window._ofdTab = _ofdTab;
+
+function openFilamentCatalogModal(tab) {
+    let modal = document.getElementById('modal-filament-catalog');
+    if (modal) modal.remove();
+    modal = document.createElement('div');
+    modal.id = 'modal-filament-catalog';
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-book-open"></i> ${_t3('filament.catalog_title', 'Catalogue et étiquettes NFC')}</h2>
+                <button class="modal-close" onclick="closeModal('modal-filament-catalog')">×</button>
+            </div>
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:10px;">
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <button id="ofd-tab-catalog" class="btn btn-sm btn-primary" onclick="_ofdTab('catalog')"><i class="fa-solid fa-book-open"></i> ${_t3('filament.tab_catalog', 'Catalogue Open Filament Database')}</button>
+                    <button id="ofd-tab-tag" class="btn btn-sm btn-ghost" onclick="_ofdTab('tag')"><i class="fa-solid fa-tag"></i> ${_t3('filament.tab_tag', 'Étiquette OpenPrintTag')}</button>
+                </div>
+                <div id="ofd-pane-catalog" style="display:flex; flex-direction:column; gap:8px;">
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <span id="ofd-status" class="settings-hint" style="flex:1; min-width:140px; margin:0;"></span>
+                        <button class="btn btn-ghost btn-sm" onclick="_ofdRefresh(true)"><i class="fa-solid fa-rotate"></i> ${_t3('filament.catalog_refresh', 'Actualiser le catalogue')}</button>
+                        <label class="btn btn-ghost btn-sm" style="cursor:pointer; margin:0;"><i class="fa-solid fa-file-import"></i> ${_t3('filament.catalog_import_file', 'Importer filaments.json')}
+                            <input type="file" accept=".json,application/json" style="display:none;" onchange="_ofdImportFile(this)"></label>
+                    </div>
+                    <div class="input-group" style="margin:0;"><input type="text" id="ofd-q" placeholder="${_t3('filament.catalog_search_ph', 'Rechercher (marque, nom, couleur…)')}"></div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <select id="ofd-material" class="settings-select" style="flex:1; min-width:110px;"><option value="">${_t3('filament.catalog_all_materials', 'Toute matière')}</option></select>
+                        <select id="ofd-brand" class="settings-select" style="flex:1; min-width:110px;"><option value="">${_t3('filament.catalog_all_brands', 'Toute marque')}</option></select>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <div class="input-group" style="flex:1; min-width:140px; margin:0;"><input type="number" id="ofd-remaining" placeholder="${_t3('filament.catalog_remaining', 'Poids restant (g), facultatif')}"></div>
+                        <div class="input-group" style="flex:1; min-width:140px; margin:0;"><input type="number" step="0.01" id="ofd-price" placeholder="${_t3('filament.catalog_price', 'Prix (€), facultatif')}"></div>
+                    </div>
+                    <div id="ofd-results" style="max-height:340px; overflow:auto;"></div>
+                    <p class="settings-hint" style="margin:0;">${_t3('filament.catalog_attrib', 'Données : Open Filament Database (licence ouverte)')}</p>
+                </div>
+                <div id="ofd-pane-tag" style="display:none; flex-direction:column; gap:10px;">
+                    <p class="settings-hint" style="margin:0;">${_t3('filament.tag_import_hint', 'Choisissez un fichier .bin ou NDEF exporté depuis une étiquette OpenPrintTag.')}</p>
+                    <label class="btn btn-ghost btn-sm" style="cursor:pointer; align-self:flex-start; margin:0;"><i class="fa-solid fa-file-import"></i> ${_t3('filament.tag_choose', 'Choisir un fichier')}
+                        <input type="file" accept=".bin,.ndef,application/octet-stream" style="display:none;" onchange="_optPick(this)"></label>
+                    <div id="opt-preview"></div>
+                    <p class="settings-hint" style="margin:0;"><i class="fa-solid fa-tag"></i> ${_t3('filament.tag_export_hint', "Pour écrire une étiquette NFC : exportez le .bin d'une bobine (bouton étiquette sur sa carte) ou utilisez l'application Android.")}</p>
+                </div>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('modal-filament-catalog'); });
+    openModal('modal-filament-catalog');
+    modal.querySelector('#ofd-q').addEventListener('input', () => { clearTimeout(_ofdTimer); _ofdTimer = setTimeout(_ofdSearch, 250); });
+    ['ofd-material', 'ofd-brand'].forEach(i => modal.querySelector('#' + i).addEventListener('change', _ofdSearch));
+    _ofdTab(tab === 'tag' ? 'tag' : 'catalog');
+    _ofdLoadStatus();
+}
+window.openFilamentCatalogModal = openFilamentCatalogModal;

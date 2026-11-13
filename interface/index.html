@@ -347,6 +347,10 @@
                         <i class="fa-brands fa-discord"></i>
                         <span data-i18n="nav.discord">Discord</span>
                     </a>
+                    <a class="nav-btn" id="nav-wiki-link" href="https://github.com/stellio-app/stellio/wiki" target="_blank" rel="noopener noreferrer">
+                        <i class="fa-solid fa-book-open"></i>
+                        <span data-i18n="nav.wiki">Wiki</span>
+                    </a>
                     <a class="nav-btn" data-nav-id="github" href="https://github.com/stellio-app/stellio" target="_blank" rel="noopener noreferrer">
                         <i class="fa-brands fa-github"></i>
                         <span data-i18n="nav.github">GitHub</span>
@@ -3084,6 +3088,9 @@
 							<button id="add-manual-spool-btn" class="btn btn-primary btn-sm" style="display:none;" onclick="openSpoolInventoryModal()">
 								<i class="fa-solid fa-plus"></i> <span data-i18n="spoolman.add_spool_btn">Ajouter bobine</span>
 							</button>
+							<button id="catalog-manual-spool-btn" class="btn btn-ghost btn-sm" style="display:none;" onclick="openFilamentCatalogModal()">
+								<i class="fa-solid fa-book-open"></i> <span data-i18n="filament.catalog_btn">Catalogue &amp; étiquettes</span>
+							</button>
 							<button id="import-manual-spool-btn" class="btn btn-ghost btn-sm" style="display:none;" onclick="openSpoolImportModal()">
 								<i class="fa-solid fa-file-excel"></i> <span data-i18n="spoolimport.btn">Importer (Excel/CSV)</span>
 							</button>
@@ -3459,6 +3466,7 @@
             <div class="modal-body">
                 <p id="slicer-file-name" style="margin-bottom: 15px; font-weight: bold;"></p>
                 <div id="slicer-quick-estimate" class="slicer-quick-estimate hidden"></div>
+                <div id="slicer-printer-slicer-hint" class="hidden" style="margin-bottom:10px; font-size:calc(12px * var(--fs, 1)); color:var(--text-muted);"></div>
                 <div id="slicer-preprint-warnings" style="display:none; margin-bottom:15px; flex-direction:column; gap:6px;"></div>
                 <div id="slicer-calib-box" class="slicer-calib-box" style="display:none;"></div>
                 <div id="slicer-spool-box" style="display:none; margin-bottom:15px; padding:10px 12px; border-radius:var(--radius); background:var(--bg-input); border:1px solid var(--border); font-size:calc(12px * var(--fs, 1));">
@@ -4534,6 +4542,13 @@
 						<small id="printer-bed-suggest" style="display:none;color:var(--accent);font-size:calc(11px * var(--fs, 1));" data-i18n="printers.bed_suggested">Valeurs suggérées d'après le modèle : vérifie-les et ajuste si besoin.</small>
 						<small style="color:var(--text-muted);font-size:calc(11px * var(--fs, 1));" data-i18n="printers.bed_size_hint">Largeur × profondeur × hauteur maximale d'impression. Sert à avertir quand une pièce est trop grande avant l'envoi au slicer.</small>
 					</div>
+					<div class="input-group" id="group-printer-slicer">
+						<label data-i18n="printers.default_slicer_label">Slicer de cette imprimante</label>
+						<select id="printer-default-slicer" class="settings-select" style="width:100%; max-width:none;">
+							<option value="" data-i18n="printers.default_slicer_global">Slicer des Paramètres (par défaut)</option>
+						</select>
+						<small style="color:var(--text-muted);font-size:calc(11px * var(--fs, 1));" data-i18n="printers.default_slicer_hint">Les fichiers envoyés pour cette imprimante s'ouvrent dans ce slicer, avec les profils (réglages, filament) rattachés à l'imprimante.</small>
+					</div>
 					<div class="input-group" id="group-timelapse">
 						<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
 							<input type="checkbox" id="printer-timelapse" style="width:auto;margin:0;">
@@ -5187,5 +5202,6 @@
 
     <script src="script.js"></script>
     <script src="management.js"></script>
+    <script src="filament_tags.js"></script>
 </body>
 </html>

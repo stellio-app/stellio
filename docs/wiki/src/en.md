@@ -1,16 +1,39 @@
 @@@ Home | Home
-# Stellio Wiki
+# 🧊 Stellio, your 3D workshop in one place
 {{img:dashboard}}
 
+> **Library, printers, spools, costs and quotes: everything is organised, one click away, and stays on your own machine.**
 
-**Stellio** is the 3D file manager for makers and 3D printer owners. It centralizes your library (STL, 3MF, OBJ, STEP, PLY, AMF), automates repetitive tasks and plugs into your printing workflow.
+🔒 **100% local** · 🆓 **Free and open source** (AGPL v3) · 🌍 **8 languages** · 🖥️ Windows, macOS, Linux, Raspberry Pi, Proxmox · 📱 Android
 
-> 🔒 **Philosophy**: your data stays with you. Everything runs locally; by default, nothing leaves your machine.
+**[⬇️ Download Stellio](https://github.com/stellio-app/stellio/releases)** · **[▶ Try the online demo](https://demo.stellio-app.com)** · **[💬 Join the Discord](https://discord.gg/ySxpHvS6bd)**
 
-## Where to start
+## ✨ Why you will love it
+
+| For you… | What Stellio changes |
+|---|---|
+| 🗂️ **A library that organises itself** | Automatic 3D thumbnails, AI tags, natural-language search, duplicates spotted. |
+| 🖨️ **All your printers on one screen** | Bambu Lab, Prusa, Klipper, OctoPrint, Creality… temperature, camera, progress, end-of-print photo and timelapse. |
+| 🚀 **From library to machine in one click** | Send to the slicer with the right profiles and the right spool (one slicer per printer), checks before printing. |
+| 🧵 **Your spools under control** | Inventory, Spoolman, TigerTag, OpenPrintTag, run-out forecast, drying reminders. |
+| 💶 **Costs, quotes and orders** | Real cost (material, power, wear), PDF quotes, online customer tracking, invoices. |
+| 🤖 **An AI that stays at home** | Local Ollama: tagging, search, printability, failure watch, S.O.S Print. |
+| 🛠️ **Tools that save a part** | 3D viewer, mesh repair, conversion, auto-placement, suggested orientations. |
+| 📱 **With you everywhere** | Phone (PWA and Android app), remote access, push notifications, Home Assistant. |
+
+## 🚀 Get started in 3 minutes
+
+1. **Install** Stellio: an installer, an AppImage, or one command on Raspberry Pi and Proxmox ([Installation](en-Installation)).
+2. **Add a folder** with your models: Stellio sorts them and creates the 3D thumbnails by itself.
+3. **Add a printer** (optional): it is detected automatically on your network.
+
+👉 Next: [Getting started](en-Getting-Started), then the [Step-by-step guide](en-How-To) that explains **every feature and how to use it**.
+
+## 🧭 Explore the wiki
 
 | I want to… | Page |
 |---|---|
+| Learn how to use every feature | [Step-by-step guide](en-How-To) |
 | Install Stellio | [Installation](en-Installation) |
 | Take my first steps | [Getting started](en-Getting-Started) |
 | Manage my 3D files | [Library](en-Library) |
@@ -18,19 +41,22 @@
 | Track my spools | [Filament](en-Filament) |
 | Download models | [Downloads](en-Downloads) |
 | Use AI and S.O.S Print | [Artificial intelligence](en-AI) |
-| Calculate costs, quotes, invoices | [Costs and management](en-Costs-and-Management) |
-| Reach it from my phone | [Remote and mobile access](en-Remote-Access) |
+| Work out costs, quotes, invoices | [Costs and management](en-Costs-and-Management) |
+| Reach it from my phone | [Remote access and mobile](en-Remote-Access) |
 | Install on Raspberry Pi / Proxmox | [Server edition](en-Server-Edition) |
 | Configure, back up, understand my data | [Settings and data](en-Settings-and-Data) |
 | Fix a problem | [Troubleshooting](en-Troubleshooting) |
 | Contribute to the project | [Contributing](en-Contributing) |
+| See what each version brings | [What's new](en-Changelog) |
+
+> 🔒 **Philosophy**: your data stays with you. Everything works locally; by default, nothing leaves your machine.
 
 ## Useful links
 
-- 🌐 Website: [stellio-app.com](https://stellio-app.com) — ▶ [live demo (read-only)](https://demo.stellio-app.com)
+- 🌐 Website: [stellio-app.com](https://stellio-app.com) · ▶ [online demo (read-only)](https://demo.stellio-app.com)
 - 📦 [Downloads (Releases)](https://github.com/stellio-app/stellio/releases)
 - 🐛 [Report a bug](https://github.com/stellio-app/stellio/issues) · 💡 [Suggest an idea](https://github.com/stellio-app/stellio/discussions) · 💬 [Discord](https://discord.gg/ySxpHvS6bd)
-- 📜 **AGPL v3** license
+- 📜 **AGPL v3** licence
 
 @@@ Installation | Installation
 # Installation
@@ -128,6 +154,188 @@ The home page gathers prints in progress, low stock, recent prints and recent fi
 - **Notification center** (bell): print finished, failure, maintenance, low stock, spool drying.
 - **Floating widget** showing the current print's progress, visible on every page.
 - **Keyboard shortcuts**: see [Settings and data](en-Settings-and-Data).
+
+@@@ How-To | Step-by-step guide
+# Step-by-step guide
+
+Every Stellio feature, **what it is for and how to use it**. Technical details are on the other pages; here, we do.
+
+> 💡 Everywhere in the app: `Ctrl+K` opens the **command palette** (go somewhere, run an action, find a file, a tag, a spool) and `?` shows the shortcuts.
+
+## Finding your way around Stellio
+
+| Menu | What it is for |
+|---|---|
+| **Dashboard** | Running prints, low stock, recent files; rearrangeable widgets. |
+| **Library** | All your 3D models, with thumbnails, tags, filters and search. |
+| **Favorites** | Your favourite models, one click away. |
+| **Print soon** | Your print waiting list, reorderable. |
+| **Projects** | Several files grouped for one object. |
+| **Printers** | Live monitoring, sending, maintenance, wear parts. |
+| **Filament inventory** | Your spools, the run-out forecast, drying. |
+| **History** | Every print sent, rated success or failure. |
+| **Gallery** | The photos of your prints. |
+| **Statistics** | Reliability, consumption, formats, reports. |
+| **Management** | Costs, customer quotes, orders, accounting. |
+| **Workshop mode** | Full-screen display for tablet or phone. |
+| **S.O.S Print** | Guided diagnosis of a failed print. |
+| **Download** | Fetch models from Printables, MakerWorld, Thingiverse… |
+| **Repair** | Find and repair damaged meshes. |
+| **Converter** | Switch from one 3D format to another. |
+| **Duplicates** | Spot duplicate files. |
+| **Trash** | Restore what you deleted. |
+| **Settings** | Appearance, slicer, AI, backups, remote access. |
+
+## Add and find my files
+
+1. Click **Add a source** (or `Ctrl+K` then "Add a source") and choose a **folder**, a single file or an **SMB / NFS** share. The 3D folders found on your computer are suggested.
+2. Stellio scans and creates the **3D thumbnails** in the background; generation pauses while you use the app.
+3. To find a model: type in the **search** bar, or describe it in plain language ("a headphone stand") with AI search.
+4. Drag and drop 3D files from your file explorer to add them directly.
+
+💡 Archives (ZIP, RAR, 7z, TAR) can be browsed without extracting them.
+
+## Organise with tags, favorites and filters
+
+1. Open a file's **⋯** menu, or select several (`Shift+click` for a range) to act in bulk.
+2. Add coloured **tags** by hand, or let the AI suggest them; `T` opens the tag manager.
+3. Click the star to make a model a **favorite** (`F` opens favorites).
+4. Combine **filters** (type, size, weight, print status, "Filament stock") then **save** the filter to reuse it.
+5. To rename many files: **Bulk rename** (find/replace, prefix, suffix, numbering), with a preview before you confirm.
+
+## View and prepare a model in 3D
+
+1. Click a file's thumbnail: the **3D viewer** opens (it works offline).
+2. Rotate and zoom; for a multi-plate 3MF, switch between plates.
+3. Run the **printability analysis** (overhangs): Stellio suggests recommended **orientations**.
+4. Use **auto-placement** to arrange several parts on your printer's bed.
+5. Send the result to the slicer from the viewer.
+
+## Repair a damaged mesh
+
+1. Open **Repair**: Stellio lists files with holes or open edges (the analysis also runs in the background when thumbnails are created).
+2. Pick a file and start the **repair**; compare **before / after**.
+3. The file is repaired in place; a `.bak` safety copy is kept just in case.
+
+## Convert files
+
+1. Open **Converter** and choose one or more files (STL, 3MF, OBJ, PLY, AMF, STEP).
+2. Select the output format: STL, 3MF, OBJ, PLY, OFF or GLB.
+3. If needed, tick **Automatically repair the mesh** and **Delete the original file**.
+4. Start. A batch conversion can be cancelled at any time: files already converted are kept.
+
+## Tidy up: duplicates and trash
+
+1. Open **Duplicates**: identical files, and those with **similar geometry** (same model renamed or re-exported), are grouped.
+2. Keep the one you want and delete the others.
+3. Deleted by mistake? `Ctrl+Z` undoes it for 5 minutes; the **Trash** keeps items longer and lets you restore them or delete them permanently.
+
+## Group files into projects
+
+1. Open **Projects** and create a project; add the files of one object (body, lid, supports…).
+2. A **multi-plate** 3MF added to a project is split into one 3MF per plate (also available: **Split plates**, in the ⋯ menu).
+3. Track progress ("In progress" / "Done") and click **Project cost** to price the whole set.
+
+## Download models
+
+1. Open **Download** (or `Ctrl+N`) and paste a model link (Printables, MakerWorld, Thingiverse, Nexprint, Creality Cloud, Snapmaker Space).
+2. Connect the requested account once (see [Downloads](en-Downloads)).
+3. Pick the destination **source**: the file arrives with its **origin** (link, author, licence).
+4. Stellio checks every day whether a **new version** of the model exists; **My likes** and **My creations** find your models on connected accounts.
+
+## Connect a printer
+
+1. Open **Printers → Add**: **network detection** suggests the machines it finds; otherwise enter type, address and access key.
+2. Enter the **print volume** (X, Y, Z): Stellio warns you before sending if a part is too big.
+3. If you like, choose the **slicer for this printer** (1.0.8): that is the one that opens for this machine.
+4. Turn on the useful options: **timelapse**, **end-of-print photo**, **AI watch**, **smart plug** (real consumption).
+
+## Send a file to the slicer
+
+1. From the library or the viewer, click **Send to slicer**.
+2. In the window: look at the **estimate** (weight, time), choose the **printer**, the **spool** and the **settings profile**, or leave "Automatic".
+3. Read the **pre-print checks**: spool to dry, abrasive filament, volume exceeded, not enough material.
+4. Click **Send**: the file opens in the printer's slicer (or the one from Settings), with the profiles linked to the machine. The spool is deducted if you asked for it.
+
+💡 To link profiles to a printer, import them from Settings → Slicer.
+
+## Prepare what comes next: "Print soon"
+
+1. In a file's **⋯** menu, choose **Add to print soon**.
+2. Open **Print soon**: drag to **reorder**.
+3. Send an item straight to the slicer or remove it from the list.
+
+## Follow a print
+
+1. On the printer card: temperature, progress, **live camera** and the name of the current file.
+2. A **floating widget** shows progress on every page.
+3. The **bell** warns you (finished, failed, maintenance, low stock); turn on **push notifications** (ntfy, Telegram, Discord, webhook) to be told with the window closed.
+4. At 100%, Stellio takes the **end photo**: mark it *Success* or *Failure* in one click. The **timelapse** is assembled automatically.
+
+## Rate, reprint, find your photos
+
+1. Open **History**: filter by platform, result or dates.
+2. Rate each print **success** or **failure**: this feeds recommendations and statistics.
+3. **View the file** or **Reprint** as last time (same settings).
+4. Find your photos in the **Gallery**; **My G-codes** keeps the G-codes linked to a file with the **Open in slicer** button.
+
+## Track my spools
+
+1. Open **Filament inventory**: add spools by hand (or import Excel/CSV), link **Spoolman**, **TigerTag** or **OpenPrintTag**, or look a spool up in the **Open Filament Database**.
+2. When sending to the slicer, pick the spool: Stellio **deducts** the consumption and checks that enough is left.
+3. In **Weighing and forecast**, weigh a spool: Stellio estimates its **run-out date** and warns you as it gets close.
+4. Log a spool's **drying** to track its state; use **Rebuy** to open the maker's shop.
+
+## Work out a cost and make a quote
+
+1. Open the calculator from a file (**Cost**) or a project (**Project cost**).
+2. Check material, power, **machine wear**, **fixed fees**, **margin** and **quantity**: unit price and total are shown.
+3. Click **Generate the quote (PDF)**: fill in the customer and description. The PDF is kept and found in the **Quotes** widget.
+4. Set the default margin in **Settings → Print pricing**.
+
+## Manage orders, customers and invoices
+
+1. Turn on *Enable cost, quote and invoicing features* in Settings: the **Management** screen appears.
+2. Send a quote to the customer with its **tracking link**: they can accept or decline online; acceptance creates the print task. **Stellio processes no payment.**
+3. Follow the **order queue**, payments, deposit invoices and credit notes; **smart dispatch** suggests the right printer without ever starting a print.
+4. Every month, export the **accounting** (ZIP with CSV and PDF).
+
+## Maintain my printers
+
+1. On a printer card, open **Maintenance** and choose the **brand**: recommended tasks are offered.
+2. Add them to your tracking: they turn "due" according to print hours and days elapsed.
+3. Record your **wear parts** (nozzles, plates, belts) with an alert threshold, and your **calibrations** per filament.
+
+## Diagnose a failure: S.O.S Print and AI
+
+1. Open **S.O.S Print** and describe the problem (photo possible).
+2. Answer the questions, one at a time (4 at most): Stellio narrows the hypotheses and gives a **final diagnosis**.
+3. For local AI, install [Ollama](https://ollama.com/) then set it up in **Settings → Artificial intelligence**. **Failure watch** alerts you without ever stopping the print.
+
+## Use Stellio on a phone and remotely
+
+1. In **Settings → Mobile access**, scan the **QR code**: the library opens on your phone (installable like an app).
+2. For the **Android** app, scan the dedicated QR code.
+3. Away from home: turn on **remote access** (Cloudflare Tunnel or custom address), or create a temporary **share link**.
+4. Share read-only with a **guest account**.
+
+## Back up and restore
+
+1. Open **Settings → Backup and data** and **export** your data (.zip).
+2. Schedule **automatic backups**.
+3. To restore, **import** the .zip file. A Stellio update never touches your data.
+
+## Shortcuts worth knowing
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+K` | Command palette |
+| `Ctrl+N` | New download |
+| `Ctrl+Z` | Undo the last deletion |
+| `F` · `T` | Favorites · tag manager |
+| `?` | Shortcut help |
+
+Full list: [Settings and data](en-Settings-and-Data).
 
 @@@ Library | Library
 # Library

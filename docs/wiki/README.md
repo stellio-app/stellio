@@ -18,7 +18,7 @@ GitHub n'ouvre le dépôt du wiki qu'à la création d'une première page :
 
 ## Modifier le texte
 Un fichier par langue : `docs/wiki/src/<langue>.md`. Les pages sont séparées par `@@@ Slug | Titre`.
-Les 8 fichiers doivent garder la même structure (titres, tableaux, blocs de code, liens) : `python tools/build_wiki.py --check`.
+Les 8 fichiers (dont « Guide pas à pas » = page `How-To`) doivent garder la même structure (titres, tableaux, blocs de code, liens) : `python tools/build_wiki.py --check`.
 
 ## Captures d'écran
 - Dans une page, écrire `{{img:nom}}` sur sa propre ligne (noms : dashboard, library, viewer, projects, printers, filament, stats, management, settings).

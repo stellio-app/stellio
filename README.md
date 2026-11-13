@@ -134,6 +134,8 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 🟢 **Creality CFS** support
 - 🐯 [**TigerTag**](https://tigersystem.io) integration (NFC/RFID spool identification): sign in to see your TigerTag spools in the inventory, or let Stellio pick up an existing TigerTag Studio session automatically — read-only, never modifies your TigerTag inventory
 - ⚪ Manual spools
+- 🏷️ [**OpenPrintTag**](https://specs.openprinttag.org/) native support (open NFC spool-tag standard): import/export tag files, read and write tags from the Android app, consumed weight kept up to date on the tag
+- 📚 [**Open Filament Database**](https://openfilamentdatabase.org) catalog: search a spool by brand/material/colour and create it in one click with weight, diameter and density filled in
 - 📉 Automatic consumption tracking on send-to-slicer, with a compatibility check before printing (enough material left?)
 - 🔔 **Low-stock alerts** on startup, with a quick link to buy more
 - 🛒 **Buying a spool again**: Stellio first offers the manufacturer's own shop for the brand (Arianeplast, Bambu Lab, Polymaker, eSUN, Sunlu…), then general shops, with stock checked automatically when the site allows it
@@ -226,6 +228,16 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 3. That's it! 🎉
 
 > 💼 **Portable version (no installation)**: download `Stellio-v<version>-portable-win64.zip` from the Releases, unzip it anywhere (disk, USB drive) and run `Stellio.exe`. Your data stays in the `data` folder next to the executable (keep the `portable.flag` file).
+
+### 🍎 macOS
+
+1. Download the `.dmg` that matches your Mac from [Releases](https://github.com/stellio-app/stellio/releases): `Stellio-v<version>-macOS-arm64.dmg` (Apple Silicon: M1, M2, M3…) or `Stellio-v<version>-macOS-x86_64.dmg` (Intel).
+2. Open the `.dmg` and drag **Stellio** into **Applications**.
+3. First launch: right-click (or Control-click) **Stellio → Open**, then confirm. 🎉
+
+> ⚠️ The macOS builds are **not notarized yet**, so Gatekeeper shows a warning at first launch (right-click → Open gets around it). Each file comes with a `.sha256` checksum you can verify.
+>
+> 💡 **Blank window?** Port 5000 is often taken by the macOS “AirPlay Receiver”: Stellio then automatically picks another free port (5001–5030). Your data lives in `~/.stellio`.
 
 ### 🐧 Raspberry Pi / Linux
 
@@ -336,7 +348,7 @@ Stellio automatically detects:
 | Backend | Python 3.8+, Flask, Waitress |
 | Frontend | HTML5, CSS3, vanilla JavaScript |
 | Database | SQLite (WAL mode) |
-| Desktop | pywebview (Windows) / headless browser mode (Raspberry Pi, Linux) |
+| Desktop | pywebview (Windows, macOS) / headless browser mode (Raspberry Pi, Linux) |
 | 3D rendering | PyRender, numpy CPU rasterizer, Three.js |
 | Mesh & nesting | trimesh, pymeshfix, shapely, rectpack |
 | AI | Ollama (local) |
@@ -375,7 +387,7 @@ stellio/
 ├── release-notes/          # notes_version_X.Y.Z.txt (release texts)
 ├── tests/  tools/          # pytest tests, maintenance tools (incl. stellio_manager.bat)
 ├── check_deps.py           # Self-healing dependency checker
-├── modules/            # Modules split out of main.py (print_session, share_link, timelapse, mqtt_publisher, quote_portal, digest…)
+├── modules/                # Modules split out of main.py (print_session, share_link, timelapse, mqtt_publisher, quote_portal, digest…)
 ├── worker.py               # Unused 3MF worker skeleton (placeholder, not wired in yet)
 ├── assets/                 # Logos, icons
 ├── languages/              # Translation files (JSON)

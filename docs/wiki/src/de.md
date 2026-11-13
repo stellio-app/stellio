@@ -1,33 +1,59 @@
 @@@ Home | Startseite
-# Stellio-Wiki
+# 🧊 Stellio, Ihre 3D-Werkstatt an einem Ort
 {{img:dashboard}}
 
+> **Bibliothek, Drucker, Spulen, Kosten und Angebote: alles ist geordnet, nur einen Klick entfernt und bleibt bei Ihnen.**
 
-**Stellio** ist der 3D-Dateimanager für Maker und 3D-Drucker-Besitzer. Er bündelt Ihre Bibliothek (STL, 3MF, OBJ, STEP, PLY, AMF), automatisiert wiederkehrende Aufgaben und fügt sich in Ihren Druck-Workflow ein.
+🔒 **100 % lokal** · 🆓 **Kostenlos und Open Source** (AGPL v3) · 🌍 **8 Sprachen** · 🖥️ Windows, macOS, Linux, Raspberry Pi, Proxmox · 📱 Android
 
-> 🔒 **Philosophie**: Ihre Daten bleiben bei Ihnen. Alles läuft lokal; standardmäßig verlässt nichts Ihren Rechner.
+**[⬇️ Stellio herunterladen](https://github.com/stellio-app/stellio/releases)** · **[▶ Online-Demo ausprobieren](https://demo.stellio-app.com)** · **[💬 Dem Discord beitreten](https://discord.gg/ySxpHvS6bd)**
 
-## Wo anfangen?
+## ✨ Warum Sie es lieben werden
 
-| Ich möchte … | Seite |
+| Für Sie… | Was Stellio ändert |
 |---|---|
+| 🗂️ **Eine Bibliothek, die sich selbst ordnet** | Automatische 3D-Vorschaubilder, KI-Tags, Suche in natürlicher Sprache, erkannte Duplikate. |
+| 🖨️ **Alle Drucker auf einem Bildschirm** | Bambu Lab, Prusa, Klipper, OctoPrint, Creality … Temperatur, Kamera, Fortschritt, Foto am Druckende und Zeitraffer. |
+| 🚀 **Von der Bibliothek zur Maschine mit einem Klick** | Senden an den Slicer mit den richtigen Profilen und der richtigen Spule (ein Slicer pro Drucker), Prüfungen vor dem Druck. |
+| 🧵 **Ihre Spulen im Griff** | Bestand, Spoolman, TigerTag, OpenPrintTag, Prognose des Leerwerdens, Trocknungs-Erinnerungen. |
+| 💶 **Kosten, Angebote und Aufträge** | Echte Kosten (Material, Strom, Verschleiß), PDF-Angebote, Online-Kundenverfolgung, Rechnungen. |
+| 🤖 **Eine KI, die zu Hause bleibt** | Lokales Ollama: Tagging, Suche, Druckbarkeit, Fehlerüberwachung, S.O.S Print. |
+| 🛠️ **Werkzeuge, die ein Teil retten** | 3D-Viewer, Netzreparatur, Konvertierung, automatische Platzierung, empfohlene Ausrichtungen. |
+| 📱 **Überall dabei** | Smartphone (PWA und Android-App), Fernzugriff, Push-Benachrichtigungen, Home Assistant. |
+
+## 🚀 In 3 Minuten loslegen
+
+1. **Installieren** Sie Stellio: ein Installer, ein AppImage oder ein Befehl auf Raspberry Pi und Proxmox ([Installation](de-Installation)).
+2. **Fügen Sie einen Ordner** mit Ihren Modellen hinzu: Stellio sortiert sie und erstellt die 3D-Vorschaubilder von selbst.
+3. **Fügen Sie einen Drucker hinzu** (optional): Er wird in Ihrem Netzwerk automatisch erkannt.
+
+👉 Weiter mit den [Erste Schritte](de-Getting-Started) und der [Schritt-für-Schritt-Anleitung](de-How-To), die **jede Funktion und ihre Bedienung** erklärt.
+
+## 🧭 Das Wiki entdecken
+
+| Ich möchte… | Seite |
+|---|---|
+| Jede Funktion bedienen lernen | [Schritt-für-Schritt-Anleitung](de-How-To) |
 | Stellio installieren | [Installation](de-Installation) |
-| Erste Schritte machen | [Erste Schritte](de-Getting-Started) |
+| Meine ersten Schritte machen | [Erste Schritte](de-Getting-Started) |
 | Meine 3D-Dateien verwalten | [Bibliothek](de-Library) |
 | Meine Drucker verbinden | [Drucker](de-Printers) |
 | Meine Spulen verfolgen | [Filament](de-Filament) |
 | Modelle herunterladen | [Downloads](de-Downloads) |
 | KI und S.O.S Print nutzen | [Künstliche Intelligenz](de-AI) |
 | Kosten, Angebote, Rechnungen berechnen | [Kosten und Verwaltung](de-Costs-and-Management) |
-| Vom Smartphone zugreifen | [Fern- und mobiler Zugriff](de-Remote-Access) |
+| Vom Smartphone darauf zugreifen | [Fernzugriff und Mobil](de-Remote-Access) |
 | Auf Raspberry Pi / Proxmox installieren | [Server-Edition](de-Server-Edition) |
 | Einstellen, sichern, meine Daten verstehen | [Einstellungen und Daten](de-Settings-and-Data) |
 | Ein Problem lösen | [Fehlerbehebung](de-Troubleshooting) |
 | Zum Projekt beitragen | [Mitwirken](de-Contributing) |
+| Sehen, was jede Version bringt | [Neuigkeiten](de-Changelog) |
+
+> 🔒 **Philosophie**: Ihre Daten bleiben bei Ihnen. Alles läuft lokal; standardmäßig verlässt nichts Ihren Rechner.
 
 ## Nützliche Links
 
-- 🌐 Website: [stellio-app.com](https://stellio-app.com) — ▶ [Live-Demo (nur Lesezugriff)](https://demo.stellio-app.com)
+- 🌐 Website: [stellio-app.com](https://stellio-app.com) · ▶ [Online-Demo (nur Lesen)](https://demo.stellio-app.com)
 - 📦 [Downloads (Releases)](https://github.com/stellio-app/stellio/releases)
 - 🐛 [Fehler melden](https://github.com/stellio-app/stellio/issues) · 💡 [Idee vorschlagen](https://github.com/stellio-app/stellio/discussions) · 💬 [Discord](https://discord.gg/ySxpHvS6bd)
 - 📜 Lizenz **AGPL v3**
@@ -128,6 +154,188 @@ Die Startseite zeigt laufende Drucke, niedrigen Bestand, letzte Drucke und letzt
 - **Benachrichtigungszentrum** (Glocke): Druck beendet, Fehler, Wartung, niedriger Bestand, Spulentrocknung.
 - **Schwebendes Widget** mit dem Fortschritt des aktuellen Drucks, auf jeder Seite sichtbar.
 - **Tastenkürzel**: siehe [Einstellungen und Daten](de-Settings-and-Data).
+
+@@@ How-To | Schritt-für-Schritt-Anleitung
+# Schritt-für-Schritt-Anleitung
+
+Jede Funktion von Stellio: **wofür sie da ist und wie man sie benutzt**. Technische Details stehen auf den anderen Seiten; hier wird gemacht.
+
+> 💡 In der ganzen App: `Strg+K` öffnet die **Befehlspalette** (irgendwohin gehen, eine Aktion starten, eine Datei, ein Tag, eine Spule finden) und `?` zeigt die Tastenkürzel.
+
+## Sich in Stellio zurechtfinden
+
+| Menü | Wofür es da ist |
+|---|---|
+| **Dashboard** | Laufende Drucke, niedriger Bestand, letzte Dateien; verschiebbare Widgets. |
+| **Bibliothek** | Alle Ihre 3D-Modelle mit Vorschaubildern, Tags, Filtern und Suche. |
+| **Favoriten** | Ihre Lieblingsmodelle, ein Klick entfernt. |
+| **Bald drucken** | Ihre Druck-Warteliste, umsortierbar. |
+| **Projekte** | Mehrere Dateien für ein Objekt gebündelt. |
+| **Drucker** | Live-Überwachung, Senden, Wartung, Verschleißteile. |
+| **Filament-Bestand** | Ihre Spulen, die Prognose des Leerwerdens, Trocknung. |
+| **Verlauf** | Jeder gesendete Druck, als Erfolg oder Fehlschlag bewertet. |
+| **Galerie** | Die Fotos Ihrer Drucke. |
+| **Statistiken** | Zuverlässigkeit, Verbrauch, Formate, Berichte. |
+| **Verwaltung** | Kosten, Kundenangebote, Aufträge, Buchhaltung. |
+| **Werkstattmodus** | Vollbildanzeige für Tablet oder Smartphone. |
+| **S.O.S Print** | Geführte Diagnose eines fehlgeschlagenen Drucks. |
+| **Download** | Modelle von Printables, MakerWorld, Thingiverse … holen. |
+| **Reparatur** | Beschädigte Netze finden und reparieren. |
+| **Konverter** | Von einem 3D-Format in ein anderes wechseln. |
+| **Duplikate** | Doppelte Dateien aufspüren. |
+| **Papierkorb** | Gelöschtes wiederherstellen. |
+| **Einstellungen** | Erscheinungsbild, Slicer, KI, Sicherungen, Fernzugriff. |
+
+## Meine Dateien hinzufügen und finden
+
+1. Klicken Sie auf **Quelle hinzufügen** (oder `Strg+K` und dann „Quelle hinzufügen“) und wählen Sie einen **Ordner**, eine einzelne Datei oder eine **SMB-/NFS**-Freigabe. Auf Ihrem Computer gefundene 3D-Ordner werden vorgeschlagen.
+2. Stellio scannt und erstellt die **3D-Vorschaubilder** im Hintergrund; die Erzeugung pausiert, solange Sie die App benutzen.
+3. Ein Modell finden: in die **Suchleiste** tippen oder es mit der KI-Suche in normaler Sprache beschreiben („ein Kopfhörerständer“).
+4. Ziehen Sie 3D-Dateien aus dem Datei-Explorer per Drag-and-drop hinein, um sie direkt hinzuzufügen.
+
+💡 Archive (ZIP, RAR, 7z, TAR) lassen sich durchsuchen, ohne sie zu entpacken.
+
+## Mit Tags, Favoriten und Filtern ordnen
+
+1. Öffnen Sie das **⋯**-Menü einer Datei oder wählen Sie mehrere aus (`Umschalt+Klick` für einen Bereich), um in einem Zug zu handeln.
+2. Fügen Sie farbige **Tags** von Hand hinzu oder lassen Sie sie von der KI vorschlagen; `T` öffnet die Tag-Verwaltung.
+3. Klicken Sie auf den Stern, um ein Modell zum **Favoriten** zu machen (`F` öffnet die Favoriten).
+4. Kombinieren Sie **Filter** (Typ, Größe, Gewicht, Druckstatus, „Filamentbestand“) und **speichern** Sie den Filter zur Wiederverwendung.
+5. Viele Dateien umbenennen: **Massenumbenennung** (Suchen/Ersetzen, Präfix, Suffix, Nummerierung) mit Vorschau vor der Bestätigung.
+
+## Ein Modell in 3D ansehen und vorbereiten
+
+1. Klicken Sie auf das Vorschaubild einer Datei: Der **3D-Viewer** öffnet sich (er funktioniert offline).
+2. Drehen und zoomen Sie; bei einem 3MF mit mehreren Platten wechseln Sie zwischen den Platten.
+3. Starten Sie die **Druckbarkeitsanalyse** (Überhänge): Stellio schlägt empfohlene **Ausrichtungen** vor.
+4. Nutzen Sie die **automatische Platzierung**, um mehrere Teile auf dem Druckbett anzuordnen.
+5. Senden Sie das Ergebnis aus dem Viewer an den Slicer.
+
+## Ein beschädigtes Netz reparieren
+
+1. Öffnen Sie **Reparatur**: Stellio listet Dateien mit Löchern oder offenen Kanten auf (die Analyse läuft auch im Hintergrund, wenn Vorschaubilder erstellt werden).
+2. Wählen Sie eine Datei und starten Sie die **Reparatur**; vergleichen Sie **vorher / nachher**.
+3. Die Datei wird an Ort und Stelle repariert; eine `.bak`-Sicherheitskopie bleibt zur Sicherheit erhalten.
+
+## Dateien konvertieren
+
+1. Öffnen Sie den **Konverter** und wählen Sie eine oder mehrere Dateien (STL, 3MF, OBJ, PLY, AMF, STEP).
+2. Wählen Sie das Ausgabeformat: STL, 3MF, OBJ, PLY, OFF oder GLB.
+3. Haken Sie bei Bedarf **Netz automatisch reparieren** und **Originaldatei löschen** an.
+4. Starten Sie. Eine Stapelkonvertierung lässt sich jederzeit abbrechen: bereits konvertierte Dateien bleiben erhalten.
+
+## Aufräumen: Duplikate und Papierkorb
+
+1. Öffnen Sie **Duplikate**: identische Dateien und solche mit **ähnlicher Geometrie** (dasselbe Modell umbenannt oder neu exportiert) werden gruppiert.
+2. Behalten Sie die gewünschte Datei und löschen Sie die anderen.
+3. Versehentlich gelöscht? `Strg+Z` macht es 5 Minuten lang rückgängig; der **Papierkorb** behält Elemente länger und erlaubt, sie wiederherzustellen oder endgültig zu löschen.
+
+## Dateien zu Projekten bündeln
+
+1. Öffnen Sie **Projekte** und legen Sie ein Projekt an; fügen Sie die Dateien eines Objekts hinzu (Körper, Deckel, Stützen …).
+2. Ein 3MF mit **mehreren Platten**, das einem Projekt hinzugefügt wird, wird in ein 3MF pro Platte aufgeteilt (auch verfügbar: **Platten aufteilen** im ⋯-Menü).
+3. Verfolgen Sie den Fortschritt („In Arbeit“ / „Fertig“) und klicken Sie auf **Projektkosten**, um das ganze Set zu kalkulieren.
+
+## Modelle herunterladen
+
+1. Öffnen Sie **Download** (oder `Strg+N`) und fügen Sie den Link eines Modells ein (Printables, MakerWorld, Thingiverse, Nexprint, Creality Cloud, Snapmaker Space).
+2. Verbinden Sie das verlangte Konto einmalig (siehe [Downloads](de-Downloads)).
+3. Wählen Sie die Ziel-**Quelle**: Die Datei kommt mit ihrer **Herkunft** (Link, Autor, Lizenz).
+4. Stellio prüft täglich, ob es eine **neue Version** des Modells gibt; **Meine Likes** und **Meine Kreationen** finden Ihre Modelle auf verbundenen Konten.
+
+## Einen Drucker verbinden
+
+1. Öffnen Sie **Drucker → Hinzufügen**: Die **Netzwerkerkennung** schlägt gefundene Maschinen vor; andernfalls geben Sie Typ, Adresse und Zugangsschlüssel ein.
+2. Geben Sie das **Druckvolumen** (X, Y, Z) an: Stellio warnt vor dem Senden, wenn ein Teil zu groß ist.
+3. Wählen Sie auf Wunsch den **Slicer dieses Druckers** (1.0.8): Dieser öffnet sich für diese Maschine.
+4. Aktivieren Sie die nützlichen Optionen: **Zeitraffer**, **Foto am Druckende**, **KI-Überwachung**, **smarte Steckdose** (realer Verbrauch).
+
+## Eine Datei an den Slicer senden
+
+1. Klicken Sie in der Bibliothek oder im Viewer auf **An Slicer senden**.
+2. Im Fenster: Sehen Sie sich die **Schätzung** (Gewicht, Zeit) an, wählen Sie **Drucker**, **Spule** und **Einstellungsprofil** oder lassen Sie „Automatisch“.
+3. Lesen Sie die **Prüfungen vor dem Druck**: Spule zu trocknen, abrasives Filament, Volumen überschritten, zu wenig Material.
+4. Klicken Sie auf **Senden**: Die Datei öffnet sich im Slicer des Druckers (oder dem aus den Einstellungen) mit den der Maschine zugeordneten Profilen. Die Spule wird abgebucht, wenn Sie es verlangt haben.
+
+💡 Um Profile einem Drucker zuzuordnen, importieren Sie sie unter Einstellungen → Slicer.
+
+## Das Nächste vorbereiten: „Bald drucken“
+
+1. Wählen Sie im **⋯**-Menü einer Datei **Zu „Bald drucken“ hinzufügen**.
+2. Öffnen Sie **Bald drucken**: Ziehen Sie zum **Umsortieren**.
+3. Senden Sie ein Element direkt an den Slicer oder entfernen Sie es aus der Liste.
+
+## Einen Druck verfolgen
+
+1. Auf der Druckerkarte: Temperatur, Fortschritt, **Live-Kamera** und Name der aktuellen Datei.
+2. Ein **schwebendes Widget** zeigt den Fortschritt auf jeder Seite.
+3. Die **Glocke** benachrichtigt Sie (fertig, fehlgeschlagen, Wartung, niedriger Bestand); aktivieren Sie **Push-Benachrichtigungen** (ntfy, Telegram, Discord, Webhook), um auch bei geschlossenem Fenster informiert zu werden.
+4. Bei 100 % macht Stellio das **Abschlussfoto**: Markieren Sie es mit einem Klick als *Erfolg* oder *Fehlschlag*. Der **Zeitraffer** wird automatisch erstellt.
+
+## Bewerten, erneut drucken, Fotos wiederfinden
+
+1. Öffnen Sie den **Verlauf**: Filtern Sie nach Plattform, Ergebnis oder Datum.
+2. Bewerten Sie jeden Druck als **Erfolg** oder **Fehlschlag**: Das speist Empfehlungen und Statistiken.
+3. **Datei ansehen** oder **Erneut drucken** wie beim letzten Mal (gleiche Einstellungen).
+4. Ihre Fotos finden Sie in der **Galerie**; **Meine G-Codes** hält die mit einer Datei verknüpften G-Codes bereit, mit der Schaltfläche **Im Slicer öffnen**.
+
+## Meine Spulen verfolgen
+
+1. Öffnen Sie den **Filament-Bestand**: Fügen Sie Spulen von Hand hinzu (oder per Excel/CSV-Import), verbinden Sie **Spoolman**, **TigerTag** oder **OpenPrintTag** oder suchen Sie eine Spule in der **Open Filament Database**.
+2. Wählen Sie beim Senden an den Slicer die Spule: Stellio **bucht** den Verbrauch **ab** und prüft, ob genug übrig ist.
+3. Wiegen Sie unter **Wiegen und Prognose** eine Spule: Stellio schätzt ihr **Leerdatum** und warnt, wenn es näher rückt.
+4. Tragen Sie die **Trocknung** einer Spule ein, um ihren Zustand zu verfolgen; über **Nachkaufen** öffnen Sie den Shop des Herstellers.
+
+## Kosten berechnen und ein Angebot erstellen
+
+1. Öffnen Sie den Rechner aus einer Datei (**Kosten**) oder einem Projekt (**Projektkosten**).
+2. Prüfen Sie Material, Strom, **Maschinenverschleiß**, **Fixkosten**, **Marge** und **Menge**: Stückpreis und Gesamtpreis werden angezeigt.
+3. Klicken Sie auf **Angebot erstellen (PDF)**: Tragen Sie Kunde und Bezeichnung ein. Das PDF wird aufbewahrt und ist im Widget **Angebote** zu finden.
+4. Legen Sie die Standardmarge unter **Einstellungen → Druckpreise** fest.
+
+## Aufträge, Kunden und Rechnungen verwalten
+
+1. Aktivieren Sie in den Einstellungen *Kosten-, Angebots- und Rechnungsfunktionen aktivieren*: Der Bildschirm **Verwaltung** erscheint.
+2. Senden Sie dem Kunden ein Angebot mit seinem **Tracking-Link**: Er kann es online annehmen oder ablehnen; die Annahme erstellt die Druckaufgabe. **Stellio wickelt keine Zahlung ab.**
+3. Verfolgen Sie die **Auftragswarteschlange**, Zahlungen, Anzahlungsrechnungen und Gutschriften; die **intelligente Zuteilung** schlägt den passenden Drucker vor, ohne je einen Druck zu starten.
+4. Exportieren Sie jeden Monat die **Buchhaltung** (ZIP mit CSV und PDF).
+
+## Meine Drucker warten
+
+1. Öffnen Sie auf einer Druckerkarte **Wartung** und wählen Sie die **Marke**: Empfohlene Aufgaben werden angeboten.
+2. Fügen Sie sie Ihrer Verfolgung hinzu: Sie werden je nach Druckstunden und vergangenen Tagen „fällig“.
+3. Erfassen Sie Ihre **Verschleißteile** (Düsen, Platten, Riemen) mit Warnschwelle und Ihre **Kalibrierungen** je Filament.
+
+## Einen Fehler diagnostizieren: S.O.S Print und KI
+
+1. Öffnen Sie **S.O.S Print** und beschreiben Sie das Problem (Foto möglich).
+2. Beantworten Sie die Fragen, eine nach der anderen (höchstens 4): Stellio grenzt die Hypothesen ein und liefert eine **abschließende Diagnose**.
+3. Für lokale KI installieren Sie [Ollama](https://ollama.com/) und richten es unter **Einstellungen → Künstliche Intelligenz** ein. Die **Fehlerüberwachung** warnt Sie, ohne den Druck je zu stoppen.
+
+## Stellio auf dem Smartphone und aus der Ferne nutzen
+
+1. Scannen Sie unter **Einstellungen → Mobiler Zugriff** den **QR-Code**: Die Bibliothek öffnet sich auf Ihrem Smartphone (wie eine App installierbar).
+2. Für die **Android**-App scannen Sie den speziellen QR-Code.
+3. Unterwegs: Aktivieren Sie den **Fernzugriff** (Cloudflare Tunnel oder eigene Adresse) oder erstellen Sie einen temporären **Freigabelink**.
+4. Teilen Sie schreibgeschützt mit einem **Gastkonto**.
+
+## Sichern und wiederherstellen
+
+1. Öffnen Sie **Einstellungen → Sicherung und Daten** und **exportieren** Sie Ihre Daten (.zip).
+2. Planen Sie **automatische Sicherungen**.
+3. Zum Wiederherstellen **importieren** Sie die .zip-Datei. Ein Stellio-Update berührt Ihre Daten nie.
+
+## Nützliche Tastenkürzel
+
+| Kürzel | Aktion |
+|---|---|
+| `Strg+K` | Befehlspalette |
+| `Strg+N` | Neuer Download |
+| `Strg+Z` | Letzte Löschung rückgängig |
+| `F` · `T` | Favoriten · Tag-Verwaltung |
+| `?` | Hilfe zu Tastenkürzeln |
+
+Vollständige Liste: [Einstellungen und Daten](de-Settings-and-Data).
 
 @@@ Library | Bibliothek
 # Bibliothek

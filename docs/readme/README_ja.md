@@ -9,7 +9,7 @@
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python"></a>
   <a href="https://flask.palletsprojects.com/"><img src="https://img.shields.io/badge/flask-3.0+-green.svg" alt="Flask"></a>
   <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg" alt="License: AGPL v3"></a>
-  <a href="https://github.com/stellio-app/stellio/blob/main"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20Raspberry%20Pi%20%2F%20Linux-lightgrey.svg" alt="Platform"></a>
+  <a href="https://github.com/stellio-app/stellio/blob/main"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Raspberry%20Pi%20%2F%20Linux-lightgrey.svg" alt="Platform"></a>
   <a href="https://github.com/stellio-app/stellio/blob/main"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
 </p>
 
@@ -227,6 +227,16 @@
 
 > 💼 **ポータブル版（インストール不要）**：Releases から `Stellio-v<バージョン>-portable-win64.zip` をダウンロードし、好きな場所（ディスク、USBメモリ）に展開して `Stellio.exe` を起動します。データは実行ファイルの横の `data` フォルダーに保存されます（`portable.flag` ファイルは削除しないでください）。
 
+### 🍎 macOS
+
+1. [Releases](https://github.com/stellio-app/stellio/releases) からお使いの Mac に合った `.dmg` をダウンロードします：`Stellio-v<version>-macOS-arm64.dmg`（Apple シリコン：M1、M2、M3…）または `Stellio-v<version>-macOS-x86_64.dmg`（Intel）。
+2. `.dmg` を開き、**Stellio** を**アプリケーション**にドラッグします。
+3. 初回起動：**Stellio** を右クリック（または Control キーを押しながらクリック）して**開く**を選び、確認します。🎉
+
+> ⚠️ macOS 版は**まだ公証されていません**。初回起動時に Gatekeeper の警告が表示されます（右クリック →「開く」で回避できます）。各ファイルには確認用の `.sha256` チェックサムが付属しています。
+>
+> 💡 **ウィンドウが真っ白？** ポート 5000 は macOS の「AirPlay レシーバー」に使われていることがよくあります。その場合、Stellio は空いている別のポート（5001〜5030）を自動で選びます。データは `~/.stellio` に保存されます。
+
 ### 🐧 Raspberry Pi / Linux
 
 **ヘッドレスサーバーモード**（GUIなし）で動作します：Stellioはバックグラウンドで動作し、Pi自体、またはローカルネットワーク上の任意のデバイスのブラウザからアクセスします。
@@ -336,7 +346,7 @@ Stellioは以下を自動検出します：
 | バックエンド | Python 3.8+、Flask、Waitress |
 | フロントエンド | HTML5、CSS3、Vanilla JavaScript |
 | データベース | SQLite（WALモード） |
-| デスクトップ | pywebview（Windows）／ヘッドレスブラウザモード（Raspberry Pi、Linux） |
+| デスクトップ | pywebview（Windows、macOS）／ヘッドレスブラウザモード（Raspberry Pi、Linux） |
 | 3Dレンダリング | PyRender、numpy CPUラスタライザー、Three.js |
 | メッシュ・ネスティング | trimesh、pymeshfix、shapely、rectpack |
 | AI | Ollama（ローカル） |

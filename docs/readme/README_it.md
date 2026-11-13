@@ -9,7 +9,7 @@
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python"></a>
   <a href="https://flask.palletsprojects.com/"><img src="https://img.shields.io/badge/flask-3.0+-green.svg" alt="Flask"></a>
   <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg" alt="License: AGPL v3"></a>
-  <a href="https://github.com/stellio-app/stellio/blob/main"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20Raspberry%20Pi%20%2F%20Linux-lightgrey.svg" alt="Platform"></a>
+  <a href="https://github.com/stellio-app/stellio/blob/main"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Raspberry%20Pi%20%2F%20Linux-lightgrey.svg" alt="Platform"></a>
   <a href="https://github.com/stellio-app/stellio/blob/main"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
 </p>
 
@@ -227,6 +227,16 @@ Che tu sia un maker alle prime armi o un utente esperto con più macchine, Stell
 
 > 💼 **Versione portatile (senza installazione)**: scarica `Stellio-v<versione>-portable-win64.zip` dalle Releases, decomprimilo dove vuoi (disco, chiavetta USB) e avvia `Stellio.exe`. I tuoi dati restano nella cartella `data` accanto all'eseguibile (conserva il file `portable.flag`).
 
+### 🍎 macOS
+
+1. Scarica da [Releases](https://github.com/stellio-app/stellio/releases) il `.dmg` adatto al tuo Mac: `Stellio-v<version>-macOS-arm64.dmg` (Apple Silicon: M1, M2, M3…) oppure `Stellio-v<version>-macOS-x86_64.dmg` (Intel).
+2. Apri il `.dmg` e trascina **Stellio** in **Applicazioni**.
+3. Primo avvio: clic destro (o Control+clic) su **Stellio → Apri**, poi conferma. 🎉
+
+> ⚠️ Le versioni per macOS **non sono ancora notarizzate**, quindi Gatekeeper mostra un avviso al primo avvio (clic destro → Apri lo aggira). Ogni file è accompagnato da una somma di controllo `.sha256` da verificare.
+>
+> 💡 **Finestra bianca?** La porta 5000 è spesso occupata dal «Ricevitore AirPlay» di macOS: Stellio sceglie allora automaticamente un'altra porta libera (5001–5030). I tuoi dati sono in `~/.stellio`.
+
 ### 🐧 Raspberry Pi / Linux
 
 Funziona in **modalità server headless** (senza interfaccia grafica): Stellio gira in background e viene gestito da browser, sia sul Pi stesso sia da qualsiasi dispositivo sulla rete locale.
@@ -336,7 +346,7 @@ Stellio rileva automaticamente:
 | Backend | Python 3.8+, Flask, Waitress |
 | Frontend | HTML5, CSS3, JavaScript vanilla |
 | Database | SQLite (modalità WAL) |
-| Desktop | pywebview (Windows) / modalità browser headless (Raspberry Pi, Linux) |
+| Desktop | pywebview (Windows, macOS) / modalità browser headless (Raspberry Pi, Linux) |
 | Rendering 3D | PyRender, rasterizzatore CPU numpy, Three.js |
 | Mesh e nesting | trimesh, pymeshfix, shapely, rectpack |
 | IA | Ollama (locale) |

@@ -9911,6 +9911,7 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
 .mg-empty{color:var(--text-muted,inherit);font-size:calc(12.5px * var(--fs,1))}
 .mg-msg{min-height:18px;font-size:calc(12.5px * var(--fs,1));margin:0 0 6px}.mg-msg.ok{color:#22c55e}.mg-msg.bad{color:#ef4444}
 
+
 .source-banner-forecast { background: linear-gradient(135deg, rgba(168,85,247,0.10), rgba(168,85,247,0.02)); border: 1px solid rgba(168,85,247,0.3); }
 .source-banner-forecast .source-banner-icon { background: rgba(168,85,247,0.15); color: #a855f7; }
 .spool-forecast { font-size: calc(11.5px * var(--fs, 1)); color: var(--text-muted); margin-top: 8px; line-height: 1.4; }

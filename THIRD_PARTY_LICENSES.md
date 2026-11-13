@@ -43,6 +43,13 @@ Packaging: PyInstaller (GPL-2.0 with the bootloader exception, which allows any 
 | Material Design Icons (`mdi`) | Apache-2.0 (icons), SIL OFL 1.1 (font) | Source: https://github.com/Templarian/MaterialDesign |
 | Inter | SIL OFL 1.1 | Source: https://github.com/rsms/inter. The OFL requires keeping the copyright and license text with the font files |
 
+## Open data and standards
+
+| Component | License | Notes |
+|---|---|---|
+| OpenPrintTag specification (https://github.com/OpenPrintTag/openprinttag-specification, Prusa Research) | MIT | Stellio reads and writes OpenPrintTag NFC spool tags with its own codec (`modules/openprinttag.py`); enumeration tables come from the specification |
+| Open Filament Database (https://openfilamentdatabase.org, Open Filament Collective) | MIT | Public catalog downloaded at run time (Spoolman format) and cached locally; attribution is shown in the app |
+
 ## Names and logos
 
 The TigerTag logo is used with the permission that comes with the official integration partnership

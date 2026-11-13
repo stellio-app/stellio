@@ -24,4 +24,11 @@
     <string name="retry">再試行</string>
     <string name="edit_addresses">アドレスを変更</string>
     <string name="press_again">もう一度戻るで終了</string>
+    <string name="update_title">アップデートがあります</string>
+    <string name="update_msg">Stellio %1$s が利用可能です（現在：%2$s）。今すぐ更新しますか？</string>
+    <string name="update_now">更新する</string>
+    <string name="update_later">後で</string>
+    <string name="update_need_perm">Stellio にアプリのインストールを許可してから戻ってください。更新が自動で始まります。</string>
+    <string name="update_downloading">アップデートをダウンロード中…</string>
+    <string name="update_failed">更新に失敗しました。後でもう一度お試しいただくか、GitHub からダウンロードしてください。</string>
 </resources>

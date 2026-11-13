@@ -15,6 +15,7 @@ stellio/
 │   ├── clients.py  trash_routes.py  tigertag.py  sosprint_helpers.py
 │   └── quote_portal.py  accounting_zip.py  parts_stock.py  printer_dispatch.py
 │       digest.py  filament_weighing.py  profile_share.py        (v1.0.6, écran « Gestion »)
+│       openprinttag.py  open_filament_db.py                     (v1.0.8, étiquettes NFC + catalogue)
 ├── interface/               Interface (JavaScript pur, sans compilation)
 │   ├── index.html  script.js  style.css
 │   ├── management.js          écran « Gestion » (v1.0.6)

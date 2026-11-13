@@ -26,4 +26,6 @@ ALL = (
     'digest',
     'filament_weighing',
     'profile_share',
+    'openprinttag',
+    'open_filament_db',
 )

@@ -1,21 +1,44 @@
 @@@ Home | Home
-# Wiki di Stellio
+# 🧊 Stellio, il tuo laboratorio 3D in un solo posto
 {{img:dashboard}}
 
+> **Libreria, stampanti, bobine, costi e preventivi: tutto in ordine, a un clic e sempre sul tuo computer.**
 
-**Stellio** è il gestore di file 3D per maker e proprietari di stampanti 3D. Centralizza la tua libreria (STL, 3MF, OBJ, STEP, PLY, AMF), automatizza le attività ripetitive e si integra nel tuo flusso di stampa.
+🔒 **100 % locale** · 🆓 **Gratuito e open source** (AGPL v3) · 🌍 **8 lingue** · 🖥️ Windows, macOS, Linux, Raspberry Pi, Proxmox · 📱 Android
 
-> 🔒 **Filosofia**: i tuoi dati restano con te. Tutto funziona in locale; per impostazione predefinita nulla lascia il tuo computer.
+**[⬇️ Scarica Stellio](https://github.com/stellio-app/stellio/releases)** · **[▶ Prova la demo online](https://demo.stellio-app.com)** · **[💬 Entra nel Discord](https://discord.gg/ySxpHvS6bd)**
 
-## Da dove iniziare?
+## ✨ Perché ti piacerà
+
+| Per te… | Cosa cambia Stellio |
+|---|---|
+| 🗂️ **Una libreria che si ordina da sola** | Miniature 3D automatiche, tag con IA, ricerca in linguaggio naturale, duplicati individuati. |
+| 🖨️ **Tutte le stampanti su una schermata** | Bambu Lab, Prusa, Klipper, OctoPrint, Creality… temperatura, camera, avanzamento, foto finale e timelapse. |
+| 🚀 **Dalla libreria alla macchina con un clic** | Invio allo slicer con i profili e la bobina giusti (uno slicer per stampante), controlli prima della stampa. |
+| 🧵 **Le tue bobine sotto controllo** | Inventario, Spoolman, TigerTag, OpenPrintTag, previsione di esaurimento, promemoria di essiccazione. |
+| 💶 **Costi, preventivi e ordini** | Costo reale (materiale, elettricità, usura), preventivi PDF, tracciamento cliente online, fatture. |
+| 🤖 **Un'IA che resta a casa** | Ollama in locale: tag, ricerca, stampabilità, sorveglianza dei guasti, S.O.S Print. |
+| 🛠️ **Strumenti che salvano un pezzo** | Visualizzatore 3D, riparazione della mesh, conversione, posizionamento automatico, orientamenti suggeriti. |
+| 📱 **Con te ovunque** | Smartphone (PWA e app Android), accesso remoto, notifiche push, Home Assistant. |
+
+## 🚀 Inizia in 3 minuti
+
+1. **Installa** Stellio: un installer, un AppImage o un comando su Raspberry Pi e Proxmox ([Installazione](it-Installation)).
+2. **Aggiungi una cartella** con i tuoi modelli: Stellio li ordina e crea da solo le miniature 3D.
+3. **Aggiungi una stampante** (facoltativo): viene rilevata automaticamente sulla tua rete.
+
+👉 Poi: i [Primi passi](it-Getting-Started) e la [Guida passo passo](it-How-To), che spiega **ogni funzione e come usarla**.
+
+## 🧭 Esplora la wiki
 
 | Voglio… | Pagina |
 |---|---|
+| Imparare a usare ogni funzione | [Guida passo passo](it-How-To) |
 | Installare Stellio | [Installazione](it-Installation) |
 | Muovere i primi passi | [Primi passi](it-Getting-Started) |
 | Gestire i miei file 3D | [Libreria](it-Library) |
 | Collegare le mie stampanti | [Stampanti](it-Printers) |
-| Seguire le mie bobine | [Filamento](it-Filament) |
+| Tenere traccia delle mie bobine | [Filamento](it-Filament) |
 | Scaricare modelli | [Download](it-Downloads) |
 | Usare l'IA e S.O.S Print | [Intelligenza artificiale](it-AI) |
 | Calcolare costi, preventivi, fatture | [Costi e gestione](it-Costs-and-Management) |
@@ -24,12 +47,15 @@
 | Configurare, fare backup, capire i miei dati | [Impostazioni e dati](it-Settings-and-Data) |
 | Risolvere un problema | [Risoluzione dei problemi](it-Troubleshooting) |
 | Contribuire al progetto | [Contribuire](it-Contributing) |
+| Vedere le novità di ogni versione | [Novità](it-Changelog) |
+
+> 🔒 **Filosofia**: i tuoi dati restano con te. Tutto funziona in locale; per impostazione predefinita, nulla lascia il tuo computer.
 
 ## Link utili
 
-- 🌐 Sito: [stellio-app.com](https://stellio-app.com) — ▶ [demo online (sola lettura)](https://demo.stellio-app.com)
+- 🌐 Sito: [stellio-app.com](https://stellio-app.com) · ▶ [demo online (sola lettura)](https://demo.stellio-app.com)
 - 📦 [Download (Releases)](https://github.com/stellio-app/stellio/releases)
-- 🐛 [Segnalare un bug](https://github.com/stellio-app/stellio/issues) · 💡 [Proporre un'idea](https://github.com/stellio-app/stellio/discussions) · 💬 [Discord](https://discord.gg/ySxpHvS6bd)
+- 🐛 [Segnala un bug](https://github.com/stellio-app/stellio/issues) · 💡 [Proponi un'idea](https://github.com/stellio-app/stellio/discussions) · 💬 [Discord](https://discord.gg/ySxpHvS6bd)
 - 📜 Licenza **AGPL v3**
 
 @@@ Installation | Installazione
@@ -128,6 +154,188 @@ La home riunisce stampe in corso, scorte basse, stampe recenti e file recenti. I
 - **Centro notifiche** (campanella): fine stampa, errore, manutenzione, scorte basse, essiccazione delle bobine.
 - **Widget mobile** con l'avanzamento della stampa in corso, visibile in tutte le pagine.
 - **Scorciatoie da tastiera**: vedi [Impostazioni e dati](it-Settings-and-Data).
+
+@@@ How-To | Guida passo passo
+# Guida passo passo
+
+Ogni funzione di Stellio: **a cosa serve e come usarla**. I dettagli tecnici sono nelle altre pagine; qui si pratica.
+
+> 💡 In tutta l'app: `Ctrl+K` apre la **palette dei comandi** (andare in un punto, avviare un'azione, trovare un file, un tag, una bobina) e `?` mostra le scorciatoie.
+
+## Orientarsi in Stellio
+
+| Menu | A cosa serve |
+|---|---|
+| **Dashboard** | Stampe in corso, scorte basse, file recenti; widget riordinabili. |
+| **Libreria** | Tutti i tuoi modelli 3D, con miniature, tag, filtri e ricerca. |
+| **Preferiti** | I tuoi modelli preferiti, a un clic. |
+| **Da stampare presto** | La tua lista d'attesa di stampe, riordinabile. |
+| **Progetti** | Più file raggruppati per uno stesso oggetto. |
+| **Stampanti** | Monitoraggio in diretta, invio, manutenzione, parti di usura. |
+| **Inventario filamento** | Le tue bobine, la previsione di esaurimento, l'essiccazione. |
+| **Cronologia** | Ogni stampa inviata, valutata riuscita o fallita. |
+| **Galleria** | Le foto delle tue stampe. |
+| **Statistiche** | Affidabilità, consumo, formati, report. |
+| **Gestione** | Costi, preventivi clienti, ordini, contabilità. |
+| **Modalità officina** | Schermo intero per tablet o telefono. |
+| **S.O.S Print** | Diagnosi guidata di una stampa fallita. |
+| **Scarica** | Prendere modelli da Printables, MakerWorld, Thingiverse… |
+| **Riparazione** | Trovare e riparare le mesh danneggiate. |
+| **Convertitore** | Passare da un formato 3D a un altro. |
+| **Duplicati** | Individuare i file doppi. |
+| **Cestino** | Ripristinare ciò che hai eliminato. |
+| **Impostazioni** | Aspetto, slicer, IA, backup, accesso remoto. |
+
+## Aggiungere e ritrovare i miei file
+
+1. Fai clic su **Aggiungi una sorgente** (o `Ctrl+K` e «Aggiungi una sorgente») e scegli una **cartella**, un file singolo o una condivisione **SMB / NFS**. Le cartelle 3D trovate sul tuo computer vengono suggerite.
+2. Stellio analizza e crea le **miniature 3D** in background; la generazione si mette in pausa mentre usi l'app.
+3. Per trovare un modello: scrivi nella barra di **ricerca** o descrivilo in linguaggio naturale («un supporto per cuffie») con la ricerca IA.
+4. Trascina e rilascia file 3D dall'esplora risorse per aggiungerli direttamente.
+
+💡 Gli archivi (ZIP, RAR, 7z, TAR) si esplorano senza estrarli.
+
+## Organizzare con tag, preferiti e filtri
+
+1. Apri il menu **⋯** di un file, o selezionane più di uno (`Maiusc+clic` per un intervallo) per agire in blocco.
+2. Aggiungi **tag** colorati a mano o lascia che li proponga l'IA; `T` apre il gestore dei tag.
+3. Fai clic sulla stella per rendere un modello **preferito** (`F` apre i preferiti).
+4. Combina i **filtri** (tipo, dimensione, peso, stato di stampa, «Scorta di filamento») e **salva** il filtro per riutilizzarlo.
+5. Per rinominare molti file: **Rinomina in blocco** (cerca/sostituisci, prefisso, suffisso, numerazione), con anteprima prima di confermare.
+
+## Guardare e preparare un modello in 3D
+
+1. Fai clic sulla miniatura di un file: si apre il **visualizzatore 3D** (funziona offline).
+2. Ruota e fai zoom; in un 3MF multi-piatto, passa da un piatto all'altro.
+3. Avvia l'**analisi di stampabilità** (sporgenze): Stellio suggerisce **orientamenti** consigliati.
+4. Usa il **posizionamento automatico** per disporre più pezzi sul piatto della stampante.
+5. Invia il risultato allo slicer dal visualizzatore.
+
+## Riparare una mesh danneggiata
+
+1. Apri **Riparazione**: Stellio elenca i file con buchi o spigoli aperti (l'analisi viene fatta anche in background alla creazione delle miniature).
+2. Scegli un file e avvia la **riparazione**; confronta **prima / dopo**.
+3. Il file viene riparato sul posto; resta una copia di sicurezza `.bak`, per precauzione.
+
+## Convertire i file
+
+1. Apri **Convertitore** e scegli uno o più file (STL, 3MF, OBJ, PLY, AMF, STEP).
+2. Seleziona il formato di uscita: STL, 3MF, OBJ, PLY, OFF o GLB.
+3. Se serve, spunta **Ripara automaticamente la mesh** ed **Elimina il file originale**.
+4. Avvia. Una conversione in blocco può essere annullata in qualsiasi momento: i file già convertiti vengono mantenuti.
+
+## Fare ordine: duplicati e cestino
+
+1. Apri **Duplicati**: i file identici e quelli con **geometria simile** (lo stesso modello rinominato o riesportato) vengono raggruppati.
+2. Tieni quello che vuoi ed elimina gli altri.
+3. Eliminato per errore? `Ctrl+Z` lo annulla per 5 minuti; il **Cestino** conserva gli elementi più a lungo e permette di ripristinarli o eliminarli definitivamente.
+
+## Raggruppare i file in progetti
+
+1. Apri **Progetti** e crea un progetto; aggiungi i file di uno stesso oggetto (corpo, coperchio, supporti…).
+2. Un 3MF **multi-piatto** aggiunto a un progetto viene diviso in un 3MF per piatto (disponibile anche: **Dividi i piatti**, nel menu ⋯).
+3. Segui l'avanzamento («In corso» / «Completati») e fai clic su **Costo del progetto** per valutare l'intero insieme.
+
+## Scaricare modelli
+
+1. Apri **Scarica** (o `Ctrl+N`) e incolla il link di un modello (Printables, MakerWorld, Thingiverse, Nexprint, Creality Cloud, Snapmaker Space).
+2. Collega una volta l'account richiesto (vedi [Download](it-Downloads)).
+3. Scegli la **sorgente** di destinazione: il file arriva con la sua **origine** (link, autore, licenza).
+4. Stellio controlla ogni giorno se esiste una **nuova versione** del modello; **I miei like** e **Le mie creazioni** ritrovano i tuoi modelli negli account collegati.
+
+## Collegare una stampante
+
+1. Apri **Stampanti → Aggiungi**: il **rilevamento di rete** propone le macchine trovate; altrimenti inserisci tipo, indirizzo e chiave di accesso.
+2. Indica il **volume di stampa** (X, Y, Z): Stellio ti avvisa prima dell'invio se un pezzo è troppo grande.
+3. Se vuoi, scegli lo **slicer di questa stampante** (1.0.8): è quello che si aprirà per questa macchina.
+4. Attiva le opzioni utili: **timelapse**, **foto di fine stampa**, **sorveglianza IA**, **presa smart** (consumo reale).
+
+## Inviare un file allo slicer
+
+1. Dalla libreria o dal visualizzatore, fai clic su **Invia allo slicer**.
+2. Nella finestra: guarda la **stima** (peso, tempo), scegli la **stampante**, la **bobina** e il **profilo di impostazioni**, oppure lascia «Automatico».
+3. Leggi i **controlli prima della stampa**: bobina da essiccare, filamento abrasivo, volume superato, materiale insufficiente.
+4. Fai clic su **Invia**: il file si apre nello slicer della stampante (o in quello delle Impostazioni), con i profili collegati alla macchina. La bobina viene scalata se l'hai richiesto.
+
+💡 Per collegare dei profili a una stampante, importali da Impostazioni → Slicer.
+
+## Preparare il seguito: «Da stampare presto»
+
+1. Nel menu **⋯** di un file, scegli **Aggiungi a da stampare presto**.
+2. Apri **Da stampare presto**: trascina per **riordinare**.
+3. Invia un elemento direttamente allo slicer o toglilo dalla lista.
+
+## Seguire una stampa
+
+1. Sulla scheda della stampante: temperatura, avanzamento, **camera in diretta** e nome del file in corso.
+2. Un **widget flottante** mostra l'avanzamento in tutte le pagine.
+3. La **campanella** ti avvisa (fine, errore, manutenzione, scorte basse); attiva le **notifiche push** (ntfy, Telegram, Discord, webhook) per essere avvisato anche a finestra chiusa.
+4. Al 100 %, Stellio scatta la **foto finale**: classificala come *Riuscita* o *Fallita* con un clic. Il **timelapse** viene montato automaticamente.
+
+## Valutare, ristampare, ritrovare le foto
+
+1. Apri la **Cronologia**: filtra per piattaforma, risultato o date.
+2. Valuta ogni stampa **riuscita** o **fallita**: alimenta i consigli e le statistiche.
+3. **Vedi il file** o **Ristampa** come l'ultima volta (stesse impostazioni).
+4. Ritrova le tue foto nella **Galleria**; **I miei G-code** conserva i G-code collegati a un file con il pulsante **Apri nello slicer**.
+
+## Tenere traccia delle mie bobine
+
+1. Apri l'**Inventario filamento**: aggiungi le bobine a mano (o importa Excel/CSV), collega **Spoolman**, **TigerTag** o **OpenPrintTag**, oppure cerca una bobina nell'**Open Filament Database**.
+2. All'invio allo slicer, scegli la bobina: Stellio **scala** il consumo e verifica che ne resti abbastanza.
+3. In **Pesatura e previsione**, pesa una bobina: Stellio stima la sua **data di esaurimento** e ti avvisa quando si avvicina.
+4. Registra l'**essiccazione** di una bobina per seguirne lo stato; usa **Riacquista** per aprire il negozio del produttore.
+
+## Calcolare un costo e fare un preventivo
+
+1. Apri il calcolatore da un file (**Costo**) o da un progetto (**Costo del progetto**).
+2. Controlla materiale, elettricità, **usura macchina**, **costi fissi**, **margine** e **quantità**: vengono mostrati prezzo unitario e totale.
+3. Fai clic su **Genera il preventivo (PDF)**: indica cliente e descrizione. Il PDF viene conservato e si trova nel widget **Preventivi**.
+4. Imposta il margine predefinito in **Impostazioni → Prezzi di stampa**.
+
+## Gestire ordini, clienti e fatture
+
+1. Attiva *Attiva le funzioni di costo, preventivo e fatturazione* nelle Impostazioni: compare la schermata **Gestione**.
+2. Invia un preventivo al cliente con il suo **link di tracciamento**: può accettarlo o rifiutarlo online; l'accettazione crea l'attività di stampa. **Stellio non elabora alcun pagamento.**
+3. Segui la **coda degli ordini**, i pagamenti, le fatture di acconto e le note di credito; la **ripartizione intelligente** propone la stampante adatta senza mai avviare una stampa.
+4. Ogni mese, esporta la **contabilità** (ZIP con CSV e PDF).
+
+## Fare manutenzione alle mie stampanti
+
+1. Sulla scheda di una stampante, apri **Manutenzione** e scegli la **marca**: vengono proposte attività consigliate.
+2. Aggiungile al tuo monitoraggio: diventano «da fare» in base alle ore di stampa e ai giorni trascorsi.
+3. Registra le tue **parti di usura** (ugelli, piatti, cinghie) con soglia di allerta e le tue **calibrazioni** per filamento.
+
+## Diagnosticare un guasto: S.O.S Print e IA
+
+1. Apri **S.O.S Print** e descrivi il problema (foto possibile).
+2. Rispondi alle domande, una alla volta (massimo 4): Stellio restringe le ipotesi e fornisce una **diagnosi finale**.
+3. Per l'IA locale, installa [Ollama](https://ollama.com/) e configuralo in **Impostazioni → Intelligenza artificiale**. La **sorveglianza dei guasti** ti avvisa senza mai fermare la stampa.
+
+## Usare Stellio su telefono e da remoto
+
+1. In **Impostazioni → Accesso mobile**, scansiona il **codice QR**: la libreria si apre sul telefono (installabile come un'app).
+2. Per l'app **Android**, scansiona il codice QR dedicato.
+3. Fuori casa: attiva l'**accesso remoto** (Cloudflare Tunnel o indirizzo personalizzato) oppure crea un **link di condivisione** temporaneo.
+4. Condividi in sola lettura con un **account ospite**.
+
+## Salvare e ripristinare
+
+1. Apri **Impostazioni → Backup e dati** ed **esporta** i tuoi dati (.zip).
+2. Programma **backup automatici**.
+3. Per ripristinare, **importa** il file .zip. Un aggiornamento di Stellio non tocca mai i tuoi dati.
+
+## Scorciatoie da conoscere
+
+| Scorciatoia | Azione |
+|---|---|
+| `Ctrl+K` | Palette dei comandi |
+| `Ctrl+N` | Nuovo download |
+| `Ctrl+Z` | Annulla l'ultima eliminazione |
+| `F` · `T` | Preferiti · gestore dei tag |
+| `?` | Aiuto sulle scorciatoie |
+
+Elenco completo: [Impostazioni e dati](it-Settings-and-Data).
 
 @@@ Library | Libreria
 # Libreria

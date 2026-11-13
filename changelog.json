@@ -1,5 +1,74 @@
 [
   {
+    "version": "1.0.8",
+    "items": {
+      "fr": [
+        "Open Filament Database intégré : cherchez une bobine (marque, matière, couleur) dans le catalogue ouvert et créez-la d'un clic avec poids, diamètre et densité déjà remplis",
+        "OpenPrintTag intégré : import et export des étiquettes NFC de bobines (fichier .bin), poids consommé mis à jour sur l'étiquette",
+        "Application Android : lecture et écriture des étiquettes NFC OpenPrintTag directement depuis le téléphone",
+        "Inventaire filament (partie Manuel) : bouton « Catalogue & étiquettes » et export / écriture NFC de l'étiquette sur chaque bobine",
+        "Imprimantes : chaque imprimante peut avoir son propre slicer par défaut (OrcaSlicer, QIDIStudio, Bambu Studio…) ; l'envoi au slicer l'utilise avec les profils (réglages, filament) rattachés à l'imprimante, et la liste des profils s'adapte (suggestion d'un utilisateur)",
+        "Application Android : mise à jour directement depuis l'application — à l'ouverture, une fenêtre signale la nouvelle version publiée sur GitHub et propose de la télécharger et de l'installer en un geste (somme de contrôle vérifiée)"
+      ],
+      "en": [
+        "Open Filament Database integrated: search a spool (brand, material, colour) in the open catalog and create it in one click with weight, diameter and density already filled in",
+        "OpenPrintTag integrated: import and export of NFC spool tags (.bin file), consumed weight updated on the tag",
+        "Android app: read and write OpenPrintTag NFC tags straight from the phone",
+        "Filament inventory (Manual part): “Catalog & tags” button and tag export / NFC writing on each spool",
+        "Printers: each printer can have its own default slicer (OrcaSlicer, QIDIStudio, Bambu Studio…); sending to the slicer uses it with the profiles (settings, filament) linked to the printer, and the profile list follows (user suggestion)",
+        "Android app: update straight from the app — on opening, a dialog announces the new version published on GitHub and offers to download and install it in one tap (checksum verified)"
+      ],
+      "de": [
+        "Open Filament Database integriert: Spule (Marke, Material, Farbe) im offenen Katalog suchen und mit einem Klick anlegen – Gewicht, Durchmesser und Dichte sind schon ausgefüllt",
+        "OpenPrintTag integriert: Import und Export von NFC-Spulenetiketten (.bin-Datei), verbrauchtes Gewicht wird auf dem Etikett aktualisiert",
+        "Android-App: OpenPrintTag-NFC-Etiketten direkt mit dem Telefon lesen und schreiben",
+        "Filament-Inventar (Teil Manuell): Schaltfläche „Katalog & Etiketten“ sowie Tag-Export / NFC-Schreiben bei jeder Spule",
+        "Drucker: Jeder Drucker kann seinen eigenen Standard-Slicer haben (OrcaSlicer, QIDIStudio, Bambu Studio …); das Senden an den Slicer nutzt ihn mit den dem Drucker zugeordneten Profilen (Einstellungen, Filament), und die Profilliste passt sich an (Nutzervorschlag)",
+        "Android-App: Aktualisierung direkt in der App – beim Öffnen meldet ein Dialog die neue auf GitHub veröffentlichte Version und bietet Download und Installation mit einem Tipp an (Prüfsumme wird kontrolliert)"
+      ],
+      "es": [
+        "Open Filament Database integrado: busque una bobina (marca, material, color) en el catálogo abierto y créela con un clic con peso, diámetro y densidad ya rellenados",
+        "OpenPrintTag integrado: importación y exportación de etiquetas NFC de bobinas (archivo .bin), peso consumido actualizado en la etiqueta",
+        "Aplicación Android: lectura y escritura de etiquetas NFC OpenPrintTag directamente desde el teléfono",
+        "Inventario de filamento (parte Manual): botón «Catálogo y etiquetas» y exportación / escritura NFC de la etiqueta en cada bobina",
+        "Impresoras: cada impresora puede tener su propio slicer por defecto (OrcaSlicer, QIDIStudio, Bambu Studio…); el envío al slicer lo usa con los perfiles (ajustes, filamento) vinculados a la impresora y la lista de perfiles se adapta (sugerencia de un usuario)",
+        "Aplicación Android: actualización directamente desde la app — al abrirla, un cuadro avisa de la nueva versión publicada en GitHub y propone descargarla e instalarla con un toque (suma de comprobación verificada)"
+      ],
+      "pt": [
+        "Open Filament Database integrado: procure uma bobina (marca, material, cor) no catálogo aberto e crie-a com um clique, com peso, diâmetro e densidade já preenchidos",
+        "OpenPrintTag integrado: importação e exportação de etiquetas NFC de bobinas (ficheiro .bin), peso consumido atualizado na etiqueta",
+        "Aplicação Android: leitura e escrita de etiquetas NFC OpenPrintTag diretamente a partir do telemóvel",
+        "Inventário de filamento (parte Manual): botão «Catálogo e etiquetas» e exportação / escrita NFC da etiqueta em cada bobina",
+        "Impressoras: cada impressora pode ter o seu próprio slicer predefinido (OrcaSlicer, QIDIStudio, Bambu Studio…); o envio para o slicer usa-o com os perfis (definições, filamento) associados à impressora e a lista de perfis adapta-se (sugestão de um utilizador)",
+        "Aplicação Android: atualização diretamente a partir da app — ao abrir, uma janela avisa da nova versão publicada no GitHub e propõe descarregá-la e instalá-la com um toque (soma de verificação confirmada)"
+      ],
+      "it": [
+        "Open Filament Database integrato: cerca una bobina (marca, materiale, colore) nel catalogo aperto e creala con un clic, con peso, diametro e densità già compilati",
+        "OpenPrintTag integrato: importazione ed esportazione delle etichette NFC delle bobine (file .bin), peso consumato aggiornato sull'etichetta",
+        "App Android: lettura e scrittura delle etichette NFC OpenPrintTag direttamente dal telefono",
+        "Inventario filamento (parte Manuale): pulsante «Catalogo ed etichette» ed esportazione / scrittura NFC dell'etichetta su ogni bobina",
+        "Stampanti: ogni stampante può avere il proprio slicer predefinito (OrcaSlicer, QIDIStudio, Bambu Studio…); l'invio allo slicer lo usa con i profili (impostazioni, filamento) collegati alla stampante e l'elenco dei profili si adatta (suggerimento di un utente)",
+        "App Android: aggiornamento direttamente dall'app — all'apertura una finestra segnala la nuova versione pubblicata su GitHub e propone di scaricarla e installarla con un tocco (checksum verificato)"
+      ],
+      "zh": [
+        "已集成 Open Filament Database：在开放目录中搜索料盘（品牌、材料、颜色），一键创建，重量、直径和密度自动填写",
+        "已集成 OpenPrintTag：导入和导出料盘 NFC 标签（.bin 文件），并在标签上更新已消耗重量",
+        "Android 应用：直接用手机读取和写入 OpenPrintTag NFC 标签",
+        "耗材库存（手动部分）：新增“目录与标签”按钮，每个料盘可导出标签 / 写入 NFC",
+        "打印机：每台打印机可单独指定默认切片软件（OrcaSlicer、QIDIStudio、Bambu Studio 等）；发送到切片软件时使用它，并加载与该打印机关联的配置（设置、耗材），配置列表也随之调整（来自用户建议）",
+        "Android 应用：可直接在应用内更新——打开应用时会提示 GitHub 上发布的新版本，一键下载并安装（会校验文件校验和）"
+      ],
+      "ja": [
+        "Open Filament Database を統合：オープンカタログでスプール（ブランド・素材・色）を検索し、重量・直径・密度が入力済みの状態でワンクリックで作成",
+        "OpenPrintTag を統合：スプール NFC タグの取り込みと書き出し（.bin ファイル）、消費重量をタグ上で更新",
+        "Android アプリ：スマートフォンから直接 OpenPrintTag NFC タグを読み書き",
+        "フィラメント在庫（手動の部分）：「カタログとタグ」ボタンと、各スプールのタグ書き出し／NFC 書き込みを追加",
+        "プリンター：プリンターごとに既定のスライサー（OrcaSlicer、QIDIStudio、Bambu Studio など）を設定可能。スライサーへの送信ではそれを使い、プリンターに紐づけたプロファイル（設定・フィラメント）を読み込み、プロファイル一覧も連動（ユーザーからの提案）",
+        "Android アプリ：アプリ内から直接アップデート。起動時に GitHub で公開された新バージョンを通知し、ワンタップでダウンロード・インストールできます（チェックサムを検証）"
+      ]
+    }
+  },
+  {
     "version": "1.0.7",
     "items": {
       "fr": [

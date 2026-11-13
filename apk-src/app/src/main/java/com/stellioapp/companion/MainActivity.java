@@ -58,6 +58,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Deux adresses possibles : interne (réseau local) et externe (accès distant). L'application essaie d'abord l'interne,
  * sinon l'externe, et bascule toute seule de l'une à l'autre quand le réseau change (contrôle toutes les 20 s).
  * Liaison par QR code : stellio://connect?local=…&remote=… (scanner intégré ou appareil photo du téléphone).
+ * Étiquettes NFC OpenPrintTag : voir NfcBridge (lecture / écriture, le codage est fait par le serveur).
  */
 public class MainActivity extends Activity {
     private static final String PREFS = "stellio";
@@ -93,6 +94,8 @@ public class MainActivity extends Activity {
     private Uri cameraUri;
     private boolean cameraAsked = false;
     private ConnectivityManager.NetworkCallback netCallback;
+    private NfcBridge nfc;
+    private Updater updater;
 
     private final Runnable retryTask = new Runnable() {
         @Override public void run() { if (visible(offlineView)) { reach(true); ui.postDelayed(this, RETRY_MS); } }
@@ -119,6 +122,8 @@ public class MainActivity extends Activity {
         local = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_LOCAL, "");
         remote = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_REMOTE, "");
         registerNetworkMonitor();
+        updater = new Updater(this);
+        updater.checkAtLaunch();
         if (handleLink(getIntent() == null ? null : getIntent().getDataString())) return;
         if (local.isEmpty() && remote.isEmpty()) showSetup(); else { showWeb(); reach(true); }
         ui.postDelayed(monitorTask, MONITOR_MS);
@@ -183,10 +188,12 @@ public class MainActivity extends Activity {
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);   // serveur en http local
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setSupportZoom(false);
-        s.setUserAgentString(s.getUserAgentString() + " StellioCompanion/1.0.7");
+        s.setUserAgentString(s.getUserAgentString() + " StellioCompanion/1.0.8");
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
         cm.setAcceptThirdPartyCookies(web, false);
+        nfc = new NfcBridge(this, web, ui);                       // v1.0.8 : lecture / écriture des étiquettes OpenPrintTag
+        web.addJavascriptInterface(nfc, "StellioAndroid");
         web.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
                 Uri u = r.getUrl();
@@ -579,13 +586,14 @@ public class MainActivity extends Activity {
         super.onActivityResult(req, res, data);
     }
 
-    @Override protected void onResume() { super.onResume(); web.onResume(); ui.removeCallbacks(netTask); ui.postDelayed(netTask, 500); }
-    @Override protected void onPause() { web.onPause(); CookieManager.getInstance().flush(); super.onPause(); }
+    @Override protected void onResume() { super.onResume(); web.onResume(); ui.removeCallbacks(netTask); ui.postDelayed(netTask, 500); if (updater != null) updater.onResume(); }
+    @Override protected void onPause() { if (nfc != null) nfc.stop(); web.onPause(); CookieManager.getInstance().flush(); super.onPause(); }
 
     @Override
     protected void onDestroy() {
         ui.removeCallbacksAndMessages(null);
         try { if (netCallback != null) ((ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE)).unregisterNetworkCallback(netCallback); } catch (Exception ignored) { }
+        if (updater != null) updater.destroy();
         web.destroy();
         super.onDestroy();
     }

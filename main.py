@@ -42,6 +42,10 @@ def _early_extra_libs_dir():
 
 _EXTRA_LIBS_DIR = _early_extra_libs_dir()
 
+# ── Splash précoce ───────────────────────────────────────────────────────────
+# Affiché dès les premières millisecondes, AVANT la vérification des modules et les gros
+# imports (trimesh, numpy, pyrender...). Il tourne dans son propre thread : tous les objets Tk y
+# sont créés ET détruits, pendant que le reste du démarrage continue dans le thread principal.
 import threading as _early_threading
 import queue as _early_queue
 
@@ -8210,6 +8214,10 @@ def ui_script():
 def ui_management_script():
     return send_file(_ui_file('management.js'), mimetype='application/javascript')
 
+@app.route('/filament_tags.js')
+def ui_filament_tags_script():
+    return send_file(_ui_file('filament_tags.js'), mimetype='application/javascript')
+
 
 @app.route('/style.css')
 def ui_style():
@@ -15039,16 +15047,34 @@ def _resolve_slicer_profile_paths(slicer_family, printer_id, material_type=None,
     return settings_paths, filament_paths, matched_ids
 
 
+def _slicer_for_printer(user_id, printer_id, fallback):
+    """v1.0.8 : slicer par défaut propre à l'imprimante (config.default_slicer) ; sinon celui des Paramètres."""
+    pid = _safe_int(printer_id)
+    if pid is None:
+        return fallback
+    try:
+        conn = get_db()
+        try:
+            row = conn.execute("SELECT config FROM printers WHERE id=? AND user_id=?", (pid, user_id)).fetchone()
+        finally:
+            conn.close()
+        cfg = json.loads(row['config']) if row and row['config'] else {}
+        ds = str(cfg.get('default_slicer') or '').strip()
+        return ds or fallback
+    except Exception:
+        return fallback
+
+
 @app.route('/api/slicer/process-profiles', methods=['GET'])
 @login_required
 def api_slicer_process_profiles():
     synced = _sync_slicer_profiles(session['user_id'])
     settings = load_settings() or {}
-    slicer_name = settings.get('default_slicer', 'system_default')
+    printer_id = _safe_int(request.args.get('printer_id'))
+    slicer_name = _slicer_for_printer(session['user_id'], printer_id, settings.get('default_slicer', 'system_default'))
     slicer_path = find_slicer_by_name(slicer_name)
     family = _resolve_slicer_family(slicer_path, slicer_name) if slicer_path else None
     all_slicers = str(request.args.get('all_slicers') or '') in ('1', 'true')
-    printer_id = _safe_int(request.args.get('printer_id'))
     out = []
     for p in load_slicer_profiles():
         if p.get('profile_type') != 'process':
@@ -15118,7 +15144,7 @@ def api_send_to_slicer():
 
     try:
         settings = load_settings()
-        slicer_name = settings.get('default_slicer', 'system_default')
+        slicer_name = _slicer_for_printer(session['user_id'], data.get('printer_id'), settings.get('default_slicer', 'system_default'))
         slicer_path = find_slicer_by_name(slicer_name)
         detected_slicer = os.path.basename(slicer_path).replace('.exe','') if slicer_path else 'Défaut système'
         if pc_mode:
@@ -22642,7 +22668,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.0.7"
+CURRENT_VERSION = "1.0.8"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -32839,7 +32865,7 @@ def api_remote_access_disable_fixed():
 # ── Version 1.0.6 : nouveaux modules (portail client des devis, export comptable ZIP, stock de pièces, répartition des
 # imprimantes, résumé périodique, pesées de bobines, partage de profils). Leurs services sont fournis par `X.init(globals())`
 # (juste avant le démarrage) ; voir docs/ARCHITECTURE.md. ──
-from modules import quote_portal, accounting_zip, parts_stock, printer_dispatch, digest, filament_weighing, profile_share
+from modules import quote_portal, accounting_zip, parts_stock, printer_dispatch, digest, filament_weighing, profile_share, openprinttag, open_filament_db
 
 print_session.init(globals())   # v1.0.4 : fournit ses services au module et enregistre ses routes
 
@@ -32880,6 +32906,8 @@ printer_dispatch.init(globals())
 digest.init(globals())
 
 filament_weighing.init(globals())
+openprinttag.init(globals())
+open_filament_db.init(globals())
 
 profile_share.init(globals())
 

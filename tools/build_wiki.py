@@ -28,7 +28,7 @@ REPO = os.environ.get('GITHUB_REPOSITORY', 'stellio-app/stellio')
 
 LANGS = [('fr', 'Français', '🇫🇷'), ('en', 'English', '🇬🇧'), ('de', 'Deutsch', '🇩🇪'), ('es', 'Español', '🇪🇸'),
          ('pt', 'Português', '🇵🇹'), ('it', 'Italiano', '🇮🇹'), ('zh', '中文', '🇨🇳'), ('ja', '日本語', '🇯🇵')]
-PAGES = ['Home', 'Installation', 'Getting-Started', 'Library', 'Printers', 'Filament', 'Downloads', 'AI',
+PAGES = ['Home', 'Installation', 'Getting-Started', 'How-To', 'Library', 'Printers', 'Filament', 'Downloads', 'AI',
          'Costs-and-Management', 'Remote-Access', 'Server-Edition', 'Settings-and-Data', 'Troubleshooting', 'Contributing']
 CHANGELOG_TITLE = {'fr': 'Nouveautés', 'en': "What's new", 'de': 'Neuigkeiten', 'es': 'Novedades', 'pt': 'Novidades',
                    'it': 'Novità', 'zh': '更新日志', 'ja': '更新履歴'}
@@ -186,10 +186,15 @@ def build(out_dir):
             foot = ' · '.join(f'[{fl} {nm}]({c}-{slug})' for c, nm, fl in LANGS if c != lang)
             md = f'> {flag} {nav}\n\n{body.strip()}\n\n---\n<sub>🌍 {foot} · [{ALL_LANGS[lang]}](Home)</sub>\n'
             open(os.path.join(out_dir, f'{lang}-{slug}.md'), 'w', encoding='utf-8', newline='\n').write(md)
-    home = ('# 🌍 Stellio Wiki\n\n![Stellio](https://stellio-app.com/assets/logo-nom-stellio.png)\n\n'
-            + '\n'.join(f'- {fl} **[{nm}]({c}-Home)**' for c, nm, fl in LANGS)
-            + '\n\n> The 3D file manager for makers and 3D printer owners · [stellio-app.com](https://stellio-app.com)'
-              f' · [GitHub](https://github.com/{REPO})\n')
+    rows = '\n'.join(
+        f'| {fl} **[{nm}]({c}-Home)** | [{pages_all[c]["How-To"][0]}]({c}-How-To) · [{pages_all[c]["Installation"][0]}]({c}-Installation)'
+        f' · [{CHANGELOG_TITLE[c]}]({c}-Changelog) |' for c, nm, fl in LANGS)
+    home = ('<p align="center">\n  <img src="https://stellio-app.com/assets/logo-nom-stellio.png" alt="Stellio Logo" width="360">\n</p>\n\n'
+            '<h3 align="center">The ultimate 3D file manager for makers and 3D printer owners</h3>\n\n'
+            '<p align="center">Library · printers · spools · costs · AI, all local.</p>\n\n'
+            '### 👇 Choose your language\n\n| Language | Start here |\n|---|---|\n' + rows
+            + f'\n\n**[⬇️ Download](https://github.com/{REPO}/releases)** · **[▶ Online demo](https://demo.stellio-app.com)**'
+              f' · **[🌐 stellio-app.com](https://stellio-app.com)** · **[💬 Discord](https://discord.gg/ySxpHvS6bd)**\n')
     open(os.path.join(out_dir, 'Home.md'), 'w', encoding='utf-8', newline='\n').write(home)
     side = ('### 🌍 Stellio\n\n' + '\n'.join(f'- {fl} [{nm}]({c}-Home)' for c, nm, fl in LANGS)
             + f'\n\n---\n[stellio-app.com](https://stellio-app.com) · [Releases](https://github.com/{REPO}/releases)'

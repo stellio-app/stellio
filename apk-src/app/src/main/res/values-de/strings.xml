@@ -24,4 +24,11 @@
     <string name="retry">Erneut versuchen</string>
     <string name="edit_addresses">Adressen ändern</string>
     <string name="press_again">Zum Beenden erneut Zurück drücken</string>
+    <string name="update_title">Update verfügbar</string>
+    <string name="update_msg">Stellio %1$s ist verfügbar (installiert: %2$s). Jetzt aktualisieren?</string>
+    <string name="update_now">Aktualisieren</string>
+    <string name="update_later">Später</string>
+    <string name="update_need_perm">Erlauben Sie Stellio, Apps zu installieren, und kehren Sie zurück: Das Update startet dann automatisch.</string>
+    <string name="update_downloading">Update wird heruntergeladen…</string>
+    <string name="update_failed">Das Update ist fehlgeschlagen. Versuchen Sie es später erneut oder laden Sie es von GitHub herunter.</string>
 </resources>

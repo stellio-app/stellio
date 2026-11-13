@@ -24,4 +24,11 @@
     <string name="retry">Tentar de novo</string>
     <string name="edit_addresses">Alterar os endereços</string>
     <string name="press_again">Prima voltar outra vez para sair</string>
+    <string name="update_title">Atualização disponível</string>
+    <string name="update_msg">O Stellio %1$s está disponível (instalada: %2$s). Atualizar agora?</string>
+    <string name="update_now">Atualizar</string>
+    <string name="update_later">Mais tarde</string>
+    <string name="update_need_perm">Permita que o Stellio instale aplicações e volte: a atualização começará sozinha.</string>
+    <string name="update_downloading">A transferir a atualização…</string>
+    <string name="update_failed">A atualização falhou. Tente mais tarde ou transfira-a do GitHub.</string>
 </resources>
