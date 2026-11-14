@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://demo.stellio-app.com"><b>▶ Prova la demo online (sola lettura)</b></a>
+  <a href="https://demo.stellio-app.com"><b>▶ Prova la demo online (sola lettura)</b></a> &nbsp;·&nbsp; <a href="https://stellio-app.com/docs/"><b>📖 Documentazione</b></a>
 </p>
 
 <p align="center">
@@ -170,6 +170,7 @@ Che tu sia un maker alle prime armi o un utente esperto con più macchine, Stell
 ### 🔔 Notifiche
 - 🪟 **Notifiche native di Windows**
 - 🌐 **Notifiche del browser**, attivabili per l'accesso da Raspberry Pi o da mobile
+- 📖 **Documentazione** : [stellio-app.com/docs](https://stellio-app.com/docs/)
 - 📣 **Notifiche push** (ntfy, Telegram, Discord o webhook): fine e fallimento della stampa rilevati anche a finestra chiusa, oltre agli avvisi di manutenzione e di scorte
 
 ### 🌐 Accesso mobile e remoto

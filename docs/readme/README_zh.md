@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://demo.stellio-app.com"><b>▶ 在线试用演示（只读）</b></a>
+  <a href="https://demo.stellio-app.com"><b>▶ 在线试用演示（只读）</b></a> &nbsp;·&nbsp; <a href="https://stellio-app.com/docs/"><b>📖 文档</b></a>
 </p>
 
 <p align="center">
@@ -483,6 +483,7 @@ Stellio 是 NFC/RFID 耗材识别系统 [**TigerTag**](https://tigersystem.io) �
 - 💡 **功能建议**：[GitHub Discussions](https://github.com/stellio-app/stellio/discussions)
 - 📧 **邮箱**：contact@stellio-app.com
 - 🌐 **官网**：[stellio-app.com](https://stellio-app.com)
+- 📖 **文档** : [stellio-app.com/docs](https://stellio-app.com/docs/)
 - 💬 **Discord**: [加入 Discord 社区](https://discord.gg/ySxpHvS6bd)
 
 ---

@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://demo.stellio-app.com"><b>▶ Live-Demo ausprobieren (nur Lesen)</b></a>
+  <a href="https://demo.stellio-app.com"><b>▶ Live-Demo ausprobieren (nur Lesen)</b></a> &nbsp;·&nbsp; <a href="https://stellio-app.com/docs/"><b>📖 Dokumentation</b></a>
 </p>
 
 <p align="center">
@@ -170,6 +170,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 ### 🔔 Benachrichtigungen
 - 🪟 **Native Windows-Benachrichtigungen**
 - 🌐 **Browser-Benachrichtigungen**, aktivierbar für den Zugriff über Raspberry Pi oder Mobilgerät
+- 📖 **Dokumentation** : [stellio-app.com/docs](https://stellio-app.com/docs/)
 - 📣 **Push-Benachrichtigungen** (ntfy, Telegram, Discord oder Webhook): Druckende und Fehler werden auch bei geschlossenem Fenster erkannt, dazu Wartungs- und Bestandswarnungen
 
 ### 🌐 Fern- und mobiler Zugriff

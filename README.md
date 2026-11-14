@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://demo.stellio-app.com"><b>▶ Try the live demo (read-only)</b></a>
+  <a href="https://demo.stellio-app.com"><b>▶ Try the live demo (read-only)</b></a> &nbsp;·&nbsp; <a href="https://stellio-app.com/docs/"><b>📖 Documentation</b></a>
 </p>
 
 <p align="center">
@@ -172,6 +172,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 ### 🔔 Notifications
 - 🪟 **Native Windows notifications**
 - 🌐 **Browser notifications** you can enable for Raspberry Pi or mobile access
+- 📖 **Documentation** : [stellio-app.com/docs](https://stellio-app.com/docs/)
 - 📣 **Push notifications** (ntfy, Telegram, Discord or webhook): print completion and failure detected even with the window closed, plus maintenance and stock alerts
 
 ### 🌐 Remote & mobile access

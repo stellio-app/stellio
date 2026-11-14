@@ -1,20 +1,11 @@
 # Wiki de Stellio
 
-Le wiki GitHub (8 langues : fr, en, de, es, pt, it, zh, ja) est **généré** depuis ce dossier et publié automatiquement.
+La documentation (8 langues : fr, en, de, es, pt, it, zh, ja) est **générée** depuis ce dossier et publiée sur `https://stellio-app.com/docs/`.
+L'onglet Wiki de GitHub est désactivé : plus de workflow `wiki`.
 
-## Quand est-il mis à jour ?
-Le workflow `.github/workflows/wiki.yml` s'exécute :
-- à chaque push sur `main` qui touche `docs/wiki/**`, `changelog.json` ou `tools/build_wiki.py` ;
-- à chaque release publiée ;
-- à la demande (onglet Actions → wiki → Run workflow).
-
-La page « Nouveautés » de chaque langue est produite à partir de `changelog.json` : elle suit donc chaque version sans rien faire.
-
-## Première fois (une seule fois)
-GitHub n'ouvre le dépôt du wiki qu'à la création d'une première page :
-1. `Settings → Features` : cocher **Wikis**.
-2. Onglet **Wiki** → *Create the first page* → enregistrer (contenu quelconque, il sera remplacé).
-3. Relancer le workflow `wiki` (Actions → wiki → Run workflow). Tant que le wiki n'est pas initialisé, le workflow se termine avec un avertissement, sans erreur.
+## Quand est-elle générée ?
+Le workflow `.github/workflows/docs.yml` s'exécute à chaque push sur `main` qui touche `docs/wiki/**`, `changelog.json` ou `tools/build_*.py`, à chaque release et à la demande. Il produit l'artefact `docs-site` (Actions → docs), à déposer dans le dossier `/docs/` du site.
+La page « Nouveautés » de chaque langue est produite à partir de `changelog.json`.
 
 ## Modifier le texte
 Un fichier par langue : `docs/wiki/src/<langue>.md`. Les pages sont séparées par `@@@ Slug | Titre`.

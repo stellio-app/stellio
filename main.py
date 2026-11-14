@@ -15,7 +15,7 @@ if sys.platform.startswith('linux'):
 def _portable_data_dir():
     """Mode portable (Windows) : si un fichier « portable.flag » se trouve à côté de Stellio.exe, toutes les données
     (base, réglages, journaux, bibliothèques ajoutées, profil du navigateur intégré) restent dans le dossier « data »
-    à côté de l'exécutable : on peut copier le dossier sur une clé USB. Sans ce fichier."""
+    à côté de l'exécutable : on peut copier le dossier sur une clé USB. Sans ce fichier, rien ne change."""
     if os.name != 'nt':
         return None
     try:
@@ -42,6 +42,10 @@ def _early_extra_libs_dir():
 
 _EXTRA_LIBS_DIR = _early_extra_libs_dir()
 
+# ── Splash précoce ───────────────────────────────────────────────────────────
+# Affiché dès les premières millisecondes, AVANT la vérification des modules et les gros
+# imports (trimesh, numpy, pyrender...). Il tourne dans son propre thread : tous les objets Tk y
+# sont créés ET détruits, pendant que le reste du démarrage continue dans le thread principal.
 import threading as _early_threading
 import queue as _early_queue
 
