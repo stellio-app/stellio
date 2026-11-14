@@ -2971,5 +2971,10 @@
   "nav.cat_tools": "Ferram.",
   "nav.cat_track": "Controlo",
   "nav.cat_help": "Ajuda",
-  "nav.cat_update": "Atualizar"
+  "nav.cat_update": "Atualizar",
+  "slicer.spool_search": "Pesquisar uma bobina…",
+  "about.data_title": "Dados e padrões abertos",
+  "about.data_desc": "O catálogo de bobinas vem da Open Filament Database (Open Filament Collective, licença MIT). Obrigado aos seus colaboradores.",
+  "about.optag_desc": "As etiquetas NFC de bobinas seguem o padrão OpenPrintTag (Prusa Research, licença MIT).",
+  "settings.bg_default": "Imagem padrão"
 }

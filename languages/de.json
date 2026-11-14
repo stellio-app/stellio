@@ -2971,5 +2971,10 @@
   "nav.cat_tools": "Werkzeuge",
   "nav.cat_track": "Auswertung",
   "nav.cat_help": "Hilfe",
-  "nav.cat_update": "Updates"
+  "nav.cat_update": "Updates",
+  "slicer.spool_search": "Spule suchen…",
+  "about.data_title": "Offene Daten und Standards",
+  "about.data_desc": "Der Spulenkatalog stammt aus der Open Filament Database (Open Filament Collective, MIT-Lizenz). Dank an alle Mitwirkenden.",
+  "about.optag_desc": "Die NFC-Spulenetiketten folgen dem OpenPrintTag-Standard (Prusa Research, MIT-Lizenz).",
+  "settings.bg_default": "Standardbild"
 }

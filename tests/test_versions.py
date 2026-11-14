@@ -2153,3 +2153,101 @@ def test_sidebar_rail_sums_badges():
     css = (root / 'interface/style.css').read_text(encoding='utf-8')
     assert 'function refreshRailBadges' in js and "'rail-badge'" in js
     assert '.rail-badge' in css
+
+
+# ── 1.1.0 : plus de popup « Stellio a été mis à jour ! » ────────────────────
+def test_v110_no_update_done_popup():
+    import json
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    body = js[js.index('async checkAndShowChangelog()'):js.index('async checkForUpdates(')]
+    assert 'showChangelogModal(' not in body and 'stellio-last-seen-version' in body
+    assert 'CURRENT_VERSION = "1.1.0"' in (root / 'main.py').read_text(encoding='utf-8')
+    for p in ('changelog.json', 'languages/changelog.json'):
+        d = json.loads((root / p).read_text(encoding='utf-8'))
+        assert d[0]['version'] == '1.1.0' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
+    assert (root / 'release-notes/notes_version_1.1.0.txt').exists()
+
+
+def test_v110_no_badge_on_likes_and_creations():
+    from pathlib import Path as _P
+    html = (_P(__file__).resolve().parent.parent / 'interface/index.html').read_text(encoding='utf-8')
+    for bid in ('nav-acct-likes-btn', 'nav-acct-creations-btn'):
+        i = html.index(f'id="{bid}"')
+        assert 'acct-count' not in html[i:html.index('</button>', i)]
+
+
+def test_v110_slicer_spool_search():
+    import json
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    html = (root / 'interface/index.html').read_text(encoding='utf-8')
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    assert 'id="slicer-spool-search"' in html and 'oninput="filterSlicerSpools()"' in html
+    assert 'window.filterSlicerSpools' in js and '_slicerSpoolRenderOptions' in js
+    for l in ('fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'):
+        assert json.loads((root / f'languages/{l}.json').read_text(encoding='utf-8')).get('slicer.spool_search'), l
+
+
+def test_v110_about_credits_open_filament_database():
+    import json
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    html = (root / 'interface/index.html').read_text(encoding='utf-8')
+    assert 'https://openfilamentdatabase.org' in html and 'github.com/OpenFilamentCollective/open-filament-database' in html
+    for l in ('fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'):
+        d = json.loads((root / f'languages/{l}.json').read_text(encoding='utf-8'))
+        assert d.get('about.data_title') and d.get('about.data_desc'), l
+
+
+def test_v110_about_credits_openprinttag():
+    import json
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    html = (root / 'interface/index.html').read_text(encoding='utf-8')
+    assert 'https://specs.openprinttag.org/' in html and 'OpenPrintTag/openprinttag-specification' in html
+    for l in ('fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'):
+        assert json.loads((root / f'languages/{l}.json').read_text(encoding='utf-8')).get('about.optag_desc'), l
+
+
+def test_v110_default_background_image():
+    import json
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    assert (root / 'assets/default-bg.jpg').exists()
+    assert "BG_DEFAULT_URL = 'assets/default-bg.jpg'" in js and 'function _currentBgUrl' in js and 'function resetBackgroundImage' in js
+    for l in ('fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'):
+        assert json.loads((root / f'languages/{l}.json').read_text(encoding='utf-8')).get('settings.bg_default'), l
+
+
+def test_v110_default_background_settings():
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    assert "const d = { dim: 70, blur: 0, alpha: 80, fit: 'cover', zoom: 100, x: 50, y: 50 }" in js
+
+
+def test_v110_about_two_columns():
+    from pathlib import Path as _P
+    css = (_P(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
+    assert 'max-width: 920px' in css and '.about-body {' in css and '.about-col' in css
+
+
+def test_v110_no_seam_between_logo_and_title():
+    from pathlib import Path as _P
+    css = (_P(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
+    assert 'html.has-bg-image .sidebar-header { background: transparent' in css
+
+
+def test_v110_sidebar_line_not_through_logo():
+    from pathlib import Path as _P
+    css = (_P(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
+    assert '.sidebar::after { content: ""' in css and 'top: var(--topbar-h, var(--header-height))' in css
+
+
+def test_v110_separator_on_open_panel_edge():
+    from pathlib import Path as _P
+    css = (_P(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
+    assert '.sidebar.panel-open::after { right: calc(-1 * var(--sidebar-width)); }' in css

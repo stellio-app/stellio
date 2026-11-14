@@ -2971,5 +2971,10 @@
   "nav.cat_tools": "Herram.",
   "nav.cat_track": "Seguimiento",
   "nav.cat_help": "Ayuda",
-  "nav.cat_update": "Actualizar"
+  "nav.cat_update": "Actualizar",
+  "slicer.spool_search": "Buscar una bobina…",
+  "about.data_title": "Datos y estándares abiertos",
+  "about.data_desc": "El catálogo de bobinas proviene de la Open Filament Database (Open Filament Collective, licencia MIT). Gracias a sus colaboradores.",
+  "about.optag_desc": "Las etiquetas NFC de bobinas siguen el estándar OpenPrintTag (Prusa Research, licencia MIT).",
+  "settings.bg_default": "Imagen predeterminada"
 }

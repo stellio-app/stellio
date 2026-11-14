@@ -2971,5 +2971,10 @@
   "nav.cat_tools": "工具",
   "nav.cat_track": "统计",
   "nav.cat_help": "帮助",
-  "nav.cat_update": "检查更新"
+  "nav.cat_update": "检查更新",
+  "slicer.spool_search": "搜索线材盘…",
+  "about.data_title": "开放数据与标准",
+  "about.data_desc": "线材盘目录来自 Open Filament Database（Open Filament Collective，MIT 许可）。感谢所有贡献者。",
+  "about.optag_desc": "NFC 线材盘标签遵循 OpenPrintTag 标准（Prusa Research，MIT 许可）。",
+  "settings.bg_default": "默认图片"
 }

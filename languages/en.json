@@ -2971,5 +2971,10 @@
   "nav.cat_tools": "Tools",
   "nav.cat_track": "Tracking",
   "nav.cat_help": "Help",
-  "nav.cat_update": "Updates"
+  "nav.cat_update": "Updates",
+  "slicer.spool_search": "Search a spool…",
+  "about.data_title": "Open data and standards",
+  "about.data_desc": "The spool catalogue comes from the Open Filament Database (Open Filament Collective, MIT licence). Thanks to its contributors.",
+  "about.optag_desc": "The NFC spool tags follow the OpenPrintTag standard (Prusa Research, MIT licence).",
+  "settings.bg_default": "Default image"
 }

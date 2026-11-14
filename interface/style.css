@@ -3846,9 +3846,29 @@ kbd {
 }
 
 .modal-about-content {
-    max-width: 460px;
+    max-width: 920px;
+    width: 92vw;
     text-align: center;
     overflow: hidden;
+}
+/* Fenêtre « À propos » : en-tête pleine largeur, puis 2 colonnes de même hauteur, licence en bas */
+.about-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 20px;
+    align-items: stretch;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+}
+.about-body > .about-logo-section,
+.about-body > .about-description,
+.about-body > .about-section:last-child { grid-column: 1 / -1; }
+.about-body > .about-description { margin-bottom: 4px; }
+.about-body .about-section { margin-bottom: 0; }
+.about-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.about-col > .about-section:last-child { flex: 1; }
+@media (max-width: 760px) {
+    .about-body { grid-template-columns: 1fr; }
 }
 
 .about-logo-section {
@@ -9376,7 +9396,7 @@ body.has-demo-banner .auth-screen { height: calc(100vh - var(--demo-banner-h, 32
 
 /* v0.9.9 : image de fond (les panneaux deviennent translucides, les fenêtres restent opaques) */
 #app-bg { position: fixed; inset: -20px; z-index: -1; background-size: cover; background-position: center; pointer-events: none; }
-#app-bg::after { content: ""; position: absolute; inset: 0; background: var(--bg-primary); opacity: var(--bg-image-dim, .5); }
+#app-bg::after { content: ""; position: absolute; inset: 0; background: var(--bg-primary); opacity: var(--bg-image-dim, .7); }
 html.has-bg-image { background: var(--bg-primary); }
 html.has-bg-image body, html.has-bg-image .main-content { background: transparent; }
 html.has-bg-image .sidebar, html.has-bg-image .app-header, html.has-bg-image .bottom-nav {
@@ -9967,9 +9987,9 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
     :root { --rail-width: 76px; --foot-h: 120px; }
     .sidebar { position: relative; z-index: 60; display: flex; flex-direction: column; width: var(--rail-width); }
     /* en-tête inchangé (logo complet + nom), posé en largeur normale par-dessus la barre étroite */
-    .sidebar-header { position: absolute; top: 0; left: 0; width: var(--sidebar-width); z-index: 90; background: var(--bg-secondary); border-right: 1px solid var(--border); box-sizing: border-box; }
+    .sidebar-header { position: absolute; top: 0; left: 0; width: var(--sidebar-width); height: var(--topbar-h, var(--header-height)); z-index: 90; background: var(--bg-secondary); border-right: 0; box-sizing: border-box; }
     .app-header { padding-left: calc(20px + var(--sidebar-width) - var(--rail-width)); }
-    .sidebar-rail { order: 1; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: calc(var(--header-height) + 10px) 6px 12px; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+    .sidebar-rail { order: 1; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: calc(var(--topbar-h, var(--header-height)) + 10px) 6px 12px; min-height: 0; overflow-y: auto; scrollbar-width: none; }
     .sidebar-rail::-webkit-scrollbar { display: none; }
     .rail-spacer { flex: 1; }
     .rail-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; width: 64px; min-height: 50px; padding: 4px 0; border: 0; border-radius: 10px; background: transparent; color: var(--text-secondary); font-family: inherit; font-size: calc(10.5px * var(--fs, 1)); font-weight: 600; cursor: pointer; transition: var(--transition); flex-shrink: 0; }
@@ -9981,17 +10001,18 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
     .rail-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
     .rail-btn.active { background: var(--accent-glow); color: var(--accent); }
     /* pied de page : réduit quand le volet est fermé, élargi avec lui quand il s'ouvre */
-    .sidebar-footer { order: 2; position: absolute; left: 0; bottom: 0; z-index: 85; width: var(--rail-width); height: var(--foot-h); box-sizing: border-box; padding: 14px 10px; gap: 10px; background: var(--bg-secondary); border-top: 0; border-right: 1px solid var(--border); overflow: hidden; transition: width 0.16s ease; }
-    /* séparateur : toujours de la largeur de la barre, volet ouvert ou fermé ; la zone élargie se fond dans le volet */
-    .sidebar-footer::before { content: ''; position: absolute; top: 0; left: 0; width: calc(var(--rail-width) - 1px); height: 1px; background: var(--border); }
-    .sidebar.panel-open .sidebar-footer { box-shadow: 14px 16px 20px -12px rgba(0, 0, 0, 0.35); }
+    .sidebar-footer { order: 2; position: absolute; left: 0; bottom: 0; z-index: 85; width: var(--rail-width); height: auto; box-sizing: border-box; padding: 14px 10px; gap: 10px; background: var(--bg-secondary); border-top: 1px solid var(--border); border-right: 1px solid var(--border); overflow: hidden; transition: width 0.16s ease; }
     .sidebar.panel-open .sidebar-footer { width: calc(var(--rail-width) + var(--sidebar-width)); padding: 14px 16px; }
     .sidebar:not(.panel-open) .sidebar-footer .user-info { justify-content: center; }
     .sidebar:not(.panel-open) #current-username, .sidebar:not(.panel-open) .kofi-btn span { display: none; }
     .sidebar:not(.panel-open) .kofi-btn { padding-left: 0; padding-right: 0; justify-content: center; }
     .sidebar-footer #current-username, .sidebar-footer .kofi-btn span { white-space: nowrap; }
+    /* mêmes hauteurs volet fermé / ouvert : rien ne bouge dans la barre quand le volet s'ouvre */
+    .sidebar-footer .user-info { height: 32px; }
+    .sidebar-footer .kofi-btn { height: 34px; min-height: 34px; padding-top: 0; padding-bottom: 0; box-sizing: border-box; }
+    .sidebar-footer, .sidebar.panel-open .sidebar-footer { padding-top: 14px; padding-bottom: 14px; }
     .sidebar-rail { padding-bottom: calc(var(--foot-h) + 8px); }
-    .sidebar-nav { position: absolute; left: 100%; top: var(--header-height); bottom: var(--foot-h); width: var(--sidebar-width); z-index: 70; background: var(--bg-secondary); border-right: 1px solid var(--border); box-shadow: 8px 0 24px rgba(0, 0, 0, 0.35); padding-top: 12px; visibility: hidden; opacity: 0; transform: translateX(-10px); pointer-events: none; transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s linear 0.16s; }
+    .sidebar-nav { position: absolute; left: 100%; top: var(--topbar-h, var(--header-height)); bottom: 0; padding-bottom: var(--foot-h); box-sizing: border-box; width: var(--sidebar-width); z-index: 70; background: var(--bg-secondary); box-shadow: 8px 0 24px rgba(0, 0, 0, 0.35); clip-path: inset(0 -40px 0 0); padding-top: 12px; visibility: hidden; opacity: 0; transform: translateX(-10px); pointer-events: none; transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s linear 0.16s; }
     .sidebar.panel-open .sidebar-nav { visibility: visible; opacity: 1; transform: none; pointer-events: auto; transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s; }
     .sidebar-panel-title { display: block; padding: 4px 14px 10px; font-size: calc(18px * var(--fs, 1)); font-weight: 700; color: var(--text-primary); flex-shrink: 0; }
     .sidebar .nav-btn[data-cat="home"], .sidebar-nav-separator { display: none !important; }
@@ -10002,9 +10023,26 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
     .sidebar[data-cat="track"] .nav-btn[data-cat]:not([data-cat="track"]),
     .sidebar[data-cat="help"] .nav-btn[data-cat]:not([data-cat="help"]) { display: none !important; }
     .sidebar:not([data-cat="library"]):not([data-cat="print"]):not([data-cat="help"]) .nav-about-spacer { display: none; }
-    .nav-about-spacer { max-height: none; overflow: visible; }
+    /* le séparateur du volet est celui du pied de page (même ligne, sur toute la largeur) */
+    .nav-about-spacer { max-height: none; overflow: visible; border-top: 0; padding-top: 0; padding-bottom: 8px; }
 }
 
 @media (min-width: 861px) {
     .rail-btn.sel:not(.active) { background: var(--bg-hover); color: var(--text-primary); }
+}
+
+/* v1.1.0 : avec une image de fond, le logo (opaque) tranchait avec la barre du titre (translucide) → il devient transparent */
+@media (min-width: 861px) {
+    html.has-bg-image .sidebar-header { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* v1.1.0 : le logo étant transparent, le trait vertical de la barre le traversait → on ne le trace que sous l'en-tête */
+@media (min-width: 861px) {
+    .sidebar { border-right: 0; }
+    .sidebar::after { content: ""; position: absolute; right: 0; bottom: 0; top: var(--topbar-h, var(--header-height)); width: 1px; background: var(--border); pointer-events: none; z-index: 95; }
+}
+
+/* volet ouvert : le séparateur vertical se place sur le bord droit du volet */
+@media (min-width: 861px) {
+    .sidebar.panel-open::after { right: calc(-1 * var(--sidebar-width)); }
 }

@@ -10064,6 +10064,18 @@ function _slicerSpoolRefresh() {
         hint.style.display = 'block';
     }
 }
+function _slicerSpoolRenderOptions(query) {
+    const sel = document.getElementById('slicer-spool-select');
+    if (!sel) return;
+    const keep = sel.value;
+    const words = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
+    const list = (_slicerSpoolState.list || []).filter(o => o.key === keep || words.every(w => o.text.includes(w)));
+    sel.innerHTML = `<option value="">${escapeHtml(_t3('slicer.spool_none', '— Aucune bobine —'))}</option>` + list.map(o => o.html).join('');
+    sel.value = [...sel.options].some(o => o.value === keep) ? keep : '';
+}
+window.filterSlicerSpools = function () {
+    _slicerSpoolRenderOptions(document.getElementById('slicer-spool-search')?.value || '');
+};
 async function _loadSlicerSpoolBox(path) {
     const box = document.getElementById('slicer-spool-box');
     const sel = document.getElementById('slicer-spool-select');
@@ -10076,16 +10088,21 @@ async function _loadSlicerSpoolBox(path) {
         const slots = data.slots || [];
         if (!res.ok || !slots.length) return;
         _slicerSpoolState.required = data.required_weight_g;
-        const opts = [`<option value="">${escapeHtml(_t3('slicer.spool_none', '— Aucune bobine —'))}</option>`];
-        slots.forEach(s => {
+        // v1.1.0 : liste classée (compatibles d'abord, puis par nom) + recherche
+        const _rank = s => s.compatible === true ? 0 : (s.compatible == null ? 1 : 2);
+        const sorted = [...slots].sort((a, b) => _rank(a) - _rank(b) || String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base', numeric: true }));
+        _slicerSpoolState.list = sorted.map(s => {
             const key = `${s.source_type}:${s.source_id}`;
             _slicerSpoolState.slots[key] = s;
             const icon = s.compatible === true ? '🟢' : s.compatible === false ? '🔴' : '⚪';
             const rem = typeof s.remaining_g === 'number' ? `${Math.round(s.remaining_g)} g` : '—';
             const src = ({ bambu_ams: 'AMS', creality_cfs: 'CFS' })[s.source_type] || _sourceLabelFor(s.source_type);
-            opts.push(`<option value="${escapeHtml(key)}">${icon} ${escapeHtml(s.name || '—')}${s.material ? ` (${escapeHtml(s.material)})` : ''} — ${rem} · ${escapeHtml(src)}</option>`);
+            return { key, html: `<option value="${escapeHtml(key)}">${icon} ${escapeHtml(s.name || '—')}${s.material ? ` (${escapeHtml(s.material)})` : ''} — ${rem} · ${escapeHtml(src)}</option>`,
+                     text: [s.name, s.material, s.brand, s.color_name, s.color_hex, src].filter(Boolean).join(' ').toLowerCase() };
         });
-        sel.innerHTML = opts.join('');
+        const search = document.getElementById('slicer-spool-search');
+        if (search) { search.value = ''; search.style.display = slots.length >= 4 ? '' : 'none'; }
+        _slicerSpoolRenderOptions('');
         const a = data.assigned;
         const akey = a ? `${a.source_type}:${a.source_id}` : '';
         sel.value = _slicerSpoolState.slots[akey] ? akey : '';
@@ -11716,20 +11733,26 @@ function _cssColorToHex(val) {
 }
 
 // ---- Image de fond (0.9.9) : stockée sur l'appareil (localStorage), réduite à 1920 px max
-const BG_IMG_KEY = 'stellio-bg-image', BG_OPT_KEY = 'stellio-bg-opts';
+const BG_IMG_KEY = 'stellio-bg-image', BG_OPT_KEY = 'stellio-bg-opts', BG_OFF_KEY = 'stellio-bg-off';
+const BG_DEFAULT_URL = 'assets/default-bg.jpg';   // v1.1.0 : image de fond par défaut (désactivable)
+function _currentBgUrl() {
+    let url = null, off = false;
+    try { url = localStorage.getItem(BG_IMG_KEY); off = localStorage.getItem(BG_OFF_KEY) === '1'; } catch (_) {}
+    if (url && url.startsWith('data:image/')) return url;
+    return off ? null : BG_DEFAULT_URL;
+}
 function _getBgOpts() {
-    const d = { dim: 50, blur: 0, alpha: 80, fit: 'cover', zoom: 100, x: 50, y: 50 };
+    const d = { dim: 70, blur: 0, alpha: 80, fit: 'cover', zoom: 100, x: 50, y: 50 };
     try { const o = JSON.parse(localStorage.getItem(BG_OPT_KEY) || '{}') || {}; ['dim', 'blur', 'alpha', 'zoom', 'x', 'y'].forEach(k => { if (Number.isFinite(+o[k])) d[k] = +o[k]; }); if (['cover', 'contain', 'tile'].includes(o.fit)) d.fit = o.fit; } catch (_) {}
     d.zoom = Math.max(50, Math.min(300, d.zoom)); d.x = Math.max(0, Math.min(100, d.x)); d.y = Math.max(0, Math.min(100, d.y));
     d.dim = Math.max(0, Math.min(90, d.dim)); d.blur = Math.max(0, Math.min(20, d.blur)); d.alpha = Math.max(40, Math.min(100, d.alpha));
     return d;
 }
 function applyBackgroundImage() {
-    let url = null;
-    try { url = localStorage.getItem(BG_IMG_KEY); } catch (_) {}
+    const url = _currentBgUrl();
     const root = document.documentElement;
     let layer = document.getElementById('app-bg');
-    if (!url || !url.startsWith('data:image/')) {
+    if (!url) {
         root.classList.remove('has-bg-image');
         layer?.remove();
         return false;
@@ -11771,7 +11794,7 @@ async function setBackgroundImageFromFile(file) {
     try {
         let url = await _downscaleImageToDataUrl(file);
         if (url.length > 3.5e6) url = await _downscaleImageToDataUrl(file, 1280, 0.7);   // garde de la place dans le stockage du navigateur
-        localStorage.setItem(BG_IMG_KEY, url);
+        localStorage.setItem(BG_IMG_KEY, url); localStorage.removeItem(BG_OFF_KEY);
         applyBackgroundImage(); refreshBackgroundControls();
         showToast(_t3('settings.bg_applied', 'Image de fond appliquée'), 'success');
     } catch (err) {
@@ -11779,8 +11802,12 @@ async function setBackgroundImageFromFile(file) {
         showToast(_t3('settings.bg_failed', "Impossible d'enregistrer cette image (trop lourde pour le navigateur ?)"), 'error');
     }
 }
+function resetBackgroundImage() {
+    try { localStorage.removeItem(BG_IMG_KEY); localStorage.removeItem(BG_OFF_KEY); } catch (_) {}
+    applyBackgroundImage(); refreshBackgroundControls();
+}
 function removeBackgroundImage() {
-    try { localStorage.removeItem(BG_IMG_KEY); } catch (_) {}
+    try { localStorage.removeItem(BG_IMG_KEY); localStorage.setItem(BG_OFF_KEY, '1'); } catch (_) {}
     applyBackgroundImage(); refreshBackgroundControls();
     showToast(_t3('settings.bg_removed', 'Image de fond supprimée'), 'info');
 }
@@ -11788,7 +11815,9 @@ function refreshBackgroundControls() {
     const has = document.documentElement.classList.contains('has-bg-image');
     const o = _getBgOpts();
     const prev = document.getElementById('bg-image-preview');
-    if (prev) { prev.style.backgroundImage = has ? `url("${localStorage.getItem(BG_IMG_KEY)}")` : 'none'; prev.classList.toggle('hidden', !has); }
+    if (prev) { prev.style.backgroundImage = has ? `url("${_currentBgUrl()}")` : 'none'; prev.classList.toggle('hidden', !has); }
+    let _isDefault = true; try { const u = localStorage.getItem(BG_IMG_KEY); _isDefault = !(u && u.startsWith('data:image/')) && localStorage.getItem(BG_OFF_KEY) !== '1'; } catch (_) {}
+    document.getElementById('bg-image-default')?.classList.toggle('hidden', _isDefault);
     document.getElementById('bg-image-remove')?.classList.toggle('hidden', !has);
     document.getElementById('bg-image-opts')?.classList.toggle('hidden', !has);
     const _fit = document.getElementById('bg-fit'); if (_fit) _fit.value = o.fit;
@@ -11798,6 +11827,7 @@ function _wireBackgroundControls() {
     document.getElementById('bg-image-pick')?.addEventListener('click', () => document.getElementById('bg-image-file')?.click());
     document.getElementById('bg-image-file')?.addEventListener('change', async (e) => { const f = e.target.files?.[0]; e.target.value = ''; await setBackgroundImageFromFile(f); });
     document.getElementById('bg-image-remove')?.addEventListener('click', removeBackgroundImage);
+    document.getElementById('bg-image-default')?.addEventListener('click', resetBackgroundImage);
     document.getElementById('bg-fit')?.addEventListener('change', (e) => {
         const o = _getBgOpts(); o.fit = e.target.value;
         try { localStorage.setItem(BG_OPT_KEY, JSON.stringify(o)); } catch (_) {}
@@ -11835,6 +11865,7 @@ function buildThemeEditor() {
                 <div id="bg-image-preview" class="bg-image-preview hidden"></div>
                 <input type="file" id="bg-image-file" accept="image/*" class="hidden">
                 <button type="button" class="btn btn-ghost btn-sm" id="bg-image-pick"><i class="fa-solid fa-image"></i> <span data-i18n="settings.bg_choose">Choisir une image</span></button>
+                <button type="button" class="btn btn-ghost btn-sm hidden" id="bg-image-default"><i class="fa-solid fa-rotate-left"></i> <span data-i18n="settings.bg_default">Image par défaut</span></button>
                 <button type="button" class="btn btn-ghost btn-sm hidden" id="bg-image-remove" style="color:var(--danger);"><i class="fa-solid fa-trash"></i> <span data-i18n="settings.bg_remove">Supprimer</span></button>
             </div>
             <div id="bg-image-opts" class="bg-image-opts hidden">
@@ -21316,10 +21347,7 @@ const response = await fetch('https://api.github.com/repos/stellio-app/stellio/r
 if (!response.ok) return;
 const release = await response.json();
 const latestVersion = release.tag_name.replace('v', '');
-if (lastSeenVersion && lastSeenVersion !== latestVersion && latestVersion === this.currentVersion) {
-console.log(`[UpdateManager] 🎉 Mise à jour détectée: ${lastSeenVersion} → ${latestVersion}`);
-this.showChangelogModal(release);
-}
+// v1.1.0 : plus de fenêtre « Stellio a été mis à jour ! » (doublon de « Quoi de neuf ») ; on mémorise seulement la version vue
 localStorage.setItem('stellio-last-seen-version', latestVersion);
 } catch (e) {
 console.warn('[UpdateManager] Erreur check changelog:', e);
@@ -27264,6 +27292,18 @@ window.openFilamentCatalogModal = openFilamentCatalogModal;
     new MutationObserver(_rbSched).observe(sidebar.querySelector('.sidebar-nav'), { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['style', 'class'] });
     refreshRailBadges();
     [800, 2500].forEach(ms => setTimeout(refreshRailBadges, ms));
+    // L'en-tête de la barre prend la hauteur réelle du bandeau du haut : les deux lignes de séparation restent alignées
+    const _top = document.querySelector('.app-header');
+    if (_top && window.ResizeObserver) {
+        const _th = () => document.documentElement.style.setProperty('--topbar-h', _top.offsetHeight + 'px');
+        new ResizeObserver(_th).observe(_top); _th();
+    }
+    // La hauteur du pied de page (nom du compte, Ko-fi) varie : le volet s'arrête exactement au-dessus de lui
+    const _foot = sidebar.querySelector('.sidebar-footer');
+    if (_foot && window.ResizeObserver) {
+        const _fh = () => document.documentElement.style.setProperty('--foot-h', _foot.offsetHeight + 'px');
+        new ResizeObserver(_fh).observe(_foot); _fh();
+    }
     window.StellioNav = {
         setCat,
         revealFor(selector) {
@@ -27278,4 +27318,10 @@ window.openFilamentCatalogModal = openFilamentCatalogModal;
             try { return fn(); } finally { sidebar.dataset.cat = prev; }
         }
     };
+})();
+
+// v1.1.0 : (re)applique l'image de fond une fois le script entièrement chargé (le premier appel, au tout début, précède la déclaration des constantes)
+(function () {
+    const go = () => { try { applyBackgroundImage(); refreshBackgroundControls(); } catch (_) {} };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
 })();

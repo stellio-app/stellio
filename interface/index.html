@@ -258,12 +258,10 @@
                 <button class="nav-btn" id="nav-acct-likes-btn" data-page="acct-likes" data-icon="fa-heart" data-title-key="nav.acct_likes" style="display:none;" data-cat="library">
                     <i class="fa-solid fa-heart"></i>
                     <span data-i18n="nav.acct_likes">Mes likes</span>
-                    <span class="badge acct-count" style="margin-left:auto;background:var(--bg-tertiary);color:var(--text-secondary);padding:2px 8px;border-radius:12px;font-size:calc(11px * var(--fs, 1));">0</span>
                 </button>
                 <button class="nav-btn" id="nav-acct-creations-btn" data-page="acct-creations" data-icon="fa-pen-ruler" data-title-key="nav.acct_creations" style="display:none;" data-cat="library">
                     <i class="fa-solid fa-pen-ruler"></i>
                     <span data-i18n="nav.acct_creations">Mes créations</span>
-                    <span class="badge acct-count" style="margin-left:auto;background:var(--bg-tertiary);color:var(--text-secondary);padding:2px 8px;border-radius:12px;font-size:calc(11px * var(--fs, 1));">0</span>
                 </button>
                 <div id="reorderable-nav-items">
 				<button class="nav-btn" data-page="stats" data-nav-id="stats" data-icon="fa-chart-pie" data-title-key="nav.stats" data-cat="track">
@@ -3485,6 +3483,7 @@
                 <div id="slicer-calib-box" class="slicer-calib-box" style="display:none;"></div>
                 <div id="slicer-spool-box" style="display:none; margin-bottom:15px; padding:10px 12px; border-radius:var(--radius); background:var(--bg-input); border:1px solid var(--border); font-size:calc(12px * var(--fs, 1));">
                     <label for="slicer-spool-select" style="display:block; font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); margin-bottom:3px;" data-i18n="slicer.spool_label">Bobine utilisée</label>
+                    <input type="search" id="slicer-spool-search" class="settings-select" style="display:none; width:100%; max-width:none; margin-bottom:6px;" data-i18n-placeholder="slicer.spool_search" placeholder="Rechercher une bobine…" autocomplete="off" oninput="filterSlicerSpools()">
                     <select id="slicer-spool-select" class="settings-select" style="width:100%; max-width:none;" onchange="onSlicerSpoolChange()"></select>
                     <div id="slicer-spool-hint" style="display:none; margin-top:6px; color:var(--danger, #e5484d);"></div>
                     <label id="slicer-consume-row" style="display:none; align-items:center; gap:8px; cursor:pointer; margin-top:8px;">
@@ -3751,6 +3750,7 @@
                 <p class="about-description" data-i18n="about.description">
                     Stellio est un gestionnaire de fichiers 3D moderne et léger, conçu pour les makers, imprimeurs 3D et passionnés de modélisation. Il centralise vos fichiers STL, 3MF et OBJ, génère des miniatures haute qualité via PyVista et s'intègre directement avec votre Slicer.
                 </p>
+                <div class="about-col">
                 <div class="about-section">
                     <h4><i class="fa-solid fa-microchip"></i> <span data-i18n="about.tech">Technologies utilisées</span></h4>
                     <div class="tech-tags">
@@ -3768,6 +3768,20 @@
                         <a class="about-link-btn" href="https://tigertag.io" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-tag"></i><span>tigertag.io</span></a>
                         <a class="about-link-btn" href="https://github.com/TigerTag-Project/TigerTag-Studio-Manager" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i><span>Studio Manager</span></a>
                         <a class="about-link-btn" href="https://github.com/TigerTag-Project/TigerTag-RFID-Guide" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i><span>RFID Guide</span></a>
+                    </div>
+                </div>
+                </div>
+                <div class="about-section">
+                    <h4><i class="fa-solid fa-database"></i> <span data-i18n="about.data_title">Données et standards ouverts</span></h4>
+                    <p class="about-legal" data-i18n="about.data_desc">Le catalogue de bobines provient de l'Open Filament Database (Open Filament Collective, licence MIT).</p>
+                    <div class="about-partner-links">
+                        <a class="about-link-btn" href="https://openfilamentdatabase.org" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-globe"></i><span>openfilamentdatabase.org</span></a>
+                        <a class="about-link-btn" href="https://github.com/OpenFilamentCollective/open-filament-database" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i><span>open-filament-database</span></a>
+                    </div>
+                    <p class="about-legal" data-i18n="about.optag_desc" style="margin-top:12px;">Les étiquettes NFC de bobines suivent le standard OpenPrintTag (Prusa Research, licence MIT).</p>
+                    <div class="about-partner-links">
+                        <a class="about-link-btn" href="https://specs.openprinttag.org/" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-globe"></i><span>specs.openprinttag.org</span></a>
+                        <a class="about-link-btn" href="https://github.com/OpenPrintTag/openprinttag-specification" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i><span>openprinttag-specification</span></a>
                     </div>
                 </div>
                 <div class="about-section">

@@ -2971,5 +2971,10 @@
   "nav.cat_tools": "Outils",
   "nav.cat_track": "Suivi",
   "nav.cat_help": "Aide",
-  "nav.cat_update": "Mises à jour"
+  "nav.cat_update": "Mises à jour",
+  "slicer.spool_search": "Rechercher une bobine…",
+  "about.data_title": "Données et standards ouverts",
+  "about.data_desc": "Le catalogue de bobines provient de l'Open Filament Database (Open Filament Collective, licence MIT). Merci à ses contributeurs.",
+  "about.optag_desc": "Les étiquettes NFC de bobines suivent le standard OpenPrintTag (Prusa Research, licence MIT).",
+  "settings.bg_default": "Image par défaut"
 }
