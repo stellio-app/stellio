@@ -358,10 +358,16 @@ Full list: [Settings and data](en-Settings-and-Data).
 - **"Print soon" queue**, reorderable, sendable to the slicer.
 - **Bulk rename** (find/replace, prefix, suffix, numbering) with a preview.
 - **Undo deletions** (`Ctrl+Z`) thanks to a 5-minute temporary trash; also works for tags, projects and sources.
+- **Green / red halo** around the thumbnail: green for a file already printed successfully, red for a failed print (gallery and details views).
+- **Already printed** (⋯ menu of a file): record by hand a print made elsewhere — pick the printer, the settings (slicer profile) and the spool, then **Success** or **Failed**. The file joins the “Printed OK” / “Failed” filters and its details sheet (right-click) shows the printer, settings and spool.
 - Fast selection: `Shift+click` for a range, arrows + `Enter`.
 - **Duplicate detection** (exact and similar geometry).
 - **Model origin**: source link, author, license, notes, download date.
 - **Drag and drop** 3D files from your file explorer, also through a browser.
+
+{{img:library-halo}}
+
+{{img:already-printed}}
 
 ## Search
 - Classic search and **AI semantic search** ("I'm looking for a support for…"), with recent searches remembered.
@@ -427,6 +433,9 @@ Other models that speak the same protocol usually work. Tell us on GitHub if you
 - **Reprint like last time** from the history.
 - **Light collaborative mode**: warns if another device is viewing the file or before a double send.
 - **Open in slicer** from "My G-codes".
+- **Slicer per printer**: each printer can have its own default slicer (OrcaSlicer, QIDIStudio, Bambu Studio…). Sending uses it with the profiles (settings, filament) attached to that printer, and the profile list adapts.
+
+{{img:printer-slicer}}
 
 ## During the print
 - **Smart plug** (Shelly, Tasmota, Home Assistant): Stellio reads the watts and records real consumption (kWh) and cost.
@@ -568,7 +577,10 @@ Visible when *Enable cost, quote and invoicing features* is checked:
 ## Phone and tablet
 - **QR code** for mobile access to the library (**installable PWA**).
 - **Android companion app**: a dedicated QR code (Settings → mobile access) downloads the APK. It handles internal and external addresses with automatic switching, QR pairing, photos straight from a print, and reading/writing OpenPrintTag NFC tags.
+- **Android app update**: on launch, a dialog announces the new version published on GitHub and offers to download and install it in one tap (checksum verified).
 - Full-screen **workshop mode** for tablet/phone.
+
+{{img:android-update}}
 
 ## Remote access
 - **Cloudflare Tunnel** (free, random or fixed address), or a **custom address** (domain name, DynDNS, VPN, Tailscale…) to avoid Cloudflare, with a one-click return to Cloudflare.

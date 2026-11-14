@@ -9929,3 +9929,82 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
 @media (max-width: 860px) {
     #bottom-stack:has(> .scroll-to-top.visible) > .mini-printer-widget { left: 0 !important; right: 60px !important; max-width: none; }
 }
+
+
+/* ── v1.0.9 : halo extérieur autour de la carte (miniature) — vert = déjà réussi, rouge = échec à retenter ── */
+.file-card.ps-success {
+    border-color: rgba(52, 211, 153, 0.95);
+    box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.7), 0 0 14px 3px rgba(52, 211, 153, 0.5);
+}
+.file-card.ps-failed {
+    border-color: rgba(248, 113, 113, 0.95);
+    box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.7), 0 0 14px 3px rgba(248, 113, 113, 0.55);
+}
+
+.ap-label { display:block; font-size:calc(11px * var(--fs, 1)); color:var(--text-muted); margin-bottom:3px; }
+.ap-btn-success { background: rgba(52,211,153,0.16); color:#34d399; border:1px solid rgba(52,211,153,0.6); }
+.ap-btn-success:hover { background: rgba(52,211,153,0.28); }
+.ap-btn-failed { background: rgba(248,113,113,0.16); color:#f87171; border:1px solid rgba(248,113,113,0.6); }
+.ap-btn-failed:hover { background: rgba(248,113,113,0.28); }
+
+/* v1.0.9 : fiche du fichier — boutons sous la miniature, colonne gauche fixe pendant le défilement */
+.file-info-left { flex: 0 0 52%; max-width: 560px; position: sticky; top: 0; align-self: flex-start; }
+.file-info-left .file-info-thumb { flex: none; width: 100%; max-width: none; }
+.file-info-left .file-info-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+@media (max-width: 640px) { .file-info-left { flex: none; width: 100%; max-width: none; position: static; } }
+
+/* v1.0.9 : fiche du fichier plus compacte (imprimante / réglages / bobine tiennent sans défilement) et sans barre de défilement visible */
+.file-info-table th { padding: 4px 10px 4px 0; }
+.file-info-table td { padding: 4px 0; }
+.file-info-controls { margin-bottom: 8px; }
+#modal-file-info .modal-body { scrollbar-width: none; -ms-overflow-style: none; }
+#modal-file-info .modal-body::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* v1.0.9 : barre latérale « catégories + volet » (ordinateur) — l'en-tête (logo + nom) ne change pas ; sous lui, les catégories ;
+   un clic ouvre le volet à droite, qui se referme après le choix. Les boutons restent les mêmes : seule leur visibilité suit la catégorie. */
+.sidebar-rail, .sidebar-panel-title { display: none; }
+@media (min-width: 861px) {
+    :root { --rail-width: 76px; --foot-h: 120px; }
+    .sidebar { position: relative; z-index: 60; display: flex; flex-direction: column; width: var(--rail-width); }
+    /* en-tête inchangé (logo complet + nom), posé en largeur normale par-dessus la barre étroite */
+    .sidebar-header { position: absolute; top: 0; left: 0; width: var(--sidebar-width); z-index: 90; background: var(--bg-secondary); border-right: 1px solid var(--border); box-sizing: border-box; }
+    .app-header { padding-left: calc(20px + var(--sidebar-width) - var(--rail-width)); }
+    .sidebar-rail { order: 1; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: calc(var(--header-height) + 10px) 6px 12px; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+    .sidebar-rail::-webkit-scrollbar { display: none; }
+    .rail-spacer { flex: 1; }
+    .rail-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; width: 64px; min-height: 50px; padding: 4px 0; border: 0; border-radius: 10px; background: transparent; color: var(--text-secondary); font-family: inherit; font-size: calc(10.5px * var(--fs, 1)); font-weight: 600; cursor: pointer; transition: var(--transition); flex-shrink: 0; }
+    .rail-btn i { font-size: calc(18px * var(--fs, 1)); width: auto; }
+    .rail-btn .rail-caret { display: none; }
+    .rail-btn span { max-width: 68px; letter-spacing: -0.2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rail-btn { position: relative; }
+    .rail-badge { position: absolute; top: 1px; right: 7px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: var(--accent); color: #fff; font-size: calc(10px * var(--fs, 1)); font-weight: 700; line-height: 16px; text-align: center; pointer-events: none; }
+    .rail-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .rail-btn.active { background: var(--accent-glow); color: var(--accent); }
+    /* pied de page : réduit quand le volet est fermé, élargi avec lui quand il s'ouvre */
+    .sidebar-footer { order: 2; position: absolute; left: 0; bottom: 0; z-index: 85; width: var(--rail-width); height: var(--foot-h); box-sizing: border-box; padding: 14px 10px; gap: 10px; background: var(--bg-secondary); border-top: 0; border-right: 1px solid var(--border); overflow: hidden; transition: width 0.16s ease; }
+    /* séparateur : toujours de la largeur de la barre, volet ouvert ou fermé ; la zone élargie se fond dans le volet */
+    .sidebar-footer::before { content: ''; position: absolute; top: 0; left: 0; width: calc(var(--rail-width) - 1px); height: 1px; background: var(--border); }
+    .sidebar.panel-open .sidebar-footer { box-shadow: 14px 16px 20px -12px rgba(0, 0, 0, 0.35); }
+    .sidebar.panel-open .sidebar-footer { width: calc(var(--rail-width) + var(--sidebar-width)); padding: 14px 16px; }
+    .sidebar:not(.panel-open) .sidebar-footer .user-info { justify-content: center; }
+    .sidebar:not(.panel-open) #current-username, .sidebar:not(.panel-open) .kofi-btn span { display: none; }
+    .sidebar:not(.panel-open) .kofi-btn { padding-left: 0; padding-right: 0; justify-content: center; }
+    .sidebar-footer #current-username, .sidebar-footer .kofi-btn span { white-space: nowrap; }
+    .sidebar-rail { padding-bottom: calc(var(--foot-h) + 8px); }
+    .sidebar-nav { position: absolute; left: 100%; top: var(--header-height); bottom: var(--foot-h); width: var(--sidebar-width); z-index: 70; background: var(--bg-secondary); border-right: 1px solid var(--border); box-shadow: 8px 0 24px rgba(0, 0, 0, 0.35); padding-top: 12px; visibility: hidden; opacity: 0; transform: translateX(-10px); pointer-events: none; transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s linear 0.16s; }
+    .sidebar.panel-open .sidebar-nav { visibility: visible; opacity: 1; transform: none; pointer-events: auto; transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s; }
+    .sidebar-panel-title { display: block; padding: 4px 14px 10px; font-size: calc(18px * var(--fs, 1)); font-weight: 700; color: var(--text-primary); flex-shrink: 0; }
+    .sidebar .nav-btn[data-cat="home"], .sidebar-nav-separator { display: none !important; }
+    .sidebar[data-cat="library"] .nav-btn[data-cat]:not([data-cat="library"]),
+    .sidebar[data-cat="print"] .nav-btn[data-cat]:not([data-cat="print"]),
+    .sidebar[data-cat="filament"] .nav-btn[data-cat]:not([data-cat="filament"]),
+    .sidebar[data-cat="tools"] .nav-btn[data-cat]:not([data-cat="tools"]),
+    .sidebar[data-cat="track"] .nav-btn[data-cat]:not([data-cat="track"]),
+    .sidebar[data-cat="help"] .nav-btn[data-cat]:not([data-cat="help"]) { display: none !important; }
+    .sidebar:not([data-cat="library"]):not([data-cat="print"]):not([data-cat="help"]) .nav-about-spacer { display: none; }
+    .nav-about-spacer { max-height: none; overflow: visible; }
+}
+
+@media (min-width: 861px) {
+    .rail-btn.sel:not(.active) { background: var(--bg-hover); color: var(--text-primary); }
+}

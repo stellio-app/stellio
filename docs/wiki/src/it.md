@@ -358,10 +358,16 @@ Elenco completo: [Impostazioni e dati](it-Settings-and-Data).
 - Coda **«Da stampare presto»**, riordinabile e inviabile allo slicer.
 - **Rinomina di massa** (trova/sostituisci, prefisso, suffisso, numerazione) con anteprima.
 - **Annulla eliminazioni** (`Ctrl+Z`) grazie a un cestino temporaneo di 5 minuti; vale anche per etichette, progetti e fonti.
+- **Alone verde / rosso** attorno alla miniatura: verde per un file già stampato con successo, rosso per una stampa fallita (viste galleria e dettagli).
+- **Già stampato** (menu ⋯ di un file): registra a mano una stampa fatta altrove — scegli stampante, impostazioni (profilo dello slicer) e bobina, poi **Riuscita** o **Fallita**. Il file entra nei filtri «Già riuscito» / «Già fallito» e la sua scheda (clic destro) mostra stampante, impostazioni e bobina.
 - Selezione rapida: `Maiusc+clic` per un intervallo, frecce + `Invio`.
 - **Rilevamento dei duplicati** (esatti e di geometria simile).
 - **Origine del modello**: link di origine, autore, licenza, note, data di download.
 - **Trascinamento** dei file 3D da Esplora risorse, anche tramite browser.
+
+{{img:library-halo}}
+
+{{img:already-printed}}
 
 ## Ricerca
 - Ricerca classica e **ricerca semantica con IA** («cerco un supporto per…»), con le ricerche recenti memorizzate.
@@ -427,6 +433,9 @@ Gli altri modelli che parlano lo stesso protocollo di solito funzionano. Dicci s
 - **Ristampa come l'ultima volta** dalla cronologia.
 - **Modalità collaborativa leggera**: avvisa se un altro dispositivo sta guardando il file o prima di un doppio invio.
 - **Apri nello slicer** da «I miei G-code».
+- **Slicer per stampante**: ogni stampante può avere il proprio slicer predefinito (OrcaSlicer, QIDIStudio, Bambu Studio…). L'invio lo usa con i profili (impostazioni, filamento) associati a quella stampante e l'elenco dei profili si adatta.
+
+{{img:printer-slicer}}
 
 ## Durante la stampa
 - **Presa smart** (Shelly, Tasmota, Home Assistant): Stellio legge i watt e registra il consumo reale (kWh) e il costo.
@@ -568,7 +577,10 @@ Visibile quando è spuntata l'opzione *Attiva le funzioni di costi, preventivi e
 ## Telefono e tablet
 - **Codice QR** per l'accesso mobile alla libreria (**PWA installabile**).
 - **App Android companion**: un codice QR dedicato (Impostazioni → accesso mobile) scarica l'APK. Gestisce indirizzo interno ed esterno con passaggio automatico, associazione tramite QR, foto direttamente da una stampa e lettura/scrittura di etichette NFC OpenPrintTag.
+- **Aggiornamento dell'app Android**: all'apertura, una finestra segnala la nuova versione pubblicata su GitHub e propone di scaricarla e installarla con un tocco (checksum verificato).
 - **Modalità officina** a schermo intero per tablet/telefono.
+
+{{img:android-update}}
 
 ## Accesso remoto
 - **Cloudflare Tunnel** (gratuito, indirizzo casuale o fisso), oppure un **indirizzo personalizzato** (nome di dominio, DynDNS, VPN, Tailscale…) per evitare Cloudflare, con ritorno a Cloudflare con un clic.

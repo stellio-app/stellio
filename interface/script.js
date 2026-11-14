@@ -5555,6 +5555,7 @@ function _isTourTargetVisible(el) {
 }
 
 function _positionTourStep(step, idx, total) {
+    window.StellioNav?.revealFor(step.selector);
     const target = document.querySelector(step.selector);
     const spotlight = document.getElementById('tour-spotlight');
     const tooltip = document.getElementById('tour-tooltip');
@@ -5692,12 +5693,13 @@ function _staticCommands() {
 
 function _navCommands() {
     const seen = new Set();
-    return [...document.querySelectorAll('.nav-btn[data-page]')].filter(btn => {
+    const _visible = () => [...document.querySelectorAll('.nav-btn[data-page]')].filter(btn => {
         const page = btn.dataset.page;
         if (seen.has(page) || getComputedStyle(btn).display === 'none') return false;
         seen.add(page);
         return true;
-    }).map(btn => ({
+    });
+    return (window.StellioNav ? window.StellioNav.withAllVisible(_visible) : _visible()).map(btn => ({
         type: 'nav',
         icon: (btn.querySelector('i')?.className.match(/fa-[\w-]+/g) || []).slice(-1)[0] || 'fa-arrow-right',
         label: btn.querySelector('span')?.textContent?.trim() || btn.dataset.page,
@@ -7835,14 +7837,21 @@ window.openFileInfoModal = async function (path, opts) {
     if (ext) baseRows.push(row(_t3('fileinfo.format', 'Format'), e(ext) + (file.plate_count > 1 ? ` · ${file.plate_count} ${e(_t3('fileinfo.plates', 'plateaux'))}` : '')));
     if (file.size) baseRows.push(row(_t3('fileinfo.file_size', 'Taille du fichier'), e(formatSize(file.size))));
     if (file.mtime) baseRows.push(row(_t3('fileinfo.modified', 'Modifié le'), e(new Date(file.mtime * 1000).toLocaleString(I18N.lang, { dateStyle: 'medium', timeStyle: 'short' }))));
-    const tailRows = row(_t3('fileinfo.sent_slicer', 'Envoyé au slicer'), yn(ps !== 'never')) + row(_t3('fileinfo.printed', 'Imprimé'), yn(ps === 'success'));
+    let tailRows = row(_t3('fileinfo.sent_slicer', 'Envoyé au slicer'), yn(ps !== 'never')) + row(_t3('fileinfo.printed', 'Imprimé'), yn(ps === 'success'));
 
     let savedProfile = '__geo';
     if (!demo) { try { savedProfile = localStorage.getItem('stellio_fileinfo_profile') || '__geo'; } catch (err) { /* stockage indisponible */ } }
     const st = { meta: null, cost: null, scale: 100, profile: savedProfile, slicer: null, failReason: '', timer: null, poll: null };
 
     body.innerHTML = `<div class="file-info-layout">
+        <div class="file-info-left">
         <div class="file-info-thumb">${file.has_thumb === false ? '<i class="fa-solid fa-cube fa-3x" style="color:var(--text-muted)"></i>' : `<img src="${thumbUrl}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('i'), {className:'fa-solid fa-cube fa-3x'}))">`}</div>
+        <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;" class="file-info-actions">
+                <button type="button" class="btn btn-primary btn-sm" id="file-info-slicer"><i class="fa-solid fa-paper-plane"></i> ${e(_t3('fileinfo.send_slicer', 'Envoyer au slicer'))}</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="file-info-open"><i class="fa-solid fa-cube"></i> ${e(_t3('fileinfo.open_viewer', 'Ouvrir dans le viewer'))}</button>
+                <button type="button" class="btn btn-ghost btn-sm commercial-only" id="file-info-cost"><i class="fa-solid fa-coins"></i> ${e(_t3('fileinfo.cost_details', 'Détail du coût'))}</button>
+            </div>
+        </div>
         <div style="flex:1; min-width:0;">
             <div class="file-info-controls">
                 <label>${e(_t3('fileinfo.profile', 'Profil du slicer'))}
@@ -7863,11 +7872,6 @@ window.openFileInfoModal = async function (path, opts) {
             </div>
             <table class="file-info-table"><tbody id="file-info-rows"></tbody></table>
             <div id="file-info-status" style="margin-top:8px; font-size:calc(12px * var(--fs, 1)); color:var(--text-muted); min-height:16px;"></div>
-            <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
-                <button type="button" class="btn btn-primary btn-sm" id="file-info-slicer"><i class="fa-solid fa-paper-plane"></i> ${e(_t3('fileinfo.send_slicer', 'Envoyer au slicer'))}</button>
-                <button type="button" class="btn btn-ghost btn-sm" id="file-info-open"><i class="fa-solid fa-cube"></i> ${e(_t3('fileinfo.open_viewer', 'Ouvrir dans le viewer'))}</button>
-                <button type="button" class="btn btn-ghost btn-sm commercial-only" id="file-info-cost"><i class="fa-solid fa-coins"></i> ${e(_t3('fileinfo.cost_details', 'Détail du coût'))}</button>
-            </div>
         </div>
     </div>`;
     const $ = (id) => document.getElementById(id);
@@ -7947,6 +7951,36 @@ window.openFileInfoModal = async function (path, opts) {
         }
         rowsEl.innerHTML = html + tailRows;
     };
+
+    const _baseTailRows = tailRows;
+    if (!demo) {
+        fetch(`${API}/api/print-history/by-file?path=${encodeURIComponent(path)}`).then(r => r.ok ? r.json() : null).then(d => {
+            const hist = (d && d.history) || [];
+            if (!hist.length || token !== _fileInfoToken) return;
+            const uniq = (arr) => [...new Set(arr.filter(Boolean))];
+            const results = hist.map(h => h.result).filter(Boolean);
+            let extra = '';
+            if (results.length) {
+                const ok = results.includes('success');
+                const last = hist.find(h => h.result);
+                const when = last && last.sent_at ? new Date(String(last.sent_at).replace(' ', 'T') + 'Z').toLocaleDateString(I18N.lang, { dateStyle: 'medium' }) : '';
+                const nOk = results.filter(r => r === 'success').length, nKo = results.filter(r => r === 'failed').length;
+                const counts = [nOk ? `${nOk} ${_t3('printed.success', 'Réussi').toLowerCase()}` : '', nKo ? `${nKo} ${_t3('printed.failed', 'Raté').toLowerCase()}` : ''].filter(Boolean).join(' · ');
+                extra += row(_t3('printed.row', 'Déjà imprimé'),
+                    `<span class="meta-val ${ok ? 'meta-yes' : 'meta-no'}"><i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${e(counts)}${when ? ' · ' + e(when) : ''}</span>`);
+            }
+            const printers = uniq(hist.map(h => h.printer_name));
+            if (printers.length) extra += row(_t3('printed.printer', 'Imprimante'), e(printers.join(', ')));
+            const profiles = uniq(hist.map(h => h.slicer_profile_name));
+            if (profiles.length) extra += row(_t3('printed.settings', 'Réglages'), e(profiles.join(', ')));
+            const spools = uniq(hist.map(h => h.filament_label ? (h.filament_label + (h.filament_material ? ` (${h.filament_material})` : '')) : h.filament_material));
+            if (spools.length) extra += row(_t3('printed.spool', 'Bobine'), e(spools.join(', ')));
+            if (!extra) return;
+            tailRows = _baseTailRows + extra;
+            renderRows();
+        }).catch(() => { /* fiche affichée sans l'historique */ });
+    }
+
 
     // Estimation du slicer pour le profil et la taille choisis (la taille est appliquée à une copie du modèle)
     const stopPoll = () => { if (st.poll) { clearTimeout(st.poll); st.poll = null; } };
@@ -8087,6 +8121,7 @@ const viewedByOtherBadgeHtml = isFileViewedByOther(f.path)
 const _ps = f.print_status || 'never';
 const _sentToSlicer = _ps !== 'never';
 const _printedOk = _ps === 'success';
+const _psClass = _ps === 'success' ? ' ps-success' : (_ps === 'failed' ? ' ps-failed' : '');   // v1.0.9 : halo vert / rouge autour de la miniature
 const _yn = (ok) => `<span class="meta-val ${ok ? 'meta-yes' : 'meta-no'}"><i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${ok ? _t2('card.yes', 'Oui') : _t2('card.no', 'Non')}</span>`;
 const tooltipHtml = `<div class="file-metadata-tooltip" id="tooltip-${f.path.replace(/[^\w]/g, '-')}"><div class="meta-row"><i class="fa-solid fa-paper-plane"></i><span class="meta-label">${_t2('card.tooltip_sent_slicer', 'Envoyé au slicer')}</span>${_yn(_sentToSlicer)}</div><div class="meta-row"><i class="fa-solid fa-print"></i><span class="meta-label">${_t2('card.tooltip_printed', 'Imprimé')}</span>${_yn(_printedOk)}</div><div class="meta-row meta-source-row" data-source="${escapeHtml(f.source || '')}"><i class="fa-solid fa-hard-drive"></i><span class="meta-label">${_t2('card.tooltip_source', 'Source')}</span>${_sourceStateHtml(_sourceAvailability[f.source] !== false)}</div></div>`;
 const thumbContent = f.has_thumb
@@ -8101,7 +8136,7 @@ if (currentView === 'details') {
     const dirPath = escapeHtml(f.path.replace(/\\/g, '/').split('/').slice(0, -1).join('/') || I18N.t('source.local_folder'));
     const sizeStr = formatSize(f.size || 0);
     const safeId = f.path.replace(/[^\w]/g, '-');
-    return `<div class="file-card file-card--details${selectedClass}${offlineClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}>
+    return `<div class="file-card file-card--details${selectedClass}${offlineClass}${_psClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}>
   <div class="dv-thumb">${checkboxHtml}${thumbContent}${isNew ? `<span class="file-new-badge file-new-badge--small"><i class="fa-solid fa-sparkles"></i></span>` : ''}${inArchiveBadgeHtml}${multiPlateBadgeHtml}${viewedByOtherBadgeHtml}</div>
   <div class="dv-name">
     <span class="dv-filename" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
@@ -8126,7 +8161,7 @@ const isVirtualEntry = f.path.includes('::');
 const deleteBtnHtml = (!isVirtualEntry && !isSelectionMode)
     ? `<button type="button" class="file-delete-btn" onclick="event.stopPropagation(); openDeleteFileModal('${escapeJs(f.path)}', '${escapeJs(f.name)}')" title="${I18N.t('actions.delete') || 'Supprimer'}"><i class="fa-solid fa-xmark"></i></button>`
     : '';
-return `<div class="file-card${selectedClass}${offlineClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}><div class="file-thumb" style="position:relative;">${checkboxHtml}${fileMenuBtnHtml}${thumbContent}${tooltipHtml}<span class="file-ext-badge">${ext.replace('.', '')}</span>${deleteBtnHtml}${isArchive ? archiveEntryHtml : ''}${inArchiveBadgeHtml}${multiPlateBadgeHtml}${viewedByOtherBadgeHtml}${isNew ? newBadgeHtml : ''}${isArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); decompressFile('${escapeJs(f.path)}', event)" title="${I18N.t('toast.extract_success')}"><i class="fa-solid fa-file-zipper"></i> ${I18N.t('actions.add')}</button>` : ''}${inArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); extractArchiveEntry('${escapeJs(f.archive_path)}', '${escapeJs(f.internal_path)}', event)" title="${I18N.t('actions.extract_single_file') || 'Extraire uniquement ce fichier'}"><i class="fa-solid fa-download"></i></button>` : ''}<button type="button" class="file-favorite-btn ${isFav ? 'favorited' : ''}" onclick="toggleFavorite('${escapeJs(f.path)}', event); return false;" title="${isFav ? I18N.t('toast.favorites_removed') : I18N.t('toast.favorites_added')}"><i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-star"></i></button><button type="button" class="file-tag-btn" onclick="event.stopPropagation(); openTagModal('${escapeJs(f.path)}')" title="${I18N.t('modal.manage_tags')}"><i class="fa-solid fa-tag"></i></button></div><div class="file-info"><div class="file-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>${f.tags?.length ? `<div class="file-tags">${f.tags.map(t => `<span class="file-tag" style="background:${t.color}20;color:${t.color};border-color:${t.color}">${escapeHtml(t.name)}</span>`).join('')}</div>` : ''}</div></div>`;
+return `<div class="file-card${selectedClass}${offlineClass}${_psClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}><div class="file-thumb" style="position:relative;">${checkboxHtml}${fileMenuBtnHtml}${thumbContent}${tooltipHtml}<span class="file-ext-badge">${ext.replace('.', '')}</span>${deleteBtnHtml}${isArchive ? archiveEntryHtml : ''}${inArchiveBadgeHtml}${multiPlateBadgeHtml}${viewedByOtherBadgeHtml}${isNew ? newBadgeHtml : ''}${isArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); decompressFile('${escapeJs(f.path)}', event)" title="${I18N.t('toast.extract_success')}"><i class="fa-solid fa-file-zipper"></i> ${I18N.t('actions.add')}</button>` : ''}${inArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); extractArchiveEntry('${escapeJs(f.archive_path)}', '${escapeJs(f.internal_path)}', event)" title="${I18N.t('actions.extract_single_file') || 'Extraire uniquement ce fichier'}"><i class="fa-solid fa-download"></i></button>` : ''}<button type="button" class="file-favorite-btn ${isFav ? 'favorited' : ''}" onclick="toggleFavorite('${escapeJs(f.path)}', event); return false;" title="${isFav ? I18N.t('toast.favorites_removed') : I18N.t('toast.favorites_added')}"><i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-star"></i></button><button type="button" class="file-tag-btn" onclick="event.stopPropagation(); openTagModal('${escapeJs(f.path)}')" title="${I18N.t('modal.manage_tags')}"><i class="fa-solid fa-tag"></i></button></div><div class="file-info"><div class="file-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>${f.tags?.length ? `<div class="file-tags">${f.tags.map(t => `<span class="file-tag" style="background:${t.color}20;color:${t.color};border-color:${t.color}">${escapeHtml(t.name)}</span>`).join('')}</div>` : ''}</div></div>`;
 }
 
 
@@ -8442,7 +8477,9 @@ function buildLibraryEmptyStateHTML() {
     return `<div class="empty-state"><i class="fa-solid fa-inbox"></i><p>${I18N.t('library.no_files')}</p></div>`;
 }
 
+let _renderFilesSeq = 0;   // v1.0.9 : un rendu plus récent annule la suite (par morceaux) du précédent
 function renderFiles(chunkSize = 50) {
+const _seq = ++_renderFilesSeq;
 const grid = document.getElementById('files-grid');
 renderSmartCollections();
 if (!filteredFiles?.length) {
@@ -8554,6 +8591,7 @@ window.toggleFolderBlock = function(uid) {
 };
 
 function renderChunk() {
+    if (_seq !== _renderFilesSeq) return;      // la liste a été redessinée entre-temps (ex. clics rapides sur un filtre) : on n'ajoute plus de cartes périmées
     const end = Math.min(idx + chunkSize, filesToRender.length);
     let chunkHtml = '';
     for (let i = idx; i < end; i++) {
@@ -22146,11 +22184,95 @@ startThumbAutoRefresh();
             closeModal('modal-file-actions');
             openFileGcodesModal(_ctxPath, _ctxName);
         });
+        document.getElementById('ctx-printed-btn')?.addEventListener('click', () => {
+            closeModal('modal-file-actions');
+            openAlreadyPrintedModal(_ctxPath, _ctxName);
+        });
+        document.getElementById('ap-success-btn')?.addEventListener('click', () => _submitAlreadyPrinted('success'));
+        document.getElementById('ap-failed-btn')?.addEventListener('click', () => _submitAlreadyPrinted('failed'));
         document.getElementById('ctx-project-btn')?.addEventListener('click', () => {
             closeModal('modal-file-actions');
             openAddToProjectModal(_ctxPath, _ctxName);
         });
     });
+
+
+    // « Déjà imprimé » : enregistre à la main une impression passée (imprimante, réglages, bobine, résultat)
+    window.openAlreadyPrintedModal = async function (filePath, fileName) {
+        const nameEl = document.getElementById('ap-file-name');
+        if (nameEl) nameEl.textContent = fileName || '';
+        const pSel = document.getElementById('ap-printer-select');
+        const sSel = document.getElementById('ap-spool-select');
+        const prSel = document.getElementById('ap-profile-select');
+        [pSel, sSel, prSel].forEach(sel => { if (sel) { sel.querySelectorAll('option[data-dynamic]').forEach(o => o.remove()); sel.value = ''; } });
+        window._apState = { path: filePath, slots: {} };
+        openModal('modal-already-printed');
+        try {
+            const res = await fetch(`${API}/api/printers`);
+            const printers = res.ok ? await res.json() : [];
+            (Array.isArray(printers) ? printers : []).forEach(pr => {
+                const o = document.createElement('option');
+                o.value = pr.id; o.textContent = pr.name || ('#' + pr.id); o.setAttribute('data-dynamic', '1');
+                pSel.appendChild(o);
+            });
+        } catch (err) { /* liste vide */ }
+        try {
+            const res = await fetch(`${API}/api/filament/spools`);
+            const data = res.ok ? await res.json() : {};
+            (data.slots || []).forEach(sl => {
+                const key = `${sl.source_type}:${sl.source_id}`;
+                window._apState.slots[key] = sl;
+                const o = document.createElement('option');
+                o.value = key;
+                o.textContent = `${sl.name || ('#' + sl.source_id)}${sl.material ? ' — ' + sl.material : ''}`;
+                o.setAttribute('data-dynamic', '1');
+                sSel.appendChild(o);
+            });
+        } catch (err) { /* liste vide */ }
+        _loadProcessProfileSelect('ap-profile-select', null, { allSlicers: true });
+    };
+
+    async function _submitAlreadyPrinted(result) {
+        const st = window._apState || {};
+        if (!st.path) return;
+        const pSel = document.getElementById('ap-printer-select');
+        const prSel = document.getElementById('ap-profile-select');
+        const sSel = document.getElementById('ap-spool-select');
+        const opt = prSel && prSel.selectedOptions[0];
+        const sl = st.slots[sSel.value];
+        const body = {
+            path: st.path, result,
+            printer_id: pSel.value || null,
+            slicer_profile_id: prSel.value || '',
+            slicer_profile_name: prSel.value && opt ? (opt.dataset.name || '') : '',
+            spool: sl ? { source_type: sl.source_type, source_id: sl.source_id, name: sl.name || '', material: sl.material || '', color_hex: sl.color_hex || '' } : null
+        };
+        try {
+            const res = await fetch(`${API}/api/print-history/manual`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            if (!res.ok) throw new Error('http ' + res.status);
+            closeModal('modal-already-printed');
+            showToast(I18N.t('printed.saved') || 'Impression enregistrée', 'success');
+            // Mise à jour sur place (sans recharger la bibliothèque : pas de clignotement des miniatures)
+            const f = (typeof allFiles !== 'undefined' ? allFiles : []).find(x => x.path === st.path);
+            if (f) {
+                const before = f.print_status || 'never';
+                f.print_status = (result === 'success' || before === 'success') ? 'success' : 'failed';
+                const cls = f.print_status === 'success' ? 'ps-success' : 'ps-failed';
+                document.querySelectorAll('.file-card').forEach(card => {
+                    if (card.dataset.path !== st.path) return;
+                    card.classList.remove('ps-success', 'ps-failed');
+                    card.classList.add(cls);
+                });
+                if (typeof renderSmartCollections === 'function') renderSmartCollections();
+                // Un filtre « jamais imprimés / réussis / échecs » actif peut changer la liste : on ne rafraîchit que dans ce cas
+                if (typeof activeSmartCollection !== 'undefined' && activeSmartCollection && before !== f.print_status) applyFilters();
+            } else if (typeof loadFiles === 'function') {
+                loadFiles();
+            }
+        } catch (err) {
+            showToast(I18N.t('printed.error') || "Échec de l'enregistrement", 'error');
+        }
+    }
 
     window.repairFileFromMenu = async function (filePath, fileName) {
         showToast(`${I18N.t('actions.repairing') || 'Réparation...'} ${fileName}`, 'info');
@@ -27054,3 +27176,106 @@ function openFilamentCatalogModal(tab) {
     _ofdLoadStatus();
 }
 window.openFilamentCatalogModal = openFilamentCatalogModal;
+
+
+// ============================================================================
+// v1.0.9 : barre latérale « rail + panneau » — catégorie courante, synchronisée avec la page ouverte
+// ============================================================================
+(function () {
+    const sidebar = document.getElementById('app-sidebar');
+    const rail = document.getElementById('sidebar-rail');
+    if (!sidebar || !rail) return;
+    const CATS = ['library', 'print', 'filament', 'tools', 'track', 'help'];
+    const KEY = 'stellio-nav-cat';
+    const TITLES = { library: ['nav.library', 'Bibliothèque'], print: ['nav.cat_print', 'Impression'], filament: ['nav.cat_filament', 'Filament'],
+        tools: ['nav.cat_tools', 'Outils'], track: ['nav.cat_track', 'Suivi'], help: ['nav.cat_help', 'Aide'] };
+    function refreshSel() {
+        const open = sidebar.classList.contains('panel-open');
+        rail.querySelectorAll('[data-rail]').forEach(b => {
+            b.classList.toggle('sel', open && b.dataset.rail === sidebar.dataset.cat);
+            b.setAttribute('aria-expanded', open && b.dataset.rail === sidebar.dataset.cat ? 'true' : 'false');
+        });
+    }
+    function setOpen(open) { sidebar.classList.toggle('panel-open', !!open); refreshSel(); }
+    function setCat(cat, remember) {
+        if (!CATS.includes(cat)) return;
+        sidebar.dataset.cat = cat;
+        refreshSel();
+        const t = document.getElementById('sidebar-panel-title');
+        if (t) { const [k, fb] = TITLES[cat]; t.textContent = (window.I18N && I18N.has && I18N.has(k)) ? I18N.t(k) : fb; }
+    }
+    function syncPageHighlight() {
+        const page = (document.querySelector('.page.active')?.id || 'page-dashboard').replace(/^page-/, '');
+        rail.querySelectorAll('[data-rail-page]').forEach(b => b.classList.toggle('active', b.dataset.railPage === page));
+        // La catégorie qui contient la page ouverte prend la couleur d'accent ; la catégorie seulement consultée reste discrète
+        const cur = document.querySelector('.nav-btn.active[data-cat]')?.dataset.cat;
+        rail.querySelectorAll('[data-rail]').forEach(b => b.classList.toggle('active', b.dataset.rail === cur));
+    }
+    rail.addEventListener('click', (e) => {
+        const b = e.target.closest('.rail-btn');
+        if (!b) return;
+        if (b.dataset.rail) {
+            const same = sidebar.classList.contains('panel-open') && sidebar.dataset.cat === b.dataset.rail;
+            if (same) { setOpen(false); return; }
+            setCat(b.dataset.rail); setOpen(true); return;
+        }
+        setOpen(false);
+        if (b.dataset.railClick) { document.querySelector(b.dataset.railClick)?.click(); setTimeout(syncPageHighlight, 30); }
+    });
+    // Le volet se referme dès qu'on a choisi une entrée, qu'on clique à côté ou qu'on appuie sur Échap
+    sidebar.querySelector('.sidebar-nav')?.addEventListener('click', (e) => { if (e.target.closest('.nav-btn')) setTimeout(() => setOpen(false), 0); });
+    document.addEventListener('click', (e) => { if (!e.target.closest('#app-sidebar')) setOpen(false); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sidebar.classList.contains('panel-open')) setOpen(false); });
+    // La catégorie suit la page ouverte (raccourcis, palette de commandes, visite guidée…)
+    const mo = new MutationObserver((muts) => {
+        for (const m of muts) {
+            const el = m.target;
+            if (el.classList && el.classList.contains('active') && el.classList.contains('nav-btn')) {
+                const c = el.dataset.cat;
+                if (c && !['home', 'settings', 'update'].includes(c)) setCat(c, false);
+                syncPageHighlight();
+            }
+        }
+    });
+    document.querySelectorAll('.nav-btn').forEach(b => mo.observe(b, { attributes: true, attributeFilter: ['class'] }));
+    document.addEventListener('i18n:changed', () => setCat(sidebar.dataset.cat || 'library', false));
+    setCat('library', false);
+    syncPageHighlight();
+    // Les textes arrivent après le chargement des langues : on rafraîchit le titre du panneau
+    [400, 1500].forEach(ms => setTimeout(() => setCat(sidebar.dataset.cat || 'library', false), ms));
+    // Utilisé par la palette de commandes et la visite guidée : rend visible le bouton ciblé
+    // Pastilles : la somme des pastilles des entrées de chaque catégorie s'affiche sur son icône, volet fermé
+    function refreshRailBadges() {
+        rail.querySelectorAll('[data-rail]').forEach(b => {
+            let total = 0;
+            sidebar.querySelectorAll('.sidebar-nav .nav-btn[data-cat="' + b.dataset.rail + '"] .badge').forEach(el => {
+                if (el.classList.contains('hidden') || getComputedStyle(el).display === 'none') return;
+                const n = parseInt((el.textContent || '').trim(), 10);
+                if (n > 0) total += n;
+            });
+            let pill = b.querySelector('.rail-badge');
+            if (!total) { if (pill) pill.remove(); return; }
+            if (!pill) { pill = document.createElement('span'); pill.className = 'rail-badge'; b.appendChild(pill); }
+            pill.textContent = total > 99 ? '99+' : String(total);
+        });
+    }
+    let _rbT = null;
+    const _rbSched = () => { clearTimeout(_rbT); _rbT = setTimeout(refreshRailBadges, 80); };
+    new MutationObserver(_rbSched).observe(sidebar.querySelector('.sidebar-nav'), { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['style', 'class'] });
+    refreshRailBadges();
+    [800, 2500].forEach(ms => setTimeout(refreshRailBadges, ms));
+    window.StellioNav = {
+        setCat,
+        revealFor(selector) {
+            const el = selector ? document.querySelector(selector) : null;
+            const c = el && el.closest && el.closest('.nav-btn[data-cat]')?.dataset.cat;
+            if (c && !['home', 'settings', 'update'].includes(c)) { setCat(c, false); setOpen(true); }
+        },
+        closePanel() { setOpen(false); },
+        withAllVisible(fn) {
+            const prev = sidebar.dataset.cat;
+            sidebar.dataset.cat = 'all';
+            try { return fn(); } finally { sidebar.dataset.cat = prev; }
+        }
+    };
+})();

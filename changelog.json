@@ -1,5 +1,82 @@
 [
   {
+    "version": "1.0.9",
+    "items": {
+      "fr": [
+        "Application Android : nouvelle icône avec le logo Stellio (emblème en relief sur fond sombre, icône adaptative)",
+        "Bibliothèque : halo vert autour de la miniature des fichiers déjà imprimés avec succès et halo rouge pour ceux dont l'impression a échoué (vue galerie et vue détails)",
+        "Bibliothèque : correction de l'affichage de tout le catalogue alors qu'un filtre (ex. « À retenter ») restait sélectionné après plusieurs clics rapides sur la même pastille",
+        "Menu d'actions d'un fichier : nouveau bouton « Déjà imprimé » (imprimante, réglages, bobine, Réussi/Raté) ; ces fichiers apparaissent dans Déjà réussis / À retenter et la fiche (clic droit) affiche l'imprimante, les réglages et la bobine",
+        "Refonte du wiki",
+        "Fiche du fichier (clic droit) : les boutons Envoyer au slicer / Ouvrir dans le viewer / Détail du coût passent sous la miniature, toujours visibles",
+        "Barre latérale : les catégories passent sous le logo (en-tête inchangé) ; un clic sur une catégorie ouvre le volet, qui se referme après le choix (clic ailleurs ou Échap aussi)"
+      ],
+      "en": [
+        "Android app: new icon with the Stellio logo (embossed emblem on a dark background, adaptive icon)",
+        "Library: green halo around the thumbnail of files already printed successfully and red halo for failed prints (gallery and details views)",
+        "Library: fixed the whole catalogue showing while a filter (e.g. “To retry”) stayed selected after several quick clicks on the same chip",
+        "File action menu: new “Already printed” button (printer, settings, spool, Success/Failed); these files show up in Printed OK / To retry and the details sheet (right-click) shows the printer, settings and spool",
+        "Wiki redesign",
+        "File details (right-click): the Send to slicer / Open in viewer / Cost breakdown buttons now sit under the thumbnail and stay visible",
+        "Sidebar: the categories now sit under the logo (header unchanged); clicking a category opens the flyout, which closes after you pick an entry (click elsewhere or Esc also close it)"
+      ],
+      "de": [
+        "Android-App: neues Symbol mit dem Stellio-Logo (Emblem in Relief auf dunklem Hintergrund, adaptives Symbol)",
+        "Bibliothek: grüner Schimmer um die Vorschau erfolgreich gedruckter Dateien und roter Schimmer bei fehlgeschlagenen Drucken (Galerie- und Detailansicht)",
+        "Bibliothek: Fehler behoben, bei dem nach mehreren schnellen Klicks auf denselben Filter (z. B. „Erneut versuchen“) die ganze Bibliothek angezeigt wurde, obwohl der Filter aktiv blieb",
+        "Dateiaktionsmenü: neue Schaltfläche „Schon gedruckt“ (Drucker, Einstellungen, Spule, Erfolgreich/Fehlgeschlagen); diese Dateien erscheinen in den Filtern erfolgreich/erneut versuchen und das Detailblatt (Rechtsklick) zeigt Drucker, Einstellungen und Spule",
+        "Überarbeitung des Wikis",
+        "Dateidetails (Rechtsklick): Die Schaltflächen An Slicer senden / Im Viewer öffnen / Kostendetails liegen jetzt unter der Vorschau und bleiben sichtbar",
+        "Seitenleiste: Die Icon-Leiste liegt jetzt unter dem Logo; ein Klick auf eine Kategorie öffnet das Flyout, das sich nach der Auswahl schließt (Klick daneben oder Esc schließen es auch)"
+      ],
+      "es": [
+        "Aplicación Android: nuevo icono con el logo de Stellio (emblema en relieve sobre fondo oscuro, icono adaptable)",
+        "Biblioteca: halo verde alrededor de la miniatura de los archivos ya impresos con éxito y halo rojo para las impresiones fallidas (vistas de galería y detalles)",
+        "Biblioteca: corregido que se mostrara todo el catálogo mientras un filtro (p. ej. «Reintentar») seguía seleccionado tras varios clics rápidos en la misma etiqueta",
+        "Menú de acciones del archivo: nuevo botón «Ya impreso» (impresora, ajustes, bobina, Logrado/Fallido); estos archivos aparecen en los filtros de logrados / reintentar y la ficha (clic derecho) muestra impresora, ajustes y bobina",
+        "Rediseño del wiki",
+        "Ficha del archivo (clic derecho): los botones Enviar al slicer / Abrir en el visor / Detalle del coste pasan bajo la miniatura y siempre están visibles",
+        "Barra lateral: el carril de iconos pasa bajo el logo; un clic en una categoría abre el panel, que se cierra tras elegir una entrada (clic fuera o Esc también lo cierran)"
+      ],
+      "pt": [
+        "Aplicação Android: novo ícone com o logótipo do Stellio (emblema em relevo sobre fundo escuro, ícone adaptável)",
+        "Biblioteca: halo verde à volta da miniatura dos ficheiros já impressos com sucesso e halo vermelho para as impressões falhadas (vistas de galeria e detalhes)",
+        "Biblioteca: corrigido o aparecimento de todo o catálogo com um filtro (ex. «Repetir») ainda selecionado após vários cliques rápidos no mesmo filtro",
+        "Menu de ações do ficheiro: novo botão «Já impresso» (impressora, definições, bobina, Sucesso/Falhou); estes ficheiros aparecem nos filtros de sucesso / repetir e a ficha (clique direito) mostra impressora, definições e bobina",
+        "Redesenho da wiki",
+        "Ficha do ficheiro (clique direito): os botões Enviar para o slicer / Abrir no visualizador / Detalhe do custo ficam sob a miniatura e sempre visíveis",
+        "Barra lateral: o carril de ícones fica sob o logótipo; um clique numa categoria abre o painel, que fecha depois da escolha (clique fora ou Esc também o fecham)"
+      ],
+      "it": [
+        "App Android: nuova icona con il logo di Stellio (emblema in rilievo su sfondo scuro, icona adattiva)",
+        "Libreria: alone verde attorno alla miniatura dei file già stampati con successo e alone rosso per le stampe fallite (viste galleria e dettagli)",
+        "Libreria: corretta la visualizzazione dell'intero catalogo con un filtro (es. «Da riprovare») ancora selezionato dopo diversi clic rapidi sullo stesso chip",
+        "Menu azioni del file: nuovo pulsante «Già stampato» (stampante, impostazioni, bobina, Riuscita/Fallita); questi file compaiono nei filtri riusciti / da riprovare e la scheda (clic destro) mostra stampante, impostazioni e bobina",
+        "Restyling della wiki",
+        "Scheda del file (clic destro): i pulsanti Invia allo slicer / Apri nel visualizzatore / Dettaglio costo passano sotto la miniatura e restano sempre visibili",
+        "Barra laterale: la colonna di icone passa sotto il logo; un clic su una categoria apre il pannello, che si chiude dopo la scelta (anche con clic altrove o Esc)"
+      ],
+      "zh": [
+        "Android 应用：换用 Stellio 标志的新图标（深色背景上的立体徽标，自适应图标）",
+        "资料库：已成功打印的文件缩略图外围显示绿色光晕，打印失败的显示红色光晕（画廊和详情视图）",
+        "资料库：修复了对同一筛选标签快速连续点击后，筛选（如“待重试”）仍处于选中状态却显示整个资料库的问题",
+        "文件操作菜单：新增“已打印”按钮（打印机、设置、线材盘、成功/失败）；这些文件会出现在“已成功/待重试”筛选中，右键详情页显示打印机、设置和线材盘",
+        "维基改版",
+        "文件详情（右键）：“发送到切片软件 / 在查看器中打开 / 成本明细”按钮移到缩略图下方，始终可见",
+        "侧边栏：图标栏移到徽标下方；点击分类会展开面板，选择条目后自动收起（点击别处或按 Esc 也会收起）"
+      ],
+      "ja": [
+        "Android アプリ：Stellio ロゴを使った新しいアイコン（暗い背景に浮き出るエンブレム、アダプティブアイコン）",
+        "ライブラリ：印刷に成功したファイルのサムネイルに緑、失敗したものに赤のハローを表示（ギャラリー／詳細表示）",
+        "ライブラリ：同じフィルターを素早く連続でクリックすると、フィルター（例：「再挑戦」）が選択されたままなのにライブラリ全体が表示される問題を修正",
+        "ファイル操作メニュー：「印刷済み」ボタンを追加（プリンター・設定・スプール・成功/失敗）。これらのファイルは成功済み／再挑戦フィルターに表示され、右クリックの詳細にもプリンター・設定・スプールを表示",
+        "Wiki のリニューアル",
+        "ファイル詳細（右クリック）：「スライサーに送信／ビューアーで開く／コスト詳細」ボタンをサムネイルの下に移動し、常に表示",
+        "サイドバー：アイコンレールをロゴの下に配置。カテゴリをクリックするとパネルが開き、項目を選ぶと閉じます（他をクリック／Esc でも閉じます）"
+      ]
+    }
+  },
+  {
     "version": "1.0.8",
     "items": {
       "fr": [

@@ -1959,7 +1959,7 @@ ROOT_108wikilink = pathlib.Path(__file__).resolve().parent.parent
 
 def test_wiki_link_in_sidebar():
     html = (ROOT_108wikilink / 'interface' / 'index.html').read_text(encoding='utf-8')
-    assert 'href="https://github.com/stellio-app/stellio/wiki"' in html
+    assert 'href="https://stellio-app.com/docs/"' in html   # le lien pointe vers la documentation en ligne (1.0.9)
     assert 'data-i18n="nav.wiki"' in html
 
 
@@ -1995,3 +1995,161 @@ def test_apk_workflow_publishes_version_json():
     wf = (_P(__file__).resolve().parent.parent / '.github/workflows/build-apk.yml').read_text(encoding='utf-8')
     assert 'apk/version.json' in wf and 'versionCode' in wf and 'sha256sum' in wf
     assert 'git add apk/stellio.apk apk/version.json' in wf
+
+
+# ======================================================================
+# v109_apk_icon
+# Android : icône = logo Stellio (PNG 432 px, icône adaptative)
+# ======================================================================
+def test_apk_icon_is_stellio_logo():
+    from pathlib import Path as _P
+    res = _P(__file__).resolve().parent.parent / 'apk-src/app/src/main/res'
+    png = (res / 'drawable-nodpi/ic_foreground.png').read_bytes()
+    assert png[:8] == b'\x89PNG\r\n\x1a\n'
+    assert int.from_bytes(png[16:20], 'big') == 432 and int.from_bytes(png[20:24], 'big') == 432
+    assert not (res / 'drawable/ic_foreground.xml').exists()           # pas de doublon de ressource
+    ic = (res / 'mipmap-anydpi-v26/ic_launcher.xml').read_text(encoding='utf-8')
+    assert '@drawable/ic_foreground' in ic and '<foreground' in ic
+
+
+# ======================================================================
+# v109_library_halo
+# Bibliothèque : halo vert/rouge sur la miniature + plus de cartes périmées après des clics rapides sur un filtre
+# ======================================================================
+def test_library_halo_and_render_race_guard():
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    assert js.count('${_psClass}') == 2 and "' ps-success'" in js and "' ps-failed'" in js
+    assert '.file-card.ps-failed {' in css and '.file-card.ps-success {' in css
+    # un rendu plus récent doit stopper la suite (par morceaux) du précédent
+    assert 'const _seq = ++_renderFilesSeq;' in js and 'if (_seq !== _renderFilesSeq) return;' in js
+
+
+# ======================================================================
+# v109_already_printed
+# Menu d'actions : « Déjà imprimé » (imprimante, réglages, bobine, Réussi/Raté) + infos dans la fiche du fichier
+# ======================================================================
+def test_already_printed_wiring_and_i18n():
+    import json
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    html = (root / 'interface/index.html').read_text(encoding='utf-8')
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    for ident in ('ctx-printed-btn', 'modal-already-printed', 'ap-printer-select', 'ap-profile-select',
+                  'ap-spool-select', 'ap-success-btn', 'ap-failed-btn'):
+        assert f'id="{ident}"' in html
+    assert 'openAlreadyPrintedModal' in js and '/api/print-history/manual' in js and '/api/print-history/by-file' in js
+    keys = ['action', 'title', 'printer', 'settings', 'spool', 'none', 'success', 'failed', 'row', 'saved', 'error']
+    for lang in ('fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'):
+        d = json.loads((root / f'languages/{lang}.json').read_text(encoding='utf-8'))
+        for k in keys:
+            assert d.get('printed.' + k), (lang, k)
+
+
+def test_already_printed_api(tmp_path):
+    from pathlib import Path as _P
+    src = (_P(__file__).resolve().parent.parent / 'main.py').read_text(encoding='utf-8')
+    assert "@app.route('/api/print-history/manual', methods=['POST'])" in src
+    assert "@app.route('/api/print-history/by-file', methods=['GET'])" in src
+    assert "result not in ('success', 'failed')" in src
+
+
+# ======================================================================
+# v109_docs_site
+# Site de documentation HTML (façon docs.frigate.video) généré depuis les sources du wiki
+# ======================================================================
+def test_docs_site_builds(tmp_path):
+    import pytest
+    pytest.importorskip('markdown')
+    import importlib.util
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    spec = importlib.util.spec_from_file_location('build_docs_109', root / 'tools/build_docs.py')
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    broken, pages, _ = mod.build(str(tmp_path / 'out'), '/docs/')
+    assert broken == [] and pages == 16 * 8
+    html = (tmp_path / 'out/fr/Library/index.html').read_text(encoding='utf-8')
+    assert 'class="toc"' in html and 'id="ov"' in html and 'Déjà imprimé' in html
+    assert (tmp_path / 'out/ja/search.json').stat().st_size > 1000
+    assert '{{img:' not in html and '](fr-' not in html
+
+
+def test_already_printed_updates_in_place():
+    # pas de rechargement complet de la bibliothèque (clignotement des miniatures) après « Déjà imprimé »
+    from pathlib import Path as _P
+    js = (_P(__file__).resolve().parent.parent / 'interface/script.js').read_text(encoding='utf-8')
+    seg = js[js.index('async function _submitAlreadyPrinted'):]
+    seg = seg[:seg.index('window.repairFileFromMenu') if 'window.repairFileFromMenu' in seg else 4000]
+    assert "card.classList.add(cls)" in seg and "renderSmartCollections()" in seg
+    assert seg.index('if (f) {') < seg.index('loadFiles()')
+
+
+def test_file_info_buttons_under_thumbnail():
+    # fiche (clic droit) : boutons sous la miniature, colonne gauche collante
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    seg = js[js.index('<div class="file-info-left">'):]
+    left_end = seg.index('<div style="flex:1; min-width:0;">')
+    assert 'id="file-info-slicer"' in seg[:left_end] and 'id="file-info-cost"' in seg[:left_end]
+    assert 'id="file-info-slicer"' not in seg[left_end:left_end + 3000]
+    assert '.file-info-left {' in css and 'position: sticky' in css
+
+
+# ======================================================================
+# v109_sidebar_rail
+# Barre latérale « rail d'icônes + panneau » : chaque bouton garde son identité, seule sa visibilité suit la catégorie
+# ======================================================================
+def test_sidebar_rail_structure_and_i18n():
+    import json, re
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    html = (root / 'interface/index.html').read_text(encoding='utf-8')
+    side = html[html.index('<aside class="sidebar" id="app-sidebar">'):html.index('</aside>')]
+    assert 'id="sidebar-rail"' in side and 'id="sidebar-panel-title"' in side
+    for rail in ('library', 'print', 'filament', 'tools', 'track', 'help'):
+        assert f'data-rail="{rail}"' in side
+    # tous les boutons de navigation (hors rail) ont une catégorie
+    navs = [m.group(0) for m in re.finditer(r'<(?:button|a)\b[^>]*class="nav-btn[^"]*"[^>]*>', side)]
+    assert len(navs) >= 28 and all('data-cat="' in n for n in navs), [n for n in navs if 'data-cat="' not in n][:3]
+    for needed in ('data-nav-id="printers"', 'data-nav-id="spoolman"', 'id="nav-trash-btn"', 'data-page="settings"'):
+        assert any(needed in n for n in navs)
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    assert '.sidebar[data-cat="print"] .nav-btn[data-cat]:not([data-cat="print"])' in css
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    assert 'window.StellioNav' in js and 'revealFor(step.selector)' in js and 'withAllVisible(_visible)' in js
+    for lang in ('fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'):
+        d = json.loads((root / f'languages/{lang}.json').read_text(encoding='utf-8'))
+        for k in ('home', 'library', 'print', 'filament', 'tools', 'track', 'help'):
+            assert d.get('nav.cat_' + k), (lang, k)
+
+
+def test_file_info_modal_has_no_visible_scrollbar():
+    from pathlib import Path as _P
+    css = (_P(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
+    assert '#modal-file-info .modal-body { scrollbar-width: none;' in css
+
+
+def test_sidebar_flyout_opens_and_closes():
+    # volet fermé par défaut, ouvert au clic sur une catégorie, refermé après le choix / clic ailleurs / Échap
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    assert '.sidebar.panel-open .sidebar-nav { visibility: visible;' in css
+    assert 'visibility: hidden; opacity: 0;' in css
+    for s in ("classList.toggle('panel-open'", "e.key === 'Escape'", "closest('#app-sidebar')", "setOpen(false)"):
+        assert s in js
+
+
+def test_sidebar_rail_sums_badges():
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    assert 'function refreshRailBadges' in js and "'rail-badge'" in js
+    assert '.rail-badge' in css

@@ -358,10 +358,16 @@ Vollständige Liste: [Einstellungen und Daten](de-Settings-and-Data).
 - Warteschlange **„Bald drucken"**, umsortierbar, an den Slicer sendbar.
 - **Mehrfach umbenennen** (Suchen/Ersetzen, Präfix, Suffix, Nummerierung) mit Vorschau.
 - **Löschen rückgängig machen** (`Strg+Z`) dank 5-Minuten-Papierkorb; gilt auch für Tags, Projekte und Quellen.
+- **Grüner / roter Schimmer** um die Vorschau: grün für erfolgreich gedruckte Dateien, rot für fehlgeschlagene Drucke (Galerie- und Detailansicht).
+- **Schon gedruckt** (⋯-Menü einer Datei): einen anderswo gemachten Druck von Hand erfassen — Drucker, Einstellungen (Slicer-Profil) und Spule wählen, dann **Erfolgreich** oder **Fehlgeschlagen**. Die Datei erscheint in den Filtern „Erfolgreich gedruckt“ / „Fehlgeschlagen“, ihr Detailblatt (Rechtsklick) zeigt Drucker, Einstellungen und Spule.
 - Schnelle Auswahl: `Umschalt+Klick` für einen Bereich, Pfeiltasten + `Enter`.
 - **Duplikaterkennung** (exakt und ähnliche Geometrie).
 - **Modellherkunft**: Quelllink, Autor, Lizenz, Notizen, Download-Datum.
 - **Drag & Drop** von 3D-Dateien aus dem Datei-Explorer, auch im Browser.
+
+{{img:library-halo}}
+
+{{img:already-printed}}
 
 ## Suche
 - Klassische Suche und **semantische KI-Suche** („Ich suche eine Halterung für …") mit gemerkten letzten Suchen.
@@ -427,6 +433,9 @@ Andere Modelle mit demselben Protokoll funktionieren in der Regel. Sagen Sie uns
 - **Erneut drucken wie beim letzten Mal** aus dem Verlauf.
 - **Leichter Mehrbenutzermodus**: warnt, wenn ein anderes Gerät die Datei ansieht oder vor einem doppelten Senden.
 - **Im Slicer öffnen** aus „Meine G-Codes".
+- **Slicer pro Drucker**: Jeder Drucker kann seinen eigenen Standard-Slicer haben (OrcaSlicer, QIDIStudio, Bambu Studio…). Das Senden nutzt ihn mit den diesem Drucker zugeordneten Profilen (Einstellungen, Filament), die Profilliste passt sich an.
+
+{{img:printer-slicer}}
 
 ## Während des Drucks
 - **Smarte Steckdose** (Shelly, Tasmota, Home Assistant): Stellio liest die Watt und speichert den realen Verbrauch (kWh) und die Kosten.
@@ -568,7 +577,10 @@ Sichtbar, wenn *Kosten-, Angebots- und Rechnungsfunktionen aktivieren* angehakt 
 ## Smartphone und Tablet
 - **QR-Code** für den mobilen Zugriff auf die Bibliothek (**installierbare PWA**).
 - **Android-Begleit-App**: Ein eigener QR-Code (Einstellungen → Mobiler Zugriff) lädt die APK herunter. Sie verwaltet interne und externe Adresse mit automatischem Wechsel, Kopplung per QR, Fotos direkt von einem Druck sowie Lesen/Schreiben von OpenPrintTag-NFC-Tags.
+- **Update der Android-App**: Beim Start meldet ein Dialog die neue, auf GitHub veröffentlichte Version und bietet an, sie mit einem Tipp herunterzuladen und zu installieren (Prüfsumme wird kontrolliert).
 - **Werkstattmodus** im Vollbild für Tablet/Smartphone.
+
+{{img:android-update}}
 
 ## Fernzugriff
 - **Cloudflare Tunnel** (kostenlos, zufällige oder feste Adresse) oder eine **eigene Adresse** (Domainname, DynDNS, VPN, Tailscale …), um Cloudflare zu umgehen, mit Rückkehr zu Cloudflare per Klick.

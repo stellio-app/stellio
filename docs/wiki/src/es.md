@@ -358,10 +358,16 @@ Lista completa: [Ajustes y datos](es-Settings-and-Data).
 - Cola **«Imprimir pronto»**, reordenable y enviable al slicer.
 - **Renombrado masivo** (buscar/reemplazar, prefijo, sufijo, numeración) con vista previa.
 - **Deshacer eliminaciones** (`Ctrl+Z`) gracias a una papelera temporal de 5 minutos; vale también para etiquetas, proyectos y fuentes.
+- **Halo verde / rojo** alrededor de la miniatura: verde para un archivo ya impreso con éxito, rojo para una impresión fallida (vistas galería y detalles).
+- **Ya impreso** (menú ⋯ de un archivo): anote a mano una impresión hecha en otro sitio — elija la impresora, los ajustes (perfil del slicer) y la bobina, luego **Logrado** o **Fallido**. El archivo entra en los filtros «Ya logrado» / «Ya fallido» y su ficha (clic derecho) muestra impresora, ajustes y bobina.
 - Selección rápida: `Mayús+clic` para un rango, flechas + `Intro`.
 - **Detección de duplicados** (exactos y de geometría similar).
 - **Origen del modelo**: enlace de origen, autor, licencia, notas, fecha de descarga.
 - **Arrastrar y soltar** archivos 3D desde el explorador, también a través del navegador.
+
+{{img:library-halo}}
+
+{{img:already-printed}}
 
 ## Búsqueda
 - Búsqueda clásica y **búsqueda semántica por IA** («busco un soporte para…»), con las búsquedas recientes recordadas.
@@ -427,6 +433,9 @@ Los demás modelos que hablan el mismo protocolo suelen funcionar. Cuéntenos en
 - **Reimprimir como la última vez** desde el historial.
 - **Modo colaborativo ligero**: avisa si otro dispositivo está viendo el archivo o antes de un doble envío.
 - **Abrir en el slicer** desde «Mis G-codes».
+- **Slicer por impresora**: cada impresora puede tener su propio slicer por defecto (OrcaSlicer, QIDIStudio, Bambu Studio…). El envío lo usa con los perfiles (ajustes, filamento) asociados a esa impresora y la lista de perfiles se adapta.
+
+{{img:printer-slicer}}
 
 ## Durante la impresión
 - **Enchufe inteligente** (Shelly, Tasmota, Home Assistant): Stellio lee los vatios y registra el consumo real (kWh) y el coste.
@@ -568,7 +577,10 @@ Visible cuando está marcada la opción *Activar las funciones de costes, presup
 ## Móvil y tableta
 - **Código QR** de acceso móvil a la biblioteca (**PWA instalable**).
 - **App Android complementaria**: un código QR específico (Ajustes → acceso móvil) descarga el APK. Gestiona direcciones interna y externa con cambio automático, vinculación por QR, fotos directamente desde una impresión y lectura/escritura de etiquetas NFC OpenPrintTag.
+- **Actualización de la app Android**: al abrirla, una ventana avisa de la nueva versión publicada en GitHub y ofrece descargarla e instalarla con un toque (suma de comprobación verificada).
 - **Modo taller** a pantalla completa para tableta/móvil.
+
+{{img:android-update}}
 
 ## Acceso remoto
 - **Cloudflare Tunnel** (gratuito, dirección aleatoria o fija), o una **dirección personalizada** (nombre de dominio, DynDNS, VPN, Tailscale…) para evitar Cloudflare, con regreso a Cloudflare con un clic.

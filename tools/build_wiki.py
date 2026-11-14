@@ -44,28 +44,28 @@ CHANGELOG_INTRO = {
 ALL_LANGS = {'fr': 'Toutes les langues', 'en': 'All languages', 'de': 'Alle Sprachen', 'es': 'Todos los idiomas',
              'pt': 'Todos os idiomas', 'it': 'Tutte le lingue', 'zh': '所有语言', 'ja': 'すべての言語'}
 CAPTIONS = {
-    'fr': {'dashboard': 'Le tableau de bord', 'library': 'La bibliothèque', 'viewer': 'La visionneuse 3D', 'projects': 'Les projets',
+    'fr': {'already-printed': '« Déjà imprimé » : imprimante, réglages, bobine', 'library-halo': 'Halo vert (réussi) et rouge (raté) sur les miniatures', 'printer-slicer': 'Un slicer par imprimante', 'android-update': "Mise à jour de l'application Android", 'dashboard': 'Le tableau de bord', 'library': 'La bibliothèque', 'viewer': 'La visionneuse 3D', 'projects': 'Les projets',
            'printers': 'Les imprimantes', 'filament': "L'inventaire de filament et le bloc « Pesée et prévision »",
            'stats': 'Les statistiques', 'management': "L'écran « Gestion » (devis clients)", 'settings': 'Les réglages'},
-    'en': {'dashboard': 'The dashboard', 'library': 'The library', 'viewer': 'The 3D viewer', 'projects': 'Projects',
+    'en': {'already-printed': '“Already printed”: printer, settings, spool', 'library-halo': 'Green (success) and red (failed) halo on thumbnails', 'printer-slicer': 'One slicer per printer', 'android-update': 'Android app update', 'dashboard': 'The dashboard', 'library': 'The library', 'viewer': 'The 3D viewer', 'projects': 'Projects',
            'printers': 'Printers', 'filament': 'The filament inventory and the "Weighing and forecast" block',
            'stats': 'Statistics', 'management': 'The "Management" screen (client quotes)', 'settings': 'Settings'},
-    'de': {'dashboard': 'Das Dashboard', 'library': 'Die Bibliothek', 'viewer': 'Der 3D-Viewer', 'projects': 'Projekte',
+    'de': {'already-printed': '„Schon gedruckt“: Drucker, Einstellungen, Spule', 'library-halo': 'Grüner (Erfolg) und roter (Fehlschlag) Schimmer um die Vorschau', 'printer-slicer': 'Ein Slicer pro Drucker', 'android-update': 'Update der Android-App', 'dashboard': 'Das Dashboard', 'library': 'Die Bibliothek', 'viewer': 'Der 3D-Viewer', 'projects': 'Projekte',
            'printers': 'Drucker', 'filament': 'Der Filamentbestand und der Block „Wiegen und Prognose"',
            'stats': 'Statistiken', 'management': 'Der Bildschirm „Verwaltung" (Kundenangebote)', 'settings': 'Einstellungen'},
-    'es': {'dashboard': 'El panel de control', 'library': 'La biblioteca', 'viewer': 'El visor 3D', 'projects': 'Proyectos',
+    'es': {'already-printed': '«Ya impreso»: impresora, ajustes, bobina', 'library-halo': 'Halo verde (logrado) y rojo (fallido) en las miniaturas', 'printer-slicer': 'Un slicer por impresora', 'android-update': 'Actualización de la app Android', 'dashboard': 'El panel de control', 'library': 'La biblioteca', 'viewer': 'El visor 3D', 'projects': 'Proyectos',
            'printers': 'Impresoras', 'filament': 'El inventario de filamento y el bloque «Pesaje y previsión»',
            'stats': 'Estadísticas', 'management': 'La pantalla «Gestión» (presupuestos de clientes)', 'settings': 'Ajustes'},
-    'pt': {'dashboard': 'O painel', 'library': 'A biblioteca', 'viewer': 'O visualizador 3D', 'projects': 'Projetos',
+    'pt': {'already-printed': '«Já impresso»: impressora, definições, bobina', 'library-halo': 'Halo verde (sucesso) e vermelho (falhou) nas miniaturas', 'printer-slicer': 'Um slicer por impressora', 'android-update': 'Atualização da app Android', 'dashboard': 'O painel', 'library': 'A biblioteca', 'viewer': 'O visualizador 3D', 'projects': 'Projetos',
            'printers': 'Impressoras', 'filament': 'O inventário de filamento e o bloco «Pesagem e previsão»',
            'stats': 'Estatísticas', 'management': 'O ecrã «Gestão» (orçamentos de clientes)', 'settings': 'Definições'},
-    'it': {'dashboard': 'La dashboard', 'library': 'La libreria', 'viewer': 'Il visualizzatore 3D', 'projects': 'Progetti',
+    'it': {'already-printed': '«Già stampato»: stampante, impostazioni, bobina', 'library-halo': 'Alone verde (riuscita) e rosso (fallita) sulle miniature', 'printer-slicer': 'Uno slicer per stampante', 'android-update': "Aggiornamento dell'app Android", 'dashboard': 'La dashboard', 'library': 'La libreria', 'viewer': 'Il visualizzatore 3D', 'projects': 'Progetti',
            'printers': 'Stampanti', 'filament': "L'inventario dei filamenti e il blocco «Pesatura e previsione»",
            'stats': 'Statistiche', 'management': 'La schermata «Gestione» (preventivi clienti)', 'settings': 'Impostazioni'},
-    'zh': {'dashboard': '仪表盘', 'library': '资料库', 'viewer': '3D 查看器', 'projects': '项目',
+    'zh': {'already-printed': '“已打印”：打印机、设置、线材盘', 'library-halo': '缩略图上的绿色（成功）和红色（失败）光晕', 'printer-slicer': '每台打印机一个切片软件', 'android-update': 'Android 应用更新', 'dashboard': '仪表盘', 'library': '资料库', 'viewer': '3D 查看器', 'projects': '项目',
            'printers': '打印机', 'filament': '耗材库存和“耗材称重与预测”模块',
            'stats': '统计', 'management': '“管理”界面（客户报价）', 'settings': '设置'},
-    'ja': {'dashboard': 'ダッシュボード', 'library': 'ライブラリ', 'viewer': '3D ビューアー', 'projects': 'プロジェクト',
+    'ja': {'already-printed': '「印刷済み」：プリンター・設定・スプール', 'library-halo': 'サムネイルの緑（成功）と赤（失敗）のハロー', 'printer-slicer': 'プリンターごとのスライサー', 'android-update': 'Android アプリの更新', 'dashboard': 'ダッシュボード', 'library': 'ライブラリ', 'viewer': '3D ビューアー', 'projects': 'プロジェクト',
            'printers': 'プリンター', 'filament': 'フィラメント在庫と「フィラメントの計量と予測」ブロック',
            'stats': '統計', 'management': '「管理」画面（顧客向け見積）', 'settings': '設定'},
 }
@@ -132,9 +132,9 @@ def check():
             ub = sorted(x for x in re.findall(r'https?://[^\s)>]+', b) if '<' not in x)
             if ua != ub:
                 errs.append(f'{lang}/{s}: URLs différentes')
-            if re.findall(r'\{\{img:\w+\}\}', a) != re.findall(r'\{\{img:\w+\}\}', b):
+            if re.findall(r'\{\{img:[\w-]+\}\}', a) != re.findall(r'\{\{img:[\w-]+\}\}', b):
                 errs.append(f'{lang}/{s}: captures {{img:…}} différentes')
-            for name in re.findall(r'\{\{img:(\w+)\}\}', b):
+            for name in re.findall(r'\{\{img:([\w-]+)\}\}', b):
                 if not find_image(lang, name):
                     errs.append(f'{lang}/{s}: capture introuvable « {name} »')
                 if name not in CAPTIONS[lang]:
@@ -180,7 +180,7 @@ def build(out_dir):
                 url = f'https://raw.githubusercontent.com/wiki/{REPO}/images/{ver}/{lg}/{name}.png'
                 cap = CAPTIONS[lang].get(name, name)
                 return f'\n\n[![{cap}]({url})]({url})\n\n'
-            body = re.sub(r'\n*\{\{img:(\w+)\}\}\n*', img, body)
+            body = re.sub(r'\n*\{\{img:([\w-]+)\}\}\n*', img, body)
             body = re.sub(r'\n{3,}', '\n\n', body)
             nav = ' · '.join(f'**{titles[x]}**' if x == slug else f'[{titles[x]}]({lang}-{x})' for x in nav_pages)
             foot = ' · '.join(f'[{fl} {nm}]({c}-{slug})' for c, nm, fl in LANGS if c != lang)
@@ -193,7 +193,7 @@ def build(out_dir):
             '<h3 align="center">The ultimate 3D file manager for makers and 3D printer owners</h3>\n\n'
             '<p align="center">Library · printers · spools · costs · AI, all local.</p>\n\n'
             '### 👇 Choose your language\n\n| Language | Start here |\n|---|---|\n' + rows
-            + f'\n\n**[⬇️ Download](https://github.com/{REPO}/releases)** · **[▶ Online demo](https://demo.stellio-app.com)**'
+            + f'\n\n**[📖 Documentation](https://stellio-app.com/docs/)** · **[⬇️ Download](https://github.com/{REPO}/releases)** · **[▶ Online demo](https://demo.stellio-app.com)**'
               f' · **[🌐 stellio-app.com](https://stellio-app.com)** · **[💬 Discord](https://discord.gg/ySxpHvS6bd)**\n')
     open(os.path.join(out_dir, 'Home.md'), 'w', encoding='utf-8', newline='\n').write(home)
     side = ('### 🌍 Stellio\n\n' + '\n'.join(f'- {fl} [{nm}]({c}-Home)' for c, nm, fl in LANGS)

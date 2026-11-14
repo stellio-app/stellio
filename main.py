@@ -13575,6 +13575,92 @@ def _sync_print_success_links(conn, user_id, file_path, was_success, is_success)
         f"(SELECT project_id FROM project_files WHERE file_path IN ({ph}))", (user_id,) + vals)
 
 
+@app.route('/api/print-history/manual', methods=['POST'])
+@login_required
+def api_manual_print_history():
+    """« Déjà imprimé » : enregistre à la main une impression passée (imprimante, réglages, bobine, résultat)."""
+    data = request.json or {}
+    file_path = (data.get('path') or '').strip()
+    result = data.get('result')
+    if not file_path:
+        return jsonify({"error": "path requis"}), 400
+    if result not in ('success', 'failed'):
+        return jsonify({"error": "result doit être 'success' ou 'failed'"}), 400
+    norm = file_path.replace('\\', '/')
+    try:
+        printer_id = int(data['printer_id']) if data.get('printer_id') not in (None, '') else None
+    except (TypeError, ValueError):
+        printer_id = None
+    profile_id = str(data.get('slicer_profile_id') or '')[:200]
+    profile_name = (data.get('slicer_profile_name') or '').strip()[:200]
+    spool = data.get('spool') if isinstance(data.get('spool'), dict) else {}
+    s_type = (str(spool.get('source_type') or '').strip()[:40]) or None
+    s_id = (str(spool.get('source_id') if spool.get('source_id') is not None else '').strip()[:100]) or None
+    s_label = (spool.get('name') or '').strip()[:200] or None
+    s_mat = (spool.get('material') or '').strip()[:60] or None
+    snapshot = json.dumps({'source_type': s_type or '', 'source_id': s_id or '', 'name': s_label or '',
+                           'material': s_mat or '', 'color_hex': spool.get('color_hex') or '', 'manual': True}) if s_type else None
+    spool_id = None
+    if s_type == 'spoolman' and s_id:
+        try:
+            spool_id = int(s_id)
+        except (TypeError, ValueError):
+            spool_id = None
+    try:
+        conn = get_db()
+        try:
+            if printer_id is not None:
+                ok = conn.execute("SELECT 1 FROM printers WHERE id=? AND user_id=?", (printer_id, session['user_id'])).fetchone()
+                if not ok:
+                    printer_id = None
+            prev_success = conn.execute(
+                "SELECT 1 FROM print_history WHERE user_id=? AND file_path=? AND result='success' LIMIT 1",
+                (session['user_id'], norm)).fetchone() is not None
+            real = file_path if os.path.exists(file_path) else norm
+            cur = conn.execute(
+                """INSERT INTO print_history (user_id, file_path, file_name, file_size, file_ext, slicer, source_platform,
+                       spool_id, slicer_profile_id, slicer_profile_name, printer_id, filament_material, filament_label,
+                       spool_source_type, spool_source_id, assignment_json, result, rated_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)""",
+                (session['user_id'], norm, os.path.basename(norm),
+                 os.path.getsize(real) if os.path.exists(real) else 0,
+                 os.path.splitext(norm)[1].lower(), 'manual', detect_platform_from_path(norm),
+                 spool_id, profile_id, profile_name, printer_id, s_mat, s_label, s_type, s_id, snapshot, result))
+            try:
+                _sync_print_success_links(conn, session['user_id'], norm, prev_success, prev_success or result == 'success')
+            except Exception as link_err:
+                app_logger.warning(f"[PrintHistory] Synchronisation projets/file d'attente échouée: {link_err}")
+            conn.commit()
+            entry_id = cur.lastrowid
+        finally:
+            conn.close()
+        return jsonify({"success": True, "id": entry_id}), 200
+    except Exception as e:
+        app_logger.error(f"[PrintHistory] Ajout manuel échoué: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+
+@app.route('/api/print-history/by-file', methods=['GET'])
+@login_required
+def api_print_history_by_file():
+    """Impressions déjà enregistrées pour un fichier (utilisé par la fiche du fichier)."""
+    path = (request.args.get('path') or '').strip()
+    if not path:
+        return jsonify({"history": []}), 200
+    norm = path.replace('\\', '/')
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """SELECT id, sent_at, result, slicer, slicer_profile_name, printer_id, filament_material, filament_label,
+                      (SELECT p.name FROM printers p WHERE p.id = print_history.printer_id) AS printer_name
+               FROM print_history WHERE user_id=? AND (file_path=? OR file_path=?)
+               ORDER BY sent_at DESC LIMIT 20""",
+            (session['user_id'], norm, path)).fetchall()
+    finally:
+        conn.close()
+    return jsonify({"history": [dict(r) for r in rows]}), 200
+
+
 @app.route('/api/print-history/<int:entry_id>/rate', methods=['POST'])
 @login_required
 def api_rate_print_history(entry_id):
@@ -22668,7 +22754,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.0.8"
+CURRENT_VERSION = "1.0.9"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 

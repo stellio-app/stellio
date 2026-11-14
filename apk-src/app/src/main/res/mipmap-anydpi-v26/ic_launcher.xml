@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- logo Stellio plein cadre (drawable-nodpi/ic_foreground.png, 432 px) : l'emblème reste dans la zone sûre de 66 dp -->
     <background android:drawable="@color/icon_bg" />
     <foreground android:drawable="@drawable/ic_foreground" />
 </adaptive-icon>

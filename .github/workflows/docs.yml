@@ -1,0 +1,36 @@
+name: docs
+# Génère le site de documentation (8 langues, façon docs.frigate.video) et le publie comme artefact téléchargeable.
+# À déposer ensuite dans le dossier /docs/ du site stellio-app.com (base d'URL : /docs/).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/wiki/**'
+      - 'changelog.json'
+      - 'tools/build_docs.py'
+      - 'tools/build_wiki.py'
+      - '.github/workflows/docs.yml'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install markdown
+      - name: Contrôle de la structure (8 langues)
+        run: python tools/build_wiki.py --check
+      - name: Génération du site de documentation
+        run: python tools/build_docs.py --out docs-out --base /docs/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docs-site
+          path: docs-out
+          retention-days: 30

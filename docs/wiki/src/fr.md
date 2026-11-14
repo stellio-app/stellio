@@ -358,10 +358,16 @@ Liste complète : [Réglages et données](fr-Settings-and-Data).
 - **File « À imprimer bientôt »**, réordonnable, envoyable au slicer.
 - **Renommage en masse** (rechercher/remplacer, préfixe, suffixe, numérotation) avec aperçu.
 - **Annuler une suppression** (`Ctrl+Z`) grâce à une corbeille temporaire de 5 minutes ; vaut aussi pour étiquettes, projets et sources.
+- **Halo vert / rouge** autour de la miniature : vert pour un fichier déjà imprimé avec succès, rouge pour une impression ratée (vues galerie et détails).
+- **Déjà imprimé** (menu ⋯ d'un fichier) : notez à la main une impression faite ailleurs — choisissez l'imprimante, les réglages (profil du slicer), la bobine, puis **Réussi** ou **Raté**. Le fichier rejoint les filtres « Déjà réussi » / « Déjà raté » et sa fiche (clic droit) affiche l'imprimante, les réglages et la bobine.
 - Sélection rapide : `Maj+clic` pour une plage, flèches + `Entrée`.
 - **Détection de doublons** (exacts et de géométrie proche).
 - **Origine du modèle** : lien source, auteur, licence, notes, date de téléchargement.
 - **Glisser-déposer** de fichiers 3D depuis l'explorateur, y compris via navigateur.
+
+{{img:library-halo}}
+
+{{img:already-printed}}
 
 ## Recherche
 - Recherche classique et **recherche sémantique par IA** (« je cherche un support pour… »), avec recherches récentes mémorisées.
@@ -427,6 +433,9 @@ Les autres modèles qui parlent le même protocole fonctionnent en général. Di
 - **Réimprimer comme la dernière fois** depuis l'historique.
 - **Mode collaboratif léger** : prévient si un autre appareil regarde le fichier ou avant un double envoi.
 - **Ouvrir dans le slicer** depuis « Mes G-codes ».
+- **Slicer par imprimante** : chaque imprimante peut avoir son propre slicer par défaut (OrcaSlicer, QIDIStudio, Bambu Studio…). L'envoi l'utilise avec les profils (réglages, filament) rattachés à cette imprimante, et la liste des profils s'adapte.
+
+{{img:printer-slicer}}
 
 ## Pendant l'impression
 - **Prise connectée** (Shelly, Tasmota, Home Assistant) : Stellio lit les watts, enregistre la consommation réelle (kWh) et le coût.
@@ -568,7 +577,10 @@ Visible quand l'option *Activer les fonctions de coût, devis et facturation* es
 ## Téléphone et tablette
 - **QR code** d'accès mobile à la bibliothèque (**PWA installable**).
 - **Application Android compagnon** : un QR code dédié (Réglages → accès mobile) permet de télécharger l'APK. Elle gère adresse interne et externe avec bascule automatique, liaison par QR, photos directement depuis une impression, et lecture/écriture d'étiquettes NFC OpenPrintTag.
+- **Mise à jour de l'application Android** : à l'ouverture, une fenêtre signale la nouvelle version publiée sur GitHub et propose de la télécharger et de l'installer en un geste (somme de contrôle vérifiée).
 - **Mode atelier** plein écran pour tablette/téléphone.
+
+{{img:android-update}}
 
 ## Accès à distance
 - **Cloudflare Tunnel** (gratuit, adresse aléatoire ou fixe), ou **adresse personnalisée** (nom de domaine, DynDNS, VPN, Tailscale…) pour éviter Cloudflare, avec retour à Cloudflare en un clic.

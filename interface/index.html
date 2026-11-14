@@ -226,145 +226,159 @@
     <div id="app-screen" class="app-screen hidden">
         <div id="sidebar-overlay" class="sidebar-overlay"></div>
         <aside class="sidebar" id="app-sidebar">
+            <div class="sidebar-rail" id="sidebar-rail" role="toolbar" aria-orientation="vertical">
+                <button type="button" class="rail-btn" data-rail-click='.nav-btn[data-page="dashboard"]' data-rail-page="dashboard"><i class="fa-solid fa-gauge-high"></i><span data-i18n="nav.cat_home">Accueil</span></button>
+                <button type="button" class="rail-btn" data-rail="library" aria-expanded="false"><i class="fa-solid fa-layer-group"></i><span data-i18n="nav.library">Bibliothèque</span><i class="fa-solid fa-chevron-right rail-caret"></i></button>
+                <button type="button" class="rail-btn" data-rail="print" aria-expanded="false"><i class="fa-solid fa-print"></i><span data-i18n="nav.cat_print">Impression</span><i class="fa-solid fa-chevron-right rail-caret"></i></button>
+                <button type="button" class="rail-btn" data-rail="filament" aria-expanded="false"><i class="fa-solid fa-circle-nodes"></i><span data-i18n="nav.cat_filament">Filament</span><i class="fa-solid fa-chevron-right rail-caret"></i></button>
+                <button type="button" class="rail-btn" data-rail="tools" aria-expanded="false"><i class="fa-solid fa-screwdriver-wrench"></i><span data-i18n="nav.cat_tools">Outils</span><i class="fa-solid fa-chevron-right rail-caret"></i></button>
+                <button type="button" class="rail-btn" data-rail="track" aria-expanded="false"><i class="fa-solid fa-chart-pie"></i><span data-i18n="nav.cat_track">Suivi</span><i class="fa-solid fa-chevron-right rail-caret"></i></button>
+                <div class="rail-spacer"></div>
+                <button type="button" class="rail-btn" data-rail-click="#nav-workshop-btn"><i class="fa-solid fa-tablet-screen-button"></i><span data-i18n="nav.workshop">Mode atelier</span></button>
+                <button type="button" class="rail-btn" data-rail="help" aria-expanded="false"><i class="fa-solid fa-circle-question"></i><span data-i18n="nav.cat_help">Aide</span><i class="fa-solid fa-chevron-right rail-caret"></i></button>
+                <button type="button" class="rail-btn" data-rail-click="#nav-check-update-btn" data-i18n-title="update.check_button" title="Vérifier les mises à jour"><i class="fa-solid fa-rotate"></i><span data-i18n="nav.cat_update">Mises à jour</span></button>
+                <button type="button" class="rail-btn" data-rail-click='.nav-btn[data-page="settings"]' data-rail-page="settings"><i class="fa-solid fa-gear"></i><span data-i18n="nav.settings">Paramètres</span></button>
+            </div>
             <div class="sidebar-header">
                 <img src="assets/logo-stellio.png" alt="Stellio Logo" class="stellio-logo-img">
                 <span><img src="assets/nom-stellio.png" alt="Stellio Logo" class="stellio-nom-img"></span>
             </div>
             <nav class="sidebar-nav">
-                <button class="nav-btn active" data-page="dashboard" data-icon="fa-gauge-high" data-title-key="nav.dashboard">
+                <div class="sidebar-panel-title" id="sidebar-panel-title"></div>
+                <button class="nav-btn active" data-page="dashboard" data-icon="fa-gauge-high" data-title-key="nav.dashboard" data-cat="home">
                     <i class="fa-solid fa-gauge-high"></i>
                     <span data-i18n="nav.dashboard">Tableau de bord</span>
                 </button>
                 <div class="sidebar-nav-separator" role="separator"></div>
                 <div class="sidebar-nav-scroll">
-                <button class="nav-btn" data-page="library" data-icon="fa-layer-group" data-title-key="nav.library">
+                <button class="nav-btn" data-page="library" data-icon="fa-layer-group" data-title-key="nav.library" data-cat="library">
                     <i class="fa-solid fa-layer-group"></i>
                     <span data-i18n="nav.library">Bibliothèque</span>
                 </button>
-                <button class="nav-btn" id="nav-acct-likes-btn" data-page="acct-likes" data-icon="fa-heart" data-title-key="nav.acct_likes" style="display:none;">
+                <button class="nav-btn" id="nav-acct-likes-btn" data-page="acct-likes" data-icon="fa-heart" data-title-key="nav.acct_likes" style="display:none;" data-cat="library">
                     <i class="fa-solid fa-heart"></i>
                     <span data-i18n="nav.acct_likes">Mes likes</span>
                     <span class="badge acct-count" style="margin-left:auto;background:var(--bg-tertiary);color:var(--text-secondary);padding:2px 8px;border-radius:12px;font-size:calc(11px * var(--fs, 1));">0</span>
                 </button>
-                <button class="nav-btn" id="nav-acct-creations-btn" data-page="acct-creations" data-icon="fa-pen-ruler" data-title-key="nav.acct_creations" style="display:none;">
+                <button class="nav-btn" id="nav-acct-creations-btn" data-page="acct-creations" data-icon="fa-pen-ruler" data-title-key="nav.acct_creations" style="display:none;" data-cat="library">
                     <i class="fa-solid fa-pen-ruler"></i>
                     <span data-i18n="nav.acct_creations">Mes créations</span>
                     <span class="badge acct-count" style="margin-left:auto;background:var(--bg-tertiary);color:var(--text-secondary);padding:2px 8px;border-radius:12px;font-size:calc(11px * var(--fs, 1));">0</span>
                 </button>
                 <div id="reorderable-nav-items">
-				<button class="nav-btn" data-page="stats" data-nav-id="stats" data-icon="fa-chart-pie" data-title-key="nav.stats">
+				<button class="nav-btn" data-page="stats" data-nav-id="stats" data-icon="fa-chart-pie" data-title-key="nav.stats" data-cat="track">
 				    <i class="fa-solid fa-chart-pie"></i>
 				    <span data-i18n="nav.stats">Statistiques</span>
 				</button>
-				<button class="nav-btn" data-page="projects" data-nav-id="projects" data-icon="fa-diagram-project" data-title-key="nav.projects">
+				<button class="nav-btn" data-page="projects" data-nav-id="projects" data-icon="fa-diagram-project" data-title-key="nav.projects" data-cat="print">
 					<i class="fa-solid fa-diagram-project"></i>
 					<span data-i18n="nav.projects">Projets</span>
 				</button>
-				<button class="nav-btn" data-page="print-queue" data-nav-id="print-queue" data-icon="fa-list-ol" data-title-key="nav.print_queue">
+				<button class="nav-btn" data-page="print-queue" data-nav-id="print-queue" data-icon="fa-list-ol" data-title-key="nav.print_queue" data-cat="print">
 					<i class="fa-solid fa-list-ol"></i>
 					<span data-i18n="nav.print_queue">À imprimer bientôt</span>
 					<span class="badge" id="print-queue-count" style="display:none;">0</span>
 				</button>
-				<button class="nav-btn commercial-only" data-page="management" data-nav-id="management" data-icon="fa-briefcase" data-title-key="nav.management">
+				<button class="nav-btn commercial-only" data-page="management" data-nav-id="management" data-icon="fa-briefcase" data-title-key="nav.management" data-cat="track">
 					<i class="fa-solid fa-briefcase"></i>
 					<span data-i18n="nav.management">Gestion</span>
 				</button>
-				<button class="nav-btn" data-page="history" data-nav-id="history" data-icon="fa-clock-rotate-left" data-title-key="nav.history">
+				<button class="nav-btn" data-page="history" data-nav-id="history" data-icon="fa-clock-rotate-left" data-title-key="nav.history" data-cat="print">
 				    <i class="fa-solid fa-clock-rotate-left"></i>
 				    <span data-i18n="nav.history">Historique</span>
 				    <span class="badge" id="history-count" style="display:none;">0</span>
 				</button>
-				<button class="nav-btn" data-page="gallery" data-nav-id="gallery" data-icon="fa-camera" data-title-key="nav.gallery">
+				<button class="nav-btn" data-page="gallery" data-nav-id="gallery" data-icon="fa-camera" data-title-key="nav.gallery" data-cat="library">
 				    <i class="fa-solid fa-camera"></i>
 				    <span data-i18n="nav.gallery">Galerie</span>
 				</button>
-                <button class="nav-btn" id="nav-favorites-btn" data-nav-id="favorites" onclick="toggleFavoritesFilterFromNav()">
+                <button class="nav-btn" id="nav-favorites-btn" data-nav-id="favorites" onclick="toggleFavoritesFilterFromNav()" data-cat="library">
                     <i class="fa-solid fa-star"></i>
                     <span data-i18n="nav.favorites">Favoris</span>
                     <span class="badge" id="favorites-count" style="margin-left: auto; background: var(--accent); color: white; padding: 2px 8px; border-radius: 12px; font-size: calc(11px * var(--fs, 1)); display: none;">0</span>
                     <span class="badge" id="favorites-restock-badge" data-i18n-title="favorites.restock_warning_title" title="Stock de filament insuffisant pour un ou plusieurs favoris" style="background: var(--danger); color: white; padding: 2px 8px; border-radius: 12px; font-size: calc(11px * var(--fs, 1)); display: none;">0</span>
                 </button>
 
-                <button class="nav-btn" data-nav-id="filters" onclick="openFiltersModal()" style="cursor: pointer;">
+                <button class="nav-btn" data-nav-id="filters" onclick="openFiltersModal()" style="cursor: pointer;" data-cat="library">
                     <i class="fa-solid fa-filter"></i>
                     <span data-i18n="nav.filters">Filtres</span>
                 </button>
-                <button class="nav-btn" data-nav-id="download" onclick="openDownloadModal()" style="cursor: pointer;">
+                <button class="nav-btn" data-nav-id="download" onclick="openDownloadModal()" style="cursor: pointer;" data-cat="library">
                     <i class="fa-solid fa-cloud-arrow-down"></i>
                     <span data-i18n="nav.download">Télécharger</span>
                 </button>
-				<button class="nav-btn desktop-only-nav" data-nav-id="repair" data-page="repair" data-titleKey="nav.repair" data-icon="fa-screwdriver-wrench">
+				<button class="nav-btn desktop-only-nav" data-nav-id="repair" data-page="repair" data-titleKey="nav.repair" data-icon="fa-screwdriver-wrench" data-cat="tools">
 				  <i class="fa-solid fa-screwdriver-wrench"></i>
 				  <span data-i18n="nav.repair">Réparation</span>
 				  <span class="badge" id="repair-count" style="display:none;">0</span>
 				</button>
-				<button class="nav-btn desktop-only-nav" data-nav-id="converter" data-page="converter" data-icon="fa-file-export">
+				<button class="nav-btn desktop-only-nav" data-nav-id="converter" data-page="converter" data-icon="fa-file-export" data-cat="tools">
 				  <i class="fa-solid fa-file-export"></i>
 				  <span data-i18n="nav.converter">Convertisseur</span>
 				</button>
-				<button class="nav-btn" data-nav-id="duplicates" onclick="openDuplicatesModal()" style="cursor:pointer;">
+				<button class="nav-btn" data-nav-id="duplicates" onclick="openDuplicatesModal()" style="cursor:pointer;" data-cat="library">
 				  <i class="fa-solid fa-copy"></i>
 				  <span data-i18n="nav.duplicates">Doublons</span>
 				</button>
-				<button class="nav-btn" data-nav-id="sosprint" data-page="sosprint" data-title-key="nav.sosprint" data-icon="fa-kit-medical">
+				<button class="nav-btn" data-nav-id="sosprint" data-page="sosprint" data-title-key="nav.sosprint" data-icon="fa-kit-medical" data-cat="print">
 				  <i class="fa-solid fa-kit-medical"></i>
 				  <span data-i18n="nav.sosprint">S.O.S print</span>
 				</button>
-				<button class="nav-btn" data-nav-id="printers" data-page="printers" data-title-key="nav.printers" data-icon="fa-print">
+				<button class="nav-btn" data-nav-id="printers" data-page="printers" data-title-key="nav.printers" data-icon="fa-print" data-cat="print">
 					<i class="fa-solid fa-print"></i>
 					<span data-i18n="nav.printers">Imprimantes</span>
 				</button>
-				<button class="nav-btn" data-nav-id="spoolman" data-page="spoolman" data-title-key="nav.spoolman" data-icon="fa-circle-nodes">
+				<button class="nav-btn" data-nav-id="spoolman" data-page="spoolman" data-title-key="nav.spoolman" data-icon="fa-circle-nodes" data-cat="filament">
 					<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="22"/><line x1="2" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="22" y2="12"/></svg>
 					<span data-i18n="nav.spoolman">Inventaire filament</span>
 				</button>
                 </div>
                 </div>
                 <div class="nav-about-spacer">
-					<button class="nav-btn viewer-hide" id="nav-trash-btn" onclick="openTrashModal()">
+					<button class="nav-btn viewer-hide" id="nav-trash-btn" onclick="openTrashModal()" data-cat="library">
 						<i class="fa-solid fa-trash-can-arrow-up"></i>
 						<span data-i18n="nav.trash">Corbeille</span>
 						<span class="badge" id="trash-count" style="display:none;">0</span>
 					</button>
-					<button class="nav-btn" id="nav-workshop-btn" onclick="openWorkshopMode()" data-i18n-title="workshop.hint" title="Affichage plein écran des imprimantes, pensé pour tablette et téléphone">
+					<button class="nav-btn" id="nav-workshop-btn" onclick="openWorkshopMode()" data-i18n-title="workshop.hint" title="Affichage plein écran des imprimantes, pensé pour tablette et téléphone" data-cat="print">
 						<i class="fa-solid fa-tablet-screen-button"></i>
 						<span data-i18n="nav.workshop">Mode atelier</span>
 					</button>
-					<button class="nav-btn hidden" id="pwa-install-btn" onclick="installStellioApp()" data-i18n-title="pwa.install_hint" title="Installer Stellio comme application sur cet appareil">
+					<button class="nav-btn hidden" id="pwa-install-btn" onclick="installStellioApp()" data-i18n-title="pwa.install_hint" title="Installer Stellio comme application sur cet appareil" data-cat="help">
 						<i class="fa-solid fa-download"></i>
 						<span data-i18n="pwa.install">Installer l'application</span>
 					</button>
-					<button class="nav-btn" id="nav-check-update-btn" onclick="manualCheckUpdate()" data-i18n-title="update.check_button" title="Vérifier les mises à jour">
+					<button class="nav-btn" id="nav-check-update-btn" onclick="manualCheckUpdate()" data-i18n-title="update.check_button" title="Vérifier les mises à jour" data-cat="update">
 						<i class="fa-solid fa-arrows-rotate"></i>
 						<span data-i18n="nav.check_update">Mises à jour</span>
 						<span id="update-available-dot" class="badge hidden" style="background:var(--success);">!</span>
 					</button>
-                    <button class="nav-btn" onclick="openLinksModal()" style="cursor: pointer;">
+                    <button class="nav-btn" onclick="openLinksModal()" style="cursor: pointer;" data-cat="help">
                         <i class="fa-solid fa-link"></i>
                         <span data-i18n="nav.partners">Liens utiles</span>
                     </button>
-                    <a class="nav-btn" id="nav-discord-link" href="https://discord.gg/ySxpHvS6bd" target="_blank" rel="noopener noreferrer">
+                    <a class="nav-btn" id="nav-discord-link" href="https://discord.gg/ySxpHvS6bd" target="_blank" rel="noopener noreferrer" data-cat="help">
                         <i class="fa-brands fa-discord"></i>
                         <span data-i18n="nav.discord">Discord</span>
                     </a>
-                    <a class="nav-btn" id="nav-wiki-link" href="https://github.com/stellio-app/stellio/wiki" target="_blank" rel="noopener noreferrer">
+                    <a class="nav-btn" id="nav-wiki-link" href="https://stellio-app.com/docs/" target="_blank" rel="noopener noreferrer" data-cat="help">
                         <i class="fa-solid fa-book-open"></i>
                         <span data-i18n="nav.wiki">Wiki</span>
                     </a>
-                    <a class="nav-btn" data-nav-id="github" href="https://github.com/stellio-app/stellio" target="_blank" rel="noopener noreferrer">
+                    <a class="nav-btn" data-nav-id="github" href="https://github.com/stellio-app/stellio" target="_blank" rel="noopener noreferrer" data-cat="help">
                         <i class="fa-brands fa-github"></i>
                         <span data-i18n="nav.github">GitHub</span>
                     </a>
-                    <button class="nav-btn" id="nav-feedback-btn" onclick="openFeedbackModal()" style="cursor: pointer;">
+                    <button class="nav-btn" id="nav-feedback-btn" onclick="openFeedbackModal()" style="cursor: pointer;" data-cat="help">
                         <i class="fa-solid fa-comment-dots"></i>
                         <span data-i18n="nav.feedback">Suggestions &amp; bugs</span>
                         <span id="feedback-unread-dot" class="badge hidden" style="background:var(--accent);">0</span>
                     </button>
-                    <button class="nav-btn" onclick="openModal('modal-about')" style="cursor: pointer;">
+                    <button class="nav-btn" onclick="openModal('modal-about')" style="cursor: pointer;" data-cat="help">
                         <i class="fa-solid fa-circle-info"></i>
                         <span data-i18n="nav.about">À propos de</span>
                     </button>
-                    <button class="nav-btn mobile-hidden-nav" data-page="settings" data-icon="fa-gear" data-title-key="nav.settings">
+                    <button class="nav-btn mobile-hidden-nav" data-page="settings" data-icon="fa-gear" data-title-key="nav.settings" data-cat="settings">
                         <i class="fa-solid fa-gear"></i>
                         <span data-i18n="nav.settings">Paramètres</span>
                     </button>
@@ -4607,6 +4621,40 @@
 		</div>
 	</div>
 
+    <div id="modal-already-printed" class="modal hidden">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-circle-check"></i> <span data-i18n="printed.title">Déjà imprimé</span></h3>
+                <button class="modal-close" onclick="closeModal('modal-already-printed')" aria-label="Fermer" data-i18n-aria="actions.close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="ap-file-name" style="font-size:calc(12px * var(--fs, 1)); color:var(--text-muted); margin:0 0 12px; word-break:break-all;"></p>
+                <div style="margin-bottom:10px;">
+                    <label for="ap-printer-select" class="ap-label" data-i18n="printed.printer">Imprimante</label>
+                    <select id="ap-printer-select" class="settings-select" style="width:100%; max-width:none;">
+                        <option value="" data-i18n="printed.none">— Non précisé —</option>
+                    </select>
+                </div>
+                <div style="margin-bottom:10px;">
+                    <label for="ap-profile-select" class="ap-label" data-i18n="printed.settings">Réglages</label>
+                    <select id="ap-profile-select" class="settings-select" style="width:100%; max-width:none;">
+                        <option value="" data-i18n="printed.none">— Non précisé —</option>
+                    </select>
+                </div>
+                <div style="margin-bottom:14px;">
+                    <label for="ap-spool-select" class="ap-label" data-i18n="printed.spool">Bobine</label>
+                    <select id="ap-spool-select" class="settings-select" style="width:100%; max-width:none;">
+                        <option value="" data-i18n="printed.none">— Non précisé —</option>
+                    </select>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" class="btn ap-btn-success" id="ap-success-btn" style="flex:1; justify-content:center;"><i class="fa-solid fa-circle-check"></i> <span data-i18n="printed.success">Réussi</span></button>
+                    <button type="button" class="btn ap-btn-failed" id="ap-failed-btn" style="flex:1; justify-content:center;"><i class="fa-solid fa-circle-xmark"></i> <span data-i18n="printed.failed">Raté</span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-file-actions" class="modal hidden">
         <div class="modal-content small">
             <div class="modal-header">
@@ -4663,6 +4711,11 @@
                 <button class="file-action-row" id="ctx-queue-btn">
                     <span class="file-action-icon"><i class="fa-solid fa-list-ol"></i></span>
                     <span class="file-action-label" id="ctx-queue-label" data-i18n="queue.add_action">Ajouter à imprimer bientôt</span>
+                    <i class="fa-solid fa-chevron-right file-action-arrow"></i>
+                </button>
+                <button class="file-action-row" id="ctx-printed-btn">
+                    <span class="file-action-icon"><i class="fa-solid fa-circle-check"></i></span>
+                    <span class="file-action-label" data-i18n="printed.action">Déjà imprimé</span>
                     <i class="fa-solid fa-chevron-right file-action-arrow"></i>
                 </button>
                 <button class="file-action-row" id="ctx-rename-btn">
