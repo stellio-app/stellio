@@ -215,6 +215,7 @@ Ya seas un maker principiante o un usuario experimentado con varias máquinas, S
 | ![Estadísticas de la biblioteca](../../images/statistics.png) *Estadísticas de la biblioteca* | ![Tarifas de impresión: electricidad, desgaste, margen](../../images/print-pricing.png) *Tarifas de impresión: electricidad, desgaste, margen* |
 | ![Biblioteca con miniaturas](../../images/library.png) *Biblioteca con miniaturas* | ![Monitorización de impresoras](../../images/monitoring.png) *Monitorización de impresoras* |
 | ![Recomendación de perfil por IA](../../images/slicer.png) *Recomendación de perfil por IA* | ![Nesting automático](../../images/nesting.png) *Nesting automático* |
+| ![Detección de duplicados](../../images/duplicates.png) *Detección de duplicados* | ![Filtros avanzados](../../images/filters.png) *Filtros avanzados* |
 
 ---
 

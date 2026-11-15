@@ -215,6 +215,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 | ![Bibliotheksstatistiken](../../images/statistics.png) *Bibliotheksstatistiken* | ![Druckpreise: Strom, Verschleiß, Aufschlag](../../images/print-pricing.png) *Druckpreise: Strom, Verschleiß, Aufschlag* |
 | ![Bibliothek mit Vorschaubildern](../../images/library.png) *Bibliothek mit Vorschaubildern* | ![Drucker-Überwachung](../../images/monitoring.png) *Drucker-Überwachung* |
 | ![KI-Profilempfehlung](../../images/slicer.png) *KI-Profilempfehlung* | ![Automatisches Nesting](../../images/nesting.png) *Automatisches Nesting* |
+| ![Doppelte erkennen](../../images/duplicates.png) *Doppelte erkennen* | ![Erweiterte Filter](../../images/filters.png) *Erweiterte Filter* |
 
 ---
 

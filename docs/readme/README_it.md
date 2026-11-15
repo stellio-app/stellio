@@ -215,6 +215,7 @@ Che tu sia un maker alle prime armi o un utente esperto con più macchine, Stell
 | ![Statistiche della libreria](../../images/statistics.png) *Statistiche della libreria* | ![Tariffe di stampa: elettricità, usura, margine](../../images/print-pricing.png) *Tariffe di stampa: elettricità, usura, margine* |
 | ![Libreria con miniature](../../images/library.png) *Libreria con miniature* | ![Monitoraggio stampanti](../../images/monitoring.png) *Monitoraggio stampanti* |
 | ![Raccomandazione profilo via IA](../../images/slicer.png) *Raccomandazione profilo via IA* | ![Nesting automatico](../../images/nesting.png) *Nesting automatico* |
+| ![Rilevamento dei duplicati](../../images/duplicates.png) *Rilevamento dei duplicati* | ![Filtri avanzati](../../images/filters.png) *Filtri avanzati* |
 
 ---
 

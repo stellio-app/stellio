@@ -217,6 +217,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 | ![Library statistics](images/statistics.png) *Library statistics* | ![Print pricing: electricity, wear, margin](images/print-pricing.png) *Print pricing: electricity, wear, margin* |
 | ![Library with thumbnails](images/library.png) *Library with thumbnails* | ![Printer monitoring](images/monitoring.png) *Printer monitoring* |
 | ![AI profile recommendation](images/slicer.png) *AI profile recommendation* | ![Automatic nesting](images/nesting.png) *Automatic nesting* |
+| ![Duplicate detection](images/duplicates.png) *Duplicate detection* | ![Advanced filters](images/filters.png) *Advanced filters* |
 
 ---
 

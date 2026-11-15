@@ -214,6 +214,7 @@
 | ![ライブラリ統計](../../images/statistics.png) *ライブラリ統計* | ![印刷料金：電気代・摩耗・マージン](../../images/print-pricing.png) *印刷料金：電気代・摩耗・マージン* |
 | ![サムネイル付きライブラリ](../../images/library.png) *サムネイル付きライブラリ* | ![プリンター監視](../../images/monitoring.png) *プリンター監視* |
 | ![AIによるプロファイル推奨](../../images/slicer.png) *AIによるプロファイル推奨* | ![自動ネスティング](../../images/nesting.png) *自動ネスティング* |
+| ![重複検出](../../images/duplicates.png) *重複検出* | ![高度なフィルター](../../images/filters.png) *高度なフィルター* |
 
 ---
 

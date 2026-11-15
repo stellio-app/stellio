@@ -214,6 +214,7 @@
 | ![文件库统计](../../images/statistics.png) *文件库统计* | ![打印价格：电费、损耗、利润率](../../images/print-pricing.png) *打印价格：电费、损耗、利润率* |
 | ![带缩略图的文件库](../../images/library.png) *带缩略图的文件库* | ![打印机监控](../../images/monitoring.png) *打印机监控* |
 | ![AI配置推荐](../../images/slicer.png) *AI配置推荐* | ![自动嵌套排版](../../images/nesting.png) *自动嵌套排版* |
+| ![重复文件检测](../../images/duplicates.png) *重复文件检测* | ![高级筛选](../../images/filters.png) *高级筛选* |
 
 ---
 
