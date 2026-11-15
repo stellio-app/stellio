@@ -473,6 +473,8 @@ Stellio est partenaire d'intégration de [**TigerTag**](https://tigersystem.io),
 - [trimesh](https://github.com/mikedh/trimesh) pour le traitement de mesh
 - [Spoolman](https://github.com/Donkie/Spoolman) pour la gestion des bobines de filament
 - [TigerTag](https://tigersystem.io) pour l'identification NFC/RFID des filaments
+- [Open Filament Database](https://openfilamentdatabase.org) (Open Filament Collective) pour le catalogue de bobines (licence MIT)
+- [OpenPrintTag](https://specs.openprinttag.org/) pour le standard d'étiquettes NFC de bobines (Prusa Research, licence MIT)
 - La communauté des makers pour ses retours et suggestions
 - Tous les contributeurs ❤️
 

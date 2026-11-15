@@ -472,6 +472,8 @@ Stellio は、NFC/RFID によるフィラメント識別システム [**TigerTag
 - メッシュ処理の[trimesh](https://github.com/mikedh/trimesh)
 - フィラメントスプール管理の[Spoolman](https://github.com/Donkie/Spoolman)
 - NFC/RFIDによるフィラメント識別の[TigerTag](https://tigersystem.io)
+- フィラメントカタログ（MITライセンス）の[Open Filament Database](https://openfilamentdatabase.org)（Open Filament Collective）
+- スプールNFCタグ標準（Prusa Research、MITライセンス）の[OpenPrintTag](https://specs.openprinttag.org/)
 - フィードバックや提案をくれたメイカーコミュニティ
 - すべてのコントリビューターに ❤️
 

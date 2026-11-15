@@ -2282,3 +2282,12 @@ def test_v110_printed_search_field_styled():
     from pathlib import Path as _P
     css = (_P(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
     assert '.history-filters #printed-search' in css
+
+
+def test_v110_readme_credits_open_data():
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    files = [root / 'README.md'] + [root / f'docs/readme/README_{l}.md' for l in ('fr', 'de', 'es', 'it', 'pt', 'zh', 'ja')]
+    for f in files:
+        t = f.read_text(encoding='utf-8')
+        assert 'openfilamentdatabase.org' in t and 'specs.openprinttag.org' in t, f.name

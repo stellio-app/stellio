@@ -472,6 +472,8 @@ Stellio 是 NFC/RFID 耗材识别系统 [**TigerTag**](https://tigersystem.io) �
 - [trimesh](https://github.com/mikedh/trimesh) 提供网格处理支持
 - [Spoolman](https://github.com/Donkie/Spoolman) 提供耗材卷轴管理
 - [TigerTag](https://tigersystem.io) 提供 NFC/RFID 耗材识别
+- [Open Filament Database](https://openfilamentdatabase.org)（Open Filament Collective）提供耗材目录（MIT 许可证）
+- [OpenPrintTag](https://specs.openprinttag.org/) 提供耗材卷轴 NFC 标签标准（Prusa Research，MIT 许可证）
 - 感谢创客社区的反馈与建议
 - 感谢所有贡献者 ❤️
 
