@@ -1,0 +1,20 @@
+name: Good first issue (mainteneur / maintainer)
+description: Tâche courte et bien délimitée pour un premier contributeur / Short, well-scoped task for a newcomer
+labels: ["good first issue", "help wanted"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Ce qu'il faut faire / What to do
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Où dans le code / Where in the code
+      description: Fichier(s) concerné(s), voir CODEMAP.md
+  - type: textarea
+    id: done
+    attributes:
+      label: Critère de réussite / Definition of done
+      placeholder: "Test ajouté, traductions des 8 langues à jour."

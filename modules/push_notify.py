@@ -76,6 +76,26 @@ def _push_deliver(cfg, title, message, notif_type='info'):
         if not url:
             raise ValueError("URL du webhook Discord manquante")
         _push_http_post(url, {"username": "Stellio", "content": f"**{title}**\n{message}"[:1900]})
+    elif provider == 'gotify':
+        server = (cfg.get('push_gotify_url') or '').strip().rstrip('/')
+        token = (cfg.get('push_gotify_token') or '').strip()
+        if not server or not token:
+            raise ValueError("URL ou jeton Gotify manquant")
+        _push_http_post(f"{server}/message", {"title": title, "message": message, "priority": 8 if notif_type in ('print_failed', 'printer_offline') else 5},
+                        {"X-Gotify-Key": token})
+    elif provider == 'pushover':
+        token = (cfg.get('push_pushover_token') or '').strip()
+        user = (cfg.get('push_pushover_user') or '').strip()
+        if not token or not user:
+            raise ValueError("Jeton d'application ou clé utilisateur Pushover manquant")
+        _push_http_post("https://api.pushover.net/1/messages.json",
+                        {"token": token, "user": user, "title": title, "message": message,
+                         "priority": 1 if notif_type in ('print_failed', 'printer_offline') else 0})
+    elif provider == 'slack':
+        url = (cfg.get('push_slack_url') or '').strip()
+        if not url:
+            raise ValueError("URL du webhook Slack manquante")
+        _push_http_post(url, {"text": f"*{title}*\n{message}"[:3000]})
     elif provider == 'webhook':
         url = (cfg.get('push_webhook_url') or '').strip()
         if not url:
@@ -116,6 +136,44 @@ def api_push_test():
 
 _push_watch_state = {}
 
+def _push_fmt_duration(seconds):
+    """3725 -> « 1 h 02 min » ; 540 -> « 9 min » ; 0/inconnu -> chaîne vide."""
+    try:
+        minutes = int(float(seconds or 0)) // 60
+    except (TypeError, ValueError):
+        return ''
+    if minutes <= 0:
+        return ''
+    h, m = divmod(minutes, 60)
+    return f"{h} h {m:02d} min" if h else f"{m} min"
+
+def _push_job_message(printer_name, job):
+    """« Ender 3 — boite.3mf (1 h 24 min) » : machine, fichier et durée quand ils sont connus."""
+    parts = [str(printer_name or '')]
+    f = str((job or {}).get('file') or '').strip()
+    if f:
+        parts.append(f)
+    msg = ' — '.join(x for x in parts if x)
+    d = _push_fmt_duration((job or {}).get('elapsed'))
+    return f"{msg} ({d})" if d else msg
+
+_PUSH_OFFLINE_AFTER_SECONDS = 180      # une imprimante injoignable depuis 3 min (après avoir été vue en ligne) = alerte « hors ligne »
+_push_seen_online = set()
+_push_offline_since = {}
+
+def _push_check_offline(pid, name, online, now, types):
+    if online:
+        _push_seen_online.add(pid)
+        _push_offline_since.pop(pid, None)
+        return
+    if pid not in _push_seen_online:
+        return                             # jamais vue en ligne depuis le démarrage : pas d'alerte (machine éteinte volontairement)
+    since = _push_offline_since.setdefault(pid, {'ts': now, 'notified': False})
+    if not since['notified'] and now - since['ts'] >= _PUSH_OFFLINE_AFTER_SECONDS:
+        since['notified'] = True
+        if 'printer_offline' in types:
+            _push_notify_async('printer_offline', _server_t('notif.printer_offline_title', 'Imprimante hors ligne'), name)
+
 def _push_watch_once(cfg):
     types = cfg.get('push_types') if isinstance(cfg.get('push_types'), list) else _PUSH_DEFAULT_TYPES
     conn = get_db()
@@ -125,20 +183,25 @@ def _push_watch_once(cfg):
         conn.close()
     now = time.time()
     for p in rows:
+        pid = p['id']
         try:
             status = printer_hub.get_status(parse_printer_config(p)) or {}
         except Exception:
+            _push_check_offline(pid, p['name'], False, now, types)
             continue
-        st, pid = status.get('status'), p['id']
+        st = status.get('status')
+        _push_check_offline(pid, p['name'], st not in ('offline', 'timeout', None), now, types)
         prev = _push_watch_state.get(pid)
         if st == 'printing':
-            _push_watch_state[pid] = {'status': 'printing', 'ts': now}
+            tm = status.get('time') or {}
+            _push_watch_state[pid] = {'status': 'printing', 'ts': now, 'file': status.get('file') or '',
+                                      'elapsed': tm.get('elapsed') or 0}
         elif st in ('idle', 'error'):
             if prev and prev['status'] == 'printing' and now - prev['ts'] < 600:
                 if st == 'idle' and 'print_finished' in types:
-                    _push_notify_async('print_finished', _server_t('notif.print_finished_title', 'Impression terminée'), p['name'])
+                    _push_notify_async('print_finished', _server_t('notif.print_finished_title', 'Impression terminée'), _push_job_message(p['name'], prev))
                 elif st == 'error' and 'print_failed' in types:
-                    _push_notify_async('print_failed', _server_t('notif.print_failed_title', "Échec d'impression"), p['name'])
+                    _push_notify_async('print_failed', _server_t('notif.print_failed_title', "Échec d'impression"), _push_job_message(p['name'], prev))
             _push_watch_state[pid] = {'status': st, 'ts': now}
         elif st == 'paused':
             if prev and prev['status'] == 'printing':

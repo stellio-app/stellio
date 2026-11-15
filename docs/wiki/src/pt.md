@@ -149,6 +149,9 @@ O Stellio deteta automaticamente os slicers instalados (OrcaSlicer, Bambu Studio
 ## Painel
 A página inicial reúne impressões em curso, stock baixo, impressões recentes e ficheiros recentes. Os **widgets** (cerca de vinte) reordenam-se arrastando e largando e podem ser ocultados: impressões em curso, stock baixo, últimos S.O.S Print, sugestões, instâncias do Stellio, projetos concluídos, galeria, orçamentos…
 
+## Navegação
+A barra da esquerda é um **trilho estreito**: Início, Biblioteca, Impressão, Filamento, Ferramentas e Acompanhamento. Clique numa categoria para abrir o seu **painel**; fecha-se depois da sua escolha. Os distintivos de notificação das páginas de uma categoria são **somados** no seu ícone. Em baixo: Modo oficina, Ajuda, **Atualizações** e Definições. **Projetos** e **Já impressos** estão em Impressão.
+
 ## Ferramentas do dia a dia
 - **Paleta de comandos** `Ctrl+K`: navegar, executar uma ação, encontrar um ficheiro, uma etiqueta, uma bobina ou um perfil.
 - **Centro de notificações** (sino): fim de impressão, falha, manutenção, stock baixo, secagem de bobinas.
@@ -269,7 +272,7 @@ Cada funcionalidade do Stellio: **para que serve e como a usar**. Os detalhes t�
 
 1. No cartão da impressora: temperatura, progresso, **câmara em direto** e nome do ficheiro em curso.
 2. Um **widget flutuante** mostra o progresso em todas as páginas.
-3. O **sino** avisa-o (fim, falha, manutenção, stock baixo); ative as **notificações push** (ntfy, Telegram, Discord, webhook) para ser avisado com a janela fechada.
+3. O **sino** avisa-o (fim, falha, manutenção, stock baixo); ative as **notificações push** (ntfy, Gotify, Pushover, Telegram, Discord, Slack, webhook) para ser avisado com a janela fechada.
 4. A 100 %, o Stellio tira a **foto final**: classifique-a como *Sucesso* ou *Falha* com um clique. O **timelapse** é montado automaticamente.
 
 ## Avaliar, reimprimir, encontrar as fotos
@@ -360,6 +363,7 @@ Lista completa: [Definições e dados](pt-Settings-and-Data).
 - **Anular eliminações** (`Ctrl+Z`) graças a uma reciclagem temporária de 5 minutos; vale também para etiquetas, projetos e fontes.
 - **Halo verde / vermelho** à volta da miniatura: verde para um ficheiro já impresso com sucesso, vermelho para uma impressão falhada (vistas galeria e detalhes).
 - **Já impresso** (menu ⋯ de um ficheiro): registe à mão uma impressão feita noutro sítio — escolha a impressora, as definições (perfil do slicer) e a bobina, depois **Sucesso** ou **Falhou**. O ficheiro entra nos filtros «Já com sucesso» / «Já falhado» e a sua ficha (clique direito) mostra impressora, definições e bobina.
+- **Página «Já impressos»** (painel Impressão): todos os ficheiros impressos ou marcados como «já impresso», com as mesmas miniaturas e halos da biblioteca, uma pesquisa e um filtro Com sucesso / Falhados. O botão **Remover** (também na ficha do ficheiro) anula esse estado: o ficheiro volta a ser «nunca impresso». Existe um widget com o mesmo nome no início.
 - Seleção rápida: `Shift+clique` para um intervalo, setas + `Enter`.
 - **Deteção de duplicados** (exatos e de geometria semelhante).
 - **Origem do modelo**: ligação de origem, autor, licença, notas, data de transferência.
@@ -463,6 +467,8 @@ Os outros modelos que falam o mesmo protocolo costumam funcionar. Diga-nos no Gi
 | **Bambu AMS / Creality CFS** | Leitura dos slots. |
 
 **Open Filament Database**: procure uma bobina por marca, material e cor e crie-a com um clique (peso, diâmetro e densidade preenchidos).
+
+Na janela de envio para o slicer, a lista de bobines está ordenada e tem um **campo de pesquisa**.
 
 ## No dia a dia
 - **Consumo automático** ao enviar ao slicer, com verificação de compatibilidade (há material suficiente?).
@@ -578,6 +584,7 @@ Visível quando a opção *Ativar as funções de custos, orçamentos e faturaç
 - **Código QR** de acesso móvel à biblioteca (**PWA instalável**).
 - **App Android complementar**: um código QR próprio (Definições → acesso móvel) transfere o APK. Gere endereços interno e externo com alternância automática, emparelhamento por QR, fotos diretamente a partir de uma impressão e leitura/escrita de etiquetas NFC OpenPrintTag.
 - **Atualização da app Android**: ao abrir, uma janela avisa da nova versão publicada no GitHub e propõe descarregá-la e instalá-la com um toque (soma de verificação validada).
+- **Atualizações sobre a app existente**: desde a 1.1.0 o APK é assinado com uma chave permanente. Se o Android mostrar «o pacote está em conflito com um pacote existente», desinstale a versão antiga uma vez e instale a nova; as atualizações seguintes instalam-se normalmente.
 - **Modo oficina** em ecrã inteiro para tablet/telemóvel.
 
 {{img:android-update}}
@@ -599,7 +606,7 @@ Visível quando a opção *Ativar as funções de custos, orçamentos e faturaç
 
 ## Notificações
 - Notificações nativas do **Windows**, notificações do **navegador** (Pi, telemóvel).
-- **Push**: ntfy, Telegram, Discord ou webhook, mesmo com a janela fechada (fim de impressão, falha, manutenção, stock).
+- **Push**: ntfy, Gotify, Pushover, Telegram, Discord, Slack ou webhook, mesmo com a janela fechada (fim de impressão com nome do ficheiro e duração, falha, manutenção, stock, impressora offline).
 
 ## Domótica
 - **MQTT / Home Assistant**: publicação do estado e descoberta automática; dispositivo MQTT «Stellio» e sensores.
@@ -667,7 +674,7 @@ Intervenções da vigilância: `journalctl -t stellio-watchdog`. Os contentores 
 
 ## Aparência
 - **Tema**: Escuro / Claro / Sistema. Por predefinição, **claro**; escuro apenas se o sistema (ou você) o pedir.
-- **Temas de marca**: Stellio, Bambu, Prusa, Voron, Creality; 33 paletas, cor de destaque personalizada, imagem de fundo ajustável.
+- **Temas de marca**: Stellio, Bambu, Prusa, Voron, Creality; 33 paletas, cor de destaque personalizada, imagem de fundo ajustável. É proposta uma imagem Stellio por predefinição (botão **Imagem predefinida**).
 - **Acessibilidade**: alto contraste, animações reduzidas, foco de teclado visível, tamanho do texto, modo daltónico.
 - **8 idiomas**: fr, en, de, es, it, pt, ja, zh.
 - Navegação reordenável arrastando e largando; **anular a última definição alterada**.

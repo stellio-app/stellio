@@ -149,6 +149,9 @@ Stellio erkennt Ihre installierten Slicer automatisch (OrcaSlicer, Bambu Studio,
 ## Dashboard
 Die Startseite zeigt laufende Drucke, niedrigen Bestand, letzte Drucke und letzte Dateien. Die **Widgets** (etwa zwanzig) lassen sich per Drag & Drop neu anordnen und ausblenden: laufende Drucke, niedriger Bestand, letzte S.O.S Print, Vorschläge, Stellio-Instanzen, abgeschlossene Projekte, Galerie, Angebote …
 
+## Navigation
+Die linke Leiste ist eine **schmale Schiene**: Start, Bibliothek, Drucken, Filament, Werkzeuge und Verfolgung. Klicken Sie auf eine Kategorie, um ihr **Panel** zu öffnen; es schließt sich nach Ihrer Auswahl. Die Benachrichtigungs-Badges der Seiten einer Kategorie werden auf ihrem Symbol **addiert**. Unten: Werkstattmodus, Hilfe, **Updates** und Einstellungen. **Projekte** und **Bereits gedruckt** befinden sich unter Drucken.
+
 ## Werkzeuge für den Alltag
 - **Befehlspalette** `Strg+K`: navigieren, Aktion ausführen, Datei, Tag, Spule oder Profil finden.
 - **Benachrichtigungszentrum** (Glocke): Druck beendet, Fehler, Wartung, niedriger Bestand, Spulentrocknung.
@@ -269,7 +272,7 @@ Jede Funktion von Stellio: **wofür sie da ist und wie man sie benutzt**. Techni
 
 1. Auf der Druckerkarte: Temperatur, Fortschritt, **Live-Kamera** und Name der aktuellen Datei.
 2. Ein **schwebendes Widget** zeigt den Fortschritt auf jeder Seite.
-3. Die **Glocke** benachrichtigt Sie (fertig, fehlgeschlagen, Wartung, niedriger Bestand); aktivieren Sie **Push-Benachrichtigungen** (ntfy, Telegram, Discord, Webhook), um auch bei geschlossenem Fenster informiert zu werden.
+3. Die **Glocke** benachrichtigt Sie (fertig, fehlgeschlagen, Wartung, niedriger Bestand); aktivieren Sie **Push-Benachrichtigungen** (ntfy, Gotify, Pushover, Telegram, Discord, Slack, Webhook), um auch bei geschlossenem Fenster informiert zu werden.
 4. Bei 100 % macht Stellio das **Abschlussfoto**: Markieren Sie es mit einem Klick als *Erfolg* oder *Fehlschlag*. Der **Zeitraffer** wird automatisch erstellt.
 
 ## Bewerten, erneut drucken, Fotos wiederfinden
@@ -360,6 +363,7 @@ Vollständige Liste: [Einstellungen und Daten](de-Settings-and-Data).
 - **Löschen rückgängig machen** (`Strg+Z`) dank 5-Minuten-Papierkorb; gilt auch für Tags, Projekte und Quellen.
 - **Grüner / roter Schimmer** um die Vorschau: grün für erfolgreich gedruckte Dateien, rot für fehlgeschlagene Drucke (Galerie- und Detailansicht).
 - **Schon gedruckt** (⋯-Menü einer Datei): einen anderswo gemachten Druck von Hand erfassen — Drucker, Einstellungen (Slicer-Profil) und Spule wählen, dann **Erfolgreich** oder **Fehlgeschlagen**. Die Datei erscheint in den Filtern „Erfolgreich gedruckt“ / „Fehlgeschlagen“, ihr Detailblatt (Rechtsklick) zeigt Drucker, Einstellungen und Spule.
+- **Seite „Bereits gedruckt“** (Panel Drucken): alle gedruckten oder als „bereits gedruckt“ markierten Dateien, mit denselben Vorschaubildern und Rahmen wie die Bibliothek, einer Suche und einem Filter Erfolgreich / Fehlgeschlagen. Die Schaltfläche **Entfernen** (auch in den Dateiinfos) hebt diesen Status auf: Die Datei gilt wieder als „nie gedruckt“. Ein gleichnamiges Widget gibt es auf der Startseite.
 - Schnelle Auswahl: `Umschalt+Klick` für einen Bereich, Pfeiltasten + `Enter`.
 - **Duplikaterkennung** (exakt und ähnliche Geometrie).
 - **Modellherkunft**: Quelllink, Autor, Lizenz, Notizen, Download-Datum.
@@ -463,6 +467,8 @@ Andere Modelle mit demselben Protokoll funktionieren in der Regel. Sagen Sie uns
 | **Bambu AMS / Creality CFS** | Auslesen der Slots. |
 
 **Open Filament Database**: Spule nach Marke, Material und Farbe suchen und mit einem Klick anlegen (Gewicht, Durchmesser und Dichte vorausgefüllt).
+
+Im Fenster „An Slicer senden“ ist die Spulenliste sortiert und hat ein **Suchfeld**.
 
 ## Im Alltag
 - **Automatischer Verbrauch** beim Senden an den Slicer, mit Kompatibilitätsprüfung (genug Material?).
@@ -578,6 +584,7 @@ Sichtbar, wenn *Kosten-, Angebots- und Rechnungsfunktionen aktivieren* angehakt 
 - **QR-Code** für den mobilen Zugriff auf die Bibliothek (**installierbare PWA**).
 - **Android-Begleit-App**: Ein eigener QR-Code (Einstellungen → Mobiler Zugriff) lädt die APK herunter. Sie verwaltet interne und externe Adresse mit automatischem Wechsel, Kopplung per QR, Fotos direkt von einem Druck sowie Lesen/Schreiben von OpenPrintTag-NFC-Tags.
 - **Update der Android-App**: Beim Start meldet ein Dialog die neue, auf GitHub veröffentlichte Version und bietet an, sie mit einem Tipp herunterzuladen und zu installieren (Prüfsumme wird kontrolliert).
+- **Updates über die bestehende App**: Seit 1.1.0 ist die APK mit einem dauerhaften Schlüssel signiert. Zeigt Android „Paket steht in Konflikt mit einem vorhandenen Paket“, deinstallieren Sie die alte Version einmal und installieren Sie die neue; spätere Updates werden normal installiert.
 - **Werkstattmodus** im Vollbild für Tablet/Smartphone.
 
 {{img:android-update}}
@@ -599,7 +606,7 @@ Sichtbar, wenn *Kosten-, Angebots- und Rechnungsfunktionen aktivieren* angehakt 
 
 ## Benachrichtigungen
 - Native **Windows**-Benachrichtigungen, **Browser**-Benachrichtigungen (Pi, Smartphone).
-- **Push**: ntfy, Telegram, Discord oder Webhook, auch bei geschlossenem Fenster (Druck beendet, Fehler, Wartung, Bestand).
+- **Push**: ntfy, Gotify, Pushover, Telegram, Discord, Slack oder Webhook, auch bei geschlossenem Fenster (Druck beendet mit Dateiname und Dauer, Fehler, Wartung, Bestand, Drucker offline).
 
 ## Hausautomation
 - **MQTT / Home Assistant**: Zustandsveröffentlichung und automatische Erkennung; MQTT-Gerät „Stellio" und Sensoren.
@@ -667,7 +674,7 @@ Eingriffe der Prüfung: `journalctl -t stellio-watchdog`. Bestehende Container e
 
 ## Darstellung
 - **Design**: Dunkel / Hell / System. Standardmäßig **hell**; dunkel nur, wenn das System (oder Sie) es wünscht.
-- **Markendesigns**: Stellio, Bambu, Prusa, Voron, Creality; 33 Farbpaletten, eigene Akzentfarbe, einstellbares Hintergrundbild.
+- **Markendesigns**: Stellio, Bambu, Prusa, Voron, Creality; 33 Farbpaletten, eigene Akzentfarbe, einstellbares Hintergrundbild. Standardmäßig wird ein Stellio-Bild angeboten (Schaltfläche **Standardbild**).
 - **Barrierefreiheit**: hoher Kontrast, reduzierte Animationen, sichtbarer Tastaturfokus, Textgröße, Farbenblindmodus.
 - **8 Sprachen**: fr, en, de, es, it, pt, ja, zh.
 - Navigation per Drag & Drop umsortierbar; **letzte geänderte Einstellung rückgängig machen**.

@@ -43,3 +43,11 @@ def test_captures_communes_a_toutes_les_langues(tmp_path, monkeypatch):
     # plus de sous-dossiers par version / langue dans le dépôt
     real = os.path.join(bw.ROOT, 'docs', 'wiki', 'images')
     assert not [d for d in os.listdir(real) if os.path.isdir(os.path.join(real, d))]
+
+
+def test_doc_110_nouveautes_dans_les_8_langues():
+    ref = bw.parse('fr')['Getting-Started'][1].count('\n## ')
+    for lang, _, _ in bw.LANGS:
+        p = bw.parse(lang)
+        assert p['Getting-Started'][1].count('\n## ') == ref, lang     # même structure, section « Navigation » comprise
+        assert '1.1.0' in p['Remote-Access'][1], lang                    # note sur la signature de l'APK

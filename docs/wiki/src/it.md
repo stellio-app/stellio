@@ -149,6 +149,9 @@ Stellio rileva automaticamente gli slicer installati (OrcaSlicer, Bambu Studio, 
 ## Dashboard
 La home riunisce stampe in corso, scorte basse, stampe recenti e file recenti. I **widget** (una ventina) si riordinano con il trascinamento e si possono nascondere: stampe in corso, scorte basse, ultimi S.O.S Print, suggerimenti, istanze di Stellio, progetti completati, galleria, preventivi…
 
+## Navigazione
+La barra a sinistra è una **guida stretta**: Home, Libreria, Stampa, Filamento, Strumenti e Monitoraggio. Fai clic su una categoria per aprire il suo **pannello**; si chiude dopo la tua scelta. I badge di notifica delle pagine di una categoria sono **sommati** sulla sua icona. In basso: Modalità officina, Aiuto, **Aggiornamenti** e Impostazioni. **Progetti** e **Già stampati** si trovano in Stampa.
+
 ## Strumenti di tutti i giorni
 - **Palette dei comandi** `Ctrl+K`: navigare, eseguire un'azione, trovare un file, un'etichetta, una bobina o un profilo.
 - **Centro notifiche** (campanella): fine stampa, errore, manutenzione, scorte basse, essiccazione delle bobine.
@@ -269,7 +272,7 @@ Ogni funzione di Stellio: **a cosa serve e come usarla**. I dettagli tecnici son
 
 1. Sulla scheda della stampante: temperatura, avanzamento, **camera in diretta** e nome del file in corso.
 2. Un **widget flottante** mostra l'avanzamento in tutte le pagine.
-3. La **campanella** ti avvisa (fine, errore, manutenzione, scorte basse); attiva le **notifiche push** (ntfy, Telegram, Discord, webhook) per essere avvisato anche a finestra chiusa.
+3. La **campanella** ti avvisa (fine, errore, manutenzione, scorte basse); attiva le **notifiche push** (ntfy, Gotify, Pushover, Telegram, Discord, Slack, webhook) per essere avvisato anche a finestra chiusa.
 4. Al 100 %, Stellio scatta la **foto finale**: classificala come *Riuscita* o *Fallita* con un clic. Il **timelapse** viene montato automaticamente.
 
 ## Valutare, ristampare, ritrovare le foto
@@ -360,6 +363,7 @@ Elenco completo: [Impostazioni e dati](it-Settings-and-Data).
 - **Annulla eliminazioni** (`Ctrl+Z`) grazie a un cestino temporaneo di 5 minuti; vale anche per etichette, progetti e fonti.
 - **Alone verde / rosso** attorno alla miniatura: verde per un file già stampato con successo, rosso per una stampa fallita (viste galleria e dettagli).
 - **Già stampato** (menu ⋯ di un file): registra a mano una stampa fatta altrove — scegli stampante, impostazioni (profilo dello slicer) e bobina, poi **Riuscita** o **Fallita**. Il file entra nei filtri «Già riuscito» / «Già fallito» e la sua scheda (clic destro) mostra stampante, impostazioni e bobina.
+- **Pagina «Già stampati»** (pannello Stampa): tutti i file stampati o contrassegnati come «già stampato», con le stesse miniature e aloni della libreria, una ricerca e un filtro Riusciti / Falliti. Il pulsante **Rimuovi** (anche nella scheda del file) annulla questo stato: il file torna «mai stampato». Nella home è disponibile un widget con lo stesso nome.
 - Selezione rapida: `Maiusc+clic` per un intervallo, frecce + `Invio`.
 - **Rilevamento dei duplicati** (esatti e di geometria simile).
 - **Origine del modello**: link di origine, autore, licenza, note, data di download.
@@ -463,6 +467,8 @@ Gli altri modelli che parlano lo stesso protocollo di solito funzionano. Dicci s
 | **Bambu AMS / Creality CFS** | Lettura degli slot. |
 
 **Open Filament Database**: cerca una bobina per marchio, materiale e colore e creala con un clic (peso, diametro e densità precompilati).
+
+Nella finestra di invio allo slicer, l'elenco delle bobine è ordinato e ha un **campo di ricerca**.
 
 ## Ogni giorno
 - **Consumo automatico** all'invio allo slicer, con controllo di compatibilità (c'è abbastanza materiale?).
@@ -578,6 +584,7 @@ Visibile quando è spuntata l'opzione *Attiva le funzioni di costi, preventivi e
 - **Codice QR** per l'accesso mobile alla libreria (**PWA installabile**).
 - **App Android companion**: un codice QR dedicato (Impostazioni → accesso mobile) scarica l'APK. Gestisce indirizzo interno ed esterno con passaggio automatico, associazione tramite QR, foto direttamente da una stampa e lettura/scrittura di etichette NFC OpenPrintTag.
 - **Aggiornamento dell'app Android**: all'apertura, una finestra segnala la nuova versione pubblicata su GitHub e propone di scaricarla e installarla con un tocco (checksum verificato).
+- **Aggiornamenti sopra l'app esistente**: dalla 1.1.0 l'APK è firmato con una chiave permanente. Se Android mostra «il pacchetto è in conflitto con un pacchetto esistente», disinstalla una volta la vecchia versione e installa la nuova; i successivi aggiornamenti si installano normalmente.
 - **Modalità officina** a schermo intero per tablet/telefono.
 
 {{img:android-update}}
@@ -599,7 +606,7 @@ Visibile quando è spuntata l'opzione *Attiva le funzioni di costi, preventivi e
 
 ## Notifiche
 - Notifiche native di **Windows**, notifiche del **browser** (Pi, telefono).
-- **Push**: ntfy, Telegram, Discord o webhook, anche a finestra chiusa (fine stampa, guasto, manutenzione, scorte).
+- **Push**: ntfy, Gotify, Pushover, Telegram, Discord, Slack o webhook, anche a finestra chiusa (fine stampa con nome del file e durata, guasto, manutenzione, scorte, stampante offline).
 
 ## Domotica
 - **MQTT / Home Assistant**: pubblicazione dello stato e rilevamento automatico; dispositivo MQTT «Stellio» e sensori.
@@ -667,7 +674,7 @@ Interventi della sorveglianza: `journalctl -t stellio-watchdog`. I container esi
 
 ## Aspetto
 - **Tema**: Scuro / Chiaro / Sistema. Per impostazione predefinita **chiaro**; scuro solo se il sistema (o tu) lo richiede.
-- **Temi di marca**: Stellio, Bambu, Prusa, Voron, Creality; 33 palette, colore di accento personalizzato, immagine di sfondo regolabile.
+- **Temi di marca**: Stellio, Bambu, Prusa, Voron, Creality; 33 palette, colore di accento personalizzato, immagine di sfondo regolabile. Per impostazione predefinita viene proposta un'immagine Stellio (pulsante **Immagine predefinita**).
 - **Accessibilità**: alto contrasto, animazioni ridotte, focus da tastiera visibile, dimensione del testo, modalità daltonici.
 - **8 lingue**: fr, en, de, es, it, pt, ja, zh.
 - Navigazione riordinabile con il trascinamento; **annulla l'ultima impostazione modificata**.

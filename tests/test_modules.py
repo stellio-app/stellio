@@ -43,6 +43,7 @@ def test_init_registers_every_route(name):
     app = flask.Flask('t')
     ns = {n: (lambda *a, **k: None) for n in mod._REQUIRED}
     ns['DATA_DIR'] = '/tmp'
+    ns['_effective_cpu_count'] = lambda: 4
     ns.update(app=app, login_required=lambda f: f)
     mod.init(dict(ns, DATA_DIR='/tmp'))
     rules = {r.rule for r in app.url_map.iter_rules()}

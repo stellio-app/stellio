@@ -149,6 +149,9 @@ Stellio détecte automatiquement vos slicers installés (OrcaSlicer, Bambu Studi
 ## Tableau de bord
 La page d'accueil réunit impressions en cours, stock bas, impressions et fichiers récents. Les **widgets** (une vingtaine) se réorganisent par glisser-déposer et peuvent être masqués : impressions en cours, stock bas, derniers S.O.S Print, suggestions, instances Stellio, projets terminés, galerie, devis…
 
+## Navigation
+La barre de gauche est un **rail étroit** : Accueil, Bibliothèque, Impression, Filament, Outils et Suivi. Cliquez une catégorie pour ouvrir son **volet** ; il se referme après votre choix. Les pastilles de notification des pages d'une catégorie sont **additionnées** sur son icône. En bas : Mode atelier, Aide, **Mises à jour** et Paramètres. **Projets** et **Déjà imprimés** se trouvent dans Impression.
+
 ## Outils du quotidien
 - **Palette de commandes** `Ctrl+K` : naviguer, lancer une action, retrouver un fichier, une étiquette, une bobine ou un profil.
 - **Centre de notifications** (cloche) : fin d'impression, échec, maintenance, stock bas, séchage de bobine.
@@ -269,7 +272,7 @@ Chaque fonction de Stellio, **à quoi elle sert et comment s'en servir**. Les d�
 
 1. Sur la carte de l'imprimante : température, progression, **caméra en direct** et nom du fichier en cours.
 2. Un **widget flottant** montre l'avancement sur toutes les pages.
-3. La **cloche** vous prévient (fin, échec, maintenance, stock bas) ; activez les **notifications push** (ntfy, Telegram, Discord, webhook) pour être prévenu fenêtre fermée.
+3. La **cloche** vous prévient (fin, échec, maintenance, stock bas) ; activez les **notifications push** (ntfy, Gotify, Pushover, Telegram, Discord, Slack, webhook) pour être prévenu fenêtre fermée.
 4. À 100 %, Stellio prend la **photo de fin** : classez-la *Réussi* ou *Raté* d'un clic. Le **timelapse** est monté automatiquement.
 
 ## Noter, réimprimer, retrouver ses photos
@@ -360,6 +363,7 @@ Liste complète : [Réglages et données](fr-Settings-and-Data).
 - **Annuler une suppression** (`Ctrl+Z`) grâce à une corbeille temporaire de 5 minutes ; vaut aussi pour étiquettes, projets et sources.
 - **Halo vert / rouge** autour de la miniature : vert pour un fichier déjà imprimé avec succès, rouge pour une impression ratée (vues galerie et détails).
 - **Déjà imprimé** (menu ⋯ d'un fichier) : notez à la main une impression faite ailleurs — choisissez l'imprimante, les réglages (profil du slicer), la bobine, puis **Réussi** ou **Raté**. Le fichier rejoint les filtres « Déjà réussi » / « Déjà raté » et sa fiche (clic droit) affiche l'imprimante, les réglages et la bobine.
+- **Page « Déjà imprimés »** (volet Impression) : tous les fichiers imprimés ou marqués « déjà imprimé », avec les mêmes miniatures et halos que la bibliothèque, une recherche et un filtre Réussis / Ratés. Le bouton **Retirer** (aussi dans la fiche du fichier) annule ce statut : le fichier redevient « jamais imprimé ». Un widget du même nom est disponible sur l'accueil.
 - Sélection rapide : `Maj+clic` pour une plage, flèches + `Entrée`.
 - **Détection de doublons** (exacts et de géométrie proche).
 - **Origine du modèle** : lien source, auteur, licence, notes, date de téléchargement.
@@ -463,6 +467,8 @@ Les autres modèles qui parlent le même protocole fonctionnent en général. Di
 | **Bambu AMS / Creality CFS** | Lecture des emplacements. |
 
 **Open Filament Database** : cherchez une bobine par marque, matière et couleur, puis créez-la en un clic (poids, diamètre et densité préremplis).
+
+Dans la fenêtre d'envoi au slicer, la liste des bobines est triée et dispose d'un **champ de recherche**.
 
 ## Au quotidien
 - **Consommation automatique** à l'envoi au slicer, avec contrôle de compatibilité (assez de matière ?).
@@ -578,6 +584,7 @@ Visible quand l'option *Activer les fonctions de coût, devis et facturation* es
 - **QR code** d'accès mobile à la bibliothèque (**PWA installable**).
 - **Application Android compagnon** : un QR code dédié (Réglages → accès mobile) permet de télécharger l'APK. Elle gère adresse interne et externe avec bascule automatique, liaison par QR, photos directement depuis une impression, et lecture/écriture d'étiquettes NFC OpenPrintTag.
 - **Mise à jour de l'application Android** : à l'ouverture, une fenêtre signale la nouvelle version publiée sur GitHub et propose de la télécharger et de l'installer en un geste (somme de contrôle vérifiée).
+- **Mises à jour par-dessus** : depuis la 1.1.0, l'APK est signé avec une clé permanente. Si Android affiche « package en conflit avec un package déjà présent », désinstallez une fois l'ancienne version puis installez la nouvelle ; les mises à jour suivantes s'installent normalement.
 - **Mode atelier** plein écran pour tablette/téléphone.
 
 {{img:android-update}}
@@ -599,7 +606,7 @@ Visible quand l'option *Activer les fonctions de coût, devis et facturation* es
 
 ## Notifications
 - Notifications **Windows** natives, notifications **navigateur** (Pi, mobile).
-- **Push** : ntfy, Telegram, Discord ou webhook, même fenêtre fermée (fin d'impression, échec, maintenance, stock).
+- **Push** : ntfy, Gotify, Pushover, Telegram, Discord, Slack ou webhook, même fenêtre fermée (fin d'impression avec le nom du fichier et la durée, échec, maintenance, stock, imprimante hors ligne).
 
 ## Domotique
 - **MQTT / Home Assistant** : publication d'état et découverte automatique ; appareil MQTT « Stellio » et capteurs.
@@ -667,7 +674,7 @@ Interventions de la surveillance : `journalctl -t stellio-watchdog`. Les contene
 
 ## Apparence
 - **Thème** : Sombre / Clair / Système. Par défaut, **clair** ; sombre seulement si le système (ou vous) le demande.
-- **Thèmes de marque** : Stellio, Bambu, Prusa, Voron, Creality ; 33 palettes, couleur d'accent personnalisée, image de fond réglable.
+- **Thèmes de marque** : Stellio, Bambu, Prusa, Voron, Creality ; 33 palettes, couleur d'accent personnalisée, image de fond réglable. Une image Stellio est proposée par défaut (bouton **Image par défaut**).
 - **Accessibilité** : contraste élevé, animations réduites, focus clavier visible, taille du texte, mode daltonien.
 - **8 langues** : fr, en, de, es, it, pt, ja, zh.
 - Navigation réordonnable par glisser-déposer ; **annuler le dernier réglage modifié**.

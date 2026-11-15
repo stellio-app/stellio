@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://stellio-app.com/docs/
+    about: Guide d'utilisation / User guide

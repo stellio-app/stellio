@@ -805,6 +805,14 @@ jobs:
     if: ${{ !cancelled() && needs.check-version.outputs.should_release == 'true' && needs.build.result == 'success' && needs.build-macos.result == 'success' && needs.build-linux.result == 'success' && needs.build-apk.result != 'failure' }}
     runs-on: windows-latest
     steps:
+      - name: Checkout (notes de version)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            changelog.json
+            tools/release_notes.py
+          sparse-checkout-cone-mode: false
+
       - name: Download Windows installer artifact
         uses: actions/download-artifact@v4
         with:
@@ -850,9 +858,14 @@ jobs:
           $hash = (Get-FileHash -Algorithm SHA256 $file.FullName).Hash.ToLower()
           "$hash  $($file.Name)" | Out-File -Encoding ascii "release-files\$($file.Name).sha256"
 
+      - name: Générer les notes de version depuis changelog.json
+        shell: bash
+        run: python tools/release_notes.py "${{ needs.check-version.outputs.version }}" RELEASE_BODY.md
+
       - name: Create GitHub Release (Draft)
         uses: softprops/action-gh-release@v2
         with:
+          body_path: RELEASE_BODY.md
           tag_name: v${{ needs.check-version.outputs.version }}
           name: Stellio v${{ needs.check-version.outputs.version }}
           draft: true                     

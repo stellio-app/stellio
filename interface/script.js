@@ -5951,7 +5951,7 @@ async function _renderDashboardCameras(active) {
     const widget = document.getElementById('dashboard-widget-cameras');
     const body = document.getElementById('dashboard-cameras-body');
     if (!widget || !body) return;
-    const list = (active || []).slice(0, 6);
+    const list = (active || []).slice(0, 4);   // 4 caméras au maximum dans le widget
     const key = list.map(a => a.printer.id).join(',');
     if (!list.length) {
         _stopDashboardCameras();
@@ -5986,7 +5986,7 @@ async function _renderDashboardCameras(active) {
     }
     withCam.forEach(e => { _dashCamAvail[e.printer.id] = e.cam; });
     body.innerHTML = `<div class="dashboard-camera-grid">${withCam.map(({ printer, status, cam }) => `
-        <div class="dashboard-camera-tile" data-pid="${printer.id}" onclick="openPrinterMonitor(${printer.id})" title="${escapeHtml(printer.name)}">
+        <div class="dashboard-camera-tile" data-pid="${printer.id}" onclick="openCameraPopup(${printer.id})" title="${escapeHtml(printer.name)}">
             <img src="${escapeHtml(cam.stream_url || cam.snapshot_url)}" alt="${escapeHtml(printer.name)}" loading="lazy"
                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
             <div class="dashboard-camera-off" style="display:none;"><i class="fa-solid fa-video-slash fa-lg"></i><span>${escapeHtml(_t2('dashboard.camera_unavailable', 'Caméra indisponible'))}</span></div>
@@ -5994,6 +5994,94 @@ async function _renderDashboardCameras(active) {
         </div>`).join('')}</div>`;
     widget.classList.add('has-content');
 }
+
+// --- Popup « caméra seule » (clic sur une vignette du widget caméras) ---
+let _camPopupTimer = null;
+function _ensureModal(id, title, bodyId) {
+    let modal = document.getElementById(id);
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = id;
+        modal.className = 'modal hidden';
+        modal.innerHTML = `<div class="modal-content camera-popup-content"><div class="modal-header"><h3 id="${id}-title"></h3><button class="modal-close" onclick="closeModal('${id}')" aria-label="Fermer">×</button></div><div class="modal-body" id="${bodyId}"></div></div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', e => { if (e.target === modal) closeModal(id); });
+    }
+    document.getElementById(`${id}-title`).innerHTML = title;
+    return modal;
+}
+
+function _closeCameraPopup() {
+    if (_camPopupTimer) { clearInterval(_camPopupTimer); _camPopupTimer = null; }
+    const img = document.querySelector('#camera-popup-body img');
+    if (img) img.src = '';
+}
+
+async function openCameraPopup(pid) {
+    let printer = (typeof printersList !== 'undefined' ? printersList : []).find(p => p.id === pid);
+    const name = printer ? printer.name : `#${pid}`;
+    _ensureModal('modal-camera-popup', `<i class="fa-solid fa-video"></i> ${escapeHtml(name)}`, 'camera-popup-body');
+    const body = document.getElementById('camera-popup-body');
+    body.innerHTML = `<div class="camera-popup-frame"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
+    const modal = document.getElementById('modal-camera-popup');
+    if (!modal.dataset.bound) {
+        modal.dataset.bound = '1';
+        modal.querySelector('.modal-close').addEventListener('click', _closeCameraPopup);
+        modal.addEventListener('click', e => { if (e.target === modal) _closeCameraPopup(); });
+    }
+    openModal('modal-camera-popup');
+    if (_camPopupTimer) { clearInterval(_camPopupTimer); _camPopupTimer = null; }
+    const frame = body.querySelector('.camera-popup-frame');
+    const fail = (msg) => { frame.innerHTML = `<div class="camera-popup-off"><i class="fa-solid fa-video-slash fa-2x"></i><p>${escapeHtml(msg)}</p></div>`; };
+    try {
+        const res = await fetch(`${API}/api/printers/${pid}/camera`);
+        const cam = res.ok ? await res.json() : { available: false };
+        if (!cam.available || !(cam.stream_url || cam.snapshot_url)) { fail(_t2('dashboard.camera_unavailable', 'Caméra indisponible')); return; }
+        const alt = escapeHtml(name);
+        if (cam.stream_url) {
+            frame.innerHTML = `<img src="${escapeHtml(cam.stream_url)}" alt="${alt}">`;
+        } else {
+            const snap = cam.snapshot_url;
+            const url = () => snap + (snap.includes('?') ? '&' : '?') + '_t=' + Date.now();
+            frame.innerHTML = `<img src="${escapeHtml(url())}" alt="${alt}">`;
+            _camPopupTimer = setInterval(() => { const i = frame.querySelector('img'); if (i) i.src = url(); }, 2000);
+        }
+        const img = frame.querySelector('img');
+        if (img) img.onerror = () => fail(_t2('dashboard.camera_unavailable', 'Caméra indisponible'));
+    } catch (e) { fail(_t2('dashboard.camera_unavailable', 'Caméra indisponible')); }
+}
+window.openCameraPopup = openCameraPopup;
+
+// --- « Voir tout » du widget caméras : liste de toutes les caméras pour en choisir une ---
+async function openCameraPicker() {
+    _ensureModal('modal-camera-picker', `<i class="fa-solid fa-video"></i> ${escapeHtml(_t2('dashboard.cameras_pick', 'Choisir une caméra'))}`, 'camera-picker-body');
+    const body = document.getElementById('camera-picker-body');
+    body.innerHTML = `<div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
+    openModal('modal-camera-picker');
+    let printers = (typeof printersList !== 'undefined' && printersList.length) ? printersList : [];
+    if (!printers.length) {
+        try { const r = await fetch(`${API}/api/printers`); const d = await r.json(); printers = Array.isArray(d) ? d : (d.printers || []); } catch (e) { /* liste vide */ }
+    }
+    const cams = await Promise.all(printers.map(async p => {
+        try {
+            const r = await fetch(`${API}/api/printers/${p.id}/camera`);
+            const c = r.ok ? await r.json() : null;
+            return c && c.available && (c.stream_url || c.snapshot_url) ? p : null;
+        } catch (e) { return null; }
+    }));
+    const list = cams.filter(Boolean);
+    if (!list.length) {
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-video-slash"></i><p>${escapeHtml(_t2('dashboard.cameras_none', 'Aucune caméra configurée'))}</p></div>`;
+        return;
+    }
+    body.innerHTML = list.map(p => `
+        <div class="dashboard-row" style="cursor:pointer;" onclick="closeModal('modal-camera-picker'); openCameraPopup(${p.id});">
+            <div class="dashboard-row-icon"><i class="mdi ${getPrinterIcon(p.type)}"></i></div>
+            <div class="dashboard-row-body"><div class="dashboard-row-title">${escapeHtml(p.name)}</div></div>
+            <div class="dashboard-row-meta"><i class="fa-solid fa-video"></i></div>
+        </div>`).join('');
+}
+window.openCameraPicker = openCameraPicker;
 
 // Actualisation régulière des impressions en cours tant que le tableau de bord est affiché
 setInterval(() => {
@@ -7975,8 +8063,16 @@ window.openFileInfoModal = async function (path, opts) {
             if (printers.length) extra += row(_t3('printed.printer', 'Imprimante'), e(printers.join(', ')));
             const profiles = uniq(hist.map(h => h.slicer_profile_name));
             if (profiles.length) extra += row(_t3('printed.settings', 'Réglages'), e(profiles.join(', ')));
-            const spools = uniq(hist.map(h => h.filament_label ? (h.filament_label + (h.filament_material ? ` (${h.filament_material})` : '')) : h.filament_material));
-            if (spools.length) extra += row(_t3('printed.spool', 'Bobine'), e(spools.join(', ')));
+            const dotOf = (sp) => sp.color_hex ? `<span class="ap-dot" style="background:${e(String(sp.color_hex).startsWith('#') ? sp.color_hex : '#' + sp.color_hex)}"></span>` : '';
+            const withPlates = hist.find(h => h.plates && h.plates.length);
+            if (withPlates) {
+                const multiP = withPlates.plates.length > 1;
+                extra += row(_t3('printed.spool', 'Bobine'), withPlates.plates.map(pl =>
+                    `<div>${multiP ? e(_t3('printed.plate_n', 'Plateau {{n}}', { n: pl.plate })) + ' : ' : ''}${pl.spools.map(sp => dotOf(sp) + e(sp.name || sp.material || '?')).join(' + ')}</div>`).join(''));
+            } else {
+                const spools = uniq(hist.map(h => h.filament_label ? (h.filament_label + (h.filament_material ? ` (${h.filament_material})` : '')) : h.filament_material));
+                if (spools.length) extra += row(_t3('printed.spool', 'Bobine'), e(spools.join(', ')));
+            }
             if (!extra) return;
             tailRows = _baseTailRows + extra;
             renderRows();
@@ -8123,11 +8219,11 @@ const viewedByOtherBadgeHtml = isFileViewedByOther(f.path)
 const _ps = f.print_status || 'never';
 const _sentToSlicer = _ps !== 'never';
 const _printedOk = _ps === 'success';
-const _psClass = _ps === 'success' ? ' ps-success' : (_ps === 'failed' ? ' ps-failed' : '');   // v1.0.9 : halo vert / rouge autour de la miniature
+const _psClass = _ps === 'success' ? ' ps-success' : (_ps === 'failed' ? ' ps-failed' : (_ps === 'printed' ? ' ps-sent' : ''));   // v1.0.9 : halo vert / rouge autour de la miniature
 const _yn = (ok) => `<span class="meta-val ${ok ? 'meta-yes' : 'meta-no'}"><i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${ok ? _t2('card.yes', 'Oui') : _t2('card.no', 'Non')}</span>`;
 const tooltipHtml = `<div class="file-metadata-tooltip" id="tooltip-${f.path.replace(/[^\w]/g, '-')}"><div class="meta-row"><i class="fa-solid fa-paper-plane"></i><span class="meta-label">${_t2('card.tooltip_sent_slicer', 'Envoyé au slicer')}</span>${_yn(_sentToSlicer)}</div><div class="meta-row"><i class="fa-solid fa-print"></i><span class="meta-label">${_t2('card.tooltip_printed', 'Imprimé')}</span>${_yn(_printedOk)}</div><div class="meta-row meta-source-row" data-source="${escapeHtml(f.source || '')}"><i class="fa-solid fa-hard-drive"></i><span class="meta-label">${_t2('card.tooltip_source', 'Source')}</span>${_sourceStateHtml(_sourceAvailability[f.source] !== false)}</div></div>`;
 const thumbContent = f.has_thumb
-    ? `<img src="${thumbUrl}" data-loaded="pending" onload="this.dataset.loaded='true'; this.style.display='block'; this.nextElementSibling?.style.setProperty('display','none','important');" onerror="window.handleThumbnailError(this)" style="width:100%; height:100%; object-fit:cover; display:block;"><div class="file-loading" style="display:none; align-items:center; justify-content:center;"><i class="fa-solid ${icon} thumb-icon" style="font-size:calc(48px * var(--fs, 1)); color:var(--text-muted);"></i></div>`
+    ? `<img src="${thumbUrl}" loading="lazy" decoding="async" data-loaded="pending" onload="this.dataset.loaded='true'; this.style.display='block'; this.nextElementSibling?.style.setProperty('display','none','important');" onerror="window.handleThumbnailError(this)" style="width:100%; height:100%; object-fit:cover; display:block;"><div class="file-loading" style="display:none; align-items:center; justify-content:center;"><i class="fa-solid ${icon} thumb-icon" style="font-size:calc(48px * var(--fs, 1)); color:var(--text-muted);"></i></div>`
     : `<img src="" data-loaded="false" style="display:none; width:100%; height:100%; object-fit:cover;"><div class="file-loading thumb-pending" data-path="${escapeHtml(f.path)}"><div class="skeleton-thumb"><i class="fa-solid ${icon} skeleton-thumb-icon"></i></div></div>`;
 const checkboxHtml = isSelectionMode ? `<div class="file-checkbox" onclick="event.stopPropagation(); toggleFileSelection('${escapeJs(f.path)}', event)" title="${isSelected ? I18N.t('actions.cancel') : I18N.t('actions.select')}"><i class="fa-solid ${isSelected ? 'fa-check-square' : 'fa-square'}"></i></div>` : '';
 const fileMenuBtnHtml = isSelectionMode ? '' : `<button type="button" class="file-menu-btn" onclick="event.stopPropagation(); openFileCtxMenu(event, '${escapeJs(f.path)}', '${escapeJs(f.name)}')" title="${I18N.t('actions.more') || 'Actions'}"><i class="fa-solid fa-bars"></i></button>`;
@@ -8233,7 +8329,7 @@ async function _batchSpoolStep(paths) {
     const opt = (s, key) => {
         const icon = '';
         const rem = typeof s.remaining_g === 'number' ? `${Math.round(s.remaining_g)} g` : '—';
-        return `<option value="${escapeHtml(key)}">${escapeHtml(s.name || '—')}${s.material ? ` (${escapeHtml(s.material)})` : ''} — ${rem} · ${escapeHtml(srcLabel(s.source_type))}</option>`;
+        return `<option value="${escapeHtml(key)}" style="${_spoolDotStyle(s)}">${escapeHtml(s.name || '—')}${s.material ? ` (${escapeHtml(s.material)})` : ''} — ${rem} · ${escapeHtml(srcLabel(s.source_type))}</option>`;
     };
     const options = `<option value="">${escapeHtml(_t3('slicer.spool_none', '— Aucune bobine —'))}</option>` + Object.entries(slots).map(([k, s]) => opt(s, k)).join('');
     const rows = paths.map((p, i) => {
@@ -9735,9 +9831,12 @@ showToast(I18N.t('toast.filters_reset'), 'info');
 // ============================================================================
 const SMART_COLLECTIONS = [
     { id: 'recent', icon: 'fa-clock', key: 'collections.recent', fb: 'Ajoutés cette semaine', test: f => f.mtime && (Date.now() / 1000 - f.mtime) < 7 * 86400 },
+    { id: 'queue', icon: 'fa-list-check', key: 'collections.queue', fb: 'À imprimer bientôt', test: f => typeof printQueuePaths !== 'undefined' && printQueuePaths.has(f.path) },
+    { id: 'favorites', icon: 'fa-star', key: 'collections.favorites', fb: 'Favoris', test: f => favoriteFiles.has(f.path) },
     { id: 'never', icon: 'fa-hourglass-start', key: 'collections.never', fb: 'Jamais imprimés', test: f => (f.print_status || 'never') === 'never' },
     { id: 'success', icon: 'fa-circle-check', key: 'collections.success', fb: 'Déjà réussis', test: f => f.print_status === 'success' },
     { id: 'failed', icon: 'fa-triangle-exclamation', key: 'collections.failed', fb: 'À retenter (échecs)', test: f => f.print_status === 'failed' },
+    { id: 'sent', icon: 'fa-paper-plane', key: 'collections.sent', fb: 'Envoyés au slicer', test: f => f.print_status === 'printed' },
     { id: 'light', icon: 'fa-feather', key: 'collections.light', fb: 'Rapides à tirer (≤ 20 g)', test: f => f.weight_g != null && f.weight_g <= 20 },
     { id: 'heavy', icon: 'fa-weight-hanging', key: 'collections.heavy', fb: 'Gros projets (≥ 150 g)', test: f => f.weight_g != null && f.weight_g >= 150 },
 ];
@@ -10046,6 +10145,24 @@ async function _loadProcessProfileSelect(selectId, printerId, opts = {}) {
     } catch (e) { /* liste vide : on reste sur « Automatique » */ }
 }
 
+// Pastille de couleur d'une bobine dans une liste déroulante native : un rond dessiné en fond de l'option (les <option> n'acceptent pas de balises).
+function _spoolDotHex(s) {
+    const raw = String((s && (s.color_hex || s.color)) || '').split(/[,;\s]/)[0].replace(/^#/, '');
+    return /^[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(raw) || /^[0-9a-fA-F]{3}$/.test(raw) ? '#' + raw.slice(0, 6) : '';
+}
+function _spoolDotGradient(s, size) {
+    const hex = _spoolDotHex(s);
+    size = size || 7;
+    return hex
+        ? `radial-gradient(circle at ${size + 6}px 50%, ${hex} 0 ${size}px, rgba(128,128,128,.55) ${size}px ${size + 1}px, transparent ${size + 1.5}px)`
+        : `radial-gradient(circle at ${size + 6}px 50%, transparent 0 ${size - 1}px, rgba(128,128,128,.55) ${size - 1}px ${size}px, transparent ${size + .5}px)`;
+}
+function _spoolDotStyle(s, size) {
+    size = size || 7;
+    return `background:${_spoolDotGradient(s, size)} no-repeat; padding-left:${size * 2 + 14}px;`;
+}
+window._spoolDotStyle = _spoolDotStyle;
+
 let _slicerSpoolState = { path: '', slots: {}, required: null };
 function _slicerSpoolRefresh() {
     const sel = document.getElementById('slicer-spool-select');
@@ -10055,6 +10172,8 @@ function _slicerSpoolRefresh() {
     if (!sel || !hint || !row || !label) return;
     const s = _slicerSpoolState.slots[sel.value];
     hint.style.display = 'none';
+    if (s) { sel.style.backgroundImage = _spoolDotGradient(s, 6); sel.style.backgroundRepeat = 'no-repeat'; sel.style.paddingLeft = '32px'; }
+    else { sel.style.backgroundImage = ''; sel.style.backgroundRepeat = ''; sel.style.paddingLeft = ''; }
     row.style.display = (s && s.source_type !== 'spoolman') ? 'flex' : 'none';   // Spoolman décompte lui-même : pas de case « décompter »
     if (!s) return;
     const badge = FILAMENT_SOURCE_BADGES[s.source_type] || '';
@@ -10096,10 +10215,10 @@ async function _loadSlicerSpoolBox(path) {
         _slicerSpoolState.list = sorted.map(s => {
             const key = `${s.source_type}:${s.source_id}`;
             _slicerSpoolState.slots[key] = s;
-            const icon = s.compatible === true ? '🟢' : s.compatible === false ? '🔴' : '⚪';
+            const icon = s.compatible === true ? '🟢 ' : s.compatible === false ? '🔴 ' : '';
             const rem = typeof s.remaining_g === 'number' ? `${Math.round(s.remaining_g)} g` : '—';
             const src = ({ bambu_ams: 'AMS', creality_cfs: 'CFS' })[s.source_type] || _sourceLabelFor(s.source_type);
-            return { key, html: `<option value="${escapeHtml(key)}">${icon} ${escapeHtml(s.name || '—')}${s.material ? ` (${escapeHtml(s.material)})` : ''} — ${rem} · ${escapeHtml(src)}</option>`,
+            return { key, html: `<option value="${escapeHtml(key)}" style="${_spoolDotStyle(s)}">${icon}${escapeHtml(s.name || '—')}${s.material ? ` (${escapeHtml(s.material)})` : ''} — ${rem} · ${escapeHtml(src)}</option>`,
                      text: [s.name, s.material, s.brand, s.color_name, s.color_hex, src].filter(Boolean).join(' ').toLowerCase() };
         });
         const search = document.getElementById('slicer-spool-search');
@@ -11750,6 +11869,19 @@ function _getBgOpts() {
     d.dim = Math.max(0, Math.min(90, d.dim)); d.blur = Math.max(0, Math.min(20, d.blur)); d.alpha = Math.max(40, Math.min(100, d.alpha));
     return d;
 }
+// Image de fond par défaut : le logo est à 52,4 % de la largeur de l'image. Sur un écran étroit (téléphone, application Android) l'image est
+// recadrée en « remplir » : on place donc le logo au centre de l'écran au lieu du centre de l'image.
+const BG_DEFAULT_LOGO = { w: 1352, h: 644, fx: 0.524 };
+function _bgFocusX(layer, o, url) {
+    if (url !== BG_DEFAULT_URL || o.fit !== 'cover' || o.x !== 50) return o.x;
+    const cw = layer.clientWidth || window.innerWidth, ch = layer.clientHeight || window.innerHeight;
+    const scale = Math.max(cw / BG_DEFAULT_LOGO.w, ch / BG_DEFAULT_LOGO.h);
+    const iw = BG_DEFAULT_LOGO.w * scale;
+    if (iw - cw < 2) return o.x;
+    const x = (cw / 2 - BG_DEFAULT_LOGO.fx * iw) / (cw - iw) * 100;
+    return Math.max(0, Math.min(100, Math.round(x * 10) / 10));
+}
+window.addEventListener('resize', () => { const l = document.getElementById('app-bg'); if (l) l.style.backgroundPosition = `${_bgFocusX(l, _getBgOpts(), _currentBgUrl())}% ${_getBgOpts().y}%`; });
 function applyBackgroundImage() {
     const url = _currentBgUrl();
     const root = document.documentElement;
@@ -11764,7 +11896,7 @@ function applyBackgroundImage() {
     layer.style.backgroundImage = `url("${url}")`;
     layer.style.filter = o.blur ? `blur(${o.blur}px)` : 'none';
     // cadrage : mode (remplir / ajuster / mosaïque), zoom, position
-    layer.style.backgroundPosition = `${o.x}% ${o.y}%`;
+    layer.style.backgroundPosition = `${_bgFocusX(layer, o, url)}% ${o.y}%`;
     layer.style.backgroundRepeat = o.fit === 'tile' ? 'repeat' : 'no-repeat';
     layer.style.backgroundSize = o.fit === 'tile' ? `${Math.max(5, Math.round(o.zoom / 4))}vw auto` : (o.fit === 'contain' ? 'contain' : 'cover');
     layer.style.transformOrigin = `${o.x}% ${o.y}%`;
@@ -15380,7 +15512,8 @@ const _PUSH_FIELDS = [
     ['push-ntfy-server', 'push_ntfy_server', 'https://ntfy.sh'], ['push-ntfy-topic', 'push_ntfy_topic', ''],
     ['push-ntfy-token', 'push_ntfy_token', ''], ['push-telegram-token', 'push_telegram_token', ''],
     ['push-telegram-chat', 'push_telegram_chat_id', ''], ['push-discord-url', 'push_discord_url', ''],
-    ['push-webhook-url', 'push_webhook_url', '']
+    ['push-webhook-url', 'push_webhook_url', ''], ['push-gotify-url', 'push_gotify_url', ''], ['push-gotify-token', 'push_gotify_token', ''],
+    ['push-pushover-token', 'push_pushover_token', ''], ['push-pushover-user', 'push_pushover_user', ''], ['push-slack-url', 'push_slack_url', '']
 ];
 const _PUSH_DEFAULT_TYPES_UI = ['print_finished', 'print_failed', 'maintenance', 'low_stock', 'payment_overdue', 'spool_low', 'print_drift'];
 
@@ -16995,7 +17128,7 @@ function openMobileSidebar() {
 }
 
 function closeMobileSidebar() {
-    document.getElementById('app-sidebar')?.classList.remove('mobile-open');
+    document.getElementById('app-sidebar')?.classList.remove('mobile-open', 'panel-open');
     document.getElementById('sidebar-overlay')?.classList.remove('visible');
 }
 
@@ -17009,6 +17142,17 @@ function toggleMobileSidebar() {
 }
 
 document.getElementById('mobile-menu-toggle')?.addEventListener('click', toggleMobileSidebar);
+// La barre d'état « tiroir ouvert / volet ouvert » est reflétée sur <body> pour que la pastille d'impression et les notifications s'écartent
+(function () {
+    const sb = document.getElementById('app-sidebar');
+    if (!sb) return;
+    const sync = () => {
+        document.body.classList.toggle('nav-drawer-open', sb.classList.contains('mobile-open'));
+        document.body.classList.toggle('nav-panel-open', sb.classList.contains('mobile-open') && sb.classList.contains('panel-open'));
+    };
+    new MutationObserver(sync).observe(sb, { attributes: true, attributeFilter: ['class'] });
+    sync();
+})();
 document.getElementById('sidebar-overlay')?.addEventListener('click', closeMobileSidebar);
 
 document.getElementById('nav-favorites-btn')?.addEventListener('click', closeMobileSidebar);
@@ -17909,6 +18053,16 @@ async function _confirmSendToSlicer(force, ignoreStock) {
             _openInPcSlicer(data.pc_open);
         } else {
             showToast(res.ok ? I18N.t('toast.files_sent') : data.error, res.ok ? 'success' : 'error');
+        }
+        if (res.ok) {
+            // halo « envoyé au slicer » tout de suite (sans écraser un statut réussi / raté déjà connu)
+            const sentPath = currentSlicerFile;
+            const ff = (typeof allFiles !== 'undefined' ? allFiles : []).find(x => x.path === sentPath);
+            if (ff && (ff.print_status || 'never') === 'never') {
+                ff.print_status = 'printed';
+                document.querySelectorAll('.file-card').forEach(card => { if (card.dataset.path === sentPath) card.classList.add('ps-sent'); });
+                if (typeof renderSmartCollections === 'function') renderSmartCollections();
+            }
         }
         if (res.ok && data.stock_warning) _showStockWarningToast(data.stock_warning);
         if (res.ok && data.consume && data.consume.done === false && data.consume.reason === 'no_weight') {
@@ -22233,10 +22387,15 @@ startThumbAutoRefresh();
         const nameEl = document.getElementById('ap-file-name');
         if (nameEl) nameEl.textContent = fileName || '';
         const pSel = document.getElementById('ap-printer-select');
-        const sSel = document.getElementById('ap-spool-select');
         const prSel = document.getElementById('ap-profile-select');
-        [pSel, sSel, prSel].forEach(sel => { if (sel) { sel.querySelectorAll('option[data-dynamic]').forEach(o => o.remove()); sel.value = ''; } });
-        window._apState = { path: filePath, slots: {} };
+        [pSel, prSel].forEach(sel => { if (sel) { sel.querySelectorAll('option[data-dynamic]').forEach(o => o.remove()); sel.value = ''; } });
+        const known = (typeof allFiles !== 'undefined' ? allFiles : []).find(x => x.path === filePath);
+        let plateCount = known ? (known.plate_count || (known.multi_plate ? 2 : 1)) : 1;
+        if (!known && /\.3mf$/i.test(filePath)) {
+            try { const r = await fetch(`${API}/api/file/plate-count?path=${encodeURIComponent(filePath)}`); if (r.ok) plateCount = (await r.json()).plate_count || 1; } catch (_) { /* 1 plateau */ }
+        }
+        window._apState = { path: filePath, slots: {}, plates: Math.max(1, Math.min(plateCount, 64)), rows: {} };
+        _apRenderPlates();
         openModal('modal-already-printed');
         try {
             const res = await fetch(`${API}/api/printers`);
@@ -22250,33 +22409,56 @@ startThumbAutoRefresh();
         try {
             const res = await fetch(`${API}/api/filament/spools`);
             const data = res.ok ? await res.json() : {};
-            (data.slots || []).forEach(sl => {
-                const key = `${sl.source_type}:${sl.source_id}`;
-                window._apState.slots[key] = sl;
-                const o = document.createElement('option');
-                o.value = key;
-                o.textContent = `${sl.name || ('#' + sl.source_id)}${sl.material ? ' — ' + sl.material : ''}`;
-                o.setAttribute('data-dynamic', '1');
-                sSel.appendChild(o);
-            });
+            (data.slots || []).forEach(sl => { window._apState.slots[`${sl.source_type}:${sl.source_id}`] = sl; });
+            _apRenderPlates();
         } catch (err) { /* liste vide */ }
         _loadProcessProfileSelect('ap-profile-select', null, { allSlicers: true });
     };
+
+    // Une zone par plateau ; dans chaque zone, une ou plusieurs bobines (fichier multicolore)
+    function _apSpoolOptions(selected) {
+        const st = window._apState;
+        return `<option value="">${escapeHtml(_t3('printed.none', '— Non précisé —'))}</option>` + Object.entries(st.slots).map(([key, sl]) =>
+            `<option value="${escapeHtml(key)}" style="${_spoolDotStyle(sl)}"${key === selected ? ' selected' : ''}>${escapeHtml((sl.name || ('#' + sl.source_id)) + (sl.material ? ' — ' + sl.material : ''))}</option>`).join('');
+    }
+    function _apRenderPlates() {
+        const box = document.getElementById('ap-plates'), st = window._apState;
+        if (!box || !st) return;
+        for (let i = 1; i <= st.plates; i++) if (!st.rows[i]) st.rows[i] = [''];
+        const multi = st.plates > 1;
+        box.innerHTML = Array.from({ length: st.plates }, (_, k) => {
+            const n = k + 1;
+            const title = multi ? _t3('printed.plate_n', 'Plateau {{n}}', { n }) : _t3('printed.spool', 'Bobine');
+            const rows = st.rows[n].map((key, idx) => {
+                const sl = st.slots[key];
+                const dot = `<span class="ap-dot" style="background:${escapeHtml(sl && sl.color_hex ? (String(sl.color_hex).startsWith('#') ? sl.color_hex : '#' + sl.color_hex) : 'transparent')}"></span>`;
+                const del = st.rows[n].length > 1 ? `<button type="button" class="btn btn-ghost btn-sm" onclick="_apRemoveSpool(${n},${idx})" aria-label="${escapeHtml(_t3('actions.delete', 'Supprimer'))}"><i class="fa-solid fa-xmark"></i></button>` : '';
+                return `<div class="ap-spool-row">${dot}<select class="settings-select" style="flex:1; max-width:none;" onchange="_apSetSpool(${n},${idx},this.value)">${_apSpoolOptions(key)}</select>${del}</div>`;
+            }).join('');
+            return `<div class="ap-plate-block"><label class="ap-label">${escapeHtml(title)}</label>${rows}
+                <button type="button" class="btn btn-ghost btn-sm" onclick="_apAddSpool(${n})"><i class="fa-solid fa-plus"></i> ${escapeHtml(_t3('printed.add_color', 'Ajouter une couleur'))}</button></div>`;
+        }).join('');
+    }
+    window._apSetSpool = (n, i, v) => { window._apState.rows[n][i] = v; _apRenderPlates(); };
+    window._apAddSpool = (n) => { window._apState.rows[n].push(''); _apRenderPlates(); };
+    window._apRemoveSpool = (n, i) => { window._apState.rows[n].splice(i, 1); _apRenderPlates(); };
 
     async function _submitAlreadyPrinted(result) {
         const st = window._apState || {};
         if (!st.path) return;
         const pSel = document.getElementById('ap-printer-select');
         const prSel = document.getElementById('ap-profile-select');
-        const sSel = document.getElementById('ap-spool-select');
         const opt = prSel && prSel.selectedOptions[0];
-        const sl = st.slots[sSel.value];
+        const plates = Object.entries(st.rows).map(([n, keys]) => ({
+            plate: Number(n),
+            spools: keys.map(k => st.slots[k]).filter(Boolean).map(sl => ({ source_type: sl.source_type, source_id: sl.source_id, name: sl.name || '', material: sl.material || '', color_hex: sl.color_hex || '' }))
+        })).filter(pl => pl.spools.length);
         const body = {
             path: st.path, result,
             printer_id: pSel.value || null,
             slicer_profile_id: prSel.value || '',
             slicer_profile_name: prSel.value && opt ? (opt.dataset.name || '') : '',
-            spool: sl ? { source_type: sl.source_type, source_id: sl.source_id, name: sl.name || '', material: sl.material || '', color_hex: sl.color_hex || '' } : null
+            plates
         };
         try {
             const res = await fetch(`${API}/api/print-history/manual`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -22291,7 +22473,7 @@ startThumbAutoRefresh();
                 const cls = f.print_status === 'success' ? 'ps-success' : 'ps-failed';
                 document.querySelectorAll('.file-card').forEach(card => {
                     if (card.dataset.path !== st.path) return;
-                    card.classList.remove('ps-success', 'ps-failed');
+                    card.classList.remove('ps-success', 'ps-failed', 'ps-sent');
                     card.classList.add(cls);
                 });
                 if (typeof renderSmartCollections === 'function') renderSmartCollections();
@@ -26690,7 +26872,7 @@ const ACCT_BRAND = {
 };
 let _acctOverview = null;
 let _acctPollTimer = null;
-const _acctKey = 'stellio_acct_collapsed';
+const _acctKey = 'stellio_acct_open';   // sections dépliées (fermées par défaut)
 function _acctCollapsedState() { try { return JSON.parse(localStorage.getItem(_acctKey) || '{}') || {}; } catch (_) { return {}; } }
 function _acctSaveCollapsed(o) { try { localStorage.setItem(_acctKey, JSON.stringify(o)); } catch (_) {} }
 
@@ -26780,7 +26962,7 @@ async function loadAcctModels(kind) {
         const brand = ACCT_BRAND[p.platform] || { color: '#4ea1d3', icon: 'fa-cube' };
         const meta = ov.platforms.find(x => x.platform === p.platform) || {};
         const key = `${kind}:${p.platform}`;
-        const isCol = !!collapsed[key];
+        const isCol = !collapsed[key];   // 'collapsed' = état des sections ouvertes : tout est fermé par défaut
         const missing = p.items.filter(i => !i.in_library).length;
         const synced = meta.synced_at ? new Date(meta.synced_at * 1000).toLocaleString() : '';
         html.push(`<div class="inv-section acct-section${isCol ? ' inv-collapsed' : ''}" data-acct-key="${key}" style="margin-top:20px;">
@@ -26930,7 +27112,7 @@ document.addEventListener('click', async (ev) => {
         const now = !sec.classList.contains('inv-collapsed');
         sec.classList.toggle('inv-collapsed', now);
         banner.querySelector('.inv-toggle')?.setAttribute('aria-expanded', String(!now));
-        const st = _acctCollapsedState(); if (now) st[sec.dataset.acctKey] = true; else delete st[sec.dataset.acctKey]; _acctSaveCollapsed(st);
+        const st = _acctCollapsedState(); if (now) delete st[sec.dataset.acctKey]; else st[sec.dataset.acctKey] = true; _acctSaveCollapsed(st);
     }
 });
 document.addEventListener('input', (ev) => {
@@ -27251,10 +27433,11 @@ window.openFilamentCatalogModal = openFilamentCatalogModal;
             setCat(b.dataset.rail); setOpen(true); return;
         }
         setOpen(false);
+        if (typeof closeMobileSidebar === 'function') closeMobileSidebar();   // petit écran : le tiroir se referme aussi
         if (b.dataset.railClick) { document.querySelector(b.dataset.railClick)?.click(); setTimeout(syncPageHighlight, 30); }
     });
     // Le volet se referme dès qu'on a choisi une entrée, qu'on clique à côté ou qu'on appuie sur Échap
-    sidebar.querySelector('.sidebar-nav')?.addEventListener('click', (e) => { if (e.target.closest('.nav-btn')) setTimeout(() => setOpen(false), 0); });
+    sidebar.querySelector('.sidebar-nav')?.addEventListener('click', (e) => { if (e.target.closest('.nav-btn')) setTimeout(() => { setOpen(false); if (typeof closeMobileSidebar === 'function') closeMobileSidebar(); }, 0); });
     document.addEventListener('click', (e) => { if (!e.target.closest('#app-sidebar')) setOpen(false); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sidebar.classList.contains('panel-open')) setOpen(false); });
     // La catégorie suit la page ouverte (raccourcis, palette de commandes, visite guidée…)
@@ -27421,3 +27604,40 @@ async function _loadDashboardPrinted() {
         body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${escapeHtml(I18N.t('toast.connection_error'))}</p></div>`;
     }
 }
+
+
+// ===== v1.1.2 : accessibilité =====
+// Boutons « icône seule » : le titre devient le nom accessible ; fenêtres : rôle dialog ; liste de fichiers : étiquettes de cartes.
+(function setupA11y() {
+    const label = (el) => {
+        if (el.hasAttribute('aria-label') || el.hasAttribute('aria-labelledby')) return;
+        if ((el.textContent || '').trim()) return;
+        const t = el.getAttribute('title') || el.getAttribute('data-title');
+        if (t) el.setAttribute('aria-label', t);
+    };
+    const scan = (root) => {
+        if (!root || root.nodeType !== 1) return;
+        if (root.matches?.('button, [role="button"]')) label(root);
+        root.querySelectorAll?.('button:not([aria-label]), [role="button"]:not([aria-label])').forEach(label);
+        if (root.matches?.('.modal')) modal(root);
+        root.querySelectorAll?.('.modal:not([role])').forEach(modal);
+    };
+    const modal = (m) => {
+        if (m.getAttribute('role')) return;
+        m.setAttribute('role', 'dialog');
+        m.setAttribute('aria-modal', 'true');
+        const h = m.querySelector('h1, h2, h3, .modal-title');
+        if (h && (h.textContent || '').trim()) m.setAttribute('aria-label', h.textContent.trim());
+    };
+    let queue = new Set(), timer = null;
+    const flush = () => { timer = null; const items = [...queue]; queue = new Set(); items.forEach(scan); };
+    const start = () => {
+        scan(document.body);
+        new MutationObserver((records) => {
+            for (const r of records) r.addedNodes.forEach(n => { if (n.nodeType === 1) queue.add(n); });
+            if (queue.size && !timer) timer = setTimeout(flush, 250);
+        }).observe(document.body, { childList: true, subtree: true });
+        document.addEventListener('i18n:changed', () => { document.querySelectorAll('button[aria-label]').forEach(b => { const t = b.getAttribute('title'); if (t && !(b.textContent || '').trim()) b.setAttribute('aria-label', t); }); });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();

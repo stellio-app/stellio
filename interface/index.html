@@ -52,6 +52,7 @@
     <script src="assets/vendor/threejs/loaders/3MFLoader.js"></script>
 </head>
 <body>
+<a class="skip-link" href="#main-content" data-i18n="a11y.skip_to_content">Aller au contenu</a>
     <div id="auth-screen" class="auth-screen">
         <div class="auth-container">
             <div class="auth-logo">
@@ -561,7 +562,7 @@
                 </div>
             </div>
 
-            <main class="main-content">
+            <main class="main-content" id="main-content" tabindex="-1">
                 <div id="page-dashboard" class="page active">
                     <div class="dashboard-page">
                         <div class="dashboard-header">
@@ -594,6 +595,7 @@
                                 <div class="dashboard-widget-header">
                                     <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
                                     <h3><i class="fa-solid fa-video"></i> <span data-i18n="dashboard.cameras_title">Caméras des impressions en cours</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="openCameraPicker(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
                                     <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('cameras')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
                                 </div>
                                 <div class="dashboard-widget-body" id="dashboard-cameras-body"></div>
@@ -2220,6 +2222,9 @@
                                         <option value="ntfy" data-i18n="push.provider_ntfy">ntfy (auto-hébergeable)</option>
                                         <option value="telegram" data-i18n="push.provider_telegram">Telegram</option>
                                         <option value="discord" data-i18n="push.provider_discord">Discord (webhook)</option>
+                                        <option value="gotify" data-i18n="push.provider_gotify">Gotify (auto-hébergeable)</option>
+                                        <option value="pushover" data-i18n="push.provider_pushover">Pushover</option>
+                                        <option value="slack" data-i18n="push.provider_slack">Slack (webhook)</option>
                                         <option value="webhook" data-i18n="push.provider_webhook">Webhook générique</option>
                                     </select>
                                 </div>
@@ -2235,6 +2240,17 @@
                                 <div data-push-provider="discord" class="hidden" style="display:flex; flex-direction:column; gap:8px;">
                                     <label class="spool-extra-field"><span data-i18n="push.discord_url">URL du webhook Discord</span><input type="password" id="push-discord-url" class="settings-select" autocomplete="new-password"></label>
                                 </div>
+                                <div data-push-provider="gotify" class="hidden" style="display:flex; flex-direction:column; gap:8px;">
+                                    <label class="spool-extra-field"><span data-i18n="push.gotify_url">URL du serveur Gotify</span><input type="url" id="push-gotify-url" class="settings-select" placeholder="https://gotify.exemple.fr" autocomplete="off"></label>
+                                    <label class="spool-extra-field"><span data-i18n="push.gotify_token">Jeton de l'application</span><input type="password" id="push-gotify-token" class="settings-select" autocomplete="new-password"></label>
+                                </div>
+                                <div data-push-provider="pushover" class="hidden" style="display:flex; flex-direction:column; gap:8px;">
+                                    <label class="spool-extra-field"><span data-i18n="push.pushover_token">Jeton d'application (API token)</span><input type="password" id="push-pushover-token" class="settings-select" autocomplete="new-password"></label>
+                                    <label class="spool-extra-field"><span data-i18n="push.pushover_user">Clé utilisateur (user key)</span><input type="password" id="push-pushover-user" class="settings-select" autocomplete="new-password"></label>
+                                </div>
+                                <div data-push-provider="slack" class="hidden" style="display:flex; flex-direction:column; gap:8px;">
+                                    <label class="spool-extra-field"><span data-i18n="push.slack_url">URL du webhook Slack</span><input type="password" id="push-slack-url" class="settings-select" autocomplete="new-password"></label>
+                                </div>
                                 <div data-push-provider="webhook" class="hidden" style="display:flex; flex-direction:column; gap:8px;">
                                     <label class="spool-extra-field"><span data-i18n="push.webhook_url">URL du webhook</span><input type="url" id="push-webhook-url" class="settings-select" autocomplete="off"></label>
                                 </div>
@@ -2248,6 +2264,7 @@
                                         <label class="checkbox-label"><input type="checkbox" data-push-type="payment_overdue" checked> <span data-i18n="push.type_payment_overdue">Factures en retard</span></label>
                                         <label class="checkbox-label"><input type="checkbox" data-push-type="spool_low" checked> <span data-i18n="push.type_spool_low">Bobine presque vide</span></label>
                                         <label class="checkbox-label"><input type="checkbox" data-push-type="print_drift" checked> <span data-i18n="push.type_print_drift">Dérive d'impression</span></label>
+                                        <label class="checkbox-label"><input type="checkbox" data-push-type="printer_offline"> <span data-i18n="push.type_printer_offline">Imprimante hors ligne (injoignable depuis 3 min)</span></label>
                                     </div>
                                 </div>
                                 <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
@@ -4696,12 +4713,7 @@
                         <option value="" data-i18n="printed.none">— Non précisé —</option>
                     </select>
                 </div>
-                <div style="margin-bottom:14px;">
-                    <label for="ap-spool-select" class="ap-label" data-i18n="printed.spool">Bobine</label>
-                    <select id="ap-spool-select" class="settings-select" style="width:100%; max-width:none;">
-                        <option value="" data-i18n="printed.none">— Non précisé —</option>
-                    </select>
-                </div>
+                <div id="ap-plates" style="margin-bottom:14px;"></div>
                 <div style="display:flex; gap:8px;">
                     <button type="button" class="btn ap-btn-success" id="ap-success-btn" style="flex:1; justify-content:center;"><i class="fa-solid fa-circle-check"></i> <span data-i18n="printed.success">Réussi</span></button>
                     <button type="button" class="btn ap-btn-failed" id="ap-failed-btn" style="flex:1; justify-content:center;"><i class="fa-solid fa-circle-xmark"></i> <span data-i18n="printed.failed">Raté</span></button>

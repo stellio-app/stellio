@@ -1,0 +1,36 @@
+name: Bug / Signaler un bug
+description: Quelque chose ne fonctionne pas / Something is broken
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version de Stellio / Stellio version
+      placeholder: "1.1.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: edition
+    attributes:
+      label: Édition / Edition
+      options: [Windows, macOS, Linux, Serveur (Pi / Proxmox / Docker), Android]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Étapes pour reproduire / Steps to reproduce
+      placeholder: "1. ...\n2. ...\n3. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Résultat attendu et obtenu / Expected and actual result
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs ou capture d'écran / Logs or screenshot
+      description: Sans mot de passe ni jeton / No passwords or tokens

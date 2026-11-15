@@ -37,6 +37,7 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -257,6 +258,7 @@ public class MainActivity extends Activity {
 
     private void buildSetup() {
         LinearLayout c = column(Gravity.TOP);
+        c.addView(logo());
         c.addView(text(getString(R.string.setup_title), 22, getColor(R.color.text), true));
         TextView note = text(getString(R.string.edition_note), 13, getColor(R.color.muted), false);
         note.setPadding(0, dp(6), 0, dp(10));
@@ -292,10 +294,24 @@ public class MainActivity extends Activity {
         root.addView(sv);
     }
 
+    /** Logo Stellio (fond transparent) affiché en haut des pages de configuration et « serveur injoignable ». */
+    private ImageView logo() {
+        ImageView iv = new ImageView(this);
+        iv.setImageResource(R.drawable.logo_stellio);
+        iv.setAdjustViewBounds(true);
+        iv.setContentDescription("Stellio");
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(96), dp(96));
+        lp.gravity = Gravity.CENTER_HORIZONTAL;
+        lp.bottomMargin = dp(18);
+        iv.setLayoutParams(lp);
+        return iv;
+    }
+
     private void buildOffline() {
         LinearLayout c = column(Gravity.CENTER);
         c.setBackgroundColor(getColor(R.color.bg));
         c.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        c.addView(logo());
         c.addView(text(getString(R.string.offline_title), 22, getColor(R.color.text), true));
         TextView t = text(getString(R.string.offline_text), 14, getColor(R.color.muted), false);
         t.setGravity(Gravity.CENTER);

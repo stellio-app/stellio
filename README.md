@@ -407,7 +407,7 @@ Got an idea? [Open an issue](https://github.com/stellio-app/stellio/issues)!
 ## 🤝 Contributing
 
 
-Contributions are welcome! 🎉
+Contributions are welcome! 🎉 Read [CONTRIBUTING.md](CONTRIBUTING.md) to get started in 5 minutes, and look for the [good first issue](https://github.com/stellio-app/stellio/labels/good%20first%20issue) label.
 
 1. **Fork** the project
 2. Create your branch (`git checkout -b feature/AmazingFeature`)

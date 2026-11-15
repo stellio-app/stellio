@@ -149,6 +149,9 @@ Stellio automatically detects your installed slicers (OrcaSlicer, Bambu Studio, 
 ## Dashboard
 The home page gathers prints in progress, low stock, recent prints and recent files. The **widgets** (about twenty) can be reordered by drag and drop and hidden: current prints, low stock, latest S.O.S Print, suggestions, Stellio instances, completed projects, gallery, quotes…
 
+## Navigation
+The left bar is a **narrow rail**: Home, Library, Printing, Filament, Tools and Tracking. Click a category to open its **panel**; it closes after you choose. The notification badges of a category's pages are **added up** on its icon. At the bottom: Workshop mode, Help, **Updates** and Settings. **Projects** and **Already printed** are in Printing.
+
 ## Everyday tools
 - **Command palette** `Ctrl+K`: navigate, run an action, find a file, tag, spool or profile.
 - **Notification center** (bell): print finished, failure, maintenance, low stock, spool drying.
@@ -269,7 +272,7 @@ Every Stellio feature, **what it is for and how to use it**. Technical details a
 
 1. On the printer card: temperature, progress, **live camera** and the name of the current file.
 2. A **floating widget** shows progress on every page.
-3. The **bell** warns you (finished, failed, maintenance, low stock); turn on **push notifications** (ntfy, Telegram, Discord, webhook) to be told with the window closed.
+3. The **bell** warns you (finished, failed, maintenance, low stock); turn on **push notifications** (ntfy, Gotify, Pushover, Telegram, Discord, Slack, webhook) to be told with the window closed.
 4. At 100%, Stellio takes the **end photo**: mark it *Success* or *Failure* in one click. The **timelapse** is assembled automatically.
 
 ## Rate, reprint, find your photos
@@ -360,6 +363,7 @@ Full list: [Settings and data](en-Settings-and-Data).
 - **Undo deletions** (`Ctrl+Z`) thanks to a 5-minute temporary trash; also works for tags, projects and sources.
 - **Green / red halo** around the thumbnail: green for a file already printed successfully, red for a failed print (gallery and details views).
 - **Already printed** (⋯ menu of a file): record by hand a print made elsewhere — pick the printer, the settings (slicer profile) and the spool, then **Success** or **Failed**. The file joins the “Printed OK” / “Failed” filters and its details sheet (right-click) shows the printer, settings and spool.
+- **“Already printed” page** (Printing panel): every file you printed or marked “already printed”, with the same thumbnails and halos as the library, a search and a Successful / Failed filter. The **Remove** button (also in the file info) undoes that status: the file becomes “never printed” again. A widget of the same name is available on the home page.
 - Fast selection: `Shift+click` for a range, arrows + `Enter`.
 - **Duplicate detection** (exact and similar geometry).
 - **Model origin**: source link, author, license, notes, download date.
@@ -463,6 +467,8 @@ Other models that speak the same protocol usually work. Tell us on GitHub if you
 | **Bambu AMS / Creality CFS** | Slot reading. |
 
 **Open Filament Database**: search a spool by brand, material and color, then create it in one click (weight, diameter and density prefilled).
+
+In the send-to-slicer window, the spool list is sorted and has a **search field**.
 
 ## Day to day
 - **Automatic consumption** on send-to-slicer, with a compatibility check (enough material?).
@@ -578,6 +584,7 @@ Visible when *Enable cost, quote and invoicing features* is checked:
 - **QR code** for mobile access to the library (**installable PWA**).
 - **Android companion app**: a dedicated QR code (Settings → mobile access) downloads the APK. It handles internal and external addresses with automatic switching, QR pairing, photos straight from a print, and reading/writing OpenPrintTag NFC tags.
 - **Android app update**: on launch, a dialog announces the new version published on GitHub and offers to download and install it in one tap (checksum verified).
+- **Updates over the existing app**: since 1.1.0 the APK is signed with a permanent key. If Android shows “package conflicts with an existing package”, uninstall the old version once and install the new one; later updates install normally.
 - Full-screen **workshop mode** for tablet/phone.
 
 {{img:android-update}}
@@ -599,7 +606,7 @@ Visible when *Enable cost, quote and invoicing features* is checked:
 
 ## Notifications
 - Native **Windows** notifications, **browser** notifications (Pi, mobile).
-- **Push**: ntfy, Telegram, Discord or webhook, even with the window closed (print finished, failure, maintenance, stock).
+- **Push**: ntfy, Gotify, Pushover, Telegram, Discord, Slack or webhook, even with the window closed (print finished with file name and duration, failure, maintenance, stock, printer offline).
 
 ## Home automation
 - **MQTT / Home Assistant**: state publishing and automatic discovery; "Stellio" MQTT device and sensors.
@@ -667,7 +674,7 @@ Watchdog interventions: `journalctl -t stellio-watchdog`. Existing containers ge
 
 ## Appearance
 - **Theme**: Dark / Light / System. **Light** by default; dark only if the system (or you) asks for it.
-- **Brand themes**: Stellio, Bambu, Prusa, Voron, Creality; 33 palettes, custom accent color, adjustable background image.
+- **Brand themes**: Stellio, Bambu, Prusa, Voron, Creality; 33 palettes, custom accent color, adjustable background image. A Stellio image is offered by default (**Default image** button).
 - **Accessibility**: high contrast, reduced motion, visible keyboard focus, text size, color-blind mode.
 - **8 languages**: fr, en, de, es, it, pt, ja, zh.
 - Navigation reorderable by drag and drop; **undo the last setting you changed**.

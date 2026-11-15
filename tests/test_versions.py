@@ -1137,7 +1137,7 @@ def _auto_ns(tmp_path, headless, last=None, now=1_000_000.0):
                          'ACCT_MODELS_PLATFORMS': {'makerworld': {}, 'printables': {}, 'thingiverse': {}},
                          '_acct_sync_async': lambda uid, plats, force=False: calls.append((uid, tuple(plats), force)) or list(plats),
                          'load_settings': lambda: settings, 'save_settings': lambda s: settings.update(s),
-                         'app_logger': _Log_106fixes(), 'time': clock, 'STELLIO_HEADLESS': headless})
+                         'app_logger': _Log_106fixes(), 'time': clock, 'STELLIO_HEADLESS': headless, '_MAIN': {'STELLIO_HEADLESS': headless}})
     return ns, calls, settings, clock
 
 
@@ -1271,13 +1271,13 @@ def test_issue_description_gets_printer_block_when_tech_info_is_sent():
 # ======================================================================
 
 ROOT_107gcodeslicer = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MAIN_107gcodeslicer = open(os.path.join(ROOT_107gcodeslicer, 'main.py'), encoding='utf-8').read()
+MAIN_107gcodeslicer = open(os.path.join(ROOT_107gcodeslicer, 'modules', 'gcode_archive.py'), encoding='utf-8').read()   # code déplacé de main.py vers ce module (v1.1.1)
 JS_107gcodeslicer = open(os.path.join(ROOT_107gcodeslicer, 'interface', 'script.js'), encoding='utf-8').read()
 
 
 def test_backend_route_opens_stored_gcode_in_default_slicer():
     a = MAIN_107gcodeslicer.index('def api_project_gcode_open_in_slicer')
-    b = MAIN_107gcodeslicer.index("@app.route('/api/projects/<int:project_id>/files', methods=['DELETE'])")
+    b = MAIN_107gcodeslicer.index('\ndef ', a + 10)
     s = MAIN_107gcodeslicer[a:b]
     assert "find_slicer_by_name(slicer_name)" in s and "subprocess.Popen([slicer_path, path])" in s
     assert "IS_SERVER_EDITION" in s and "_slicer_fetch_links[ftoken]" in s and "_gcode_row(gid)" in s
@@ -2038,7 +2038,7 @@ def test_already_printed_wiring_and_i18n():
     html = (root / 'interface/index.html').read_text(encoding='utf-8')
     js = (root / 'interface/script.js').read_text(encoding='utf-8')
     for ident in ('ctx-printed-btn', 'modal-already-printed', 'ap-printer-select', 'ap-profile-select',
-                  'ap-spool-select', 'ap-success-btn', 'ap-failed-btn'):
+                  'ap-plates', 'ap-success-btn', 'ap-failed-btn'):
         assert f'id="{ident}"' in html
     assert 'openAlreadyPrintedModal' in js and '/api/print-history/manual' in js and '/api/print-history/by-file' in js
     keys = ['action', 'title', 'printer', 'settings', 'spool', 'none', 'success', 'failed', 'row', 'saved', 'error']
@@ -2163,10 +2163,10 @@ def test_v110_no_update_done_popup():
     js = (root / 'interface/script.js').read_text(encoding='utf-8')
     body = js[js.index('async checkAndShowChangelog()'):js.index('async checkForUpdates(')]
     assert 'showChangelogModal(' not in body and 'stellio-last-seen-version' in body
-    assert 'CURRENT_VERSION = "1.1.0"' in (root / 'main.py').read_text(encoding='utf-8')
+    assert 'CURRENT_VERSION = "1.1.1"' in (root / 'main.py').read_text(encoding='utf-8')
     for p in ('changelog.json', 'languages/changelog.json'):
         d = json.loads((root / p).read_text(encoding='utf-8'))
-        assert d[0]['version'] == '1.1.0' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
+        assert d[0]['version'] == '1.1.1' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
 
 
 def test_v110_no_badge_on_likes_and_creations():
@@ -2291,3 +2291,230 @@ def test_v110_readme_credits_open_data():
     for f in files:
         t = f.read_text(encoding='utf-8')
         assert 'openfilamentdatabase.org' in t and 'specs.openprinttag.org' in t, f.name
+
+
+def test_v110_account_sections_closed_by_default():
+    from pathlib import Path as _P
+    js = (_P(__file__).resolve().parent.parent / 'interface/script.js').read_text(encoding='utf-8')
+    assert "const isCol = !collapsed[key];" in js
+    assert "stellio_acct_open" in js
+
+
+def test_v110_printed_cards_same_size():
+    from pathlib import Path as _P
+    css = (_P(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
+    assert 'grid-auto-rows: 1fr' in css and '.printed-card { height: 100%; }' in css
+
+
+def test_v111_changelog_entry():
+    import json
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    for p in ('changelog.json', 'languages/changelog.json'):
+        d = json.loads((root / p).read_text(encoding='utf-8'))
+        assert d[0]['version'] == '1.1.1' and len(d[0]['items']['fr']) >= 15 and all(len(v) >= 2 for v in d[0]['items'].values())
+
+
+def test_v111_security_options_and_modules():
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    main = (root / 'main.py').read_text(encoding='utf-8')
+    assert "STELLIO_COOKIE_SECURE" in main and "Strict-Transport-Security" in main
+    assert (root / 'docs/SECURITY.md').exists()
+    for m in ('ai_features', 'ai_providers', 'account_platforms', 'backup_restore', 'file_convert', 'file_origin_delete',
+              'gcode_archive', 'integrity_check', 'photo_search', 'slicer_import', 'trash_core', 'workshop_watch'):
+        assert (root / 'modules' / f'{m}.py').exists(), m
+    assert 'integrity_check.integrity_check_state' in main      # régression corrigée : /api/diagnostic/health
+
+
+def test_v112_lazy_thumbs_collections_and_a11y():
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    html = (root / 'interface/index.html').read_text(encoding='utf-8')
+    assert '<img src="${thumbUrl}" loading="lazy" decoding="async"' in js
+    assert "id: 'queue'" in js and "id: 'favorites'" in js and 'setupA11y' in js
+    assert 'prefers-reduced-motion' in css and '.skip-link' in css and ':focus-visible' in css
+    assert 'class="skip-link"' in html and 'id="main-content"' in html
+    import json
+    for l in ('fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'):
+        d = json.loads((root / f'languages/{l}.json').read_text(encoding='utf-8'))
+        assert d['collections.queue'] and d['collections.favorites'] and d['a11y.skip_to_content'], l
+
+
+# ── v1.1.3 : notifications push enrichies ───────────────────────────────────
+def _push_mod():
+    import importlib.util
+    from pathlib import Path as _P
+    path = _P(__file__).resolve().parent.parent / 'modules' / 'push_notify.py'
+    spec = importlib.util.spec_from_file_location('push_notify_under_test', path)
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+    m._PUSH_TAGS = {}; m._PUSH_DEFAULT_TYPES = ['print_finished', 'print_failed']
+    m._server_t = lambda key, default: default
+    return m
+
+
+def test_v113_duration_and_job_message():
+    m = _push_mod()
+    assert m._push_fmt_duration(3725) == '1 h 02 min' and m._push_fmt_duration(540) == '9 min'
+    assert m._push_fmt_duration(0) == '' and m._push_fmt_duration(None) == '' and m._push_fmt_duration('x') == ''
+    assert m._push_job_message('Ender', {'file': 'boite.3mf', 'elapsed': 5040}) == 'Ender — boite.3mf (1 h 24 min)'
+    assert m._push_job_message('Ender', {}) == 'Ender'
+
+
+def test_v113_new_providers_payloads():
+    m = _push_mod()
+    sent = []
+    m._push_http_post = lambda url, body, headers=None: sent.append((url, body, headers))
+    m._push_deliver({'push_provider': 'gotify', 'push_gotify_url': 'https://g.example/', 'push_gotify_token': 'TK'}, 'T', 'M', 'print_failed')
+    m._push_deliver({'push_provider': 'pushover', 'push_pushover_token': 'AT', 'push_pushover_user': 'UK'}, 'T', 'M', 'print_finished')
+    m._push_deliver({'push_provider': 'slack', 'push_slack_url': 'https://hooks.slack.com/x'}, 'T', 'M')
+    assert sent[0][0] == 'https://g.example/message' and sent[0][2] == {'X-Gotify-Key': 'TK'} and sent[0][1]['priority'] == 8
+    assert sent[1][0] == 'https://api.pushover.net/1/messages.json' and sent[1][1]['user'] == 'UK' and sent[1][1]['priority'] == 0
+    assert sent[2][1]['text'] == '*T*\nM'
+    for cfg in ({'push_provider': 'gotify'}, {'push_provider': 'pushover', 'push_pushover_token': 'a'}, {'push_provider': 'slack'}):
+        with pytest.raises(ValueError):
+            m._push_deliver(cfg, 'T', 'M')
+
+
+def test_v113_offline_alert_only_after_being_seen_online():
+    m = _push_mod()
+    got = []
+    m._push_notify_async = lambda *a: got.append(a)
+    types = ['printer_offline']
+    m._push_check_offline(1, 'Ender', False, 1000.0, types)           # jamais vue en ligne : rien
+    m._push_check_offline(1, 'Ender', False, 5000.0, types)
+    assert got == []
+    m._push_check_offline(2, 'Sidewinder', True, 1000.0, types)       # vue en ligne
+    m._push_check_offline(2, 'Sidewinder', False, 1100.0, types)      # début de la panne
+    m._push_check_offline(2, 'Sidewinder', False, 1200.0, types)      # < 3 min : rien
+    assert got == []
+    m._push_check_offline(2, 'Sidewinder', False, 1290.0, types)      # ≥ 3 min : une alerte
+    m._push_check_offline(2, 'Sidewinder', False, 1500.0, types)      # pas de doublon
+    assert len(got) == 1 and got[0][0] == 'printer_offline' and got[0][2] == 'Sidewinder'
+    m._push_check_offline(2, 'Sidewinder', True, 1600.0, types)       # revenue : ré-armée
+    m._push_check_offline(2, 'Sidewinder', False, 1700.0, types)
+    m._push_check_offline(2, 'Sidewinder', False, 1900.0, types)
+    assert len(got) == 2
+    got.clear(); m._push_offline_since.clear()
+    m._push_check_offline(2, 'Sidewinder', False, 2000.0, [])        # type non coché : pas d'envoi
+    m._push_check_offline(2, 'Sidewinder', False, 2300.0, [])
+    assert got == []
+
+
+def test_v113_ui_has_new_providers_and_offline_type():
+    import json
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    html = (root / 'interface/index.html').read_text(encoding='utf-8')
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    for pid in ('gotify', 'pushover', 'slack'):
+        assert f'<option value="{pid}"' in html and f'data-push-provider="{pid}"' in html
+    assert 'data-push-type="printer_offline"' in html
+    for fid in ('push-gotify-url', 'push-gotify-token', 'push-pushover-token', 'push-pushover-user', 'push-slack-url'):
+        assert f'id="{fid}"' in html and f"'{fid}'" in js
+    for l in ('fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'):
+        d = json.loads((root / f'languages/{l}.json').read_text(encoding='utf-8'))
+        for k in ('push.provider_gotify', 'push.provider_pushover', 'push.provider_slack', 'push.type_printer_offline', 'notif.printer_offline_title', 'push.gotify_url', 'push.slack_url'):
+            assert d.get(k), (l, k)
+
+
+# ── v1.1.4 : releases GitHub automatiques + contribution ────────────────────
+def test_v114_release_notes_generator():
+    import subprocess, sys
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    out = subprocess.run([sys.executable, str(root / 'tools' / 'release_notes.py'), 'v1.1.1'],
+                         capture_output=True, text=True, check=True).stdout
+    assert out.startswith('## Stellio v1.1.1') and "What's new" in out and 'Nouveautés' in out
+    assert subprocess.run([sys.executable, str(root / 'tools' / 'release_notes.py'), '9.9.9'],
+                          capture_output=True).returncode != 0
+
+
+def test_v114_workflow_uses_notes_and_community_files():
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    wf = (root / '.github' / 'workflows' / 'build-and-sign.yml').read_text(encoding='utf-8')
+    assert 'tools/release_notes.py' in wf and 'body_path: RELEASE_BODY.md' in wf
+    assert (root / 'CONTRIBUTING.md').is_file()
+    for n in ('bug.yml', 'feature.yml', 'good-first-issue.yml', 'config.yml'):
+        assert (root / '.github' / 'ISSUE_TEMPLATE' / n).is_file()
+    assert 'versionName \'1.1.1\'' in (root / 'apk-src' / 'app' / 'build.gradle').read_text(encoding='utf-8')
+
+
+# ── v1.1.1 (ajouts) : popup caméra, couleurs par plateau, boutiques OFD ─────
+def test_v111_camera_popup_and_see_all():
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    assert 'openCameraPopup(${printer.id})' in js and '.slice(0, 4)' in js and 'function openCameraPicker' in js
+    assert 'openCameraPicker()' in (root / 'interface/index.html').read_text(encoding='utf-8')
+
+
+def test_v111_ofd_shops_file_and_generator():
+    import json, pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent
+    d = json.loads((root / 'languages/ofd_shops.json').read_text(encoding='utf-8'))
+    assert d['license'] == 'MIT' and len(d['shops']) >= 80
+    assert all(s['url'].startswith('http') and s['name'] and s['id'].startswith('ofd_') for s in d['shops'])
+    assert (root / 'tools/update_ofd_shops.py').is_file()
+
+
+def test_v111_new_i18n_keys_in_all_languages():
+    import json, pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent
+    for l in ('fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'):
+        d = json.loads((root / f'languages/{l}.json').read_text(encoding='utf-8'))
+        for k in ('dashboard.cameras_pick', 'dashboard.cameras_none', 'printed.plate_n', 'printed.add_color'):
+            assert d.get(k), (l, k)
+
+
+def test_v111_recent_searches_dropdown_stays_above_cards():
+    import pathlib
+    css = (pathlib.Path(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
+    assert '.app-header:focus-within { z-index: 200; }' in css
+    block = css[css.index('.search-recent-dropdown {'):css.index('@keyframes recentSearchIn')]
+    assert 'z-index: 300' in block
+
+
+def test_v111_sent_to_slicer_halo():
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    assert "' ps-sent'" in js and "card.classList.add('ps-sent')" in js
+    assert '.file-card.ps-sent' in css
+
+
+def test_v111_sent_to_slicer_smart_collection():
+    import json, pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent
+    assert "id: 'sent'" in (root / 'interface/script.js').read_text(encoding='utf-8')
+    for l in ('fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'):
+        assert json.loads((root / f'languages/{l}.json').read_text(encoding='utf-8')).get('collections.sent')
+
+
+def test_v111_apk_logo_on_setup_and_offline_pages():
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent / 'apk-src/app/src/main'
+    java = (root / 'java/com/stellioapp/companion/MainActivity.java').read_text(encoding='utf-8')
+    assert java.count('c.addView(logo());') == 2 and 'R.drawable.logo_stellio' in java
+    assert (root / 'res/drawable-nodpi/logo_stellio.png').is_file()
+
+
+def test_v111_mobile_drawer_and_centered_background():
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    assert '.bottom-nav, .bottom-nav-scroll-hint { display: none !important; }' in css
+    assert '.mobile-menu-toggle { display: flex !important;' in css and '@media all {\n    :root { --rail-width: 76px;' in css
+    assert "classList.remove('mobile-open', 'panel-open')" in js and 'function _bgFocusX' in js
+
+
+def test_v111_mini_printer_badge_yields_to_drawer():
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    assert 'body.nav-panel-open #bottom-stack > * { display: none !important; }' in css
+    assert "'nav-drawer-open'" in js and "'nav-panel-open'" in js
