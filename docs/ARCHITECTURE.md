@@ -35,7 +35,7 @@ stellio/
 ├── install-pi.sh            installation Raspberry Pi / Linux (adresse publiée, voir ci-dessous)
 ├── stellio-lxc.sh           installation Proxmox LXC (adresse publiée, voir ci-dessous)
 ├── CODEMAP.md  llms.txt  README*.md  LICENSE  THIRD_PARTY_LICENSES.md  CODE_SIGNING_POLICY.md
-└── .github/workflows/       build-and-sign.yml (compilation, signature, release), tests.yml (pytest)
+└── .github/workflows/       build-and-sign.yml (compilation, signature, release)
 ```
 
 Restent à la racine, volontairement : `install-pi.sh` et `stellio-lxc.sh` (leurs adresses `raw.githubusercontent.com/.../main/…` sont publiées dans les README et

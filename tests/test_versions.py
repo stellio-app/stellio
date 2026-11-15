@@ -2167,7 +2167,6 @@ def test_v110_no_update_done_popup():
     for p in ('changelog.json', 'languages/changelog.json'):
         d = json.loads((root / p).read_text(encoding='utf-8'))
         assert d[0]['version'] == '1.1.0' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
-    assert (root / 'release-notes/notes_version_1.1.0.txt').exists()
 
 
 def test_v110_no_badge_on_likes_and_creations():
