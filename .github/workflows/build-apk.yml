@@ -54,7 +54,11 @@ jobs:
           KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
         run: |
           if [ -n "$KS_B64" ]; then
-            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/stellio.jks"
+            # tolère les espaces / retours à la ligne collés avec le secret
+            if ! printf '%s' "$KS_B64" | tr -d ' \r\n\t' | base64 -d > "$RUNNER_TEMP/stellio.jks" 2>/dev/null || [ ! -s "$RUNNER_TEMP/stellio.jks" ]; then
+              echo "::error::ANDROID_KEYSTORE_B64 est invalide : recopiez UNIQUEMENT le contenu du fichier keystore.b64.txt (une seule ligne, sans le titre ni espace)."
+              exit 1
+            fi
             echo "STELLIO_KEYSTORE=$RUNNER_TEMP/stellio.jks" >> "$GITHUB_ENV"
           else
             echo "::warning::ANDROID_KEYSTORE_B64 absent : APK signé avec la clé de debug (la signature peut changer d'un build à l'autre)."
