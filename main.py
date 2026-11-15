@@ -13640,6 +13640,61 @@ def api_manual_print_history():
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 
+@app.route('/api/printed-files', methods=['GET'])
+@login_required
+def api_printed_files():
+    """Fichiers déjà imprimés (réussi / raté), regroupés par fichier : alimente la page « Déjà imprimés » et son widget."""
+    try:
+        limit = max(1, min(int(request.args.get('limit', 500)), 2000))
+    except (TypeError, ValueError):
+        limit = 500
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """SELECT file_path, MAX(file_name) AS file_name, MAX(file_ext) AS file_ext, MAX(sent_at) AS last_at,
+                      SUM(CASE WHEN result='success' THEN 1 ELSE 0 END) AS ok,
+                      SUM(CASE WHEN result='failed' THEN 1 ELSE 0 END) AS ko,
+                      SUM(CASE WHEN result='partial' THEN 1 ELSE 0 END) AS partial,
+                      COUNT(*) AS total
+               FROM print_history WHERE user_id=? AND IFNULL(result,'') <> ''
+               GROUP BY file_path ORDER BY last_at DESC LIMIT ?""",
+            (session['user_id'], limit)).fetchall()
+    finally:
+        conn.close()
+    return jsonify({"files": [dict(r) for r in rows]}), 200
+
+
+@app.route('/api/print-history/by-file', methods=['DELETE'])
+@login_required
+def api_print_history_delete_by_file():
+    """Retire le statut « déjà imprimé » d'un fichier : supprime ses impressions notées (réussies / ratées)."""
+    data = request.get_json(silent=True) or {}
+    path = (data.get('path') or request.args.get('path') or '').strip()
+    if not path:
+        return jsonify({"error": "path requis"}), 400
+    norm = path.replace('\\', '/')
+    conn = get_db()
+    try:
+        prev_success = conn.execute(
+            "SELECT 1 FROM print_history WHERE user_id=? AND (file_path=? OR file_path=?) AND result='success' LIMIT 1",
+            (session['user_id'], norm, path)).fetchone() is not None
+        cur = conn.execute(
+            "DELETE FROM print_history WHERE user_id=? AND (file_path=? OR file_path=?) AND IFNULL(result,'') <> ''",
+            (session['user_id'], norm, path))
+        removed = cur.rowcount
+        try:
+            _sync_print_success_links(conn, session['user_id'], norm, prev_success, False)
+        except Exception as link_err:
+            app_logger.warning(f"[PrintHistory] Synchronisation projets échouée: {link_err}")
+        conn.commit()
+    except Exception as e:
+        app_logger.error(f"[PrintHistory] Retrait du statut imprimé échoué: {e}")
+        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+    finally:
+        conn.close()
+    return jsonify({"success": True, "removed": removed}), 200
+
+
 @app.route('/api/print-history/by-file', methods=['GET'])
 @login_required
 def api_print_history_by_file():

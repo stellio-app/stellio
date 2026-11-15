@@ -2976,5 +2976,20 @@
   "about.data_title": "Dati e standard aperti",
   "about.data_desc": "Il catalogo delle bobine proviene dall'Open Filament Database (Open Filament Collective, licenza MIT). Grazie ai suoi collaboratori.",
   "about.optag_desc": "Le etichette NFC delle bobine seguono lo standard OpenPrintTag (Prusa Research, licenza MIT).",
-  "settings.bg_default": "Immagine predefinita"
+  "settings.bg_default": "Immagine predefinita",
+  "nav.printed": "Già stampati",
+  "printed.page_title": "Già stampati",
+  "printed.page_hint": "File che hai stampato o contrassegnato come «già stampato». Rimuovine uno per farlo tornare «mai stampato».",
+  "printed.search": "Cerca un file…",
+  "printed.filter_all": "Tutti",
+  "printed.filter_success": "Riusciti",
+  "printed.filter_failed": "Falliti",
+  "printed.empty_title": "Nessun file stampato per ora",
+  "printed.empty": "I file contrassegnati come «già stampato» appariranno qui.",
+  "printed.remove": "Rimuovi",
+  "printed.remove_confirm": "Rimuovere questo file da «Già stampati»? Tornerà «mai stampato».",
+  "printed.removed": "Stato «già stampato» rimosso",
+  "dashboard.printed_title": "Già stampati",
+  "dashboard.no_printed": "Nessun file stampato per ora",
+  "dashboard.printed_summary": "{{n}} file già stampato/i"
 }

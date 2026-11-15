@@ -2976,5 +2976,20 @@
   "about.data_title": "Offene Daten und Standards",
   "about.data_desc": "Der Spulenkatalog stammt aus der Open Filament Database (Open Filament Collective, MIT-Lizenz). Dank an alle Mitwirkenden.",
   "about.optag_desc": "Die NFC-Spulenetiketten folgen dem OpenPrintTag-Standard (Prusa Research, MIT-Lizenz).",
-  "settings.bg_default": "Standardbild"
+  "settings.bg_default": "Standardbild",
+  "nav.printed": "Bereits gedruckt",
+  "printed.page_title": "Bereits gedruckt",
+  "printed.page_hint": "Dateien, die Sie gedruckt oder als „bereits gedruckt“ markiert haben. Entfernen Sie eine, damit sie wieder „nie gedruckt“ ist.",
+  "printed.search": "Datei suchen …",
+  "printed.filter_all": "Alle",
+  "printed.filter_success": "Erfolgreich",
+  "printed.filter_failed": "Fehlgeschlagen",
+  "printed.empty_title": "Noch keine gedruckten Dateien",
+  "printed.empty": "Als „bereits gedruckt“ markierte Dateien erscheinen hier.",
+  "printed.remove": "Entfernen",
+  "printed.remove_confirm": "Diese Datei aus „Bereits gedruckt“ entfernen? Sie gilt dann wieder als „nie gedruckt“.",
+  "printed.removed": "Status „bereits gedruckt“ entfernt",
+  "dashboard.printed_title": "Bereits gedruckt",
+  "dashboard.no_printed": "Noch keine gedruckten Dateien",
+  "dashboard.printed_summary": "{{n}} Datei(en) bereits gedruckt"
 }

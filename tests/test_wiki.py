@@ -33,15 +33,13 @@ def test_captures_referencees_existent(tmp_path):
             assert (out / m).exists(), (f.name, m)
 
 
-def test_capture_la_plus_recente(tmp_path, monkeypatch):
+def test_captures_communes_a_toutes_les_langues(tmp_path, monkeypatch):
     img = tmp_path / 'images'
-    for v in ('v1.0.7', 'v1.0.10', 'v1.0.9'):
-        (img / v / 'fr').mkdir(parents=True)
-    (img / 'v1.0.7' / 'fr' / 'library.png').write_bytes(b'x')
-    (img / 'v1.0.10' / 'fr' / 'library.png').write_bytes(b'x')
-    (img / 'v1.0.9' / 'en').mkdir()
-    (img / 'v1.0.9' / 'en' / 'viewer.png').write_bytes(b'x')
+    img.mkdir()
+    (img / 'library.png').write_bytes(b'x')
     monkeypatch.setattr(bw, 'IMG', str(img))
-    assert bw.find_image('fr', 'library') == ('v1.0.10', 'fr')      # tri numérique, pas alphabétique
-    assert bw.find_image('de', 'viewer') == ('v1.0.9', 'en')        # repli sur l'anglais
+    assert bw.find_image('fr', 'library') == bw.find_image('ja', 'library') == str(img / 'library.png')
     assert bw.find_image('fr', 'inconnue') is None
+    # plus de sous-dossiers par version / langue dans le dépôt
+    real = os.path.join(bw.ROOT, 'docs', 'wiki', 'images')
+    assert not [d for d in os.listdir(real) if os.path.isdir(os.path.join(real, d))]

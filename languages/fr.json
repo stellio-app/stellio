@@ -2976,5 +2976,20 @@
   "about.data_title": "Données et standards ouverts",
   "about.data_desc": "Le catalogue de bobines provient de l'Open Filament Database (Open Filament Collective, licence MIT). Merci à ses contributeurs.",
   "about.optag_desc": "Les étiquettes NFC de bobines suivent le standard OpenPrintTag (Prusa Research, licence MIT).",
-  "settings.bg_default": "Image par défaut"
+  "settings.bg_default": "Image par défaut",
+  "nav.printed": "Déjà imprimés",
+  "printed.page_title": "Déjà imprimés",
+  "printed.page_hint": "Les fichiers que vous avez imprimés ou marqués « déjà imprimé ». Retirez-en un pour qu'il redevienne « jamais imprimé ».",
+  "printed.search": "Rechercher un fichier…",
+  "printed.filter_all": "Tous",
+  "printed.filter_success": "Réussis",
+  "printed.filter_failed": "Ratés",
+  "printed.empty_title": "Aucun fichier imprimé pour l'instant",
+  "printed.empty": "Les fichiers marqués « déjà imprimé » apparaîtront ici.",
+  "printed.remove": "Retirer",
+  "printed.remove_confirm": "Retirer ce fichier de « Déjà imprimés » ? Il redeviendra « jamais imprimé ».",
+  "printed.removed": "Statut « déjà imprimé » retiré",
+  "dashboard.printed_title": "Déjà imprimés",
+  "dashboard.no_printed": "Aucun fichier imprimé pour l'instant",
+  "dashboard.printed_summary": "{{n}} fichier(s) déjà imprimé(s)"
 }

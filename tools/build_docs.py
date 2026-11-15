@@ -104,10 +104,9 @@ def render(lang, slug, md_text, base, used):
         found = W.find_image(lang, name)
         if not found:
             return ''
-        ver, lg = found
-        used.add((ver, lg, name))
+        used.add(name)
         cap = html.escape(W.CAPTIONS[lang].get(name, name), quote=True)
-        url = f'{base}assets/img/{ver}/{lg}/{name}.png'
+        url = f'{base}assets/img/{name}.png'
         return f'\n\n<figure class="shot"><a href="{url}" target="_blank" rel="noopener"><img src="{url}" alt="{cap}" loading="lazy"></a><figcaption>{cap}</figcaption></figure>\n\n'
     md_text = re.sub(r'\n*\{\{img:([\w-]+)\}\}\n*', img, md_text)
     md_text = re.sub(r'\]\((%s)-([A-Za-z-]+)\)' % lang, lambda m: f']({base}{lang}/{m.group(2)}/)', md_text)
@@ -301,10 +300,10 @@ def build(out_dir, base):
             os.makedirs(os.path.join(out_dir, lang, slug), exist_ok=True)
             open(os.path.join(out_dir, lang, slug, 'index.html'), 'w', encoding='utf-8', newline='\n').write(page)
             changed += 1
-    for ver_, lg, name in sorted(used):
-        dst = os.path.join(out_dir, 'assets', 'img', ver_, lg)
+    for name in sorted(used):
+        dst = os.path.join(out_dir, 'assets', 'img')
         os.makedirs(dst, exist_ok=True)
-        shutil.copyfile(os.path.join(W.IMG, ver_, lg, f'{name}.png'), os.path.join(dst, f'{name}.png'))
+        shutil.copyfile(os.path.join(W.IMG, f'{name}.png'), os.path.join(dst, f'{name}.png'))
     langs_js = json.dumps([c for c, _, _ in LANGS])
     open(os.path.join(out_dir, 'index.html'), 'w', encoding='utf-8', newline='\n').write(
         f'<!doctype html><meta charset="utf-8"><title>Stellio docs</title><meta name="viewport" content="width=device-width,initial-scale=1">'

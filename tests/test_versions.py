@@ -2251,3 +2251,35 @@ def test_v110_separator_on_open_panel_edge():
     from pathlib import Path as _P
     css = (_P(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
     assert '.sidebar.panel-open::after { right: calc(-1 * var(--sidebar-width)); }' in css
+
+
+def test_v110_printed_files_page_widget_and_remove():
+    import json
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    src = (root / 'main.py').read_text(encoding='utf-8')
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    html = (root / 'interface/index.html').read_text(encoding='utf-8')
+    assert "@app.route('/api/printed-files', methods=['GET'])" in src
+    assert "@app.route('/api/print-history/by-file', methods=['DELETE'])" in src
+    assert 'data-page="printed"' in html and 'id="page-printed"' in html and 'data-widget-id="printed"' in html
+    assert 'data-cat="print"' in html[html.index('data-page="printed"'):html.index('data-page="printed"') + 300]
+    assert "'printed'" in js and 'function removePrintedFile' in js and 'function _loadDashboardPrinted' in js and "page === 'printed'" in js
+    for l in ('fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'):
+        d = json.loads((root / f'languages/{l}.json').read_text(encoding='utf-8'))
+        for k in ('nav.printed', 'printed.page_title', 'printed.remove', 'printed.remove_confirm', 'printed.removed', 'dashboard.printed_title', 'dashboard.no_printed'):
+            assert d.get(k), (l, k)
+
+
+def test_v110_printed_page_uses_library_cards():
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    assert 'renderFileCard(f, icons)' in js[js.index('function renderPrintedPage'):js.index('function _loadDashboardPrinted')]
+    assert '.printed-card' in (root / 'interface/style.css').read_text(encoding='utf-8')
+
+
+def test_v110_printed_search_field_styled():
+    from pathlib import Path as _P
+    css = (_P(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
+    assert '.history-filters #printed-search' in css

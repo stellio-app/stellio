@@ -2976,5 +2976,20 @@
   "about.data_title": "オープンデータと標準",
   "about.data_desc": "スプールのカタログは Open Filament Database（Open Filament Collective、MIT ライセンス）のデータを使用しています。貢献者の皆さんに感謝します。",
   "about.optag_desc": "NFC スプールタグは OpenPrintTag 標準（Prusa Research、MIT ライセンス）に準拠しています。",
-  "settings.bg_default": "既定の画像"
+  "settings.bg_default": "既定の画像",
+  "nav.printed": "印刷済み",
+  "printed.page_title": "印刷済み",
+  "printed.page_hint": "印刷した、または「印刷済み」にしたファイル。削除すると「未印刷」に戻ります。",
+  "printed.search": "ファイルを検索…",
+  "printed.filter_all": "すべて",
+  "printed.filter_success": "成功",
+  "printed.filter_failed": "失敗",
+  "printed.empty_title": "印刷済みのファイルはまだありません",
+  "printed.empty": "「印刷済み」にしたファイルがここに表示されます。",
+  "printed.remove": "削除",
+  "printed.remove_confirm": "このファイルを「印刷済み」から削除しますか？「未印刷」に戻ります。",
+  "printed.removed": "「印刷済み」を削除しました",
+  "dashboard.printed_title": "印刷済み",
+  "dashboard.no_printed": "印刷済みのファイルはまだありません",
+  "dashboard.printed_summary": "{{n}} 件のファイルが印刷済み"
 }

@@ -2976,5 +2976,20 @@
   "about.data_title": "Open data and standards",
   "about.data_desc": "The spool catalogue comes from the Open Filament Database (Open Filament Collective, MIT licence). Thanks to its contributors.",
   "about.optag_desc": "The NFC spool tags follow the OpenPrintTag standard (Prusa Research, MIT licence).",
-  "settings.bg_default": "Default image"
+  "settings.bg_default": "Default image",
+  "nav.printed": "Already printed",
+  "printed.page_title": "Already printed",
+  "printed.page_hint": "Files you have printed or marked as “already printed”. Remove one to make it “never printed” again.",
+  "printed.search": "Search a file…",
+  "printed.filter_all": "All",
+  "printed.filter_success": "Successful",
+  "printed.filter_failed": "Failed",
+  "printed.empty_title": "No printed files yet",
+  "printed.empty": "Files marked “already printed” will appear here.",
+  "printed.remove": "Remove",
+  "printed.remove_confirm": "Remove this file from “Already printed”? It will become “never printed” again.",
+  "printed.removed": "“Already printed” status removed",
+  "dashboard.printed_title": "Already printed",
+  "dashboard.no_printed": "No printed files yet",
+  "dashboard.printed_summary": "{{n}} file(s) already printed"
 }

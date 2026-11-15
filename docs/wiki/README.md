@@ -13,8 +13,8 @@ Les 8 fichiers (dont « Guide pas à pas » = page `How-To`) doivent garder la m
 
 ## Captures d'écran
 - Dans une page, écrire `{{img:nom}}` sur sa propre ligne (noms : dashboard, library, viewer, projects, printers, filament, stats, management, settings, library-halo, already-printed, printer-slicer, android-update).
-- Les images sont rangées par version et par langue : `docs/wiki/images/v1.0.7/<langue>/<nom>.png`.
-- Pour une nouvelle version, ajoutez un dossier `docs/wiki/images/v<version>/` avec **uniquement les captures qui ont changé** : le wiki prend automatiquement la plus récente (langue de la page, sinon anglais, sinon français).
+- Les images sont dans un seul dossier, les mêmes pour les 8 langues : `docs/wiki/images/<nom>.png`.
+- Pour mettre une capture à jour, remplacez simplement le fichier (même nom) : le wiki et le site de documentation la reprennent seuls.
 - Une nouvelle capture : ajouter son nom dans `CAPTIONS` (légendes des 8 langues) de `tools/build_wiki.py` et placer `{{img:nom}}` dans les 8 sources.
 
 ## Tester en local
@@ -33,10 +33,5 @@ python tools/build_docs.py --out docs-out --base /docs/
 ```
 Le workflow `.github/workflows/docs.yml` le régénère à chaque modification de `docs/wiki/**` ou de `changelog.json` et le publie comme artefact `docs-site` (onglet Actions). Déposez son contenu dans le dossier `docs/` du site stellio-app.com.
 
-### Captures 1.0.9 à remplacer (images provisoires « CAPTURE À REMPLACER »)
-Dossier `docs/wiki/images/v1.0.9/<langue>/` (1280×800, 8 langues) :
-- `library-halo.png` : bibliothèque avec fichiers réussis (halo vert) et ratés (halo rouge)
-- `already-printed.png` : menu ⋯ d'un fichier → « Déjà imprimé », popup ouvert
-- `printer-slicer.png` : slicer par défaut d'une imprimante + profils rattachés
-- `android-update.png` : fenêtre « mise à jour disponible » de l'application Android
-Il suffit d'écraser le fichier avec la vraie capture (même nom) : wiki et site de documentation la reprennent seuls.
+### Captures
+Toutes les captures sont dans `docs/wiki/images/` (dashboard, library, library-halo, already-printed, viewer, projects, printers, printer-slicer, filament, stats, management, settings, android-update).

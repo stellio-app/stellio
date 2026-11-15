@@ -3,6 +3,7 @@
     "version": "1.1.0",
     "items": {
       "fr": [
+        "Déjà imprimés : nouvelle page dans l'onglet Impression et widget sur l'accueil listant les fichiers marqués « déjà imprimé », avec un bouton « Retirer » (aussi dans la fiche du fichier) pour annuler ce statut",
         "Mise à jour : la fenêtre « Stellio a été mis à jour ! » (rond vert) ne s'affiche plus au redémarrage ; seule la fenêtre « Quoi de neuf » reste, sans doublon",
         "Barre latérale : plus de pastille sur « Mes likes » et « Mes créations » (leur total n'est plus ajouté à l'icône Bibliothèque)",
         "Envoi au slicer : la liste « Bobine utilisée » est classée (bobines compatibles d'abord, puis par nom) et un champ de recherche permet de retrouver une bobine (nom, matière, marque, couleur)",
@@ -10,6 +11,7 @@
         "Image de fond par défaut : le visuel Stellio s'affiche derrière l'application sur toutes les versions (ordinateur, serveur, Android) ; elle se remplace, se retire ou se restaure dans Paramètres › Image de fond"
       ],
       "en": [
+        "Already printed: new page in the Printing tab and a home widget listing files marked “already printed”, with a “Remove” button (also in the file info) to undo that status",
         "Update: the “Stellio has been updated!” window (green circle) no longer appears on restart; only the “What's new” window remains, with no duplicate",
         "Sidebar: no more badge on “My likes” and “My creations” (their total is no longer added to the Library icon)",
         "Send to slicer: the “Spool used” list is now sorted (compatible spools first, then by name) and a search box lets you find a spool (name, material, brand, colour)",
@@ -17,6 +19,7 @@
         "Default background image: the Stellio artwork now appears behind the app on every version (desktop, server, Android); replace, remove or restore it in Settings › Background image"
       ],
       "de": [
+        "Bereits gedruckt: neue Seite im Reiter Drucken und Widget auf der Startseite mit den als „bereits gedruckt“ markierten Dateien, mit Schaltfläche „Entfernen“ (auch im Dateiinfo), um den Status rückgängig zu machen",
         "Update: Das Fenster „Stellio wurde aktualisiert!“ (grüner Kreis) erscheint beim Neustart nicht mehr; es bleibt nur das Fenster „Neuigkeiten“, ohne Doppelung",
         "Seitenleiste: kein Zähler mehr bei „Meine Likes“ und „Meine Kreationen“ (ihre Summe wird nicht mehr zum Bibliothek-Symbol addiert)",
         "An den Slicer senden: Die Liste „Verwendete Spule“ ist jetzt sortiert (kompatible zuerst, dann nach Name) und ein Suchfeld findet eine Spule (Name, Material, Marke, Farbe)",
@@ -24,6 +27,7 @@
         "Standard-Hintergrundbild: Das Stellio-Motiv erscheint auf allen Versionen (Desktop, Server, Android) hinter der App; ersetzen, entfernen oder wiederherstellen unter Einstellungen › Hintergrundbild"
       ],
       "es": [
+        "Ya impresos: nueva página en la pestaña Impresión y widget en el inicio con los archivos marcados como «ya impreso», con un botón «Quitar» (también en la ficha del archivo) para deshacer ese estado",
         "Actualización: la ventana «¡Stellio se ha actualizado!» (círculo verde) ya no aparece al reiniciar; solo queda la ventana «Novedades», sin duplicado",
         "Barra lateral: sin insignia en «Mis likes» y «Mis creaciones» (su total ya no se suma al icono Biblioteca)",
         "Enviar al slicer: la lista «Bobina utilizada» ahora está ordenada (primero las compatibles, luego por nombre) y un buscador permite encontrar una bobina (nombre, material, marca, color)",
@@ -31,6 +35,7 @@
         "Imagen de fondo predeterminada: la imagen de Stellio aparece detrás de la aplicación en todas las versiones (escritorio, servidor, Android); se puede cambiar, quitar o restaurar en Ajustes › Imagen de fondo"
       ],
       "pt": [
+        "Já impressos: nova página no separador Impressão e widget no início com os ficheiros marcados como «já impresso», com um botão «Remover» (também na ficha do ficheiro) para anular esse estado",
         "Atualização: a janela «O Stellio foi atualizado!» (círculo verde) já não aparece ao reiniciar; fica só a janela «Novidades», sem duplicado",
         "Barra lateral: sem distintivo em «Meus likes» e «Minhas criações» (o total deixa de ser somado ao ícone Biblioteca)",
         "Enviar ao slicer: a lista «Bobina utilizada» agora está ordenada (primeiro as compatíveis, depois por nome) e um campo de pesquisa permite encontrar uma bobina (nome, material, marca, cor)",
@@ -38,6 +43,7 @@
         "Imagem de fundo padrão: o visual do Stellio aparece atrás da aplicação em todas as versões (computador, servidor, Android); pode ser substituída, removida ou restaurada em Definições › Imagem de fundo"
       ],
       "it": [
+        "Già stampati: nuova pagina nella scheda Stampa e widget nella home con i file contrassegnati come «già stampato», con un pulsante «Rimuovi» (anche nella scheda del file) per annullare lo stato",
         "Aggiornamento: la finestra «Stellio è stato aggiornato!» (cerchio verde) non compare più al riavvio; resta solo la finestra «Novità», senza doppione",
         "Barra laterale: nessun badge su «I miei like» e «Le mie creazioni» (il totale non viene più sommato all'icona Libreria)",
         "Invio allo slicer: l'elenco «Bobina utilizzata» è ora ordinato (prima le compatibili, poi per nome) e un campo di ricerca permette di trovare una bobina (nome, materiale, marca, colore)",
@@ -45,6 +51,7 @@
         "Immagine di sfondo predefinita: l'immagine di Stellio compare dietro l'app su tutte le versioni (computer, server, Android); si può sostituire, rimuovere o ripristinare in Impostazioni › Immagine di sfondo"
       ],
       "zh": [
+        "已打印：打印标签页新增页面，主页新增小组件，列出标记为“已打印”的文件，并提供“移除”按钮（文件信息中也有）以撤销该状态",
         "更新：重启后不再显示“Stellio 已更新！”窗口（绿色圆圈），只保留“新功能”窗口，不再重复",
         "侧边栏：“我的点赞”和“我的作品”不再显示数字徽章（总数不再加到“库”图标上）",
         "发送到切片软件：“使用的线材盘”列表现已排序（先显示兼容的，再按名称），并新增搜索框，可按名称、材料、品牌、颜色查找线材盘",
@@ -52,6 +59,7 @@
         "默认背景图：所有版本（桌面、服务器、Android）默认在应用后方显示 Stellio 图案；可在“设置 › 背景图片”中更换、移除或恢复"
       ],
       "ja": [
+        "印刷済み：印刷タブに新しいページ、ホームにウィジェットを追加し、「印刷済み」にしたファイルを一覧表示。「削除」ボタン（ファイル情報内にも）でその状態を取り消せます",
         "アップデート：再起動時に「Stellio がアップデートされました！」ウィンドウ（緑の丸）を表示しないようにし、「新機能」ウィンドウだけにしました（重複なし）",
         "サイドバー：「いいね」と「作成したモデル」のバッジを廃止（合計がライブラリのアイコンに加算されなくなりました）",
         "スライサーへ送信：「使用するスプール」の一覧を並べ替え（対応するものを先に、次に名前順）、検索欄で名前・素材・ブランド・色からスプールを探せるようにしました",

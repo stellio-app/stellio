@@ -4040,7 +4040,8 @@ kbd {
 }
 
 .history-filters select,
-.history-filters input[type="date"] {
+.history-filters input[type="date"],
+.history-filters #printed-search {
     background: var(--bg-input);
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -4050,7 +4051,8 @@ kbd {
 }
 
 .history-filters select:focus,
-.history-filters input[type="date"]:focus {
+.history-filters input[type="date"]:focus,
+.history-filters #printed-search:focus {
     outline: none;
     border-color: var(--accent);
 }
@@ -10046,3 +10048,18 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
 @media (min-width: 861px) {
     .sidebar.panel-open::after { right: calc(-1 * var(--sidebar-width)); }
 }
+
+/* v1.1.0 : page « Déjà imprimés » */
+.printed-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-top: 12px; padding: 4px; }
+.printed-card { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.printed-card .file-card { margin: 0; }
+.printed-card-remove { align-self: stretch; justify-content: center; }
+.printed-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); }
+.printed-row-icon { color: var(--accent); font-size: calc(18px * var(--fs, 1)); }
+.printed-row-body { flex: 1; min-width: 0; }
+.printed-row-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.printed-row-sub { font-size: calc(12px * var(--fs, 1)); color: var(--text-muted); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.printed-remove-btn { margin-left: 6px; }
+#page-printed .history-page { max-width: none; }
+.history-filters #printed-search { min-width: 240px; font-family: inherit; color: var(--text-primary); }
+.history-filters #printed-search::placeholder { color: var(--text-muted); }

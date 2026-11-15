@@ -6,12 +6,11 @@
 
 Sources :
   docs/wiki/src/<langue>.md          14 pages par langue, séparées par des lignes « @@@ Page | Titre »
-  docs/wiki/images/<vX.Y.Z>/<langue>/<nom>.png   captures d'écran, un dossier par version
+  docs/wiki/images/<nom>.png         captures d'écran, les mêmes pour les 8 langues
   changelog.json                     la page « Nouveautés » (Changelog) est générée à chaque fois
 
-Dans les pages, une ligne « {{img:nom}} » est remplacée par la capture la plus récente portant ce nom
-(version la plus haute qui la contient, dans la langue de la page, sinon en anglais, sinon en français).
-Pour une nouvelle version, ajoutez seulement les captures qui ont changé dans docs/wiki/images/v<version>/.
+Dans les pages, une ligne « {{img:nom}} » est remplacée par la capture docs/wiki/images/<nom>.png (la même pour toutes les langues).
+Pour mettre une capture à jour, remplacez simplement le fichier (même nom).
 """
 import argparse
 import glob
@@ -81,21 +80,10 @@ def parse(lang):
     return pages
 
 
-def _vkey(v):
-    return tuple(int(x) for x in re.findall(r'\d+', v))
-
-
-def image_versions():
-    return sorted((os.path.basename(d) for d in glob.glob(os.path.join(IMG, 'v*')) if os.path.isdir(d)), key=_vkey, reverse=True)
-
-
 def find_image(lang, name):
-    """(version, langue) de la capture la plus récente : langue de la page, sinon anglais, sinon français."""
-    for lg in (lang, 'en', 'fr'):
-        for v in image_versions():
-            if os.path.exists(os.path.join(IMG, v, lg, f'{name}.png')):
-                return v, lg
-    return None
+    """Chemin de la capture « nom » (la même pour toutes les langues), ou None si elle n'existe pas."""
+    path = os.path.join(IMG, f'{name}.png')
+    return path if os.path.exists(path) else None
 
 
 def check():
@@ -175,9 +163,8 @@ def build(out_dir):
                 found = find_image(lang, name)
                 if not found:
                     return ''
-                ver, lg = found
-                used.add((ver, lg, name))
-                url = f'https://raw.githubusercontent.com/wiki/{REPO}/images/{ver}/{lg}/{name}.png'
+                used.add(name)
+                url = f'https://raw.githubusercontent.com/wiki/{REPO}/images/{name}.png'
                 cap = CAPTIONS[lang].get(name, name)
                 return f'\n\n[![{cap}]({url})]({url})\n\n'
             body = re.sub(r'\n*\{\{img:([\w-]+)\}\}\n*', img, body)
@@ -200,10 +187,10 @@ def build(out_dir):
             + f'\n\n---\n[stellio-app.com](https://stellio-app.com) · [Releases](https://github.com/{REPO}/releases)'
               ' · [Discord](https://discord.gg/ySxpHvS6bd)\n')
     open(os.path.join(out_dir, '_Sidebar.md'), 'w', encoding='utf-8', newline='\n').write(side)
-    for ver, lg, name in sorted(used):
-        dst = os.path.join(out_dir, 'images', ver, lg)
+    for name in sorted(used):
+        dst = os.path.join(out_dir, 'images')
         os.makedirs(dst, exist_ok=True)
-        shutil.copyfile(os.path.join(IMG, ver, lg, f'{name}.png'), os.path.join(dst, f'{name}.png'))
+        shutil.copyfile(os.path.join(IMG, f'{name}.png'), os.path.join(dst, f'{name}.png'))
     # contrôle des liens internes
     names = {os.path.basename(f)[:-3] for f in glob.glob(os.path.join(out_dir, '*.md'))}
     broken = []

@@ -2983,7 +2983,7 @@ document.addEventListener('visibilitychange', _syncAppHeight);
 _syncAppHeight();
 
 // --- Tableau de bord ---
-const DASHBOARD_WIDGET_IDS = ['printers', 'cameras', 'stock', 'restock', 'history', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'timelapses', 'mqtt', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues', 'gcodes', 'health', 'trash', 'changelog'];
+const DASHBOARD_WIDGET_IDS = ['printers', 'cameras', 'stock', 'restock', 'history', 'printed', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'timelapses', 'mqtt', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues', 'gcodes', 'health', 'trash', 'changelog'];
 let _dashboardEditMode = false;
 let _draggedDashboardWidget = null;
 
@@ -3000,6 +3000,7 @@ async function loadDashboard(force = false) {
     _loadOnboardingChecklist();
     _loadDashboardPrinters();
     _loadDashboardHistory();
+    _loadDashboardPrinted();
     _loadDashboardStock();
     _loadDashboardRestock();
     _loadDashboardRecentFiles();
@@ -7967,7 +7968,8 @@ window.openFileInfoModal = async function (path, opts) {
                 const nOk = results.filter(r => r === 'success').length, nKo = results.filter(r => r === 'failed').length;
                 const counts = [nOk ? `${nOk} ${_t3('printed.success', 'Réussi').toLowerCase()}` : '', nKo ? `${nKo} ${_t3('printed.failed', 'Raté').toLowerCase()}` : ''].filter(Boolean).join(' · ');
                 extra += row(_t3('printed.row', 'Déjà imprimé'),
-                    `<span class="meta-val ${ok ? 'meta-yes' : 'meta-no'}"><i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${e(counts)}${when ? ' · ' + e(when) : ''}</span>`);
+                    `<span class="meta-val ${ok ? 'meta-yes' : 'meta-no'}"><i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${e(counts)}${when ? ' · ' + e(when) : ''}</span>`
+                    + ` <button type="button" class="btn btn-ghost btn-sm printed-remove-btn" onclick="removePrintedFile('${escapeJs(path)}', this)"><i class="fa-solid fa-rotate-left"></i> ${e(_t3('printed.remove', 'Retirer'))}</button>`);
             }
             const printers = uniq(hist.map(h => h.printer_name));
             if (printers.length) extra += row(_t3('printed.printer', 'Imprimante'), e(printers.join(', ')));
@@ -16975,6 +16977,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         if (page === 'acct-creations') refreshAcctModelsNav().then(() => loadAcctModels('creations'));
         if (page === 'stats') loadStats();
         if (page === 'history') { loadHistory(); loadDownloadHistory(); }
+        if (page === 'printed') loadPrintedPage();
         if (page === 'gallery') loadGalleryPage();
         if (page === 'projects') loadProjects();
         if (page === 'sosprint') loadSosprintProfiles(true);
@@ -27325,3 +27328,96 @@ window.openFilamentCatalogModal = openFilamentCatalogModal;
     const go = () => { try { applyBackgroundImage(); refreshBackgroundControls(); } catch (_) {} };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
 })();
+
+
+// --- Déjà imprimés : page de l'onglet Impression, widget d'accueil et retrait du statut ---
+let _printedFiles = [];
+async function _fetchPrintedFiles() {
+    const res = await fetch(`${API}/api/printed-files`);
+    if (!res.ok) throw new Error('printed-files');
+    _printedFiles = (await res.json()).files || [];
+    return _printedFiles;
+}
+function _printedBaseName(f) { return f.file_name || String(f.file_path || '').split(/[\\/]/).pop(); }
+function _printedBadges(f) {
+    const out = [];
+    if (f.ok) out.push(`<span class="meta-val meta-yes"><i class="fa-solid fa-circle-check"></i> ${f.ok}</span>`);
+    if (f.ko) out.push(`<span class="meta-val meta-no"><i class="fa-solid fa-circle-xmark"></i> ${f.ko}</span>`);
+    if (f.partial) out.push(`<span class="meta-val"><i class="fa-solid fa-circle-half-stroke"></i> ${f.partial}</span>`);
+    return out.join(' ');
+}
+function _printedWhen(f) {
+    if (!f.last_at) return '';
+    const d = new Date(String(f.last_at).replace(' ', 'T') + 'Z');
+    return isNaN(d) ? '' : d.toLocaleDateString(I18N.lang, { dateStyle: 'medium' });
+}
+async function removePrintedFile(path, btn) {
+    showConfirmModal(_t3('printed.remove_confirm', 'Retirer ce fichier de « Déjà imprimés » ? Il redeviendra « jamais imprimé ».'), async () => {
+        try {
+            const res = await fetch(`${API}/api/print-history/by-file`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) });
+            if (!res.ok) throw new Error('remove');
+            showToast(_t3('printed.removed', 'Statut « déjà imprimé » retiré'), 'success');
+            const row = btn && btn.closest ? btn.closest('.file-info-row, tr, .printed-row') : null;
+            if (btn && btn.classList.contains('printed-remove-btn') && row) row.remove();
+            _printedFiles = _printedFiles.filter(f => f.file_path !== path);
+            if (document.getElementById('page-printed')?.classList.contains('active')) renderPrintedPage();
+            if (document.getElementById('dashboard-printed-body')) _loadDashboardPrinted();
+            if (document.getElementById('page-library')?.classList.contains('active')) { try { loadFiles(); } catch (_) {} }
+        } catch (_) { showToast(I18N.t('toast.error'), 'error'); }
+    });
+}
+window.removePrintedFile = removePrintedFile;
+async function loadPrintedPage() {
+    try { await _fetchPrintedFiles(); } catch (_) { _printedFiles = []; }
+    renderPrintedPage();
+    // mêmes miniatures que la bibliothèque : on recharge la liste des fichiers si elle n'est pas encore là, puis on réaffiche
+    if (!(allFiles && allFiles.length)) { try { await loadFiles(); renderPrintedPage(); } catch (_) {} }
+}
+window.loadPrintedPage = loadPrintedPage;
+function renderPrintedPage() {
+    const list = document.getElementById('printed-list'), empty = document.getElementById('printed-empty');
+    if (!list || !empty) return;
+    const q = (document.getElementById('printed-search')?.value || '').trim().toLowerCase();
+    const flt = document.getElementById('printed-filter')?.value || '';
+    const rows = _printedFiles.filter(f => (!q || (_printedBaseName(f) + ' ' + f.file_path).toLowerCase().includes(q))
+        && (!flt || (flt === 'success' ? f.ok > 0 : (f.ko > 0 && !f.ok))));
+    empty.classList.toggle('hidden', rows.length > 0);
+    const icons = { '.stl': 'fa-cube', '.3mf': 'fa-file-lines', '.obj': 'fa-shapes', '.step': 'fa-gear', '.stp': 'fa-gear', '.ply': 'fa-cubes', '.amf': 'fa-cubes-stacked' };
+    const norm = (x) => String(x || '').replace(/\\/g, '/');
+    const byPath = new Map((allFiles || []).map(x => [norm(x.path), x]));
+    list.innerHTML = rows.map(pf => {
+        const known = byPath.get(norm(pf.file_path));
+        const name = _printedBaseName(pf);
+        const ext = pf.file_ext || (name.includes('.') ? '.' + name.split('.').pop().toLowerCase() : '');
+        const f = Object.assign(known ? { ...known } : { path: pf.file_path, name, extension: ext, has_thumb: false, size: 0, plate_count: 1, tags: [] },
+            { print_status: pf.ok ? 'success' : (pf.ko ? 'failed' : 'printed') });
+        return `<div class="printed-card">${renderFileCard(f, icons)}
+            <button type="button" class="btn btn-ghost btn-sm printed-card-remove" onclick="removePrintedFile('${escapeJs(pf.file_path)}', this)"><i class="fa-solid fa-rotate-left"></i> ${escapeHtml(_t3('printed.remove', 'Retirer'))}</button>
+        </div>`;
+    }).join('');
+    try { setTimeout(() => generateVisibleThumbnails(), 100); } catch (_) {}
+    const badge = document.getElementById('printed-count');
+    if (badge) badge.style.display = 'none';
+}
+window.renderPrintedPage = renderPrintedPage;
+async function _loadDashboardPrinted() {
+    const body = document.getElementById('dashboard-printed-body');
+    if (!body) return;
+    try {
+        const files = await _fetchPrintedFiles();
+        if (!files.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-circle-check"></i><p>${escapeHtml(_t3('dashboard.no_printed', "Aucun fichier imprimé pour l'instant"))}</p></div>`;
+            return;
+        }
+        const nOk = files.filter(f => f.ok > 0).length;
+        body.innerHTML = `<div class="dashboard-row-sub" style="padding:0 2px 6px;">${escapeHtml(_t3('dashboard.printed_summary', '{{n}} fichier(s) déjà imprimé(s)', { n: files.length }))} · ${nOk} ${escapeHtml(_t3('printed.success', 'Réussi').toLowerCase())}</div>`
+            + files.slice(0, 5).map(f => `<div class="dashboard-row">
+                <div class="dashboard-row-icon"><i class="fa-solid fa-cube"></i></div>
+                <div class="dashboard-row-body"><div class="dashboard-row-title" title="${escapeHtml(f.file_path)}">${escapeHtml(_printedBaseName(f))}</div>
+                <div class="dashboard-row-sub">${_printedBadges(f)}${_printedWhen(f) ? ' · ' + escapeHtml(_printedWhen(f)) : ''}</div></div>
+                <div class="dashboard-row-meta"><button type="button" class="btn btn-ghost btn-sm" title="${escapeHtml(_t3('printed.remove', 'Retirer'))}" onclick="removePrintedFile('${escapeJs(f.file_path)}', this)"><i class="fa-solid fa-rotate-left"></i></button></div>
+            </div>`).join('');
+    } catch (err) {
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${escapeHtml(I18N.t('toast.connection_error'))}</p></div>`;
+    }
+}

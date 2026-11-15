@@ -286,6 +286,11 @@
 				    <span data-i18n="nav.history">Historique</span>
 				    <span class="badge" id="history-count" style="display:none;">0</span>
 				</button>
+				<button class="nav-btn" data-page="printed" data-nav-id="printed" data-icon="fa-circle-check" data-title-key="nav.printed" data-cat="print">
+				    <i class="fa-solid fa-circle-check"></i>
+				    <span data-i18n="nav.printed">Déjà imprimés</span>
+				    <span class="badge" id="printed-count" style="display:none;">0</span>
+				</button>
 				<button class="nav-btn" data-page="gallery" data-nav-id="gallery" data-icon="fa-camera" data-title-key="nav.gallery" data-cat="library">
 				    <i class="fa-solid fa-camera"></i>
 				    <span data-i18n="nav.gallery">Galerie</span>
@@ -625,6 +630,18 @@
                                     <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('history')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
                                 </div>
                                 <div class="dashboard-widget-body" id="dashboard-history-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-printed" data-widget-id="printed" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-circle-check"></i> <span data-i18n="dashboard.printed_title">Déjà imprimés</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;printed&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('printed')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-printed-body">
                                     <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
                                 </div>
                             </div>
@@ -1106,6 +1123,29 @@
                             <p data-i18n="gallery.empty">Ajoute-en depuis le menu (⋯) d'un fichier.</p>
                         </div>
                         <div id="gallery-grid" class="hidden" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px;"></div>
+                    </div>
+                </div>
+
+                <div id="page-printed" class="page">
+                    <div class="history-page">
+                        <div class="history-header">
+                            <h2><i class="fa-solid fa-circle-check"></i> <span data-i18n="printed.page_title">Déjà imprimés</span></h2>
+                        </div>
+                        <p class="settings-hint" data-i18n="printed.page_hint">Les fichiers que vous avez imprimés ou marqués comme « déjà imprimé ». Retirez-en un pour qu'il redevienne « jamais imprimé ».</p>
+                        <div class="history-filters">
+                            <input type="text" id="printed-search" data-i18n-placeholder="printed.search" placeholder="Rechercher un fichier…" oninput="renderPrintedPage()">
+                            <select id="printed-filter" onchange="renderPrintedPage()">
+                                <option value="" data-i18n="printed.filter_all">Tous</option>
+                                <option value="success" data-i18n="printed.filter_success">Réussis</option>
+                                <option value="failed" data-i18n="printed.filter_failed">Ratés</option>
+                            </select>
+                        </div>
+                        <div id="printed-empty" class="empty-state illustrated hidden">
+                            <div class="empty-state-icon"><i class="fa-solid fa-circle-check"></i></div>
+                            <h3 data-i18n="printed.empty_title">Aucun fichier imprimé pour l'instant</h3>
+                            <p data-i18n="printed.empty">Les fichiers marqués « déjà imprimé » apparaîtront ici.</p>
+                        </div>
+                        <div id="printed-list" class="printed-list"></div>
                     </div>
                 </div>
 
@@ -2004,6 +2044,7 @@
 								<div class="nav-toggle-row" draggable="true" data-nav-id="projects"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.projects">Projets</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="projects" onchange="toggleNavItem('projects',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 								<div class="nav-toggle-row" draggable="true" data-nav-id="print-queue"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.print_queue">À imprimer bientôt</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="print-queue" onchange="toggleNavItem('print-queue',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 				<div class="nav-toggle-row" draggable="true" data-nav-id="history"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.history">Historique</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="history" onchange="toggleNavItem('history',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+				<div class="nav-toggle-row" draggable="true" data-nav-id="printed"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.printed">Déjà imprimés</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="printed" onchange="toggleNavItem('printed',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 				<div class="nav-toggle-row" draggable="true" data-nav-id="gallery"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.gallery">Galerie</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="gallery" onchange="toggleNavItem('gallery',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 								<div class="nav-toggle-row" draggable="true" data-nav-id="favorites"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.favorites">Favoris</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="favorites" onchange="toggleNavItem('favorites',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 								<div class="nav-toggle-row" draggable="true" data-nav-id="duplicates"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.duplicates">Doublons</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="duplicates" onchange="toggleNavItem('duplicates',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>

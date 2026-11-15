@@ -2976,5 +2976,20 @@
   "about.data_title": "开放数据与标准",
   "about.data_desc": "线材盘目录来自 Open Filament Database（Open Filament Collective，MIT 许可）。感谢所有贡献者。",
   "about.optag_desc": "NFC 线材盘标签遵循 OpenPrintTag 标准（Prusa Research，MIT 许可）。",
-  "settings.bg_default": "默认图片"
+  "settings.bg_default": "默认图片",
+  "nav.printed": "已打印",
+  "printed.page_title": "已打印",
+  "printed.page_hint": "您已打印或标记为“已打印”的文件。移除后将恢复为“从未打印”。",
+  "printed.search": "搜索文件…",
+  "printed.filter_all": "全部",
+  "printed.filter_success": "成功",
+  "printed.filter_failed": "失败",
+  "printed.empty_title": "暂无已打印的文件",
+  "printed.empty": "标记为“已打印”的文件将显示在这里。",
+  "printed.remove": "移除",
+  "printed.remove_confirm": "从“已打印”中移除此文件？它将恢复为“从未打印”。",
+  "printed.removed": "已移除“已打印”状态",
+  "dashboard.printed_title": "已打印",
+  "dashboard.no_printed": "暂无已打印的文件",
+  "dashboard.printed_summary": "已打印 {{n}} 个文件"
 }
