@@ -32,7 +32,7 @@ node_modules/
 *.spec
 
 # --- Notes de version (texte des releases, gardées en local) ----------------
-/release-notes/
+#release-notes/
 
 # --- Binaires tiers téléchargés par la CI (ffmpeg, UnRAR…) -------------------
 /bin/
