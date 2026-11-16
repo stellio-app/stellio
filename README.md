@@ -105,13 +105,15 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 📊 **Detailed statistics** (formats, platforms, profile reliability)
 
 ### 🤖 Artificial Intelligence (local Ollama)
+> ⚠️ The AI is not 100% reliable: it can make mistakes (tags, descriptions, S.O.S Print diagnoses…). Treat its answers as leads to check, not as certainties.
+
 - 🏷️ Smart **auto-tagging** of files
 - 📝 **Automatic description** of models
 - 🔎 **Natural-language semantic search**
 - 📐 **Printability analysis** (overhang detection) and **suggested orientations** (less overhang, bed contact shown)
 - 🎯 **Slicer profile recommendation** based on geometry + success history
 - ⏱️ **Print time estimation** before slicing
-- 🩺 **S.O.S Print**: adaptive, step-by-step print-failure diagnosis — Stellio asks one question at a time, narrows down a live list of hypotheses as you answer (max 4 questions), then gives a final diagnosis; photo analysis supported throughout, with saved conversations you can reopen or mark as resolved
+- 🩺 **S.O.S Print**: adaptive, step-by-step print-failure diagnosis — Stellio asks one question at a time, narrows down a live list of hypotheses as you answer (no question limit: new hypotheses are added and the investigation continues after a “still not solved”), then gives a final diagnosis; photo analysis supported throughout, with saved conversations you can reopen or mark as resolved ⚠️ The AI is not 100% reliable and can make mistakes: its hypotheses are leads to verify.
 
 ### 🖨️ Printer management
 - 🔌 Support for **OctoPrint**, **Klipper/Moonraker**, **Bambu Lab** (MQTT), **Creality** (WebSocket), **FlashForge**, **Elegoo** (SDCP) and **PrusaLink**

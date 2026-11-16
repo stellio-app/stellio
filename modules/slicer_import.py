@@ -212,6 +212,15 @@ def _normalize_profile(raw, slicer, name, source_filename, source_path=None, typ
         "bottom_layers": int(bottom_layers) if bottom_layers is not None else None,
         "supports_enabled": _to_bool(g('support_material', 'support_enable', 'enable_support')),
         "print_speed": _first_num(g('perimeter_speed', 'speed_print', 'outer_wall_speed')),
+        "first_layer_speed": _first_num(g('first_layer_speed', 'initial_layer_speed', 'speed_layer_0')),
+        "outer_wall_speed": _first_num(g('external_perimeter_speed', 'outer_wall_speed', 'speed_wall_0')),
+        "inner_wall_speed": _first_num(g('perimeter_speed', 'inner_wall_speed', 'speed_wall_x')),
+        "infill_speed": _first_num(g('infill_speed', 'sparse_infill_speed', 'speed_infill')),
+        "travel_speed": _first_num(g('travel_speed', 'speed_travel')),
+        "retraction_distance": _first_num(g('retract_length', 'retraction_length', 'filament_retraction_length', 'retraction_amount')),
+        "retraction_speed": _first_num(g('retract_speed', 'retraction_speed', 'filament_retraction_speed')),
+        "fan_speed": _first_num(g('fan_max_speed', 'cool_fan_speed', 'max_fan_speed')),
+        "prime_tower_width": _first_num(g('prime_tower_width', 'wipe_tower_width', 'prime_tower_size')),
         "nozzle_temp": _first_num(g('temperature', 'material_print_temperature', 'nozzle_temperature')),
         "bed_temp": _first_num(g('bed_temperature', 'material_bed_temperature', 'hot_plate_temp')),
     }
@@ -480,6 +489,10 @@ def _scan_dir_for_profiles(dir_path, already_imported, imported_out, slicer_hint
         except Exception as e:
             app_logger.debug(f"[SlicerProfiles] Ignoré {fpath}: {e}")
 
+# Vitesses / rétraction / ventilateur lus dans les profils importés (utilisés par S.O.S Print)
+_SPEED_KEYS = ('first_layer_speed', 'outer_wall_speed', 'inner_wall_speed', 'infill_speed', 'travel_speed',
+               'retraction_distance', 'retraction_speed', 'fan_speed', 'prime_tower_width')
+
 def _refresh_stale_slicer_profiles(profiles):
     updated_count = 0
     errors = []
@@ -487,6 +500,22 @@ def _refresh_stale_slicer_profiles(profiles):
         source_path = p.get('source_path')
         if not source_path or not os.path.isfile(source_path):
             continue
+        if p.get('speeds_v') != 2:
+            # Profil importé avant la lecture des vitesses : on relit une fois son fichier d'origine.
+            try:
+                with open(source_path, 'rb') as f:
+                    _fresh = _parse_slicer_profile_file(os.path.basename(source_path), f.read(),
+                                                        slicer_hint=p.get('slicer'), source_path=source_path,
+                                                        type_hint=p.get('profile_type'))
+                if _fresh:
+                    for k in _SPEED_KEYS:
+                        if _fresh[0].get(k) is not None:
+                            p[k] = _fresh[0][k]
+                p['speeds_v'] = 2
+                updated_count += 1
+            except Exception as e:
+                p['speeds_v'] = 2
+                app_logger.debug(f"[SlicerProfiles] Relecture des vitesses impossible pour {p.get('name')}: {e}")
         try:
             if os.path.commonpath([os.path.normpath(source_path), os.path.normpath(IMPORTED_PROFILES_DIR)]) == os.path.normpath(IMPORTED_PROFILES_DIR):
                 continue  
@@ -513,7 +542,7 @@ def _refresh_stale_slicer_profiles(profiles):
             fresh = fresh_versions[0]
             for key in ('name', 'layer_height', 'nozzle_diameter', 'material_type', 'infill_density',
                         'infill_pattern', 'wall_count', 'top_layers', 'bottom_layers',
-                        'supports_enabled', 'print_speed', 'nozzle_temp', 'bed_temp'):
+                        'supports_enabled', 'print_speed', 'nozzle_temp', 'bed_temp', *_SPEED_KEYS):
                 if fresh.get(key) is not None:
                     p[key] = fresh[key]
             p['source_mtime'] = current_mtime

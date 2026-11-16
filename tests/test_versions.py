@@ -2141,7 +2141,7 @@ def test_sidebar_flyout_opens_and_closes():
     css = (root / 'interface/style.css').read_text(encoding='utf-8')
     js = (root / 'interface/script.js').read_text(encoding='utf-8')
     assert '.sidebar.panel-open .sidebar-nav { visibility: visible;' in css
-    assert 'visibility: hidden; opacity: 0;' in css
+    assert 'visibility: hidden; pointer-events: none; transition: clip-path' in css
     for s in ("classList.toggle('panel-open'", "e.key === 'Escape'", "closest('#app-sidebar')", "setOpen(false)"):
         assert s in js
 
@@ -2163,10 +2163,10 @@ def test_v110_no_update_done_popup():
     js = (root / 'interface/script.js').read_text(encoding='utf-8')
     body = js[js.index('async checkAndShowChangelog()'):js.index('async checkForUpdates(')]
     assert 'showChangelogModal(' not in body and 'stellio-last-seen-version' in body
-    assert 'CURRENT_VERSION = "1.1.1"' in (root / 'main.py').read_text(encoding='utf-8')
+    assert 'CURRENT_VERSION = "1.1.2"' in (root / 'main.py').read_text(encoding='utf-8')
     for p in ('changelog.json', 'languages/changelog.json'):
         d = json.loads((root / p).read_text(encoding='utf-8'))
-        assert d[0]['version'] == '1.1.1' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
+        assert d[0]['version'] == '1.1.2' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
 
 
 def test_v110_no_badge_on_likes_and_creations():
@@ -2312,7 +2312,7 @@ def test_v111_changelog_entry():
     root = _P(__file__).resolve().parent.parent
     for p in ('changelog.json', 'languages/changelog.json'):
         d = json.loads((root / p).read_text(encoding='utf-8'))
-        assert d[0]['version'] == '1.1.1' and len(d[0]['items']['fr']) >= 15 and all(len(v) >= 2 for v in d[0]['items'].values())
+        assert d[1]['version'] == '1.1.1' and len(d[1]['items']['fr']) >= 15 and all(len(v) >= 2 for v in d[0]['items'].values())
 
 
 def test_v111_security_options_and_modules():
@@ -2424,9 +2424,9 @@ def test_v113_ui_has_new_providers_and_offline_type():
 def test_v114_release_notes_generator():
     import subprocess, sys
     root = __import__("pathlib").Path(__file__).resolve().parent.parent
-    out = subprocess.run([sys.executable, str(root / 'tools' / 'release_notes.py'), 'v1.1.1'],
+    out = subprocess.run([sys.executable, str(root / 'tools' / 'release_notes.py'), 'v1.1.2'],
                          capture_output=True, text=True, check=True).stdout
-    assert out.startswith('## Stellio v1.1.1') and "What's new" in out and 'Nouveautés' in out
+    assert out.startswith('## Stellio v1.1.2') and '### 🇫🇷 Français' in out and '<details>' in out and '✓ APK' in out
     assert subprocess.run([sys.executable, str(root / 'tools' / 'release_notes.py'), '9.9.9'],
                           capture_output=True).returncode != 0
 
@@ -2438,7 +2438,7 @@ def test_v114_workflow_uses_notes_and_community_files():
     assert (root / 'CONTRIBUTING.md').is_file()
     for n in ('bug.yml', 'feature.yml', 'good-first-issue.yml', 'config.yml'):
         assert (root / '.github' / 'ISSUE_TEMPLATE' / n).is_file()
-    assert 'versionName \'1.1.1\'' in (root / 'apk-src' / 'app' / 'build.gradle').read_text(encoding='utf-8')
+    assert 'versionName \'1.1.2\'' in (root / 'apk-src' / 'app' / 'build.gradle').read_text(encoding='utf-8')
 
 
 # ── v1.1.1 (ajouts) : popup caméra, couleurs par plateau, boutiques OFD ─────
@@ -2471,7 +2471,7 @@ def test_v111_new_i18n_keys_in_all_languages():
 def test_v111_recent_searches_dropdown_stays_above_cards():
     import pathlib
     css = (pathlib.Path(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
-    assert '.app-header:focus-within { z-index: 200; }' in css
+    assert '.app-header:focus-within,' in css and 'z-index: 200;' in css
     block = css[css.index('.search-recent-dropdown {'):css.index('@keyframes recentSearchIn')]
     assert 'z-index: 300' in block
 
@@ -2518,3 +2518,119 @@ def test_v111_mini_printer_badge_yields_to_drawer():
     js = (root / 'interface/script.js').read_text(encoding='utf-8')
     assert 'body.nav-panel-open #bottom-stack > * { display: none !important; }' in css
     assert "'nav-drawer-open'" in js and "'nav-panel-open'" in js
+
+
+def test_v111_workflows_no_deprecated_actions():
+    import pathlib, re
+    root = pathlib.Path(__file__).resolve().parent.parent
+    txt = ''.join(p.read_text(encoding='utf-8') for p in (root / '.github/workflows').glob('*.yml'))
+    for old in ('checkout@v4', 'setup-python@v5', 'upload-artifact@v4', 'download-artifact@v4',
+                'setup-java@v4', 'setup-gradle@v4', 'action-gh-release@v2', 'ubuntu-latest'):
+        assert old not in txt, old
+    assert '--no-appstream' in txt
+    assert '68b393c000758d477fde43c955ff7542f12f76f3f5e87cdda923152fc791bd4d' in txt
+    assert 'da1fb3c3d7748136c9b369b683d574b372cb1ed049a634a81f85d93918346d8f' in txt
+
+
+def test_v112_real_logo_and_release_notes_from_files():
+    from PIL import Image
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    im = Image.open(root / 'apk-src/app/src/main/res/drawable-nodpi/logo_stellio.png')
+    assert im.size[0] >= 200 and im.mode == 'RGBA'          # emblème réel, plus l'étoile provisoire de 128 px
+    wf = (root / '.github/workflows/build-and-sign.yml').read_text(encoding='utf-8')
+    assert '            release-notes\n' in wf
+    assert (root / 'release-notes/notes_version_1.1.2.txt').is_file()
+
+
+def test_v112_modal_hides_floating_badges():
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    assert 'body:has(.modal:not(.hidden)) #bottom-stack > .mini-printer-widget' in css
+
+
+def test_v112_empty_rail_category_hidden():
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    assert "b.style.display = _any ? '' : 'none'" in js and "addEventListener('resize', _rbSched)" in js
+
+
+def test_v112_notif_panel_stays_above_widgets():
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    assert '.app-header:has(#notif-panel:not(.hidden)) { z-index: 200; }' in css
+
+
+def test_v112_printed_card_red_cross():
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    assert 'class="printed-card-remove"' in js and 'fa-xmark' in js.split('printed-card-remove')[1][:400]
+    assert '.printed-card-remove { position: absolute;' in css and '.printed-card:hover .printed-card-remove' in css
+
+
+def test_v112_gallery_full_width():
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    assert '#page-gallery .history-page { max-width: none; }' in (root / 'interface/style.css').read_text(encoding='utf-8')
+
+
+def test_v112_printed_touch_two_taps():
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    assert 'touch-active' in js and '(hover: none)' in js
+    assert '.printed-card.touch-active .printed-card-remove { opacity: 1; }' in css and '@media (hover: none) { .printed-card-remove' not in css
+
+
+def test_v112_printed_badge_hidden_on_hover():
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    assert '.printed-card:hover .file-ext-badge' in (root / 'interface/style.css').read_text(encoding='utf-8')
+
+
+def test_v112_no_sideways_open_animation():
+    import re
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    for sel in ('.notif-panel {', '.mini-printer-widget {', '.command-palette {'):
+        i = css.index('\n' + sel)
+        block = css[i:css.index('}', i)]
+        assert 'animation: slideUp' not in block, sel
+
+
+def test_v112_no_inline_slideup_in_js():
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    assert 'animation: slideUp' not in (root / 'interface/script.js').read_text(encoding='utf-8')
+
+
+def test_v112_sidebar_footer_in_sync_with_panel():
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    assert 'transition: clip-path 0.2s ease, visibility 0s linear 0.2s' in css and 'transition: width 0.2s ease' in css
+    assert '.sidebar-footer .kofi-btn span { white-space: nowrap; overflow: hidden; max-width: 220px' in css
+
+
+def test_v112_sidebar_line_under_footer():
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    assert 'pointer-events: none; z-index: 80; transition: right 0.2s ease;' in css
+
+
+def test_v112_account_avatar_stable():
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    assert '.sidebar-footer .user-info { justify-content: flex-start; padding-left: calc((var(--rail-width) - 21px - 32px) / 2)' in css
+    assert 'padding: 14px 16px; }\n    .sidebar:not(.panel-open) .sidebar-footer .user-info' not in css
+
+
+def test_v112_docs_new_screenshots():
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    for n in ('already-printed-plates', 'sidebar-panel', 'mobile-drawer'):
+        for lang in ('fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'):
+            assert (root / 'docs/wiki/images' / lang / f'{n}.png').is_file(), (lang, n)
+            assert '{{img:%s}}' % n in (root / 'docs/wiki/src' / f'{lang}.md').read_text(encoding='utf-8'), (lang, n)
+
+
+def test_v112_demo_banner_sidebar_below_banner():
+    root = pathlib.Path(__file__).resolve().parent.parent
+    css = (root / "interface" / "style.css").read_text(encoding="utf-8")
+    assert "body.has-demo-banner .sidebar { top: var(--demo-banner-h, 32px)" in css
+    assert "body.has-demo-banner .sidebar-overlay { top: var(--demo-banner-h, 32px)" in css

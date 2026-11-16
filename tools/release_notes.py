@@ -1,33 +1,51 @@
 #!/usr/bin/env python3
-"""Génère le corps d'une release GitHub à partir de changelog.json.
+"""Génère le corps d'une release GitHub à partir de release-notes/notes_version_X.Y.Z.txt.
 
 Usage : python3 tools/release_notes.py <version> [sortie.md]
 
-Anglais d'abord puis français, puis le lien vers le changelog complet.
-Sans sortie, écrit sur stdout. Code retour 1 si la version est inconnue.
+Le fichier contient une section par langue (<!--fr-->, <!--en-->…), une ligne « ✓ » par nouveauté.
+Le corps de la release reprend ces lignes telles quelles : français et anglais dépliés, les autres
+langues dans des blocs repliables. Sans sortie, écrit sur stdout. Code retour 1 si la version est inconnue.
 """
-import json
 import os
+import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LANGS = [("fr", "🇫🇷 Français", True), ("en", "🇬🇧 English", True), ("de", "🇩🇪 Deutsch", False),
+         ("es", "🇪🇸 Español", False), ("pt", "🇵🇹 Português", False), ("it", "🇮🇹 Italiano", False),
+         ("zh", "🇨🇳 中文", False), ("ja", "🇯🇵 日本語", False)]
+
+
+def parse(text):
+    """{'fr': ['✓ …', …], …} à partir du fichier de notes."""
+    sections, cur = {}, None
+    for line in text.splitlines():
+        m = re.match(r"^<!--\s*([a-z]{2})\s*-->\s*$", line.strip())
+        if m:
+            cur = m.group(1)
+            sections[cur] = []
+        elif cur and line.strip():
+            sections[cur].append(line.strip())
+    return sections
 
 
 def build(version, repo="stellio-app/stellio"):
-    with open(os.path.join(ROOT, "changelog.json"), encoding="utf-8") as f:
-        entries = json.load(f)
-    entry = next((e for e in entries if e.get("version") == version), None)
-    if entry is None:
-        raise SystemExit(f"Version {version} absente de changelog.json")
-    items = entry.get("items", {})
+    path = os.path.join(ROOT, "release-notes", f"notes_version_{version}.txt")
+    if not os.path.isfile(path):
+        raise SystemExit(f"Notes absentes : release-notes/notes_version_{version}.txt")
+    with open(path, encoding="utf-8") as f:
+        sections = parse(f.read())
     out = [f"## Stellio v{version}", ""]
-    for lang, title in (("en", "What's new"), ("fr", "Nouveautés")):
-        lines = items.get(lang) or []
+    for code, title, opened in LANGS:
+        lines = sections.get(code)
         if not lines:
             continue
-        out.append(f"### {title}")
-        out.extend(f"- {line}" for line in lines)
-        out.append("")
+        body = "\n".join(line + "  " for line in lines)   # deux espaces : un saut de ligne par « ✓ »
+        if opened:
+            out += [f"### {title}", "", body, ""]
+        else:
+            out += ["<details>", f"<summary><b>{title}</b></summary>", "", body, "", "</details>", ""]
     out.append(f"Full changelog / Historique complet : https://github.com/{repo}/blob/main/changelog.json")
     out.append("")
     return "\n".join(out)

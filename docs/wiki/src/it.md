@@ -83,6 +83,8 @@ Tutti i file sono nella pagina [Releases](https://github.com/stellio-app/stellio
 
 > ⚠️ Il programma di installazione **non è firmato**: Windows SmartScreen può mostrare un avviso. Controlla il `.sha256` se vuoi; l'aggiornamento integrato lo verifica prima di installare.
 
+> 💡 Se la finestra integrata non riesce ad aprirsi (WebView2 o `Python.Runtime.dll` bloccato, spesso dopo un download), Stellio si apre in una finestra separata di Edge/Chrome e si ferma quando la chiudi. Per riavere la finestra integrata: tasto destro sullo zip → Proprietà → **Sblocca**, poi estrai di nuovo. I dettagli sono in `data\stellio.log`.
+
 ## macOS
 
 Apri il `.dmg` e trascina Stellio in Applicazioni. Scegli il file adatto al tuo Mac: `arm64` (M1, M2, M3…) o `x86_64` (Intel). Le build non sono notarizzate: al primo avvio, clic destro → **Apri**.
@@ -124,6 +126,10 @@ Dettagli in [Edizione server](it-Server-Edition).
 @@@ Getting-Started | Primi passi
 # Primi passi
 {{img:library}}
+
+La barra a sinistra è una **colonna** di icone; un clic su una categoria apre il suo **pannello** a destra, che si chiude dopo la scelta.
+
+{{img:sidebar-panel}}
 
 
 ## 1. Primo avvio
@@ -312,7 +318,7 @@ Ogni funzione di Stellio: **a cosa serve e come usarla**. I dettagli tecnici son
 ## Diagnosticare un guasto: S.O.S Print e IA
 
 1. Apri **S.O.S Print** e descrivi il problema (foto possibile).
-2. Rispondi alle domande, una alla volta (massimo 4): Stellio restringe le ipotesi e fornisce una **diagnosi finale**.
+2. Rispondi alle domande, una alla volta, **senza limite**: Stellio restringe le ipotesi (e ne aggiunge di nuove se serve) finché trova la causa, poi fornisce una **diagnosi finale**. Se la soluzione non funziona, rispondi «ancora non risolto» e l'indagine continua.
 3. Per l'IA locale, installa [Ollama](https://ollama.com/) e configuralo in **Impostazioni → Intelligenza artificiale**. La **sorveglianza dei guasti** ti avvisa senza mai fermare la stampa.
 
 ## Usare Stellio su telefono e da remoto
@@ -363,7 +369,7 @@ Elenco completo: [Impostazioni e dati](it-Settings-and-Data).
 - **Annulla eliminazioni** (`Ctrl+Z`) grazie a un cestino temporaneo di 5 minuti; vale anche per etichette, progetti e fonti.
 - **Alone verde / rosso** attorno alla miniatura: verde per un file già stampato con successo, rosso per una stampa fallita (viste galleria e dettagli).
 - **Già stampato** (menu ⋯ di un file): registra a mano una stampa fatta altrove — scegli stampante, impostazioni (profilo dello slicer) e bobina, poi **Riuscita** o **Fallita**. Il file entra nei filtri «Già riuscito» / «Già fallito» e la sua scheda (clic destro) mostra stampante, impostazioni e bobina.
-- **Pagina «Già stampati»** (pannello Stampa): tutti i file stampati o contrassegnati come «già stampato», con le stesse miniature e aloni della libreria, una ricerca e un filtro Riusciti / Falliti. Il pulsante **Rimuovi** (anche nella scheda del file) annulla questo stato: il file torna «mai stampato». Nella home è disponibile un widget con lo stesso nome.
+- **Pagina «Già stampati»** (pannello Stampa): tutti i file stampati o contrassegnati come «già stampato», con le stesse miniature e aloni della libreria, una ricerca e un filtro Riusciti / Falliti. Passando il mouse su una miniatura compare una **croce rossa** (su telefono: un tocco la mostra, un secondo tocco apre il file); dopo una conferma rimuove il file dall'elenco e torna «mai stampato». Il pulsante **Rimuovi** nella scheda del file fa lo stesso. Nella home è disponibile un widget con lo stesso nome.
 - Selezione rapida: `Maiusc+clic` per un intervallo, frecce + `Invio`.
 - **Rilevamento dei duplicati** (esatti e di geometria simile).
 - **Origine del modello**: link di origine, autore, licenza, note, data di download.
@@ -372,6 +378,12 @@ Elenco completo: [Impostazioni e dati](it-Settings-and-Data).
 {{img:library-halo}}
 
 {{img:already-printed}}
+
+In un 3MF **multi-piatto**, la finestra «Già stampato» offre una zona per piatto, ciascuna con la propria bobina; un file **multicolore** accetta più colori per piatto (**Aggiungi un colore**). I pallini di colore riprendono quelli delle bobine e la scheda del file mostra i dettagli.
+
+{{img:already-printed-plates}}
+
+I file **inviati allo slicer** hanno un **alone ambra** (verde se la stampa è riuscita, rosso se è fallita) fin dall'invio, e il filtro **Inviati allo slicer** della libreria li ritrova con un clic.
 
 ## Ricerca
 - Ricerca classica e **ricerca semantica con IA** («cerco un supporto per…»), con le ricerche recenti memorizzate.
@@ -405,6 +417,8 @@ Raggruppa più file per un singolo oggetto.
 @@@ Printers | Stampanti
 # Stampanti
 {{img:printers}}
+
+Nella home, il widget **Telecamere** mostra fino a **4 telecamere** (una per stampante in corso): un clic su una miniatura apre una finestra con **solo la telecamera** (il widget «Stampe in corso» mantiene il monitoraggio completo). Il pulsante **Vedi tutto** apre l'elenco di tutte le telecamere per scegliere quella da mostrare.
 
 
 ## Marchi supportati
@@ -485,6 +499,8 @@ Il blocco **Pesatura e previsione del filamento** stima la **data di esaurimento
 
 {{img:filament}}
 
+I **negozi dell'Open Filament Database** (86) sono aggiunti ai **Link utili**, filtrati in base al tuo paese, e usati anche dalla ricerca **Riacquista una bobina**: Stellio propone i negozi che spediscono da te.
+
 ## Previsione dei consumi
 La libreria può mostrare un **avviso di rifornimento** quando le scorte non bastano per i tuoi preferiti.
 
@@ -511,6 +527,8 @@ Scarica modelli direttamente nelle tue fonti da diverse piattaforme:
 @@@ AI | Intelligenza artificiale
 # Intelligenza artificiale
 
+> ⚠️ L'IA non è affidabile al 100 %: può sbagliare (tag, descrizioni, diagnosi di S.O.S Print…). Considera le sue risposte come indizi da verificare, non come certezze.
+
 ## IA locale (Ollama)
 Per impostazione predefinita l'IA funziona **al 100 % in locale** con [Ollama](https://ollama.com/). Può essere disattivata.
 
@@ -532,8 +550,8 @@ Al posto di Ollama usa **Claude** (Anthropic), **ChatGPT** (OpenAI) o **Gemini**
 
 ## S.O.S Print
 Diagnosi **adattiva** di un guasto di stampa:
-1. Descrivi il problema (foto possibile a ogni passaggio) e, se vuoi, le impostazioni usate (temperature, velocità, retrazione…).
-2. Stellio pone **una domanda alla volta** (al massimo 4) e restringe in diretta una lista di ipotesi.
+1. Descrivi il problema (foto possibile a ogni passaggio) e, se vuoi, le impostazioni usate (temperature, velocità, retrazione…). Le **velocità** vengono lette dal profilo dello slicer scelto (o inserite da te); se mancano, l'IA le chiede. Nelle stampe **multicolore** l'IA controlla la **torre di spurgo** (si stacca, crolla, cade sul pezzo, colori mescolati) e pone le domande utili; la larghezza della torre viene letta dal profilo. Dal primo passo e dopo ogni risposta, l'IA mostra le sue **ipotesi ordinate per probabilità** (%), ciascuna con il motivo o un controllo rapido.
+2. Stellio pone **una domanda alla volta**, senza limite, e restringe in diretta una lista di ipotesi (ne aggiunge di nuove se le prime vengono escluse).
 3. Fornisce una **diagnosi finale**.
 
 Le conversazioni vengono salvate: riaprile o segnale come risolte.
@@ -541,6 +559,9 @@ Le conversazioni vengono salvate: riaprile o segnale come risolte.
 > ℹ️ I risultati «Riuscito / Fallito» che valuti nella cronologia migliorano le raccomandazioni.
 
 @@@ Costs-and-Management | Costi e gestione
+
+> ⚠️ L'IA non è affidabile al 100 %: può sbagliare. Le sue ipotesi sono indizi da verificare, non certezze; controlla prima di cambiare le impostazioni o la macchina.
+
 # Costi e gestione
 {{img:management}}
 
@@ -588,6 +609,10 @@ Visibile quando è spuntata l'opzione *Attiva le funzioni di costi, preventivi e
 - **Modalità officina** a schermo intero per tablet/telefono.
 
 {{img:android-update}}
+
+**Menu sugli schermi piccoli**: la barra in basso scompare; un pulsante in alto a sinistra apre la stessa barra laterale del computer (categorie + pannello a destra). I badge (stampa in corso, notifiche, avvisi) si riducono per non dare fastidio. Il logo di Stellio appare nelle pagine di configurazione e «Server irraggiungibile».
+
+{{img:mobile-drawer}}
 
 ## Accesso remoto
 - **Cloudflare Tunnel** (gratuito, indirizzo casuale o fisso), oppure un **indirizzo personalizzato** (nome di dominio, DynDNS, VPN, Tailscale…) per evitare Cloudflare, con ritorno a Cloudflare con un clic.

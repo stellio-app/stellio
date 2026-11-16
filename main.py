@@ -1256,6 +1256,137 @@ _TRAY_LABELS = {
 _TRAY_STATE = {'started': False}
 
 
+def _webview2_runtime_version():
+    """Version du runtime Microsoft Edge WebView2 (nécessaire à la fenêtre intégrée de Stellio sous Windows), ou None s'il est absent."""
+    if os.name != 'nt':
+        return None
+    try:
+        import winreg
+        guid = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+        for hive, path in ((winreg.HKEY_LOCAL_MACHINE, 'SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\' + guid),
+                           (winreg.HKEY_LOCAL_MACHINE, 'SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\' + guid),
+                           (winreg.HKEY_CURRENT_USER, 'Software\\Microsoft\\EdgeUpdate\\Clients\\' + guid)):
+            try:
+                with winreg.OpenKey(hive, path) as k:
+                    v = str(winreg.QueryValueEx(k, 'pv')[0] or '').strip()
+                    if v and v != '0.0.0.0':
+                        return v
+            except OSError:
+                continue
+    except Exception:
+        pass
+    return None
+
+
+_WINDOW_FALLBACK_TEXT = {
+    'fr': ("Stellio — fenêtre intégrée indisponible",
+           "La fenêtre de Stellio n'a pas pu s'ouvrir (composant Microsoft Edge WebView2 {wv}). Stellio s'ouvre donc dans votre navigateur.\n\n"
+           "Pour fermer Stellio : icône Stellio près de l'horloge (clic droit → Quitter), ou bouton « Quitter » dans l'application.\n\n"
+           "Pour retrouver la fenêtre : installez « Microsoft Edge WebView2 Runtime » (microsoft.com), puis relancez Stellio. Le détail est dans data\\stellio.log."),
+    'en': ("Stellio — built-in window unavailable",
+           "Stellio's window could not open (Microsoft Edge WebView2 component {wv}). Stellio is opening in your browser instead.\n\n"
+           "To close Stellio: Stellio icon near the clock (right-click → Quit), or the “Quit” button in the app.\n\n"
+           "To get the window back: install “Microsoft Edge WebView2 Runtime” (microsoft.com), then restart Stellio. Details are in data\\stellio.log."),
+    'de': ("Stellio — integriertes Fenster nicht verfügbar",
+           "Das Stellio-Fenster konnte nicht geöffnet werden (Microsoft Edge WebView2 {wv}). Stellio öffnet sich stattdessen im Browser.\n\n"
+           "Zum Beenden: Stellio-Symbol neben der Uhr (Rechtsklick → Beenden) oder die Schaltfläche „Beenden“ in der App.\n\n"
+           "Für das Fenster: „Microsoft Edge WebView2 Runtime“ installieren und Stellio neu starten. Details in data\\stellio.log."),
+    'es': ("Stellio — ventana integrada no disponible",
+           "No se pudo abrir la ventana de Stellio (componente Microsoft Edge WebView2 {wv}). Stellio se abre en tu navegador.\n\n"
+           "Para cerrar Stellio: icono de Stellio junto al reloj (clic derecho → Salir) o el botón «Salir» de la aplicación.\n\n"
+           "Para recuperar la ventana: instala «Microsoft Edge WebView2 Runtime» y reinicia Stellio. Detalles en data\\stellio.log."),
+    'pt': ("Stellio — janela integrada indisponível",
+           "Não foi possível abrir a janela do Stellio (componente Microsoft Edge WebView2 {wv}). O Stellio abre no seu navegador.\n\n"
+           "Para fechar o Stellio: ícone do Stellio junto ao relógio (clique direito → Sair) ou o botão «Sair» na aplicação.\n\n"
+           "Para recuperar a janela: instale o «Microsoft Edge WebView2 Runtime» e reinicie o Stellio. Detalhes em data\\stellio.log."),
+    'it': ("Stellio — finestra integrata non disponibile",
+           "Impossibile aprire la finestra di Stellio (componente Microsoft Edge WebView2 {wv}). Stellio si apre nel browser.\n\n"
+           "Per chiudere Stellio: icona di Stellio vicino all'orologio (clic destro → Esci) o pulsante «Esci» nell'app.\n\n"
+           "Per riavere la finestra: installa «Microsoft Edge WebView2 Runtime» e riavvia Stellio. Dettagli in data\\stellio.log."),
+    'zh': ("Stellio — 无法打开内置窗口",
+           "无法打开 Stellio 窗口（Microsoft Edge WebView2 组件：{wv}）。Stellio 将改在浏览器中打开。\n\n"
+           "关闭 Stellio：右键单击时钟旁的 Stellio 图标 →“退出”，或使用应用内的“退出”按钮。\n\n"
+           "恢复窗口：安装“Microsoft Edge WebView2 Runtime”后重新启动 Stellio。详情见 data\\stellio.log。"),
+    'ja': ("Stellio — 内蔵ウィンドウを開けません",
+           "Stellio のウィンドウを開けませんでした（Microsoft Edge WebView2：{wv}）。代わりにブラウザで開きます。\n\n"
+           "終了するには：時計の近くの Stellio アイコンを右クリック →「終了」、またはアプリ内の「終了」ボタン。\n\n"
+           "ウィンドウを戻すには：「Microsoft Edge WebView2 Runtime」をインストールして Stellio を再起動してください。詳細は data\\stellio.log。"),
+}
+
+
+_WINDOW_FALLBACK_STATE = {'why': ''}
+_WINDOW_FALLBACK_PRESENT = {
+    'fr': "WebView2 est bien installé (version {wv}) : le blocage vient d'autre chose.\n\nCause relevée : {why}\n\nEnvoyez le fichier data\\stellio.log au développeur. Pour fermer Stellio : icône Stellio près de l'horloge (clic droit → Quitter), ou bouton « Quitter » dans l'application.",
+    'en': "WebView2 is installed (version {wv}): the problem comes from something else.\n\nCause found: {why}\n\nPlease send data\\stellio.log to the developer. To close Stellio: Stellio icon near the clock (right-click → Quit), or the “Quit” button in the app.",
+    'de': "WebView2 ist installiert (Version {wv}): Das Problem hat eine andere Ursache.\n\nGefundene Ursache: {why}\n\nBitte senden Sie data\\stellio.log an den Entwickler. Zum Beenden: Stellio-Symbol neben der Uhr (Rechtsklick → Beenden) oder Schaltfläche „Beenden“ in der App.",
+    'es': "WebView2 está instalado (versión {wv}): el problema es otro.\n\nCausa detectada: {why}\n\nEnvía data\\stellio.log al desarrollador. Para cerrar Stellio: icono junto al reloj (clic derecho → Salir) o botón «Salir» en la aplicación.",
+    'pt': "O WebView2 está instalado (versão {wv}): o problema é outro.\n\nCausa encontrada: {why}\n\nEnvie data\\stellio.log ao desenvolvedor. Para fechar o Stellio: ícone junto ao relógio (clique direito → Sair) ou botão «Sair» na aplicação.",
+    'it': "WebView2 è installato (versione {wv}): il problema è un altro.\n\nCausa rilevata: {why}\n\nInvia data\\stellio.log allo sviluppatore. Per chiudere Stellio: icona vicino all'orologio (clic destro → Esci) o pulsante «Esci» nell'app.",
+    'zh': "已安装 WebView2（版本 {wv}）：问题另有原因。\n\n检测到的原因：{why}\n\n请将 data\\stellio.log 发送给开发者。关闭 Stellio：右键单击时钟旁的图标 →“退出”，或使用应用内的“退出”按钮。",
+    'ja': "WebView2 はインストール済みです（バージョン {wv}）。原因は別にあります。\n\n検出された原因：{why}\n\ndata\\stellio.log を開発者に送ってください。終了するには：時計付近のアイコンを右クリック →「終了」、またはアプリ内の「終了」ボタン。",
+}
+
+
+def _find_chromium_app_browser():
+    """Cherche Edge puis Chrome (Windows) pour ouvrir Stellio dans une fenêtre « application » séparée."""
+    if os.name != 'nt':
+        return None
+    bases = [os.environ.get('PROGRAMFILES(X86)'), os.environ.get('PROGRAMFILES'), os.environ.get('LOCALAPPDATA')]
+    rels = [r'Microsoft\Edge\Application\msedge.exe', r'Google\Chrome\Application\chrome.exe']
+    for rel in rels:
+        for b in bases:
+            if b:
+                c = os.path.join(b, rel)
+                if os.path.isfile(c):
+                    return c
+    return None
+
+
+def _open_app_window_fallback(url):
+    """Repli quand PyWebView est inutilisable : fenêtre Edge/Chrome en mode application (sans barre d'onglets),
+    avec son propre profil. Bloque jusqu'à la fermeture de la fenêtre ; renvoie True si elle a bien été ouverte
+    puis fermée (Stellio doit alors s'arrêter), False si aucun navigateur compatible n'est disponible."""
+    exe = _find_chromium_app_browser()
+    if not exe:
+        return False
+    try:
+        profile = os.path.join(DATA_DIR, 'appwin')
+        os.makedirs(profile, exist_ok=True)
+        t0 = time.time()
+        proc = subprocess.Popen([exe, f'--app={url}', f'--user-data-dir={profile}', '--no-first-run',
+                                 '--no-default-browser-check', '--window-size=1280,800'])
+        app_logger.info(f"[Window] Fenêtre de secours ouverte ({os.path.basename(exe)})")
+        proc.wait()
+        # Si le processus se termine aussitôt (relais vers une instance existante), on ne peut pas suivre la fenêtre.
+        return (time.time() - t0) > 5
+    except Exception as ex:
+        app_logger.warning(f"[Window] Fenêtre de secours impossible ({ex})")
+        return False
+
+
+def _tell_window_fallback():
+    """Fenêtre intégrée impossible (Windows) : on le dit clairement au lieu d'ouvrir le navigateur en silence."""
+    wv = _webview2_runtime_version()
+    app_logger.warning(f"[Window] Fenêtre intégrée indisponible — WebView2 Runtime : {wv or 'ABSENT'}")
+    if os.name != 'nt':
+        return
+
+    def _box():
+        try:
+            import ctypes
+            lang = {0x0C: 'fr', 0x09: 'en', 0x07: 'de', 0x0A: 'es', 0x16: 'pt', 0x10: 'it', 0x04: 'zh', 0x11: 'ja'}.get(
+                ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0xFF, 'en')
+            title, msg = _WINDOW_FALLBACK_TEXT.get(lang, _WINDOW_FALLBACK_TEXT['en'])
+            if wv:      # composant présent : on ne le met pas en cause, on affiche la vraie erreur relevée
+                msg = _WINDOW_FALLBACK_PRESENT.get(lang, _WINDOW_FALLBACK_PRESENT['en'])
+            why = (_WINDOW_FALLBACK_STATE.get('why') or '?')[:300]
+            ctypes.windll.user32.MessageBoxW(0, msg.replace('{wv}', wv or 'absent').replace('{why}', why), title, 0x40 | 0x40000)
+        except Exception:
+            pass
+    threading.Thread(target=_box, daemon=True).start()
+
+
+
 def _start_tray_icon(on_open, on_quit):
     """Icône Stellio dans la zone de notification de Windows (à côté de l'horloge) : montre que Stellio tourne,
     clic = ouvrir, clic droit = Ouvrir / Quitter. Implémentée avec l'API Windows (aucune dépendance à installer)."""
@@ -20379,7 +20510,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.1.1"
+CURRENT_VERSION = "1.1.2"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -22881,13 +23012,13 @@ from modules import sosprint_helpers
 from modules.sosprint_helpers import (
     SOSPRINT_HARD_MAX_QUESTIONS,
     SOSPRINT_SETTING_FIELDS,
-    SOSPRINT_SOFT_QUESTIONS,
     _sosprint_add_message,
     _sosprint_clean_settings,
     _sosprint_conversation_photos_b64,
     _sosprint_conversation_settings_block,
     _sosprint_get_conversation,
     _sosprint_parse_causes,
+    _sosprint_parse_hypotheses,
     _sosprint_parse_eliminated,
     _sosprint_reference_cases_block,
     _sosprint_resolved_reference_cases,
@@ -22928,8 +23059,9 @@ def api_ollama_sos_print_questions():
         f"Problem described by the user: \"{description}\"\n"
         f"{settings_block}"
         f"{reference_block}"
-        f"Step 1 — list 4 to 6 short plausible causes (hypotheses) for this problem, most likely "
-        f"first, each as a very short label (3-6 words, no explanation). If a reference case above "
+        f"Step 1 — list 4 to 6 plausible causes (hypotheses) for this problem, most likely "
+        f"first, each as a very short label (3-6 words), then its likelihood in % (all together about 100) "
+        f"and ONE short reason or quick check (max 12 words). If a reference case above "
         f"clearly matches, make its confirmed cause one of the top hypotheses.\n"
         f"Step 2 — pick ONE single clarifying question: the one whose answer would rule out the "
         f"most hypotheses above. Ask about something the user didn't already mention (e.g. "
@@ -22939,10 +23071,10 @@ def api_ollama_sos_print_questions():
         f"The question must be short and answerable in one line.\n"
         f"Strict format, nothing else:\n"
         f"CAUSES:\n"
-        f"- [Cause 1]\n"
-        f"- [Cause 2]\n"
-        f"- [Cause 3]\n"
-        f"- [Cause 4]\n"
+        f"- [Cause 1] | [likelihood %] | [reason or quick check]\n"
+        f"- [Cause 2] | [likelihood %] | [reason or quick check]\n"
+        f"- [Cause 3] | [likelihood %] | [reason or quick check]\n"
+        f"- [Cause 4] | [likelihood %] | [reason or quick check]\n"
         f"QUESTION: [Question]\n"
         f"IMPORTANT: Write your entire response in {lang_name}."
     )
@@ -22952,10 +23084,11 @@ def api_ollama_sos_print_questions():
     )
 
     try:
-        raw_text, source = _call_ai(prompt, system=system, num_predict=220, temperature=0.2)
+        raw_text, source = _call_ai(prompt, system=system, num_predict=450, temperature=0.2)
 
         causes_block = _sosprint_section(raw_text, 'CAUSES:', 'QUESTION:')
         candidate_causes = _sosprint_parse_causes(causes_block)
+        hypotheses = _sosprint_parse_hypotheses(causes_block)
 
         question_block = _sosprint_section(raw_text, 'QUESTION:')
         question = question_block.splitlines()[0].strip() if question_block else ''
@@ -22980,6 +23113,7 @@ def api_ollama_sos_print_questions():
         return jsonify({
             "conversation_id": conversation_id,
             "candidate_causes": candidate_causes,
+            "hypotheses": hypotheses,
             "question": question,
             "reference_cases": reference_cases,
             "print_settings": print_settings,
@@ -23004,6 +23138,10 @@ def api_ollama_sos_print_next_question():
     candidate_causes = data.get('candidate_causes') or []
     conversation_id  = data.get('conversation_id') or None
     user_wants_conclusion = bool(data.get('conclude_now'))
+    try:
+        failed_attempts = max(0, min(int(data.get('failed_attempts') or 0), 50))
+    except (TypeError, ValueError):
+        failed_attempts = 0
 
     if not description:
         return jsonify({"error": "Merci de décrire le problème rencontré"}), 400
@@ -23027,7 +23165,7 @@ def api_ollama_sos_print_next_question():
     lang      = get_user_lang()
     lang_name = LANG_NAMES.get(lang, lang)
     ref_block = _material_ref_block(material)
-    settings_block = _sosprint_conversation_settings_block(conversation_id) if conversation_id else ''
+    settings_block = _sosprint_conversation_settings_block(conversation_id) if conversation_id else _sosprint_settings_block({})
     causes_block = "\n".join(f"- {c}" for c in candidate_causes) if candidate_causes else "(none listed yet)"
 
     if force_conclusion:
@@ -23035,16 +23173,17 @@ def api_ollama_sos_print_next_question():
             "Do NOT ask another question — conclude now: decide which hypotheses the answers above "
             "rule out.\n"
         )
-    elif asked_count >= SOSPRINT_SOFT_QUESTIONS:
+    elif failed_attempts:
         instruction = (
-            f"You have already asked {asked_count} questions. Only ask one more if it would genuinely "
-            f"and significantly narrow down the remaining hypotheses; otherwise conclude now rather than "
-            f"asking for the sake of it.\n"
+            f"The user already tried the proposed fixes {failed_attempts} time(s) and the problem is NOT solved. "
+            f"Do NOT conclude. Keep investigating: ask a new question that explores something not yet checked, "
+            f"and add new hypotheses if the current ones are exhausted or ruled out.\n"
         )
     else:
         instruction = (
-            "Decide whether you now have enough information to conclude with confidence, or whether "
-            "one more clarifying question would meaningfully rule out more hypotheses.\n"
+            "There is no limit on the number of questions. Keep asking, one at a time, until ONE cause "
+            "clearly stands out and you are confident enough to propose a concrete fix. Conclude only then; "
+            "never conclude just because many questions were asked.\n"
         )
 
     prompt = (
@@ -23059,10 +23198,17 @@ def api_ollama_sos_print_next_question():
         f"STATUS: DONE\n"
         f"ELIMINATED: [comma-separated hypotheses from the suspect list ruled out by the answers "
         f"above, or 'none']\n"
+        f"LIKELIHOOD:\n"
+        f"- [each remaining hypothesis, most likely first] | [likelihood %] | [short reason]\n"
         f"If asking another question, write exactly:\n"
         f"STATUS: QUESTION\n"
         f"ELIMINATED: [comma-separated hypotheses from the suspect list ruled out so far by the "
         f"answers above, or 'none']\n"
+        f"NEW_CAUSES: [comma-separated NEW hypotheses worth checking that are not in the suspect list "
+        f"(at most 3), or 'none']\n"
+        f"LIKELIHOOD:\n"
+        f"- [each remaining or new hypothesis, most likely first] | [likelihood %, all together about 100] | "
+        f"[ONE short reason or quick check, max 12 words, based on the answers so far]\n"
         f"QUESTION: [one short new clarifying question, not already asked, whose answer would rule "
         f"out the most remaining hypotheses]\n"
         f"IMPORTANT: Write your entire response in {lang_name}."
@@ -23074,19 +23220,32 @@ def api_ollama_sos_print_next_question():
     )
 
     try:
-        raw_text, source = _call_ai(prompt, system=system, num_predict=200, temperature=0.2)
+        raw_text, source = _call_ai(prompt, system=system, num_predict=550, temperature=0.2)
 
         status_block = _sosprint_section(raw_text, 'STATUS:', 'ELIMINATED:')
         is_done = force_conclusion or 'DONE' in status_block.upper()
 
         eliminated_block = _sosprint_section(
-            raw_text, 'ELIMINATED:', None if is_done else 'QUESTION:'
+            raw_text, 'ELIMINATED:', None if is_done else 'NEW_CAUSES:'
         )
         eliminated = [
             e for e in _sosprint_parse_eliminated(eliminated_block)
             if any(e.lower() in c.lower() or c.lower() in e.lower() for c in candidate_causes)
         ] or [e for e in _sosprint_parse_eliminated(eliminated_block)]
         remaining_causes = [c for c in candidate_causes if c not in eliminated] or candidate_causes
+        if not is_done:
+            _new = _sosprint_parse_eliminated(_sosprint_section(raw_text, 'NEW_CAUSES:', 'LIKELIHOOD:'))
+            for _c in _new[:3]:
+                _c = _c[:120]
+                if _c and not any(_c.lower() == x.lower() for x in remaining_causes + eliminated):
+                    remaining_causes.append(_c)
+            remaining_causes = remaining_causes[:10]
+        _lk = _sosprint_section(raw_text, 'LIKELIHOOD:', None if is_done else 'QUESTION:')
+        hypotheses = [h for h in _sosprint_parse_hypotheses(_lk)
+                      if not any(h['cause'].lower() == e.lower() for e in eliminated)]
+        for h in hypotheses:      # une hypothèse citée par l'IA mais absente de la liste y est ajoutée
+            if not any(h['cause'].lower() == c.lower() for c in remaining_causes) and len(remaining_causes) < 10 and not is_done:
+                remaining_causes.append(h['cause'])
 
         if conversation_id:
             _sosprint_touch_conversation(
@@ -23106,6 +23265,7 @@ def api_ollama_sos_print_next_question():
                     "question": question,
                     "eliminated": eliminated,
                     "candidate_causes": remaining_causes,
+                    "hypotheses": hypotheses,
                     "conversation_id": conversation_id,
                     "source": source
                 }), 200
@@ -23114,6 +23274,7 @@ def api_ollama_sos_print_next_question():
             "status": "done",
             "eliminated": eliminated,
             "candidate_causes": remaining_causes,
+            "hypotheses": hypotheses,
             "conversation_id": conversation_id,
             "source": source
         }), 200
@@ -23262,7 +23423,7 @@ def api_ollama_sos_print():
     lang      = get_user_lang()
     lang_name = LANG_NAMES.get(lang, lang)
     ref_block = _material_ref_block(material)
-    settings_block = _sosprint_conversation_settings_block(conversation_id) if conversation_id else ''
+    settings_block = _sosprint_conversation_settings_block(conversation_id) if conversation_id else _sosprint_settings_block({})
     fix_format = ("[Concrete fix: the exact setting to change, from its current value to the value to try]"
                   if settings_block else "[Concrete fix]")
 
@@ -29496,7 +29657,8 @@ if __name__ in ('__main__', 'stellio_main'):
             webview.start(_bind_drag_drop, window, **_webview_options)
             app_logger.info("[INFO] Stellio s'est arrêté.")
         except Exception as e:
-            app_logger.info(f"[WARN] PyWebView échec ({type(e).__name__}: {e})")
+            app_logger.warning(f"[WARN] PyWebView échec ({type(e).__name__}: {e})")
+            _WINDOW_FALLBACK_STATE['why'] = f"{type(e).__name__}: {e}"
             try:
                 import traceback
                 app_logger.info("[WARN] Détail PyWebView :\n" + traceback.format_exc())
@@ -29521,9 +29683,18 @@ if __name__ in ('__main__', 'stellio_main'):
                     app_logger.info("[INFO] Stellio s'est arrêté.")
             except Exception as e2:
                 _wv_recovered = False
-                app_logger.info(f"[WARN] Nouvel essai impossible ({type(e2).__name__}: {e2})")
+                app_logger.warning(f"[WARN] Nouvel essai impossible ({type(e2).__name__}: {e2})")
+                _WINDOW_FALLBACK_STATE['why'] = f"{type(e2).__name__}: {e2}"
             if not _wv_recovered:
                 app_logger.info("[INFO] Ouverture de secours dans le navigateur par défaut...")
+                if _open_app_window_fallback(_desktop_url(SERVER_URL)):
+                    app_logger.info("[Window] Fenêtre de secours fermée : arrêt de Stellio.")
+                    try:
+                        _cleanup_before_exit()
+                    except Exception:
+                        pass
+                    os._exit(0)
+                _tell_window_fallback()   # message seulement si la fenêtre de secours n'a pas pu s'ouvrir
                 import webbrowser
                 webbrowser.open(_desktop_url(SERVER_URL))   # repli : la fenêtre n'a pas pu s'ouvrir, le navigateur reçoit le jeton
                 try:

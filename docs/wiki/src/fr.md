@@ -83,6 +83,8 @@ Tous les fichiers sont sur la page [Releases](https://github.com/stellio-app/ste
 
 > ⚠️ L'installateur n'est **pas signé** : Windows SmartScreen peut afficher un avertissement. Vérifiez le `.sha256` si vous le souhaitez ; la mise à jour intégrée le contrôle avant d'installer.
 
+> 💡 Si la fenêtre intégrée ne peut pas s'ouvrir (WebView2 ou `Python.Runtime.dll` bloqué, souvent après un téléchargement), Stellio s'ouvre dans une fenêtre séparée Edge/Chrome et s'arrête quand vous la fermez. Pour retrouver la fenêtre intégrée : clic droit sur le zip → Propriétés → **Débloquer**, puis dézippez à nouveau. Le détail est dans `data\stellio.log`.
+
 ## macOS
 
 Ouvrez le `.dmg` et glissez Stellio dans Applications. Choisissez le fichier adapté à votre Mac : `arm64` (M1, M2, M3…) ou `x86_64` (Intel). Les versions ne sont pas notariées : au premier lancement, clic droit → **Ouvrir**.
@@ -124,6 +126,10 @@ Détails dans [Édition serveur](fr-Server-Edition).
 @@@ Getting-Started | Premiers pas
 # Premiers pas
 {{img:library}}
+
+La barre de gauche est un **rail** d'icônes ; un clic sur une catégorie ouvre son **volet** à droite, qui se referme après votre choix.
+
+{{img:sidebar-panel}}
 
 
 ## 1. Premier lancement
@@ -312,7 +318,7 @@ Chaque fonction de Stellio, **à quoi elle sert et comment s'en servir**. Les d�
 ## Diagnostiquer un échec : S.O.S Print et IA
 
 1. Ouvrez **S.O.S Print** et décrivez le problème (photo possible).
-2. Répondez aux questions, une à la fois (4 au maximum) : Stellio réduit les hypothèses et rend un **diagnostic final**.
+2. Répondez aux questions, une à la fois, **sans limite** : Stellio réduit les hypothèses (et en ajoute de nouvelles si besoin) jusqu'à trouver la cause, puis rend un **diagnostic final**. Si la solution ne marche pas, répondez « toujours pas résolu » : l'enquête continue.
 3. Pour l'IA locale, installez [Ollama](https://ollama.com/) puis réglez-le dans **Paramètres → Intelligence artificielle**. La **surveillance des échecs** vous alerte sans jamais arrêter l'impression.
 
 ## Utiliser Stellio sur téléphone et à distance
@@ -363,7 +369,7 @@ Liste complète : [Réglages et données](fr-Settings-and-Data).
 - **Annuler une suppression** (`Ctrl+Z`) grâce à une corbeille temporaire de 5 minutes ; vaut aussi pour étiquettes, projets et sources.
 - **Halo vert / rouge** autour de la miniature : vert pour un fichier déjà imprimé avec succès, rouge pour une impression ratée (vues galerie et détails).
 - **Déjà imprimé** (menu ⋯ d'un fichier) : notez à la main une impression faite ailleurs — choisissez l'imprimante, les réglages (profil du slicer), la bobine, puis **Réussi** ou **Raté**. Le fichier rejoint les filtres « Déjà réussi » / « Déjà raté » et sa fiche (clic droit) affiche l'imprimante, les réglages et la bobine.
-- **Page « Déjà imprimés »** (volet Impression) : tous les fichiers imprimés ou marqués « déjà imprimé », avec les mêmes miniatures et halos que la bibliothèque, une recherche et un filtre Réussis / Ratés. Le bouton **Retirer** (aussi dans la fiche du fichier) annule ce statut : le fichier redevient « jamais imprimé ». Un widget du même nom est disponible sur l'accueil.
+- **Page « Déjà imprimés »** (volet Impression) : tous les fichiers imprimés ou marqués « déjà imprimé », avec les mêmes miniatures et halos que la bibliothèque, une recherche et un filtre Réussis / Ratés. Une **croix rouge** apparaît au survol de la miniature (sur téléphone : un premier appui l'affiche, un second ouvre le fichier) ; après confirmation, elle retire le fichier de la liste et il redevient « jamais imprimé ». Le bouton **Retirer** de la fiche du fichier fait la même chose. Un widget du même nom est disponible sur l'accueil.
 - Sélection rapide : `Maj+clic` pour une plage, flèches + `Entrée`.
 - **Détection de doublons** (exacts et de géométrie proche).
 - **Origine du modèle** : lien source, auteur, licence, notes, date de téléchargement.
@@ -372,6 +378,12 @@ Liste complète : [Réglages et données](fr-Settings-and-Data).
 {{img:library-halo}}
 
 {{img:already-printed}}
+
+Pour un 3MF **multi-plateaux**, la fenêtre « Déjà imprimé » propose une zone par plateau, avec une bobine différente pour chacun ; un fichier **multicolore** accepte plusieurs couleurs par plateau (**Ajouter une couleur**). Les pastilles de couleur reprennent celles des bobines, et la fiche du fichier affiche le détail.
+
+{{img:already-printed-plates}}
+
+Les fichiers **envoyés au slicer** portent un **halo ambre** (vert si l'impression a réussi, rouge si elle a échoué) dès l'envoi, et la pastille **Envoyés au slicer** de la bibliothèque les retrouve d'un clic.
 
 ## Recherche
 - Recherche classique et **recherche sémantique par IA** (« je cherche un support pour… »), avec recherches récentes mémorisées.
@@ -405,6 +417,8 @@ Regroupez plusieurs fichiers pour un même objet.
 @@@ Printers | Imprimantes
 # Imprimantes
 {{img:printers}}
+
+Sur l'accueil, le widget **Caméras** affiche jusqu'à **4 caméras** (une par imprimante en cours) : un clic sur une vignette ouvre une fenêtre avec **seulement la caméra** (le widget « Impressions en cours » garde le suivi complet). Le bouton **Voir tout** ouvre la liste de toutes les caméras pour choisir celle à afficher.
 
 
 ## Marques prises en charge
@@ -485,6 +499,8 @@ Le bloc **Pesée et prévision de filament** estime la **date de rupture** de ch
 
 {{img:filament}}
 
+Les **boutiques de l'Open Filament Database** (86) sont ajoutées aux **Liens utiles**, filtrées selon votre pays, et utilisées aussi par la recherche **Racheter une bobine** : Stellio propose les boutiques qui expédient chez vous.
+
 ## Prévision de consommation
 La bibliothèque peut afficher un **avertissement de réassort** quand le stock ne suffit pas pour vos favoris.
 
@@ -511,6 +527,8 @@ Téléchargez des modèles directement dans vos sources depuis plusieurs platefo
 @@@ AI | Intelligence artificielle
 # Intelligence artificielle
 
+> ⚠️ L'IA n'est pas fiable à 100 % : elle peut se tromper (étiquettes, descriptions, diagnostics S.O.S Print…). Considérez ses réponses comme des pistes à vérifier, pas comme des certitudes.
+
 ## IA locale (Ollama)
 Par défaut, l'IA tourne **100 % en local** avec [Ollama](https://ollama.com/). Elle est désactivable.
 
@@ -532,8 +550,8 @@ Au lieu d'Ollama, utilisez **Claude** (Anthropic), **ChatGPT** (OpenAI) ou **Gem
 
 ## S.O.S Print
 Diagnostic **adaptatif** d'un échec d'impression :
-1. Vous décrivez le problème (photo possible à chaque étape) et, si vous voulez, les réglages utilisés (températures, vitesses, rétraction…).
-2. Stellio pose **une question à la fois** (4 au maximum) et réduit une liste d'hypothèses en direct.
+1. Vous décrivez le problème (photo possible à chaque étape) et, si vous voulez, les réglages utilisés (températures, vitesses, rétraction…). Les **vitesses** sont lues dans le profil de slicer choisi (ou saisies par vous) ; si elles manquent, l'IA vous les demande. En **multicolore**, l'IA s'intéresse à la **tour de purge** (décrochage, effondrement, chute sur la pièce, couleurs mélangées) et pose les questions utiles ; la largeur de la tour est lue dans le profil. Dès la première étape et après chaque réponse, l'IA affiche ses **hypothèses classées par probabilité** (en %), chacune avec sa raison ou un test rapide.
+2. Stellio pose **une question à la fois**, sans limite, et réduit une liste d'hypothèses en direct (nouvelles pistes ajoutées si les premières sont écartées).
 3. Il rend un **diagnostic final**.
 
 Les conversations sont enregistrées : rouvrez-les ou marquez-les comme résolues.
@@ -541,6 +559,9 @@ Les conversations sont enregistrées : rouvrez-les ou marquez-les comme résolue
 > ℹ️ Les résultats « Réussi / Raté » que vous notez dans l'historique améliorent les recommandations.
 
 @@@ Costs-and-Management | Coûts et gestion
+
+> ⚠️ L'IA n'est pas fiable à 100 % : elle peut se tromper. Ses hypothèses sont des pistes à vérifier, pas des certitudes ; vérifiez avant de modifier vos réglages ou votre machine.
+
 # Coûts et gestion
 {{img:management}}
 
@@ -588,6 +609,10 @@ Visible quand l'option *Activer les fonctions de coût, devis et facturation* es
 - **Mode atelier** plein écran pour tablette/téléphone.
 
 {{img:android-update}}
+
+**Menu sur petit écran** : la barre du bas disparaît, un bouton en haut à gauche ouvre la même barre latérale que sur ordinateur (catégories + volet à droite). Les badges (impression en cours, notifications, bandeaux) se réduisent pour ne pas la gêner. Le logo Stellio s'affiche sur les pages de configuration et « Serveur injoignable ».
+
+{{img:mobile-drawer}}
 
 ## Accès à distance
 - **Cloudflare Tunnel** (gratuit, adresse aléatoire ou fixe), ou **adresse personnalisée** (nom de domaine, DynDNS, VPN, Tailscale…) pour éviter Cloudflare, avec retour à Cloudflare en un clic.

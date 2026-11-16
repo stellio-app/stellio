@@ -2880,9 +2880,24 @@
 				  </div>
 				</div>
 				<div id="page-sosprint" class="page">
-					<div class="sosprint-header">
-						<h2><i class="fa-solid fa-kit-medical"></i> <span data-i18n="sosprint.title">S.O.S print — Diagnostic d'échec</span></h2>
-						<p data-i18n="sosprint.subtitle">Décrivez votre problème d'impression, l'IA locale (Ollama) analyse et vous propose les causes les plus probables ainsi que les réglages à corriger.</p>
+					<div class="sosprint-header sp-hero">
+						<div class="sp-hero-icon"><i class="fa-solid fa-kit-medical"></i></div>
+						<div class="sp-hero-text">
+							<h2 data-i18n="sosprint.title">S.O.S print — Diagnostic d'échec</h2>
+							<p data-i18n="sosprint.subtitle">Décrivez votre problème d'impression, l'IA locale (Ollama) analyse et vous propose les causes les plus probables ainsi que les réglages à corriger.</p>
+						</div>
+					</div>
+
+					<ol class="sp-stepper" id="sosprint-stepper" data-step="1">
+						<li data-n="1"><span>1</span><b data-i18n="sosprint.step_problem">Problème</b></li>
+						<li data-n="2"><span>2</span><b data-i18n="sosprint.step_investigation">Enquête</b></li>
+						<li data-n="3"><span>3</span><b data-i18n="sosprint.step_diagnosis">Diagnostic</b></li>
+					</ol>
+
+					<div class="sp-notice" role="note">
+						<i class="fa-solid fa-triangle-exclamation"></i>
+						<div><strong data-i18n="sosprint.notice_title">L'IA peut se tromper</strong>
+						<span data-i18n="sosprint.ai_warning">L'IA n'est pas fiable à 100 % : elle peut se tromper. Ses hypothèses sont des pistes à vérifier, pas des certitudes.</span></div>
 					</div>
 
 					<div id="sosprint-ai-disabled-banner" style="display:none; align-items:center; gap:10px; padding:12px 16px; margin-bottom:16px; background:#f59e0b15; border:1px solid #f59e0b40; border-radius:var(--radius); color:var(--cb-warn, #f59e0b); font-size:calc(13px * var(--fs, 1));">
@@ -2906,8 +2921,10 @@
 						</div>
 					</div>
 
-					<div class="sosprint-container">
+					<div class="sosprint-container sp-layout">
 						<form id="sosprint-form" class="sosprint-form">
+							<section class="sp-card">
+							<h3 class="sp-card-title"><span class="sp-num">1</span> <span data-i18n="sosprint.card_problem">Le problème</span></h3>
 							<div class="input-group">
 								<label data-i18n="sosprint.material">Matériau utilisé</label>
 								<div class="sosprint-material-options" id="sosprint-material-options">
@@ -2945,6 +2962,8 @@
 								<label for="sosprint-description" data-i18n="sosprint.describe_problem">Décrivez le problème</label>
 								<textarea id="sosprint-description" rows="4" data-i18n-placeholder="sosprint.describe_placeholder" placeholder="ex : Mes couches se séparent en hauteur sur les pièces hautes, ou le plastique fait des fils entre les pièces..." maxlength="2000" required></textarea>
 							</div>
+
+							</section>
 
 							<div class="sosprint-settings" id="sosprint-settings">
 								<label class="sosprint-settings-title" for="sosprint-profile-select"><span data-i18n="sosprint.settings_title">Réglages utilisés pour cette impression</span> <span class="sosprint-optional-tag" data-i18n="sosprint.optional">(facultatif)</span></label>
@@ -2984,6 +3003,26 @@
 										<div class="sosprint-settings-field">
 											<label for="sosprint-set-first_layer_speed" data-i18n="sosprint.set_first_layer_speed">Vitesse 1re couche (mm/s)</label>
 											<input type="number" id="sosprint-set-first_layer_speed" inputmode="decimal" step="1" min="1" max="500">
+										</div>
+										<div class="sosprint-settings-field">
+											<label for="sosprint-set-outer_wall_speed" data-i18n="sosprint.set_outer_wall_speed">Vitesse parois extérieures (mm/s)</label>
+											<input type="number" id="sosprint-set-outer_wall_speed" inputmode="decimal" step="1" min="1" max="1000">
+										</div>
+										<div class="sosprint-settings-field">
+											<label for="sosprint-set-inner_wall_speed" data-i18n="sosprint.set_inner_wall_speed">Vitesse parois intérieures (mm/s)</label>
+											<input type="number" id="sosprint-set-inner_wall_speed" inputmode="decimal" step="1" min="1" max="1000">
+										</div>
+										<div class="sosprint-settings-field">
+											<label for="sosprint-set-infill_speed" data-i18n="sosprint.set_infill_speed">Vitesse remplissage (mm/s)</label>
+											<input type="number" id="sosprint-set-infill_speed" inputmode="decimal" step="1" min="1" max="1000">
+										</div>
+										<div class="sosprint-settings-field">
+											<label for="sosprint-set-travel_speed" data-i18n="sosprint.set_travel_speed">Vitesse de déplacement (mm/s)</label>
+											<input type="number" id="sosprint-set-travel_speed" inputmode="decimal" step="1" min="1" max="1500">
+										</div>
+										<div class="sosprint-settings-field">
+											<label for="sosprint-set-prime_tower_width" data-i18n="sosprint.set_prime_tower_width">Largeur tour de purge (mm)</label>
+											<input type="number" id="sosprint-set-prime_tower_width" inputmode="decimal" step="1" min="5" max="200">
 										</div>
 										<div class="sosprint-settings-field">
 											<label for="sosprint-set-retraction_distance" data-i18n="sosprint.set_retraction_distance">Rétraction (mm)</label>
@@ -3030,12 +3069,12 @@
 							</button>
 						</form>
 
+						<aside class="sp-aside">
 						<div id="sosprint-questions" class="sosprint-questions sosprint-investigation" style="display:none;">
 							<h3><i class="fa-solid fa-magnifying-glass"></i> <span data-i18n="sosprint.investigation_title">Enquête en cours</span></h3>
 							<p class="sosprint-questions-hint" data-i18n="sosprint.investigation_hint">L'IA affine son diagnostic question après question, en éliminant les causes les moins probables.</p>
 
 							<div id="sosprint-suspects-list" class="sosprint-suspects-list"></div>
-
 							<div class="sosprint-investigation-progress">
 								<span id="sosprint-question-counter"></span>
 							</div>
@@ -3073,6 +3112,7 @@
 						<div id="sosprint-result" class="sosprint-result" style="display:none;">
 							<h3><i class="fa-solid fa-list-check"></i> <span data-i18n="sosprint.result_title">Causes les plus probables</span></h3>
 							<div id="sosprint-causes-list" class="sosprint-causes-list"></div>
+							<p class="sosprint-ai-warning"><i class="fa-solid fa-triangle-exclamation"></i> <span data-i18n="sosprint.ai_warning">L'IA n'est pas fiable à 100 % : elle peut se tromper. Ses hypothèses sont des pistes à vérifier, pas des certitudes ; vérifiez avant de modifier vos réglages ou votre machine.</span></p>
 
 							<div id="sosprint-resolve-box" class="sosprint-resolve-box">
 								<div id="sosprint-resolve-form">
@@ -3097,6 +3137,7 @@
 							<i class="fa-solid fa-circle-info"></i>
 							<span data-i18n="sosprint.hint">Le diagnostic utilise exclusivement votre modèle Ollama local (Paramètres → Tags IA), y compris pour l'analyse d'une éventuelle photo. Aucune donnée n'est envoyée en ligne. Si Ollama est indisponible ou met trop de temps à répondre, un message vous l'indique clairement.</span>
 						</div>
+						</aside>
 					</div>
 				</div>
 				<div id="page-acct-likes" class="page">

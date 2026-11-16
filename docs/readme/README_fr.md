@@ -105,13 +105,15 @@ Que vous soyez un maker débutant ou un propriétaire expérimenté gérant plus
 - 📊 **Statistiques détaillées** (formats, plateformes, fiabilité des profils)
 
 ### 🤖 Intelligence artificielle (Ollama local)
+> ⚠️ L'IA n'est pas fiable à 100 % : elle peut se tromper (étiquettes, descriptions, diagnostics S.O.S Print…). Considérez ses réponses comme des pistes à vérifier, pas comme des certitudes.
+
 - 🏷️ **Auto-tagging** intelligent des fichiers
 - 📝 **Description automatique** des modèles
 - 🔎 **Recherche sémantique** en langage naturel
 - 📐 **Analyse d'imprimabilité** (détection des porte-à-faux) et **orientations suggérées** (moins de porte-à-faux, contact avec le plateau affiché)
 - 🎯 **Recommandation de profil slicer** basée sur la géométrie + l'historique de réussite
 - ⏱️ **Estimation du temps d'impression** avant le slicing
-- 🩺 **S.O.S Print** : diagnostic de raté d'impression adaptatif, question par question — Stellio pose une question à la fois, réduit une liste d'hypothèses au fur et à mesure de vos réponses (4 questions maximum), puis délivre un diagnostic final ; l'analyse photo est disponible à tout moment, et les conversations sont sauvegardées (réouverture, marquage « résolu »)
+- 🩺 **S.O.S Print** : diagnostic de raté d'impression adaptatif, question par question — Stellio pose une question à la fois, réduit une liste d'hypothèses au fur et à mesure de vos réponses (sans limite de questions : de nouvelles pistes s'ajoutent et l'enquête continue après un « toujours pas résolu »), puis délivre un diagnostic final ; l'analyse photo est disponible à tout moment, et les conversations sont sauvegardées (réouverture, marquage « résolu ») ⚠️ L'IA n'est pas fiable à 100 % et peut se tromper : ses hypothèses sont des pistes à vérifier.
 
 ### 🖨️ Gestion des imprimantes
 - 🔌 Support **OctoPrint**, **Klipper/Moonraker**, **Bambu Lab** (MQTT), **Creality** (WebSocket), **FlashForge**, **Elegoo** (SDCP) et **PrusaLink**

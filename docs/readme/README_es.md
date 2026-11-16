@@ -105,13 +105,15 @@ Ya seas un maker principiante o un usuario experimentado con varias máquinas, S
 - 📊 **Estadísticas detalladas** (formatos, plataformas, fiabilidad de perfiles)
 
 ### 🤖 Inteligencia artificial (Ollama local)
+> ⚠️ La IA no es 100 % fiable: puede equivocarse (etiquetas, descripciones, diagnósticos de S.O.S Print…). Considera sus respuestas como pistas que hay que comprobar, no como certezas.
+
 - 🏷️ **Etiquetado automático** inteligente de archivos
 - 📝 **Descripción automática** de modelos
 - 🔎 **Búsqueda semántica** en lenguaje natural
 - 📐 **Análisis de imprimibilidad** (detección de voladizos) y **orientaciones sugeridas** (menos voladizo, se muestra el contacto con la cama)
 - 🎯 **Recomendación de perfil de slicer** basada en la geometría + historial de éxito
 - ⏱️ **Estimación del tiempo de impresión** antes del slicing
-- 🩺 **S.O.S Print**: diagnóstico adaptativo de fallos de impresión, paso a paso — Stellio hace una pregunta a la vez, reduce una lista de hipótesis según tus respuestas (máximo 4 preguntas) y luego ofrece un diagnóstico final; el análisis de fotos está disponible en cualquier momento y las conversaciones se guardan (reabrir, marcar como resuelto)
+- 🩺 **S.O.S Print**: diagnóstico adaptativo de fallos de impresión, paso a paso — Stellio hace una pregunta a la vez, reduce una lista de hipótesis según tus respuestas (sin límite de preguntas: se añaden nuevas hipótesis y la investigación continúa tras un «sigue sin resolverse») y luego ofrece un diagnóstico final; el análisis de fotos está disponible en cualquier momento y las conversaciones se guardan (reabrir, marcar como resuelto) ⚠️ La IA no es 100 % fiable y puede equivocarse: sus hipótesis son pistas que hay que comprobar.
 
 ### 🖨️ Gestión de impresoras
 - 🔌 Compatible con **OctoPrint**, **Klipper/Moonraker**, **Bambu Lab** (MQTT), **Creality** (WebSocket), **FlashForge**, **Elegoo** (SDCP) y **PrusaLink**

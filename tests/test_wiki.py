@@ -33,16 +33,26 @@ def test_captures_referencees_existent(tmp_path):
             assert (out / m).exists(), (f.name, m)
 
 
-def test_captures_communes_a_toutes_les_langues(tmp_path, monkeypatch):
+def test_captures_par_langue(tmp_path, monkeypatch):
     img = tmp_path / 'images'
-    img.mkdir()
-    (img / 'library.png').write_bytes(b'x')
+    (img / 'fr').mkdir(parents=True)
+    (img / 'fr' / 'library.png').write_bytes(b'x')
+    (img / 'commune.png').write_bytes(b'x')
     monkeypatch.setattr(bw, 'IMG', str(img))
-    assert bw.find_image('fr', 'library') == bw.find_image('ja', 'library') == str(img / 'library.png')
+    assert bw.find_image('fr', 'library') == str(img / 'fr' / 'library.png')
+    assert bw.find_image('ja', 'library') is None                       # pas de capture japonaise : rien
+    assert bw.find_image('ja', 'commune') == str(img / 'commune.png')   # capture commune en repli
     assert bw.find_image('fr', 'inconnue') is None
-    # plus de sous-dossiers par version / langue dans le dépôt
+
+
+def test_doc_captures_dans_les_8_langues():
     real = os.path.join(bw.ROOT, 'docs', 'wiki', 'images')
-    assert not [d for d in os.listdir(real) if os.path.isdir(os.path.join(real, d))]
+    refs = set()
+    for lang, _, _ in bw.LANGS:
+        refs |= set(re.findall(r'\{\{img:([\w-]+)\}\}', open(os.path.join(bw.SRC, f'{lang}.md'), encoding='utf-8').read()))
+    for lang, _, _ in bw.LANGS:
+        for n in refs:
+            assert os.path.isfile(os.path.join(real, lang, f'{n}.png')), (lang, n)
 
 
 def test_doc_110_nouveautes_dans_les_8_langues():

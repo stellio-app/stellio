@@ -28,7 +28,7 @@ jobs:
   # 1. Détecte la version courante et decide si une release est necessaire
   # ──────────────────────────────────────────────────────────────────────
   check-version:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.check.outputs.version }}
       should_release: ${{ steps.check.outputs.should_release }}
@@ -68,10 +68,10 @@ jobs:
       artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -238,7 +238,7 @@ jobs:
           "$hash  $zipName" | Out-File -Encoding ascii "$zipName.sha256"
 
       - name: Upload patch ZIP artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: stellio-patch-zip
           path: |
@@ -278,7 +278,7 @@ jobs:
           "$hash  $zipName" | Out-File -Encoding ascii "$zipName.sha256"
 
       - name: Upload portable ZIP artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: stellio-portable-zip
           path: |
@@ -297,7 +297,7 @@ jobs:
 
       - name: Upload unsigned installer artifact
         id: upload-unsigned
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: stellio-installer-unsigned
           path: output\Stellio-Setup-${{ needs.check-version.outputs.version }}.exe
@@ -318,10 +318,10 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -473,8 +473,8 @@ jobs:
           # SHA-256 attendus des archives rarmacos-<arch>-<version>.tar.gz. Tant qu'une valeur est vide, le build
           # continue mais affiche le hash obtenu en avertissement : le verifier a la main puis le coller ici.
           case "${{ matrix.arch }}" in
-            arm64)  RAR_ARCH="arm"; RAR_SHA="" ;;
-            x86_64) RAR_ARCH="x64"; RAR_SHA="" ;;
+            arm64)  RAR_ARCH="arm"; RAR_SHA="68b393c000758d477fde43c955ff7542f12f76f3f5e87cdda923152fc791bd4d" ;;
+            x86_64) RAR_ARCH="x64"; RAR_SHA="da1fb3c3d7748136c9b369b683d574b372cb1ed049a634a81f85d93918346d8f" ;;
           esac
           URL="https://www.rarlab.com/rar/rarmacos-${RAR_ARCH}-${RAR_VERSION}.tar.gz"
           echo "Telechargement depuis $URL"
@@ -557,7 +557,7 @@ jobs:
           shasum -a 256 "$DMG_NAME" > "$DMG_NAME.sha256"
 
       - name: Upload macOS installer artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: stellio-macos-dmg-${{ matrix.arch }}
           path: |
@@ -575,10 +575,10 @@ jobs:
     timeout-minutes: 45   # un job qui bloque (réseau du runner) est arrêté au lieu de tourner des heures
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -769,7 +769,7 @@ jobs:
           wget -q -O appimagetool "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
           chmod +x appimagetool
           # -u : intègre l'information de mise à jour dans l'AppImage et génère le .zsync à côté (suivi des versions, mises à jour delta)
-          ./appimagetool --appimage-extract-and-run \
+          ./appimagetool --appimage-extract-and-run --no-appstream \
             -u "gh-releases-zsync|stellio-app|stellio|latest|Stellio-v*-x86_64.AppImage.zsync" \
             AppDir "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage"
           test -f "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage.zsync" || { echo "Le .zsync n'a pas été généré"; exit 1; }
@@ -778,7 +778,7 @@ jobs:
             > "Stellio-v${{ needs.check-version.outputs.version }}-x86_64.AppImage.sha256"
 
       - name: Upload Linux AppImage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: stellio-linux-appimage
           path: |
@@ -806,47 +806,48 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout (notes de version)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           sparse-checkout: |
             changelog.json
+            release-notes
             tools/release_notes.py
           sparse-checkout-cone-mode: false
 
       - name: Download Windows installer artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: stellio-installer-unsigned
           path: release-files
 
       - name: Download patch ZIP artifact (commun aux 3 plateformes)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: stellio-patch-zip
           path: release-files
 
       - name: Download portable ZIP artifact (Windows)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: stellio-portable-zip
           path: release-files
 
       - name: Download macOS .dmg artifacts (arm64 + x86_64)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: stellio-macos-dmg-*
           path: release-files
           merge-multiple: true
 
       - name: Download Linux AppImage artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: stellio-linux-appimage
           path: release-files
 
       - name: Download Android APK (si recompilé pour cette release)
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: stellio-apk
           path: release-files
@@ -858,12 +859,12 @@ jobs:
           $hash = (Get-FileHash -Algorithm SHA256 $file.FullName).Hash.ToLower()
           "$hash  $($file.Name)" | Out-File -Encoding ascii "release-files\$($file.Name).sha256"
 
-      - name: Générer les notes de version depuis changelog.json
+      - name: Générer les notes de version depuis release-notes/
         shell: bash
         run: python tools/release_notes.py "${{ needs.check-version.outputs.version }}" RELEASE_BODY.md
 
       - name: Create GitHub Release (Draft)
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           body_path: RELEASE_BODY.md
           tag_name: v${{ needs.check-version.outputs.version }}

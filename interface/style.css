@@ -6082,6 +6082,25 @@ kbd {
     }
 }
 
+.sosprint-ai-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 10px 0 0;
+    padding: 8px 12px;
+    font-size: calc(12px * var(--fs, 1));
+    line-height: 1.4;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+    border-left: 3px solid var(--warning, #f59e0b);
+    border-radius: 6px;
+}
+
+.sosprint-ai-warning i {
+    color: var(--warning, #f59e0b);
+    margin-top: 2px;
+}
+
 .sosprint-suspects-list {
     display: flex;
     flex-wrap: wrap;
@@ -6105,6 +6124,26 @@ kbd {
 .sosprint-suspect i {
     color: var(--accent);
     font-size: calc(11px * var(--fs, 1));
+}
+
+.sosprint-suspect-detailed {
+    flex-wrap: wrap;
+    border-radius: 12px;
+    flex: 1 1 260px;
+}
+
+.sosprint-pct {
+    margin-left: auto;
+    font-weight: 700;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+}
+
+.sosprint-why {
+    flex-basis: 100%;
+    font-weight: 400;
+    color: var(--text-muted);
+    line-height: 1.35;
 }
 
 .sosprint-suspect-eliminated {
@@ -7597,7 +7636,7 @@ kbd {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    animation: slideUp 0.15s ease;
+    animation: recentSearchIn 0.15s ease;   /* v1.1.2 : le slideUp global décale de -50 % en X (le panneau arrivait de la gauche) */
 }
 
 .notif-panel-header {
@@ -7814,7 +7853,7 @@ kbd {
     cursor: pointer;
     max-width: 260px;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
-    animation: slideUp 0.2s ease;
+    animation: recentSearchIn 0.2s ease;
 }
 
 .mini-printer-widget:hover {
@@ -7910,7 +7949,7 @@ kbd {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    animation: slideUp 0.15s ease;
+    animation: recentSearchIn 0.15s ease;
 }
 
 .command-palette-input-wrap {
@@ -10003,19 +10042,23 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
     .rail-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
     .rail-btn.active { background: var(--accent-glow); color: var(--accent); }
     /* pied de page : réduit quand le volet est fermé, élargi avec lui quand il s'ouvre */
-    .sidebar-footer { order: 2; position: absolute; left: 0; bottom: 0; z-index: 85; width: var(--rail-width); height: auto; box-sizing: border-box; padding: 14px 10px; gap: 10px; background: var(--bg-secondary); border-top: 1px solid var(--border); border-right: 1px solid var(--border); overflow: hidden; transition: width 0.16s ease; }
-    .sidebar.panel-open .sidebar-footer { width: calc(var(--rail-width) + var(--sidebar-width)); padding: 14px 16px; }
-    .sidebar:not(.panel-open) .sidebar-footer .user-info { justify-content: center; }
-    .sidebar:not(.panel-open) #current-username, .sidebar:not(.panel-open) .kofi-btn span { display: none; }
+    .sidebar-footer { order: 2; position: absolute; left: 0; bottom: 0; z-index: 85; width: var(--rail-width); height: auto; box-sizing: border-box; padding: 14px 10px; gap: 10px; background: var(--bg-secondary); border-top: 1px solid var(--border); border-right: 1px solid var(--border); overflow: hidden; transition: width 0.2s ease; }
+    .sidebar.panel-open .sidebar-footer { width: calc(var(--rail-width) + var(--sidebar-width)); }
+    /* v1.1.2 : l'avatar du compte garde exactement la même place volet fermé ou ouvert (plus de sursaut : marges fixes, plus de centrage qui bascule d'un coup) */
+    .sidebar-footer .user-info { justify-content: flex-start; padding-left: calc((var(--rail-width) - 21px - 32px) / 2); box-sizing: border-box; }
+    /* v1.1.2 : les textes (nom du compte, « Soutenir sur Ko-fi ») se déploient avec la largeur du pied de page au lieu d'apparaître d'un coup (le bouton ne s'élargissait plus puis se coupait) */
+    .sidebar-footer #current-username, .sidebar-footer .kofi-btn span { white-space: nowrap; overflow: hidden; max-width: 220px; opacity: 1; transition: max-width 0.2s ease, opacity 0.2s ease; }
+    .sidebar:not(.panel-open) #current-username, .sidebar:not(.panel-open) .kofi-btn span { max-width: 0; opacity: 0; flex: 0 0 auto; }
+    .sidebar:not(.panel-open) .sidebar-footer .user-info, .sidebar:not(.panel-open) .kofi-btn { gap: 0; }
     .sidebar:not(.panel-open) .kofi-btn { padding-left: 0; padding-right: 0; justify-content: center; }
-    .sidebar-footer #current-username, .sidebar-footer .kofi-btn span { white-space: nowrap; }
+    .sidebar-footer .kofi-btn { overflow: hidden; }
     /* mêmes hauteurs volet fermé / ouvert : rien ne bouge dans la barre quand le volet s'ouvre */
     .sidebar-footer .user-info { height: 32px; }
     .sidebar-footer .kofi-btn { height: 34px; min-height: 34px; padding-top: 0; padding-bottom: 0; box-sizing: border-box; }
     .sidebar-footer, .sidebar.panel-open .sidebar-footer { padding-top: 14px; padding-bottom: 14px; }
     .sidebar-rail { padding-bottom: calc(var(--foot-h) + 8px); }
-    .sidebar-nav { position: absolute; left: 100%; top: var(--topbar-h, var(--header-height)); bottom: 0; padding-bottom: var(--foot-h); box-sizing: border-box; width: var(--sidebar-width); z-index: 70; background: var(--bg-secondary); box-shadow: 8px 0 24px rgba(0, 0, 0, 0.35); clip-path: inset(0 -40px 0 0); padding-top: 12px; visibility: hidden; opacity: 0; transform: translateX(-10px); pointer-events: none; transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s linear 0.16s; }
-    .sidebar.panel-open .sidebar-nav { visibility: visible; opacity: 1; transform: none; pointer-events: auto; transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s; }
+    .sidebar-nav { position: absolute; left: 100%; top: var(--topbar-h, var(--header-height)); bottom: 0; padding-bottom: var(--foot-h); box-sizing: border-box; width: var(--sidebar-width); z-index: 70; background: var(--bg-secondary); box-shadow: 8px 0 24px rgba(0, 0, 0, 0.35); clip-path: inset(0 100% 0 0); padding-top: 12px; visibility: hidden; pointer-events: none; transition: clip-path 0.2s ease, visibility 0s linear 0.2s; }
+    .sidebar.panel-open .sidebar-nav { visibility: visible; clip-path: inset(0 -40px 0 0); pointer-events: auto; transition: clip-path 0.2s ease, visibility 0s; }
     .sidebar-panel-title { display: block; padding: 4px 14px 10px; font-size: calc(18px * var(--fs, 1)); font-weight: 700; color: var(--text-primary); flex-shrink: 0; }
     .sidebar .nav-btn[data-cat="home"], .sidebar-nav-separator { display: none !important; }
     .sidebar[data-cat="library"] .nav-btn[data-cat]:not([data-cat="library"]),
@@ -10041,7 +10084,7 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
 /* v1.1.0 : le logo étant transparent, le trait vertical de la barre le traversait → on ne le trace que sous l'en-tête */
 @media all {
     .sidebar { border-right: 0; }
-    .sidebar::after { content: ""; position: absolute; right: 0; bottom: 0; top: var(--topbar-h, var(--header-height)); width: 1px; background: var(--border); pointer-events: none; z-index: 95; }
+    .sidebar::after { content: ""; position: absolute; right: 0; bottom: 0; top: var(--topbar-h, var(--header-height)); width: 1px; background: var(--border); pointer-events: none; z-index: 80; transition: right 0.2s ease; }   /* v1.1.2 : sous le pied de page (z 85) et animé comme le volet : à la fermeture le trait ne traverse plus le bouton Ko-fi */
 }
 
 /* volet ouvert : le séparateur vertical se place sur le bord droit du volet */
@@ -10051,10 +10094,16 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
 
 /* v1.1.0 : page « Déjà imprimés » */
 .printed-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); grid-auto-rows: 1fr; align-items: stretch; gap: 16px; margin-top: 12px; padding: 4px; }
-.printed-card { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.printed-card { display: flex; flex-direction: column; gap: 8px; min-width: 0; position: relative; }
 .printed-card { height: 100%; }
 .printed-card .file-card { margin: 0; flex: 1 1 auto; height: auto; min-height: 0; align-self: stretch; }
-.printed-card-remove { align-self: stretch; justify-content: center; }
+/* v1.1.2 : même comportement que la croix de la bibliothèque — cachée, elle apparaît au survol de la miniature (sur écran tactile : un appui l'affiche, un second ouvre le fichier) */
+.printed-card-remove { position: absolute; top: 6px; right: 6px; z-index: 5; width: 22px; height: 22px; padding: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.75); color: var(--cb-bad, #f87171); border: 1px solid rgba(248,113,113,0.5); border-radius: 4px; font-size: calc(12px * var(--fs, 1)); cursor: pointer; opacity: 0; transition: var(--transition); }
+.printed-card:hover .printed-card-remove, .printed-card-remove:focus-visible { opacity: 1; }
+.printed-card-remove:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+.printed-card.touch-active .printed-card-remove { opacity: 1; }   /* écran tactile : 1er appui = survol, 2e appui = ouvre le fichier */
+.printed-card .file-ext-badge { transition: opacity .15s ease; }
+.printed-card:hover .file-ext-badge, .printed-card.touch-active .file-ext-badge { opacity: 0; }   /* v1.1.2 : le badge de format s'efface au survol, la croix prend sa place */
 .printed-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); }
 .printed-row-icon { color: var(--accent); font-size: calc(18px * var(--fs, 1)); }
 .printed-row-body { flex: 1; min-width: 0; }
@@ -10062,6 +10111,7 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
 .printed-row-sub { font-size: calc(12px * var(--fs, 1)); color: var(--text-muted); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .printed-remove-btn { margin-left: 6px; }
 #page-printed .history-page { max-width: none; }
+#page-gallery .history-page { max-width: none; }   /* v1.1.2 : la galerie occupe toute la largeur, comme la bibliothèque */
 .history-filters #printed-search { min-width: 240px; font-family: inherit; color: var(--text-primary); }
 .history-filters #printed-search::placeholder { color: var(--text-muted); }
 
@@ -10106,7 +10156,8 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
 .ap-spool-row .ap-dot { margin-right: 0; }
 
 /* v1.1.1 — la liste « Recherches récentes » passe toujours au-dessus des puces de filtre et des cartes (elle était parfois recouverte) */
-.app-header:focus-within { z-index: 200; }
+.app-header:focus-within,
+.app-header:has(#notif-panel:not(.hidden)) { z-index: 200; }   /* v1.1.2 : panneau des notifications ouvert = au-dessus des widgets, même après un clic sur la croix (le bouton disparaît, le focus aussi) */
 
 /* v1.1.1 — halo ambre autour des fichiers envoyés au slicer (pas encore notés réussi / raté) */
 .file-card.ps-sent {
@@ -10142,14 +10193,220 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
 @media (max-width: 860px) {
     #bottom-stack { transition: left 0.25s cubic-bezier(0.32, 0.72, 0, 1); }
     body.nav-drawer-open #bottom-stack { left: calc(var(--rail-width) + 8px); }
-    body.nav-drawer-open #bottom-stack > .mini-printer-widget { align-self: flex-end; max-width: none; gap: 6px; padding-right: 12px; }
-    body.nav-drawer-open #bottom-stack > .mini-printer-widget .mini-printer-widget-body,
-    body.nav-drawer-open #bottom-stack > .mini-printer-widget .mini-printer-widget-extra,
-    body.nav-drawer-open #bottom-stack > .mini-printer-widget .mini-printer-widget-close { display: none; }
-    body.nav-drawer-open #bottom-stack > .scroll-to-top { transform: scale(0.85); transform-origin: bottom right; }
+    /* v1.1.2 : sur téléphone le badge d'impression est toujours réduit (icône seule), pas seulement barre ouverte */
+    #bottom-stack > .mini-printer-widget { align-self: flex-end; max-width: none; gap: 6px; padding-right: 12px; }
+    #bottom-stack > .mini-printer-widget .mini-printer-widget-body,
+    #bottom-stack > .mini-printer-widget .mini-printer-widget-extra,
+    #bottom-stack > .mini-printer-widget .mini-printer-widget-close { display: none; }
+    #bottom-stack > .scroll-to-top { transform: scale(0.85); transform-origin: bottom right; }
     body.nav-drawer-open #bottom-stack > #toast-container .toast,
     body.nav-drawer-open #bottom-stack > .update-toast,
     body.nav-drawer-open #bottom-stack > .viewer-banner { font-size: 0.85em; padding-top: 8px; padding-bottom: 8px; }
     /* volet ouvert : tous les badges (pastille d'impression, notifications, bandeaux, retour en haut) sont masqués puis reviennent à la fermeture */
     body.nav-panel-open #bottom-stack > * { display: none !important; }
+}
+
+/* v1.1.2 : une fenêtre (modale) ouverte passe devant le badge d'impression, le bouton « haut de page » et les bandeaux ;
+   sur téléphone le badge cachait les boutons du bas (ex. « Compris » de « Quoi de neuf »). Les notifications (toasts) restent visibles. */
+@media (min-width: 861px) {
+    body:has(.modal:not(.hidden)) #bottom-stack > .mini-printer-widget,
+    body:has(.modal:not(.hidden)) #bottom-stack > .scroll-to-top,
+    body:has(.modal:not(.hidden)) #bottom-stack > .viewer-banner { display: none !important; }
+}
+
+/* v1.1.2 — démo sur téléphone : la barre latérale (tiroir) démarre sous le bandeau bleu au lieu de passer dessus ;
+   son haut est collé au bas du bandeau et le fond assombri ne le recouvre plus. */
+@media (max-width: 860px) {
+    body.has-demo-banner .sidebar { top: var(--demo-banner-h, 32px); height: calc(100vh - var(--demo-banner-h, 32px)); height: calc(100dvh - var(--demo-banner-h, 32px)); }
+    body.has-demo-banner .sidebar-overlay { top: var(--demo-banner-h, 32px); }
+}
+
+
+/* ===== S.O.S Print — page refaite : deux colonnes, cartes, indicateur d'étapes ===== */
+#page-sosprint { --sp-w: 1240px; }
+#page-sosprint .sosprint-header.sp-hero,
+#page-sosprint .sp-stepper,
+#page-sosprint .sp-notice,
+#page-sosprint .sosprint-history-panel,
+#page-sosprint #sosprint-ai-disabled-banner,
+#page-sosprint .sosprint-container.sp-layout {
+    width: min(var(--sp-w), 100%);
+    max-width: none;
+    min-width: 0;
+    margin-left: auto;
+    margin-right: auto;
+}
+.sp-hero {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    text-align: left;
+    margin-bottom: 16px;
+}
+.sp-hero-icon {
+    flex: 0 0 auto;
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    font-size: calc(22px * var(--fs, 1));
+    color: #fff;
+    background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #7c3aed));
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.sp-hero-text { min-width: 0; }
+.sp-hero h2 { justify-content: flex-start; margin: 0 0 4px; }
+.sp-hero p { margin: 0; max-width: 70ch; }
+
+.sp-stepper {
+    list-style: none;
+    padding: 0;
+    margin: 0 auto 14px;
+    display: flex;
+    gap: 8px;
+}
+.sp-stepper li {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 14px;
+    border-radius: 999px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: calc(13px * var(--fs, 1));
+    transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+.sp-stepper li span {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: calc(12px * var(--fs, 1));
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+}
+.sp-stepper[data-step="1"] li[data-n="1"],
+.sp-stepper[data-step="2"] li[data-n="2"],
+.sp-stepper[data-step="3"] li[data-n="3"] {
+    color: var(--text-primary);
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--bg-card));
+}
+.sp-stepper[data-step="1"] li[data-n="1"] span,
+.sp-stepper[data-step="2"] li[data-n="2"] span,
+.sp-stepper[data-step="3"] li[data-n="3"] span {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+.sp-stepper[data-step="2"] li[data-n="1"],
+.sp-stepper[data-step="3"] li[data-n="1"],
+.sp-stepper[data-step="3"] li[data-n="2"] { color: var(--text-secondary); }
+.sp-stepper[data-step="2"] li[data-n="1"] span,
+.sp-stepper[data-step="3"] li[data-n="1"] span,
+.sp-stepper[data-step="3"] li[data-n="2"] span { background: color-mix(in srgb, var(--accent) 25%, var(--bg-card)); }
+
+.sp-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--warning, #f59e0b) 10%, var(--bg-card));
+    border: 1px solid color-mix(in srgb, var(--warning, #f59e0b) 35%, var(--border));
+    font-size: calc(13px * var(--fs, 1));
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+.sp-notice i { color: var(--warning, #f59e0b); margin-top: 3px; }
+.sp-notice strong { display: block; color: var(--text-primary); margin-bottom: 2px; }
+
+.sosprint-container.sp-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+}
+.sp-layout .sosprint-form {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    gap: 14px;
+}
+.sp-layout .sosprint-form > .sp-card,
+.sp-layout .sosprint-form > .input-group,
+.sp-layout .sosprint-form > .sosprint-settings {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+}
+.sp-card { display: flex; flex-direction: column; gap: 14px; }
+.sp-card-title {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: calc(15px * var(--fs, 1));
+    color: var(--text-primary);
+}
+.sp-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: calc(12px * var(--fs, 1));
+    font-weight: 700;
+    color: #fff;
+    background: var(--accent);
+}
+.sp-layout .sosprint-material-options { justify-content: flex-start; }
+.sp-layout .sosprint-submit-row,
+.sp-layout #sosprint-submit-btn { min-height: 46px; font-size: calc(15px * var(--fs, 1)); }
+
+.sp-aside {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: sticky;
+    top: 12px;
+    min-width: 0;
+}
+.sp-aside > * { margin-top: 0 !important; }
+.sp-aside .sosprint-questions,
+.sp-aside .sosprint-result {
+    border-radius: var(--radius-lg);
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+    box-shadow: 0 4px 20px rgba(0, 0, 0, .12);
+}
+.sp-aside .sosprint-hint {
+    padding: 22px 20px;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+    border-style: dashed;
+    font-size: calc(13px * var(--fs, 1));
+}
+.sp-aside .sosprint-hint i { font-size: calc(26px * var(--fs, 1)); margin: 0; }
+.sp-aside:has(#sosprint-questions:not([style*="none"])) .sosprint-hint,
+.sp-aside:has(#sosprint-result:not([style*="none"])) .sosprint-hint { display: none; }
+
+@media (max-width: 980px) {
+    .sosprint-container.sp-layout { grid-template-columns: minmax(0, 1fr); }
+    .sp-aside { position: static; }
+    .sp-aside:empty { display: none; }
+}
+@media (max-width: 560px) {
+    .sp-stepper li { padding: 8px 10px; gap: 6px; }
+    .sp-stepper li b { font-size: calc(12px * var(--fs, 1)); }
+    .sp-hero { align-items: flex-start; }
 }

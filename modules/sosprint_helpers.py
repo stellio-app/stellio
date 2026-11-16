@@ -24,9 +24,8 @@ get_db = None
 session = None
 
 
-SOSPRINT_SOFT_QUESTIONS = 4
-
-SOSPRINT_HARD_MAX_QUESTIONS = 30
+# Pas de limite pratique : l'IA continue à poser des questions tant qu'elle n'a pas trouvé (le plafond ne sert qu'à éviter une boucle folle).
+SOSPRINT_HARD_MAX_QUESTIONS = 1000
 
 def _sosprint_get_conversation(conv_id, user_id):
     conn = get_db()
@@ -177,12 +176,36 @@ def _sosprint_parse_causes(block: str, max_items: int = 6) -> list:
         line = line.strip()
         line = re.sub(r'^[-*•]\s*', '', line)
         line = re.sub(r'^\d+[\.\)]\s*', '', line)
-        line = line.strip(' .')
+        line = line.split('|')[0].strip(' .')
         if line:
             causes.append(line)
         if len(causes) >= max_items:
             break
     return causes
+
+def _sosprint_parse_hypotheses(block: str, max_items: int = 10) -> list:
+    """Lignes « - cause | probabilité % | pourquoi / test rapide » → [{'cause', 'pct', 'why'}] (tolérant : champs facultatifs)."""
+    out = []
+    for line in (block or '').splitlines():
+        line = re.sub(r'^[-*•]\s*', '', line.strip())
+        line = re.sub(r'^\d+[\.\)]\s*', '', line)
+        if not line:
+            continue
+        parts = [x.strip() for x in line.split('|')]
+        cause = parts[0].strip(' .')
+        if not cause or cause.upper().startswith(('QUESTION', 'STATUS')):
+            continue
+        pct, why = None, ''
+        for extra in parts[1:]:
+            m = re.fullmatch(r'~?\s*(\d{1,3})\s*%?', extra)
+            if m and pct is None:
+                pct = max(0, min(100, int(m.group(1))))
+            elif extra and not why:
+                why = extra[:160]
+        out.append({'cause': cause[:120], 'pct': pct, 'why': why})
+        if len(out) >= max_items:
+            break
+    return out
 
 def _sosprint_parse_eliminated(block: str) -> list:
     first_line = block.splitlines()[0].strip() if block.strip() else ''
@@ -197,6 +220,11 @@ SOSPRINT_SETTING_FIELDS = {
     'layer_height':        ('Layer height', 'mm', 0.04, 1.5),
     'print_speed':         ('Print speed', 'mm/s', 1, 1000),
     'first_layer_speed':   ('First layer speed', 'mm/s', 1, 500),
+    'outer_wall_speed':    ('Outer wall speed', 'mm/s', 1, 1000),
+    'inner_wall_speed':    ('Inner wall speed', 'mm/s', 1, 1000),
+    'infill_speed':        ('Sparse infill speed', 'mm/s', 1, 1000),
+    'travel_speed':        ('Travel speed', 'mm/s', 1, 1500),
+    'prime_tower_width':   ('Purge / prime tower width', 'mm', 5, 200),
     'retraction_distance': ('Retraction distance', 'mm', 0, 20),
     'retraction_speed':    ('Retraction speed', 'mm/s', 1, 200),
     'fan_speed':           ('Cooling fan speed', '%', 0, 100),
@@ -240,10 +268,37 @@ def _sosprint_clean_settings(raw) -> dict:
                 out['profile_changes'] = changes
     return out
 
+_SPEED_FIELDS = ('print_speed', 'first_layer_speed', 'outer_wall_speed', 'inner_wall_speed', 'infill_speed',
+                 'travel_speed', 'retraction_speed')
+
+SOSPRINT_SPEED_RULE_ASK = (
+    "No printing speeds were provided. Speeds matter for most failures (stringing, blobs, ringing, layer shifts, "
+    "under-extrusion, weak or messy layers, poor first layer, warping): when the problem could be related to speed, "
+    "ASK the user for the relevant speeds (print speed, first layer speed, outer wall, travel, retraction) "
+    "BEFORE concluding, and never guess them.\n"
+)
+SOSPRINT_SPEED_RULE_USE = (
+    "Take the speeds into account: judge them for this material and printer (flexible filaments and small nozzles need "
+    "slow speeds; fast speeds with high temperatures cause stringing and under-extrusion; a fast first layer hurts adhesion; "
+    "check the maximum volumetric flow = speed × layer height × line width). If a speed that matters for the problem is "
+    "missing, ask for it before concluding.\n"
+)
+
+SOSPRINT_MULTICOLOR_RULE = (
+    "Multicolor / multi-material prints (AMS, MMU, CFS, toolchanger, several filaments, color changes): if the user mentions "
+    "several colors or materials, or a purge / prime / wipe tower, the tower is a prime suspect when it detaches, wobbles, "
+    "collapses, falls onto the print, strings, prints badly or when colors mix or blob at changes. In that case check, one "
+    "question at a time and only what is not already known: is the tower enabled, its width and position (away from the part, "
+    "well inside the bed), its first-layer adhesion (brim, bed temperature, clean plate), purge / flush volumes, tower speed and "
+    "layer height, number of color changes and the height of the print (a tall thin tower needs a wider base and slower speed). "
+    "If the symptoms hint at multicolor (color bleeding, blobs at changes, a tower) but it is unclear, ask once whether the print "
+    "is multicolor. Never assume the print is single-color when the user says otherwise.\n"
+)
+
 def _sosprint_settings_block(settings) -> str:
     cleaned = _sosprint_clean_settings(settings)
     if not cleaned:
-        return ''
+        return SOSPRINT_SPEED_RULE_ASK + SOSPRINT_MULTICOLOR_RULE
     parts = [f"{label}: {cleaned[key]} {unit}" for key, (label, unit, _lo, _hi) in SOSPRINT_SETTING_FIELDS.items() if key in cleaned]
     block = ""
     if cleaned.get('profile_name'):
@@ -264,6 +319,8 @@ def _sosprint_settings_block(settings) -> str:
             ("; ".join(parts) if parts else "none given besides the remarks below") + ".\n"
     if cleaned.get('notes'):
         block += f"Other settings or remarks from the user: \"{cleaned['notes']}\"\n"
+    block += SOSPRINT_SPEED_RULE_USE if any(k in cleaned for k in _SPEED_FIELDS) else SOSPRINT_SPEED_RULE_ASK
+    block += SOSPRINT_MULTICOLOR_RULE
     block += (
         "Use these values to target your answer: name the exact slicer setting to change and a concrete value "
         "to try, relative to the current value (for example \"nozzle 215 °C → 205 °C\"); do not suggest changing "
@@ -278,7 +335,7 @@ def _sosprint_conversation_settings_block(conversation_id) -> str:
             return _sosprint_settings_block(conv['print_settings'])
     except Exception:
         pass
-    return ''
+    return _sosprint_settings_block({})
 
 
 _ROUTES = (

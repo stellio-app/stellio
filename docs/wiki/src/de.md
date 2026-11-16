@@ -83,6 +83,8 @@ Alle Dateien finden Sie auf der Seite [Releases](https://github.com/stellio-app/
 
 > ⚠️ Das Installationsprogramm ist **nicht signiert**: Windows SmartScreen kann eine Warnung anzeigen. Prüfen Sie bei Bedarf die `.sha256`; die integrierte Aktualisierung kontrolliert sie vor der Installation.
 
+> 💡 Kann das integrierte Fenster nicht geöffnet werden (WebView2 oder `Python.Runtime.dll` blockiert, oft nach einem Download), öffnet sich Stellio in einem eigenen Edge/Chrome-Fenster und beendet sich beim Schließen. Das integrierte Fenster kommt zurück, wenn Sie die ZIP-Datei per Rechtsklick → Eigenschaften → **Zulassen** entsperren und neu entpacken. Details stehen in `data\stellio.log`.
+
 ## macOS
 
 Öffnen Sie die `.dmg` und ziehen Sie Stellio nach „Programme". Wählen Sie die zu Ihrem Mac passende Datei: `arm64` (M1, M2, M3 …) oder `x86_64` (Intel). Die Builds sind nicht notariell beglaubigt: Beim ersten Start Rechtsklick → **Öffnen**.
@@ -124,6 +126,10 @@ Details unter [Server-Edition](de-Server-Edition).
 @@@ Getting-Started | Erste Schritte
 # Erste Schritte
 {{img:library}}
+
+Die linke Leiste ist eine **Symbolleiste**; ein Klick auf eine Kategorie öffnet rechts ihr **Panel**, das sich nach der Auswahl wieder schließt.
+
+{{img:sidebar-panel}}
 
 
 ## 1. Erster Start
@@ -312,7 +318,7 @@ Jede Funktion von Stellio: **wofür sie da ist und wie man sie benutzt**. Techni
 ## Einen Fehler diagnostizieren: S.O.S Print und KI
 
 1. Öffnen Sie **S.O.S Print** und beschreiben Sie das Problem (Foto möglich).
-2. Beantworten Sie die Fragen, eine nach der anderen (höchstens 4): Stellio grenzt die Hypothesen ein und liefert eine **abschließende Diagnose**.
+2. Beantworten Sie die Fragen, eine nach der anderen, **ohne Limit**: Stellio grenzt die Hypothesen ein (und ergänzt bei Bedarf neue), bis die Ursache gefunden ist, und liefert dann eine **abschließende Diagnose**. Hilft die Lösung nicht, antworten Sie „immer noch nicht gelöst“ – die Untersuchung geht weiter.
 3. Für lokale KI installieren Sie [Ollama](https://ollama.com/) und richten es unter **Einstellungen → Künstliche Intelligenz** ein. Die **Fehlerüberwachung** warnt Sie, ohne den Druck je zu stoppen.
 
 ## Stellio auf dem Smartphone und aus der Ferne nutzen
@@ -363,7 +369,7 @@ Vollständige Liste: [Einstellungen und Daten](de-Settings-and-Data).
 - **Löschen rückgängig machen** (`Strg+Z`) dank 5-Minuten-Papierkorb; gilt auch für Tags, Projekte und Quellen.
 - **Grüner / roter Schimmer** um die Vorschau: grün für erfolgreich gedruckte Dateien, rot für fehlgeschlagene Drucke (Galerie- und Detailansicht).
 - **Schon gedruckt** (⋯-Menü einer Datei): einen anderswo gemachten Druck von Hand erfassen — Drucker, Einstellungen (Slicer-Profil) und Spule wählen, dann **Erfolgreich** oder **Fehlgeschlagen**. Die Datei erscheint in den Filtern „Erfolgreich gedruckt“ / „Fehlgeschlagen“, ihr Detailblatt (Rechtsklick) zeigt Drucker, Einstellungen und Spule.
-- **Seite „Bereits gedruckt“** (Panel Drucken): alle gedruckten oder als „bereits gedruckt“ markierten Dateien, mit denselben Vorschaubildern und Rahmen wie die Bibliothek, einer Suche und einem Filter Erfolgreich / Fehlgeschlagen. Die Schaltfläche **Entfernen** (auch in den Dateiinfos) hebt diesen Status auf: Die Datei gilt wieder als „nie gedruckt“. Ein gleichnamiges Widget gibt es auf der Startseite.
+- **Seite „Bereits gedruckt“** (Panel Drucken): alle gedruckten oder als „bereits gedruckt“ markierten Dateien, mit denselben Vorschaubildern und Rahmen wie die Bibliothek, einer Suche und einem Filter Erfolgreich / Fehlgeschlagen. Beim Überfahren einer Vorschau erscheint ein **rotes Kreuz** (am Smartphone: ein Tippen zeigt es an, ein zweites öffnet die Datei); nach einer Bestätigung entfernt es die Datei aus der Liste, sie gilt wieder als „nie gedruckt“. Die Schaltfläche **Entfernen** in den Dateiinfos macht dasselbe. Ein gleichnamiges Widget gibt es auf der Startseite.
 - Schnelle Auswahl: `Umschalt+Klick` für einen Bereich, Pfeiltasten + `Enter`.
 - **Duplikaterkennung** (exakt und ähnliche Geometrie).
 - **Modellherkunft**: Quelllink, Autor, Lizenz, Notizen, Download-Datum.
@@ -372,6 +378,12 @@ Vollständige Liste: [Einstellungen und Daten](de-Settings-and-Data).
 {{img:library-halo}}
 
 {{img:already-printed}}
+
+Bei einer 3MF mit **mehreren Platten** bietet das Fenster „Bereits gedruckt“ einen Bereich pro Platte, jeweils mit eigener Spule; eine **mehrfarbige** Datei akzeptiert mehrere Farben pro Platte (**Farbe hinzufügen**). Die Farbpunkte entsprechen Ihren Spulen, die Dateiinfos zeigen die Details.
+
+{{img:already-printed-plates}}
+
+An den **an den Slicer gesendeten** Dateien erscheint sofort ein **bernsteinfarbener Rahmen** (grün bei Erfolg, rot bei Fehlschlag); der Filter **An Slicer gesendet** der Bibliothek findet sie mit einem Klick.
 
 ## Suche
 - Klassische Suche und **semantische KI-Suche** („Ich suche eine Halterung für …") mit gemerkten letzten Suchen.
@@ -405,6 +417,8 @@ Mehrere Dateien für ein Objekt gruppieren.
 @@@ Printers | Drucker
 # Drucker
 {{img:printers}}
+
+Auf der Startseite zeigt das Widget **Kameras** bis zu **4 Kameras** (eine pro laufendem Drucker): Ein Klick auf eine Vorschau öffnet ein Fenster mit **nur der Kamera** (das Widget „Laufende Drucke“ behält die komplette Anzeige). Mit **Alle anzeigen** öffnet sich die Liste aller Kameras zur Auswahl.
 
 
 ## Unterstützte Marken
@@ -485,6 +499,8 @@ Der Block **Filament wiegen und Prognose** schätzt das **Aufbrauchdatum** jeder
 
 {{img:filament}}
 
+Die **Shops der Open Filament Database** (86) sind in den **Nützlichen Links** enthalten, nach Ihrem Land gefiltert, und werden auch von der Suche **Spule nachkaufen** genutzt: Stellio schlägt die Shops vor, die zu Ihnen liefern.
+
 ## Verbrauchsprognose
 Die Bibliothek kann eine **Nachbestell-Warnung** anzeigen, wenn der Bestand für Ihre Favoriten nicht reicht.
 
@@ -511,6 +527,8 @@ Laden Sie Modelle von mehreren Plattformen direkt in Ihre Quellen herunter:
 @@@ AI | Künstliche Intelligenz
 # Künstliche Intelligenz
 
+> ⚠️ Die KI ist nicht zu 100 % zuverlässig und kann sich irren (Tags, Beschreibungen, S.O.S-Print-Diagnosen …). Betrachten Sie ihre Antworten als Hinweise zum Überprüfen, nicht als Gewissheiten.
+
 ## Lokale KI (Ollama)
 Standardmäßig läuft die KI **zu 100 % lokal** mit [Ollama](https://ollama.com/). Sie lässt sich deaktivieren.
 
@@ -532,8 +550,8 @@ Statt Ollama nutzen Sie **Claude** (Anthropic), **ChatGPT** (OpenAI) oder **Gemi
 
 ## S.O.S Print
 **Adaptive** Diagnose eines Druckfehlers:
-1. Sie beschreiben das Problem (bei jedem Schritt ist ein Foto möglich) und, wenn Sie möchten, die verwendeten Einstellungen (Temperaturen, Geschwindigkeiten, Rückzug …).
-2. Stellio stellt **eine Frage nach der anderen** (höchstens 4) und grenzt eine Liste von Hypothesen live ein.
+1. Sie beschreiben das Problem (bei jedem Schritt ist ein Foto möglich) und, wenn Sie möchten, die verwendeten Einstellungen (Temperaturen, Geschwindigkeiten, Rückzug …). Die **Geschwindigkeiten** werden aus dem gewählten Slicer-Profil gelesen (oder von Ihnen eingegeben); fehlen sie, fragt die KI danach. Bei **Mehrfarbdrucken** prüft die KI den **Reinigungsturm** (löst sich, kippt, fällt aufs Teil, Farben vermischen sich) und stellt die passenden Fragen; die Turmbreite wird aus dem Profil gelesen. Ab dem ersten Schritt und nach jeder Antwort zeigt die KI ihre **Hypothesen nach Wahrscheinlichkeit sortiert** (%), jeweils mit Begründung oder Schnelltest.
+2. Stellio stellt **eine Frage nach der anderen**, ohne Limit, und grenzt eine Liste von Hypothesen live ein (neue kommen hinzu, wenn die ersten ausgeschlossen sind).
 3. Es liefert eine **endgültige Diagnose**.
 
 Unterhaltungen werden gespeichert: erneut öffnen oder als gelöst markieren.
@@ -541,6 +559,9 @@ Unterhaltungen werden gespeichert: erneut öffnen oder als gelöst markieren.
 > ℹ️ Die Ergebnisse „Erfolgreich / Fehlgeschlagen", die Sie im Verlauf bewerten, verbessern die Empfehlungen.
 
 @@@ Costs-and-Management | Kosten und Verwaltung
+
+> ⚠️ Die KI ist nicht zu 100 % zuverlässig und kann sich irren. Ihre Hypothesen sind Hinweise zum Überprüfen, keine Gewissheiten; prüfen Sie nach, bevor Sie Einstellungen oder Ihre Maschine ändern.
+
 # Kosten und Verwaltung
 {{img:management}}
 
@@ -588,6 +609,10 @@ Sichtbar, wenn *Kosten-, Angebots- und Rechnungsfunktionen aktivieren* angehakt 
 - **Werkstattmodus** im Vollbild für Tablet/Smartphone.
 
 {{img:android-update}}
+
+**Menü auf kleinen Bildschirmen**: Die untere Leiste entfällt; eine Schaltfläche oben links öffnet dieselbe Seitenleiste wie am Computer (Kategorien + Panel rechts). Badges (laufender Druck, Benachrichtigungen, Banner) schrumpfen, damit sie nicht stören. Das Stellio-Logo erscheint auf den Einrichtungsseiten und bei „Server nicht erreichbar“.
+
+{{img:mobile-drawer}}
 
 ## Fernzugriff
 - **Cloudflare Tunnel** (kostenlos, zufällige oder feste Adresse) oder eine **eigene Adresse** (Domainname, DynDNS, VPN, Tailscale …), um Cloudflare zu umgehen, mit Rückkehr zu Cloudflare per Klick.

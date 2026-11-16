@@ -7571,7 +7571,7 @@ function showScanBadge(text, type = 'info') {
 if (!scanBadgeElement) {
 scanBadgeElement = document.createElement('div');
 scanBadgeElement.id = 'scan-progress-badge';
-scanBadgeElement.style.cssText = `background: var(--bg-secondary); color: var(--text-primary); padding: 12px 18px; border-radius: 12px; font-size: calc(13px * var(--fs, 1)); font-weight: 500; box-shadow: 0 4px 20px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 10px; border: 1px solid var(--accent); animation: slideUp 0.3s ease; max-width: 350px; align-self: flex-end; transition: opacity 0.3s ease;`;
+scanBadgeElement.style.cssText = `background: var(--bg-secondary); color: var(--text-primary); padding: 12px 18px; border-radius: 12px; font-size: calc(13px * var(--fs, 1)); font-weight: 500; box-shadow: 0 4px 20px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 10px; border: 1px solid var(--accent); animation: recentSearchIn 0.3s ease; max-width: 350px; align-self: flex-end; transition: opacity 0.3s ease;`;
 const container = document.getElementById('toast-container');
 (container || document.body).appendChild(scanBadgeElement);
 }
@@ -13529,12 +13529,35 @@ window.ollamaAutoTag        = ollamaAutoTag;
 window.ollamaAddSuggestedTag = ollamaAddSuggestedTag;
 
 
+// Indicateur d'étapes (Problème → Enquête → Diagnostic) : suit l'affichage des blocs « enquête » et « résultat »
+(function sosprintStepper() {
+    const st = document.getElementById('sosprint-stepper');
+    const q = document.getElementById('sosprint-questions');
+    const r = document.getElementById('sosprint-result');
+    if (!st || !q || !r) return;
+    const shown = el => !!el.style.display && el.style.display !== 'none';
+    const update = () => { st.dataset.step = shown(r) ? '3' : (shown(q) ? '2' : '1'); };
+    const obs = new MutationObserver(update);
+    [q, r].forEach(el => obs.observe(el, { attributes: true, attributeFilter: ['style'] }));
+    update();
+})();
+
 let sosprintPhotoFile = null;
 let sosprintCandidateCauses = [];
 let sosprintEliminatedCauses = [];
 let sosprintQaHistory = [];
 let sosprintCurrentQuestion = null;
 let sosprintConversationId = null;
+let sosprintFailedAttempts = 0;
+let sosprintHypotheses = {};
+
+// Hypothèses détaillées (probabilité + raison) renvoyées à chaque étape par l'IA
+function mergeSosprintHypotheses(data) {
+    const list = (data && data.hypotheses) || [];
+    if (!list.length) return;
+    sosprintHypotheses = {};
+    list.forEach(h => { if (h && h.cause) sosprintHypotheses[h.cause.toLowerCase()] = h; });
+}
 let sosprintLastCauses = [];
 let sosprintHistoryLoaded = { open: false, resolved: false };
 let sosprintHistoryActiveTab = 'open';
@@ -13548,6 +13571,7 @@ function getSosprintFormValues() {
 
 // Réglages d'impression (facultatifs) : le backend ne garde que les champs connus, bornés
 const SOSPRINT_SETTING_KEYS = ['nozzle_temp', 'bed_temp', 'layer_height', 'print_speed', 'first_layer_speed',
+    'outer_wall_speed', 'inner_wall_speed', 'infill_speed', 'travel_speed', 'prime_tower_width',
     'retraction_distance', 'retraction_speed', 'fan_speed', 'infill'];
 
 // Réglages : « Non renseignés » (défaut) | « Réglages manuels » | un profil de slicer déjà importé.
@@ -13629,7 +13653,10 @@ function onSosprintProfileChange(id) {
     document.querySelectorAll('input[name="sosprint-profile-state"]').forEach(r => { r.checked = false; });
     const profile = (sosprintProfilesCache || []).find(p => p.id === id);
     if (profile) {
-        const map = { nozzle_temp: 'nozzle_temp', bed_temp: 'bed_temp', layer_height: 'layer_height', print_speed: 'print_speed', infill: 'infill_density' };
+        const map = { nozzle_temp: 'nozzle_temp', bed_temp: 'bed_temp', layer_height: 'layer_height', print_speed: 'print_speed', infill: 'infill_density',
+            first_layer_speed: 'first_layer_speed', outer_wall_speed: 'outer_wall_speed', inner_wall_speed: 'inner_wall_speed',
+            infill_speed: 'infill_speed', travel_speed: 'travel_speed', retraction_distance: 'retraction_distance',
+            retraction_speed: 'retraction_speed', fan_speed: 'fan_speed', prime_tower_width: 'prime_tower_width' };
         Object.entries(map).forEach(([field, key]) => {
             const el = document.getElementById('sosprint-set-' + field);
             if (el && profile[key] != null) el.value = profile[key];
@@ -13924,11 +13951,17 @@ function renderSosprintSuspects() {
         return;
     }
     listEl.style.display = 'flex';
-    const remaining = sosprintCandidateCauses.map(c => `
-        <div class="sosprint-suspect">
-            <i class="fa-solid fa-magnifying-glass"></i> ${escapeHtml(c)}
-        </div>
-    `).join('');
+    const info = c => sosprintHypotheses[String(c).toLowerCase()] || null;
+    const ordered = sosprintCandidateCauses.slice().sort((a, b) => ((info(b)?.pct ?? -1) - (info(a)?.pct ?? -1)));
+    const remaining = ordered.map(c => {
+        const h = info(c);
+        const pct = h && h.pct != null ? `<span class="sosprint-pct">${h.pct}\u00a0%</span>` : '';
+        const why = h && h.why ? `<small class="sosprint-why">${escapeHtml(h.why)}</small>` : '';
+        return `
+        <div class="sosprint-suspect${why ? ' sosprint-suspect-detailed' : ''}">
+            <i class="fa-solid fa-magnifying-glass"></i> <span class="sosprint-suspect-label">${escapeHtml(c)}</span>${pct}${why}
+        </div>`;
+    }).join('');
     const eliminated = sosprintEliminatedCauses.map(c => `
         <div class="sosprint-suspect sosprint-suspect-eliminated">
             <i class="fa-solid fa-xmark"></i> <span>${escapeHtml(c)}</span>
@@ -13968,6 +14001,8 @@ function resetSosprintInvestigation() {
     sosprintQaHistory = [];
     sosprintCurrentQuestion = null;
     sosprintConversationId = null;
+    sosprintFailedAttempts = 0;
+    sosprintHypotheses = {};
 }
 
 function resetSosprintResolveBox() {
@@ -14035,6 +14070,7 @@ document.getElementById('sosprint-not-resolved-btn')?.addEventListener('click', 
     let answerText = _t2('sosprint.not_resolved_answer_template', 'Non, toujours pas résolu après avoir vérifié : {causes}').replace('{causes}', triedCauses);
     if (extraNote) answerText += ` (${extraNote})`;
 
+    sosprintFailedAttempts += 1;
     sosprintQaHistory.push({
         question: _t2('sosprint.not_resolved_question', 'Ce diagnostic a-t-il résolu le problème ?'),
         answer: answerText
@@ -14062,6 +14098,7 @@ document.getElementById('sosprint-not-resolved-btn')?.addEventListener('click', 
                 material, description,
                 candidate_causes: sosprintCandidateCauses,
                 qa_history: sosprintQaHistory,
+                failed_attempts: sosprintFailedAttempts,
                 conversation_id: sosprintConversationId
             })
         });
@@ -14072,6 +14109,7 @@ document.getElementById('sosprint-not-resolved-btn')?.addEventListener('click', 
             if (!sosprintEliminatedCauses.includes(c)) sosprintEliminatedCauses.push(c);
         });
         sosprintCandidateCauses = data.candidate_causes || sosprintCandidateCauses;
+        mergeSosprintHypotheses(data);
         if (data.conversation_id) sosprintConversationId = data.conversation_id;
 
         if (data.status === 'question' && data.question) {
@@ -14294,6 +14332,7 @@ document.getElementById('sosprint-form')?.addEventListener('submit', async (e) =
 
         sosprintConversationId = data.conversation_id || null;
         sosprintCandidateCauses = data.candidate_causes || [];
+        mergeSosprintHypotheses(data);
         sosprintCurrentQuestion = data.question || null;
 
         if (sosprintPhotoFile && sosprintConversationId) {
@@ -14341,6 +14380,7 @@ document.getElementById('sosprint-next-question-btn')?.addEventListener('click',
                 material, description,
                 candidate_causes: sosprintCandidateCauses,
                 qa_history: sosprintQaHistory,
+                failed_attempts: sosprintFailedAttempts,
                 conversation_id: sosprintConversationId
             })
         });
@@ -14351,6 +14391,7 @@ document.getElementById('sosprint-next-question-btn')?.addEventListener('click',
             if (!sosprintEliminatedCauses.includes(c)) sosprintEliminatedCauses.push(c);
         });
         sosprintCandidateCauses = data.candidate_causes || sosprintCandidateCauses;
+        mergeSosprintHypotheses(data);
         if (data.conversation_id) sosprintConversationId = data.conversation_id;
 
         if (data.status === 'done') {
@@ -14388,6 +14429,7 @@ document.getElementById('sosprint-skip-questions-btn')?.addEventListener('click'
                 material, description,
                 candidate_causes: sosprintCandidateCauses,
                 qa_history: sosprintQaHistory,
+                failed_attempts: sosprintFailedAttempts,
                 conversation_id: sosprintConversationId,
                 conclude_now: true
             })
@@ -14398,6 +14440,7 @@ document.getElementById('sosprint-skip-questions-btn')?.addEventListener('click'
             if (!sosprintEliminatedCauses.includes(c)) sosprintEliminatedCauses.push(c);
         });
         sosprintCandidateCauses = data.candidate_causes || sosprintCandidateCauses;
+        mergeSosprintHypotheses(data);
     } catch (err) {
         console.debug('[SOS Print Conclude]', err);
     }
@@ -21673,7 +21716,7 @@ const overlay = document.createElement('div');
 overlay.id = 'quit-confirmation-overlay';
 overlay.style.cssText = `position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 999999; animation: fadeIn 0.2s ease;`;
 const modal = document.createElement('div');
-modal.style.cssText = `background: var(--bg-secondary, #22262e); border: 1px solid var(--border, #363c4a); border-radius: 16px; padding: 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); text-align: center; animation: slideUp 0.3s ease;`;
+modal.style.cssText = `background: var(--bg-secondary, #22262e); border: 1px solid var(--border, #363c4a); border-radius: 16px; padding: 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); text-align: center; animation: recentSearchIn 0.3s ease;`;
 modal.innerHTML = `<div style="margin-bottom: 20px;"><div style="width: 64px; height: 64px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #3d8fb8); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; box-shadow: 0 8px 24px rgba(78, 161, 211, 0.3);"><i class="fa-solid fa-power-off" style="font-size: calc(28px * var(--fs, 1)); color: white;"></i></div><h3 style="margin: 0 0 8px 0; color: var(--text-primary, #e8e9eb); font-size: calc(20px * var(--fs, 1)); font-weight: 600;">${I18N.t('app.quit_title') || 'Quitter Stellio'}</h3><p style="margin: 0 0 24px 0; color: var(--text-secondary, #9ca0ab); font-size: calc(14px * var(--fs, 1)); line-height: 1.5;">${I18N.t('app.quit_message') || 'Voulez-vous vraiment quitter l\'application ?'}</p></div><div style="display: flex; gap: 12px; justify-content: center;"><button id="quit-cancel-btn" style="padding: 12px 28px; border: 1px solid var(--border, #363c4a); border-radius: 8px; background: var(--bg-tertiary, #2a2e38); color: var(--text-primary, #e8e9eb); cursor: pointer; font-weight: 500; font-size: calc(14px * var(--fs, 1)); transition: all 0.2s;">${I18N.t('actions.cancel') || 'Annuler'}</button><button id="quit-confirm-btn" style="padding: 12px 28px; border: none; border-radius: 8px; background: linear-gradient(135deg, var(--danger, #f87171), #ef4444); color: white; cursor: pointer; font-weight: 600; font-size: calc(14px * var(--fs, 1)); box-shadow: 0 4px 12px rgba(248, 113, 113, 0.3); transition: all 0.2s; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-power-off"></i>${I18N.t('actions.quit') || 'Quitter'}</button></div>`;
 overlay.appendChild(modal);
 document.body.appendChild(overlay);
@@ -27467,6 +27510,9 @@ window.openFilamentCatalogModal = openFilamentCatalogModal;
                 const n = parseInt((el.textContent || '').trim(), 10);
                 if (n > 0) total += n;
             });
+            // v1.1.2 : une catégorie sans aucune entrée visible (ex. « Outils » sur téléphone, où réparation et convertisseur sont réservés à l'ordinateur) disparaît de la barre
+            const _any = [...sidebar.querySelectorAll('.sidebar-nav .nav-btn[data-cat="' + b.dataset.rail + '"]')].some(el => el.style.display !== 'none' && !el.classList.contains('hidden') && !(el.classList.contains('desktop-only-nav') && window.matchMedia('(max-width: 860px)').matches));
+            b.style.display = _any ? '' : 'none';
             let pill = b.querySelector('.rail-badge');
             if (!total) { if (pill) pill.remove(); return; }
             if (!pill) { pill = document.createElement('span'); pill.className = 'rail-badge'; b.appendChild(pill); }
@@ -27476,6 +27522,7 @@ window.openFilamentCatalogModal = openFilamentCatalogModal;
     let _rbT = null;
     const _rbSched = () => { clearTimeout(_rbT); _rbT = setTimeout(refreshRailBadges, 80); };
     new MutationObserver(_rbSched).observe(sidebar.querySelector('.sidebar-nav'), { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['style', 'class'] });
+    window.addEventListener('resize', _rbSched);   // passage téléphone ↔ ordinateur : les catégories vides se masquent / réapparaissent
     refreshRailBadges();
     [800, 2500].forEach(ms => setTimeout(refreshRailBadges, ms));
     // L'en-tête de la barre prend la hauteur réelle du bandeau du haut : les deux lignes de séparation restent alignées
@@ -27575,7 +27622,7 @@ function renderPrintedPage() {
         const f = Object.assign(known ? { ...known } : { path: pf.file_path, name, extension: ext, has_thumb: false, size: 0, plate_count: 1, tags: [] },
             { print_status: pf.ok ? 'success' : (pf.ko ? 'failed' : 'printed') });
         return `<div class="printed-card">${renderFileCard(f, icons)}
-            <button type="button" class="btn btn-ghost btn-sm printed-card-remove" onclick="removePrintedFile('${escapeJs(pf.file_path)}', this)"><i class="fa-solid fa-rotate-left"></i> ${escapeHtml(_t3('printed.remove', 'Retirer'))}</button>
+            <button type="button" class="printed-card-remove" title="${escapeHtml(_t3('printed.remove', 'Retirer'))}" aria-label="${escapeHtml(_t3('printed.remove', 'Retirer'))}" onclick="event.stopPropagation(); removePrintedFile('${escapeJs(pf.file_path)}', this)"><i class="fa-solid fa-xmark"></i></button>
         </div>`;
     }).join('');
     try { setTimeout(() => generateVisibleThumbnails(), 100); } catch (_) {}
@@ -27583,6 +27630,25 @@ function renderPrintedPage() {
     if (badge) badge.style.display = 'none';
 }
 window.renderPrintedPage = renderPrintedPage;
+// v1.1.2 : écran tactile (pas de survol) — un premier appui sur la miniature fait apparaître la croix (comme le survol), un second ouvre le fichier
+(function () {
+    const list = document.getElementById('printed-list');
+    if (!list || list._touchBound) return;
+    list._touchBound = true;
+    const isTouch = () => window.matchMedia && window.matchMedia('(hover: none)').matches;
+    list.addEventListener('click', (e) => {
+        if (!isTouch()) return;
+        if (e.target.closest('.printed-card-remove')) return;
+        const card = e.target.closest('.printed-card');
+        list.querySelectorAll('.printed-card.touch-active').forEach(c => { if (c !== card) c.classList.remove('touch-active'); });
+        if (!card) return;
+        if (!card.classList.contains('touch-active')) {
+            card.classList.add('touch-active');
+            e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+        }
+    }, true);
+    document.addEventListener('click', (e) => { if (!e.target.closest('.printed-card')) list.querySelectorAll('.printed-card.touch-active').forEach(c => c.classList.remove('touch-active')); });
+})();
 async function _loadDashboardPrinted() {
     const body = document.getElementById('dashboard-printed-body');
     if (!body) return;

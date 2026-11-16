@@ -6,10 +6,10 @@
 
 Sources :
   docs/wiki/src/<langue>.md          14 pages par langue, séparées par des lignes « @@@ Page | Titre »
-  docs/wiki/images/<nom>.png         captures d'écran, les mêmes pour les 8 langues
+  docs/wiki/images/<langue>/<nom>.png   captures d'écran, une par langue (à défaut : docs/wiki/images/<nom>.png)
   changelog.json                     la page « Nouveautés » (Changelog) est générée à chaque fois
 
-Dans les pages, une ligne « {{img:nom}} » est remplacée par la capture docs/wiki/images/<nom>.png (la même pour toutes les langues).
+Dans les pages, une ligne « {{img:nom}} » est remplacée par la capture docs/wiki/images/<langue>/<nom>.png (à défaut, docs/wiki/images/<nom>.png).
 Pour mettre une capture à jour, remplacez simplement le fichier (même nom).
 """
 import argparse
@@ -68,6 +68,20 @@ CAPTIONS = {
            'printers': 'プリンター', 'filament': 'フィラメント在庫と「フィラメントの計量と予測」ブロック',
            'stats': '統計', 'management': '「管理」画面（顧客向け見積）', 'settings': '設定'},
 }
+
+# v1.1.2 : nouvelles captures (page « Déjà imprimés » avec croix au survol, plateaux/couleurs, barre latérale, menu téléphone)
+CAPTIONS_V112 = {
+    'fr': {'already-printed': '« Déjà imprimés » : la croix rouge apparaît au survol', 'already-printed-plates': 'Une bobine (ou plusieurs couleurs) par plateau', 'sidebar-panel': 'La barre latérale : rail et volet', 'mobile-drawer': 'Le menu sur téléphone (application Android)'},
+    'en': {'already-printed': '“Already printed”: the red cross appears on hover', 'already-printed-plates': 'One spool (or several colors) per plate', 'sidebar-panel': 'The sidebar: rail and panel', 'mobile-drawer': 'The menu on a phone (Android app)'},
+    'de': {'already-printed': '„Bereits gedruckt“: das rote Kreuz erscheint beim Überfahren', 'already-printed-plates': 'Eine Spule (oder mehrere Farben) pro Platte', 'sidebar-panel': 'Die Seitenleiste: Leiste und Panel', 'mobile-drawer': 'Das Menü am Smartphone (Android-App)'},
+    'es': {'already-printed': '«Ya impresos»: la cruz roja aparece al pasar el ratón', 'already-printed-plates': 'Una bobina (o varios colores) por bandeja', 'sidebar-panel': 'La barra lateral: riel y panel', 'mobile-drawer': 'El menú en el móvil (app Android)'},
+    'pt': {'already-printed': '«Já impressos»: a cruz vermelha aparece ao passar o rato', 'already-printed-plates': 'Uma bobina (ou várias cores) por placa', 'sidebar-panel': 'A barra lateral: régua e painel', 'mobile-drawer': 'O menu no telemóvel (app Android)'},
+    'it': {'already-printed': '«Già stampati»: la croce rossa compare al passaggio del mouse', 'already-printed-plates': 'Una bobina (o più colori) per piatto', 'sidebar-panel': 'La barra laterale: colonna e pannello', 'mobile-drawer': 'Il menu su telefono (app Android)'},
+    'zh': {'already-printed': '“已打印”：悬停时出现红色叉号', 'already-printed-plates': '每个盘一个耗材盘（或多种颜色）', 'sidebar-panel': '侧边栏：导轨与面板', 'mobile-drawer': '手机上的菜单（Android 应用）'},
+    'ja': {'already-printed': '「印刷済み」：ホバーで赤い×が表示', 'already-printed-plates': 'プレートごとに1つのスプール（または複数の色）', 'sidebar-panel': 'サイドバー：レールとパネル', 'mobile-drawer': 'スマートフォンのメニュー（Android アプリ）'},
+}
+for _l, _c in CAPTIONS_V112.items():
+    CAPTIONS[_l].update(_c)
 CHANGELOG_MAX_VERSIONS = 25
 
 
@@ -81,9 +95,12 @@ def parse(lang):
 
 
 def find_image(lang, name):
-    """Chemin de la capture « nom » (la même pour toutes les langues), ou None si elle n'existe pas."""
-    path = os.path.join(IMG, f'{name}.png')
-    return path if os.path.exists(path) else None
+    """Chemin de la capture « nom » dans la langue demandée (docs/wiki/images/<langue>/<nom>.png),
+    à défaut la capture commune docs/wiki/images/<nom>.png ; None si aucune n'existe."""
+    for path in (os.path.join(IMG, lang, f'{name}.png'), os.path.join(IMG, f'{name}.png')):
+        if os.path.exists(path):
+            return path
+    return None
 
 
 def check():
@@ -163,8 +180,8 @@ def build(out_dir):
                 found = find_image(lang, name)
                 if not found:
                     return ''
-                used.add(name)
-                url = f'https://raw.githubusercontent.com/wiki/{REPO}/images/{name}.png'
+                used.add((lang, name))
+                url = f'https://raw.githubusercontent.com/wiki/{REPO}/images/{lang}/{name}.png'
                 cap = CAPTIONS[lang].get(name, name)
                 return f'\n\n[![{cap}]({url})]({url})\n\n'
             body = re.sub(r'\n*\{\{img:([\w-]+)\}\}\n*', img, body)
@@ -187,10 +204,10 @@ def build(out_dir):
             + f'\n\n---\n[stellio-app.com](https://stellio-app.com) · [Releases](https://github.com/{REPO}/releases)'
               ' · [Discord](https://discord.gg/ySxpHvS6bd)\n')
     open(os.path.join(out_dir, '_Sidebar.md'), 'w', encoding='utf-8', newline='\n').write(side)
-    for name in sorted(used):
-        dst = os.path.join(out_dir, 'images')
+    for lang, name in sorted(used):
+        dst = os.path.join(out_dir, 'images', lang)
         os.makedirs(dst, exist_ok=True)
-        shutil.copyfile(os.path.join(IMG, f'{name}.png'), os.path.join(dst, f'{name}.png'))
+        shutil.copyfile(find_image(lang, name), os.path.join(dst, f'{name}.png'))
     # contrôle des liens internes
     names = {os.path.basename(f)[:-3] for f in glob.glob(os.path.join(out_dir, '*.md'))}
     broken = []

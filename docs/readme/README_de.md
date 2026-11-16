@@ -105,13 +105,15 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 - 📊 **Detaillierte Statistiken** (Formate, Plattformen, Profilzuverlässigkeit)
 
 ### 🤖 Künstliche Intelligenz (lokales Ollama)
+> ⚠️ Die KI ist nicht zu 100 % zuverlässig und kann sich irren (Tags, Beschreibungen, S.O.S-Print-Diagnosen …). Betrachten Sie ihre Antworten als Hinweise zum Überprüfen, nicht als Gewissheiten.
+
 - 🏷️ Intelligentes **automatisches Tagging** von Dateien
 - 📝 **Automatische Beschreibung** von Modellen
 - 🔎 **Semantische Suche** in natürlicher Sprache
 - 📐 **Druckbarkeitsanalyse** (Überhang-Erkennung) und **empfohlene Ausrichtungen** (weniger Überhang, Bettkontakt wird angezeigt)
 - 🎯 **Slicer-Profil-Empfehlung** basierend auf Geometrie + Erfolgshistorie
 - ⏱️ **Druckzeitschätzung** vor dem Slicen
-- 🩺 **S.O.S Print**: adaptive, schrittweise Diagnose von Druckfehlern — Stellio stellt jeweils eine Frage, grenzt anhand Ihrer Antworten eine Liste von Hypothesen ein (max. 4 Fragen) und liefert dann eine abschließende Diagnose; Fotoanalyse ist jederzeit möglich, Gespräche werden gespeichert (wieder öffnen, als gelöst markieren)
+- 🩺 **S.O.S Print**: adaptive, schrittweise Diagnose von Druckfehlern — Stellio stellt jeweils eine Frage, grenzt anhand Ihrer Antworten eine Liste von Hypothesen ein (ohne Fragenlimit: neue Hypothesen kommen hinzu, nach „immer noch nicht gelöst“ geht es weiter) und liefert dann eine abschließende Diagnose; Fotoanalyse ist jederzeit möglich, Gespräche werden gespeichert (wieder öffnen, als gelöst markieren) ⚠️ Die KI ist nicht zu 100 % zuverlässig und kann sich irren: Ihre Hypothesen sind zu überprüfende Hinweise.
 
 ### 🖨️ Druckerverwaltung
 - 🔌 Unterstützung für **OctoPrint**, **Klipper/Moonraker**, **Bambu Lab** (MQTT), **Creality** (WebSocket), **FlashForge**, **Elegoo** (SDCP) und **PrusaLink**

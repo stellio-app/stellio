@@ -83,6 +83,8 @@ All files are on the [Releases](https://github.com/stellio-app/stellio/releases)
 
 > ⚠️ The installer is **not code-signed**: Windows SmartScreen may show a warning. Check the `.sha256` if you wish; the built-in updater verifies it before installing.
 
+> 💡 If the built-in window cannot open (WebView2 or `Python.Runtime.dll` blocked, often after a download), Stellio opens in a separate Edge/Chrome window and stops when you close it. To get the built-in window back: right-click the zip → Properties → **Unblock**, then extract again. Details are in `data\stellio.log`.
+
 ## macOS
 
 Open the `.dmg` and drag Stellio to Applications. Pick the file that matches your Mac: `arm64` (M1, M2, M3…) or `x86_64` (Intel). Builds are not notarized: on first launch, right-click → **Open**.
@@ -124,6 +126,10 @@ Details in [Server edition](en-Server-Edition).
 @@@ Getting-Started | Getting started
 # Getting started
 {{img:library}}
+
+The left bar is an icon **rail**; clicking a category opens its **panel** on the right, which closes after your choice.
+
+{{img:sidebar-panel}}
 
 
 ## 1. First launch
@@ -312,7 +318,7 @@ Every Stellio feature, **what it is for and how to use it**. Technical details a
 ## Diagnose a failure: S.O.S Print and AI
 
 1. Open **S.O.S Print** and describe the problem (photo possible).
-2. Answer the questions, one at a time (4 at most): Stellio narrows the hypotheses and gives a **final diagnosis**.
+2. Answer the questions, one at a time, with **no limit**: Stellio narrows the hypotheses (and adds new ones when needed) until it finds the cause, then gives a **final diagnosis**. If the fix does not work, answer “still not solved” and the investigation continues.
 3. For local AI, install [Ollama](https://ollama.com/) then set it up in **Settings → Artificial intelligence**. **Failure watch** alerts you without ever stopping the print.
 
 ## Use Stellio on a phone and remotely
@@ -363,7 +369,7 @@ Full list: [Settings and data](en-Settings-and-Data).
 - **Undo deletions** (`Ctrl+Z`) thanks to a 5-minute temporary trash; also works for tags, projects and sources.
 - **Green / red halo** around the thumbnail: green for a file already printed successfully, red for a failed print (gallery and details views).
 - **Already printed** (⋯ menu of a file): record by hand a print made elsewhere — pick the printer, the settings (slicer profile) and the spool, then **Success** or **Failed**. The file joins the “Printed OK” / “Failed” filters and its details sheet (right-click) shows the printer, settings and spool.
-- **“Already printed” page** (Printing panel): every file you printed or marked “already printed”, with the same thumbnails and halos as the library, a search and a Successful / Failed filter. The **Remove** button (also in the file info) undoes that status: the file becomes “never printed” again. A widget of the same name is available on the home page.
+- **“Already printed” page** (Printing panel): every file you printed or marked “already printed”, with the same thumbnails and halos as the library, a search and a Successful / Failed filter. A **red cross** appears when you hover a thumbnail (on a phone: one tap shows it, a second tap opens the file); after a confirmation it removes the file from the list and it becomes “never printed” again. The **Remove** button in the file info does the same. A widget of the same name is available on the home page.
 - Fast selection: `Shift+click` for a range, arrows + `Enter`.
 - **Duplicate detection** (exact and similar geometry).
 - **Model origin**: source link, author, license, notes, download date.
@@ -372,6 +378,12 @@ Full list: [Settings and data](en-Settings-and-Data).
 {{img:library-halo}}
 
 {{img:already-printed}}
+
+For a **multi-plate** 3MF, the “Already printed” window offers one area per plate, each with its own spool; a **multicolor** file accepts several colors per plate (**Add a color**). The color dots match your spools, and the file info shows the details.
+
+{{img:already-printed-plates}}
+
+Files **sent to the slicer** get an **amber halo** (green if the print succeeded, red if it failed) as soon as they are sent, and the **Sent to slicer** chip in the library finds them in one click.
 
 ## Search
 - Classic search and **AI semantic search** ("I'm looking for a support for…"), with recent searches remembered.
@@ -405,6 +417,8 @@ Group several files for a single object.
 @@@ Printers | Printers
 # Printers
 {{img:printers}}
+
+On the home page, the **Cameras** widget shows up to **4 cameras** (one per running printer): clicking a thumbnail opens a window with **the camera only** (the “Running prints” widget keeps the full tracking). The **See all** button opens the list of all cameras so you can pick the one to display.
 
 
 ## Supported brands
@@ -485,6 +499,8 @@ The **Filament weighing and forecast** block estimates each spool's **run-out da
 
 {{img:filament}}
 
+The **Open Filament Database shops** (86) are added to **Useful links**, filtered by your country, and also used by the **Rebuy a spool** search: Stellio suggests the shops that ship to you.
+
 ## Consumption forecast
 The library can show a **restock warning** when stock is not enough for your favorites.
 
@@ -511,6 +527,8 @@ Download models straight into your sources from several platforms:
 @@@ AI | Artificial intelligence
 # Artificial intelligence
 
+> ⚠️ The AI is not 100% reliable: it can make mistakes (tags, descriptions, S.O.S Print diagnoses…). Treat its answers as leads to check, not as certainties.
+
 ## Local AI (Ollama)
 By default, AI runs **100% locally** with [Ollama](https://ollama.com/). It can be turned off.
 
@@ -532,8 +550,8 @@ Instead of Ollama, use **Claude** (Anthropic), **ChatGPT** (OpenAI) or **Gemini*
 
 ## S.O.S Print
 **Adaptive** diagnosis of a print failure:
-1. You describe the problem (a photo is possible at every step) and, if you want, the settings used (temperatures, speeds, retraction…).
-2. Stellio asks **one question at a time** (4 at most) and narrows a live list of hypotheses.
+1. You describe the problem (a photo is possible at every step) and, if you want, the settings used (temperatures, speeds, retraction…). **Speeds** are read from the chosen slicer profile (or typed by you); if they are missing, the AI asks for them. For **multicolor** prints the AI looks at the **purge tower** (detaching, collapsing, falling onto the part, mixed colors) and asks the relevant questions; the tower width is read from the profile. From the first step and after every answer, the AI shows its **hypotheses ranked by likelihood** (%), each with its reason or a quick check.
+2. Stellio asks **one question at a time**, with no limit, and narrows a live list of hypotheses (new ones are added when the first are ruled out).
 3. It gives a **final diagnosis**.
 
 Conversations are saved: reopen them or mark them as resolved.
@@ -541,6 +559,9 @@ Conversations are saved: reopen them or mark them as resolved.
 > ℹ️ The "Success / Failed" results you rate in the history improve the recommendations.
 
 @@@ Costs-and-Management | Costs and management
+
+> ⚠️ The AI is not 100% reliable: it can make mistakes. Its hypotheses are leads to check, not certainties; verify before changing your settings or your machine.
+
 # Costs and management
 {{img:management}}
 
@@ -588,6 +609,10 @@ Visible when *Enable cost, quote and invoicing features* is checked:
 - Full-screen **workshop mode** for tablet/phone.
 
 {{img:android-update}}
+
+**Small-screen menu**: the bottom bar is gone; a button at the top left opens the same sidebar as on desktop (categories + panel on the right). Badges (running print, notifications, banners) shrink so they stay out of the way. The Stellio logo appears on the setup and “Server unreachable” pages.
+
+{{img:mobile-drawer}}
 
 ## Remote access
 - **Cloudflare Tunnel** (free, random or fixed address), or a **custom address** (domain name, DynDNS, VPN, Tailscale…) to avoid Cloudflare, with a one-click return to Cloudflare.
