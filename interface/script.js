@@ -3042,7 +3042,7 @@ document.addEventListener('visibilitychange', _syncAppHeight);
 _syncAppHeight();
 
 // --- Tableau de bord ---
-const DASHBOARD_WIDGET_IDS = ['printers', 'cameras', 'stock', 'restock', 'history', 'printed', 'recent', 'thumbs', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'timelapses', 'mqtt', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues', 'gcodes', 'health', 'trash', 'changelog'];
+const DASHBOARD_WIDGET_IDS = ['printers', 'cameras', 'stock', 'restock', 'history', 'printed', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'timelapses', 'mqtt', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues', 'gcodes', 'health', 'trash', 'changelog'];
 let _dashboardEditMode = false;
 let _draggedDashboardWidget = null;
 
@@ -3063,7 +3063,6 @@ async function loadDashboard(force = false) {
     _loadDashboardStock();
     _loadDashboardRestock();
     _loadDashboardRecentFiles();
-    _loadDashboardThumbs();
     _loadDashboardSos();
     _loadDashboardFavorites();
     _loadDashboardProjects();
@@ -4418,6 +4417,7 @@ async function _ordersRender() {
                 ${_orderMarginHtml(j)}
             </div>
             <div class="order-qty">${j.qty_done}/${j.quantity}</div>
+            <input type="number" class="settings-select order-hours" min="0" step="0.25" value="${j.est_hours ? j.est_hours : ''}" placeholder="${j.hours_piece ? j.hours_piece : 'h'}" title="${escapeHtml(_t3('orders.hours_piece', 'Durée par pièce (heures) : sert au planning'))}" onchange="_orderSet(${j.id}, {est_hours: this.value || 0})">
             <select class="settings-select order-printer" onchange="_orderSet(${j.id}, {printer_id: this.value})">${pOpts(j.printer_id)}</select>
             <input type="date" class="settings-select order-due${j.late ? ' order-late' : ''}" value="${escapeHtml(j.due_date || '')}" onchange="_orderSet(${j.id}, {due_date: this.value})" title="${escapeHtml(_t3('orders.due', 'Livraison prévue'))}">
             <select class="quote-status st-${j.status === 'done' ? 'paid' : j.status === 'printing' ? 'sent' : j.status === 'cancelled' ? 'refused' : 'accepted'}" onchange="_orderSet(${j.id}, {status: this.value})">
@@ -4434,6 +4434,7 @@ async function _ordersRender() {
         <div class="order-new">
             <input type="text" id="ord-part" class="settings-select" style="flex:2; min-width:140px;" maxlength="200" placeholder="${escapeHtml(_t3('orders.part', 'Pièce'))}" autocomplete="off">
             <input type="number" id="ord-qty" class="settings-select" style="width:70px;" min="1" value="1" title="${escapeHtml(_t3('orders.qty', 'Quantité'))}">
+            <input type="number" id="ord-hours" class="settings-select order-hours" min="0" step="0.25" placeholder="h" title="${escapeHtml(_t3('orders.hours_piece', 'Durée par pièce (heures) : sert au planning'))}">
             <input type="text" id="ord-mat" class="settings-select" style="width:90px;" maxlength="40" placeholder="${escapeHtml(_t3('orders.material', 'Matière'))}" autocomplete="off">
             <select id="ord-printer" class="settings-select">${pOpts('')}</select>
             <input type="date" id="ord-due" class="settings-select">
@@ -4457,7 +4458,8 @@ window._orderAdd = async function () {
     if (!part) return;
     const r = await _ordersApi('POST', '/api/orders', {
         part, quantity: document.getElementById('ord-qty').value, material: document.getElementById('ord-mat').value,
-        printer_id: document.getElementById('ord-printer').value, due_date: document.getElementById('ord-due').value });
+        printer_id: document.getElementById('ord-printer').value, due_date: document.getElementById('ord-due').value,
+        est_hours: document.getElementById('ord-hours').value || 0 });
     if (!r.ok) showToast(_t3('toast.error', 'Erreur'), 'error');
     _ordersRender();
 };
@@ -6454,49 +6456,6 @@ async function _loadDashboardRecentFiles() {
         `).join('');
     } catch (err) {
         console.error('[Dashboard] Erreur fichiers récents:', err);
-        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
-    }
-}
-
-// v1.1.4 : « Dernières miniatures » : la dernière miniature générée en grand + les 10 dernières en bandeau
-function _thumbAgo(epoch) {
-    const s = Math.max(0, Math.round(Date.now() / 1000 - epoch));
-    if (s < 60) return _t3('dashboard.thumbs_now', 'à l\'instant', null);
-    if (s < 3600) return _t3('dashboard.thumbs_min', 'il y a {n} min', { n: Math.round(s / 60) });
-    if (s < 86400) return _t3('dashboard.thumbs_hour', 'il y a {n} h', { n: Math.round(s / 3600) });
-    return _t3('dashboard.thumbs_day', 'il y a {n} j', { n: Math.round(s / 86400) });
-}
-window._thumbsSelect = function (i) {
-    const items = window._dashThumbs || [];
-    const it = items[i];
-    const hero = document.getElementById('dashboard-thumbs-hero');
-    if (!it || !hero) return;
-    const src = `${API}/api/thumb?path=${encodeURIComponent(it.path)}&t=${it.generated_at}`;
-    hero.innerHTML = `<img src="${src}" alt="">
-        <div class="dash-thumbs-cap"><strong title="${escapeHtml(it.name)}">${escapeHtml(it.name)}</strong><span>${escapeHtml(_thumbAgo(it.generated_at))}</span></div>`;
-    hero.onclick = () => goToFileInLibrary(it.name);
-    document.querySelectorAll('#dashboard-thumbs-strip .dash-thumbs-item').forEach((el, k) => el.classList.toggle('active', k === i));
-};
-async function _loadDashboardThumbs() {
-    const body = document.getElementById('dashboard-thumbs-body');
-    if (!body) return;
-    try {
-        const res = await fetch(`${API}/api/thumb/recent?limit=10`);
-        if (!res.ok) throw new Error('http');
-        const items = (await res.json()).items || [];
-        window._dashThumbs = items;
-        if (!items.length) {
-            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-image"></i><p>${escapeHtml(_t3('dashboard.thumbs_empty', 'Aucune miniature générée pour le moment.', null))}</p></div>`;
-            return;
-        }
-        body.innerHTML = `<div class="dash-thumbs"><div id="dashboard-thumbs-hero" class="dash-thumbs-hero" style="cursor:pointer;"></div>
-            <div id="dashboard-thumbs-strip" class="dash-thumbs-strip">${items.map((it, i) => `
-                <button type="button" class="dash-thumbs-item" onclick="_thumbsSelect(${i})" title="${escapeHtml(it.name)} — ${escapeHtml(_thumbAgo(it.generated_at))}">
-                    <img src="${API}/api/thumb?path=${encodeURIComponent(it.path)}&t=${it.generated_at}" loading="lazy" alt="">
-                </button>`).join('')}</div></div>`;
-        _thumbsSelect(0);
-    } catch (err) {
-        console.error('[Dashboard] Erreur dernières miniatures:', err);
         body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
     }
 }
@@ -17322,6 +17281,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         if (page === 'projects') loadProjects();
         if (page === 'sosprint') loadSosprintProfiles(true);
         if (page === 'bigprint') window.StellioBigPrint?.onShow();
+        if (page === 'planning') window.StellioPlanning?.onShow();
         if (page === 'print-queue') loadPrintQueue();
         if (page === 'management') window.StellioManagement?.load();
         if (page === 'settings') window.StellioV113?.onSettings();

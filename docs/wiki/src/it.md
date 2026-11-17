@@ -324,6 +324,22 @@ Se modifichi un'impostazione dopo l'anteprima, rilanciala prima di salvare.
 3. Segui la **coda degli ordini**, i pagamenti, le fatture di acconto e le note di credito; la **ripartizione intelligente** propone la stampante adatta senza mai avviare una stampa.
 4. Ogni mese, esporta la **contabilità** (ZIP con CSV e PDF).
 
+## Pianificare la produzione (pianificazione e capacità)
+La pagina **Pianificazione** (menu **Stampa**) calcola, per ogni stampante, la data di fine stimata di ogni ordine, confronta la capacità disponibile con il carico richiesto e ti avvisa di un sovraccarico o di un ritardo prima che accada.
+
+{{img:planning}}
+
+1. In **Ordini**, indica per ogni ordine la **durata per pezzo** (in ore): un ordine nato da un preventivo la riprende dal calcolo dei costi. Un ordine senza durata non viene pianificato e resta segnalato in alto nella pagina (puoi compilarla direttamente lì).
+2. Scegli la **stampante** di ogni ordine (altrimenti Stellio lo colloca, come suggerimento, sulla macchina che si libera prima) e la **data di consegna**.
+3. Apri **Pianificazione**: le barre mostrano la sequenza degli ordini su ogni stampante (rosso = ritardo previsto, arancione = meno di un giorno di margine), con il **tasso di carico** di ogni macchina. La stampa in corso è considerata tramite il tempo residuo letto dalla stampante.
+4. Imposta l'**orizzonte** (7, 14 o 30 giorni). Le schede in alto riassumono capacità, carico, ritardi previsti e **rispetto dei termini** su 90 giorni.
+
+**Capacità delle stampanti**: indica le ore di stampa possibili al giorno e i giorni lavorativi (predefinito 16 h, tutti i giorni), macchina per macchina; deseleziona una stampante per escluderla dalla pianificazione.
+
+Stellio invia una notifica quando un ordine sta per superare la data di consegna o una stampante è sovraccarica (una volta per ordine e per giorno).
+
+Il calcolo è volutamente semplice: durate inserite, ordini in sequenza per data di consegna, senza considerare cambi di materiale o guasti.
+
 ## Fare manutenzione alle mie stampanti
 
 1. Sulla scheda di una stampante, apri **Manutenzione** e scegli la **marca**: vengono proposte attività consigliate.

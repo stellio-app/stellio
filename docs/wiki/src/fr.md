@@ -324,6 +324,22 @@ Si vous changez un réglage après l'aperçu, relancez-le avant d'enregistrer.
 3. Suivez la **file de commandes**, les paiements, les factures d'acompte et les avoirs ; la **répartition intelligente** propose l'imprimante adaptée sans jamais lancer d'impression.
 4. Chaque mois, exportez la **comptabilité** (ZIP avec CSV et PDF).
 
+## Planifier la production (planning et capacité)
+La page **Planning** (menu **Impression**) calcule, pour chaque imprimante, la date de fin estimée de chaque commande, compare la capacité disponible à la charge demandée et vous prévient d'une surcharge ou d'un retard avant qu'il n'arrive.
+
+{{img:planning}}
+
+1. Dans **Commandes**, saisissez pour chaque commande la **durée par pièce** (en heures) : une commande née d'un devis la reprend du chiffrage. Une commande sans durée n'est pas planifiée et reste signalée en haut de la page (vous pouvez la renseigner directement).
+2. Choisissez l'**imprimante** de chaque commande (sinon Stellio la place à titre indicatif sur la machine qui se libère le plus tôt) et sa **date de livraison**.
+3. Ouvrez **Planning** : les barres montrent l'enchaînement des commandes par imprimante (rouge = retard prévu, orange = moins d'un jour de marge), avec le **taux de charge** de chaque machine. L'impression en cours est prise en compte grâce au temps restant lu sur l'imprimante.
+4. Réglez l'**horizon** (7, 14 ou 30 jours). Les cartes du haut résument la capacité, la charge, les retards prévus et le **respect des délais** sur 90 jours.
+
+**Capacité des imprimantes** : indiquez les heures d'impression possibles par jour et les jours travaillés (par défaut 16 h, tous les jours), machine par machine ; décochez une imprimante pour l'exclure du planning.
+
+Stellio vous envoie une notification quand une commande va dépasser sa date de livraison ou qu'une imprimante est surchargée (une fois par commande et par jour).
+
+Le calcul est volontairement simple : durées saisies, commandes enchaînées par date de livraison, sans tenir compte des changements de matière ni des pannes.
+
 ## Entretenir mes imprimantes
 
 1. Sur la carte d'une imprimante, ouvrez **Maintenance** et choisissez la **marque** : des tâches recommandées sont proposées.

@@ -324,6 +324,22 @@ Si cambia un ajuste después de la vista previa, vuelva a lanzarla antes de guar
 3. Sigue la **cola de pedidos**, los pagos, las facturas de anticipo y los abonos; el **reparto inteligente** propone la impresora adecuada sin lanzar nunca una impresión.
 4. Cada mes, exporta la **contabilidad** (ZIP con CSV y PDF).
 
+## Planificar la producción (planificación y capacidad)
+La página **Planificación** (menú **Impresión**) calcula, para cada impresora, la fecha de fin estimada de cada pedido, compara la capacidad disponible con la carga solicitada y le avisa de una sobrecarga o un retraso antes de que ocurra.
+
+{{img:planning}}
+
+1. En **Pedidos**, indique para cada pedido la **duración por pieza** (en horas): un pedido creado desde un presupuesto la toma del cálculo de costes. Un pedido sin duración no se planifica y queda señalado arriba en la página (puede rellenarla ahí mismo).
+2. Elija la **impresora** de cada pedido (si no, Stellio lo coloca, a modo de sugerencia, en la máquina que se libera antes) y su **fecha de entrega**.
+3. Abra **Planificación**: las barras muestran cómo se encadenan los pedidos en cada impresora (rojo = retraso previsto, naranja = menos de un día de margen), con la **tasa de carga** de cada máquina. La impresión en curso se tiene en cuenta mediante el tiempo restante leído en la impresora.
+4. Ajuste el **horizonte** (7, 14 o 30 días). Las tarjetas superiores resumen capacidad, carga, retrasos previstos y **cumplimiento de plazos** en 90 días.
+
+**Capacidad de las impresoras**: indique las horas de impresión posibles por día y los días laborables (por defecto 16 h, todos los días), máquina por máquina; desmarque una impresora para excluirla de la planificación.
+
+Stellio le envía una notificación cuando un pedido va a superar su fecha de entrega o una impresora está sobrecargada (una vez por pedido y día).
+
+El cálculo es deliberadamente sencillo: duraciones introducidas, pedidos encadenados por fecha de entrega, sin considerar cambios de material ni averías.
+
 ## Mantener mis impresoras
 
 1. En la tarjeta de una impresora, abre **Mantenimiento** y elige la **marca**: se ofrecen tareas recomendadas.

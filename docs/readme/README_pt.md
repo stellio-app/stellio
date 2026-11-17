@@ -160,6 +160,7 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 - 🔧 **Reparo de mesh** (trimesh + pymeshfix) com **comparação antes/depois** (estanqueidade, triângulos, vértices, tamanho)
 - 🔄 **Conversor de formatos** (STL ↔ 3MF ↔ OBJ)
 - 📏 **BigPrint (Ferramentas)**: amplie um modelo para o tamanho real (ex. 1,8 m); é cortado em peças que cabem na mesa, esvaziado, com pinos e numerado, com pré-visualização 3D explodida e estimativa de filamento/custo; grava as peças STL, um projeto 3MF e um relatório numa pasta local ou de rede. Baseado no motor de código aberto [bigprint](https://github.com/PooterTF/bigprint) (AGPL-3.0).
+- 📅 **Planeamento de produção** (menu **Impressão**): data de fim estimada por impressora, capacidade disponível face à carga pedida, alertas de sobrecarga e atraso previsível, cumprimento de prazos.
 - 🛡️ **Verificação de integridade** (arquivos corrompidos/ausentes)
 - 💰 **Cálculo de custo de impressão**: material, eletricidade, desgaste da máquina (por hora), custos fixos, margem em % e quantidade — preço unitário e total calculados ao centavo
 - 🏷️ **Margem e preço de venda**: defina sua margem padrão (%) uma vez em Configurações → Tarifas de impressão; o histórico mostra o preço de venda (custo + margem) ao lado do custo, enquanto as estatísticas continuam usando o custo real
@@ -223,6 +224,7 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 | ![Recomendação de perfil por IA](../../images/slicer.png) *Recomendação de perfil por IA* | ![Nesting automático](../../images/nesting.png) *Nesting automático* |
 | ![Deteção de duplicados](../../images/duplicates.png) *Deteção de duplicados* | ![Filtros avançados](../../images/filters.png) *Filtros avançados* |
 | ![BigPrint: ampliar para o tamanho real e cortar em peças](../wiki/images/pt/bigprint.png) *BigPrint: ampliar para o tamanho real e cortar em peças* | ![BigPrint: vista explodida, filamento e lista de peças](../wiki/images/pt/bigprint-result.png) *BigPrint: vista explodida, filamento e lista de peças* |
+| ![Planeamento de produção: datas de fim por impressora, capacidade e alertas](../wiki/images/pt/planning.png) *Planeamento de produção: datas de fim por impressora, capacidade e alertas* | |
 
 ---
 

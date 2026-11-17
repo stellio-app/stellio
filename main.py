@@ -8487,6 +8487,11 @@ def ui_v113_script():
 def ui_bigprint_script():
     return send_file(_ui_file('bigprint.js'), mimetype='application/javascript')
 
+
+@app.route('/planning.js')
+def ui_planning_script():
+    return send_file(_ui_file('planning.js'), mimetype='application/javascript')
+
 @app.route('/management.js')
 def ui_management_script():
     return send_file(_ui_file('management.js'), mimetype='application/javascript')
@@ -20814,7 +20819,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.1.4"
+CURRENT_VERSION = "1.1.5"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -22928,7 +22933,8 @@ def _ensure_workshop_tables():
         cols = {r['name'] for r in conn.execute("PRAGMA table_info(print_jobs)").fetchall()}
         for name, ddl in (('scrap', 'INTEGER DEFAULT 0'), ('actual_hours', 'REAL DEFAULT 0'),
                           ('actual_weight_g', 'REAL'), ('cost_model', "TEXT DEFAULT ''"),
-                          ('track_token', "TEXT DEFAULT ''"), ('client_note', "TEXT DEFAULT ''")):
+                          ('track_token', "TEXT DEFAULT ''"), ('client_note', "TEXT DEFAULT ''"),
+                          ('est_hours', 'REAL DEFAULT 0')):
             if name not in cols:
                 conn.execute(f"ALTER TABLE print_jobs ADD COLUMN {name} {ddl}")
         conn.execute("""CREATE TABLE IF NOT EXISTS visual_index (
@@ -23040,6 +23046,7 @@ def _job_dict(r, printer_names, revenue=0):
     open_ = r['status'] in ('queued', 'printing')
     return {
         'scrap': r['scrap'] or 0, 'actual_hours': round(r['actual_hours'] or 0, 2), 'actual_weight_g': r['actual_weight_g'],
+        'est_hours': round(float(r['est_hours'] or 0), 3), 'hours_piece': round(production_planning.hours_per_piece(r), 3),
         'margin': _job_margin(r, revenue),
         'id': r['id'], 'quote_id': r['quote_id'], 'client': r['client'], 'part': r['part'],
         'quantity': r['quantity'], 'qty_done': r['qty_done'], 'material': r['material'],
@@ -23093,6 +23100,8 @@ def _job_fields(data, partial=False):
         out['scrap'] = max(0, min(100000, _int_or0(data.get('scrap'))))
     if 'actual_hours' in data:
         out['actual_hours'] = max(0.0, min(100000.0, _num(data.get('actual_hours'))))
+    if 'est_hours' in data:
+        out['est_hours'] = max(0.0, min(100000.0, _num(data.get('est_hours'))))   # v1.1.5 : durée par pièce (planning)
     if 'actual_weight_g' in data:
         out['actual_weight_g'] = None if data.get('actual_weight_g') in (None, '') else max(0.0, min(1e7, _num(data.get('actual_weight_g'))))
     if 'due_date' in data:
@@ -29453,7 +29462,7 @@ printer_dispatch.init(globals())
 digest.init(globals())
 
 # ── v1.1.3 : versions de modèle, tarif heures creuses, Obico, imprimantes Duet / Repetier, statistiques d'échecs, collections ──
-from modules import model_versions, energy_tariff, obico, printers_extra, failure_stats, collections_sets, merge_3mf, resin_printers, resin_inventory, usb_printers, thumb_recent
+from modules import model_versions, energy_tariff, obico, printers_extra, failure_stats, collections_sets, merge_3mf, resin_printers, resin_inventory, usb_printers
 
 model_versions.init(globals())
 
@@ -29464,7 +29473,6 @@ obico.init(globals())
 printers_extra.init(globals())
 resin_printers.init(globals())
 usb_printers.init(globals())
-thumb_recent.init(globals())
 resin_inventory.init(globals())
 
 failure_stats.init(globals())
@@ -29493,6 +29501,9 @@ ai_features.init(globals())
 globals().update(ai_providers.init(globals()))
 
 workshop_watch.init(globals())
+
+from modules import production_planning   # v1.1.5 : planning et capacité de production
+production_planning.init(globals())
 
 globals().update(backup_restore.init(globals()))
 
@@ -29592,6 +29603,7 @@ if __name__ in ('__main__', 'stellio_main'):
             threading.Thread(target=_auto_scan_scheduler, daemon=True).start()
             threading.Thread(target=_push_watcher_loop, daemon=True).start()
             threading.Thread(target=_workshop_watch_loop, daemon=True, name='stellio-workshop').start()
+            threading.Thread(target=production_planning._planning_loop, daemon=True, name='stellio-planning').start()
             if os.path.exists(CACHE_FILE):
                 try:
                     with open(CACHE_FILE, 'r', encoding='utf-8') as f: json.load(f)

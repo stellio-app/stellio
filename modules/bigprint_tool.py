@@ -69,6 +69,8 @@ def _engine():
         return _load()
     except ImportError as first:
         missing = getattr(first, 'name', '') or ''
+        if missing.split('.')[0] == 'bigprint':
+            raise RuntimeError("le moteur BigPrint (dossier « bigprint ») est absent de cette installation. Réinstallez Stellio avec la dernière version.")
         pip_name = {'skimage': 'scikit-image'}.get(missing.split('.')[0], missing.split('.')[0])
         if pip_name and _ensure_optional_module:
             try:

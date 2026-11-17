@@ -324,6 +324,22 @@ If you change a setting after the preview, run it again before saving.
 3. Follow the **order queue**, payments, deposit invoices and credit notes; **smart dispatch** suggests the right printer without ever starting a print.
 4. Every month, export the **accounting** (ZIP with CSV and PDF).
 
+## Plan production (schedule and capacity)
+The **Planning** page (**Printing** menu) works out, for each printer, the estimated end date of every order, compares available capacity with the requested load and warns you about an overload or a delay before it happens.
+
+{{img:planning}}
+
+1. In **Orders**, enter the **time per piece** (in hours) for each order: an order created from a quote takes it from the costing. An order without a time is not scheduled and stays flagged at the top of the page (you can fill it in right there).
+2. Pick the **printer** for each order (otherwise Stellio places it, as a suggestion, on the machine that frees up first) and its **delivery date**.
+3. Open **Planning**: bars show how orders follow one another on each printer (red = delay expected, orange = less than a day of margin), with each machine's **load rate**. The print in progress is taken into account through the remaining time read from the printer.
+4. Set the **horizon** (7, 14 or 30 days). The cards at the top summarise capacity, load, expected delays and **on-time delivery** over 90 days.
+
+**Printer capacity**: enter the possible printing hours per day and the working days (default 16 h, every day), machine by machine; untick a printer to leave it out of the schedule.
+
+Stellio sends a notification when an order is about to miss its delivery date or a printer is overloaded (once per order and per day).
+
+The calculation is deliberately simple: the times you enter, orders chained by delivery date, with no allowance for material changes or breakdowns.
+
 ## Maintain my printers
 
 1. On a printer card, open **Maintenance** and choose the **brand**: recommended tasks are offered.

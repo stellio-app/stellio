@@ -2183,10 +2183,10 @@ def test_v110_no_update_done_popup():
     js = (root / 'interface/script.js').read_text(encoding='utf-8')
     body = js[js.index('async checkAndShowChangelog()'):js.index('async checkForUpdates(')]
     assert 'showChangelogModal(' not in body and 'stellio-last-seen-version' in body
-    assert 'CURRENT_VERSION = "1.1.4"' in (root / 'main.py').read_text(encoding='utf-8')
+    assert 'CURRENT_VERSION = "1.1.5"' in (root / 'main.py').read_text(encoding='utf-8')
     for p in ('changelog.json', 'languages/changelog.json'):
         d = json.loads((root / p).read_text(encoding='utf-8'))
-        assert d[0]['version'] == '1.1.4' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
+        assert d[0]['version'] == '1.1.5' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
 
 
 def test_v110_no_badge_on_likes_and_creations():
@@ -2332,7 +2332,7 @@ def test_v111_changelog_entry():
     root = _P(__file__).resolve().parent.parent
     for p in ('changelog.json', 'languages/changelog.json'):
         d = json.loads((root / p).read_text(encoding='utf-8'))
-        assert d[3]['version'] == '1.1.1' and len(d[3]['items']['fr']) >= 15 and all(len(v) >= 2 for v in d[1]['items'].values())
+        assert d[4]['version'] == '1.1.1' and len(d[4]['items']['fr']) >= 15 and all(len(v) >= 2 for v in d[1]['items'].values())
 
 
 def test_v111_security_options_and_modules():
@@ -2446,7 +2446,7 @@ def test_v114_release_notes_generator():
     root = __import__("pathlib").Path(__file__).resolve().parent.parent
     out = subprocess.run([sys.executable, str(root / 'tools' / 'release_notes.py'), 'v1.1.3'],
                          capture_output=True, text=True, check=True).stdout
-    assert out.startswith('## Stellio v1.1.3') and '### 🇫🇷 Français' in out and '<details>' in out and '✓ ' in out
+    assert out.startswith('## Stellio v1.1.3') and '<summary><b>🇫🇷 Français</b></summary>' in out and '### ' not in out and '<details>' in out and '✓ ' in out
     # la version ne sert qu'au titre : le contenu vient toujours de notes.txt
     assert subprocess.run([sys.executable, str(root / 'tools' / 'release_notes.py'), '9.9.9'],
                           capture_output=True, text=True).stdout.startswith('## Stellio v9.9.9')
@@ -2459,7 +2459,7 @@ def test_v114_workflow_uses_notes_and_community_files():
     assert (root / 'CONTRIBUTING.md').is_file()
     for n in ('bug.yml', 'feature.yml', 'good-first-issue.yml', 'config.yml'):
         assert (root / '.github' / 'ISSUE_TEMPLATE' / n).is_file()
-    assert 'versionName \'1.1.4\'' in (root / 'apk-src' / 'app' / 'build.gradle').read_text(encoding='utf-8')
+    assert 'versionName \'1.1.5\'' in (root / 'apk-src' / 'app' / 'build.gradle').read_text(encoding='utf-8')
 
 
 # ── v1.1.1 (ajouts) : popup caméra, couleurs par plateau, boutiques OFD ─────

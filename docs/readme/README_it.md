@@ -160,6 +160,7 @@ Che tu sia un maker alle prime armi o un utente esperto con più macchine, Stell
 - 🔧 **Riparazione mesh** (trimesh + pymeshfix) con **confronto prima/dopo** (tenuta stagna, triangoli, vertici, dimensione)
 - 🔄 **Convertitore di formato** (STL ↔ 3MF ↔ OBJ)
 - 📏 **BigPrint (Strumenti)**: ingrandisci un modello a grandezza naturale (es. 1,8 m); viene tagliato in pezzi che stanno sul piatto, svuotato, dotato di perni e numerato, con anteprima 3D esplosa e stima di filamento/costo; salva i pezzi STL, un progetto 3MF e un rapporto in una cartella locale o di rete. Basato sul motore open source [bigprint](https://github.com/PooterTF/bigprint) (AGPL-3.0).
+- 📅 **Pianificazione della produzione** (menu **Stampa**): data di fine stimata per stampante, capacità disponibile rispetto al carico richiesto, avvisi di sovraccarico e ritardo prevedibile, rispetto dei termini.
 - 🛡️ **Verifica dell'integrità** (file corrotti/mancanti)
 - 💰 **Calcolo del costo di stampa**: materiale, elettricità, usura della macchina (all'ora), costi fissi, margine in % e quantità — prezzo unitario e totale calcolati al centesimo
 - 🏷️ **Margine e prezzo di vendita**: imposta il margine predefinito (%) una volta in Impostazioni → Tariffe di stampa; la cronologia mostra il prezzo di vendita (costo + margine) accanto al costo, mentre le statistiche restano basate sul costo reale
@@ -223,6 +224,7 @@ Che tu sia un maker alle prime armi o un utente esperto con più macchine, Stell
 | ![Raccomandazione profilo via IA](../../images/slicer.png) *Raccomandazione profilo via IA* | ![Nesting automatico](../../images/nesting.png) *Nesting automatico* |
 | ![Rilevamento dei duplicati](../../images/duplicates.png) *Rilevamento dei duplicati* | ![Filtri avanzati](../../images/filters.png) *Filtri avanzati* |
 | ![BigPrint: ingrandire a grandezza naturale e tagliare in pezzi](../wiki/images/it/bigprint.png) *BigPrint: ingrandire a grandezza naturale e tagliare in pezzi* | ![BigPrint: anteprima esplosa, filamento ed elenco dei pezzi](../wiki/images/it/bigprint-result.png) *BigPrint: anteprima esplosa, filamento ed elenco dei pezzi* |
+| ![Pianificazione della produzione: date di fine per stampante, capacità e avvisi](../wiki/images/it/planning.png) *Pianificazione della produzione: date di fine per stampante, capacità e avvisi* | |
 
 ---
 

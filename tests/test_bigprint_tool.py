@@ -94,3 +94,10 @@ def test_apercu_puis_enregistrement_reels(tmp_path):
     assert os.path.exists(os.path.join(out, 'project.3mf')) and os.path.isdir(os.path.join(out, 'pieces')) and os.path.exists(os.path.join(out, 'report.md'))
     assert os.path.basename(d['job']['out']).endswith('_bigprint')
     assert c.post('/api/bigprint/close').status_code == 200
+
+
+def test_build_copie_le_moteur_bigprint_a_cote_de_main():
+    """Régression 1.1.4 : sans copie du dossier bigprint dans app/, l'app installée disait « module manquant bigprint »."""
+    wf = open(os.path.join(ROOT, '.github', 'workflows', 'build-and-sign.yml'), encoding='utf-8').read()
+    assert wf.count('Copy-Item -Recurse "bigprint"') == 1 and wf.count('cp -R bigprint "$APP_DIR/bigprint"') == 2
+    assert os.path.isfile(os.path.join(ROOT, 'bigprint', 'gui.py'))

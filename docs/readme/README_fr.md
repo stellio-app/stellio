@@ -160,6 +160,7 @@ Que vous soyez un maker débutant ou un propriétaire expérimenté gérant plus
 - 🔧 **Réparation de mesh** (trimesh + pymeshfix) avec **comparatif avant/après** (étanchéité, triangles, sommets, taille)
 - 🔄 **Convertisseur de format** (STL ↔ 3MF ↔ OBJ)
 - 📏 **BigPrint (Outils)** : agrandissez un modèle à taille réelle (ex. 1,8 m) ; il est découpé en pièces qui tiennent sur votre plateau, évidé, muni de goujons et numéroté, avec aperçu 3D éclaté et estimation filament/coût ; enregistre les pièces STL, un projet 3MF et un rapport dans un dossier local ou réseau. Basé sur le moteur open source [bigprint](https://github.com/PooterTF/bigprint) (AGPL-3.0).
+- 📅 **Planning de production** (menu **Impression**) : date de fin estimée par imprimante, capacité disponible contre charge demandée, alertes de surcharge et de retard prévisible, taux de respect des délais.
 - 🛡️ **Vérification d'intégrité** (fichiers corrompus/manquants)
 - 💰 **Calcul du coût d'impression** : matière, électricité, usure machine (par heure), frais fixes, marge en % et quantité — prix unitaire et total calculés au centime
 - 🏷️ **Marge et prix de vente** : réglez votre marge par défaut (%) une fois dans Paramètres → Tarifs d'impression ; l'historique affiche le prix de vente (coût + marge) à côté du coût, tandis que les statistiques restent calculées sur le coût réel
@@ -223,6 +224,7 @@ Que vous soyez un maker débutant ou un propriétaire expérimenté gérant plus
 | ![Recommandation de profil par IA](../../images/slicer.png) *Recommandation de profil par IA* | ![Nesting automatique](../../images/nesting.png) *Nesting automatique* |
 | ![Détection des doublons](../../images/duplicates.png) *Détection des doublons* | ![Filtres avancés](../../images/filters.png) *Filtres avancés* |
 | ![BigPrint : agrandir à taille réelle et découper en pièces](../wiki/images/fr/bigprint.png) *BigPrint : agrandir à taille réelle et découper en pièces* | ![BigPrint : aperçu éclaté, filament et liste des pièces](../wiki/images/fr/bigprint-result.png) *BigPrint : aperçu éclaté, filament et liste des pièces* |
+| ![Planning de production : fin estimée par imprimante, capacité et alertes](../wiki/images/fr/planning.png) *Planning de production : fin estimée par imprimante, capacité et alertes* | |
 
 ---
 

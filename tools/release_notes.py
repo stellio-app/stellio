@@ -6,8 +6,7 @@ Usage : python3 tools/release_notes.py <version> [sortie.md]
 `<version>` ne sert que pour le titre : le contenu de notes.txt est celui de la release en cours.
 
 Le fichier contient une section par langue (<!--fr-->, <!--en-->…), une ligne « ✓ » par nouveauté.
-Le corps de la release reprend ces lignes telles quelles : français et anglais dépliés, les autres
-langues dans des blocs repliables. Sans sortie, écrit sur stdout. Code retour 1 si la version est inconnue.
+Le corps de la release reprend ces lignes telles quelles : chaque langue dans un bloc repliable. Sans sortie, écrit sur stdout. Code retour 1 si la version est inconnue.
 """
 import os
 import re
@@ -38,16 +37,13 @@ def build(version, repo="stellio-app/stellio"):
         raise SystemExit("Notes absentes : release-notes/notes.txt")
     with open(path, encoding="utf-8") as f:
         sections = parse(f.read())
-    out = [f"## Stellio v{version}", ""]
+    out = [f"## Stellio v{version}"]
     for code, title, opened in LANGS:
         lines = sections.get(code)
         if not lines:
             continue
         body = "\n".join(line + "  " for line in lines)   # deux espaces : un saut de ligne par « ✓ »
-        if opened:
-            out += [f"### {title}", "", body, ""]
-        else:
-            out += ["<details>", f"<summary><b>{title}</b></summary>", "", body, "", "</details>", ""]
+        out += ["<details>", f"<summary><b>{title}</b></summary>", "", body, "</details>", ""]   # toutes les langues repliées
     out.append(f"Full changelog / Historique complet : https://github.com/{repo}/blob/main/changelog.json")
     out.append("")
     return "\n".join(out)

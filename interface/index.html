@@ -269,6 +269,10 @@
 				    <i class="fa-solid fa-chart-pie"></i>
 				    <span data-i18n="nav.stats">Statistiques</span>
 				</button>
+				<button class="nav-btn desktop-only-nav" data-nav-id="planning" data-page="planning" data-title-key="nav.planning" data-icon="fa-calendar-days" data-cat="print">
+				  <i class="fa-solid fa-calendar-days"></i>
+				  <span data-i18n="nav.planning">Planning</span>
+				</button>
 				<button class="nav-btn" data-page="projects" data-nav-id="projects" data-icon="fa-diagram-project" data-title-key="nav.projects" data-cat="print">
 					<i class="fa-solid fa-diagram-project"></i>
 					<span data-i18n="nav.projects">Projets</span>
@@ -657,18 +661,6 @@
                                     <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('recent')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
                                 </div>
                                 <div class="dashboard-widget-body" id="dashboard-recent-body">
-                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
-                                </div>
-                            </div>
-
-                            <div class="dashboard-widget" id="dashboard-widget-thumbs" data-widget-id="thumbs" draggable="false">
-                                <div class="dashboard-widget-header">
-                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
-                                    <h3><i class="fa-solid fa-image"></i> <span data-i18n="dashboard.thumbs_title">Dernières miniatures</span></h3>
-                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;library&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
-                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('thumbs')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
-                                </div>
-                                <div class="dashboard-widget-body" id="dashboard-thumbs-body">
                                     <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
                                 </div>
                             </div>
@@ -2827,6 +2819,40 @@
 				  <div id="repair-empty" class="empty-state hidden">
 					<i class="fa-solid fa-circle-check"></i>
 					<p data-i18n="repair.all_good">Aucun fichier ne nécessite de réparation.</p>
+				  </div>
+				</div>
+				<div id="page-planning" class="page">
+				  <div class="repair-header">
+					<h2><i class="fa-solid fa-calendar-days"></i> <span data-i18n="planning.title">Planning de production</span></h2>
+					<p data-i18n="planning.subtitle">Date de fin estimée de chaque commande par imprimante, capacité disponible contre charge demandée, et alertes de surcharge ou de retard prévisible.</p>
+				  </div>
+				  <div class="pl-toolbar">
+					<label for="pl-horizon" data-i18n="planning.horizon">Horizon</label>
+					<select id="pl-horizon" class="settings-select">
+					  <option value="7" data-i18n="planning.days_7">7 jours</option>
+					  <option value="14" selected data-i18n="planning.days_14">14 jours</option>
+					  <option value="30" data-i18n="planning.days_30">30 jours</option>
+					</select>
+					<button type="button" class="btn btn-secondary btn-sm" id="pl-open-orders"><i class="fa-solid fa-list-check"></i> <span data-i18n="planning.orders">Commandes</span></button>
+					<button type="button" class="btn btn-secondary btn-sm" id="pl-open-settings"><i class="fa-solid fa-gauge-high"></i> <span data-i18n="planning.capacity_settings">Capacité des imprimantes</span></button>
+					<button type="button" class="btn btn-ghost btn-sm" id="pl-refresh"><i class="fa-solid fa-rotate"></i> <span data-i18n="planning.refresh">Actualiser</span></button>
+				  </div>
+				  <div id="pl-kpis" class="pl-kpis"></div>
+				  <div id="pl-alerts" class="pl-alerts"></div>
+				  <section class="pl-card">
+					<h3 data-i18n="planning.by_printer">Planning par imprimante</h3>
+					<div id="pl-gantt"></div>
+				  </section>
+				  <section class="pl-card">
+					<h3 data-i18n="planning.jobs_title">Commandes planifiées</h3>
+					<div id="pl-table"></div>
+				  </section>
+				</div>
+				<div id="modal-planning-settings" class="modal hidden">
+				  <div class="modal-content" style="max-width:720px;">
+					<div class="modal-header"><h3><i class="fa-solid fa-gauge-high"></i> <span data-i18n="planning.capacity_settings">Capacité des imprimantes</span></h3>
+					  <button class="modal-close" onclick="closeModal('modal-planning-settings')">×</button></div>
+					<div class="modal-body" id="pl-settings-body"></div>
 				  </div>
 				</div>
 				<div id="page-bigprint" class="page">
@@ -5610,6 +5636,7 @@
 </div>
     <script src="v113.js"></script>
     <script src="bigprint.js"></script>
+    <script src="planning.js"></script>
     <script src="filament_tags.js"></script>
 </body>
 </html>

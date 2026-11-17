@@ -1,5 +1,66 @@
 [
   {
+    "version": "1.1.5",
+    "items": {
+      "fr": [
+        "Nouvelle page Planning (menu Impression) : date de fin estimée de chaque commande par imprimante, capacité disponible contre charge demandée, taux de charge, retards prévus et taux de respect des délais sur 90 jours ; horizon de 7, 14 ou 30 jours",
+        "Capacité des imprimantes réglable (heures par jour et jours travaillés, par imprimante) ; l'impression en cours est prise en compte grâce au temps restant lu sur l'imprimante",
+        "Commandes : nouvelle durée par pièce (reprise du chiffrage du devis) ; les commandes sans durée sont signalées et peuvent être renseignées directement depuis le Planning",
+        "Notifications de retard prévisible (une commande va dépasser sa date de livraison) et de surcharge d'une imprimante",
+        "Correctif BigPrint : l'outil indiquait « module Python manquant bigprint » sur l'application installée ; le moteur est maintenant livré avec l'application (Windows, macOS, Linux)"
+      ],
+      "en": [
+        "New Planning page (Printing menu): estimated end date of every order per printer, available capacity versus requested load, load rate, expected delays and on-time delivery rate over 90 days; 7, 14 or 30-day horizon",
+        "Adjustable printer capacity (hours per day and working days, per printer); the print in progress is taken into account through the remaining time read from the printer",
+        "Orders: new time per piece (taken from the quote costing); orders without a time are flagged and can be filled in directly from Planning",
+        "Notifications for a foreseeable delay (an order will miss its delivery date) and for an overloaded printer",
+        "BigPrint fix: the tool reported “missing Python module bigprint” on the installed app; the engine now ships with the application (Windows, macOS, Linux)"
+      ],
+      "de": [
+        "Neue Seite Planung (Menü Druck): voraussichtliches Ende jedes Auftrags je Drucker, verfügbare Kapazität gegenüber geforderter Last, Auslastung, erwartete Verspätungen und Termintreue der letzten 90 Tage; Zeitraum 7, 14 oder 30 Tage",
+        "Einstellbare Druckerkapazität (Stunden pro Tag und Arbeitstage, je Drucker); der laufende Druck wird über die vom Drucker gelesene Restzeit berücksichtigt",
+        "Aufträge: neue Dauer pro Teil (aus der Angebotskalkulation übernommen); Aufträge ohne Dauer werden angezeigt und lassen sich direkt in der Planung ergänzen",
+        "Benachrichtigungen bei absehbarer Verspätung (ein Auftrag verfehlt sein Lieferdatum) und bei überlastetem Drucker",
+        "BigPrint-Korrektur: Das Werkzeug meldete in der installierten App „Python-Modul bigprint fehlt“; die Engine wird jetzt mit der App ausgeliefert (Windows, macOS, Linux)"
+      ],
+      "es": [
+        "Nueva página Planificación (menú Impresión): fecha de fin estimada de cada pedido por impresora, capacidad disponible frente a carga solicitada, tasa de carga, retrasos previstos y cumplimiento de plazos en 90 días; horizonte de 7, 14 o 30 días",
+        "Capacidad de las impresoras ajustable (horas por día y días laborables, por impresora); la impresión en curso se tiene en cuenta mediante el tiempo restante leído en la impresora",
+        "Pedidos: nueva duración por pieza (tomada del cálculo del presupuesto); los pedidos sin duración se señalan y se pueden rellenar directamente desde Planificación",
+        "Notificaciones de retraso previsible (un pedido superará su fecha de entrega) y de impresora sobrecargada",
+        "Corrección de BigPrint: la herramienta indicaba «falta el módulo Python bigprint» en la aplicación instalada; el motor ahora se incluye con la aplicación (Windows, macOS, Linux)"
+      ],
+      "pt": [
+        "Nova página Planeamento (menu Impressão): data de fim estimada de cada encomenda por impressora, capacidade disponível face à carga pedida, taxa de carga, atrasos previstos e cumprimento de prazos em 90 dias; horizonte de 7, 14 ou 30 dias",
+        "Capacidade das impressoras ajustável (horas por dia e dias de trabalho, por impressora); a impressão em curso é tida em conta através do tempo restante lido na impressora",
+        "Encomendas: nova duração por peça (herdada do cálculo do orçamento); as encomendas sem duração são assinaladas e podem ser preenchidas diretamente no Planeamento",
+        "Notificações de atraso previsível (uma encomenda vai falhar a data de entrega) e de impressora sobrecarregada",
+        "Correção do BigPrint: a ferramenta indicava «módulo Python bigprint em falta» na aplicação instalada; o motor passa a ser incluído na aplicação (Windows, macOS, Linux)"
+      ],
+      "it": [
+        "Nuova pagina Pianificazione (menu Stampa): data di fine stimata di ogni ordine per stampante, capacità disponibile rispetto al carico richiesto, tasso di carico, ritardi previsti e rispetto dei termini su 90 giorni; orizzonte di 7, 14 o 30 giorni",
+        "Capacità delle stampanti regolabile (ore al giorno e giorni lavorativi, per stampante); la stampa in corso è considerata tramite il tempo residuo letto dalla stampante",
+        "Ordini: nuova durata per pezzo (ripresa dal calcolo del preventivo); gli ordini senza durata vengono segnalati e si possono compilare direttamente dalla Pianificazione",
+        "Notifiche di ritardo prevedibile (un ordine supererà la data di consegna) e di stampante sovraccarica",
+        "Correzione BigPrint: lo strumento segnalava «modulo Python bigprint mancante» nell'app installata; il motore ora è incluso nell'app (Windows, macOS, Linux)"
+      ],
+      "zh": [
+        "新增“计划”页面（打印菜单）：每台打印机上各订单的预计完成日期、可用产能与需求负载对比、负载率、预计延误以及 90 天按时交付率；范围可选 7、14 或 30 天",
+        "可按打印机设置产能（每天小时数和工作日）；进行中的打印会根据从打印机读取的剩余时间计入",
+        "订单：新增单件耗时（取自报价成本核算）；没有耗时的订单会被提示，并可直接在计划页面补填",
+        "新增通知：预计延误（订单将超过交付日期）和打印机过载",
+        "BigPrint 修复：已安装的应用中该工具提示“缺少 Python 模块 bigprint”；现在引擎随应用一并提供（Windows、macOS、Linux）"
+      ],
+      "ja": [
+        "新ページ「計画」（印刷メニュー）：プリンターごとの各注文の完了予定日、利用可能な能力と要求負荷の比較、負荷率、遅延見込み、直近90日の納期遵守率。期間は7・14・30日",
+        "プリンターごとに生産能力（1日の時間と稼働日）を設定可能。印刷中のものはプリンターから読み取った残り時間で考慮されます",
+        "注文：1個あたりの時間を追加（見積の原価計算から引き継ぎ）。時間のない注文は表示され、計画画面から直接入力できます",
+        "通知：納期遅延の見込み（注文が納期を過ぎそう）とプリンターの過負荷",
+        "BigPrint の修正：インストール版で「Python モジュール bigprint がありません」と表示される問題を修正し、エンジンをアプリに同梱しました（Windows、macOS、Linux）"
+      ]
+    }
+  },
+  {
     "version": "1.1.4",
     "items": {
       "fr": [
@@ -7,7 +68,6 @@
         "Badge « BigPrint » sur les miniatures de la bibliothèque pour les fichiers générés par BigPrint (dossiers « …_bigprint »)",
         "Détection réseau des imprimantes résine : les Elegoo Saturn/Mars, Phrozen et Uniformation (SDCP) sont proposées en « Chitubox (résine) » et les anciens Anycubic Photon Wi-Fi sont détectés automatiquement (Formlabs : saisie manuelle, API en ligne)",
         "Fenêtre de mise à jour : notes de version en blocs repliables par langue, celui de la langue de Stellio ouvert et visible directement",
-        "Détection des imprimantes branchées en USB au PC de Stellio (bêta) : proposées dans « Détecter mes imprimantes » ; Stellio indique seulement si elles sont branchées et n'ouvre jamais le port série",
         "BigPrint entièrement traduit : usages et explications, résumé du calcul, avertissements, journal et aperçu 3D (Éclaté, Afficher les numéros, tailles…) suivent la langue de Stellio",
         "Widget « Fichiers récents » : les fichiers ajoutés ou modifiés apparaissent maintenant en quelques secondes, sans recharger la page"
       ],
@@ -16,7 +76,6 @@
         "“BigPrint” badge on library thumbnails for files generated by BigPrint (“…_bigprint” folders)",
         "Network detection of resin printers: Elegoo Saturn/Mars, Phrozen and Uniformation (SDCP) are offered as “Chitubox (resin)” and older Wi-Fi Anycubic Photon are detected automatically (Formlabs: manual entry, online API)",
         "Update window: release notes in collapsible blocks per language, the one for Stellio's language open and visible right away",
-        "Detection of printers plugged into the Stellio PC by USB (beta): offered in “Detect my printers”; Stellio only shows whether they are plugged in and never opens the serial port",
         "BigPrint fully translated: usage presets and explanations, calculation summary, warnings, log and 3D preview (Explode, Show IDs, sizes…) now follow Stellio's language",
         "“Recent files” widget: files added or modified now show up within seconds, without reloading the page"
       ],
@@ -25,7 +84,6 @@
         "Badge „BigPrint“ auf den Vorschaubildern der Bibliothek für von BigPrint erzeugte Dateien (Ordner „…_bigprint“)",
         "Netzwerkerkennung von Harzdruckern: Elegoo Saturn/Mars, Phrozen und Uniformation (SDCP) werden als „Chitubox (Harz)“ angeboten, ältere WLAN-Anycubic-Photon werden automatisch erkannt (Formlabs: manuelle Eingabe, Online-API)",
         "Update-Fenster: Versionshinweise in einklappbaren Blöcken je Sprache; der Block der Stellio-Sprache ist geöffnet und sofort sichtbar",
-        "Erkennung von per USB am Stellio-PC angeschlossenen Druckern (Beta): erscheinen unter „Meine Drucker erkennen“; Stellio zeigt nur, ob sie angesteckt sind, und öffnet den seriellen Port nie",
         "BigPrint vollständig übersetzt: Verwendungszwecke und Erklärungen, Berechnungszusammenfassung, Warnungen, Protokoll und 3D-Vorschau (Explosion, Nummern anzeigen, Größen …) folgen der Sprache von Stellio",
         "Widget „Zuletzt verwendete Dateien“: Neue oder geänderte Dateien erscheinen jetzt innerhalb weniger Sekunden, ohne die Seite neu zu laden"
       ],
@@ -34,7 +92,6 @@
         "Insignia «BigPrint» en las miniaturas de la biblioteca para los archivos generados por BigPrint (carpetas «…_bigprint»)",
         "Detección en red de impresoras de resina: las Elegoo Saturn/Mars, Phrozen y Uniformation (SDCP) se ofrecen como «Chitubox (resina)» y los Anycubic Photon Wi-Fi antiguos se detectan automáticamente (Formlabs: entrada manual, API en línea)",
         "Ventana de actualización: notas de versión en bloques plegables por idioma, con el idioma de Stellio abierto y visible de inmediato",
-        "Detección de impresoras conectadas por USB al PC de Stellio (beta): se ofrecen en «Detectar mis impresoras»; Stellio solo indica si están conectadas y nunca abre el puerto serie",
         "BigPrint totalmente traducido: usos y explicaciones, resumen del cálculo, avisos, registro y vista previa 3D (Explosionar, Mostrar números, tamaños…) siguen el idioma de Stellio",
         "Widget «Archivos recientes»: los archivos añadidos o modificados aparecen en pocos segundos, sin recargar la página"
       ],
@@ -43,7 +100,6 @@
         "Distintivo «BigPrint» nas miniaturas da biblioteca para os ficheiros gerados pelo BigPrint (pastas «…_bigprint»)",
         "Deteção em rede de impressoras de resina: as Elegoo Saturn/Mars, Phrozen e Uniformation (SDCP) são propostas como «Chitubox (resina)» e as Anycubic Photon Wi-Fi antigas são detetadas automaticamente (Formlabs: introdução manual, API online)",
         "Janela de atualização: notas da versão em blocos recolhíveis por idioma, com o idioma do Stellio aberto e visível de imediato",
-        "Deteção de impressoras ligadas por USB ao PC do Stellio (beta): propostas em «Detetar as minhas impressoras»; o Stellio só indica se estão ligadas e nunca abre a porta série",
         "BigPrint totalmente traduzido: usos e explicações, resumo do cálculo, avisos, registo e pré-visualização 3D (Explodir, Mostrar números, tamanhos…) seguem o idioma do Stellio",
         "Widget «Ficheiros recentes»: os ficheiros adicionados ou modificados aparecem em poucos segundos, sem recarregar a página"
       ],
@@ -52,7 +108,6 @@
         "Badge «BigPrint» sulle miniature della libreria per i file generati da BigPrint (cartelle «…_bigprint»)",
         "Rilevamento in rete delle stampanti a resina: Elegoo Saturn/Mars, Phrozen e Uniformation (SDCP) sono proposte come «Chitubox (resina)» e le vecchie Anycubic Photon Wi-Fi vengono rilevate automaticamente (Formlabs: inserimento manuale, API online)",
         "Finestra di aggiornamento: note di versione in blocchi comprimibili per lingua, con quello della lingua di Stellio aperto e subito visibile",
-        "Rilevamento delle stampanti collegate via USB al PC di Stellio (beta): proposte in «Rileva le mie stampanti»; Stellio indica solo se sono collegate e non apre mai la porta seriale",
         "BigPrint completamente tradotto: usi e spiegazioni, riepilogo del calcolo, avvisi, registro e anteprima 3D (Esplodi, Mostra numeri, dimensioni…) seguono la lingua di Stellio",
         "Widget «File recenti»: i file aggiunti o modificati compaiono in pochi secondi, senza ricaricare la pagina"
       ],
@@ -61,7 +116,6 @@
         "由 BigPrint 生成的文件（“…_bigprint”文件夹）在库缩略图上显示“BigPrint”徽章",
         "树脂打印机网络自动发现：Elegoo Saturn/Mars、Phrozen 和 Uniformation（SDCP）显示为“Chitubox（树脂）”，旧款 Wi-Fi Anycubic Photon 会被自动检测（Formlabs：手动填写，使用在线 API）",
         "更新窗口：版本说明按语言折叠显示，Stellio 当前语言的部分默认展开并直接可见",
-        "检测通过 USB 连接到 Stellio 所在电脑的打印机（测试版）：会出现在“检测我的打印机”中；Stellio 只显示是否已插上，从不打开串口",
         "BigPrint 已完整翻译：用途及说明、计算摘要、警告、日志和 3D 预览（分解、显示编号、尺寸等）都会跟随 Stellio 的语言",
         "“最近文件”小组件：新增或修改的文件现在几秒内就会显示，无需刷新页面"
       ],
@@ -70,7 +124,6 @@
         "BigPrint が生成したファイル（「…_bigprint」フォルダー）のライブラリのサムネイルに「BigPrint」バッジを表示",
         "レジンプリンターのネットワーク自動検出：Elegoo Saturn/Mars、Phrozen、Uniformation（SDCP）は「Chitubox（レジン）」として表示され、旧型Wi-Fi版Anycubic Photonも自動検出されます（Formlabs：手動入力、オンラインAPI）",
         "アップデート画面：リリースノートを言語ごとの折りたたみブロックにし、Stellio の言語のブロックを開いた状態ですぐ見えるように表示",
-        "StellioのPCにUSB接続したプリンターの検出（ベータ）：「プリンターを検出」に表示されます。Stellioは接続の有無だけを表示し、シリアルポートは開きません",
         "BigPrint を完全に翻訳：用途と説明、計算の概要、警告、ログ、3D プレビュー（分解、番号を表示、サイズなど）が Stellio の言語に従います",
         "「最近のファイル」ウィジェット：追加・変更されたファイルが数秒で表示され、ページの再読み込みは不要です"
       ]

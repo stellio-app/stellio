@@ -324,6 +324,22 @@ Se alterar uma definição depois da pré-visualização, execute-a novamente an
 3. Acompanhe a **fila de encomendas**, os pagamentos, as faturas de adiantamento e as notas de crédito; a **distribuição inteligente** propõe a impressora adequada sem nunca iniciar uma impressão.
 4. Todos os meses, exporte a **contabilidade** (ZIP com CSV e PDF).
 
+## Planear a produção (planeamento e capacidade)
+A página **Planeamento** (menu **Impressão**) calcula, para cada impressora, a data de fim estimada de cada encomenda, compara a capacidade disponível com a carga pedida e avisa-o de uma sobrecarga ou de um atraso antes de acontecer.
+
+{{img:planning}}
+
+1. Em **Encomendas**, indique para cada encomenda a **duração por peça** (em horas): uma encomenda criada a partir de um orçamento herda-a do cálculo de custos. Uma encomenda sem duração não é planeada e fica assinalada no topo da página (pode preenchê-la ali mesmo).
+2. Escolha a **impressora** de cada encomenda (caso contrário, o Stellio coloca-a, como sugestão, na máquina que fica livre primeiro) e a **data de entrega**.
+3. Abra **Planeamento**: as barras mostram o encadeamento das encomendas em cada impressora (vermelho = atraso previsto, laranja = menos de um dia de margem), com a **taxa de carga** de cada máquina. A impressão em curso é tida em conta através do tempo restante lido na impressora.
+4. Defina o **horizonte** (7, 14 ou 30 dias). Os cartões do topo resumem capacidade, carga, atrasos previstos e **cumprimento de prazos** em 90 dias.
+
+**Capacidade das impressoras**: indique as horas de impressão possíveis por dia e os dias de trabalho (por predefinição 16 h, todos os dias), máquina a máquina; desmarque uma impressora para a excluir do planeamento.
+
+O Stellio envia uma notificação quando uma encomenda vai falhar a data de entrega ou uma impressora está sobrecarregada (uma vez por encomenda e por dia).
+
+O cálculo é propositadamente simples: durações introduzidas, encomendas encadeadas por data de entrega, sem considerar trocas de material nem avarias.
+
 ## Manter as minhas impressoras
 
 1. No cartão de uma impressora, abra **Manutenção** e escolha a **marca**: são propostas tarefas recomendadas.

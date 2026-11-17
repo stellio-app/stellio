@@ -324,6 +324,22 @@ Wenn Sie nach der Vorschau eine Einstellung ändern, starten Sie die Vorschau vo
 3. Verfolgen Sie die **Auftragswarteschlange**, Zahlungen, Anzahlungsrechnungen und Gutschriften; die **intelligente Zuteilung** schlägt den passenden Drucker vor, ohne je einen Druck zu starten.
 4. Exportieren Sie jeden Monat die **Buchhaltung** (ZIP mit CSV und PDF).
 
+## Produktion planen (Planung und Kapazität)
+Die Seite **Planung** (Menü **Druck**) berechnet für jeden Drucker das voraussichtliche Ende jedes Auftrags, vergleicht die verfügbare Kapazität mit der geforderten Last und warnt Sie vor Überlastung oder Verspätung, bevor sie eintritt.
+
+{{img:planning}}
+
+1. Tragen Sie unter **Aufträge** für jeden Auftrag die **Dauer pro Teil** (in Stunden) ein: Ein Auftrag aus einem Angebot übernimmt sie aus der Kalkulation. Ein Auftrag ohne Dauer wird nicht eingeplant und oben auf der Seite angezeigt (dort können Sie sie direkt nachtragen).
+2. Wählen Sie den **Drucker** jedes Auftrags (sonst setzt Stellio ihn als Vorschlag auf die Maschine, die als Erste frei wird) und das **Lieferdatum**.
+3. Öffnen Sie **Planung**: Balken zeigen die Reihenfolge der Aufträge je Drucker (rot = Verspätung erwartet, orange = weniger als ein Tag Puffer) samt **Auslastung** jeder Maschine. Der laufende Druck wird über die vom Drucker gelesene Restzeit berücksichtigt.
+4. Stellen Sie den **Zeitraum** ein (7, 14 oder 30 Tage). Die Karten oben fassen Kapazität, Last, erwartete Verspätungen und die **Termintreue** der letzten 90 Tage zusammen.
+
+**Druckerkapazität**: Geben Sie je Maschine die möglichen Druckstunden pro Tag und die Arbeitstage an (Standard 16 Std., jeden Tag); einen Drucker abwählen, um ihn aus der Planung zu nehmen.
+
+Stellio benachrichtigt Sie, wenn ein Auftrag sein Lieferdatum zu verfehlen droht oder ein Drucker überlastet ist (einmal je Auftrag und Tag).
+
+Die Berechnung ist bewusst einfach: eingegebene Dauern, Aufträge nach Lieferdatum aneinandergereiht, ohne Materialwechsel oder Ausfälle.
+
 ## Meine Drucker warten
 
 1. Öffnen Sie auf einer Druckerkarte **Wartung** und wählen Sie die **Marke**: Empfohlene Aufgaben werden angeboten.

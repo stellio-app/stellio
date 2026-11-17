@@ -95,6 +95,19 @@ CAPTIONS_V114 = {
 }
 for _l, _c in CAPTIONS_V114.items():
     CAPTIONS[_l].update(_c)
+# v1.1.5 : capture du planning
+CAPTIONS_V115 = {
+    'fr': {'planning': 'Planning de production : fin estimée par imprimante, capacité et alertes'},
+    'en': {'planning': 'Production planning: end dates per printer, capacity and alerts'},
+    'de': {'planning': 'Produktionsplanung: Enddaten je Drucker, Kapazität und Warnungen'},
+    'es': {'planning': 'Planificación de producción: fechas de fin por impresora, capacidad y alertas'},
+    'pt': {'planning': 'Planeamento de produção: datas de fim por impressora, capacidade e alertas'},
+    'it': {'planning': 'Pianificazione della produzione: date di fine per stampante, capacità e avvisi'},
+    'zh': {'planning': '生产计划：各打印机完成日期、产能与提醒'},
+    'ja': {'planning': '生産計画：プリンター別の完了日・能力・警告'},
+}
+for _l, _c in CAPTIONS_V115.items():
+    CAPTIONS[_l].update(_c)
 CHANGELOG_MAX_VERSIONS = 25
 
 
