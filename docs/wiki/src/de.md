@@ -177,7 +177,6 @@ Jede Funktion von Stellio: **wofür sie da ist und wie man sie benutzt**. Techni
 |---|---|
 | **Dashboard** | Laufende Drucke, niedriger Bestand, letzte Dateien; verschiebbare Widgets. |
 | **Bibliothek** | Alle Ihre 3D-Modelle mit Vorschaubildern, Tags, Filtern und Suche. |
-| **Favoriten** | Ihre Lieblingsmodelle, ein Klick entfernt. |
 | **Bald drucken** | Ihre Druck-Warteliste, umsortierbar. |
 | **Projekte** | Mehrere Dateien für ein Objekt gebündelt. |
 | **Drucker** | Live-Überwachung, Senden, Wartung, Verschleißteile. |
@@ -360,7 +359,7 @@ Vollständige Liste: [Einstellungen und Daten](de-Settings-and-Data).
 
 ## Organisieren
 - Farbige **Tags** mit automatischer KI-Vergabe; mehrere Dateien mit einem Klick taggen.
-- **Favoriten**, erweiterte Filter (Typ, Größe, Gewicht, Druckstatus), **gespeicherte Filter**.
+- **Favoriten**, erweiterte Filter (Typ, Größe, Gewicht, Druckstatus), **gespeicherte Filter**. Zugriff: Taste **F**, Dashboard-Widget oder Stern jeder Datei (ein entfernter Stern lässt die Datei sofort aus der Favoritenansicht verschwinden).
 - Statusfilter: „An Slicer gesendet", „Bereits gedruckt", „Bereits erfolgreich", „Bereits fehlgeschlagen".
 - **Filter „Filamentbestand"**: zeigt nur Dateien, die mit Ihren vorhandenen Spulen druckbar sind.
 - Sortierung, Suche und Filter werden beim erneuten Öffnen **gemerkt**.
@@ -385,6 +384,9 @@ Bei einer 3MF mit **mehreren Platten** bietet das Fenster „Bereits gedruckt“
 
 An den **an den Slicer gesendeten** Dateien erscheint sofort ein **bernsteinfarbener Rahmen** (grün bei Erfolg, rot bei Fehlschlag); der Filter **An Slicer gesendet** der Bibliothek findet sie mit einem Klick.
 
+- **Sammlungen**: Modelle nach Thema gruppieren (Dateimenü → *Zu einer Sammlung hinzufügen*). Jede Sammlung wird in der Bibliothek zu einem Filter-Chip; legen Sie pro Datei eine **Menge** fest und setzen Sie die **ganze Sammlung mit einem Klick in die Druckwarteschlange**.
+- **Modellversionen**: Dateimenü → *Versionen*. Speichern Sie vor dem Bearbeiten eine Kopie, **vergleichen** Sie sie mit der aktuellen Datei (Größe, Dreiecke, Abmessungen, Volumen), laden Sie sie herunter oder **stellen** Sie sie **wieder her** (der aktuelle Stand wird zuerst gesichert).
+
 ## Suche
 - Klassische Suche und **semantische KI-Suche** („Ich suche eine Halterung für …") mit gemerkten letzten Suchen.
 - **Intelligente Sammlungen**.
@@ -400,6 +402,9 @@ Mehrere Dateien für ein Objekt gruppieren.
 ## 3D-Viewer und Werkzeuge
 - **3D-Viewer** (Three.js, funktioniert offline), Navigation zwischen Platten.
 - **Automatische Bauplatten-Anordnung** (rectpack oder echte Silhouette mit shapely).
+- **Zu 3MF zusammenführen**: Mehrere Modelle (STL, 3MF, OBJ …) auswählen, und Stellio erstellt daraus eine einzige 3MF-Datei — eine Platte, wenn alles passt, sonst eine Datei mit mehreren Platten (kompatibel mit Bambu Studio / OrcaSlicer; PrusaSlicer zeigt alle Teile zusammen). Dateiname und Ordner sind frei wählbar (auch Netzwerkfreigaben, Ordner anlegen möglich); danach fragt Stellio, ob die Originaldateien gelöscht oder behalten werden sollen.
+- **Spulenfarbe an den Slicer**: Beim Senden werden Farbe und Material der gewählten Spule auf das in OrcaSlicer, Bambu Studio oder PrusaSlicer geladene Filamentprofil angewendet (ein importiertes, dem Drucker zugeordnetes Filamentprofil ist nötig; beim Sammelversand nur, wenn alle Spulen gleich sind).
+- **Auswahlleiste**: alle Schaltflächen gleich groß und in einer Zeile (auf kleinen Bildschirmen nur Symbole, Name im Tooltip).
 - **Netzreparatur** (trimesh + pymeshfix) mit Vorher-Nachher-Vergleich.
 - **Konverter** STL ↔ 3MF ↔ OBJ.
 - **Druckbarkeitsanalyse** (Überhänge) und **vorgeschlagene Ausrichtungen**.
@@ -428,10 +433,17 @@ Auf der Startseite zeigt das Widget **Kameras** bis zu **4 Kameras** (eine pro l
 | **Bambu Lab** | X1/X1C/X1E, X2D, P1P/P1S, P2S, A1/A1 mini, H2D/H2S/H2C | MQTT (LAN + Cloud): Überwachung, AMS, Kamera, SSDP-Erkennung |
 | **Prusa** | MK4, MK3.9, MK3.5, MINI+, XL, CORE One | PrusaLink (HTTP) |
 | **Creality** | Serien K1/K2, Ender-3 V3, Hi | WebSocket: Überwachung, CFS, UDP-Erkennung |
-| **Elegoo** | Centauri Carbon 1 & 2, Resin-Serien Saturn/Mars | SDCP (WebSocket) |
+| **Elegoo** | Centauri Carbon 1 & 2, Resin-Serien Saturn/Mars (**Beta**) | SDCP (WebSocket) |
+| **Chitubox-Harz** *(Beta)* | Phrozen, Uniformation GKtwo und andere Chitubox-Boards | SDCP v3: Überwachung (gleiches Protokoll wie Elegoo) |
+| **Anycubic Photon** *(Beta)* | Ältere WLAN-Modelle: Mono X, Mono X 6K, Mono SQ (nicht M5s / M7) | TCP-6000-Textbefehle: nur Status und aktuelle Datei |
+| **Formlabs** *(Beta)* | Form 3 / 3L / 4 | Offizielle Web-API (client_id:client_secret): Status, Fortschritt, Schichten; Senden mit PreForm |
 | **FlashForge** | Adventurer 5M/5M Pro, AD5X | Proprietäre API |
 | **Klipper / Moonraker** | Jede Klipper-Maschine (Voron …) | HTTP: Überwachung, Upload, Kamera, genaue Stunden |
 | **OctoPrint** | Jeder über OctoPrint gesteuerte Drucker | HTTP |
+| **Duet / RepRapFirmware** | Duet 2/3, Standalone oder SBC (DSF) | HTTP: Status, Dateiversand, Temperaturen |
+| **Repetier-Server** | Jeder von Repetier-Server verwaltete Drucker | HTTP: Status, Dateiversand, Temperaturen (Marlin über USB-Seriell wird nicht unterstützt) |
+
+> 🧪 **Harzdrucker: Beta.** Sie konnten nicht auf allen Geräten getestet werden: Die Überwachung kann unvollständig oder fehlerhaft sein. Stellio startet oder stoppt nie einen Harzdruck. Bitte melden Sie Probleme auf GitHub (Creality Halot: noch nicht unterstützt).
 
 Andere Modelle mit demselben Protokoll funktionieren in der Regel. Sagen Sie uns auf GitHub, ob Ihres läuft.
 
@@ -452,6 +464,7 @@ Andere Modelle mit demselben Protokoll funktionieren in der Regel. Sagen Sie uns
 - **Leichter Mehrbenutzermodus**: warnt, wenn ein anderes Gerät die Datei ansieht oder vor einem doppelten Senden.
 - **Im Slicer öffnen** aus „Meine G-Codes".
 - **Slicer pro Drucker**: Jeder Drucker kann seinen eigenen Standard-Slicer haben (OrcaSlicer, QIDIStudio, Bambu Studio…). Das Senden nutzt ihn mit den diesem Drucker zugeordneten Profilen (Einstellungen, Filament), die Profilliste passt sich an.
+- **Harz-Software (Beta)**: Stellio erkennt CHITUBOX, CHITUBOX Pro, Anycubic Photon Workshop, PreForm (Formlabs), Voxeldance Tango und Lychee Slicer. Ein Harzdrucker ohne gewählten Slicer öffnet automatisch die erste erkannte Harz-Software; Sie können auch manuell eine wählen (Einstellungen → Slicer oder Druckerformular). Übliche Installationspfade werden geprüft: Wird Ihre Software nicht erkannt, wählen Sie sie manuell aus.
 
 {{img:printer-slicer}}
 
@@ -463,13 +476,22 @@ Andere Modelle mit demselben Protokoll funktionieren in der Regel. Sagen Sie uns
 - Automatischer **Zeitraffer** (Kamera → MP4-Video, benötigt ffmpeg).
 - **Statuslinks zum Teilen** (nur Lesezugriff).
 
+## Fehlererkennung per Kamera (Obico)
+Geben Sie unter *Einstellungen → Obico* die Adresse Ihres Obico-Servers (selbst gehostet oder obico.io) und einen API-Token an. Stellio prüft regelmäßig auf Alarme und sendet eine **Push-Benachrichtigung**, sobald Obico einen Fehler erkennt. Die Aktion (Pause, Abbruch) bleibt bei Obico: Stellio bricht nie von selbst einen Druck ab. Mit *Verbindung testen* werden Adresse und Token geprüft.
+
 ## Wartung
+- **Harz-Wartung (Beta)**: Die Schaltfläche **Wartung** auf den Karten von Harzdruckern bietet passende Aufgaben (FEP-/nFEP-Folie, Harz filtern, Bauplattform, LCD, Kohlefilter, Z-Achse, IPA, UV-/LCD-Verschleiß).
 - **Vorausschauende Wartung** mit markenspezifischen Aufgaben.
 - **Verschleißteile** (Düsen, Platten, Riemen …) mit Bestandswarnungen, verknüpft mit Wartungsaufgaben.
 - **Kalibrierungen** (Fluss, Pressure Advance, Temperaturen) pro Filament und Drucker.
 
 @@@ Filament | Filament
 # Filament
+
+## Harz (Beta) 🧪
+Die Kategorie in der Seitenleiste heißt jetzt **Materialien** und enthält zwei Seiten: **Filament** (Spulen-Inventar) und **Harz** *(Beta)*. Das Harz-Inventar ist **manuell**: Erfassen Sie Ihre Flaschen (Name, Marke, Art, Farbe, Volumen, Rest, Preis, Lagerort, Notizen) und ziehen Sie mit „Verbrauchen“ ein Volumen in ml ab. Stellio verknüpft Flaschen noch nicht mit Harzdruckern und zieht nichts automatisch ab. Beta-Funktion.
+
+Wie beim Filament funktioniert die **„Nachzubestellen“**-Erinnerung auch für Harz: Ein Harz (Marke + Name + Farbe, alle Flaschen zusammen) erscheint in der Liste, sobald sein Gesamtrest unter die auf der Seite eingestellte Schwelle fällt (Standard 200 ml, 0 = aus) oder wenn Sie bei einer Flasche „Nachbestellen“ ankreuzen. Es erscheint auch im Dashboard-Widget „Nachzubestellen“; **Bestellen** öffnet Suchlinks zu Ihren Shops (der Bestand wird bei Harz nicht automatisch geprüft), **Bereits bestellt** verschiebt die Erinnerung um 14 Tage.
 
 ## Bestandsquellen
 | Quelle | Details |
@@ -554,6 +576,8 @@ Statt Ollama nutzen Sie **Claude** (Anthropic), **ChatGPT** (OpenAI) oder **Gemi
 2. Stellio stellt **eine Frage nach der anderen**, ohne Limit, und grenzt eine Liste von Hypothesen live ein (neue kommen hinzu, wenn die ersten ausgeschlossen sind).
 3. Es liefert eine **endgültige Diagnose**.
 
+Ab **Frage 3** liefert **Abschließen und Lösung vorschlagen** die wahrscheinlichsten Ursachen und fragt dann „Hat diese Diagnose das Problem gelöst?“ (**Ja, gelöst** / **Nein, Untersuchung fortsetzen**). Mit **Untersuchung beenden** brechen Sie jederzeit ab.
+
 Unterhaltungen werden gespeichert: erneut öffnen oder als gelöst markieren.
 
 > ℹ️ Die Ergebnisse „Erfolgreich / Fehlgeschlagen", die Sie im Verlauf bewerten, verbessern die Empfehlungen.
@@ -594,6 +618,8 @@ Sichtbar, wenn *Kosten-, Angebots- und Rechnungsfunktionen aktivieren* angehakt 
 - **Monatsbericht** im Vergleich zum Vormonat, als PDF exportierbar.
 - Teilbarer **Druckbericht** (PNG-Bild) aus dem Verlauf.
 - Realer **Energieverbrauch** pro smarter Steckdose.
+- **Nebenzeit / Hauptzeit**: Tragen Sie unter *Einstellungen → Strom* zwei kWh-Preise und Ihre Nebenzeiten ein (z. B. `22:00-06:00`, Wochenende optional). Die **tatsächlichen Kosten** gemessener Drucke berücksichtigen sie, eine 30-Tage-Übersicht zeigt die **mögliche Ersparnis**, ein Simulator vergleicht „jetzt“ mit „nächstem Nebenzeit-Fenster“, und eine Erinnerung meldet den Beginn der Nebenzeit bei wartenden Aufträgen. Stellio startet nie selbst einen Druck.
+- **Warum meine Drucke scheitern**: unter *Statistiken* Fehlerquote nach Grund, Material, Drucker, Slicer-Profil, Wochentag und Tageszeit, am häufigsten fehlgeschlagene Dateien und belegte Hinweise (z. B. „PETG: 45 % Fehler gegenüber 12 % im Schnitt“). Bewerten Sie Ihre Drucke im Verlauf, um den Bereich zu füllen.
 
 
 
@@ -822,7 +848,7 @@ stellio/
 ├── packaging/         launcher.py, Windows-Installer (.iss), macOS-Berechtigungen
 ├── languages/         Übersetzungen (8 Sprachen) und changelog.json
 ├── tests/  tools/     pytest-Tests, Wartungswerkzeuge
-├── release-notes/     notes_version_X.Y.Z.txt
+├── release-notes/     notes.txt
 ├── install-pi.sh      Installation Raspberry Pi / Linux
 └── stellio-lxc.sh     Installation Proxmox-LXC
 ```

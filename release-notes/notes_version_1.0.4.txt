@@ -1,0 +1,32 @@
+<!--fr-->
+✓ Prise connectée (Shelly, Tasmota, Home Assistant) : Stellio lit les watts pendant l'impression et enregistre la consommation réelle (kWh) et son coût dans l'historique ; la puissance mesurée remplace ensuite l'estimation dans les devis. Nouvelle fenêtre « Consommation » (par imprimante, par période) et watts en direct sur la carte imprimante
+✓ Caméra : photo automatique à la fin de chaque impression, ajoutée à la galerie du fichier
+✓ Surveillance IA des échecs (Ollama de vision, 100 % local) : alerte en cas de spaghetti ou de pièce décollée, sans jamais arrêter l'impression automatiquement. Les jetons des prises sont chiffrés et jamais renvoyés au navigateur
+<!--en-->
+✓ Smart plug (Shelly, Tasmota, Home Assistant): Stellio reads the watts while printing and records the real energy use (kWh) and its cost in the history; the measured power then replaces the estimate in quotes. New “Consumption” window (per printer, per period) and live watts on the printer card
+✓ Camera: automatic photo at the end of each print, added to the file's gallery
+✓ AI failure monitoring (vision Ollama, 100% local): alert on spaghetti or a detached part, never stopping the print automatically. Plug tokens are encrypted and never sent back to the browser
+<!--de-->
+✓ Smarte Steckdose (Shelly, Tasmota, Home Assistant): Stellio liest während des Drucks die Watt und speichert den tatsächlichen Verbrauch (kWh) samt Kosten im Verlauf; die gemessene Leistung ersetzt anschließend die Schätzung in Angeboten. Neues Fenster „Verbrauch“ (pro Drucker, pro Zeitraum) und Live-Watt auf der Druckerkarte
+✓ Kamera: automatisches Foto am Ende jedes Drucks, das der Galerie der Datei hinzugefügt wird
+✓ KI-Fehlerüberwachung (Ollama mit Bildmodell, 100 % lokal): Warnung bei Spaghetti oder abgelöstem Teil, der Druck wird nie automatisch gestoppt. Steckdosen-Tokens werden verschlüsselt und nie an den Browser zurückgegeben
+<!--es-->
+✓ Enchufe inteligente (Shelly, Tasmota, Home Assistant): Stellio lee los vatios durante la impresión y registra el consumo real (kWh) y su coste en el historial; la potencia medida sustituye después a la estimación en los presupuestos. Nueva ventana «Consumo» (por impresora, por periodo) y vatios en directo en la tarjeta de la impresora
+✓ Cámara: foto automática al terminar cada impresión, añadida a la galería del archivo
+✓ Vigilancia IA de fallos (Ollama de visión, 100 % local): alerta ante espaguetis o una pieza despegada, sin detener nunca la impresión automáticamente. Los tokens de los enchufes se cifran y nunca se devuelven al navegador
+<!--pt-->
+✓ Tomada inteligente (Shelly, Tasmota, Home Assistant): o Stellio lê os watts durante a impressão e regista o consumo real (kWh) e o seu custo no histórico; a potência medida substitui depois a estimativa nos orçamentos. Nova janela «Consumo» (por impressora, por período) e watts em direto no cartão da impressora
+✓ Câmara: foto automática no fim de cada impressão, adicionada à galeria do ficheiro
+✓ Vigilância IA de falhas (Ollama de visão, 100 % local): alerta em caso de esparguete ou peça descolada, sem nunca parar a impressão automaticamente. Os tokens das tomadas são cifrados e nunca devolvidos ao navegador
+<!--it-->
+✓ Presa smart (Shelly, Tasmota, Home Assistant): Stellio legge i watt durante la stampa e registra il consumo reale (kWh) e il suo costo nella cronologia; la potenza misurata sostituisce poi la stima nei preventivi. Nuova finestra «Consumi» (per stampante, per periodo) e watt in tempo reale sulla scheda della stampante
+✓ Telecamera: foto automatica al termine di ogni stampa, aggiunta alla galleria del file
+✓ Sorveglianza IA dei fallimenti (Ollama con visione, 100 % locale): avviso in caso di spaghetti o pezzo staccato, senza mai fermare automaticamente la stampa. I token delle prese sono cifrati e mai restituiti al browser
+<!--zh-->
+✓ 智能插座（Shelly、Tasmota、Home Assistant）：打印期间 Stellio 读取功率，并在历史记录中保存实际耗电量（千瓦时）及费用；之后报价使用实测功率代替估算。新增“用电量”窗口（按打印机、按时间段），打印机卡片显示实时瓦数
+✓ 摄像头：每次打印结束时自动拍照并添加到文件相册
+✓ AI 失败监控（带视觉的 Ollama，完全本地）：发现“意大利面”或模型脱落时提醒，绝不会自动停止打印。插座令牌经过加密，绝不会返回浏览器
+<!--ja-->
+✓ スマートプラグ（Shelly、Tasmota、Home Assistant）：印刷中にワット数を読み取り、実際の消費電力量（kWh）とコストを履歴に記録します。以降、見積もりでは推定値の代わりに実測値を使用。新しい「消費電力」ウィンドウ（プリンター別・期間別）と、プリンターカードにリアルタイムのワット表示
+✓ カメラ：印刷が終わるたびに自動で写真を撮り、ファイルのギャラリーに追加
+✓ AIによる失敗監視（ビジョン対応 Ollama、完全ローカル）：スパゲッティ状態や造形物の剥がれを通知。印刷を自動停止することはありません。プラグのトークンは暗号化され、ブラウザには返されません

@@ -177,7 +177,6 @@ Every Stellio feature, **what it is for and how to use it**. Technical details a
 |---|---|
 | **Dashboard** | Running prints, low stock, recent files; rearrangeable widgets. |
 | **Library** | All your 3D models, with thumbnails, tags, filters and search. |
-| **Favorites** | Your favourite models, one click away. |
 | **Print soon** | Your print waiting list, reorderable. |
 | **Projects** | Several files grouped for one object. |
 | **Printers** | Live monitoring, sending, maintenance, wear parts. |
@@ -360,7 +359,7 @@ Full list: [Settings and data](en-Settings-and-Data).
 
 ## Organize
 - Colored **tags**, with AI auto-tagging; tag several files in one click.
-- **Favorites**, advanced filters (type, size, weight, print status), **saved filters**.
+- **Favorites**, advanced filters (type, size, weight, print status), **saved filters**. Access: **F** key, dashboard widget or each file's star (removing a star makes the file disappear from the Favorites view immediately).
 - Status filters: "Sent to slicer", "Already printed", "Already succeeded", "Already failed".
 - **"Filament stock" filter**: keeps only files printable with the spools you own.
 - Sort, search and filters are **remembered** when you reopen the app.
@@ -385,6 +384,9 @@ For a **multi-plate** 3MF, the “Already printed” window offers one area per 
 
 Files **sent to the slicer** get an **amber halo** (green if the print succeeded, red if it failed) as soon as they are sent, and the **Sent to slicer** chip in the library finds them in one click.
 
+- **Collections**: group models by theme (file menu → *Add to a collection*). Each collection becomes a filter chip in the library; set a **quantity** per file and **add the whole collection to the print queue** in one click.
+- **Model versions**: file menu → *Versions*. Save a copy before editing a model, **compare** it with the current file (size, triangles, dimensions, volume), download or **restore** it (the current state is saved first).
+
 ## Search
 - Classic search and **AI semantic search** ("I'm looking for a support for…"), with recent searches remembered.
 - **Smart collections**.
@@ -400,6 +402,9 @@ Group several files for a single object.
 ## 3D viewer and tools
 - **3D viewer** (Three.js, works offline), plate navigation.
 - **Automatic bed nesting** (rectpack, or real silhouette with shapely).
+- **Merge into 3MF**: select several models (STL, 3MF, OBJ…) and Stellio builds a single 3MF file — one plate if everything fits, otherwise a multi-plate file (structure compatible with Bambu Studio / OrcaSlicer; PrusaSlicer shows all parts together). You choose the file name and folder (network shares included, folder creation possible), then Stellio offers to delete or keep the original files.
+- **Spool colour sent to the slicer**: when sending, the colour and material of the chosen spool are applied to the filament profile loaded in OrcaSlicer, Bambu Studio or PrusaSlicer (an imported filament profile linked to the printer is required; in a batch send, the colour is applied only if all spools are identical).
+- **Selection bar**: all buttons have the same size and fit on a single line (icons only on small screens, name in the tooltip).
 - **Mesh repair** (trimesh + pymeshfix) with before/after comparison.
 - **Converter** STL ↔ 3MF ↔ OBJ.
 - **Printability analysis** (overhangs) and **suggested orientations**.
@@ -428,10 +433,17 @@ On the home page, the **Cameras** widget shows up to **4 cameras** (one per runn
 | **Bambu Lab** | X1/X1C/X1E, X2D, P1P/P1S, P2S, A1/A1 mini, H2D/H2S/H2C | MQTT (LAN + cloud): monitoring, AMS, camera, SSDP discovery |
 | **Prusa** | MK4, MK3.9, MK3.5, MINI+, XL, CORE One | PrusaLink (HTTP) |
 | **Creality** | K1/K2 series, Ender-3 V3, Hi | WebSocket: monitoring, CFS, UDP discovery |
-| **Elegoo** | Centauri Carbon 1 & 2, Saturn/Mars resin series | SDCP (WebSocket) |
+| **Elegoo** | Centauri Carbon 1 & 2, Saturn/Mars resin series (**beta**) | SDCP (WebSocket) |
+| **Chitubox resin** *(beta)* | Phrozen, Uniformation GKtwo and other Chitubox boards | SDCP v3: monitoring (same protocol as Elegoo) |
+| **Anycubic Photon** *(beta)* | Older Wi-Fi models: Mono X, Mono X 6K, Mono SQ (not the M5s / M7) | TCP 6000 text commands: state and current file only |
+| **Formlabs** *(beta)* | Form 3 / 3L / 4 | Official web API (client_id:client_secret): status, progress, layers; sending is done with PreForm |
 | **FlashForge** | Adventurer 5M/5M Pro, AD5X | Proprietary API |
 | **Klipper / Moonraker** | Any Klipper machine (Voron…) | HTTP: monitoring, upload, camera, exact hours |
 | **OctoPrint** | Any printer driven by OctoPrint | HTTP |
+| **Duet / RepRapFirmware** | Duet 2/3, standalone or SBC (DSF) | HTTP: status, file upload, temperatures |
+| **Repetier-Server** | Any printer managed by Repetier-Server | HTTP: status, file upload, temperatures (Marlin over USB serial is not supported) |
+
+> 🧪 **Resin printers: beta.** They could not be tested on every machine: monitoring may be incomplete or wrong. Stellio never starts or stops a resin print. Please report anything that does not work on GitHub (Creality Halot: not supported yet).
 
 Other models that speak the same protocol usually work. Tell us on GitHub if yours does.
 
@@ -452,6 +464,7 @@ Other models that speak the same protocol usually work. Tell us on GitHub if you
 - **Light collaborative mode**: warns if another device is viewing the file or before a double send.
 - **Open in slicer** from "My G-codes".
 - **Slicer per printer**: each printer can have its own default slicer (OrcaSlicer, QIDIStudio, Bambu Studio…). Sending uses it with the profiles (settings, filament) attached to that printer, and the profile list adapts.
+- **Resin software (beta)**: Stellio detects CHITUBOX, CHITUBOX Pro, Anycubic Photon Workshop, PreForm (Formlabs), Voxeldance Tango and Lychee Slicer. A resin printer with no slicer chosen automatically opens the first resin software detected; you can also pick one by hand (Settings → Slicer, or the printer's form). Common install locations are checked: if your software is not recognised, select it by hand.
 
 {{img:printer-slicer}}
 
@@ -463,13 +476,22 @@ Other models that speak the same protocol usually work. Tell us on GitHub if you
 - Automatic **timelapse** (camera → MP4 video, needs ffmpeg).
 - Read-only **status share links**.
 
+## Camera failure detection (Obico)
+In *Settings → Obico*, enter the address of your Obico server (self-hosted or obico.io) and an API token. Stellio regularly checks for alerts and sends you a **push notification** as soon as Obico detects a failure. The action (pause, cancel) stays Obico's: Stellio never stops a print by itself. A *Test the connection* button checks the address and token.
+
 ## Maintenance
+- **Resin maintenance (beta)**: the **Maintenance** button on resin printer cards offers suitable tasks (FEP/nFEP film, resin filtering, build plate, LCD screen, carbon filter, Z axis, wash IPA, UV/LCD wear).
 - **Predictive maintenance** with brand-specific tasks.
 - **Wear parts** (nozzles, plates, belts…) with stock alerts, linked to maintenance tasks.
 - **Calibrations** (flow, pressure advance, temperatures) per filament and printer.
 
 @@@ Filament | Filament
 # Filament
+
+## Resin (beta) 🧪
+The sidebar category is now called **Materials** and holds two pages: **Filament** (spool inventory) and **Resin** *(beta)*. The resin inventory is **manual**: add your bottles (name, brand, type, colour, volume, remaining, price, storage place, notes) and use the “Use” button to remove a volume in ml. Stellio does not link bottles to resin printers yet and never deducts anything automatically. Beta feature.
+
+As with filament, the **“To order”** reminder also works for resin: a resin (brand + name + colour, all bottles combined) is listed when its total remaining volume falls below the threshold set on the page (200 ml by default, 0 = off) or when you tick “To order” on a bottle. It also appears in the dashboard “To order” widget; **Order** opens search links to your shops (stock is not checked automatically for resin) and **Already ordered** postpones the reminder by 14 days.
 
 ## Inventory sources
 | Source | Details |
@@ -554,6 +576,8 @@ Instead of Ollama, use **Claude** (Anthropic), **ChatGPT** (OpenAI) or **Gemini*
 2. Stellio asks **one question at a time**, with no limit, and narrows a live list of hypotheses (new ones are added when the first are ruled out).
 3. It gives a **final diagnosis**.
 
+From **question 3**, the **Conclude and suggest a fix** button gives the most likely causes, then asks “Did this diagnostic solve the problem?” (**Yes, it's solved** / **No, continue the investigation**). The **Stop the investigation** button lets you abandon it at any time.
+
 Conversations are saved: reopen them or mark them as resolved.
 
 > ℹ️ The "Success / Failed" results you rate in the history improve the recommendations.
@@ -594,6 +618,8 @@ Visible when *Enable cost, quote and invoicing features* is checked:
 - **Monthly report** compared with the previous month, exportable as PDF.
 - Shareable **print report** (PNG image) from the history.
 - Real **energy** per smart plug.
+- **Off-peak / peak hours**: in *Settings → Electricity*, enter two per-kWh prices and your off-peak ranges (e.g. `22:00-06:00`, weekends optional). The **real cost** of measured prints takes them into account, a 30-day summary shows the **possible saving**, a simulator compares "now" with "next off-peak slot", and a reminder tells you when off-peak starts with jobs waiting. Stellio never starts a print by itself.
+- **Why my prints fail**: in *Statistics*, failure rate by reason, material, printer, slicer profile, weekday and time of day, most failing files, and data-driven leads (e.g. "PETG: 45% failures versus 12% on average"). Rate your prints in the history to feed it.
 
 
 
@@ -822,7 +848,7 @@ stellio/
 ├── packaging/         launcher.py, Windows installer (.iss), macOS entitlements
 ├── languages/         Translations (8 languages) and changelog.json
 ├── tests/  tools/     pytest tests, maintenance tools
-├── release-notes/     notes_version_X.Y.Z.txt
+├── release-notes/     notes.txt
 ├── install-pi.sh      Raspberry Pi / Linux install
 └── stellio-lxc.sh     Proxmox LXC install
 ```

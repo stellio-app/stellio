@@ -341,12 +341,18 @@ window.fetch = function (input, init = {}) {
 
 let allFiles = [];
 // Retire les doublons (même chemin) quand deux sources se recouvrent
+// Fichiers qu'on vient de supprimer : un rechargement de la liste (scan lent, partage réseau) ne doit pas les réafficher
+const _clientDeleted = new Map();
+const _CLIENT_DELETED_TTL = 10 * 60 * 1000;
 function _dedupeFilesByPath(list) {
     if (!Array.isArray(list)) return list;
     const seen = new Set();
+    const nowTs = Date.now();
+    _clientDeleted.forEach((ts, k) => { if (nowTs - ts > _CLIENT_DELETED_TTL) _clientDeleted.delete(k); });
     return list.filter(f => {
         const key = f && f.path ? String(f.path).replace(/\\/g, '/') : '';
         if (!key) return true;
+        if (_clientDeleted.has(key)) return false;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
@@ -399,7 +405,7 @@ function _typeFilterTotal() {
 function hasActiveFilters() {
     return (activeTypeFilters?.length > 0 && activeTypeFilters.length < _typeFilterTotal()) ||
         !!currentSizeFilter || !!currentWeightFilter || !!printStatusFilter || !!stockFilter ||
-        activeTagFilters.size > 0 || noThumbFilterOnly || failedThumbFilterOnly || !!activeSmartCollection;
+        activeTagFilters.size > 0 || noThumbFilterOnly || failedThumbFilterOnly || !!activeSmartCollection || !!(window.StellioV113 && window.StellioV113.active());
 }
 
 function clearSearchAndFilters() {
@@ -2340,26 +2346,57 @@ seenFilesSet = new Set(settings.seen_files || []);
 console.error('[SeenFiles] Erreur:', err);
 }
 }
+// Met à jour l'étoile d'un fichier directement dans la page (sans redessiner toute la grille : pas de clignotement des miniatures)
+function _setFavoriteStarDom(filePath, fav) {
+    document.querySelectorAll('.file-card[data-path]').forEach(card => {
+        if (card.dataset.path !== filePath) return;
+        card.querySelectorAll('.file-favorite-btn, .dv-btn--star').forEach(btn => {
+            btn.classList.toggle('favorited', fav);
+            btn.title = fav ? I18N.t('toast.favorites_removed') : I18N.t('toast.favorites_added');
+            const ic = btn.querySelector('i');
+            if (ic) { ic.classList.toggle('fa-solid', fav); ic.classList.toggle('fa-regular', !fav); }
+        });
+    });
+}
+// Dans la vue Favoris, la carte d'un fichier dont l'étoile est retirée disparaît tout de suite
+function _removeCardFromFavoritesView(filePath) {
+    filteredFiles = filteredFiles.filter(f => f.path !== filePath);
+    document.querySelectorAll('.file-card[data-path]').forEach(card => { if (card.dataset.path === filePath) card.remove(); });
+    if (!filteredFiles.length) renderFiles();
+    try { updateSidebarCounts(filteredFiles); } catch (e) { /* ignore */ }
+}
+// Vue qui ne montre que les favoris : page « Favoris » ou pastille de collection intelligente « Favoris »
+function _inFavoritesView() { return showFavoritesOnly || activeSmartCollection === 'favorites'; }
 window.toggleFavorite = async function (filePath, event) {
 if (event) {
 event.preventDefault();
 event.stopPropagation();
 }
+// Mise à jour immédiate de l'interface (le serveur confirme ensuite ; en cas d'échec on revient en arrière)
+const wasFav = favoriteFiles.has(filePath);
+const previousFiltered = filteredFiles;
+const applyState = (fav) => {
+    if (fav) favoriteFiles.add(filePath); else favoriteFiles.delete(filePath);
+    _setFavoriteStarDom(filePath, fav);
+    if (!fav && _inFavoritesView()) _removeCardFromFavoritesView(filePath);
+    updateFavoritesCount();
+    try { renderSmartCollections(); } catch (e) { /* ignore */ }   // compteurs des pastilles (Favoris n) à jour tout de suite
+};
+applyState(!wasFav);
 try {
 const res = await fetch(`${API}/api/favorites`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({ path: filePath })
 });
-if (res.ok) {
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
 const data = await res.json();
+if (!!data.favorited !== !wasFav) applyState(!!data.favorited);   // le serveur n'est pas d'accord : on s'aligne sur lui
 if (data.favorited) {
-favoriteFiles.add(filePath);
 showToast(I18N.t('toast.favorites_added'), 'success');
 } else {
-favoriteFiles.delete(filePath);
 showToast(I18N.t('toast.favorites_removed'), 'info');
- if (favoriteFiles.size === 0 && showFavoritesOnly) {
+if (favoriteFiles.size === 0 && showFavoritesOnly) {
 showFavoritesOnly = false;
 const navBtn = document.getElementById('nav-favorites-btn');
 if (navBtn) navBtn.classList.remove('active');
@@ -2367,17 +2404,39 @@ const btn = document.getElementById('favorites-filter-btn');
 if (btn) btn.classList.remove('active');
 const headerTitle = document.getElementById('header-page-title');
 if (headerTitle) headerTitle.innerHTML = `<i class="fa-solid fa-layer-group"></i> ${I18N.t('nav.library')}`;
+filteredFiles = [...allFiles];
+applySorting();
+renderFiles();
+updateFavoritesCount();
 showToast(I18N.t('toast.no_favorites'), 'info');
 }
 }
-renderFiles();
-updateFavoritesCount();
-}
+try { _refreshFavoritesRestockBadge(); } catch (e) { /* ignore */ }
+if (typeof _loadDashboardFavorites === 'function') { try { _loadDashboardFavorites(); } catch (e) { /* ignore */ } }
 } catch (err) {
 console.error('[Favoris] Erreur:', err);
+// retour à l'état d'avant
+if (wasFav) favoriteFiles.add(filePath); else favoriteFiles.delete(filePath);
+_setFavoriteStarDom(filePath, wasFav);
+if (_inFavoritesView()) { filteredFiles = previousFiltered; renderFiles(); }
+updateFavoritesCount();
+try { renderSmartCollections(); } catch (e) { /* ignore */ }
 showToast(I18N.t('toast.error'), 'error');
 }
 return false;
+};
+
+// Retire tout de suite de la bibliothèque les fichiers supprimés (sans attendre un nouveau scan)
+window.purgeDeletedFromLibrary = function (paths) {
+    const norm = p => String(p).replace(/\\/g, '/');
+    const gone = new Set((paths || []).map(norm));
+    const nowTs = Date.now();
+    gone.forEach(p => { _clientDeleted.set(p, nowTs); favoriteFiles.delete(p); });
+    allFiles = allFiles.filter(f => !gone.has(norm(f.path)));
+    filteredFiles = filteredFiles.filter(f => !gone.has(norm(f.path)));
+    renderFiles();
+    updateFavoritesCount();
+    try { updateSidebarCounts(filteredFiles); } catch (e) { /* ignore */ }
 };
 
 // --- File d'attente d'impression ("à imprimer bientôt") ---
@@ -6077,7 +6136,7 @@ async function openCameraPicker() {
     body.innerHTML = list.map(p => `
         <div class="dashboard-row" style="cursor:pointer;" onclick="closeModal('modal-camera-picker'); openCameraPopup(${p.id});">
             <div class="dashboard-row-icon"><i class="mdi ${getPrinterIcon(p.type)}"></i></div>
-            <div class="dashboard-row-body"><div class="dashboard-row-title">${escapeHtml(p.name)}</div></div>
+            <div class="dashboard-row-body"><div class="dashboard-row-title">${escapeHtml(p.name)}${_isResinBeta(p) ? ' ' + _betaBadgeHtml() : ''}</div></div>
             <div class="dashboard-row-meta"><i class="fa-solid fa-video"></i></div>
         </div>`).join('');
 }
@@ -6267,6 +6326,11 @@ async function _loadDashboardRestock() {
         if (!res.ok) throw new Error('http');
         const data = await res.json();
         _restockItems = data.items || [];
+        // Résines (bêta) : même liste « À commander », en ml
+        try {
+            const rr = await fetch(`${API}/api/resin/restock`);
+            if (rr.ok) _restockItems = _restockItems.concat(((await rr.json()).items || []).map(x => ({ ...x, resin: true, total_g: x.total_ml, spool_count: x.bottle_count })));
+        } catch (e) { /* résine indisponible : on garde les filaments */ }
         if (!data.threshold_g && !_restockItems.length) {
             body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-bell-slash"></i><p>${escapeHtml(_t2('dashboard.restock_disabled', 'Rappel désactivé (seuil à 0 g)'))}</p></div>`;
             return;
@@ -6278,16 +6342,16 @@ async function _loadDashboardRestock() {
         _restockItems.filter(it => !it.manual).forEach(it => {
             createNotification(
                 'low_stock',
-                _t2('notif.restock_title', 'Filament à commander'),
-                `${_restockLabel(it)} — ${Math.round(it.total_g)} g` + (it.by_forecast && it.days_left != null ? ` (≈ ${Math.max(1, Math.round(it.days_left))} ${_t2('dashboard.restock_days_short', 'j')})` : ''),
+                it.resin ? I18N.t('nav.resin') : _t2('notif.restock_title', 'Filament à commander'),
+                `${_restockLabel(it)} — ${Math.round(it.total_g)} ${it.resin ? 'ml' : 'g'}` + (it.by_forecast && it.days_left != null ? ` (≈ ${Math.max(1, Math.round(it.days_left))} ${_t2('dashboard.restock_days_short', 'j')})` : ''),
                 'spoolman',
                 `restock_${it.key}`
             );
         });
         body.innerHTML = _restockItems.map((it, i) => {
             const color = it.color_hex || '#888888';
-            const spools = _t2('dashboard.restock_spools', '{{n}} bobine(s)').replace('{{n}}', it.spool_count);
-            let left = _t2('dashboard.restock_left', '{{g}} g restants').replace('{{g}}', Math.round(it.total_g));
+            const spools = it.resin ? `${it.spool_count} ${I18N.t('nav.resin')}` : _t2('dashboard.restock_spools', '{{n}} bobine(s)').replace('{{n}}', it.spool_count);
+            let left = it.resin ? `${Math.round(it.total_g)} ml` : _t2('dashboard.restock_left', '{{g}} g restants').replace('{{g}}', Math.round(it.total_g));
             if (it.days_left != null) left += ` · ≈ ${_t2('dashboard.restock_days_left', '{{n}} j au rythme actuel').replace('{{n}}', Math.max(1, Math.round(it.days_left)))}`;
             return `
             <div class="dashboard-row restock-row">
@@ -6315,6 +6379,7 @@ function _restockLabel(it) {
 window.restockOrder = function (i) {
     const it = _restockItems[i];
     if (!it) return;
+    if (it.resin) { window.StellioV113?.resinShops?.(it); return; }
     showLowStockShopPopup({ ...it, remaining_g: it.total_g });
 };
 
@@ -6322,7 +6387,7 @@ window.restockSnooze = async function (i) {
     const it = _restockItems[i];
     if (!it) return;
     try {
-        const res = await fetch(`${API}/api/filament/restock/snooze`, {
+        const res = await fetch(`${API}${it.resin ? '/api/resin/restock/snooze' : '/api/filament/restock/snooze'}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ key: it.key, days: 14 }),
@@ -6480,6 +6545,7 @@ function showUndoToast(message, batchId, undoSeconds = 300) {
             dismiss();
             if (res.ok && data.restored_count > 0) {
                 showToast(I18N.tp('toast.undo_success', data.restored_count, { count: data.restored_count }) || 'Restauré', 'success');
+                _clientDeleted.clear();
                 if (typeof loadFiles === 'function') loadFiles();
             } else {
                 showToast(data.error || I18N.t('toast.undo_error') || "Impossible d'annuler", 'error');
@@ -8452,6 +8518,8 @@ if (res.ok) {
 if (data.deleted_count > 0) {
 const msg = I18N.tp('toast.files_deleted', data.deleted_count, { count: data.deleted_count }) || `${data.deleted_count} fichier(s) supprimé(s)`;
 showUndoToast(msg, data.batch_id, data.undo_seconds);
+const _failed = new Set((data.errors || []).map(e => e.path));
+purgeDeletedFromLibrary([...selectedFiles].filter(p => !_failed.has(p)));
 }
 if (data.errors && data.errors.length > 0) {
 showToast(`${data.errors.length} ${I18N.t('toast.delete_partial_error') || "fichier(s) n'ont pas pu être supprimés"}`, 'warning');
@@ -9340,8 +9408,8 @@ function updateThingiverseFooterStatus(connected, error = null) {
 
 
 let _downloadSourcesToken = 0;
-function _fillDownloadSources(select, sources) {
-    select.innerHTML = `<option value=""> ${I18N.t('download.select_folder')}</option>`;
+function _fillDownloadSources(select, sources, firstLabel) {
+    select.innerHTML = `<option value=""> ${escapeHtml(firstLabel || I18N.t('download.select_folder'))}</option>`;
     const folderSources = (sources || []).filter(s => s.type === 'folder' || s.type === 'smb' || s.type === 'nfs');
     if (folderSources.length === 0) {
         select.innerHTML += `<option value="" disabled>${I18N.t('download.no_local_folders')}</option>`;
@@ -9356,21 +9424,21 @@ function _fillDownloadSources(select, sources) {
         select.appendChild(option);
     });
 }
-async function loadDownloadSources() {
-    const select = document.getElementById('download-source');
+async function loadDownloadSources(selectId, firstLabel) {
+    const select = document.getElementById(selectId || 'download-source');
     if (!select) return;
     const token = ++_downloadSourcesToken;
     const previous = select.value;
     // affichage immédiat avec les sources déjà connues : la liste ne reste jamais vide pendant le chargement
-    if (Array.isArray(_sourcesCache) && _sourcesCache.length) _fillDownloadSources(select, _sourcesCache);
-    else select.innerHTML = `<option value=""> ${I18N.t('download.select_folder')}</option>`;
+    if (Array.isArray(_sourcesCache) && _sourcesCache.length) _fillDownloadSources(select, _sourcesCache, firstLabel);
+    else select.innerHTML = `<option value=""> ${escapeHtml(firstLabel || I18N.t('download.select_folder'))}</option>`;
     try {
         const res = await fetch(`${API}/api/sources`, { cache: 'no-store' });
         if (!res.ok) throw new Error(I18N.t('toast.load_source_error'));
         const sources = await res.json();
         if (token !== _downloadSourcesToken) return;
         _sourcesCache = sources || [];
-        _fillDownloadSources(select, sources);
+        _fillDownloadSources(select, sources, firstLabel);
         if (previous && [...select.options].some(o => o.value === previous)) select.value = previous;
     } catch (err) {
         console.error('[Download Sources]', err);
@@ -9533,8 +9601,10 @@ showToast(I18N.t('download.cancelled_toast'), 'info');
 } catch (err) { console.error('[cancelDownload] Erreur:', err); removeDownloadToast(downloadId); showToast(I18N.t('toast.cancel_error'), 'error'); }
 }
 }
-window.openCreateFolderModal = async function() {
-const sourceSelect = document.getElementById('download-source');
+window.openCreateFolderModal = async function(selectId) {
+const _selId = (typeof selectId === 'string' && selectId) ? selectId : 'download-source';
+const _firstLabel = _selId === 'merge3mf-dest' ? _t2('merge3mf.same_folder', 'Dossier du premier fichier') : undefined;
+const sourceSelect = document.getElementById(_selId);
 const selectedSourceId = sourceSelect ? sourceSelect.value : null;
 const _selOpt = sourceSelect ? sourceSelect.options[sourceSelect.selectedIndex] : null;
 const baseSourceId = (_selOpt && _selOpt.dataset.baseSourceId) || selectedSourceId;
@@ -9633,7 +9703,7 @@ const createFolder = async () => {
             if (result.covered_source_id) {
                 // Dossier créé dans une source déjà déclarée : pas de nouvelle source (sinon les fichiers apparaîtraient en double)
                 showToast(_t3('download.folder_created_in_source', 'Dossier créé dans « {{source}} » (aucune nouvelle source ajoutée)', { source: result.covered_source_name || '' }), 'success');
-                await loadDownloadSources();
+                await loadDownloadSources(_selId, _firstLabel);
                 const rel = result.relative_path || [baseRelPath, cleanFolderName].filter(Boolean).join('/');
                 const opt = document.createElement('option');
                 opt.value = `sub:${result.covered_source_id}:${rel}`;
@@ -9646,7 +9716,7 @@ const createFolder = async () => {
             } else {
                 showToast(I18N.t('toast.folder_created') || 'Dossier créé avec succès', 'success');
                 await loadSources();
-                await loadDownloadSources();
+                await loadDownloadSources(_selId, _firstLabel);
                 setTimeout(() => {
                     const opts = sourceSelect.options;
                     for (let i = 0; i < opts.length; i++) {
@@ -9700,6 +9770,7 @@ if (printStatusFilter) files = files.filter(f => {
 if (stockFilter && stockPrintableMap) files = files.filter(f => !!stockPrintableMap[(f.path || '').replace(/\\/g, '/')]);
 if (activeTagFilters.size > 0) files = files.filter(f => { const fileTags = new Set((f.tags || []).map(t => t.name.toLowerCase())); for (const tag of activeTagFilters) { if (!fileTags.has(tag.toLowerCase())) return false; } return true; });
 if (activeSmartCollection) { const sc = SMART_COLLECTIONS.find(c => c.id === activeSmartCollection); if (sc) files = files.filter(sc.test); }
+if (window.StellioV113 && window.StellioV113.active()) files = window.StellioV113.filterFiles(files);
 if (noThumbFilterOnly) files = files.filter(f => !f.has_thumb);
 if (failedThumbFilterOnly) files = files.filter(f => !!f.thumb_fallback);
 return files;
@@ -9852,7 +9923,7 @@ function renderSmartCollections() {
     }).join('');
     const saved = (typeof _loadSavedFilters === 'function' ? _loadSavedFilters() : []).map(f =>
         `<button type="button" class="sc-chip sc-saved" onclick="applySavedFilterSet('${f.id}')"><i class="fa-solid fa-bookmark"></i> ${escapeHtml(f.name)}</button>`).join('');
-    el.innerHTML = chips + saved;
+    el.innerHTML = chips + saved + (window.StellioV113 ? window.StellioV113.chipsHtml() : '');
 }
 
 window.toggleSmartCollection = function (id) {
@@ -10015,9 +10086,19 @@ function _refreshSlicerPrinterHint() {
     const pid = document.getElementById('slicer-ai-printer-select')?.value;
     const p = pid && printersList.find(x => String(x.id) === String(pid));
     const ds = p && p.config && p.config.default_slicer;
-    if (!ds) { box.classList.add('hidden'); box.textContent = ''; return; }
-    box.textContent = _t3('modal.slicer_for_printer', 'Slicer de cette imprimante : {{name}}', { name: _slicerLabelFor(ds) }).replace('{{name}}', _slicerLabelFor(ds));
-    box.classList.remove('hidden');
+    const show = (v) => {
+        const label = _slicerLabelFor(v);
+        box.textContent = _t3('modal.slicer_for_printer', 'Slicer de cette imprimante : {{name}}', { name: label }).replace('{{name}}', label);
+        box.classList.remove('hidden');
+    };
+    if (ds) { show(ds); return; }
+    box.classList.add('hidden'); box.textContent = '';
+    // Imprimante résine sans slicer choisi : le logiciel résine détecté sur la machine est utilisé (bêta)
+    if (p && _isResinBeta(p)) {
+        fetch(`${API}/api/slicers/installed`).then(r => r.json()).then(d => {
+            if (d && d.resin_default && String(document.getElementById('slicer-ai-printer-select')?.value) === String(p.id)) show(d.resin_default);
+        }).catch(() => {});
+    }
 }
 document.getElementById('slicer-ai-printer-select')?.addEventListener('change', _refreshSlicerPrinterHint);
 document.addEventListener('DOMContentLoaded', () => _fillPrinterSlicerSelect(''));
@@ -13800,6 +13881,7 @@ function clearSosprintPhoto() {
 })();
 
 async function runSosprintDiagnosis(material, description, answers) {
+    if (sosprintStopped) return;
     const btn = document.getElementById('sosprint-next-question-btn') || document.getElementById('sosprint-submit-btn');
     const skipBtn = document.getElementById('sosprint-skip-questions-btn');
     const resultEl = document.getElementById('sosprint-result');
@@ -13851,6 +13933,7 @@ async function runSosprintDiagnosis(material, description, answers) {
         const data = await res.json();
 
         if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        if (sosprintStopped) return;
 
         const causes = data.causes || [];
         if (!causes.length) {
@@ -13970,7 +14053,9 @@ function renderSosprintSuspects() {
     listEl.innerHTML = remaining + eliminated;
 }
 
+let sosprintStopped = false;
 function renderSosprintQuestionStep(questionNumber) {
+    if (sosprintStopped) return;
     const questionsEl = document.getElementById('sosprint-questions');
     const labelEl = document.getElementById('sosprint-current-question-label');
     const inputEl = document.getElementById('sosprint-current-answer');
@@ -13988,6 +14073,8 @@ function renderSosprintQuestionStep(questionNumber) {
         nextBtn.disabled = false;
         nextBtn.innerHTML = `<i class="fa-solid fa-arrow-right"></i> ${I18N.t('sosprint.next_question')}`;
     }
+    const _concludeBtn = document.getElementById('sosprint-skip-questions-btn');
+    if (_concludeBtn) { _concludeBtn.style.display = questionNumber >= 3 ? '' : 'none'; _concludeBtn.disabled = false; }
     renderSosprintSuspects();
     if (questionsEl) {
         questionsEl.style.display = 'flex';
@@ -14317,6 +14404,7 @@ document.getElementById('sosprint-form')?.addEventListener('submit', async (e) =
     const originalBtnHtml = submitBtn.innerHTML;
     submitBtn.disabled = true;
     submitBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${I18N.t('sosprint.preparing_questions')}`;
+    sosprintStopped = false;
     if (resultEl) resultEl.style.display = 'none';
     if (questionsEl) questionsEl.style.display = 'none';
 
@@ -17149,9 +17237,10 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         if (page === 'settings') { loadSources(); loadRemoteInstances(); loadGuests(); loadPushSettings(); loadMqttSettings(); loadSmtpSettings(); loadWorkshopSettings(); balanceSettingsColumns(); }
         else stopDiagnosticConsolePoll();
         if (page === 'spoolman') loadSpoolmanPage();
+        if (page === 'resin') window.StellioV113?.onResin();
         if (page === 'acct-likes') refreshAcctModelsNav().then(() => loadAcctModels('likes'));
         if (page === 'acct-creations') refreshAcctModelsNav().then(() => loadAcctModels('creations'));
-        if (page === 'stats') loadStats();
+        if (page === 'stats') { loadStats(); window.StellioV113?.onStats(); }
         if (page === 'history') { loadHistory(); loadDownloadHistory(); }
         if (page === 'printed') loadPrintedPage();
         if (page === 'gallery') loadGalleryPage();
@@ -17159,6 +17248,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         if (page === 'sosprint') loadSosprintProfiles(true);
         if (page === 'print-queue') loadPrintQueue();
         if (page === 'management') window.StellioManagement?.load();
+        if (page === 'settings') window.StellioV113?.onSettings();
         if (page === 'dashboard') loadDashboard();
         closeMobileSidebar();
     });
@@ -18753,7 +18843,7 @@ try {
 });
 
 
-const PRINTER_DEFAULT_PORTS = { octoprint: '80', klipper: '7125', marlin: '80' };
+const PRINTER_DEFAULT_PORTS = { octoprint: '80', klipper: '7125', marlin: '80', duet: '80', repetier: '3344' };
 
 const PRINTER_COMPATIBILITY = {
     'octoprint_generic': {
@@ -18926,6 +19016,24 @@ const PRINTER_COMPATIBILITY = {
         type: 'elegoo_sdcp',
         brands: ['saturn', 'mars', 'jupiter'],
         note: 'printers.note_elegoo_resin'
+    },
+    'phrozen_uniformation': {
+        status: 'partial',
+        type: 'chitu_sdcp',
+        brands: ['phrozen', 'sonic mini', 'sonic mega', 'uniformation', 'gktwo', 'chitubox'],
+        note: 'printers.note_chitu_resin'
+    },
+    'anycubic_photon_wifi': {
+        status: 'partial',
+        type: 'anycubic_photon',
+        brands: ['photon mono x', 'photon mono sq', 'mono x 6k', 'photon mono x2'],
+        note: 'printers.note_photon_resin'
+    },
+    'formlabs': {
+        status: 'partial',
+        type: 'formlabs',
+        brands: ['formlabs', 'form 3', 'form 4'],
+        note: 'printers.note_formlabs_resin'
     },
     'elegoo_neptune': {
         status: 'partial',
@@ -19114,9 +19222,10 @@ window.addPrinter = async function() {
     }
 
     const config = {};
-    if (type === 'klipper' && port) config.port = port;
+    if ((type === 'klipper' || type === 'repetier' || (type === 'duet' && port && port !== '80')) && port) config.port = port;
+    if (type === 'repetier' || type === 'formlabs') { const _slug = (document.getElementById('printer-repetier-slug')?.value || '').trim(); if (_slug) config.slug = _slug; }
     const _extUrl = (document.getElementById('printer-external-url')?.value || '').trim();
-    if (['klipper', 'octoprint', 'prusalink'].includes(type) && _extUrl) config.external_url = _extUrl;
+    if (['klipper', 'octoprint', 'prusalink', 'duet', 'repetier'].includes(type) && _extUrl) config.external_url = _extUrl;
     if (type === 'bambu') {
         config.code = bambuCode;
         config.serial = bambuSerial;
@@ -19229,6 +19338,7 @@ window.editPrinter = function(pid) {
     const _extField = document.getElementById('printer-external-url'); if (_extField) _extField.value = cfg.external_url || '';
     const portField = document.getElementById('printer-port');
     if (portField) portField.value = cfg.port || PRINTER_DEFAULT_PORTS?.[p.type] || '7125';
+    const _slugField = document.getElementById('printer-repetier-slug'); if (_slugField) _slugField.value = cfg.slug || '';
     const bambuCodeField = document.getElementById('printer-bambu-code');
     if (bambuCodeField) bambuCodeField.value = cfg.code || '';
     const bambuSerialField = document.getElementById('printer-bambu-serial');
@@ -19991,7 +20101,7 @@ function renderPrinters() {
         <div class="printer-card${p.is_connected ? '' : ' is-offline'}" data-id="${p.id}" onclick="if (!this.classList.contains('is-offline')) openPrinterMonitor(${p.id})">
             <div class="printer-header">
                 <i class="mdi ${getPrinterIcon(p.type)}" style="font-size:calc(22px * var(--fs, 1));"></i>
-                <span class="printer-name">${escapeHtml(p.name)}</span>
+                <span class="printer-name">${escapeHtml(p.name)}</span>${_isResinBeta(p) ? _betaBadgeHtml() : ''}
                 <span id="printer-status-${p.id}" class="printer-status ${p.is_connected ? 'connected' : 'disconnected'}">${p.is_connected ? I18N.t('printers.online') : I18N.t('printers.offline')}</span>
             </div>
             <div class="printer-body">
@@ -20014,7 +20124,7 @@ function renderPrinters() {
             </div>
             <div class="printer-actions" onclick="event.stopPropagation()">
                 <button class="btn btn-ghost btn-sm printer-action-live" onclick="openPrinterMonitor(${p.id})" title="${I18N.t('printers.monitoring')}"><i class="fa-solid fa-chart-line"></i></button>
-                <button class="btn btn-ghost btn-sm" style="position:relative;" onclick="openMaintenanceModal(${p.id}, '${escapeHtml(p.name).replace(/'/g, "\\'")}', '${(p.brand || '').replace(/'/g, "\\'")}')" title="${_t3('printers.maintenance', 'Maintenance')}">
+                <button class="btn btn-ghost btn-sm" style="position:relative;" onclick="openMaintenanceModal(${p.id}, '${escapeHtml(p.name).replace(/'/g, "\\'")}', '${(p.brand || (_isResinBeta(p) ? 'resin' : '')).replace(/'/g, "\\'")}')" title="${_t3('printers.maintenance', 'Maintenance')}">
                     <i class="fa-solid fa-wrench"></i>
                     <span id="maintenance-badge-${p.id}" style="display:none; position:absolute; top:2px; right:2px; width:7px; height:7px; border-radius:50%; background:var(--danger);"></span>
                 </button>
@@ -20079,7 +20189,12 @@ function _stopPrinterCardCamera(el) {
 
 // Imprimante hors ligne : logo à la place de la caméra (un carré noir n'apprend rien), boutons « live » masqués, pas d'agrandissement
 const PRINTER_TYPE_LABELS = { klipper: 'Klipper', octoprint: 'OctoPrint', prusalink: 'PrusaLink', bambu: 'Bambu Lab', bambuddy: 'Bambuddy',
-    elegoo_sdcp: 'Elegoo', elegoo_cc2: 'Elegoo', creality: 'Creality', flashforge: 'FlashForge' };
+    elegoo_sdcp: 'Elegoo', elegoo_cc2: 'Elegoo', creality: 'Creality', flashforge: 'FlashForge', duet: 'Duet', repetier: 'Repetier',
+    chitu_sdcp: 'Chitubox (résine)', anycubic_photon: 'Anycubic Photon (résine)', formlabs: 'Formlabs (résine)' };
+// v1.1.4 : les imprimantes résine sont en bêta (badge partout où elles apparaissent)
+const RESIN_BETA_TYPES = ['chitu_sdcp', 'anycubic_photon', 'formlabs'];
+function _isResinBeta(p) { return !!p && (RESIN_BETA_TYPES.includes(p.type) || (p.type === 'elegoo_sdcp' && /saturn|mars|jupiter|resin|r[ée]sine/i.test(p.name || ''))); }
+function _betaBadgeHtml() { return `<span class="beta-badge" title="${escapeHtml(I18N.t('printers.resin_beta_warning') || '')}">${escapeHtml(I18N.t('printers.resin_beta') || 'Bêta')}</span>`; }
 function _printerOfflineLogoHtml(type) {
     const label = PRINTER_TYPE_LABELS[type] || '';
     const generic = `<svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true"><g fill="none" stroke="#6b7280" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="8" width="44" height="6" rx="2"/><path d="M16 14v36M48 14v36"/><rect x="24" y="22" width="16" height="9" rx="2" fill="#6b7280"/><path d="M32 31v6"/><rect x="12" y="50" width="40" height="6" rx="2"/></g></svg>`;
@@ -20444,6 +20559,7 @@ function openMaintenanceModal(pid, printerName, brand) {
                             <option value="creality">Creality</option>
                             <option value="anycubic">Anycubic</option>
                             <option value="elegoo">Elegoo</option>
+                            <option value="resin" data-i18n="printers.maintenance_brand_resin">Imprimante résine (bêta)</option>
                             <option value="voron" data-i18n="printers.maintenance_brand_voron">Voron / DIY</option>
                             <option value="generic" data-i18n="printers.maintenance_brand_generic">Autre / Générique</option>
                         </select>
@@ -20506,6 +20622,18 @@ function openMaintenanceModal(pid, printerName, brand) {
 }
 
 const PRINTER_MAINTENANCE_RECOMMENDATIONS = {
+    // Imprimantes résine (bêta) : intervalles indicatifs, à adapter à ta machine et à ta résine
+    resin: [
+        { nameKey: 'printers.maintenance_task.controler_le_film_fep', interval: '~50h', hours: 50 },
+        { nameKey: 'printers.maintenance_task.remplacer_le_film_fep', interval: '~200h', hours: 200 },
+        { nameKey: 'printers.maintenance_task.filtrer_la_resine_du_bac', interval: '~20h', hours: 20 },
+        { nameKey: 'printers.maintenance_task.renivelerle_plateau_de_construction', interval: '~100h', hours: 100 },
+        { nameKey: 'printers.maintenance_task.nettoyer_lecran_lcd_et_la_vitre', interval: '~100h', hours: 100 },
+        { nameKey: 'printers.maintenance_task.remplacer_le_filtre_a_charbon_actif', intervalKey: 'printers.maintenance_interval_months', intervalParams: { count: 3 }, days: 90 },
+        { nameKey: 'printers.maintenance_task.verifier_laxe_z_resine', interval: '~500h', hours: 500 },
+        { nameKey: 'printers.maintenance_task.renouveler_lipa_de_lavage', interval: '~30 d', days: 30 },
+        { nameKey: 'printers.maintenance_task.verifier_lusure_du_module_uv_lcd', interval: '~1500h', hours: 1500 }
+    ],
     bambu: [
         { nameKey: 'printers.maintenance_task.nettoyer_remplacer_la_buse', interval: '~250h', hours: 250 },
         { nameKey: 'printers.maintenance_task.graisser_les_rails_et_tiges', interval: '~500h', hours: 500 },
@@ -21095,7 +21223,7 @@ function openPrinterMonitor(pid) {
         document.body.appendChild(modal);
         modal.addEventListener('click', (e) => { if (e.target === modal) closePrinterMonitor(); });
     }
-    document.getElementById('monitor-title').textContent = `🖨️ ${printer.name}`;
+    { const _mt = document.getElementById('monitor-title'); _mt.textContent = `🖨️ ${printer.name}`; if (_isResinBeta(printer)) _mt.insertAdjacentHTML('beforeend', ' ' + _betaBadgeHtml()); }
     initMonitorUI(printer);
     openModal('modal-printer-monitor');
     if (printerMonitorInterval) clearInterval(printerMonitorInterval);
@@ -21429,9 +21557,29 @@ window.applyDiscoveredPrinter = function(index) {
 
 window.togglePrinterFields = function() {
     const type = document.getElementById('printer-type').value;
-    document.getElementById('group-api-key').style.display = (type === 'octoprint' || type === 'prusalink' || type === 'bambuddy') ? 'block' : 'none';
-    document.getElementById('group-port').style.display = type === 'klipper' ? 'block' : 'none';
-    const _gext = document.getElementById('group-external-url'); if (_gext) _gext.style.display = ['klipper', 'octoprint', 'prusalink'].includes(type) ? 'block' : 'none';
+    document.getElementById('group-api-key').style.display = (type === 'octoprint' || type === 'prusalink' || type === 'bambuddy' || type === 'duet' || type === 'repetier' || type === 'formlabs') ? 'block' : 'none';
+    document.getElementById('group-port').style.display = (type === 'klipper' || type === 'duet' || type === 'repetier') ? 'block' : 'none';
+    const _portEl = document.getElementById('printer-port'), _portLbl = document.getElementById('printer-port-label');
+    if (_portEl && PRINTER_DEFAULT_PORTS[type] && Object.values(PRINTER_DEFAULT_PORTS).includes(_portEl.value)) { _portEl.value = PRINTER_DEFAULT_PORTS[type]; _portEl.placeholder = PRINTER_DEFAULT_PORTS[type]; }
+    if (_portLbl) _portLbl.textContent = type === 'klipper' ? (I18N.t('printers.port_moonraker') || 'Port Moonraker') : (I18N.t('printers.port_generic') || 'Port');
+    const _gslug = document.getElementById('group-repetier-slug'); if (_gslug) _gslug.style.display = (type === 'repetier' || type === 'formlabs') ? 'block' : 'none';
+    // v1.1.4 : imprimantes résine (bêta)
+    const _resin = ['elegoo_sdcp', 'chitu_sdcp', 'anycubic_photon', 'formlabs'].includes(type);
+    const _gbeta = document.getElementById('group-resin-beta'); if (_gbeta) _gbeta.style.display = _resin ? 'flex' : 'none';
+    [['chitu_sdcp', 'group-chitu-hint'], ['anycubic_photon', 'group-photon-hint'], ['formlabs', 'group-formlabs-hint']].forEach(([t, id]) => { const el = document.getElementById(id); if (el) el.style.display = type === t ? 'block' : 'none'; });
+    const _slugLbl = document.getElementById('printer-slug-label'), _slugIn = document.getElementById('printer-repetier-slug');
+    if (_slugLbl && _slugIn) {
+        _slugLbl.textContent = type === 'formlabs' ? (I18N.t('printers.formlabs_slug') || 'Imprimante Formlabs (n° de série ou nom, facultatif)') : (I18N.t('printers.repetier_slug') || 'Imprimante dans Repetier-Server (slug)');
+        _slugIn.placeholder = type === 'formlabs' ? (I18N.t('printers.formlabs_slug_ph') || 'vide = la première du compte') : (I18N.t('printers.repetier_slug_ph') || 'ex. prusa_i3 (vide = première en ligne)');
+    }
+    const _ipEl = document.getElementById('printer-ip'), _ipGrp = _ipEl && _ipEl.closest('.input-group');
+    if (_ipEl && _ipGrp) {   // Formlabs : API cloud, pas d'adresse IP à saisir
+        if (type === 'formlabs') { if (!_ipEl.value || _ipEl.value === 'api.formlabs.com') _ipEl.value = 'api.formlabs.com'; _ipGrp.style.display = 'none'; }
+        else { if (_ipEl.value === 'api.formlabs.com') _ipEl.value = ''; _ipGrp.style.display = ''; }
+    }
+    const _gduet = document.getElementById('group-duet-hint'); if (_gduet) _gduet.style.display = type === 'duet' ? 'block' : 'none';
+    const _grep = document.getElementById('group-repetier-hint'); if (_grep) _grep.style.display = type === 'repetier' ? 'block' : 'none';
+    const _gext = document.getElementById('group-external-url'); if (_gext) _gext.style.display = ['klipper', 'octoprint', 'prusalink', 'duet', 'repetier'].includes(type) ? 'block' : 'none';
     document.getElementById('group-bambu').style.display = type === 'bambu' ? 'block' : 'none';
     const _gbd = document.getElementById('group-bambuddy'); if (_gbd) _gbd.style.display = type === 'bambuddy' ? 'block' : 'none';
     document.getElementById('group-octoprint-hint').style.display = type === 'octoprint' ? 'block' : 'none';
@@ -21443,7 +21591,8 @@ window.togglePrinterFields = function() {
     document.getElementById('group-flashforge').style.display = type === 'flashforge' ? 'block' : 'none';
     const apiKeyLabel = document.getElementById('printer-api-key');
     if (apiKeyLabel) {
-        apiKeyLabel.placeholder = type === 'bambuddy' ? _t3('printers.bambuddy_key_ph', 'Clé API Bambuddy') : type === 'prusalink'
+        apiKeyLabel.placeholder = type === 'formlabs' ? (I18N.t('printers.formlabs_key_ph') || 'client_id:client_secret') : type === 'duet' ? (I18N.t('printers.duet_key_ph') || 'Mot de passe de la carte (optionnel)') : type === 'repetier' ? (I18N.t('printers.repetier_key_ph') || 'Clé API Repetier-Server')
+            : type === 'bambuddy' ? _t3('printers.bambuddy_key_ph', 'Clé API Bambuddy') : type === 'prusalink'
             ? (I18N.t('printers.prusalink_key_ph') || 'Mot de passe / clé API PrusaLink')
             : (I18N.t('printers.octoprint_key_ph') || 'Clé API OctoPrint');
     }
@@ -22415,6 +22564,14 @@ startThumbAutoRefresh();
         document.getElementById('ctx-printed-btn')?.addEventListener('click', () => {
             closeModal('modal-file-actions');
             openAlreadyPrintedModal(_ctxPath, _ctxName);
+        });
+        document.getElementById('ctx-versions-btn')?.addEventListener('click', () => {
+            closeModal('modal-file-actions');
+            window.StellioV113?.openVersions(_ctxPath, _ctxName);
+        });
+        document.getElementById('ctx-collection-btn')?.addEventListener('click', () => {
+            closeModal('modal-file-actions');
+            window.StellioV113?.openAddToCollection([_ctxPath]);
         });
         document.getElementById('ap-success-btn')?.addEventListener('click', () => _submitAlreadyPrinted('success'));
         document.getElementById('ap-failed-btn')?.addEventListener('click', () => _submitAlreadyPrinted('failed'));
@@ -27443,7 +27600,7 @@ window.openFilamentCatalogModal = openFilamentCatalogModal;
     if (!sidebar || !rail) return;
     const CATS = ['library', 'print', 'filament', 'tools', 'track', 'help'];
     const KEY = 'stellio-nav-cat';
-    const TITLES = { library: ['nav.library', 'Bibliothèque'], print: ['nav.cat_print', 'Impression'], filament: ['nav.cat_filament', 'Filament'],
+    const TITLES = { library: ['nav.library', 'Bibliothèque'], print: ['nav.cat_print', 'Impression'], filament: ['nav.cat_filament', 'Matières'],
         tools: ['nav.cat_tools', 'Outils'], track: ['nav.cat_track', 'Suivi'], help: ['nav.cat_help', 'Aide'] };
     function refreshSel() {
         const open = sidebar.classList.contains('panel-open');
@@ -27706,4 +27863,115 @@ async function _loadDashboardPrinted() {
         document.addEventListener('i18n:changed', () => { document.querySelectorAll('button[aria-label]').forEach(b => { const t = b.getAttribute('title'); if (t && !(b.textContent || '').trim()) b.setAttribute('aria-label', t); }); });
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+
+
+document.getElementById('sosprint-stop-btn')?.addEventListener('click', async () => {
+    const ok = await showConfirmDialog(_t2('sosprint.stop_confirm', "Arrêter l'enquête en cours ? Les questions et réponses déjà données seront abandonnées."), {
+        danger: true,
+        confirmLabel: _t2('sosprint.stop_btn', "Arrêter l'enquête")
+    });
+    if (!ok) return;
+    sosprintStopped = true;
+    resetSosprintInvestigation();
+    ['sosprint-questions', 'sosprint-result', 'sosprint-recurring-hint', 'sosprint-reference-hint'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+    const hint = document.getElementById('sosprint-empty-hint'); if (hint) hint.style.display = '';
+    const sub = document.getElementById('sosprint-submit-btn'); if (sub) sub.disabled = false;
+    showToast(_t2('sosprint.stopped_toast', 'Enquête arrêtée'), 'info');
+});
+
+
+// ── Fusion de plusieurs modèles en un fichier 3MF (un plateau si tout tient, sinon plusieurs) ──
+document.getElementById('merge-3mf-btn')?.addEventListener('click', () => {
+    if (selectedFiles.size < 2) {
+        showToast(_t2('merge3mf.need_two', 'Sélectionnez au moins 2 fichiers à fusionner'), 'warning');
+        return;
+    }
+    ['bed-width', 'bed-height', 'bed-height-z', 'spacing'].forEach(k => {
+        const src = document.getElementById('nesting-' + k), dst = document.getElementById('merge3mf-' + k);
+        if (src && dst && src.value) dst.value = src.value;
+    });
+    const nm = document.getElementById('merge3mf-filename'); if (nm) nm.value = `fusion_${selectedFiles.size}_pieces`;
+    loadDownloadSources('merge3mf-dest', _t2('merge3mf.same_folder', 'Dossier du premier fichier'));
+    const res = document.getElementById('merge3mf-result'); if (res) { res.style.display = 'none'; res.innerHTML = ''; }
+    const btn = document.getElementById('merge3mf-run-btn'); if (btn) btn.disabled = false;
+    openModal('modal-merge3mf');
+});
+
+async function runMerge3mf() {
+    const btn = document.getElementById('merge3mf-run-btn');
+    const box = document.getElementById('merge3mf-result');
+    const num = (id, d) => parseFloat(document.getElementById(id)?.value) || d;
+    const original = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${_t2('merge3mf.working', 'Fusion en cours…')}`; }
+    try {
+        const res = await fetch(`${API}/api/files/merge-3mf`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                paths: [...selectedFiles],
+                bed_width: num('merge3mf-bed-width', 220), bed_height: num('merge3mf-bed-height', 220),
+                bed_height_z: num('merge3mf-bed-height-z', 250), spacing: num('merge3mf-spacing', 3),
+                filename: (document.getElementById('merge3mf-filename')?.value || '').trim(),
+                source_id: (() => { const s = document.getElementById('merge3mf-dest'); const o = s && s.options[s.selectedIndex]; return (o && o.dataset.baseSourceId) || (s ? s.value : ''); })(),
+                target_subfolder: (() => { const s = document.getElementById('merge3mf-dest'); const o = s && s.options[s.selectedIndex]; return (o && o.dataset.relPath) || ''; })()
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            const detail = (data.errors || []).map(e => `${escapeHtml((e.path || '').split(/[\\/]/).pop())} : ${escapeHtml(e.error)}`).join('<br>');
+            throw new Error((data.error || `HTTP ${res.status}`) + (detail ? '\n' + detail : ''));
+        }
+        const summary = data.plate_count > 1
+            ? _t2('merge3mf.done_multi', '{n} pièces réparties sur {p} plateaux dans {file}').replace('{n}', data.piece_count).replace('{p}', data.plate_count).replace('{file}', data.output_filename)
+            : _t2('merge3mf.done_single', '{n} pièces sur un seul plateau dans {file}').replace('{n}', data.piece_count).replace('{file}', data.output_filename);
+        const skipped = (data.errors || []).length
+            ? `<div style="margin-top:6px; color:var(--warning, #f5a623);">${_t2('merge3mf.skipped', 'Ignorés :')} ${(data.errors).map(e => escapeHtml((e.path || '').split(/[\\/]/).pop()) + ' (' + escapeHtml(e.error) + ')').join(', ')}</div>` : '';
+        if (box) { box.innerHTML = `<i class="fa-solid fa-circle-check" style="color:var(--cb-ok, #22c55e);"></i> ${escapeHtml(summary)}${skipped}`; box.style.display = 'block'; }
+        showToast(summary, 'success');
+        closeModal('modal-merge3mf');
+        try { await loadFiles(); } catch (e) { /* ignore */ }   // le nouveau 3MF apparaît tout de suite
+        // Que faire des fichiers d'origine ? (seuls ceux réellement fusionnés sont concernés)
+        const merged = data.merged_paths || [];
+        if (merged.length) {
+            const del = await showConfirmDialog(
+                _t2('merge3mf.delete_originals', 'Supprimer les {n} fichiers d\'origine maintenant qu\'ils sont fusionnés ?').replace('{n}', merged.length),
+                { title: _t2('merge3mf.delete_title', 'Fichiers d\'origine'), confirmLabel: _t2('merge3mf.yes_delete', 'Oui, supprimer'), cancelLabel: _t2('merge3mf.no_keep', 'Non, les garder'), danger: true }
+            );
+            if (del) {
+                try {
+                    const dr = await fetch(`${API}/api/files/delete-batch`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file_paths: merged }) });
+                    const dd = await dr.json().catch(() => ({}));
+                    if (dr.ok && dd.deleted_count > 0) {
+                        showUndoToast(I18N.tp('toast.files_deleted', dd.deleted_count, { count: dd.deleted_count }) || `${dd.deleted_count} fichier(s) supprimé(s)`, dd.batch_id, dd.undo_seconds);
+                        const failedPaths = new Set((dd.errors || []).map(e => e.path));
+                        purgeDeletedFromLibrary(merged.filter(p => !failedPaths.has(p)));
+                    }
+                    if (dd.errors && dd.errors.length) showToast(`${dd.errors.length} ${I18N.t('toast.delete_partial_error') || "fichier(s) n'ont pas pu être supprimés"}`, 'warning');
+                    if (!dr.ok) showToast(dd.error || I18N.t('toast.delete_error'), 'error');
+                } catch (e) { showToast(I18N.t('toast.connection_error'), 'error'); }
+            }
+            selectedFiles.clear();
+            if (typeof toggleSelectionMode === 'function' && isSelectionMode) toggleSelectionMode();
+        }
+    } catch (err) {
+        if (box) { box.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color:var(--danger);"></i> ${escapeHtml(String(err.message || err)).replace(/\n/g, '<br>')}`; box.style.display = 'block'; }
+        showToast(_t2('merge3mf.failed', 'Fusion impossible'), 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = original; }
+    }
+}
+window.runMerge3mf = runMerge3mf;
+
+
+// Barre de sélection : en mode icônes seules, le nom du bouton reste visible dans l'infobulle
+(function selectionBarTooltips() {
+    const apply = () => document.querySelectorAll('#selection-action-bar .btn').forEach(b => {
+        const label = b.querySelector('span')?.textContent.trim();
+        if (label && !b.dataset.i18nTitle) b.title = label;
+    });
+    apply();
+    document.addEventListener('stellio:language-changed', apply);
+    document.getElementById('select-all-btn')?.addEventListener('click', () => setTimeout(apply, 50));
 })();

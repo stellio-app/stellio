@@ -1914,14 +1914,19 @@ def test_apply_config_efface_puis_remplace():
 def _ns(rows):
     conn = sqlite3.connect(':memory:')
     conn.row_factory = sqlite3.Row
-    conn.execute("CREATE TABLE printers (id INTEGER, user_id INTEGER, config TEXT)")
+    conn.execute("CREATE TABLE printers (id INTEGER, user_id INTEGER, config TEXT, type TEXT, name TEXT)")
     for r in rows:
-        conn.execute("INSERT INTO printers VALUES (?,?,?)", r)
+        conn.execute("INSERT INTO printers VALUES (?,?,?,?,?)", tuple(r) + ('octoprint', '')[len(r) - 3:])
     class _Keep:                                   # le code appelant ferme la connexion : on la garde ouverte pour le test
         execute = staticmethod(conn.execute)
         close = staticmethod(lambda: None)
-    return load_from_main(['_slicer_for_printer'], {
-        'get_db': lambda: _Keep, 'json': json, '_safe_int': lambda v, d=None: int(v) if str(v or '').isdigit() else d})
+    return load_from_main(['_slicer_for_printer', '_is_resin_printer_row', '_installed_resin_slicer_value', 'RESIN_SLICER_IDS', 'RESIN_PRINTER_TYPES',
+                           'SLICER_ID_TO_DEFAULT_VALUE'], {
+        'get_db': lambda: _Keep, 'json': json, 're': __import__('re'), '_safe_int': lambda v, d=None: int(v) if str(v or '').isdigit() else d,
+        'get_cached_installed_slicers': lambda: _INSTALLED})
+
+
+_INSTALLED = []
 
 
 def test_slicer_de_l_imprimante_prioritaire():
@@ -1933,6 +1938,21 @@ def test_slicer_de_l_imprimante_prioritaire():
     assert f(7, None, 'bambu-studio.exe') == 'bambu-studio.exe'
     assert f(7, 3, 'bambu-studio.exe') == 'bambu-studio.exe'     # imprimante d'un autre utilisateur : ignorée
     assert f(7, 99, 'bambu-studio.exe') == 'bambu-studio.exe'
+
+
+def test_imprimante_resine_prend_le_slicer_resine_detecte():
+    ns = _ns([(1, 7, '{}', 'formlabs', 'Form 3'), (2, 7, '{}', 'octoprint', 'Ender'), (3, 7, json.dumps({'default_slicer': 'orca-slicer.exe'}), 'formlabs', 'Form 3'),
+              (4, 7, '{}', 'elegoo_sdcp', 'Saturn 4 Ultra'), (5, 7, '{}', 'elegoo_sdcp', 'Centauri Carbon')])
+    f = ns['_slicer_for_printer']
+    _INSTALLED[:] = []
+    assert f(7, 1, 'bambu-studio.exe') == 'bambu-studio.exe'              # aucun logiciel résine détecté → Paramètres
+    _INSTALLED[:] = [{'id': 'orcaslicer'}, {'id': 'chitubox'}, {'id': 'preform'}]
+    assert f(7, 1, 'bambu-studio.exe') == 'CHITUBOX.exe'                  # résine → premier logiciel résine détecté
+    assert f(7, 4, 'bambu-studio.exe') == 'CHITUBOX.exe'                  # Elegoo Saturn = résine
+    assert f(7, 2, 'bambu-studio.exe') == 'bambu-studio.exe'              # FDM inchangé
+    assert f(7, 5, 'bambu-studio.exe') == 'bambu-studio.exe'              # Elegoo Centauri = FDM
+    assert f(7, 3, 'bambu-studio.exe') == 'orca-slicer.exe'               # le choix de l'imprimante reste prioritaire
+    _INSTALLED[:] = []
 
 
 def test_envoi_et_profils_utilisent_le_slicer_de_l_imprimante():
@@ -2163,10 +2183,10 @@ def test_v110_no_update_done_popup():
     js = (root / 'interface/script.js').read_text(encoding='utf-8')
     body = js[js.index('async checkAndShowChangelog()'):js.index('async checkForUpdates(')]
     assert 'showChangelogModal(' not in body and 'stellio-last-seen-version' in body
-    assert 'CURRENT_VERSION = "1.1.2"' in (root / 'main.py').read_text(encoding='utf-8')
+    assert 'CURRENT_VERSION = "1.1.3"' in (root / 'main.py').read_text(encoding='utf-8')
     for p in ('changelog.json', 'languages/changelog.json'):
         d = json.loads((root / p).read_text(encoding='utf-8'))
-        assert d[0]['version'] == '1.1.2' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
+        assert d[0]['version'] == '1.1.3' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
 
 
 def test_v110_no_badge_on_likes_and_creations():
@@ -2312,7 +2332,7 @@ def test_v111_changelog_entry():
     root = _P(__file__).resolve().parent.parent
     for p in ('changelog.json', 'languages/changelog.json'):
         d = json.loads((root / p).read_text(encoding='utf-8'))
-        assert d[1]['version'] == '1.1.1' and len(d[1]['items']['fr']) >= 15 and all(len(v) >= 2 for v in d[0]['items'].values())
+        assert d[2]['version'] == '1.1.1' and len(d[2]['items']['fr']) >= 15 and all(len(v) >= 2 for v in d[0]['items'].values())
 
 
 def test_v111_security_options_and_modules():
@@ -2424,11 +2444,12 @@ def test_v113_ui_has_new_providers_and_offline_type():
 def test_v114_release_notes_generator():
     import subprocess, sys
     root = __import__("pathlib").Path(__file__).resolve().parent.parent
-    out = subprocess.run([sys.executable, str(root / 'tools' / 'release_notes.py'), 'v1.1.2'],
+    out = subprocess.run([sys.executable, str(root / 'tools' / 'release_notes.py'), 'v1.1.3'],
                          capture_output=True, text=True, check=True).stdout
-    assert out.startswith('## Stellio v1.1.2') and '### 🇫🇷 Français' in out and '<details>' in out and '✓ APK' in out
+    assert out.startswith('## Stellio v1.1.3') and '### 🇫🇷 Français' in out and '<details>' in out and '✓ ' in out
+    # la version ne sert qu'au titre : le contenu vient toujours de notes.txt
     assert subprocess.run([sys.executable, str(root / 'tools' / 'release_notes.py'), '9.9.9'],
-                          capture_output=True).returncode != 0
+                          capture_output=True, text=True).stdout.startswith('## Stellio v9.9.9')
 
 
 def test_v114_workflow_uses_notes_and_community_files():
@@ -2438,7 +2459,7 @@ def test_v114_workflow_uses_notes_and_community_files():
     assert (root / 'CONTRIBUTING.md').is_file()
     for n in ('bug.yml', 'feature.yml', 'good-first-issue.yml', 'config.yml'):
         assert (root / '.github' / 'ISSUE_TEMPLATE' / n).is_file()
-    assert 'versionName \'1.1.2\'' in (root / 'apk-src' / 'app' / 'build.gradle').read_text(encoding='utf-8')
+    assert 'versionName \'1.1.3\'' in (root / 'apk-src' / 'app' / 'build.gradle').read_text(encoding='utf-8')
 
 
 # ── v1.1.1 (ajouts) : popup caméra, couleurs par plateau, boutiques OFD ─────
@@ -2539,7 +2560,8 @@ def test_v112_real_logo_and_release_notes_from_files():
     assert im.size[0] >= 200 and im.mode == 'RGBA'          # emblème réel, plus l'étoile provisoire de 128 px
     wf = (root / '.github/workflows/build-and-sign.yml').read_text(encoding='utf-8')
     assert '            release-notes\n' in wf
-    assert (root / 'release-notes/notes_version_1.1.2.txt').is_file()
+    assert (root / 'release-notes/notes.txt').is_file()
+    assert not list((root / 'release-notes').glob('notes_version_*.txt'))   # un seul fichier, remplacé à chaque release
 
 
 def test_v112_modal_hides_floating_badges():

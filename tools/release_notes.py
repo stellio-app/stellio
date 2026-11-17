@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Génère le corps d'une release GitHub à partir de release-notes/notes_version_X.Y.Z.txt.
+"""Génère le corps d'une release GitHub à partir de release-notes/notes.txt (fichier unique, contenu remplacé à chaque release).
 
 Usage : python3 tools/release_notes.py <version> [sortie.md]
+
+`<version>` ne sert que pour le titre : le contenu de notes.txt est celui de la release en cours.
 
 Le fichier contient une section par langue (<!--fr-->, <!--en-->…), une ligne « ✓ » par nouveauté.
 Le corps de la release reprend ces lignes telles quelles : français et anglais dépliés, les autres
@@ -31,9 +33,9 @@ def parse(text):
 
 
 def build(version, repo="stellio-app/stellio"):
-    path = os.path.join(ROOT, "release-notes", f"notes_version_{version}.txt")
+    path = os.path.join(ROOT, "release-notes", "notes.txt")
     if not os.path.isfile(path):
-        raise SystemExit(f"Notes absentes : release-notes/notes_version_{version}.txt")
+        raise SystemExit("Notes absentes : release-notes/notes.txt")
     with open(path, encoding="utf-8") as f:
         sections = parse(f.read())
     out = [f"## Stellio v{version}", ""]

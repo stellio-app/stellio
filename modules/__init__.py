@@ -40,4 +40,13 @@ ALL = (
     'gcode_archive',
     'trash_core',
     'file_origin_delete',
+    'model_versions',
+    'energy_tariff',
+    'obico',
+    'printers_extra',
+    'failure_stats',
+    'resin_printers',
+    'resin_inventory',
+    'collections_sets',
+    'merge_3mf',
 )

@@ -113,7 +113,7 @@
 - 📐 **印刷可能性の解析**（オーバーハング検出）と**推奨される向き**（オーバーハングが少ない向き、ベッドとの接触率を表示）
 - 🎯 形状と成功履歴に基づく**スライサープロファイルの推奨**
 - ⏱️ スライス前の**印刷時間の見積もり**
-- 🩺 **S.O.S Print**：印刷失敗のアダプティブ診断機能 — Stellioは一度に1つずつ質問し、回答に応じて仮説のリストを絞り込み（質問数の制限なし。新しい仮説を追加し、「まだ解決しない」でも調査を続けます）、最終的な診断を提示します。写真解析はいつでも利用可能で、会話は保存され、再度開いたり「解決済み」にしたりできます ⚠️ AI は 100％ 信頼できるわけではなく、間違えることがあります。仮説は確認すべき手がかりです。
+- 🩺 **S.O.S Print**：印刷失敗のアダプティブ診断機能 — Stellioは一度に1つずつ質問し、回答に応じて仮説のリストを絞り込み（質問数の制限なし。新しい仮説を追加し、「まだ解決しない」でも調査を続けます）、最終的な診断を提示します。写真解析はいつでも利用可能で、会話は保存され、再度開いたり「解決済み」にしたりできます ⚠️ AI は 100％ 信頼できるわけではなく、間違えることがあります。仮説は確認すべき手がかりです。 **質問3**から、**結論を出して解決策を提案**ボタンで最も可能性の高い原因を提示し、「この診断で問題は解決しましたか？」と確認します（**はい、解決しました** / **いいえ、調査を続ける**）。**調査を中止**ボタンでいつでも中断できます。
 
 ### 🖨️ プリンター管理
 - 🔌 **OctoPrint**、**Klipper/Moonraker**、**Bambu Lab**（MQTT）、**Creality**（WebSocket）、**FlashForge**、**Elegoo**（SDCP）、**PrusaLink** に対応
@@ -130,7 +130,8 @@
 - 🎛️ **キャリブレーション**：フィラメントとプリンターごとに flow、pressure advance、温度などを保存し、スライサー送信ウィンドウで呼び出し
 - 👥 **軽量コラボレーションモード**：別の接続デバイスがすでにファイルを閲覧中かどうかが分かり、同じファイルを誤って二重にスライサーへ送信するのを警告で防止
 
-### 🧵 フィラメント管理
+### 🧵 素材：フィラメントとレジン
+- 🧪 **レジン在庫（ベータ）**：サイドバーのカテゴリは **素材**（フィラメント + レジン）になりました。ボトルを手動で登録（ブランド・種類・色・容量・残量・価格・保管場所）し、使用量を ml で差し引けます。フィラメントと同じ **「要注文」** リマインド（低在庫しきい値、手動チェック、ショップ検索リンク、「注文済み」）も使え、ダッシュボードのウィジェットにも表示されます。プリンターとは未連携で、自動減算はしません
 - 🔗 **Spoolman** 連携（スプール管理サーバー）。ネットワーク上での自動検出に対応
 - 🟠 **Bambu Lab AMS** 対応（スロット読み取り）
 - 🟢 **Creality CFS** 対応
@@ -154,6 +155,8 @@
 
 ### 🧩 高度なツール
 - 🎨 **自動ネスティング**（rectpackまたはshapelyによる実シルエット）
+- 🧩 **3MFに統合**：複数のモデル（STL、3MF、OBJ など）を選ぶと、Stellio が1つの3MFファイルにまとめます。すべて収まれば1プレート、収まらなければ複数プレート（Bambu Studio / OrcaSlicer 互換の構造。PrusaSlicer では全パーツがまとめて表示されます）。ファイル名と保存先（ネットワーク共有も可、フォルダ作成も可）を選べ、完了後に元のファイルを削除するか残すかを確認します。
+- 🖌️ **スプールの色をスライサーへ**：送信時に、選んだスプールの色と素材が OrcaSlicer・Bambu Studio・PrusaSlicer に読み込むフィラメントプロファイルへ反映されます（プリンターに関連付けたインポート済みのフィラメントプロファイルが必要。一括送信では、すべてのスプールが同じ場合のみ色を適用）。
 - 🔧 **メッシュ修復**（trimesh + pymeshfix）。**修復前後の比較**（水密性、三角形数、頂点数、サイズ）付き
 - 🔄 **フォーマット変換**（STL ↔ 3MF ↔ OBJ）
 - 🛡️ **整合性チェック**（破損・欠落ファイル）
@@ -319,6 +322,7 @@ Stellioは以下を自動検出します：
 - ✅ ideaMaker
 - ✅ FlashPrint
 - ✅ Lychee Slicer
+- ✅ CHITUBOX / CHITUBOX Pro / Anycubic Photon Workshop / PreForm / Voxeldance Tango *（レジン、ベータ）*
 - ✅ CraftWare
 - ✅ MatterControl
 - ✅ MakerBot Print
@@ -337,6 +341,9 @@ Stellioは以下を自動検出します：
 | **FlashForge** | Adventurer 5M / 5M Pro · AD5X | 独自API：監視、UDP自動検出 |
 | **Klipper / Moonraker** | Klipper が動作するすべての機種（Voron など） | HTTP：監視、アップロード、カメラ、正確な印刷時間 |
 | **OctoPrint** | OctoPrint で制御するすべてのプリンター | HTTP：監視、アップロード、カメラ |
+| **Duet / RepRapFirmware** | Duet 2/3 ボード全般 | HTTP：監視、アップロード |
+| **Repetier-Server** | Repetier-Server 管理のプリンター全般 | HTTP：監視、アップロード |
+| **レジン（ベータ）** 🧪 | Formlabs（Web API）· Anycubic Photon Wi-Fi · Chitubox / Phrozen / Uniformation (SDCP) | 監視のみ・ベータ — 実機での検証は未完了 · メンテナンス（FEP、タンク、LCD…） |
 
 > 掲載しているモデルは、Stellio の「プリンターを追加」フォームで選べるものです。同じプロトコルを使う他のモデルも通常は動作しますが、すべてをテストしたわけではありません。お使いの機種が動作したかどうかを [GitHub でお知らせください](https://github.com/stellio-app/stellio/issues)。
 
@@ -385,7 +392,7 @@ stellio/
 ├── main.py             # Flask + デスクトップバックエンド
 ├── interface/              # index.html, script.js, style.css (UI)
 ├── packaging/              # launcher.py, installer (.iss), macOS entitlements
-├── release-notes/          # notes_version_X.Y.Z.txt (release texts)
+├── release-notes/          # notes.txt (release text, replaced at each release)
 ├── tests/  tools/          # pytest tests, maintenance tools (incl. stellio_manager.bat)
 ├── check_deps.py       # 自己修復型の依存関係チェッカー
 ├── modules/            # main.py から分離したモジュール (print_session, share_link, timelapse, mqtt_publisher…)

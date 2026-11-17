@@ -20,12 +20,6 @@
 ✓ Documentation : toutes les captures d'écran sont désormais refaites depuis la version démo, sans bandeau, et fournies dans chaque langue (interface traduite)
 ✓ Windows : quand la fenêtre intégrée de Stellio ne peut pas s'ouvrir (composant WebView2 absent ou bloqué), un message explique la situation et comment fermer Stellio (icône près de l'horloge), et le détail est consigné dans data/stellio.log
 ✓ Windows : si la fenêtre intégrée ne peut pas démarrer, Stellio s'ouvre dans une fenêtre séparée (Edge/Chrome en mode application) et s'arrête quand on la ferme, au lieu de rester actif en arrière-plan.
-✓ S.O.S Print : l'IA pose désormais autant de questions que nécessaire (plus de limite) jusqu'à trouver la cause, propose de nouvelles pistes quand les premières sont écartées, et continue l'enquête après un « toujours pas résolu » au lieu de conclure.
-✓ S.O.S Print : l'IA prend en compte les vitesses (impression, 1re couche, parois, remplissage, déplacement, rétraction) : elles sont lues dans le profil de slicer sélectionné, et l'IA les demande quand elles manquent.
-✓ S.O.S Print : prise en compte du multicolore et de la tour de purge (tour qui se décroche, s'effondre, tombe sur la pièce, couleurs qui se mélangent) : l'IA pose les questions utiles, et la largeur de la tour est lue dans le profil de slicer.
-✓ S.O.S Print : à chaque étape, dès la première question, l'IA affiche ses hypothèses classées par probabilité (en %) avec la raison ou le test rapide associé, et les remet à jour après chaque réponse.
-✓ S.O.S Print : un avertissement rappelle que l'IA n'est pas fiable à 100 % et peut se tromper (pendant l'enquête et sur le résultat, dans le README et la doc).
-✓ IA : rappel que l'IA n'est pas fiable à 100 % et peut se tromper, dans S.O.S Print (dès le formulaire), le README, la documentation et le site.
 
 <!--en-->
 ✓ APK: the real Stellio logo (blue and steel emblem) replaces the placeholder star on the "Server unreachable" and setup pages
@@ -49,12 +43,6 @@
 ✓ Documentation: all screenshots are now retaken from the demo version, without the banner, and provided in every language (translated interface)
 ✓ Windows: when Stellio's built-in window cannot open (WebView2 component missing or blocked), a message explains why and how to close Stellio (icon near the clock), and the details are logged in data/stellio.log
 ✓ Windows: if the built-in window cannot start, Stellio opens in a separate window (Edge/Chrome app mode) and stops when it is closed, instead of keeping running in the background.
-✓ S.O.S Print: the AI now asks as many questions as needed (no limit) until it finds the cause, adds new hypotheses when the first ones are ruled out, and keeps investigating after a “still not solved” instead of concluding.
-✓ S.O.S Print: the AI now takes speeds into account (print, first layer, walls, infill, travel, retraction): they are read from the selected slicer profile, and the AI asks for them when they are missing.
-✓ S.O.S Print: multicolor prints and the purge tower are now taken into account (tower detaching, collapsing, falling onto the part, colors mixing): the AI asks the relevant questions, and the tower width is read from the slicer profile.
-✓ S.O.S Print: at every step, from the very first question, the AI shows its hypotheses ranked by likelihood (%) with the reason or quick check, and updates them after each answer.
-✓ S.O.S Print: a notice reminds that the AI is not 100% reliable and can make mistakes (during the investigation and on the result, in the README and docs).
-✓ AI: reminder that the AI is not 100% reliable and can make mistakes, in S.O.S Print (from the form onward), the README, the documentation and the website.
 
 <!--de-->
 ✓ APK: Das echte Stellio-Logo (blau-stählernes Emblem) ersetzt den provisorischen Stern auf den Seiten „Server nicht erreichbar“ und Einrichtung
@@ -78,12 +66,6 @@
 ✓ Dokumentation: Alle Screenshots wurden neu aus der Demo-Version ohne Banner erstellt und liegen in jeder Sprache vor (übersetzte Oberfläche)
 ✓ Windows: Kann das integrierte Stellio-Fenster nicht geöffnet werden (WebView2-Komponente fehlt oder ist blockiert), erklärt eine Meldung den Grund und wie man Stellio beendet (Symbol neben der Uhr); Details stehen in data/stellio.log
 ✓ Windows: Kann das integrierte Fenster nicht starten, öffnet sich Stellio in einem eigenen Fenster (Edge/Chrome im App-Modus) und beendet sich beim Schließen, statt im Hintergrund weiterzulaufen.
-✓ S.O.S Print: Die KI stellt jetzt so viele Fragen wie nötig (ohne Limit), bis sie die Ursache findet, ergänzt neue Hypothesen, wenn die ersten ausgeschlossen sind, und ermittelt nach „immer noch nicht gelöst“ weiter, statt abzuschließen.
-✓ S.O.S Print: Die KI berücksichtigt jetzt Geschwindigkeiten (Druck, erste Schicht, Wände, Füllung, Leerfahrt, Rückzug): Sie werden aus dem gewählten Slicer-Profil gelesen, und die KI fragt danach, wenn sie fehlen.
-✓ S.O.S Print: Mehrfarbdrucke und der Reinigungsturm werden berücksichtigt (Turm löst sich, kippt, fällt aufs Teil, Farben vermischen sich): Die KI stellt die passenden Fragen, die Turmbreite wird aus dem Slicer-Profil gelesen.
-✓ S.O.S Print: In jedem Schritt, schon ab der ersten Frage, zeigt die KI ihre Hypothesen nach Wahrscheinlichkeit (%) sortiert mit Begründung bzw. Schnelltest und aktualisiert sie nach jeder Antwort.
-✓ S.O.S Print: Ein Hinweis erinnert daran, dass die KI nicht zu 100 % zuverlässig ist und Fehler machen kann (während der Untersuchung und beim Ergebnis, in README und Doku).
-✓ KI: Hinweis, dass die KI nicht zu 100 % zuverlässig ist und Fehler machen kann – in S.O.S Print (schon im Formular), README, Dokumentation und Website.
 
 <!--es-->
 ✓ APK: el logo real de Stellio (emblema azul y acero) sustituye a la estrella provisional en las páginas «Servidor inaccesible» y de configuración
@@ -107,12 +89,6 @@
 ✓ Documentación: todas las capturas se han rehecho desde la versión demo, sin el banner, y se ofrecen en cada idioma (interfaz traducida)
 ✓ Windows: cuando la ventana integrada de Stellio no puede abrirse (componente WebView2 ausente o bloqueado), un mensaje explica el motivo y cómo cerrar Stellio (icono junto al reloj), y los detalles quedan en data/stellio.log
 ✓ Windows: si la ventana integrada no puede iniciarse, Stellio se abre en una ventana separada (Edge/Chrome en modo aplicación) y se detiene al cerrarla, en lugar de seguir activo en segundo plano.
-✓ S.O.S Print: la IA hace ahora tantas preguntas como haga falta (sin límite) hasta encontrar la causa, añade nuevas hipótesis cuando las primeras se descartan y sigue investigando tras un «sigue sin resolverse» en lugar de concluir.
-✓ S.O.S Print: la IA tiene ahora en cuenta las velocidades (impresión, primera capa, paredes, relleno, desplazamiento, retracción): se leen del perfil de slicer seleccionado y la IA las pide cuando faltan.
-✓ S.O.S Print: se tienen en cuenta las impresiones multicolor y la torre de purga (torre que se despega, se derrumba, cae sobre la pieza, colores que se mezclan): la IA hace las preguntas útiles y el ancho de la torre se lee del perfil de slicer.
-✓ S.O.S Print: en cada paso, desde la primera pregunta, la IA muestra sus hipótesis ordenadas por probabilidad (%) con el motivo o la comprobación rápida, y las actualiza tras cada respuesta.
-✓ S.O.S Print: un aviso recuerda que la IA no es 100 % fiable y puede cometer errores (durante la investigación y en el resultado, en el README y la documentación).
-✓ IA: aviso de que la IA no es 100 % fiable y puede equivocarse, en S.O.S Print (desde el formulario), el README, la documentación y el sitio web.
 
 <!--pt-->
 ✓ APK: o logótipo real do Stellio (emblema azul e aço) substitui a estrela provisória nas páginas «Servidor inacessível» e de configuração
@@ -136,12 +112,6 @@
 ✓ Documentação: todas as capturas de ecrã foram refeitas a partir da versão demo, sem o banner, e estão disponíveis em cada idioma (interface traduzida)
 ✓ Windows: quando a janela integrada do Stellio não consegue abrir (componente WebView2 ausente ou bloqueado), uma mensagem explica o motivo e como fechar o Stellio (ícone junto ao relógio), e os detalhes ficam em data/stellio.log
 ✓ Windows: se a janela integrada não conseguir iniciar, o Stellio abre numa janela separada (Edge/Chrome em modo aplicação) e para quando ela é fechada, em vez de continuar em segundo plano.
-✓ S.O.S Print: a IA faz agora quantas perguntas forem necessárias (sem limite) até encontrar a causa, acrescenta novas hipóteses quando as primeiras são descartadas e continua a investigar após um «ainda não resolvido» em vez de concluir.
-✓ S.O.S Print: a IA passa a considerar as velocidades (impressão, primeira camada, paredes, preenchimento, deslocamento, retração): são lidas do perfil de slicer selecionado e a IA pede-as quando faltam.
-✓ S.O.S Print: passa a considerar impressões multicor e a torre de purga (torre que se solta, desmorona, cai sobre a peça, cores que se misturam): a IA faz as perguntas úteis e a largura da torre é lida do perfil de slicer.
-✓ S.O.S Print: em cada passo, logo desde a primeira pergunta, a IA mostra as hipóteses ordenadas por probabilidade (%) com o motivo ou o teste rápido, e atualiza-as após cada resposta.
-✓ S.O.S Print: um aviso lembra que a IA não é 100 % fiável e pode cometer erros (durante a investigação e no resultado, no README e na documentação).
-✓ IA: aviso de que a IA não é 100 % fiável e pode cometer erros, no S.O.S Print (desde o formulário), no README, na documentação e no site.
 
 <!--it-->
 ✓ APK: il vero logo di Stellio (emblema blu e acciaio) sostituisce la stella provvisoria nelle pagine «Server irraggiungibile» e di configurazione
@@ -165,12 +135,6 @@
 ✓ Documentazione: tutti gli screenshot sono stati rifatti dalla versione demo, senza banner, e sono disponibili in ogni lingua (interfaccia tradotta)
 ✓ Windows: quando la finestra integrata di Stellio non si apre (componente WebView2 assente o bloccato), un messaggio spiega il motivo e come chiudere Stellio (icona vicino all'orologio); i dettagli sono in data/stellio.log
 ✓ Windows: se la finestra integrata non riesce ad avviarsi, Stellio si apre in una finestra separata (Edge/Chrome in modalità app) e si ferma quando la chiudi, invece di restare attivo in background.
-✓ S.O.S Print: l'IA pone ora tutte le domande necessarie (senza limite) finché non trova la causa, aggiunge nuove ipotesi quando le prime vengono escluse e continua a indagare dopo un «ancora non risolto» invece di concludere.
-✓ S.O.S Print: l'IA tiene ora conto delle velocità (stampa, primo strato, pareti, riempimento, spostamento, retrazione): vengono lette dal profilo dello slicer selezionato e l'IA le chiede quando mancano.
-✓ S.O.S Print: vengono considerate le stampe multicolore e la torre di spurgo (torre che si stacca, crolla, cade sul pezzo, colori che si mescolano): l'IA pone le domande utili e la larghezza della torre viene letta dal profilo dello slicer.
-✓ S.O.S Print: a ogni passo, fin dalla prima domanda, l'IA mostra le ipotesi ordinate per probabilità (%) con il motivo o il controllo rapido e le aggiorna dopo ogni risposta.
-✓ S.O.S Print: un avviso ricorda che l'IA non è affidabile al 100 % e può commettere errori (durante l'indagine e nel risultato, nel README e nella documentazione).
-✓ IA: avviso che l'IA non è affidabile al 100 % e può sbagliare, in S.O.S Print (già dal modulo), nel README, nella documentazione e nel sito.
 
 <!--zh-->
 ✓ APK：在“服务器无法访问”和设置页面上，用真正的 Stellio 标志（蓝色钢质徽章）替换了临时的星形图案
@@ -194,12 +158,6 @@
 ✓ 文档：所有截图均已从演示版本重新截取（不含横幅），并提供每种语言的版本（界面已翻译）
 ✓ Windows：当 Stellio 内置窗口无法打开（WebView2 组件缺失或被拦截）时，会弹出说明原因及如何关闭 Stellio（时钟旁的图标）的提示，详细信息记录在 data/stellio.log
 ✓ Windows：若内置窗口无法启动，Stellio 将在独立窗口（Edge/Chrome 应用模式）中打开，关闭该窗口时即停止运行，而不再留在后台。
-✓ S.O.S Print：AI 现在会不限数量地提问，直到找到原因；当最初的假设被排除时会补充新的假设；在你反馈“仍未解决”后会继续排查，而不是直接下结论。
-✓ S.O.S Print：AI 现在会考虑各项速度（打印、首层、墙、填充、空驶、回抽）：从所选切片软件配置中读取，缺失时 AI 会主动询问。
-✓ S.O.S Print：现在会考虑多色打印和擦拭塔（塔脱落、倒塌、砸到模型、颜色混杂）：AI 会提出针对性的问题，塔宽度则从切片软件配置中读取。
-✓ S.O.S Print：从第一个问题起，AI 在每一步都会按概率（%）排序显示假设，并附上原因或快速检查方法，每次回答后更新。
-✓ S.O.S Print：新增提示，说明 AI 并非 100% 可靠，可能出错（排查过程与结果页，以及 README 和文档中）。
-✓ AI：在 S.O.S Print（从表单开始）、README、文档和网站中提示 AI 并非 100% 可靠，可能出错。
 
 <!--ja-->
 ✓ APK：「サーバーに接続できません」画面と設定画面の仮の星を、本物の Stellio ロゴ（青とスチールのエンブレム）に置き換えました
@@ -223,9 +181,3 @@
 ✓ ドキュメント：すべてのスクリーンショットをバナーなしのデモ版から撮り直し、各言語（翻訳済みの画面）で提供しました
 ✓ Windows：Stellio の内蔵ウィンドウを開けない場合（WebView2 コンポーネントの欠落・ブロック）、原因と Stellio の終了方法（時計付近のアイコン）を説明するメッセージを表示し、詳細を data/stellio.log に記録
 ✓ Windows：内蔵ウィンドウを起動できない場合、Stellio は別ウィンドウ（Edge/Chrome のアプリモード）で開き、閉じると終了します（バックグラウンドに残りません）。
-✓ S.O.S Print：AI は原因が見つかるまで質問数の制限なく質問を続け、最初の仮説が除外されたら新しい仮説を追加し、「まだ解決しない」と答えても結論を出さず調査を続けます。
-✓ S.O.S Print：AI が速度（印刷・1層目・壁・インフィル・移動・リトラクション）を考慮するようになりました。選択したスライサープロファイルから読み取り、不足している場合は AI が質問します。
-✓ S.O.S Print：多色印刷とプライムタワー（タワーの剥がれ・倒壊・造形物への落下・色混じり）を考慮するようになりました。AI が的確に質問し、タワー幅はスライサープロファイルから読み取ります。
-✓ S.O.S Print：最初の質問から各ステップで、AI が可能性（％）順に仮説を表示し、理由や簡単な確認方法を添え、回答のたびに更新します。
-✓ S.O.S Print：AI は 100％ 信頼できず間違えることがある旨の注意書きを追加（調査中と結果画面、README とドキュメント）。
-✓ AI：S.O.S Print（フォームの段階から）、README、ドキュメント、ウェブサイトに、AI は 100％ 信頼できず間違うことがある旨の注意書きを追加しました。

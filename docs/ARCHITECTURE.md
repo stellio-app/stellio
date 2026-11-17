@@ -16,9 +16,14 @@ stellio/
 │   └── quote_portal.py  accounting_zip.py  parts_stock.py  printer_dispatch.py
 │       digest.py  filament_weighing.py  profile_share.py        (v1.0.6, écran « Gestion »)
 │       openprinttag.py  open_filament_db.py                     (v1.0.8, étiquettes NFC + catalogue)
+│       model_versions.py  collections_sets.py  energy_tariff.py  (v1.1.3)
+│       obico.py  printers_extra.py  failure_stats.py
+│       resin_printers.py                                        (imprimantes résine, bêta)
+│       resin_inventory.py                                       (inventaire de résine manuel, bêta)
 ├── interface/               Interface (JavaScript pur, sans compilation)
 │   ├── index.html  script.js  style.css
 │   ├── management.js          écran « Gestion » (v1.0.6)
+│   ├── v113.js                versions, collections, causes d'échec, tarif, Obico (v1.1.3)
 │   └── sw.js                  service worker (servi à /sw.js)
 ├── packaging/               Empaquetage de l'application de bureau
 │   ├── launcher.py            lanceur (PyInstaller)
@@ -28,7 +33,7 @@ stellio/
 ├── assets/                  Images, icônes, polices (vendor/)
 ├── tests/                   Tests pytest
 ├── tools/                   split_module.py, range.py, smoke_boot.py, stellio_manager.bat (lancement de test sous Windows)
-├── release-notes/           notes_version_X.Y.Z.txt (texte des releases)
+├── release-notes/           notes.txt (texte de la release, remplacé à chaque version)
 ├── docs/                    ARCHITECTURE.md, DEMO.md, captures d'écran
 ├── i18n/                    scripts de traduction
 ├── apk/  relay/             application Android compagnon, relais

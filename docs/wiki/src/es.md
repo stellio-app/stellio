@@ -177,7 +177,6 @@ Cada función de Stellio: **para qué sirve y cómo usarla**. Los detalles técn
 |---|---|
 | **Panel** | Impresiones en curso, stock bajo, archivos recientes; widgets reordenables. |
 | **Biblioteca** | Todos tus modelos 3D, con miniaturas, etiquetas, filtros y búsqueda. |
-| **Favoritos** | Tus modelos preferidos, a un clic. |
 | **Imprimir pronto** | Tu lista de espera de impresiones, reordenable. |
 | **Proyectos** | Varios archivos agrupados para un mismo objeto. |
 | **Impresoras** | Seguimiento en directo, envío, mantenimiento, piezas de desgaste. |
@@ -360,7 +359,7 @@ Lista completa: [Ajustes y datos](es-Settings-and-Data).
 
 ## Organizar
 - **Etiquetas** de colores, con etiquetado automático por IA; etiquetar varios archivos con un clic.
-- **Favoritos**, filtros avanzados (tipo, tamaño, peso, estado de impresión), **filtros guardados**.
+- **Favoritos**, filtros avanzados (tipo, tamaño, peso, estado de impresión), **filtros guardados**. Acceso: tecla **F**, widget del panel o estrella de cada archivo (al quitar una estrella, el archivo desaparece al instante de la vista Favoritos).
 - Filtros de estado: «Enviado al slicer», «Ya impreso», «Ya conseguido», «Ya fallido».
 - **Filtro «Stock de filamento»**: conserva solo los archivos imprimibles con las bobinas que tiene.
 - El orden, la búsqueda y los filtros se **recuerdan** al reabrir la aplicación.
@@ -385,6 +384,9 @@ En un 3MF de **varias bandejas**, la ventana «Ya impreso» ofrece una zona por 
 
 Los archivos **enviados al slicer** llevan un **halo ámbar** (verde si la impresión salió bien, rojo si falló) desde el envío, y la etiqueta **Enviados al slicer** de la biblioteca los encuentra con un clic.
 
+- **Colecciones**: agrupa modelos por tema (menú del archivo → *Añadir a una colección*). Cada colección se convierte en un chip de filtro en la biblioteca; define una **cantidad** por archivo y **añade toda la colección a la cola de impresión** con un clic.
+- **Versiones de modelos**: menú del archivo → *Versiones*. Guarda una copia antes de modificar un modelo, **compárala** con el archivo actual (tamaño, triángulos, dimensiones, volumen), descárgala o **restáurala** (el estado actual se guarda antes).
+
 ## Búsqueda
 - Búsqueda clásica y **búsqueda semántica por IA** («busco un soporte para…»), con las búsquedas recientes recordadas.
 - **Colecciones inteligentes**.
@@ -400,6 +402,9 @@ Agrupe varios archivos para un mismo objeto.
 ## Visor 3D y herramientas
 - **Visor 3D** (Three.js, funciona sin conexión), navegación entre placas.
 - **Colocación automática** en la cama (rectpack, o silueta real con shapely).
+- **Fusionar en 3MF**: selecciona varios modelos (STL, 3MF, OBJ…) y Stellio crea un único archivo 3MF — una placa si todo cabe, si no un archivo con varias placas (estructura compatible con Bambu Studio / OrcaSlicer; PrusaSlicer muestra todas las piezas juntas). Eliges el nombre y la carpeta (incluidos recursos de red, con creación de carpetas) y Stellio pregunta si eliminar o conservar los archivos originales.
+- **Color de la bobina al slicer**: al enviar, el color y el material de la bobina elegida se aplican al perfil de filamento cargado en OrcaSlicer, Bambu Studio o PrusaSlicer (hace falta un perfil de filamento importado y vinculado a la impresora; en envío en lote, solo si todas las bobinas son iguales).
+- **Barra de selección**: todos los botones tienen el mismo tamaño y caben en una sola línea (solo iconos en pantallas pequeñas, nombre en la información emergente).
 - **Reparación de malla** (trimesh + pymeshfix) con comparación antes/después.
 - **Conversor** STL ↔ 3MF ↔ OBJ.
 - **Análisis de imprimibilidad** (voladizos) y **orientaciones sugeridas**.
@@ -428,10 +433,17 @@ En el inicio, el widget **Cámaras** muestra hasta **4 cámaras** (una por impre
 | **Bambu Lab** | X1/X1C/X1E, X2D, P1P/P1S, P2S, A1/A1 mini, H2D/H2S/H2C | MQTT (LAN + nube): seguimiento, AMS, cámara, descubrimiento SSDP |
 | **Prusa** | MK4, MK3.9, MK3.5, MINI+, XL, CORE One | PrusaLink (HTTP) |
 | **Creality** | Series K1/K2, Ender-3 V3, Hi | WebSocket: seguimiento, CFS, descubrimiento UDP |
-| **Elegoo** | Centauri Carbon 1 y 2, series de resina Saturn/Mars | SDCP (WebSocket) |
+| **Elegoo** | Centauri Carbon 1 y 2, series de resina Saturn/Mars (**beta**) | SDCP (WebSocket) |
+| **Resina Chitubox** *(beta)* | Phrozen, Uniformation GKtwo y otras placas Chitubox | SDCP v3: seguimiento (mismo protocolo que Elegoo) |
+| **Anycubic Photon** *(beta)* | Modelos Wi-Fi antiguos: Mono X, Mono X 6K, Mono SQ (no las M5s / M7) | Comandos de texto TCP 6000: solo estado y archivo actual |
+| **Formlabs** *(beta)* | Form 3 / 3L / 4 | API web oficial (client_id:client_secret): estado, progreso, capas; el envío se hace con PreForm |
 | **FlashForge** | Adventurer 5M/5M Pro, AD5X | API propietaria |
 | **Klipper / Moonraker** | Cualquier máquina Klipper (Voron…) | HTTP: seguimiento, envío, cámara, horas exactas |
 | **OctoPrint** | Cualquier impresora controlada por OctoPrint | HTTP |
+| **Duet / RepRapFirmware** | Duet 2/3, standalone o con SBC (DSF) | HTTP: seguimiento, envío de archivos, temperaturas |
+| **Repetier-Server** | Cualquier impresora gestionada por Repetier-Server | HTTP: seguimiento, envío de archivos, temperaturas (Marlin por USB serie no está admitido) |
+
+> 🧪 **Impresoras de resina: beta.** No se han podido probar en todas las máquinas: el seguimiento puede estar incompleto o fallar. Stellio nunca inicia ni detiene una impresión de resina. Cuéntanos en GitHub lo que no funcione (Creality Halot: aún no admitida).
 
 Los demás modelos que hablan el mismo protocolo suelen funcionar. Cuéntenos en GitHub si el suyo funciona.
 
@@ -452,6 +464,7 @@ Los demás modelos que hablan el mismo protocolo suelen funcionar. Cuéntenos en
 - **Modo colaborativo ligero**: avisa si otro dispositivo está viendo el archivo o antes de un doble envío.
 - **Abrir en el slicer** desde «Mis G-codes».
 - **Slicer por impresora**: cada impresora puede tener su propio slicer por defecto (OrcaSlicer, QIDIStudio, Bambu Studio…). El envío lo usa con los perfiles (ajustes, filamento) asociados a esa impresora y la lista de perfiles se adapta.
+- **Software de resina (beta)**: Stellio detecta CHITUBOX, CHITUBOX Pro, Anycubic Photon Workshop, PreForm (Formlabs), Voxeldance Tango y Lychee Slicer. Una impresora de resina sin slicer elegido abre automáticamente el primer software de resina detectado; también puedes elegir uno a mano (Ajustes → Slicer o la ficha de la impresora). Se comprueban las rutas de instalación habituales: si tu software no se reconoce, selecciónalo a mano.
 
 {{img:printer-slicer}}
 
@@ -463,13 +476,22 @@ Los demás modelos que hablan el mismo protocolo suelen funcionar. Cuéntenos en
 - **Timelapse** automático (cámara → vídeo MP4, requiere ffmpeg).
 - **Enlaces para compartir el estado**, de solo lectura.
 
+## Detección de fallos por cámara (Obico)
+En *Ajustes → Obico*, indica la dirección de tu servidor Obico (autoalojado u obico.io) y un token de API. Stellio comprueba las alertas con regularidad y te envía una **notificación push** en cuanto Obico detecta un fallo. La acción (pausa, cancelar) sigue siendo la de Obico: Stellio nunca detiene una impresión por sí solo. Un botón *Probar la conexión* verifica la dirección y el token.
+
 ## Mantenimiento
+- **Mantenimiento de resina (beta)**: el botón **Mantenimiento** de las tarjetas de impresoras de resina propone tareas adecuadas (lámina FEP/nFEP, filtrado de resina, plataforma, pantalla LCD, filtro de carbón, eje Z, IPA de lavado, desgaste UV/LCD).
 - **Mantenimiento predictivo** con tareas propias de cada marca.
 - **Piezas de desgaste** (boquillas, placas, correas…) con alertas de stock, vinculadas a las tareas de mantenimiento.
 - **Calibraciones** (flujo, pressure advance, temperaturas) por filamento e impresora.
 
 @@@ Filament | Filamento
 # Filamento
+
+## Resina (beta) 🧪
+La categoría de la barra lateral ahora se llama **Materiales** y agrupa dos páginas: **Filamento** (inventario de bobinas) y **Resina** *(beta)*. El inventario de resina es **manual**: añade tus botes (nombre, marca, tipo, color, volumen, restante, precio, ubicación, notas) y usa el botón «Usar» para restar un volumen en ml. Stellio aún no enlaza los botes con las impresoras de resina y no descuenta nada automáticamente. Función en beta.
+
+Como con el filamento, el recordatorio **«A pedir»** también funciona con la resina: una resina (marca + nombre + color, todos los botes juntos) entra en la lista cuando su total restante baja del umbral fijado en la página (200 ml por defecto, 0 = desactivado) o cuando marcas «A pedir» en un bote. También aparece en el widget «A pedir» del panel; **Pedir** abre enlaces de búsqueda a tus tiendas (el stock de resina no se comprueba automáticamente) y **Ya pedido** aplaza el recordatorio 14 días.
 
 ## Fuentes de inventario
 | Fuente | Detalles |
@@ -554,6 +576,8 @@ Diagnóstico **adaptativo** de un fallo de impresión:
 2. Stellio hace **una pregunta cada vez**, sin límite, y reduce en directo una lista de hipótesis (añade nuevas si las primeras se descartan).
 3. Entrega un **diagnóstico final**.
 
+Desde la **pregunta 3**, el botón **Concluir y proponer una solución** da las causas más probables y pregunta «¿Este diagnóstico resolvió el problema?» (**Sí, resuelto** / **No, continuar la investigación**). El botón **Detener la investigación** permite abandonar en cualquier momento.
+
 Las conversaciones se guardan: vuelva a abrirlas o márquelas como resueltas.
 
 > ℹ️ Los resultados «Conseguido / Fallido» que valora en el historial mejoran las recomendaciones.
@@ -594,6 +618,8 @@ Visible cuando está marcada la opción *Activar las funciones de costes, presup
 - **Informe mensual** comparado con el mes anterior, exportable en PDF.
 - **Informe de impresión** compartible (imagen PNG) desde el historial.
 - **Energía** real por enchufe inteligente.
+- **Horas valle / punta**: en *Ajustes → Electricidad*, introduce dos precios por kWh y tus franjas valle (p. ej. `22:00-06:00`, fin de semana opcional). El **coste real** de las impresiones medidas los tiene en cuenta, un balance de 30 días muestra el **ahorro posible**, un simulador compara «ahora» con «próxima franja valle», y un aviso te dice cuándo empiezan las horas valle con tareas en espera. Stellio nunca inicia una impresión por sí solo.
+- **Por qué fallan mis impresiones**: en *Estadísticas*, tasa de fallos por motivo, material, impresora, perfil de slicer, día de la semana y momento del día, archivos que más fallan y pistas con cifras (p. ej. «PETG: 45 % de fallos frente a 12 % de media»). Valora tus impresiones en el historial para alimentarla.
 
 
 
@@ -822,7 +848,7 @@ stellio/
 ├── packaging/         launcher.py, instalador de Windows (.iss), permisos de macOS
 ├── languages/         Traducciones (8 idiomas) y changelog.json
 ├── tests/  tools/     Pruebas pytest, herramientas de mantenimiento
-├── release-notes/     notes_version_X.Y.Z.txt
+├── release-notes/     notes.txt
 ├── install-pi.sh      Instalación Raspberry Pi / Linux
 └── stellio-lxc.sh     Instalación Proxmox LXC
 ```

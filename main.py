@@ -27,6 +27,7 @@ def _portable_data_dir():
 
 
 def _early_extra_libs_dir():
+    # Même logique que get_data_path() (défini plus bas), sans créer de dossier.
     env_override = os.environ.get('STELLIO_DATA_DIR')
     if env_override:
         base = env_override
@@ -41,6 +42,10 @@ def _early_extra_libs_dir():
 
 _EXTRA_LIBS_DIR = _early_extra_libs_dir()
 
+# ── Splash précoce ───────────────────────────────────────────────────────────
+# Affiché dès les premières millisecondes, AVANT la vérification des modules et les gros
+# imports (trimesh, numpy, pyrender...). Il tourne dans son propre thread : tous les objets Tk y
+# sont créés ET détruits, pendant que le reste du démarrage continue dans le thread principal.
 import threading as _early_threading
 import queue as _early_queue
 
@@ -4455,7 +4460,7 @@ def _stop_elegoo_cc2_connection(pid):
         conn.stop()
 
 
-HTTP_PRINTER_TYPES = ('klipper', 'octoprint', 'prusalink')
+HTTP_PRINTER_TYPES = ('klipper', 'octoprint', 'prusalink', 'duet', 'repetier')
 _printer_ext_urls = {}        # IP locale -> adresse externe (https://imprimante.mondomaine.fr)
 _printer_ext_loaded = False
 _printer_reach_cache = {}     # (ip, port) -> (instant, joignable)
@@ -4535,6 +4540,14 @@ def _pbase_is_external(ip, port=None):
     return _pbase(ip, port) != f"http://{ip}" + (f":{port}" if port else "")
 
 
+def _extra_printer_port(ptype, cfg):
+    """Port HTTP des imprimantes Duet (80, sans suffixe) et Repetier-Server (3344 par défaut)."""
+    port = (cfg or {}).get('port')
+    if ptype == 'repetier':
+        return port or 3344
+    return port if port and str(port) != '80' else None
+
+
 class PrinterManager:
     def __init__(self):
         self.clients = {}
@@ -4559,6 +4572,12 @@ class PrinterManager:
                 cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
                 r = _bambuddy_get(ip, api_key, cfg, f"/printers/{_bambuddy_printer_id(cfg)}/status", timeout=5)
                 return r.status_code == 200
+            elif ptype in ('formlabs', 'anycubic_photon'):   # v1.1.4 (bêta) : imprimantes résine
+                cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
+                return resin_printers.connect(ptype, ip, api_key, cfg)
+            elif ptype in ('duet', 'repetier'):   # v1.1.3 : Duet (RepRapFirmware) et Repetier-Server
+                cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
+                return printers_extra.connect(ptype, _pbase(ip, _extra_printer_port(ptype, cfg)), api_key, cfg)
             elif ptype == 'klipper':
                 port = db_row['config'].get('port', '7125') if db_row['config'] else '7125'
                 url = f"{_pbase(ip, port)}/server/info"
@@ -4574,7 +4593,7 @@ class PrinterManager:
                         return True
                     time.sleep(0.2)
                 return conn.is_connected
-            elif ptype == 'elegoo_sdcp':
+            elif ptype in ('elegoo_sdcp', 'chitu_sdcp'):
                 if not HAS_WEBSOCKET: return False
                 conn = _ensure_elegoo_sdcp_connection(db_row)
                 if not conn:
@@ -4820,11 +4839,23 @@ class PrinterManager:
                     import traceback
                     traceback.print_exc()
                     return {**default_result, 'status': 'error'}
+            elif ptype in ('formlabs', 'anycubic_photon'):   # v1.1.4 (bêta) : imprimantes résine
+                cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
+                try:
+                    return resin_printers.status(ptype, ip, api_key, cfg)
+                except RuntimeError as e:
+                    return {**default_result, 'status': 'offline' if str(e) == 'unreachable' else 'error'}
+            elif ptype in ('duet', 'repetier'):   # v1.1.3
+                cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
+                try:
+                    return printers_extra.status(ptype, _pbase(ip, _extra_printer_port(ptype, cfg)), api_key, cfg)
+                except RuntimeError as e:
+                    return {**default_result, 'status': 'offline' if str(e) == 'unreachable' else 'error'}
             elif ptype == 'bambuddy':
                 return _bambuddy_status(db_row, default_result)
             elif ptype == 'bambu':
                 return self._get_bambu_status(db_row, default_result)
-            elif ptype == 'elegoo_sdcp':
+            elif ptype in ('elegoo_sdcp', 'chitu_sdcp'):
                 return self._get_elegoo_sdcp_status(db_row, default_result)
             elif ptype == 'elegoo_cc2':
                 return self._get_elegoo_cc2_status(db_row, default_result)
@@ -4982,6 +5013,9 @@ class PrinterManager:
                 except Exception as e:
                     app_logger.info(f"[Klipper Upload] Erreur: {e}")
                     return False
+            elif ptype in ('duet', 'repetier'):   # v1.1.3
+                cfg = db_row['config'] if isinstance(db_row['config'], dict) else {}
+                return printers_extra.upload(ptype, _pbase(ip, _extra_printer_port(ptype, cfg)), api_key, cfg, file_path)
             elif ptype == 'bambu':
                 return True
         except Exception as e:
@@ -5643,6 +5677,43 @@ def save_file_cache(files, sources):
             _atomic_replace(tmp_path, CACHE_FILE)
     except Exception as e:
         app_logger.info(f"[WARN] Échec sauvegarde cache: {e}")
+
+_recently_deleted = {}
+_recently_deleted_lock = threading.Lock()
+_RECENTLY_DELETED_TTL = 600
+
+
+def note_deleted_paths(paths):
+    """Mémorise les fichiers qu'on vient de supprimer : un scan commencé avant la suppression (partage réseau lent)
+    ne doit pas les remettre dans la bibliothèque."""
+    now = time.time()
+    with _recently_deleted_lock:
+        for p in paths or []:
+            if p:
+                _recently_deleted[str(p).replace('\\', '/')] = now
+        for k in [k for k, t in _recently_deleted.items() if now - t > _RECENTLY_DELETED_TTL]:
+            _recently_deleted.pop(k, None)
+
+
+def drop_recently_deleted(files):
+    """Retire de la liste les fichiers supprimés récemment et réellement absents du disque (une restauration les ramène)."""
+    with _recently_deleted_lock:
+        if not _recently_deleted:
+            return files
+        suspects = set(_recently_deleted)
+    out = []
+    for f in files:
+        p = (f.get('path') or '').replace('\\', '/')
+        if p in suspects:
+            try:
+                if os.path.exists(p):
+                    out.append(f)
+            except Exception:
+                pass
+            continue
+        out.append(f)
+    return out
+
 
 def invalidate_cache():
     try:
@@ -8340,6 +8411,10 @@ def index():
 def ui_script():
     return send_file(_ui_file('script.js'), mimetype='application/javascript')
 
+
+@app.route('/v113.js')
+def ui_v113_script():
+    return send_file(_ui_file('v113.js'), mimetype='application/javascript')
 
 @app.route('/management.js')
 def ui_management_script():
@@ -12065,6 +12140,7 @@ def api_get_files():
 
         if not isinstance(cached_files, list):
             cached_files = []
+        cached_files = drop_recently_deleted(cached_files)
 
         try:
             for f in cached_files:
@@ -12662,12 +12738,28 @@ def api_restore_trash_batch_core(batch_id):
                 if not os.path.exists(trashed_path):
                     errors.append({"path": original_path, "error": "Fichier introuvable en corbeille"})
                     continue
-                os.makedirs(os.path.dirname(original_path), exist_ok=True)
-                dest_path = original_path
-                if os.path.exists(dest_path):
-                    base, ext = os.path.splitext(original_path)
-                    dest_path = f"{base}_restauré{ext}"
-                shutil.move(trashed_path, dest_path)
+                _unc_orig = original_path.startswith('//') or original_path.startswith('\\\\')
+                if _unc_orig:
+                    # partage réseau : écriture avec les identifiants de la source (copie depuis la corbeille locale)
+                    _kw = _smb_kwargs_for_path(session['user_id'], original_path)
+                    if _kw is None:
+                        raise PermissionError("Source réseau introuvable")
+                    _smb = original_path.replace('\\', '/')
+                    smbclient.makedirs(_smb.rsplit('/', 1)[0], exist_ok=True, **_kw)
+                    dest_path = _smb
+                    if smbclient.path.exists(dest_path, **_kw):
+                        base, ext = os.path.splitext(_smb)
+                        dest_path = f"{base}_restauré{ext}"
+                    with open(trashed_path, 'rb') as _src, smbclient.open_file(dest_path, mode='wb', **_kw) as _dst:
+                        shutil.copyfileobj(_src, _dst)
+                    os.remove(trashed_path)
+                else:
+                    os.makedirs(os.path.dirname(original_path), exist_ok=True)
+                    dest_path = original_path
+                    if os.path.exists(dest_path):
+                        base, ext = os.path.splitext(original_path)
+                        dest_path = f"{base}_restauré{ext}"
+                    shutil.move(trashed_path, dest_path)
                 restored.append(os.path.basename(dest_path))
                 journal_log('restore', os.path.basename(dest_path), trashed_path, dest_path, batch_id=batch_id)
             except Exception as e:
@@ -14194,6 +14286,42 @@ _SLICER_CANDIDATES = {
         'mac': ['Slic3r.app'],
         'linux': ['slic3r'],
     },
+    # --- Slicers résine (bêta) : chemins d'installation courants, non vérifiés sur toutes les versions ; à défaut, choisir le logiciel à la main
+    'chitubox': {
+        'name': 'CHITUBOX',
+        'win': (["CHITUBOX*/CHITUBOX*.exe", "CHITUBOX/CHITUBOX*.exe", "CBD Tech/CHITUBOX*/CHITUBOX*.exe", "CHITUBOX Basic*/CHITUBOX*.exe"],
+                ['CHITUBOX.exe', 'CHITUBOX64.exe']),
+        'mac': ['CHITUBOX.app', 'CHITUBOX*.app'],
+        'linux': ['chitubox', 'CHITUBOX'],
+    },
+    'chituboxpro': {
+        'name': 'CHITUBOX Pro',
+        'win': (["CHITUBOX Pro*/CHITUBOXPro*.exe", "CHITUBOX Pro*/CHITUBOX Pro*.exe", "CHITUBOXPro*/CHITUBOXPro*.exe"],
+                ['CHITUBOXPro.exe', 'CHITUBOX Pro.exe']),
+        'mac': ['CHITUBOX Pro.app', 'CHITUBOXPro.app'],
+        'linux': ['chituboxpro'],
+    },
+    'photonworkshop': {
+        'name': 'Anycubic Photon Workshop',
+        'win': (["Anycubic Photon Workshop*/*Workshop*.exe", "Photon Workshop*/*Workshop*.exe", "AnycubicPhotonWorkshop*/*.exe",
+                 "Anycubic/Anycubic Photon Workshop*/*Workshop*.exe"],
+                ['AnycubicPhotonWorkshop.exe', 'Photon Workshop.exe', 'PhotonWorkshop.exe']),
+        'mac': ['Anycubic Photon Workshop.app', 'Photon Workshop.app', 'AnycubicPhotonWorkshop.app'],
+        'linux': ['photon-workshop', 'photonworkshop'],
+    },
+    'preform': {
+        'name': 'PreForm (Formlabs)',
+        'win': (["Formlabs/PreForm/PreForm.exe", "Formlabs/PreForm*/PreForm.exe", "PreForm*/PreForm.exe"], ['PreForm.exe']),
+        'mac': ['PreForm.app'],
+        'linux': ['PreForm', 'preform'],
+    },
+    'voxeldance': {
+        'name': 'Voxeldance Tango',
+        'win': (["Voxeldance*/Voxeldance*.exe", "Voxeldance*/Tango*.exe", "Voxeldance Tango*/*.exe"],
+                ['VoxeldanceTango.exe', 'Voxeldance Tango.exe']),
+        'mac': ['Voxeldance Tango.app', 'Voxeldance*.app'],
+        'linux': [],
+    },
     'kisslicer': {
         'name': 'KISSlicer',
         'win': (["KISSlicer*/KISSlicer.exe", "KISSlicer*/KISSlicer-x64.exe"],
@@ -14828,6 +14956,78 @@ _SLICER_LOAD_SETTINGS_FAMILIES = ('orcaslicer', 'bambustudio', 'qidistudio', 'el
 _SLICER_LOAD_INI_FAMILIES = ('prusaslicer', 'superslicer')
 
 
+def _normalize_hex_colour(value):
+    v = (str(value or '')).strip().lstrip('#')
+    if len(v) == 3 and re.fullmatch(r'[0-9a-fA-F]{3}', v):
+        v = ''.join(c * 2 for c in v)
+    return ('#' + v[:6].upper()) if re.fullmatch(r'[0-9a-fA-F]{6}([0-9a-fA-F]{2})?', v) else None
+
+
+def _assigned_spool_for_files(file_paths, user_id):
+    """Bobine assignée aux fichiers (couleur, matière). Pour plusieurs fichiers, renvoie la valeur commune
+    ou None si les bobines diffèrent (un seul lancement du slicer = un seul jeu de filaments)."""
+    found = set()
+    try:
+        conn = get_db()
+        for fp in file_paths:
+            row = conn.execute("SELECT material, color_hex FROM filament_assignments WHERE file_path=? AND user_id=?",
+                               (str(fp).replace('\\', '/'), user_id)).fetchone()
+            found.add(((row['material'] or '').strip(), _normalize_hex_colour(row['color_hex'])) if row else (None, None))
+        conn.close()
+    except Exception as e:
+        app_logger.debug(f"[Slicer] Lecture de la bobine assignée ignorée : {e}")
+        return None, None
+    return next(iter(found)) if len(found) == 1 else (None, None)
+
+
+def _filament_profiles_with_colour(filament_paths, slicer_family, colour_hex):
+    """Copies temporaires des profils de filament avec la couleur de la bobine choisie (le slicer la reprend à l'ouverture).
+    Renvoie la liste des chemins à charger ; en cas d'échec, le profil d'origine est conservé."""
+    colour = _normalize_hex_colour(colour_hex)
+    if not colour or not filament_paths:
+        return filament_paths
+    out_dir = os.path.join(DATA_DIR, 'slicer_tmp')
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+    except Exception:
+        return filament_paths
+    result = []
+    for src in filament_paths:
+        try:
+            tag = hashlib.sha1((src + colour).encode('utf-8')).hexdigest()[:10]
+            if slicer_family in _SLICER_LOAD_INI_FAMILIES:
+                with open(src, 'r', encoding='utf-8', errors='replace') as f:
+                    text = f.read()
+                line = f'filament_colour = {colour[:7]}'
+                if re.search(r'^\s*filament_colour\s*=.*$', text, re.M):
+                    text = re.sub(r'^\s*filament_colour\s*=.*$', line, text, flags=re.M)
+                else:
+                    text = text.rstrip('\n') + '\n' + line + '\n'
+                dst = os.path.join(out_dir, f'filament_{tag}.ini')
+                with open(dst, 'w', encoding='utf-8') as f:
+                    f.write(text)
+            else:
+                with open(src, 'r', encoding='utf-8') as f:
+                    prof = json.load(f)
+                if not isinstance(prof, dict):
+                    raise ValueError('profil JSON inattendu')
+                prof['filament_colour'] = [colour[:7]]
+                name = str(prof.get('name') or os.path.splitext(os.path.basename(src))[0])
+                new_name = f"{name} ({colour[:7]})"
+                prof['name'] = new_name
+                if isinstance(prof.get('filament_settings_id'), list):
+                    prof['filament_settings_id'] = [new_name]
+                dst = os.path.join(out_dir, f'filament_{tag}.json')
+                with open(dst, 'w', encoding='utf-8') as f:
+                    json.dump(prof, f, ensure_ascii=False, indent=2)
+            result.append(dst)
+        except Exception as e:
+            app_logger.warning(f"[Slicer] Couleur de bobine non appliquée au profil {os.path.basename(src)} : {e}")
+            result.append(src)
+    return result
+
+
+
 def _resolve_slicer_profile_paths(slicer_family, printer_id, material_type=None, process_profile_id=None):
     if not slicer_family:
         return [], [], []
@@ -14889,20 +15089,50 @@ def _resolve_slicer_profile_paths(slicer_family, printer_id, material_type=None,
     return settings_paths, filament_paths, matched_ids
 
 
+# Slicers dédiés à la résine (bêta) ; Lychee lit aussi les formats résine. Utilisés pour les imprimantes résine sans slicer choisi.
+RESIN_SLICER_IDS = ('chitubox', 'chituboxpro', 'photonworkshop', 'preform', 'voxeldance', 'lycheeslicer')
+RESIN_PRINTER_TYPES = ('formlabs', 'anycubic_photon', 'chitu_sdcp')
+
+
+def _is_resin_printer_row(ptype, name=''):
+    return ptype in RESIN_PRINTER_TYPES or (
+        ptype == 'elegoo_sdcp' and bool(re.search(r'saturn|mars|jupiter|resin|r[ée]sine', name or '', re.I)))
+
+
+def _installed_resin_slicer_value():
+    """Valeur « slicer par défaut » du premier logiciel résine détecté (le préféré s'il en fait partie), sinon ''."""
+    try:
+        installed = [f for f in (get_cached_installed_slicers() or []) if f.get('id') in RESIN_SLICER_IDS]
+    except Exception:
+        return ''
+    for f in installed:
+        v = SLICER_ID_TO_DEFAULT_VALUE.get(f['id'])
+        if v:
+            return v
+    return ''
+
+
 def _slicer_for_printer(user_id, printer_id, fallback):
-    """v1.0.8 : slicer par défaut propre à l'imprimante (config.default_slicer) ; sinon celui des Paramètres."""
+    """v1.0.8 : slicer par défaut propre à l'imprimante (config.default_slicer) ; sinon celui des Paramètres.
+    v1.1.3 : imprimante résine sans slicer choisi → logiciel résine détecté sur la machine (CHITUBOX, Photon Workshop, PreForm…)."""
     pid = _safe_int(printer_id)
     if pid is None:
         return fallback
     try:
         conn = get_db()
         try:
-            row = conn.execute("SELECT config FROM printers WHERE id=? AND user_id=?", (pid, user_id)).fetchone()
+            row = conn.execute("SELECT config, type, name FROM printers WHERE id=? AND user_id=?", (pid, user_id)).fetchone()
         finally:
             conn.close()
         cfg = json.loads(row['config']) if row and row['config'] else {}
         ds = str(cfg.get('default_slicer') or '').strip()
-        return ds or fallback
+        if ds:
+            return ds
+        if row and _is_resin_printer_row(row['type'], row['name']):
+            resin = _installed_resin_slicer_value()
+            if resin:
+                return resin
+        return fallback
     except Exception:
         return fallback
 
@@ -15042,9 +15272,13 @@ def api_send_to_slicer():
             cmd = [slicer_path]
 
             if slicer_family and (printer_id or process_profile_id):
+                _spool_material, _spool_colour = _assigned_spool_for_files([file_path], session['user_id'])
+                if not material_type and _spool_material:
+                    material_type = _spool_material
                 settings_paths, filament_paths, matched_ids = _resolve_slicer_profile_paths(
                     slicer_family, printer_id, material_type, process_profile_id
                 )
+                filament_paths = _filament_profiles_with_colour(filament_paths, slicer_family, _spool_colour)
                 applied_profile_ids = matched_ids
                 if process_profile_id and process_profile_id in matched_ids and not data.get('slicer_profile_id'):
                     data['slicer_profile_id'] = process_profile_id   # journalisé dans l'historique d'impression
@@ -15178,9 +15412,13 @@ def api_slicer_send_batch():
         printer_id = data.get('printer_id')
         material_type = data.get('material_type')
         if slicer_family and printer_id:
+            _spool_material, _spool_colour = _assigned_spool_for_files(file_paths, session['user_id'])
+            if not material_type and _spool_material:
+                material_type = _spool_material
             settings_paths, filament_paths, matched_ids = _resolve_slicer_profile_paths(
                 slicer_family, printer_id, material_type
             )
+            filament_paths = _filament_profiles_with_colour(filament_paths, slicer_family, _spool_colour)
             applied_profile_ids = matched_ids
             if slicer_family in _SLICER_LOAD_SETTINGS_FAMILIES:
                 if settings_paths:
@@ -20505,7 +20743,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.1.2"
+CURRENT_VERSION = "1.1.3"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -20726,13 +20964,26 @@ def _fetch_expected_sha256(release_data, target_filename):
 
 SUPPORTED_UPDATE_LANGS = ('fr', 'en', 'de', 'es', 'it', 'pt', 'ja', 'zh')
 
+_RELEASE_LANG_TITLES = {'fr': 'Français', 'en': 'English', 'de': 'Deutsch', 'es': 'Español',
+                        'pt': 'Português', 'it': 'Italiano', 'zh': '中文', 'ja': '日本語'}
+
 def _extract_release_notes_for_lang(body, lang, fallback='en'):
+    """Ne garde dans le corps d'une release GitHub que la section de la langue demandée.
+    Deux formats : sections <!--fr--> (anciennes releases) ou, depuis la 1.1.2, « ### 🇫🇷 Français » et blocs
+    <details><summary><b>🇩🇪 Deutsch</b></summary> (voir tools/release_notes.py). Repli : fallback, puis le texte entier."""
     if not body:
         return body
     pattern = r"<!--{}-->\s*(.*?)(?=<!--\w{{2}}-->|\Z)"
     for candidate in (lang, fallback):
         match = re.search(pattern.format(re.escape(candidate)), body, re.DOTALL)
         if match:
+            return match.group(1).strip()
+    for candidate in (lang, fallback):
+        title = re.escape(_RELEASE_LANG_TITLES.get(candidate, candidate))
+        match = re.search(
+            r"(?:^###[ \t]+[^\n]*?" + title + r"[^\n]*\n|<summary>\s*<b>[^<]*?" + title + r"[^<]*</b>\s*</summary>)"
+            r"(.*?)(?=^###[ \t]|<details>|</details>|^Full changelog|\Z)", body, re.DOTALL | re.MULTILINE)
+        if match and match.group(1).strip():
             return match.group(1).strip()
     return body.strip()
 
@@ -22009,7 +22260,7 @@ def _resolve_printer_camera(printer, pid, host_url=''):
                         "name": "FlashForge Camera"
                     })
 
-        elif ptype == 'elegoo_sdcp':
+        elif ptype in ('elegoo_sdcp', 'chitu_sdcp'):
             conn = _ensure_elegoo_sdcp_connection(printer)
             if conn:
                 video_url, ack = conn.request_video()
@@ -23174,11 +23425,18 @@ def api_ollama_sos_print_next_question():
             f"Do NOT conclude. Keep investigating: ask a new question that explores something not yet checked, "
             f"and add new hypotheses if the current ones are exhausted or ruled out.\n"
         )
+    elif asked_count < 2:
+        instruction = (
+            "Do NOT conclude yet: it is too early. Ask the next clarifying question.\n"
+        )
     else:
         instruction = (
-            "There is no limit on the number of questions. Keep asking, one at a time, until ONE cause "
-            "clearly stands out and you are confident enough to propose a concrete fix. Conclude only then; "
-            "never conclude just because many questions were asked.\n"
+            "There is no limit on the number of questions, but you may conclude from now on (question 3 "
+            "and later). As soon as ONE cause stands out clearly enough (clearly the most likely, around "
+            "50% or more) to propose a concrete fix the user can try, conclude with STATUS: DONE: the "
+            "user will then be asked whether it solved the problem, and the investigation continues if it "
+            "did not. If no cause stands out yet, keep asking one question at a time. "
+            "Never conclude just because many questions were asked.\n"
         )
 
     prompt = (
@@ -28519,7 +28777,26 @@ SLICER_ID_TO_DEFAULT_VALUE = {
     'voxelizer': 'Voxelizer.exe',
     'slic3r': 'slic3r.exe',
     'kisslicer': 'KISSlicer.exe',
+    'chitubox': 'CHITUBOX.exe',
+    'chituboxpro': 'CHITUBOXPro.exe',
+    'photonworkshop': 'AnycubicPhotonWorkshop.exe',
+    'preform': 'PreForm.exe',
+    'voxeldance': 'VoxeldanceTango.exe',
 }
+
+
+@app.route('/api/slicers/installed', methods=['GET'])
+@login_required
+def api_slicers_installed():
+    """Logiciels de découpe détectés sur la machine ; `resin` = logiciel dédié résine (bêta), `default_value` = valeur du sélecteur de slicer."""
+    try:
+        installed = get_cached_installed_slicers(force=request.args.get('refresh') == '1') or []
+    except Exception as e:
+        app_logger.debug(f"[Slicers] Détection échouée: {e}")
+        installed = []
+    out = [{'id': f['id'], 'name': f['name'], 'default_value': SLICER_ID_TO_DEFAULT_VALUE.get(f['id']),
+            'resin': f['id'] in RESIN_SLICER_IDS} for f in installed]
+    return jsonify({'slicers': out, 'resin_default': _installed_resin_slicer_value() or None, 'beta_resin': True}), 200
 
 
 @app.route('/api/slicers/discover', methods=['GET'])
@@ -29100,6 +29377,24 @@ printer_dispatch.init(globals())
 
 digest.init(globals())
 
+# ── v1.1.3 : versions de modèle, tarif heures creuses, Obico, imprimantes Duet / Repetier, statistiques d'échecs, collections ──
+from modules import model_versions, energy_tariff, obico, printers_extra, failure_stats, collections_sets, merge_3mf, resin_printers, resin_inventory
+
+model_versions.init(globals())
+
+energy_tariff.init(globals())
+
+obico.init(globals())
+
+printers_extra.init(globals())
+resin_printers.init(globals())
+resin_inventory.init(globals())
+
+failure_stats.init(globals())
+
+collections_sets.init(globals())
+merge_3mf.init(globals())
+
 filament_weighing.init(globals())
 openprinttag.init(globals())
 open_filament_db.init(globals())
@@ -29205,6 +29500,9 @@ if __name__ in ('__main__', 'stellio_main'):
             _start_v104_worker()
             threading.Thread(target=_acct_models_auto_loop, daemon=True, name='stellio-acct-models').start()
             digest.start_worker()
+            energy_tariff.start_worker()
+            if obico._cfg()['enabled']:
+                obico.start_worker()
             _start_mqtt_publisher()
             threading.Thread(target=_startup_sync_slicer_profiles, daemon=True).start()
             threading.Thread(target=_auto_backup_scheduler, daemon=True).start()
@@ -29323,7 +29621,7 @@ if __name__ in ('__main__', 'stellio_main'):
                 if HAS_WEBSOCKET:
                     try:
                         conn_elg1 = get_db()
-                        elegoo_sdcp_printers = conn_elg1.execute("SELECT * FROM printers WHERE type = 'elegoo_sdcp'").fetchall()
+                        elegoo_sdcp_printers = conn_elg1.execute("SELECT * FROM printers WHERE type IN ('elegoo_sdcp', 'chitu_sdcp')").fetchall()
                         conn_elg1.close()
                         for p in elegoo_sdcp_printers:
                             _ensure_elegoo_sdcp_connection(parse_printer_config(p))
@@ -29683,6 +29981,7 @@ if __name__ in ('__main__', 'stellio_main'):
             if not _wv_recovered:
                 app_logger.info("[INFO] Ouverture de secours dans le navigateur par défaut...")
                 if _open_app_window_fallback(_desktop_url(SERVER_URL)):
+                    # La fenêtre « application » (Edge/Chrome) s'est fermée : on arrête Stellio proprement.
                     app_logger.info("[Window] Fenêtre de secours fermée : arrêt de Stellio.")
                     try:
                         _cleanup_before_exit()

@@ -7,17 +7,20 @@ Généré avec tools/split_module.py ; les tests importent ce module directement
 import hashlib
 import os
 import re
+import shutil
 import time
 import uuid
 
 _REQUIRED = (
     'THUMBNAILS_DIR',
+    'TRASH_DIR',
     'TRASH_UNDO_SECONDS',
     '_cleanup_empty_parent_dirs',
     '_get_source_root_paths',
     '_is_path_within_sources',
     '_move_file_to_trash',
     '_purge_expired_trash',
+    '_smb_kwargs_for_path',
     '_trash_registry',
     '_trash_registry_lock',
     '_trash_save_manifest',
@@ -25,25 +28,32 @@ _REQUIRED = (
     'app_logger',
     'get_db',
     'invalidate_cache',
+    'note_deleted_paths',
     'is_virtual_archive_path',
+    'journal_log',
     'jsonify',
     'login_required',
     'request',
     'session',
+    'smbclient',
     'split_virtual_archive_path',
 )
 _OPTIONAL = ()   # fournis seulement s'ils existent dans main.py (import facultatif)
-_OVERRIDABLE = ('hashlib', 'os', 're', 'time', 'uuid', )
+_OVERRIDABLE = ('hashlib', 'os', 're', 'shutil', 'time', 'uuid', )
 
 _MAIN = {}   # globals de main.py (vue vivante) : pour les noms définis plus tard, ex. _MAIN.get('SERVER_PORT')
 # Valeurs réelles posées par init() (None tant que le module n'est pas branché).
 THUMBNAILS_DIR = None
+TRASH_DIR = None
 TRASH_UNDO_SECONDS = None
 _cleanup_empty_parent_dirs = None
 _get_source_root_paths = None
 _is_path_within_sources = None
 _move_file_to_trash = None
 _purge_expired_trash = None
+_smb_kwargs_for_path = None
+journal_log = None
+smbclient = None
 _trash_registry = None
 _trash_registry_lock = None
 _trash_save_manifest = None
@@ -51,6 +61,7 @@ app = None
 app_logger = None
 get_db = None
 invalidate_cache = None
+note_deleted_paths = None
 is_virtual_archive_path = None
 jsonify = None
 login_required = None
@@ -205,6 +216,63 @@ def _follow_file_origin(old_path, new_path):
     except Exception as e:
         app_logger.warning(f"[ORIGIN] Suivi de l'origine ignoré ({old_path} → {new_path}): {e}")
 
+# ── Fichiers sur un partage réseau (SMB) : accès avec les identifiants de la source, pas ceux de la session système ──
+def _is_unc(path):
+    return path.startswith('//') or path.startswith('\\\\')
+
+
+def _smb_creds(path):
+    kw = _smb_kwargs_for_path(session['user_id'], path.replace('\\', '/'))
+    if kw is None:
+        raise PermissionError("Source réseau introuvable pour ce fichier")
+    return kw
+
+
+def _is_existing_file(path):
+    if _is_unc(path):
+        try:
+            return bool(smbclient.path.isfile(path.replace('\\', '/'), **_smb_creds(path)))
+        except PermissionError:
+            raise
+        except Exception:
+            return False
+    return os.path.exists(path) and os.path.isfile(path)
+
+
+def _drop_thumbs(norm_path):
+    thumb_filename = hashlib.md5(norm_path.replace('\\', '/').encode()).hexdigest()
+    for ext in ['.webp', '.png', '.jpg']:
+        thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + ext)
+        if os.path.exists(thumb_path):
+            try:
+                os.remove(thumb_path)
+            except Exception as e:
+                app_logger.warning(f"[DELETE] Erreur suppression miniature: {e}")
+
+
+def _trash_any(path, batch_id):
+    """Déplace un fichier vers la corbeille de Stellio (local ou partage réseau : copie locale puis suppression sur le partage)."""
+    if not _is_unc(path):
+        return _move_file_to_trash(path, batch_id)
+    kw = _smb_creds(path)
+    smb_path = path.replace('\\', '/')
+    batch_dir = os.path.join(TRASH_DIR, batch_id)
+    os.makedirs(batch_dir, exist_ok=True)
+    filename = os.path.basename(smb_path)
+    base, ext = os.path.splitext(filename)
+    trashed = os.path.join(batch_dir, filename)
+    n = 1
+    while os.path.exists(trashed):
+        trashed = os.path.join(batch_dir, f"{base}_{n}{ext}")
+        n += 1
+    with smbclient.open_file(smb_path, mode='rb', **kw) as src, open(trashed, 'wb') as dst:
+        shutil.copyfileobj(src, dst)
+    smbclient.remove(smb_path, **kw)
+    journal_log('delete', filename, smb_path, trashed, batch_id=batch_id)
+    return trashed
+
+
+
 def api_delete_file():
     try:
         _purge_expired_trash()
@@ -222,30 +290,18 @@ def api_delete_file():
 
         file_path = file_path.replace('/', '\\') if os.name == 'nt' else file_path.replace('\\', '/')
 
-        if not os.path.exists(file_path):
+        if not _is_existing_file(file_path):
             return jsonify({"error": "Fichier introuvable"}), 404
-        if not os.path.isfile(file_path):
-            return jsonify({"error": "Le chemin n'est pas un fichier"}), 400
 
         if not _is_path_within_sources(file_path, session['user_id']):
             app_logger.warning(f"[SECURITY] Tentative de suppression hors sources: {file_path}")
             return jsonify({"error": "Ce fichier n'appartient à aucune source configurée"}), 403
 
-        filename = os.path.basename(file_path)
-        normalized_path = file_path.replace('\\', '/')
-        thumb_filename = hashlib.md5(normalized_path.encode()).hexdigest()
-
-        for ext in ['.webp', '.png', '.jpg']:
-            thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + ext)
-            if os.path.exists(thumb_path):
-                try:
-                    os.remove(thumb_path)
-                    app_logger.info(f"[DELETE] Miniature supprimée: {thumb_filename}{ext}")
-                except Exception as e:
-                    app_logger.warning(f"[DELETE] Erreur suppression miniature: {e}")
+        filename = os.path.basename(file_path.replace('\\', '/'))
 
         batch_id = uuid.uuid4().hex
-        trashed_path = _move_file_to_trash(file_path, batch_id)
+        trashed_path = _trash_any(file_path, batch_id)
+        _drop_thumbs(file_path)      # les miniatures ne sont retirées qu'une fois le fichier réellement supprimé
         with _trash_registry_lock:
             _trash_registry[batch_id] = {
                 "created_at": time.time(),
@@ -256,10 +312,12 @@ def api_delete_file():
         app_logger.info(f"[DELETE] ✅ Fichier déplacé vers la corbeille: {filename} (lot {batch_id})")
 
         try:
-            _cleanup_empty_parent_dirs(file_path, stop_at_paths=_get_source_root_paths(session['user_id']))
+            if not _is_unc(file_path):
+                _cleanup_empty_parent_dirs(file_path, stop_at_paths=_get_source_root_paths(session['user_id']))
         except Exception as e:
             app_logger.warning(f"[DELETE] Nettoyage dossier vide ignoré: {e}")
 
+        note_deleted_paths([file_path])
         invalidate_cache()
 
         return jsonify({
@@ -302,7 +360,7 @@ def api_delete_files_batch():
                     continue
 
                 norm_path = file_path.replace('/', '\\') if os.name == 'nt' else file_path.replace('\\', '/')
-                if not os.path.exists(norm_path) or not os.path.isfile(norm_path):
+                if not _is_existing_file(norm_path):
                     errors.append({"path": file_path, "error": "Fichier introuvable"})
                     continue
 
@@ -311,22 +369,14 @@ def api_delete_files_batch():
                     errors.append({"path": file_path, "error": "N'appartient à aucune source configurée"})
                     continue
 
-                filename = os.path.basename(norm_path)
-                normalized_path = norm_path.replace('\\', '/')
-                thumb_filename = hashlib.md5(normalized_path.encode()).hexdigest()
-                for ext in ['.webp', '.png', '.jpg']:
-                    thumb_path = os.path.join(THUMBNAILS_DIR, thumb_filename + ext)
-                    if os.path.exists(thumb_path):
-                        try:
-                            os.remove(thumb_path)
-                        except Exception as e:
-                            app_logger.warning(f"[DELETE] Erreur suppression miniature: {e}")
-
-                trashed_path = _move_file_to_trash(norm_path, batch_id)
+                filename = os.path.basename(norm_path.replace('\\', '/'))
+                trashed_path = _trash_any(norm_path, batch_id)
+                _drop_thumbs(norm_path)      # miniatures retirées seulement si la suppression a réussi
                 trash_entries.append({"original": norm_path, "trashed": trashed_path})
                 deleted.append(filename)
                 try:
-                    _cleanup_empty_parent_dirs(norm_path, stop_at_paths=source_roots)
+                    if not _is_unc(norm_path):
+                        _cleanup_empty_parent_dirs(norm_path, stop_at_paths=source_roots)
                 except Exception as e:
                     app_logger.warning(f"[DELETE] Nettoyage dossier vide ignoré: {e}")
             except PermissionError:
@@ -335,6 +385,7 @@ def api_delete_files_batch():
                 errors.append({"path": file_path, "error": str(e)})
 
         if deleted:
+            note_deleted_paths([e['original'] for e in trash_entries])
             invalidate_cache()
             app_logger.info(f"[DELETE] ✅ {len(deleted)} fichier(s) déplacé(s) vers la corbeille (lot {batch_id})")
             with _trash_registry_lock:

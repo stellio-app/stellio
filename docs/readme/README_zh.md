@@ -113,7 +113,7 @@
 - 📐 **可打印性分析**（悬垂检测）与**推荐摆放方向**（悬垂更少，并显示与热床的接触率）
 - 🎯 基于几何形状与打印成功历史的**切片配置推荐**
 - ⏱️ 切片前的**打印时间预估**
-- 🩺 **S.O.S Print**：自适应、逐步进行的打印失败诊断——Stellio 每次只问一个问题，根据您的回答逐步缩小假设列表（不限问题数量：会补充新的假设，回答“仍未解决”后继续排查），最终给出诊断结果；随时支持照片分析，对话会被保存（可重新打开、标记为已解决） ⚠️ AI 并非 100% 可靠，可能出错：其假设只是需要核实的线索。
+- 🩺 **S.O.S Print**：自适应、逐步进行的打印失败诊断——Stellio 每次只问一个问题，根据您的回答逐步缩小假设列表（不限问题数量：会补充新的假设，回答“仍未解决”后继续排查），最终给出诊断结果；随时支持照片分析，对话会被保存（可重新打开、标记为已解决） ⚠️ AI 并非 100% 可靠，可能出错：其假设只是需要核实的线索。 从**第 3 个问题**起，“**结束并给出解决方案**”按钮会给出最可能的原因，并询问“此诊断解决问题了吗？”（**是的，已解决** / **没有，继续诊断**）。“**停止诊断**”按钮可随时放弃。
 
 ### 🖨️ 打印机管理
 - 🔌 支持 **OctoPrint**、**Klipper/Moonraker**、**Bambu Lab**（MQTT）、**Creality**（WebSocket）、**FlashForge**、**Elegoo**（SDCP）和 **PrusaLink**
@@ -130,7 +130,8 @@
 - 🎛️ **校准数据**：按耗材和打印机保存 flow、pressure advance、温度等，并在发送到切片软件的窗口中调用
 - 👥 **轻量协作模式**：可看到其他已连接设备是否正在查看某个文件，并通过提醒避免误将同一文件两次发送到切片软件
 
-### 🧵 耗材管理
+### 🧵 材料：耗材与树脂
+- 🧪 **树脂库存（测试版）**：侧边栏分类现为**材料**（耗材 + 树脂）。手动添加树脂瓶（品牌、类型、颜色、容量、剩余量、价格、存放位置），按 ml 扣除用量，并享有与耗材相同的**“待补货”**提醒（低库存阈值、手动勾选、商店搜索链接、“已订购”），同样显示在仪表盘小组件中。尚未与打印机关联，不会自动扣减
 - 🔗 **Spoolman** 集成（卷轴管理服务器），支持在局域网中自动发现
 - 🟠 支持 **Bambu Lab AMS**（插槽读取）
 - 🟢 支持 **Creality CFS**
@@ -154,6 +155,8 @@
 
 ### 🧩 高级工具
 - 🎨 **自动排版嵌套**（rectpack 或通过 shapely 计算真实轮廓）
+- 🧩 **合并为 3MF**：选择多个模型（STL、3MF、OBJ 等），Stellio 会生成一个 3MF 文件——全部放得下则为单个盘，否则生成多盘文件（结构兼容 Bambu Studio / OrcaSlicer；PrusaSlicer 会把所有零件一起显示）。可自选文件名和保存文件夹（支持网络共享，可新建文件夹），完成后 Stellio 会询问是删除还是保留原始文件。
+- 🖌️ **耗材盘颜色传给切片软件**：发送时，所选耗材盘的颜色和材料会应用到 OrcaSlicer、Bambu Studio 或 PrusaSlicer 加载的耗材配置（需要已导入并关联到打印机的耗材配置；批量发送时仅当所有耗材盘相同才应用颜色）。
 - 🔧 **网格修复**（trimesh + pymeshfix），提供**修复前后对比**（水密性、三角面数、顶点数、大小）
 - 🔄 **格式转换器**（STL ↔ 3MF ↔ OBJ）
 - 🛡️ **完整性检查**（损坏/缺失文件）
@@ -319,6 +322,7 @@ Stellio 可自动检测：
 - ✅ ideaMaker
 - ✅ FlashPrint
 - ✅ Lychee Slicer
+- ✅ CHITUBOX / CHITUBOX Pro / Anycubic Photon Workshop / PreForm / Voxeldance Tango *（树脂，测试版）*
 - ✅ CraftWare
 - ✅ MatterControl
 - ✅ MakerBot Print
@@ -337,6 +341,9 @@ Stellio 可自动检测：
 | **FlashForge** | Adventurer 5M / 5M Pro · AD5X | 专有 API：监控、UDP 自动发现 |
 | **Klipper / Moonraker** | 任何运行 Klipper 的机器（Voron 等） | HTTP：监控、上传、摄像头、精确打印时长 |
 | **OctoPrint** | 任何由 OctoPrint 控制的打印机 | HTTP：监控、上传、摄像头 |
+| **Duet / RepRapFirmware** | 任何 Duet 2/3 主板 | HTTP：监控、上传 |
+| **Repetier-Server** | 任何由 Repetier-Server 管理的打印机 | HTTP：监控、上传 |
+| **树脂（测试版）** 🧪 | Formlabs（Web API）· Anycubic Photon Wi-Fi · Chitubox / Phrozen / Uniformation (SDCP) | 仅监控，测试版——真实硬件未充分测试 · 维护（FEP、料盒、LCD…） |
 
 > 所列型号是 Stellio「添加打印机」表单中提供的型号。使用相同协议的其他型号通常也能工作，但并未全部测试——如果您的打印机能用或不能用，请[在 GitHub 上告诉我们](https://github.com/stellio-app/stellio/issues)。
 
@@ -385,7 +392,7 @@ stellio/
 ├── main.py             # Flask + 桌面端后端
 ├── interface/              # index.html, script.js, style.css (UI)
 ├── packaging/              # launcher.py, installer (.iss), macOS entitlements
-├── release-notes/          # notes_version_X.Y.Z.txt (release texts)
+├── release-notes/          # notes.txt (release text, replaced at each release)
 ├── tests/  tools/          # pytest tests, maintenance tools (incl. stellio_manager.bat)
 ├── check_deps.py       # 自我修复式依赖检查工具
 ├── modules/            # 从 main.py 拆分出的模块 (print_session, share_link, timelapse, mqtt_publisher…)

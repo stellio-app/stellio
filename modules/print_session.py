@@ -325,6 +325,14 @@ def _v104_record_energy(sess, energy_wh, by, duration_s):
         price = 0.0
     kwh = energy_wh / 1000.0
     cost = round(kwh * price, 4) if price > 0 else None
+    try:   # v1.1.3 : tarif heures creuses / pleines -> coût réel selon l'heure de l'impression
+        from modules import energy_tariff as _et
+        _cfg = _et.get_config(settings)
+        if _cfg['enabled'] and kwh > 0:
+            cost = _et.cost_for_session(sess['start'], duration_s, kwh, _cfg)[0]
+            price = round(cost / kwh, 4)
+    except Exception:
+        pass
     hours = duration_s / 3600.0 if duration_s else 0
     avg_w = round(energy_wh / hours, 1) if hours > 0 else None
     conn = get_db()

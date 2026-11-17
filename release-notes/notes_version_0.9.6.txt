@@ -1,0 +1,24 @@
+<!--fr-->
+✓ Mémoire : les miniatures dont le rendu dépasse le délai ne s'empilent plus en arrière-plan (elles occupaient CPU et mémoire pendant que les suivantes démarraient, jusqu'à saturer la RAM sur de très grosses bibliothèques de fichiers lourds) : elles sont comptées, s'arrêtent d'elles-mêmes dès que possible, et la génération attend qu'elles se terminent avant de continuer
+✓ Miniatures : un fichier dont le rendu dépasse le délai n'est plus relancé en boucle (il gardait sa miniature de remplacement, mais le contrôle de couverture le remettait en file à chaque passage, pour le même échec) ; les fichiers de 20 Mo et plus sont rendus un à la fois pour ne plus saturer la mémoire d'une grosse bibliothèque
+<!--en-->
+✓ Memory: thumbnail renders that exceed their time limit no longer pile up in the background (they kept using CPU and memory while the next ones started, which could exhaust RAM on very large libraries of heavy files): they are now counted, stop on their own as soon as possible, and generation waits for them to finish before continuing
+✓ Thumbnails: a file whose render exceeds its time limit is no longer retried in a loop (it kept its placeholder thumbnail, but the coverage check put it back in the queue on every pass, with the same failure each time); files of 20 MB and more are rendered one at a time so a large library no longer exhausts memory
+<!--de-->
+✓ Speicher: Vorschaubilder, deren Rendering das Zeitlimit überschreitet, stapeln sich nicht mehr im Hintergrund (sie belegten CPU und Speicher, während die nächsten starteten, und konnten bei sehr großen Bibliotheken mit schweren Dateien den Arbeitsspeicher erschöpfen): Sie werden gezählt, beenden sich so früh wie möglich selbst, und die Erzeugung wartet auf ihr Ende, bevor sie fortfährt
+✓ Vorschaubilder: Eine Datei, deren Rendering das Zeitlimit überschreitet, wird nicht mehr in einer Schleife neu gestartet (sie behielt ihr Ersatzbild, aber die Abdeckungsprüfung stellte sie bei jedem Durchlauf wieder in die Warteschlange, mit demselben Fehlschlag); Dateien ab 20 MB werden nacheinander gerendert, damit eine große Bibliothek den Speicher nicht mehr erschöpft
+<!--es-->
+✓ Memoria: las miniaturas cuyo renderizado supera el tiempo límite ya no se acumulan en segundo plano (seguían usando CPU y memoria mientras empezaban las siguientes, lo que podía agotar la RAM en bibliotecas muy grandes de archivos pesados): ahora se cuentan, se detienen solas lo antes posible y la generación espera a que terminen antes de continuar
+✓ Miniaturas: un archivo cuyo renderizado supera el tiempo límite ya no se reintenta en bucle (conservaba su miniatura provisional, pero la comprobación de cobertura lo volvía a poner en cola en cada pasada, con el mismo fallo); los archivos de 20 MB o más se renderizan de uno en uno para que una biblioteca grande no agote la memoria
+<!--pt-->
+✓ Memória: as miniaturas cuja renderização excede o tempo limite já não se acumulam em segundo plano (continuavam a usar CPU e memória enquanto as seguintes começavam, o que podia esgotar a RAM em bibliotecas muito grandes de ficheiros pesados): passam a ser contadas, param sozinhas assim que possível e a geração aguarda que terminem antes de continuar
+✓ Miniaturas: um ficheiro cuja renderização excede o tempo limite já não é repetido em ciclo (mantinha a miniatura provisória, mas a verificação de cobertura voltava a colocá-lo na fila em cada passagem, com a mesma falha); os ficheiros de 20 MB ou mais são renderizados um de cada vez para que uma biblioteca grande não esgote a memória
+<!--it-->
+✓ Memoria: le miniature il cui rendering supera il tempo limite non si accumulano più in background (continuavano a usare CPU e memoria mentre partivano le successive, fino a saturare la RAM su librerie molto grandi di file pesanti): ora vengono contate, si fermano da sole appena possibile e la generazione attende che finiscano prima di continuare
+✓ Miniature: un file il cui rendering supera il tempo limite non viene più ritentato in ciclo (manteneva la miniatura provvisoria, ma il controllo di copertura lo rimetteva in coda a ogni passaggio, con lo stesso fallimento); i file da 20 MB in su vengono renderizzati uno alla volta così una grande libreria non esaurisce più la memoria
+<!--zh-->
+✓ 内存：渲染超时的缩略图不再在后台堆积（它们在后续缩略图开始时仍占用 CPU 和内存，在包含大量大文件的超大型库中可能耗尽内存）：现在会被计数，并尽快自行停止，生成流程会等待它们结束后再继续
+✓ 缩略图：渲染超时的文件不再被循环重试（它保留了占位缩略图，但覆盖率检查每轮都会把它重新放回队列，结果每次都一样）；20 MB 及以上的文件改为逐个渲染，大型库不再耗尽内存
+<!--ja-->
+✓ メモリ：レンダリングが制限時間を超えたサムネイルがバックグラウンドに積み重ならなくなりました（次のサムネイルが始まっても CPU とメモリを使い続け、重いファイルが非常に多いライブラリでは RAM を使い切ることがありました）。これらを数えて可能な限り早く自動停止し、完了するまで生成を待機してから続行します
+✓ サムネイル：レンダリングが制限時間を超えたファイルを繰り返し再試行しなくなりました（代替サムネイルは保持されていましたが、カバレッジ確認が毎回キューに戻し、同じ失敗を繰り返していました）。20 MB 以上のファイルは 1 つずつレンダリングし、大きなライブラリでもメモリを使い切らないようにしました

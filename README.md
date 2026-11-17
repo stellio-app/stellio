@@ -113,7 +113,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 📐 **Printability analysis** (overhang detection) and **suggested orientations** (less overhang, bed contact shown)
 - 🎯 **Slicer profile recommendation** based on geometry + success history
 - ⏱️ **Print time estimation** before slicing
-- 🩺 **S.O.S Print**: adaptive, step-by-step print-failure diagnosis — Stellio asks one question at a time, narrows down a live list of hypotheses as you answer (no question limit: new hypotheses are added and the investigation continues after a “still not solved”), then gives a final diagnosis; photo analysis supported throughout, with saved conversations you can reopen or mark as resolved ⚠️ The AI is not 100% reliable and can make mistakes: its hypotheses are leads to verify.
+- 🩺 **S.O.S Print**: adaptive, step-by-step print-failure diagnosis — Stellio asks one question at a time, narrows down a live list of hypotheses as you answer (no question limit: new hypotheses are added and the investigation continues after a “still not solved”), then gives a final diagnosis; photo analysis supported throughout, with saved conversations you can reopen or mark as resolved ⚠️ The AI is not 100% reliable and can make mistakes: its hypotheses are leads to verify. From **question 3**, the **Conclude and suggest a fix** button gives the most likely causes, then asks “Did this diagnostic solve the problem?” (**Yes, it's solved** / **No, continue the investigation**). The **Stop the investigation** button lets you abandon it at any time.
 
 ### 🖨️ Printer management
 - 🔌 Support for **OctoPrint**, **Klipper/Moonraker**, **Bambu Lab** (MQTT), **Creality** (WebSocket), **FlashForge**, **Elegoo** (SDCP) and **PrusaLink**
@@ -130,7 +130,8 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 🎛️ **Calibrations**: save flow, pressure advance, temperatures… per filament and printer, recalled in the send-to-slicer window
 - 👥 **Light collaborative mode**: see if another connected device is already viewing a file, and get warned before accidentally sending the same file to the slicer twice
 
-### 🧵 Filament management
+### 🧵 Materials: filament & resin
+- 🧪 **Resin inventory (beta)**: the sidebar category is now **Materials** (Filament + Resin). Add your resin bottles by hand (brand, type, colour, volume, remaining, price, storage place), subtract what you use in ml, and get the same **“To order”** reminder as for filament (low-stock threshold, manual checkbox, shop search links, “already ordered”) — also shown in the dashboard widget. Not linked to printers yet, nothing is deducted automatically
 - 🔗 **Spoolman** integration (spool management server), with automatic detection on your network
 - 🟠 **Bambu Lab AMS** support (slot reading)
 - 🟢 **Creality CFS** support
@@ -156,6 +157,8 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 
 ### 🧩 Advanced tools
 - 🎨 **Automatic bed nesting** (rectpack or real silhouette via shapely)
+- 🧩 **Merge into 3MF**: select several models (STL, 3MF, OBJ…) and Stellio builds a single 3MF file — one plate if everything fits, otherwise a multi-plate file (structure compatible with Bambu Studio / OrcaSlicer; PrusaSlicer shows all parts together). You choose the file name and folder (network shares included, folder creation possible), then Stellio offers to delete or keep the original files.
+- 🖌️ **Spool colour sent to the slicer**: when sending, the colour and material of the chosen spool are applied to the filament profile loaded in OrcaSlicer, Bambu Studio or PrusaSlicer (an imported filament profile linked to the printer is required; in a batch send, the colour is applied only if all spools are identical).
 - 🔧 **Mesh repair** (trimesh + pymeshfix) with a **before/after comparison** (watertightness, triangles, vertices, size)
 - 🔄 **Format converter** (STL ↔ 3MF ↔ OBJ)
 - 🛡️ **Integrity check** (corrupted/missing files)
@@ -322,6 +325,7 @@ Stellio automatically detects:
 - ✅ ideaMaker
 - ✅ FlashPrint
 - ✅ Lychee Slicer
+- ✅ CHITUBOX / CHITUBOX Pro / Anycubic Photon Workshop / PreForm / Voxeldance Tango *(resin, beta)*
 - ✅ CraftWare
 - ✅ MatterControl
 - ✅ MakerBot Print
@@ -340,6 +344,9 @@ Stellio automatically detects:
 | **FlashForge** | Adventurer 5M / 5M Pro · AD5X | Proprietary API: monitoring, UDP auto-discovery |
 | **Klipper / Moonraker** | Any machine running Klipper (Voron…) | HTTP: monitoring, upload, camera, exact print hours |
 | **OctoPrint** | Any printer driven by OctoPrint | HTTP: monitoring, upload, camera |
+| **Duet / RepRapFirmware** | Any Duet 2/3 board | HTTP: monitoring, upload |
+| **Repetier-Server** | Any printer managed by Repetier-Server | HTTP: monitoring, upload |
+| **Resin (beta)** 🧪 | Formlabs (web API) · Anycubic Photon Wi-Fi · Chitubox / Phrozen / Uniformation (SDCP) | Monitoring only, still in beta — real hardware not fully tested · maintenance (FEP, vat, LCD…) |
 
 > The models listed are those offered in Stellio's “Add a printer” form. Other models that speak the same protocol usually work too, but have not all been tested — [tell us on GitHub](https://github.com/stellio-app/stellio/issues) if yours works or not.
 
@@ -388,7 +395,7 @@ stellio/
 ├── main.py                 # Flask + Desktop backend
 ├── interface/              # index.html, script.js, style.css (UI)
 ├── packaging/              # launcher.py, installer (.iss), macOS entitlements
-├── release-notes/          # notes_version_X.Y.Z.txt (release texts)
+├── release-notes/          # notes.txt (release text, replaced at each release)
 ├── tests/  tools/          # pytest tests, maintenance tools (incl. stellio_manager.bat)
 ├── check_deps.py           # Self-healing dependency checker
 ├── modules/                # Modules split out of main.py (print_session, share_link, timelapse, mqtt_publisher, quote_portal, digest…)

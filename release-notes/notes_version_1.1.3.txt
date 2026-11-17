@@ -1,0 +1,288 @@
+<!--fr-->
+✓ Versions de modèles : menu du fichier → « Versions » : enregistrez une copie avant de modifier un modèle, comparez (taille, triangles, dimensions, volume) avec le fichier actuel, téléchargez ou restaurez (l'état actuel est sauvegardé d'abord)
+✓ Collections : regroupez des fichiers par thème (menu du fichier → « Ajouter à une collection »), filtrez la bibliothèque par collection, réglez les quantités et ajoutez toute la collection à la file d'impression en un clic
+✓ Électricité heures creuses / pleines : deux prix au kWh et vos plages creuses (+ week-end) ; le coût réel des impressions mesurées en tient compte, un bilan sur 30 jours montre le gain possible, un simulateur compare « maintenant » et « prochain créneau creux », et un rappel prévient quand les heures creuses commencent avec des tâches en attente (Stellio ne lance jamais d'impression tout seul)
+✓ Obico : surveillance des alertes de détection d'échec par caméra (serveur auto-hébergé ou obico.io, jeton d'API chiffré) avec notification push dès qu'Obico lève une alerte ; test de connexion intégré
+✓ Imprimantes : prise en charge de Duet / RepRapFirmware (Duet 2/3, standalone ou SBC) et de Repetier-Server (envoi de fichiers, état, progression, températures) ; Marlin en USB-série n'est pas géré
+✓ Statistiques : nouvelle section « Pourquoi mes impressions ratent » (taux d'échec par motif, matière, imprimante, profil de slicer, jour et moment de la journée, fichiers qui échouent le plus, pistes chiffrées)
+✓ Imprimantes résine (bêta) : Chitubox (Phrozen, Uniformation GKtwo…) en SDCP, Anycubic Photon Wi-Fi anciens (état et fichier) et Formlabs Form 3/4 via l'API web officielle ; suivi seulement, signalé « Bêta » dans le formulaire, les cartes, le moniteur, la liste des marques et la documentation (Elegoo Saturn/Mars aussi). Creality Halot n'est pas encore pris en charge
+✓ Matières : la catégorie « Filament » de la barre latérale devient « Matières » avec deux entrées, Filament et Résine ; inventaire manuel de flacons de résine (bêta : volume restant, bouton « Utiliser » en ml, prix, rangement, pas encore relié aux imprimantes)
+✓ À commander pour la résine : seuil bas réglable (200 ml par défaut), case « À commander » par flacon, liens de recherche vers vos boutiques, « Déjà commandé » (rappel reporté de 14 jours), affiché aussi dans le widget « À commander » du tableau de bord
+✓ Logiciels de découpe résine détectés (CHITUBOX, Photon Workshop, PreForm, Voxeldance Tango) et ouverts automatiquement pour les imprimantes résine ; maintenance résine sur les cartes d'imprimante (FEP, bac, LCD, filtre, IPA…) — bêta
+✓ S.O.S Print : l'IA pose désormais autant de questions que nécessaire (plus de limite) jusqu'à trouver la cause, propose de nouvelles pistes quand les premières sont écartées, et continue l'enquête après un « toujours pas résolu » au lieu de conclure.
+✓ S.O.S Print : l'IA prend en compte les vitesses (impression, 1re couche, parois, remplissage, déplacement, rétraction) : elles sont lues dans le profil de slicer sélectionné, et l'IA les demande quand elles manquent.
+✓ S.O.S Print : prise en compte du multicolore et de la tour de purge (tour qui se décroche, s'effondre, tombe sur la pièce, couleurs qui se mélangent) : l'IA pose les questions utiles, et la largeur de la tour est lue dans le profil de slicer.
+✓ S.O.S Print : à chaque étape, dès la première question, l'IA affiche ses hypothèses classées par probabilité (en %) avec la raison ou le test rapide associé, et les remet à jour après chaque réponse.
+✓ S.O.S Print : un avertissement rappelle que l'IA n'est pas fiable à 100 % et peut se tromper (pendant l'enquête et sur le résultat, dans le README et la doc).
+✓ IA : rappel que l'IA n'est pas fiable à 100 % et peut se tromper, dans S.O.S Print (dès le formulaire), le README, la documentation et le site.
+✓ Mises à jour : la fenêtre « Mise à jour disponible » n'affiche plus que les notes de version dans la langue de Stellio (avec repli sur l'anglais), au lieu de toutes les langues.
+✓ S.O.S Print : page compacte, tout le formulaire tient sur un écran sans défiler avant de lancer l'enquête, et l'icône de la zone photo est de nouveau bien placée.
+✓ S.O.S Print : dès la question 3, « Conclure et proposer une solution » donne la conclusion puis demande « Ce diagnostic a-t-il résolu le problème ? » (Oui, c'est résolu / Non, continuer l'enquête)
+✓ S.O.S Print : bouton « Arrêter l'enquête » pour abandonner une enquête en cours à tout moment
+✓ S.O.S Print : le nom de la matière est centré dans son bouton
+✓ S.O.S Print : le cadre d'import de photo a la même hauteur que le cadre des réglages
+✓ Bibliothèque : « Fusionner en 3MF » — sélectionnez plusieurs modèles (STL, 3MF…) pour n'en faire qu'un seul fichier 3MF : un seul plateau si tout tient, sinon un fichier à plusieurs plateaux
+✓ Barre de sélection : tous les boutons ont la même taille
+✓ Envoi au slicer : la couleur de la bobine choisie (ex. PLA noir) est maintenant appliquée au profil de filament chargé dans le slicer (OrcaSlicer, Bambu Studio, PrusaSlicer…), et sa matière sert à choisir le bon profil
+✓ Tableau de bord : le titre en double (en haut de la page) est supprimé
+✓ Fusion en 3MF : choix du nom du fichier et du dossier d'enregistrement (avec création de dossier, comme le téléchargement) ; champs de saisie harmonisés
+✓ Barre de sélection : tous les boutons tiennent sur une seule ligne (icônes seules sur petit écran)
+✓ Fusion en 3MF : fonctionne aussi avec les fichiers et dossiers situés sur un partage réseau (SMB)
+✓ Favoris : retirer l'étoile d'un fichier le fait disparaître immédiatement de la vue Favoris (mise à jour instantanée)
+✓ Volet de la bibliothèque : l'entrée « Favoris » en double est supprimée (les favoris restent accessibles via la touche F, le tableau de bord et l'étoile des fichiers)
+✓ Fusion en 3MF : la fenêtre se ferme une fois le fichier créé, puis propose de supprimer ou de garder les fichiers d'origine
+✓ Suppression de fichiers : un fichier supprimé (par exemple après une fusion en 3MF) n'apparaît plus dans la bibliothèque, même si un scan de partage réseau était en cours
+✓ Favoris : l'étoile se met à jour sans faire clignoter les miniatures ; un fichier supprimé (y compris après une fusion en 3MF) disparaît immédiatement de la bibliothèque
+✓ Favoris : en retirant une étoile dans la vue Favoris, le fichier disparaît et les compteurs des pastilles se mettent à jour immédiatement
+<!--en-->
+✓ Model versions: file menu → "Versions": save a copy before editing a model, compare (size, triangles, dimensions, volume) with the current file, download or restore (the current state is saved first)
+✓ Collections: group files by theme (file menu → "Add to a collection"), filter the library by collection, set quantities and add the whole collection to the print queue in one click
+✓ Off-peak / peak electricity: two per-kWh prices and your off-peak ranges (+ weekend); the real cost of measured prints takes them into account, a 30-day summary shows the possible saving, a simulator compares "now" and "next off-peak slot", and a reminder tells you when off-peak starts with jobs waiting (Stellio never starts a print by itself)
+✓ Obico: monitoring of camera failure-detection alerts (self-hosted server or obico.io, encrypted API token) with a push notification as soon as Obico raises an alert; built-in connection test
+✓ Printers: support for Duet / RepRapFirmware (Duet 2/3, standalone or SBC) and Repetier-Server (file upload, status, progress, temperatures); Marlin over USB serial is not supported
+✓ Statistics: new "Why my prints fail" section (failure rate by reason, material, printer, slicer profile, weekday and time of day, most failing files, data-driven leads)
+✓ Resin printers (beta): Chitubox (Phrozen, Uniformation GKtwo…) over SDCP, older Wi-Fi Anycubic Photon (state and file) and Formlabs Form 3/4 via the official web API; monitoring only, flagged "Beta" in the form, cards, monitor, brand list and documentation (Elegoo Saturn/Mars too). Creality Halot is not supported yet
+✓ Materials: the sidebar “Filament” category becomes “Materials” with two entries, Filament and Resin; manual resin bottle inventory (beta: remaining volume, “Use” button in ml, price, storage place, not linked to printers yet)
+✓ To-order reminder for resin: adjustable low threshold (200 ml by default), per-bottle “To order” checkbox, search links to your shops, “Already ordered” (reminder postponed by 14 days), also shown in the dashboard “To order” widget
+✓ Resin slicers detected (CHITUBOX, Photon Workshop, PreForm, Voxeldance Tango) and opened automatically for resin printers; resin maintenance on printer cards (FEP, vat, LCD, filter, IPA…) — beta
+✓ S.O.S Print: the AI now asks as many questions as needed (no limit) until it finds the cause, adds new hypotheses when the first ones are ruled out, and keeps investigating after a “still not solved” instead of concluding.
+✓ S.O.S Print: the AI now takes speeds into account (print, first layer, walls, infill, travel, retraction): they are read from the selected slicer profile, and the AI asks for them when they are missing.
+✓ S.O.S Print: multicolor prints and the purge tower are now taken into account (tower detaching, collapsing, falling onto the part, colors mixing): the AI asks the relevant questions, and the tower width is read from the slicer profile.
+✓ S.O.S Print: at every step, from the very first question, the AI shows its hypotheses ranked by likelihood (%) with the reason or quick check, and updates them after each answer.
+✓ S.O.S Print: a notice reminds that the AI is not 100% reliable and can make mistakes (during the investigation and on the result, in the README and docs).
+✓ AI: reminder that the AI is not 100% reliable and can make mistakes, in S.O.S Print (from the form onward), the README, the documentation and the website.
+✓ Updates: the “Update available” window now shows only the release notes in Stellio's language (falling back to English) instead of every language.
+✓ S.O.S Print: compact page, the whole form fits on one screen with no scrolling before starting the investigation, and the photo-zone icon is placed correctly again.
+✓ S.O.S Print: from question 3, “Conclude and suggest a fix” gives the conclusion, then asks “Did this diagnostic solve the problem?” (Yes, it's solved / No, continue the investigation)
+✓ S.O.S Print: new “Stop the investigation” button to abandon an ongoing investigation at any time
+✓ S.O.S Print: the material name is centered in its button
+✓ S.O.S Print: the photo import frame now matches the height of the settings frame
+✓ Library: “Merge into 3MF” — select several models (STL, 3MF…) to build a single 3MF file: one plate if everything fits, otherwise a multi-plate file
+✓ Selection bar: all buttons now have the same size
+✓ Send to slicer: the color of the chosen spool (e.g. black PLA) is now applied to the filament profile loaded in the slicer (OrcaSlicer, Bambu Studio, PrusaSlicer…), and its material is used to pick the right profile
+✓ Dashboard: the duplicate title at the top of the page is removed
+✓ Merge into 3MF: choose the file name and the destination folder (with folder creation, like downloads); input fields harmonized
+✓ Selection bar: all buttons fit on a single line (icons only on small screens)
+✓ Merge into 3MF: now also works with files and folders on a network share (SMB)
+✓ Favorites: removing a file's star now makes it disappear from the Favorites view instantly
+✓ Library panel: the duplicate “Favorites” entry is removed (favorites remain available via the F key, the dashboard and the file stars)
+✓ Merge into 3MF: the window closes once the file is created, then offers to delete or keep the original files
+✓ File deletion: a deleted file (for example after merging into 3MF) no longer shows up in the library, even if a network-share scan was running
+✓ Favorites: the star updates without making thumbnails flash; a deleted file (including after a merge into 3MF) disappears from the library immediately
+✓ Favorites: removing a star in the Favorites view now removes the file and updates the chip counters instantly
+<!--de-->
+✓ Modellversionen: Dateimenü → „Versionen“: Kopie vor dem Bearbeiten speichern, mit der aktuellen Datei vergleichen (Größe, Dreiecke, Abmessungen, Volumen), herunterladen oder wiederherstellen (der aktuelle Stand wird zuerst gesichert)
+✓ Sammlungen: Dateien nach Thema gruppieren (Dateimenü → „Zu einer Sammlung hinzufügen“), Bibliothek nach Sammlung filtern, Mengen festlegen und die ganze Sammlung mit einem Klick in die Druckwarteschlange setzen
+✓ Strom Nebenzeit / Hauptzeit: zwei kWh-Preise und Ihre Nebenzeiten (+ Wochenende); die tatsächlichen Kosten gemessener Drucke berücksichtigen sie, eine 30-Tage-Übersicht zeigt die mögliche Ersparnis, ein Simulator vergleicht „jetzt“ mit „nächstem Nebenzeit-Fenster“, und eine Erinnerung meldet den Beginn der Nebenzeit bei wartenden Aufträgen (Stellio startet nie selbst einen Druck)
+✓ Obico: Überwachung der Fehlererkennungs-Alarme per Kamera (selbst gehosteter Server oder obico.io, verschlüsseltes API-Token) mit Push-Benachrichtigung, sobald Obico alarmiert; integrierter Verbindungstest
+✓ Drucker: Unterstützung für Duet / RepRapFirmware (Duet 2/3, Standalone oder SBC) und Repetier-Server (Dateiversand, Status, Fortschritt, Temperaturen); Marlin über USB-Seriell wird nicht unterstützt
+✓ Statistiken: neuer Bereich „Warum meine Drucke scheitern“ (Fehlerquote nach Grund, Material, Drucker, Slicer-Profil, Wochentag und Tageszeit, am häufigsten fehlgeschlagene Dateien, belegte Hinweise)
+✓ Harzdrucker (Beta): Chitubox (Phrozen, Uniformation GKtwo …) über SDCP, ältere WLAN-Anycubic-Photon (Status und Datei) und Formlabs Form 3/4 über die offizielle Web-API; nur Überwachung, in Formular, Karten, Monitor, Markenliste und Dokumentation als „Beta“ gekennzeichnet (auch Elegoo Saturn/Mars). Creality Halot wird noch nicht unterstützt
+✓ Materialien: Die Seitenleisten-Kategorie „Filament“ heißt jetzt „Materialien“ mit zwei Einträgen, Filament und Harz; manuelles Harzflaschen-Inventar (Beta: Restvolumen, Schaltfläche „Verbrauchen“ in ml, Preis, Lagerort, noch nicht mit Druckern verknüpft)
+✓ Nachbestell-Erinnerung für Harz: einstellbare Schwelle (Standard 200 ml), Häkchen „Nachbestellen“ je Flasche, Suchlinks zu Ihren Shops, „Bereits bestellt“ (Erinnerung um 14 Tage verschoben), auch im Dashboard-Widget „Nachzubestellen“
+✓ Harz-Slicer erkannt (CHITUBOX, Photon Workshop, PreForm, Voxeldance Tango) und für Harzdrucker automatisch geöffnet; Harz-Wartung auf den Druckerkarten (FEP, Tank, LCD, Filter, IPA …) – Beta
+✓ S.O.S Print: Die KI stellt jetzt so viele Fragen wie nötig (ohne Limit), bis sie die Ursache findet, ergänzt neue Hypothesen, wenn die ersten ausgeschlossen sind, und ermittelt nach „immer noch nicht gelöst“ weiter, statt abzuschließen.
+✓ S.O.S Print: Die KI berücksichtigt jetzt Geschwindigkeiten (Druck, erste Schicht, Wände, Füllung, Leerfahrt, Rückzug): Sie werden aus dem gewählten Slicer-Profil gelesen, und die KI fragt danach, wenn sie fehlen.
+✓ S.O.S Print: Mehrfarbdrucke und der Reinigungsturm werden berücksichtigt (Turm löst sich, kippt, fällt aufs Teil, Farben vermischen sich): Die KI stellt die passenden Fragen, die Turmbreite wird aus dem Slicer-Profil gelesen.
+✓ S.O.S Print: In jedem Schritt, schon ab der ersten Frage, zeigt die KI ihre Hypothesen nach Wahrscheinlichkeit (%) sortiert mit Begründung bzw. Schnelltest und aktualisiert sie nach jeder Antwort.
+✓ S.O.S Print: Ein Hinweis erinnert daran, dass die KI nicht zu 100 % zuverlässig ist und Fehler machen kann (während der Untersuchung und beim Ergebnis, in README und Doku).
+✓ KI: Hinweis, dass die KI nicht zu 100 % zuverlässig ist und Fehler machen kann – in S.O.S Print (schon im Formular), README, Dokumentation und Website.
+✓ Updates: Das Fenster „Update verfügbar“ zeigt nur noch die Versionshinweise in der Sprache von Stellio (mit Rückfall auf Englisch) statt aller Sprachen.
+✓ S.O.S Print: kompakte Seite, das ganze Formular passt auf einen Bildschirm, ohne vor dem Start der Untersuchung zu scrollen; das Symbol der Fotozone sitzt wieder richtig.
+✓ S.O.S Print: ab Frage 3 liefert „Abschließen und Lösung vorschlagen“ das Ergebnis und fragt dann „Hat diese Diagnose das Problem gelöst?“ (Ja, gelöst / Nein, Untersuchung fortsetzen)
+✓ S.O.S Print: neue Schaltfläche „Untersuchung beenden“, um eine laufende Untersuchung jederzeit abzubrechen
+✓ S.O.S Print: Der Materialname ist in seiner Schaltfläche zentriert
+✓ S.O.S Print: Der Foto-Rahmen ist jetzt so hoch wie der Einstellungsrahmen
+✓ Bibliothek: „Zu 3MF zusammenführen“ — mehrere Modelle (STL, 3MF …) auswählen und zu einer 3MF-Datei machen: eine Platte, wenn alles passt, sonst mehrere Platten
+✓ Auswahlleiste: alle Schaltflächen haben jetzt dieselbe Größe
+✓ An Slicer senden: Die Farbe der gewählten Spule (z. B. schwarzes PLA) wird jetzt auf das im Slicer geladene Filamentprofil angewendet (OrcaSlicer, Bambu Studio, PrusaSlicer …), ihr Material wählt das passende Profil
+✓ Dashboard: Der doppelte Titel oben auf der Seite wurde entfernt
+✓ Zu 3MF zusammenführen: Dateiname und Zielordner wählbar (mit Ordner anlegen, wie beim Download); Eingabefelder vereinheitlicht
+✓ Auswahlleiste: alle Schaltflächen in einer Zeile (auf kleinen Bildschirmen nur Symbole)
+✓ Zu 3MF zusammenführen: funktioniert jetzt auch mit Dateien und Ordnern auf Netzwerkfreigaben (SMB)
+✓ Favoriten: Das Entfernen des Sterns lässt die Datei sofort aus der Favoritenansicht verschwinden
+✓ Bibliotheksleiste: Der doppelte Eintrag „Favoriten“ wurde entfernt (Favoriten bleiben über die Taste F, das Dashboard und die Datei-Sterne erreichbar)
+✓ Zu 3MF zusammenführen: Das Fenster schließt sich nach dem Erstellen und fragt, ob die Originaldateien gelöscht oder behalten werden sollen
+✓ Dateilöschung: Eine gelöschte Datei (z. B. nach dem Zusammenführen zu 3MF) erscheint nicht mehr in der Bibliothek, auch wenn gerade ein Scan der Netzwerkfreigabe lief
+✓ Favoriten: Der Stern wird ohne Flackern der Vorschaubilder aktualisiert; eine gelöschte Datei (auch nach dem Zusammenführen zu 3MF) verschwindet sofort aus der Bibliothek
+✓ Favoriten: Beim Entfernen eines Sterns in der Favoriten-Ansicht verschwindet die Datei sofort und die Zähler der Chips werden direkt aktualisiert
+<!--es-->
+✓ Versiones de modelos: menú del archivo → «Versiones»: guarda una copia antes de modificar un modelo, compara (tamaño, triángulos, dimensiones, volumen) con el archivo actual, descarga o restaura (el estado actual se guarda antes)
+✓ Colecciones: agrupa archivos por tema (menú del archivo → «Añadir a una colección»), filtra la biblioteca por colección, ajusta cantidades y añade toda la colección a la cola de impresión con un clic
+✓ Electricidad horas valle / punta: dos precios por kWh y tus franjas valle (+ fin de semana); el coste real de las impresiones medidas los tiene en cuenta, un balance de 30 días muestra el ahorro posible, un simulador compara «ahora» y «próxima franja valle», y un aviso te dice cuándo empiezan las horas valle con tareas en espera (Stellio nunca inicia una impresión por sí solo)
+✓ Obico: supervisión de las alertas de detección de fallos por cámara (servidor autoalojado u obico.io, token de API cifrado) con notificación push en cuanto Obico lanza una alerta; prueba de conexión integrada
+✓ Impresoras: compatibilidad con Duet / RepRapFirmware (Duet 2/3, standalone o SBC) y Repetier-Server (envío de archivos, estado, progreso, temperaturas); Marlin por USB serie no está admitido
+✓ Estadísticas: nueva sección «Por qué fallan mis impresiones» (tasa de fallos por motivo, material, impresora, perfil de slicer, día de la semana y momento del día, archivos que más fallan, pistas con cifras)
+✓ Impresoras de resina (beta): Chitubox (Phrozen, Uniformation GKtwo…) por SDCP, Anycubic Photon Wi-Fi antiguas (estado y archivo) y Formlabs Form 3/4 mediante la API web oficial; solo seguimiento, marcado como «Beta» en el formulario, las tarjetas, el monitor, la lista de marcas y la documentación (también Elegoo Saturn/Mars). Creality Halot aún no está admitida
+✓ Materiales: la categoría «Filamento» de la barra lateral pasa a «Materiales» con dos entradas, Filamento y Resina; inventario manual de botes de resina (beta: volumen restante, botón «Usar» en ml, precio, ubicación, aún sin enlazar a impresoras)
+✓ A pedir para la resina: umbral bajo ajustable (200 ml por defecto), casilla «A pedir» por bote, enlaces de búsqueda a tus tiendas, «Ya pedido» (recordatorio aplazado 14 días), también en el widget «A pedir» del panel
+✓ Slicers de resina detectados (CHITUBOX, Photon Workshop, PreForm, Voxeldance Tango) y abiertos automáticamente para impresoras de resina; mantenimiento de resina en las tarjetas (FEP, cuba, LCD, filtro, IPA…) — beta
+✓ S.O.S Print: la IA hace ahora tantas preguntas como haga falta (sin límite) hasta encontrar la causa, añade nuevas hipótesis cuando las primeras se descartan y sigue investigando tras un «sigue sin resolverse» en lugar de concluir.
+✓ S.O.S Print: la IA tiene ahora en cuenta las velocidades (impresión, primera capa, paredes, relleno, desplazamiento, retracción): se leen del perfil de slicer seleccionado y la IA las pide cuando faltan.
+✓ S.O.S Print: se tienen en cuenta las impresiones multicolor y la torre de purga (torre que se despega, se derrumba, cae sobre la pieza, colores que se mezclan): la IA hace las preguntas útiles y el ancho de la torre se lee del perfil de slicer.
+✓ S.O.S Print: en cada paso, desde la primera pregunta, la IA muestra sus hipótesis ordenadas por probabilidad (%) con el motivo o la comprobación rápida, y las actualiza tras cada respuesta.
+✓ S.O.S Print: un aviso recuerda que la IA no es 100 % fiable y puede cometer errores (durante la investigación y en el resultado, en el README y la documentación).
+✓ IA: aviso de que la IA no es 100 % fiable y puede equivocarse, en S.O.S Print (desde el formulario), el README, la documentación y el sitio web.
+✓ Actualizaciones: la ventana «Actualización disponible» muestra ahora solo las notas de versión en el idioma de Stellio (con inglés como alternativa) en lugar de todos los idiomas.
+✓ S.O.S Print: página compacta, todo el formulario cabe en una pantalla sin desplazarse antes de iniciar la investigación, y el icono de la zona de foto vuelve a estar bien colocado.
+✓ S.O.S Print: desde la pregunta 3, «Concluir y proponer una solución» da la conclusión y pregunta «¿Este diagnóstico resolvió el problema?» (Sí, resuelto / No, continuar la investigación)
+✓ S.O.S Print: nuevo botón «Detener la investigación» para abandonar una investigación en curso en cualquier momento
+✓ S.O.S Print: el nombre del material está centrado en su botón
+✓ S.O.S Print: el recuadro de la foto tiene ahora la misma altura que el de los ajustes
+✓ Biblioteca: «Fusionar en 3MF» — selecciona varios modelos (STL, 3MF…) para crear un único archivo 3MF: una placa si todo cabe, si no varias placas
+✓ Barra de selección: todos los botones tienen el mismo tamaño
+✓ Enviar al slicer: el color de la bobina elegida (p. ej. PLA negro) se aplica ahora al perfil de filamento cargado en el slicer (OrcaSlicer, Bambu Studio, PrusaSlicer…), y su material sirve para elegir el perfil correcto
+✓ Panel: se elimina el título duplicado en la parte superior de la página
+✓ Fusionar en 3MF: elige el nombre del archivo y la carpeta de destino (con creación de carpeta, como en la descarga); campos de entrada armonizados
+✓ Barra de selección: todos los botones en una sola línea (solo iconos en pantallas pequeñas)
+✓ Fusionar en 3MF: ahora también funciona con archivos y carpetas en un recurso de red (SMB)
+✓ Favoritos: al quitar la estrella de un archivo desaparece al instante de la vista Favoritos
+✓ Panel de la biblioteca: se elimina la entrada duplicada «Favoritos» (los favoritos siguen accesibles con la tecla F, el panel y la estrella de los archivos)
+✓ Fusionar en 3MF: la ventana se cierra al crear el archivo y pregunta si eliminar o conservar los archivos originales
+✓ Eliminación de archivos: un archivo eliminado (por ejemplo tras fusionar en 3MF) ya no aparece en la biblioteca, aunque hubiera un escaneo de recurso de red en curso
+✓ Favoritos: la estrella se actualiza sin que parpadeen las miniaturas; un archivo eliminado (también tras fusionar en 3MF) desaparece al instante de la biblioteca
+✓ Favoritos: al quitar una estrella en la vista Favoritos, el archivo desaparece y los contadores de las etiquetas se actualizan al instante
+<!--pt-->
+✓ Versões de modelos: menu do ficheiro → «Versões»: guarde uma cópia antes de alterar um modelo, compare (tamanho, triângulos, dimensões, volume) com o ficheiro atual, transfira ou restaure (o estado atual é guardado primeiro)
+✓ Coleções: agrupe ficheiros por tema (menu do ficheiro → «Adicionar a uma coleção»), filtre a biblioteca por coleção, defina quantidades e adicione toda a coleção à fila de impressão com um clique
+✓ Eletricidade horas de vazio / cheias: dois preços por kWh e as suas faixas de vazio (+ fim de semana); o custo real das impressões medidas tem-nos em conta, um balanço de 30 dias mostra a poupança possível, um simulador compara «agora» e «próxima faixa de vazio», e um lembrete avisa quando as horas de vazio começam com tarefas em espera (o Stellio nunca inicia uma impressão sozinho)
+✓ Obico: monitorização dos alertas de deteção de falhas por câmara (servidor auto-alojado ou obico.io, token de API cifrado) com notificação push assim que o Obico dispara um alerta; teste de ligação integrado
+✓ Impressoras: suporte para Duet / RepRapFirmware (Duet 2/3, standalone ou SBC) e Repetier-Server (envio de ficheiros, estado, progresso, temperaturas); Marlin por USB série não é suportado
+✓ Estatísticas: nova secção «Porque falham as minhas impressões» (taxa de falhas por motivo, material, impressora, perfil de slicer, dia da semana e altura do dia, ficheiros que mais falham, pistas com números)
+✓ Impressoras de resina (beta): Chitubox (Phrozen, Uniformation GKtwo…) por SDCP, Anycubic Photon Wi-Fi mais antigas (estado e ficheiro) e Formlabs Form 3/4 através da API web oficial; só acompanhamento, assinalado como «Beta» no formulário, nos cartões, no monitor, na lista de marcas e na documentação (também Elegoo Saturn/Mars). A Creality Halot ainda não é suportada
+✓ Materiais: a categoria «Filamento» da barra lateral passa a «Materiais» com duas entradas, Filamento e Resina; inventário manual de frascos de resina (beta: volume restante, botão «Usar» em ml, preço, local, ainda não ligado às impressoras)
+✓ A encomendar para a resina: limite baixo ajustável (200 ml por defeito), caixa «A encomendar» por frasco, ligações de pesquisa para as suas lojas, «Já encomendado» (lembrete adiado 14 dias), também no widget «A encomendar» do painel
+✓ Slicers de resina detetados (CHITUBOX, Photon Workshop, PreForm, Voxeldance Tango) e abertos automaticamente para impressoras de resina; manutenção de resina nos cartões (FEP, cuba, LCD, filtro, IPA…) — beta
+✓ S.O.S Print: a IA faz agora quantas perguntas forem necessárias (sem limite) até encontrar a causa, acrescenta novas hipóteses quando as primeiras são descartadas e continua a investigar após um «ainda não resolvido» em vez de concluir.
+✓ S.O.S Print: a IA passa a considerar as velocidades (impressão, primeira camada, paredes, preenchimento, deslocamento, retração): são lidas do perfil de slicer selecionado e a IA pede-as quando faltam.
+✓ S.O.S Print: passa a considerar impressões multicor e a torre de purga (torre que se solta, desmorona, cai sobre a peça, cores que se misturam): a IA faz as perguntas úteis e a largura da torre é lida do perfil de slicer.
+✓ S.O.S Print: em cada passo, logo desde a primeira pergunta, a IA mostra as hipóteses ordenadas por probabilidade (%) com o motivo ou o teste rápido, e atualiza-as após cada resposta.
+✓ S.O.S Print: um aviso lembra que a IA não é 100 % fiável e pode cometer erros (durante a investigação e no resultado, no README e na documentação).
+✓ IA: aviso de que a IA não é 100 % fiável e pode cometer erros, no S.O.S Print (desde o formulário), no README, na documentação e no site.
+✓ Atualizações: a janela «Atualização disponível» mostra agora apenas as notas de versão no idioma do Stellio (com inglês como alternativa) em vez de todos os idiomas.
+✓ S.O.S Print: página compacta, todo o formulário cabe num ecrã sem deslocar antes de iniciar a investigação, e o ícone da zona de foto volta a estar bem posicionado.
+✓ S.O.S Print: a partir da pergunta 3, «Concluir e propor uma solução» dá a conclusão e pergunta «Este diagnóstico resolveu o problema?» (Sim, resolvido / Não, continuar a investigação)
+✓ S.O.S Print: novo botão «Parar a investigação» para abandonar uma investigação em curso a qualquer momento
+✓ S.O.S Print: o nome do material está centrado no botão
+✓ S.O.S Print: o quadro da foto tem agora a mesma altura que o das definições
+✓ Biblioteca: «Unir em 3MF» — selecione vários modelos (STL, 3MF…) para criar um único ficheiro 3MF: uma placa se tudo couber, caso contrário várias placas
+✓ Barra de seleção: todos os botões têm o mesmo tamanho
+✓ Enviar para o slicer: a cor da bobina escolhida (ex. PLA preto) é agora aplicada ao perfil de filamento carregado no slicer (OrcaSlicer, Bambu Studio, PrusaSlicer…), e o seu material serve para escolher o perfil certo
+✓ Painel: o título duplicado no topo da página foi removido
+✓ Unir em 3MF: escolha o nome do ficheiro e a pasta de destino (com criação de pasta, como no download); campos de entrada harmonizados
+✓ Barra de seleção: todos os botões numa única linha (só ícones em ecrãs pequenos)
+✓ Unir em 3MF: agora também funciona com ficheiros e pastas numa partilha de rede (SMB)
+✓ Favoritos: ao retirar a estrela de um ficheiro, ele desaparece de imediato da vista Favoritos
+✓ Painel da biblioteca: a entrada duplicada «Favoritos» foi removida (os favoritos continuam acessíveis pela tecla F, pelo painel e pela estrela dos ficheiros)
+✓ Unir em 3MF: a janela fecha depois de criar o ficheiro e pergunta se quer eliminar ou manter os ficheiros originais
+✓ Eliminação de ficheiros: um ficheiro eliminado (por exemplo após unir em 3MF) deixa de aparecer na biblioteca, mesmo que uma análise de partilha de rede estivesse em curso
+✓ Favoritos: a estrela atualiza-se sem as miniaturas piscarem; um ficheiro eliminado (também depois de unir em 3MF) desaparece de imediato da biblioteca
+✓ Favoritos: ao remover uma estrela na vista Favoritos, o ficheiro desaparece e os contadores dos chips são atualizados de imediato
+<!--it-->
+✓ Versioni dei modelli: menu del file → «Versioni»: salva una copia prima di modificare un modello, confronta (dimensione, triangoli, dimensioni, volume) con il file attuale, scarica o ripristina (lo stato attuale viene prima salvato)
+✓ Collezioni: raggruppa i file per tema (menu del file → «Aggiungi a una collezione»), filtra la libreria per collezione, imposta le quantità e aggiungi l'intera collezione alla coda di stampa con un clic
+✓ Elettricità fuori punta / punta: due prezzi al kWh e le tue fasce fuori punta (+ weekend); il costo reale delle stampe misurate ne tiene conto, un riepilogo a 30 giorni mostra il risparmio possibile, un simulatore confronta «adesso» e «prossima fascia fuori punta», e un promemoria avvisa quando iniziano le ore fuori punta con attività in attesa (Stellio non avvia mai una stampa da solo)
+✓ Obico: monitoraggio degli allarmi di rilevamento guasti via telecamera (server self-hosted o obico.io, token API cifrato) con notifica push appena Obico segnala un allarme; test di connessione integrato
+✓ Stampanti: supporto per Duet / RepRapFirmware (Duet 2/3, standalone o SBC) e Repetier-Server (invio file, stato, avanzamento, temperature); Marlin via USB seriale non è supportato
+✓ Statistiche: nuova sezione «Perché le mie stampe falliscono» (tasso di fallimento per motivo, materiale, stampante, profilo slicer, giorno della settimana e momento della giornata, file che falliscono di più, indizi con numeri)
+✓ Stampanti a resina (beta): Chitubox (Phrozen, Uniformation GKtwo…) via SDCP, Anycubic Photon Wi-Fi meno recenti (stato e file) e Formlabs Form 3/4 tramite l'API web ufficiale; solo monitoraggio, indicato come «Beta» nel modulo, nelle schede, nel monitor, nell'elenco dei marchi e nella documentazione (anche Elegoo Saturn/Mars). Creality Halot non è ancora supportata
+✓ Materiali: la categoria «Filamento» della barra laterale diventa «Materiali» con due voci, Filamento e Resina; inventario manuale dei flaconi di resina (beta: volume rimasto, pulsante «Usa» in ml, prezzo, posizione, non ancora collegato alle stampanti)
+✓ Da ordinare per la resina: soglia bassa regolabile (200 ml predefiniti), casella «Da ordinare» per flacone, link di ricerca verso i tuoi negozi, «Già ordinato» (promemoria rinviato di 14 giorni), anche nel widget «Da ordinare» della dashboard
+✓ Slicer per resina rilevati (CHITUBOX, Photon Workshop, PreForm, Voxeldance Tango) e aperti automaticamente per le stampanti a resina; manutenzione resina sulle schede (FEP, vasca, LCD, filtro, IPA…) — beta
+✓ S.O.S Print: l'IA pone ora tutte le domande necessarie (senza limite) finché non trova la causa, aggiunge nuove ipotesi quando le prime vengono escluse e continua a indagare dopo un «ancora non risolto» invece di concludere.
+✓ S.O.S Print: l'IA tiene ora conto delle velocità (stampa, primo strato, pareti, riempimento, spostamento, retrazione): vengono lette dal profilo dello slicer selezionato e l'IA le chiede quando mancano.
+✓ S.O.S Print: vengono considerate le stampe multicolore e la torre di spurgo (torre che si stacca, crolla, cade sul pezzo, colori che si mescolano): l'IA pone le domande utili e la larghezza della torre viene letta dal profilo dello slicer.
+✓ S.O.S Print: a ogni passo, fin dalla prima domanda, l'IA mostra le ipotesi ordinate per probabilità (%) con il motivo o il controllo rapido e le aggiorna dopo ogni risposta.
+✓ S.O.S Print: un avviso ricorda che l'IA non è affidabile al 100 % e può commettere errori (durante l'indagine e nel risultato, nel README e nella documentazione).
+✓ IA: avviso che l'IA non è affidabile al 100 % e può sbagliare, in S.O.S Print (già dal modulo), nel README, nella documentazione e nel sito.
+✓ Aggiornamenti: la finestra «Aggiornamento disponibile» mostra ora solo le note di rilascio nella lingua di Stellio (con ripiego sull'inglese) invece di tutte le lingue.
+✓ S.O.S Print: pagina compatta, l'intero modulo sta in una schermata senza scorrere prima di avviare l'indagine, e l'icona dell'area foto è di nuovo posizionata correttamente.
+✓ S.O.S Print: dalla domanda 3, «Concludere e proporre una soluzione» dà la conclusione e chiede «Questa diagnosi ha risolto il problema?» (Sì, risolto / No, continua l'indagine)
+✓ S.O.S Print: nuovo pulsante «Interrompi l'indagine» per abbandonare un'indagine in corso in qualsiasi momento
+✓ S.O.S Print: il nome del materiale è centrato nel pulsante
+✓ S.O.S Print: il riquadro della foto ha la stessa altezza di quello delle impostazioni
+✓ Libreria: «Unisci in 3MF» — seleziona più modelli (STL, 3MF…) per creare un unico file 3MF: un piatto se entra tutto, altrimenti più piatti
+✓ Barra di selezione: tutti i pulsanti hanno la stessa dimensione
+✓ Invio allo slicer: il colore della bobina scelta (es. PLA nero) viene ora applicato al profilo filamento caricato nello slicer (OrcaSlicer, Bambu Studio, PrusaSlicer…) e il suo materiale serve a scegliere il profilo giusto
+✓ Dashboard: rimosso il titolo duplicato in cima alla pagina
+✓ Unisci in 3MF: scegli il nome del file e la cartella di destinazione (con creazione cartella, come nel download); campi di input uniformati
+✓ Barra di selezione: tutti i pulsanti su una sola riga (solo icone su schermi piccoli)
+✓ Unisci in 3MF: ora funziona anche con file e cartelle su una condivisione di rete (SMB)
+✓ Preferiti: togliendo la stella a un file, questo scompare subito dalla vista Preferiti
+✓ Pannello della libreria: rimossa la voce duplicata «Preferiti» (i preferiti restano accessibili con il tasto F, la dashboard e la stella dei file)
+✓ Unisci in 3MF: la finestra si chiude dopo la creazione del file e chiede se eliminare o conservare i file originali
+✓ Eliminazione file: un file eliminato (ad esempio dopo l'unione in 3MF) non compare più nella libreria, anche se era in corso una scansione di una condivisione di rete
+✓ Preferiti: la stella si aggiorna senza far lampeggiare le miniature; un file eliminato (anche dopo un'unione in 3MF) scompare subito dalla libreria
+✓ Preferiti: rimuovendo una stella nella vista Preferiti il file scompare e i contatori dei chip si aggiornano subito
+<!--zh-->
+✓ 模型版本：文件菜单 → “版本”：修改模型前先保存副本，与当前文件比较（大小、三角形数、尺寸、体积），可下载或恢复（会先保存当前状态）
+✓ 收藏集：按主题归类文件（文件菜单 → “添加到收藏集”），按收藏集筛选资料库，设置数量，并一键将整个收藏集加入打印队列
+✓ 谷时 / 峰时电价：两个每千瓦时电价和你的谷时时段（+ 周末）；已测量打印的实际电费会据此计算，30 天汇总显示可节省的金额，模拟器比较“现在开始”与“下一个谷时”，谷时开始且有任务等待时会提醒你（Stellio 绝不会自行开始打印）
+✓ Obico：监控摄像头失败检测警报（自建服务器或 obico.io，API 令牌加密保存），Obico 一发出警报即推送通知；内置连接测试
+✓ 打印机：支持 Duet / RepRapFirmware（Duet 2/3，独立或 SBC）和 Repetier-Server（上传文件、状态、进度、温度）；不支持通过 USB 串口连接的 Marlin
+✓ 统计：新增“我的打印为何失败”板块（按原因、材料、打印机、切片配置、星期和时段统计失败率，失败最多的文件，以及基于数据的线索）
+✓ 树脂打印机（测试版）：通过 SDCP 支持 Chitubox（Phrozen、Uniformation GKtwo 等），支持较早的 Wi-Fi Anycubic Photon（状态和文件），并通过官方 Web API 支持 Formlabs Form 3/4；仅监控，在表单、卡片、监控窗口、品牌列表和文档中均标注“测试版”（Elegoo Saturn/Mars 同样标注）。暂不支持 Creality Halot
+✓ 材料：侧边栏的“耗材”分类更名为“材料”，包含耗材和树脂两项；新增手动树脂瓶库存（测试版：剩余量、按 ml 的“使用”按钮、价格、存放位置，尚未与打印机关联）
+✓ 树脂待补货提醒：可调低库存阈值（默认 200 ml）、每瓶“待补货”勾选、商店搜索链接、“已订购”（提醒推迟 14 天），同样显示在仪表盘“待补货”小组件中
+✓ 已检测树脂切片软件（CHITUBOX、Photon Workshop、PreForm、Voxeldance Tango）并为树脂打印机自动打开；打印机卡片提供树脂维护（FEP、料盒、LCD、滤芯、IPA 等）——测试版
+✓ S.O.S Print：AI 现在会不限数量地提问，直到找到原因；当最初的假设被排除时会补充新的假设；在你反馈“仍未解决”后会继续排查，而不是直接下结论。
+✓ S.O.S Print：AI 现在会考虑各项速度（打印、首层、墙、填充、空驶、回抽）：从所选切片软件配置中读取，缺失时 AI 会主动询问。
+✓ S.O.S Print：现在会考虑多色打印和擦拭塔（塔脱落、倒塌、砸到模型、颜色混杂）：AI 会提出针对性的问题，塔宽度则从切片软件配置中读取。
+✓ S.O.S Print：从第一个问题起，AI 在每一步都会按概率（%）排序显示假设，并附上原因或快速检查方法，每次回答后更新。
+✓ S.O.S Print：新增提示，说明 AI 并非 100% 可靠，可能出错（排查过程与结果页，以及 README 和文档中）。
+✓ AI：在 S.O.S Print（从表单开始）、README、文档和网站中提示 AI 并非 100% 可靠，可能出错。
+✓ 更新：“有可用更新”窗口现在只显示 Stellio 所用语言的更新说明（找不到时回退到英文），不再显示所有语言。
+✓ S.O.S Print：页面更紧凑，开始排查前整个表单可在一屏内显示，无需滚动；照片区域的图标位置也已修正。
+✓ S.O.S Print：从第 3 个问题起，“结束并给出解决方案”会给出结论，并询问“此诊断解决问题了吗？”（是的，已解决 / 没有，继续诊断）
+✓ S.O.S Print：新增“停止诊断”按钮，可随时放弃正在进行的诊断
+✓ S.O.S Print：材料名称在按钮中居中显示
+✓ S.O.S Print：照片导入框与设置框等高
+✓ 文件库：“合并为 3MF”——选择多个模型（STL、3MF 等）合并为一个 3MF 文件：全部放得下则单盘，否则生成多盘文件
+✓ 选择栏：所有按钮大小一致
+✓ 发送到切片软件：所选耗材盘的颜色（如黑色 PLA）现在会应用到切片软件加载的耗材配置（OrcaSlicer、Bambu Studio、PrusaSlicer 等），其材料用于选择正确的配置
+✓ 仪表盘：移除页面顶部重复的标题
+✓ 合并为 3MF：可选择文件名和保存文件夹（可新建文件夹，与下载一致）；输入框样式统一
+✓ 选择栏：所有按钮排成一行（小屏幕仅显示图标）
+✓ 合并为 3MF：现在也支持网络共享（SMB）上的文件和文件夹
+✓ 收藏：取消文件的星标后，它会立即从“收藏”视图中消失
+✓ 文件库侧栏：移除重复的“收藏”入口（仍可通过 F 键、仪表盘和文件星标访问收藏）
+✓ 合并为 3MF：创建文件后窗口自动关闭，并询问是删除还是保留原始文件
+✓ 删除文件：已删除的文件（例如合并为 3MF 之后）不再出现在文件库中，即使当时正在扫描网络共享
+✓ 收藏：更新星标时缩略图不再闪烁；已删除的文件（包括合并为 3MF 之后）会立即从文件库中消失
+✓ 收藏：在收藏视图中取消星标后，文件立即消失，标签计数即时更新
+<!--ja-->
+✓ モデルのバージョン：ファイルメニュー →「バージョン」：モデルを編集する前にコピーを保存し、現在のファイルと比較（サイズ、三角形数、寸法、体積）、ダウンロードまたは復元できます（現在の状態は先に保存されます）
+✓ コレクション：テーマでファイルをまとめ（ファイルメニュー →「コレクションに追加」）、ライブラリをコレクションで絞り込み、数量を設定して、コレクション全体をワンクリックで印刷キューに追加できます
+✓ オフピーク／ピーク電気料金：kWh 単価 2 種類とオフピーク時間帯（＋週末）を設定でき、計測済み印刷の実際の電気代に反映されます。30 日間の集計で節約できる額を表示し、シミュレーターで「今すぐ」と「次のオフピーク」を比較し、待機中のタスクがある状態でオフピークが始まると通知します（Stellio が勝手に印刷を始めることはありません）
+✓ Obico：カメラによる失敗検出の警告を監視（セルフホストサーバーまたは obico.io、API トークンは暗号化保存）。Obico が警告を出すとすぐにプッシュ通知します。接続テストを内蔵
+✓ プリンター：Duet / RepRapFirmware（Duet 2/3、スタンドアロンまたは SBC）と Repetier-Server（ファイル送信、状態、進捗、温度）に対応。USB シリアル接続の Marlin には対応していません
+✓ 統計：新セクション「印刷が失敗する原因」（原因・素材・プリンター・スライサープロファイル・曜日・時間帯別の失敗率、最も失敗しているファイル、数値に基づく手がかり）
+✓ レジンプリンター（ベータ）：SDCP 経由の Chitubox（Phrozen、Uniformation GKtwo など）、旧型 Wi-Fi の Anycubic Photon（状態とファイル）、公式 Web API 経由の Formlabs Form 3/4 に対応。監視のみで、フォーム・カード・モニター・ブランド一覧・ドキュメントに「ベータ」と表示します（Elegoo Saturn/Mars も同様）。Creality Halot は未対応です
+✓ 素材：サイドバーの「フィラメント」カテゴリが「素材」になり、フィラメントとレジンの 2 項目に。手動のレジンボトル在庫（ベータ：残量、ml 単位の「使用」ボタン、価格、保管場所、プリンター未連携）
+✓ レジンの要注文リマインド：調整可能な低在庫しきい値（既定 200 ml）、ボトルごとの「要注文」チェック、ショップ検索リンク、「注文済み」（リマインド 14 日延期）、ダッシュボードの「要注文」ウィジェットにも表示
+✓ レジン用スライサー（CHITUBOX、Photon Workshop、PreForm、Voxeldance Tango）を検出しレジンプリンターで自動的に開く。プリンターカードにレジン向けメンテナンス（FEP、タンク、LCD、フィルター、IPA など）— ベータ
+✓ S.O.S Print：AI は原因が見つかるまで質問数の制限なく質問を続け、最初の仮説が除外されたら新しい仮説を追加し、「まだ解決しない」と答えても結論を出さず調査を続けます。
+✓ S.O.S Print：AI が速度（印刷・1層目・壁・インフィル・移動・リトラクション）を考慮するようになりました。選択したスライサープロファイルから読み取り、不足している場合は AI が質問します。
+✓ S.O.S Print：多色印刷とプライムタワー（タワーの剥がれ・倒壊・造形物への落下・色混じり）を考慮するようになりました。AI が的確に質問し、タワー幅はスライサープロファイルから読み取ります。
+✓ S.O.S Print：最初の質問から各ステップで、AI が可能性（％）順に仮説を表示し、理由や簡単な確認方法を添え、回答のたびに更新します。
+✓ S.O.S Print：AI は 100％ 信頼できず間違えることがある旨の注意書きを追加（調査中と結果画面、README とドキュメント）。
+✓ AI：S.O.S Print（フォームの段階から）、README、ドキュメント、ウェブサイトに、AI は 100％ 信頼できず間違うことがある旨の注意書きを追加しました。
+✓ アップデート：「アップデートがあります」ウィンドウには、Stellio の言語のリリースノートのみが表示されます（なければ英語）。全言語は表示されません。
+✓ S.O.S Print：ページをコンパクト化し、調査を始める前にスクロールせず 1 画面でフォーム全体が見えるようになりました。写真エリアのアイコン位置も修正しました。
+✓ S.O.S Print：質問3から「結論を出して解決策を提案」で結論を出し、「この診断で問題は解決しましたか？」と確認します（はい、解決しました / いいえ、調査を続ける）
+✓ S.O.S Print：進行中の調査をいつでも中止できる「調査を中止」ボタンを追加
+✓ S.O.S Print：素材名をボタンの中央に配置
+✓ S.O.S Print：写真の読み込み枠を設定枠と同じ高さに揃えました
+✓ ライブラリ：「3MFに統合」— 複数のモデル（STL、3MFなど）を選択して1つの3MFファイルにまとめます。すべて収まれば1プレート、収まらなければ複数プレート
+✓ 選択バー：すべてのボタンを同じサイズに統一
+✓ スライサーへ送信：選んだスプールの色（例：黒PLA）を、スライサーに読み込むフィラメントプロファイルに反映します（OrcaSlicer、Bambu Studio、PrusaSlicerなど）。素材は正しいプロファイル選択に使われます
+✓ ダッシュボード：ページ上部の重複したタイトルを削除
+✓ 3MFに統合：ファイル名と保存先フォルダを選択可能（ダウンロードと同様にフォルダ作成も可）。入力欄の見た目を統一
+✓ 選択バー：すべてのボタンを1行に配置（小さな画面ではアイコンのみ）
+✓ 3MFに統合：ネットワーク共有（SMB）上のファイルとフォルダにも対応
+✓ お気に入り：星を外すと、お気に入り表示からすぐにファイルが消えます
+✓ ライブラリのサイドバー：重複していた「お気に入り」項目を削除（Fキー、ダッシュボード、ファイルの星から引き続き利用可能）
+✓ 3MFに統合：ファイル作成後にウィンドウを閉じ、元のファイルを削除するか残すかを確認します
+✓ ファイル削除：削除したファイル（例：3MF統合後）は、ネットワーク共有のスキャン中でもライブラリに表示されなくなりました
+✓ お気に入り：星の更新時にサムネイルがちらつかなくなりました。削除したファイル（3MF統合後を含む）はライブラリからすぐに消えます
+✓ お気に入り：お気に入り表示で星を外すと、ファイルがすぐに消え、チップのカウンターも即時更新されます

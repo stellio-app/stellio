@@ -10221,6 +10221,89 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
     body.has-demo-banner .sidebar-overlay { top: var(--demo-banner-h, 32px); }
 }
 
+/* ===== v1.1.3 : versions, collections, causes d'échec, tarif, Obico ===== */
+.v13-overlay{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+.v13-modal{background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-lg,12px);width:560px;max-width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+.v13-modal.v13-wide{width:760px}
+.v13-mh{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border)}
+.v13-mh h3{margin:0;font-size:1.05rem;overflow-wrap:anywhere}
+.v13-x{background:none;border:0;color:var(--text-secondary);font-size:1.6rem;line-height:1;cursor:pointer}
+.v13-mb{padding:16px 18px;overflow-y:auto;display:flex;flex-direction:column;gap:12px}
+.v13-muted{color:var(--text-secondary);font-size:.86rem;margin:0}
+.v13-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.v13-form.v13-end{justify-content:space-between}
+.v13-in{background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font:inherit;min-width:0;width:100%;box-sizing:border-box}
+.v13-form .v13-in{flex:1 1 160px;width:auto}
+textarea.v13-in{width:100%;resize:vertical}
+.v13-form .v13-qty,.v13-qty{flex:0 0 70px;width:70px;padding:4px 6px}
+.v13-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);font:inherit;font-size:.86rem;cursor:pointer;text-decoration:none}
+.v13-btn:hover{border-color:var(--accent,#6c8cff)}
+.v13-btn:disabled{opacity:.5;cursor:default}
+.v13-primary{background:var(--accent,#6c8cff);border-color:var(--accent,#6c8cff);color:#fff}
+.v13-danger{color:var(--danger,#e55353)}
+.v13-list{display:flex;flex-direction:column;gap:8px}
+.v13-row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-card)}
+.v13-click{cursor:pointer}.v13-click:hover{border-color:var(--accent,#6c8cff)}
+.v13-row-main{min-width:0;flex:1 1 220px;overflow-wrap:anywhere}
+.v13-row-act{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.v13-badge{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;background:var(--accent,#6c8cff);color:#fff;font-size:.72rem}
+.v13-badge-soft{background:var(--bg-hover);color:var(--text-secondary)}
+.v13-badge-warn{background:var(--danger,#e55353)}
+.v13-box{border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--bg-card)}
+.v13-box h4{margin:0 0 8px;font-size:.95rem}
+.v13-scroll{overflow-x:auto}
+.v13-tbl{width:100%;border-collapse:collapse;font-size:.86rem}
+.v13-tbl th,.v13-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+.v13-bar{display:flex;align-items:center;gap:10px}.v13-bar h4{margin:0}
+.v13-pick{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);font:inherit;cursor:pointer}
+.v13-pick:hover{border-color:var(--accent,#6c8cff)}
+.v13-pick.v13-in-coll{border-color:var(--accent,#6c8cff)}
+.v13-chip-manage{opacity:.8}
+.v13-section{margin:24px 0 8px;display:flex;flex-direction:column;gap:12px}
+.v13-sh{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.v13-sh h3{margin:0;font-size:1.1rem}
+.v13-chips{display:flex;gap:6px;flex-wrap:wrap}
+.v13-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+.v13-kpis>div{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--bg-card);display:flex;flex-direction:column}
+.v13-kpis b{font-size:1.4rem}.v13-kpis span{color:var(--text-secondary);font-size:.8rem}
+.v13-leads{border-color:var(--accent,#6c8cff)}.v13-leads ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.v13-bar-row{display:grid;grid-template-columns:minmax(80px,32%) 1fr auto;gap:10px;align-items:center;padding:3px 0;font-size:.86rem}
+.v13-bar-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v13-bar-t{height:8px;border-radius:99px;background:var(--bg-hover);overflow:hidden}
+.v13-bar-f{display:block;height:100%;background:var(--danger,#e55353);border-radius:99px}
+.v13-bar-v small{color:var(--text-secondary)}
+.v13-check{display:flex;gap:8px;align-items:flex-start;margin:6px 0}
+.v13-block{display:flex;flex-direction:column;gap:4px;margin:8px 0;font-size:.88rem}
+.v13-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:8px 0;font-size:.88rem}
+.v13-grid2 label{display:flex;flex-direction:column;gap:4px}
+.v13-ul{margin:8px 0 0;padding-left:18px;font-size:.86rem;color:var(--text-secondary)}
+@media (max-width:600px){.v13-overlay{padding:0;align-items:flex-end}.v13-modal,.v13-modal.v13-wide{width:100%;max-height:92vh;border-radius:14px 14px 0 0}.v13-bar-row{grid-template-columns:1fr auto}.v13-bar-t{grid-column:1 / -1;order:3}}
+
+#v13-tariff-section .accord-body,#v13-obico-section .accord-body{display:flex;flex-direction:column;gap:10px}
+#v13-tariff-section .accord-body .v13-check,#v13-tariff-section .accord-body .v13-block,#v13-tariff-section .accord-body .v13-grid2,#v13-obico-section .accord-body .v13-block,#v13-obico-section .accord-body .v13-check{margin:0}
+
+/* ===== v1.1.4 : imprimantes résine (bêta) ===== */
+.beta-badge{display:inline-block;padding:1px 8px;border-radius:999px;background:#f59e0b;color:#1a1d23;font-size:calc(10.5px * var(--fs, 1));font-weight:700;letter-spacing:.04em;text-transform:uppercase;line-height:1.6;white-space:nowrap}
+.printer-header .beta-badge{margin-left:8px}
+
+/* ===== v1.1.3 : inventaire de résine (bêta) ===== */
+.v13-bottles{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.v13-bottle{border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:var(--bg-card);display:flex;flex-direction:column;gap:8px;min-width:0}
+.v13-bottle-top{display:flex;gap:10px;align-items:center;min-width:0}
+.v13-bottle-name{min-width:0;overflow-wrap:anywhere}
+.v13-swatch{flex:0 0 28px;width:28px;height:28px;border-radius:8px;border:1px solid var(--border)}
+.v13-bar-ok{background:var(--accent,#6c8cff)!important}
+.v13-color{padding:2px;height:38px}
+.v13-low{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:20px;font-size:.75em;font-weight:600;background:rgba(229,83,83,.15);color:var(--danger,#e55353)}
+.v13-flag{display:flex;gap:6px;align-items:center;font-size:.9em;cursor:pointer}
+.v13-thr{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0 12px}
+.v13-thr .v13-in{width:100px}
+.v13-orders{border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin:0 0 14px;background:var(--bg-card);display:flex;flex-direction:column;gap:8px}
+.v13-orders h4{margin:0 0 2px}
+.v13-order{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.v13-order .v13-bottle-name{flex:1 1 160px}
+.v13-shop{display:flex;gap:8px;align-items:center;margin:6px 0;text-decoration:none}
+
 
 /* ===== S.O.S Print — page refaite : deux colonnes, cartes, indicateur d'étapes ===== */
 #page-sosprint { --sp-w: 1240px; }
@@ -10410,3 +10493,129 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
     .sp-stepper li b { font-size: calc(12px * var(--fs, 1)); }
     .sp-hero { align-items: flex-start; }
 }
+
+
+/* ===== S.O.S Print — version compacte : tout le formulaire tient sur un écran ===== */
+.sp-hero { gap: 14px; margin-bottom: 10px; flex-wrap: wrap; }
+.sp-hero-icon { width: 44px; height: 44px; border-radius: 12px; font-size: calc(19px * var(--fs, 1)); }
+.sp-hero-text { flex: 1 1 340px; }
+.sp-hero h2 { font-size: calc(21px * var(--fs, 1)); margin: 0 0 2px; }
+.sp-hero p { font-size: calc(13px * var(--fs, 1)); line-height: 1.35; }
+#page-sosprint .sp-hero .sp-stepper { width: auto; flex: 0 1 430px; margin: 0; min-width: 0; }
+.sp-stepper li { padding: 6px 12px; }
+.sp-notice { margin-bottom: 10px; padding: 8px 14px; align-items: center; }
+.sp-notice i { margin-top: 0; }
+.sp-notice strong { display: inline; margin: 0 6px 0 0; }
+
+.sosprint-container.sp-layout { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; }
+.sp-layout .sosprint-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.sp-layout .sosprint-form > .sp-card,
+.sp-layout .sosprint-form > .sosprint-submit-row,
+.sp-layout .sosprint-form > button[type="submit"],
+.sp-layout .sosprint-form > .sosprint-actions { grid-column: 1 / -1; }
+.sp-layout .sosprint-form > .sp-card,
+.sp-layout .sosprint-form > .input-group,
+.sp-layout .sosprint-form > .sosprint-settings { padding: 12px 14px; }
+
+.sp-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 18px; align-items: start; }
+.sp-card > .sp-card-title,
+.sp-card > .input-group:last-child { grid-column: 1 / -1; }
+.sp-card .input-group { margin: 0; min-width: 0; }
+.sp-card .input-group label:not(.sosprint-radio) { font-size: calc(12.5px * var(--fs, 1)); margin-bottom: 4px; }
+.sp-layout .sosprint-material-options { flex-wrap: nowrap; gap: 6px; }
+.sp-layout .sosprint-radio {
+    flex-direction: row;
+    padding: 0 12px;
+    height: 40px;
+    gap: 6px;
+    border-radius: 10px;
+}
+.sp-layout .sosprint-radio input[type="radio"] { margin: 0; }
+.sp-card #sosprint-description { min-height: 74px; height: 74px; resize: vertical; }
+
+.sp-layout .sosprint-settings-title { font-size: calc(12.5px * var(--fs, 1)); }
+.sp-layout .sosprint-settings-hint { margin: 6px 0 0; font-size: calc(11.5px * var(--fs, 1)); line-height: 1.35; }
+
+/* zone photo : l'icône reste dans la zone, sur la même ligne que le texte */
+.sosprint-photo-zone { margin-top: 4px; }
+.sosprint-photo-placeholder {
+    flex-direction: row;
+    gap: 10px;
+    padding: 14px 12px;
+}
+.sosprint-photo-placeholder i {
+    position: static;
+    transform: none;
+    inset: auto;
+    margin: 0;
+    flex: 0 0 auto;
+    font-size: calc(18px * var(--fs, 1));
+}
+
+@media (max-width: 980px) {
+    .sp-layout .sosprint-form { grid-template-columns: minmax(0, 1fr); }
+    .sp-card { grid-template-columns: minmax(0, 1fr); }
+    .sp-layout .sosprint-material-options { flex-wrap: wrap; }
+    #page-sosprint .sp-hero .sp-stepper { flex: 1 1 100%; }
+}
+
+
+.sp-layout .sosprint-radio { position: relative; }
+.sp-layout .sosprint-radio input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+.sp-layout .sosprint-radio { height: 36px; padding: 0 14px; }
+
+@media (max-height: 900px) and (min-width: 981px) {
+    .sp-hero p { display: none; }
+    .sp-layout .sosprint-settings-hint { display: none; }
+    .sp-card #sosprint-description { min-height: 60px; height: 60px; }
+    .sp-notice { font-size: calc(12px * var(--fs, 1)); padding: 6px 12px; }
+    .sosprint-photo-placeholder { padding: 10px 12px; }
+}
+
+/* Inventaire résine : bouton « Ajouter un flacon » centré verticalement avec le texte */
+.v13-sh .v13-chips{align-items:center}
+.v13-sh .v13-chips .v13-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;line-height:1.2}
+
+/* S.O.S Print : bouton d'arrêt de l'enquête, à gauche des actions */
+#sosprint-stop-btn{margin-right:auto;color:var(--danger,#ef4444)}
+#sosprint-stop-btn:hover{background:rgba(239,68,68,.12)}
+
+/* S.O.S Print : nom de la matière centré dans son bouton */
+.sp-layout .sosprint-radio { display: inline-flex; align-items: center; justify-content: center; margin: 0; padding-top: 0; padding-bottom: 0; line-height: 1; text-align: center; box-sizing: border-box; }
+.sp-layout .sosprint-radio span { display: block; margin: 0; padding: 0; line-height: 1; }
+
+/* S.O.S Print : le cadre photo est aussi haut que celui des réglages */
+.sp-layout .sosprint-form { align-items: stretch; }
+.sp-layout .sosprint-form > .input-group { display: flex; flex-direction: column; }
+.sp-layout .sosprint-form > .input-group .sosprint-photo-zone { flex: 1 1 auto; display: flex; flex-direction: column; }
+.sp-layout .sosprint-form > .input-group .sosprint-photo-placeholder { flex: 1 1 auto; justify-content: center; align-items: center; }
+
+/* Barre de sélection : une seule ligne, tous les boutons à la même taille */
+.selection-action-bar {
+    flex-wrap: nowrap; justify-content: center; gap: 8px;
+    width: max-content; max-width: calc(100vw - 100px); padding: 10px 14px; box-sizing: border-box;
+}
+.selection-action-bar .btn {
+    box-sizing: border-box; flex: 1 1 0; min-width: 74px; max-width: 108px; height: 42px; padding: 4px 6px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    text-align: center; line-height: 1.1; white-space: normal; font-size: calc(12px * var(--fs, 1));
+}
+.selection-action-bar .btn i { flex: 0 0 auto; }
+.selection-action-bar .settings-select { flex: 0 1 128px; min-width: 96px; width: 128px !important; max-width: 128px !important; height: 42px; box-sizing: border-box; }
+.selection-action-bar #selection-count { white-space: nowrap; flex: 0 0 auto; padding-right: 12px; }
+/* écran étroit : icônes seules (le nom reste dans l'infobulle) */
+@media (max-width: 1250px) {
+    .selection-action-bar .btn { flex: 0 0 auto; width: 42px; min-width: 42px; max-width: 42px; padding: 0; }
+    .selection-action-bar .btn > span { display: none; }
+}
+@media (max-width: 720px) {
+    .selection-action-bar { overflow-x: auto; justify-content: flex-start; }
+}
+
+/* Tableau de bord : le titre est déjà dans la barre du haut, seul le bouton Personnaliser reste (à droite) */
+.dashboard-header { justify-content: flex-end; }
+
+/* Fusion en 3MF : champs de la fenêtre au style des autres formulaires */
+.merge3mf-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+.merge3mf-grid .input-group { margin-bottom: 12px; }
+@media (max-width: 480px) { .merge3mf-grid { grid-template-columns: minmax(0, 1fr); } }

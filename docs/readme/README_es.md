@@ -113,7 +113,7 @@ Ya seas un maker principiante o un usuario experimentado con varias máquinas, S
 - 📐 **Análisis de imprimibilidad** (detección de voladizos) y **orientaciones sugeridas** (menos voladizo, se muestra el contacto con la cama)
 - 🎯 **Recomendación de perfil de slicer** basada en la geometría + historial de éxito
 - ⏱️ **Estimación del tiempo de impresión** antes del slicing
-- 🩺 **S.O.S Print**: diagnóstico adaptativo de fallos de impresión, paso a paso — Stellio hace una pregunta a la vez, reduce una lista de hipótesis según tus respuestas (sin límite de preguntas: se añaden nuevas hipótesis y la investigación continúa tras un «sigue sin resolverse») y luego ofrece un diagnóstico final; el análisis de fotos está disponible en cualquier momento y las conversaciones se guardan (reabrir, marcar como resuelto) ⚠️ La IA no es 100 % fiable y puede equivocarse: sus hipótesis son pistas que hay que comprobar.
+- 🩺 **S.O.S Print**: diagnóstico adaptativo de fallos de impresión, paso a paso — Stellio hace una pregunta a la vez, reduce una lista de hipótesis según tus respuestas (sin límite de preguntas: se añaden nuevas hipótesis y la investigación continúa tras un «sigue sin resolverse») y luego ofrece un diagnóstico final; el análisis de fotos está disponible en cualquier momento y las conversaciones se guardan (reabrir, marcar como resuelto) ⚠️ La IA no es 100 % fiable y puede equivocarse: sus hipótesis son pistas que hay que comprobar. Desde la **pregunta 3**, el botón **Concluir y proponer una solución** da las causas más probables y pregunta «¿Este diagnóstico resolvió el problema?» (**Sí, resuelto** / **No, continuar la investigación**). El botón **Detener la investigación** permite abandonar en cualquier momento.
 
 ### 🖨️ Gestión de impresoras
 - 🔌 Compatible con **OctoPrint**, **Klipper/Moonraker**, **Bambu Lab** (MQTT), **Creality** (WebSocket), **FlashForge**, **Elegoo** (SDCP) y **PrusaLink**
@@ -130,7 +130,8 @@ Ya seas un maker principiante o un usuario experimentado con varias máquinas, S
 - 🎛️ **Calibraciones**: guarda flow, pressure advance, temperaturas… por filamento e impresora, que se recuperan en la ventana de envío al slicer
 - 👥 **Modo colaborativo ligero**: comprueba si otro dispositivo conectado ya está viendo un archivo, y un aviso evita enviar dos veces el mismo archivo al slicer por error
 
-### 🧵 Gestión de filamento
+### 🧵 Materiales: filamento y resina
+- 🧪 **Inventario de resina (beta)**: la categoría de la barra lateral pasa a **Materiales** (Filamento + Resina). Añade tus botes a mano (marca, tipo, color, volumen, restante, precio, ubicación), resta lo que uses en ml y disfruta del mismo recordatorio **«A pedir»** que con el filamento (umbral bajo, casilla manual, enlaces de búsqueda de tiendas, «ya pedido»), también en el widget del panel. Aún sin enlazar a impresoras, nada se descuenta automáticamente
 - 🔗 Integración con **Spoolman** (servidor de gestión de bobinas), con detección automática en tu red
 - 🟠 Compatible con **AMS de Bambu Lab** (lectura de ranuras)
 - 🟢 Compatible con **CFS de Creality**
@@ -154,6 +155,8 @@ Ya seas un maker principiante o un usuario experimentado con varias máquinas, S
 
 ### 🧩 Herramientas avanzadas
 - 🎨 **Nesting automático** en la bandeja (rectpack o silueta real mediante shapely)
+- 🧩 **Fusionar en 3MF**: selecciona varios modelos (STL, 3MF, OBJ…) y Stellio crea un único archivo 3MF — una placa si todo cabe, si no un archivo con varias placas (estructura compatible con Bambu Studio / OrcaSlicer; PrusaSlicer muestra todas las piezas juntas). Eliges el nombre y la carpeta (incluidos recursos de red, con creación de carpetas) y Stellio pregunta si eliminar o conservar los archivos originales.
+- 🖌️ **Color de la bobina al slicer**: al enviar, el color y el material de la bobina elegida se aplican al perfil de filamento cargado en OrcaSlicer, Bambu Studio o PrusaSlicer (hace falta un perfil de filamento importado y vinculado a la impresora; en envío en lote, solo si todas las bobinas son iguales).
 - 🔧 **Reparación de mesh** (trimesh + pymeshfix) con **comparativa antes/después** (estanqueidad, triángulos, vértices, tamaño)
 - 🔄 **Conversor de formatos** (STL ↔ 3MF ↔ OBJ)
 - 🛡️ **Verificación de integridad** (archivos dañados/faltantes)
@@ -320,6 +323,7 @@ Stellio detecta automáticamente:
 - ✅ ideaMaker
 - ✅ FlashPrint
 - ✅ Lychee Slicer
+- ✅ CHITUBOX / CHITUBOX Pro / Anycubic Photon Workshop / PreForm / Voxeldance Tango *(resina, beta)*
 - ✅ CraftWare
 - ✅ MatterControl
 - ✅ MakerBot Print
@@ -338,6 +342,9 @@ Stellio detecta automáticamente:
 | **FlashForge** | Adventurer 5M / 5M Pro · AD5X | API propietaria: monitorización, detección UDP |
 | **Klipper / Moonraker** | Cualquier máquina con Klipper (Voron…) | HTTP: monitorización, envío, cámara, horas de impresión exactas |
 | **OctoPrint** | Cualquier impresora controlada por OctoPrint | HTTP: monitorización, envío, cámara |
+| **Duet / RepRapFirmware** | Cualquier placa Duet 2/3 | HTTP: monitorización, envío |
+| **Repetier-Server** | Cualquier impresora gestionada por Repetier-Server | HTTP: monitorización, envío |
+| **Resina (beta)** 🧪 | Formlabs (API web) · Anycubic Photon Wi-Fi · Chitubox / Phrozen / Uniformation (SDCP) | Solo monitorización, en beta — hardware real no probado del todo · mantenimiento (FEP, cuba, LCD…) |
 
 > Los modelos indicados son los que ofrece el formulario «Añadir impresora» de Stellio. Otros modelos que usen el mismo protocolo suelen funcionar también, pero no todos se han probado — [cuéntanoslo en GitHub](https://github.com/stellio-app/stellio/issues) si la tuya funciona o no.
 
@@ -386,7 +393,7 @@ stellio/
 ├── main.py             # Backend Flask + Desktop
 ├── interface/              # index.html, script.js, style.css (UI)
 ├── packaging/              # launcher.py, installer (.iss), macOS entitlements
-├── release-notes/          # notes_version_X.Y.Z.txt (release texts)
+├── release-notes/          # notes.txt (release text, replaced at each release)
 ├── tests/  tools/          # pytest tests, maintenance tools (incl. stellio_manager.bat)
 ├── check_deps.py       # Verificador de dependencias autorreparable
 ├── modules/            # Módulos separados de main.py (print_session, share_link, timelapse, mqtt_publisher…)

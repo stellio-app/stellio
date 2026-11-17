@@ -31,9 +31,7 @@ node_modules/
 /release/
 *.spec
 
-# --- Notes de version (texte des releases, gardées en local) ----------------
-#release-notes/
-
+# --- Notes de version : à versionner (la CI les lit dans release-notes/) ----
 # --- Binaires tiers téléchargés par la CI (ffmpeg, UnRAR…) -------------------
 /bin/
 
