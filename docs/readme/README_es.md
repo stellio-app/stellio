@@ -159,6 +159,7 @@ Ya seas un maker principiante o un usuario experimentado con varias máquinas, S
 - 🖌️ **Color de la bobina al slicer**: al enviar, el color y el material de la bobina elegida se aplican al perfil de filamento cargado en OrcaSlicer, Bambu Studio o PrusaSlicer (hace falta un perfil de filamento importado y vinculado a la impresora; en envío en lote, solo si todas las bobinas son iguales).
 - 🔧 **Reparación de mesh** (trimesh + pymeshfix) con **comparativa antes/después** (estanqueidad, triángulos, vértices, tamaño)
 - 🔄 **Conversor de formatos** (STL ↔ 3MF ↔ OBJ)
+- 📏 **BigPrint (Herramientas)**: amplíe un modelo a tamaño real (p. ej. 1,8 m); se corta en piezas que caben en su cama, se vacía, se le añaden pasadores y se numera, con vista previa 3D explosionada y estimación de filamento/coste; guarda las piezas STL, un proyecto 3MF y un informe en una carpeta local o de red. Basado en el motor de código abierto [bigprint](https://github.com/PooterTF/bigprint) (AGPL-3.0).
 - 🛡️ **Verificación de integridad** (archivos dañados/faltantes)
 - 💰 **Cálculo del coste de impresión**: material, electricidad, desgaste de la máquina (por hora), gastos fijos, margen en % y cantidad — precio unitario y total calculados al céntimo
 - 🏷️ **Margen y precio de venta**: define tu margen por defecto (%) una vez en Ajustes → Tarifas de impresión; el historial muestra el precio de venta (coste + margen) junto al coste, mientras que las estadísticas siguen usando el coste real
@@ -221,6 +222,7 @@ Ya seas un maker principiante o un usuario experimentado con varias máquinas, S
 | ![Biblioteca con miniaturas](../../images/library.png) *Biblioteca con miniaturas* | ![Monitorización de impresoras](../../images/monitoring.png) *Monitorización de impresoras* |
 | ![Recomendación de perfil por IA](../../images/slicer.png) *Recomendación de perfil por IA* | ![Nesting automático](../../images/nesting.png) *Nesting automático* |
 | ![Detección de duplicados](../../images/duplicates.png) *Detección de duplicados* | ![Filtros avanzados](../../images/filters.png) *Filtros avanzados* |
+| ![BigPrint: ampliar a tamaño real y cortar en piezas](../wiki/images/es/bigprint.png) *BigPrint: ampliar a tamaño real y cortar en piezas* | ![BigPrint: vista explosionada, filamento y lista de piezas](../wiki/images/es/bigprint-result.png) *BigPrint: vista explosionada, filamento y lista de piezas* |
 
 ---
 
@@ -345,6 +347,7 @@ Stellio detecta automáticamente:
 | **Duet / RepRapFirmware** | Cualquier placa Duet 2/3 | HTTP: monitorización, envío |
 | **Repetier-Server** | Cualquier impresora gestionada por Repetier-Server | HTTP: monitorización, envío |
 | **Resina (beta)** 🧪 | Formlabs (API web) · Anycubic Photon Wi-Fi · Chitubox / Phrozen / Uniformation (SDCP) | Solo monitorización, en beta — hardware real no probado del todo · mantenimiento (FEP, cuba, LCD…) |
+| **Impresora USB (beta) 🧪** | Marlin, Prusa, Creality, placas Klipper… conectadas al PC de Stellio | Detección de puertos serie (el puerto nunca se abre): conectada / ausente, sin estado ni temperaturas |
 
 > Los modelos indicados son los que ofrece el formulario «Añadir impresora» de Stellio. Otros modelos que usen el mismo protocolo suelen funcionar también, pero no todos se han probado — [cuéntanoslo en GitHub](https://github.com/stellio-app/stellio/issues) si la tuya funciona o no.
 
@@ -484,6 +487,7 @@ Stellio es socio de integración de [**TigerTag**](https://tigersystem.io), el s
 - [Spoolman](https://github.com/Donkie/Spoolman) por la gestión de bobinas de filamento
 - [TigerTag](https://tigersystem.io) por la identificación NFC/RFID de filamentos
 - [Open Filament Database](https://openfilamentdatabase.org) (Open Filament Collective) por el catálogo de bobinas (licencia MIT)
+- [bigprint](https://github.com/PooterTF/bigprint) de Michael Christopher Stone (PooterTF) por la herramienta BigPrint (corte de modelos a tamaño real, AGPL-3.0)
 - [OpenPrintTag](https://specs.openprinttag.org/) por el estándar de etiquetas NFC de bobinas (Prusa Research, licencia MIT)
 - A la comunidad maker por sus comentarios y sugerencias
 - A todos los contribuidores ❤️

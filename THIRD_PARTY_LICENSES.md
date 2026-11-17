@@ -22,8 +22,13 @@ Python modules the application needs).
 | waitress | ZPL-2.1 |
 | defusedxml, matplotlib | Python Software Foundation License (matplotlib: PSF-based) |
 | paho-mqtt | EPL-2.0 OR BSD-3-Clause (used under BSD-3-Clause) |
+| pyserial | BSD-3-Clause |
 | py7zr | LGPL-2.1-or-later (used as an unmodified library) |
 | pymeshfix | GNU AGPL v3 (same license as Stellio) |
+| bigprint (copied into `bigprint/`, © Michael Christopher Stone, https://github.com/PooterTF/bigprint) | GNU AGPL v3 or later (same license as Stellio) |
+| manifold3d | Apache-2.0 |
+| scipy, scikit-image | BSD-3-Clause |
+| three.js (bundled with bigprint for the 3D preview) | MIT |
 
 Packaging: PyInstaller (GPL-2.0 with the bootloader exception, which allows any license for the packaged program).
 

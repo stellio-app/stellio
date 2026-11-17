@@ -25,6 +25,7 @@ shapely
 rectpack
 smbprotocol
 paho-mqtt
+pyserial
 requests
 cryptography
 rarfile
@@ -43,3 +44,8 @@ pyaes
 openpyxl
 xlrd
 cascadio
+# v1.1.4 : BigPrint (moteur de decoupe grandeur nature)
+manifold3d
+scipy
+scikit-image
+lxml

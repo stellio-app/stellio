@@ -42,6 +42,7 @@ REQUIRED_MODULES = [
     ("pymeshfix",                               "pymeshfix",              "MeshFix",            None),
     ("defusedxml.ElementTree",                  "defusedxml",             "parse",              None),
     ("paho.mqtt.client",                        "paho-mqtt",              "Client",             None),
+    ("serial.tools.list_ports",                 "pyserial",               "comports",           None),
     ("rectpack",                                "rectpack",               "newPacker",          None),
     ("shapely.affinity",                        "shapely",                None,                 None),
     ("py7zr",                                   "py7zr",                  "SevenZipFile",       None),
@@ -58,6 +59,9 @@ REQUIRED_MODULES = [
     ("openpyxl",                                "openpyxl",               "load_workbook",      None),
     ("xlrd",                                    "xlrd",                   "open_workbook",      None),
     ("cascadio",                                "cascadio",               "step_to_glb",        None),
+    ("manifold3d",                              "manifold3d",             "Manifold",           None),   # v1.1.4 : BigPrint
+    ("scipy.ndimage",                           "scipy",                  None,                 None),   # v1.1.4 : BigPrint
+    ("skimage.measure",                         "scikit-image",           None,                 None),   # v1.1.4 : BigPrint
 ]
 
 TELEGRAM_MODULES = [

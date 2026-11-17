@@ -159,6 +159,7 @@ Que vous soyez un maker débutant ou un propriétaire expérimenté gérant plus
 - 🖌️ **Couleur de la bobine vers le slicer** : à l'envoi, la couleur et la matière de la bobine choisie sont appliquées au profil de filament chargé dans OrcaSlicer, Bambu Studio ou PrusaSlicer (un profil de filament importé et rattaché à l'imprimante est nécessaire ; en envoi groupé, la couleur n'est appliquée que si toutes les bobines sont identiques).
 - 🔧 **Réparation de mesh** (trimesh + pymeshfix) avec **comparatif avant/après** (étanchéité, triangles, sommets, taille)
 - 🔄 **Convertisseur de format** (STL ↔ 3MF ↔ OBJ)
+- 📏 **BigPrint (Outils)** : agrandissez un modèle à taille réelle (ex. 1,8 m) ; il est découpé en pièces qui tiennent sur votre plateau, évidé, muni de goujons et numéroté, avec aperçu 3D éclaté et estimation filament/coût ; enregistre les pièces STL, un projet 3MF et un rapport dans un dossier local ou réseau. Basé sur le moteur open source [bigprint](https://github.com/PooterTF/bigprint) (AGPL-3.0).
 - 🛡️ **Vérification d'intégrité** (fichiers corrompus/manquants)
 - 💰 **Calcul du coût d'impression** : matière, électricité, usure machine (par heure), frais fixes, marge en % et quantité — prix unitaire et total calculés au centime
 - 🏷️ **Marge et prix de vente** : réglez votre marge par défaut (%) une fois dans Paramètres → Tarifs d'impression ; l'historique affiche le prix de vente (coût + marge) à côté du coût, tandis que les statistiques restent calculées sur le coût réel
@@ -221,6 +222,7 @@ Que vous soyez un maker débutant ou un propriétaire expérimenté gérant plus
 | ![Bibliothèque avec miniatures](../../images/library.png) *Bibliothèque avec miniatures* | ![Suivi d'imprimante](../../images/monitoring.png) *Suivi d'imprimante* |
 | ![Recommandation de profil par IA](../../images/slicer.png) *Recommandation de profil par IA* | ![Nesting automatique](../../images/nesting.png) *Nesting automatique* |
 | ![Détection des doublons](../../images/duplicates.png) *Détection des doublons* | ![Filtres avancés](../../images/filters.png) *Filtres avancés* |
+| ![BigPrint : agrandir à taille réelle et découper en pièces](../wiki/images/fr/bigprint.png) *BigPrint : agrandir à taille réelle et découper en pièces* | ![BigPrint : aperçu éclaté, filament et liste des pièces](../wiki/images/fr/bigprint-result.png) *BigPrint : aperçu éclaté, filament et liste des pièces* |
 
 ---
 
@@ -345,6 +347,7 @@ Stellio détecte automatiquement :
 | **Duet / RepRapFirmware** | Toute carte Duet 2/3 | HTTP : suivi, envoi |
 | **Repetier-Server** | Toute imprimante gérée par Repetier-Server | HTTP : suivi, envoi |
 | **Résine (bêta)** 🧪 | Formlabs (API web) · Anycubic Photon Wi-Fi · Chitubox / Phrozen / Uniformation (SDCP) | Suivi uniquement, en bêta — matériel réel pas entièrement testé · maintenance (FEP, bac, LCD…) |
+| **Imprimante USB (bêta) 🧪** | Marlin, Prusa, Creality, cartes Klipper… branchées au PC de Stellio | Détection des ports série (le port n'est jamais ouvert) : branchée / absente, sans état ni températures |
 
 > Les modèles listés sont ceux proposés dans le formulaire « Ajouter une imprimante » de Stellio. D'autres modèles utilisant le même protocole fonctionnent en général aussi, mais tous n'ont pas été testés — [dites-nous sur GitHub](https://github.com/stellio-app/stellio/issues) si la vôtre fonctionne ou non.
 
@@ -484,6 +487,7 @@ Stellio est partenaire d'intégration de [**TigerTag**](https://tigersystem.io),
 - [Spoolman](https://github.com/Donkie/Spoolman) pour la gestion des bobines de filament
 - [TigerTag](https://tigersystem.io) pour l'identification NFC/RFID des filaments
 - [Open Filament Database](https://openfilamentdatabase.org) (Open Filament Collective) pour le catalogue de bobines (licence MIT)
+- [bigprint](https://github.com/PooterTF/bigprint) de Michael Christopher Stone (PooterTF) pour l'outil BigPrint (découpe de modèles grandeur nature, AGPL-3.0)
 - [OpenPrintTag](https://specs.openprinttag.org/) pour le standard d'étiquettes NFC de bobines (Prusa Research, licence MIT)
 - La communauté des makers pour ses retours et suggestions
 - Tous les contributeurs ❤️

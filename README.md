@@ -161,6 +161,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 🖌️ **Spool colour sent to the slicer**: when sending, the colour and material of the chosen spool are applied to the filament profile loaded in OrcaSlicer, Bambu Studio or PrusaSlicer (an imported filament profile linked to the printer is required; in a batch send, the colour is applied only if all spools are identical).
 - 🔧 **Mesh repair** (trimesh + pymeshfix) with a **before/after comparison** (watertightness, triangles, vertices, size)
 - 🔄 **Format converter** (STL ↔ 3MF ↔ OBJ)
+- 📏 **BigPrint (Tools)**: scale a model to life size (e.g. 1.8 m); it is cut into pieces that fit your bed, hollowed, fitted with dowel pins and numbered, with an exploded 3D preview and filament/cost estimate; saves STL pieces, a 3MF project and a report to a local or network folder. Built on the open-source [bigprint](https://github.com/PooterTF/bigprint) engine (AGPL-3.0).
 - 🛡️ **Integrity check** (corrupted/missing files)
 - 💰 **Print cost calculation**: material, electricity, machine wear (per hour), fixed fee, margin in % and quantity — unit price and total computed to the cent
 - 🏷️ **Margin & sale price**: set your default margin (%) once in Settings → Print pricing; the history shows the sale price (cost + margin) next to the cost, while statistics keep using the real cost
@@ -223,6 +224,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 | ![Library with thumbnails](images/library.png) *Library with thumbnails* | ![Printer monitoring](images/monitoring.png) *Printer monitoring* |
 | ![AI profile recommendation](images/slicer.png) *AI profile recommendation* | ![Automatic nesting](images/nesting.png) *Automatic nesting* |
 | ![Duplicate detection](images/duplicates.png) *Duplicate detection* | ![Advanced filters](images/filters.png) *Advanced filters* |
+| ![BigPrint: scale to life size and split into pieces](images/bigprint.png) *BigPrint: scale to life size and split into pieces* | ![BigPrint: exploded preview, filament and piece list](images/bigprint-result.png) *BigPrint: exploded preview, filament and piece list* |
 
 ---
 
@@ -347,6 +349,7 @@ Stellio automatically detects:
 | **Duet / RepRapFirmware** | Any Duet 2/3 board | HTTP: monitoring, upload |
 | **Repetier-Server** | Any printer managed by Repetier-Server | HTTP: monitoring, upload |
 | **Resin (beta)** 🧪 | Formlabs (web API) · Anycubic Photon Wi-Fi · Chitubox / Phrozen / Uniformation (SDCP) | Monitoring only, still in beta — real hardware not fully tested · maintenance (FEP, vat, LCD…) |
+| **USB printer (beta) 🧪** | Marlin, Prusa, Creality, Klipper boards… plugged into the Stellio PC | Serial port detection (the port is never opened): plugged in / absent, no status or temperatures |
 
 > The models listed are those offered in Stellio's “Add a printer” form. Other models that speak the same protocol usually work too, but have not all been tested — [tell us on GitHub](https://github.com/stellio-app/stellio/issues) if yours works or not.
 
@@ -486,6 +489,7 @@ Stellio is an official integration partner of [**TigerTag**](https://tigersystem
 - [Spoolman](https://github.com/Donkie/Spoolman) for filament spool management
 - [TigerTag](https://tigersystem.io) for NFC/RFID filament identification
 - [Open Filament Database](https://openfilamentdatabase.org) (Open Filament Collective) for the filament catalog (MIT license)
+- [bigprint](https://github.com/PooterTF/bigprint) by Michael Christopher Stone (PooterTF) for the BigPrint tool (life-size model cutter, AGPL-3.0)
 - [OpenPrintTag](https://specs.openprinttag.org/) for the NFC spool tag standard (Prusa Research, MIT license)
 - The maker community for feedback and suggestions
 - All contributors ❤️

@@ -232,6 +232,22 @@ Stellio 的每一项功能：**它有什么用，怎么用**。技术细节见�
 3. 如有需要，勾选**自动修复网格**和**删除原始文件**。
 4. 开始。批量转换可随时取消：已转换的文件会保留。
 
+## 将模型放大到等身大小（BigPrint）
+BigPrint（**工具**菜单）可将模型放大到所需尺寸——1.8 米甚至更大——并切成适合您打印平台的部件：部件掏空、带拼接销钉，每个部件上刻有编号。计算由集成在 Stellio 中的开源引擎 [bigprint](https://github.com/PooterTF/bigprint)（AGPL-3.0，作者 Michael Christopher Stone）完成。
+
+{{img:bigprint}}
+
+1. 选择模型：**从库中选择**、**导入文件**，或在文件的**操作**菜单中点击**发送到 BigPrint**（STL、3MF、OBJ、PLY）。
+2. 填写**最终尺寸**（高度、宽度、深度或缩放系数）和您的**打印机**（预设列表或自定义尺寸）。
+3. 设置**强度**（用途、材料、掏空、外壳厚度）和**销钉**；高级选项（向上轴、边距、平滑等）默认折叠。
+4. 点击**预览**：Stellio 以分解视图显示各部件、耗材重量、预估成本和部件表。计算可随时取消。
+
+{{img:bigprint-result}}
+
+选择保存位置（库来源、子文件夹，可新建文件夹，支持网络共享），然后点击**保存打印文件**：STL 部件、3MF 项目、销钉、报告和预览会复制到 `<模型>_bigprint` 文件夹。
+
+预览之后如果修改了设置，请先重新预览再保存。
+
 ## 整理：重复文件与回收站
 
 1. 打开**重复文件**：完全相同的文件，以及**几何相近**的文件（同一模型被改名或重新导出）会被归为一组。
@@ -402,6 +418,7 @@ Stellio 的每一项功能：**它有什么用，怎么用**。技术细节见�
 ## 3D 查看器与工具
 - **3D 查看器**（Three.js，可离线使用），支持在各盘之间切换。
 - **自动排版**（rectpack，或使用 shapely 的真实轮廓）。
+- **BigPrint**（**工具**菜单）：将模型放大到所需尺寸并切成带销钉的编号部件，提供分解式 3D 预览以及耗材与成本估算（开源引擎 bigprint）。
 - **合并为 3MF**：选择多个模型（STL、3MF、OBJ 等），Stellio 会生成一个 3MF 文件——全部放得下则为单个盘，否则生成多盘文件（结构兼容 Bambu Studio / OrcaSlicer；PrusaSlicer 会把所有零件一起显示）。可自选文件名和保存文件夹（支持网络共享，可新建文件夹），完成后 Stellio 会询问是删除还是保留原始文件。
 - **耗材盘颜色传给切片软件**：发送时，所选耗材盘的颜色和材料会应用到 OrcaSlicer、Bambu Studio 或 PrusaSlicer 加载的耗材配置（需要已导入并关联到打印机的耗材配置；批量发送时仅当所有耗材盘相同才应用颜色）。
 - **选择栏**：所有按钮大小一致并排成一行（小屏幕仅显示图标，名称显示在提示中）。
@@ -435,6 +452,7 @@ Stellio 的每一项功能：**它有什么用，怎么用**。技术细节见�
 | **Creality** | K1/K2 系列、Ender-3 V3、Hi | WebSocket：监控、CFS、UDP 发现 |
 | **Elegoo** | Centauri Carbon 1 和 2、Saturn/Mars 光固化系列（**测试版**） | SDCP（WebSocket） |
 | **Chitubox 树脂机** *(测试版)* | Phrozen、Uniformation GKtwo 及其他 Chitubox 主板 | SDCP v3：监控（与 Elegoo 相同的协议） |
+| **USB 打印机 *(测试版)*** | 连接到 Stellio 所在电脑的 Marlin、Prusa、Creality、Klipper 主板等 | 串口检测（从不打开端口）：已插上 / 未连接，无状态和温度 |
 | **Anycubic Photon** *(测试版)* | 较早的 Wi-Fi 机型：Mono X、Mono X 6K、Mono SQ（不含 M5s / M7） | TCP 6000 文本命令：仅状态和当前文件 |
 | **Formlabs** *(测试版)* | Form 3 / 3L / 4 | 官方 Web API（client_id:client_secret）：状态、进度、层数；通过 PreForm 发送 |
 | **FlashForge** | Adventurer 5M/5M Pro、AD5X | 专有 API |

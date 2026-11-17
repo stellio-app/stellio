@@ -82,6 +82,19 @@ CAPTIONS_V112 = {
 }
 for _l, _c in CAPTIONS_V112.items():
     CAPTIONS[_l].update(_c)
+# v1.1.4 : captures BigPrint
+CAPTIONS_V114 = {
+    'fr': {'bigprint': 'BigPrint : réglages en trois colonnes', 'bigprint-result': 'BigPrint : aperçu éclaté, filament et liste des pièces'},
+    'en': {'bigprint': 'BigPrint: settings in three columns', 'bigprint-result': 'BigPrint: exploded preview, filament and piece list'},
+    'de': {'bigprint': 'BigPrint: Einstellungen in drei Spalten', 'bigprint-result': 'BigPrint: Explosionsansicht, Filament und Teileliste'},
+    'es': {'bigprint': 'BigPrint: ajustes en tres columnas', 'bigprint-result': 'BigPrint: vista explosionada, filamento y lista de piezas'},
+    'pt': {'bigprint': 'BigPrint: definições em três colunas', 'bigprint-result': 'BigPrint: vista explodida, filamento e lista de peças'},
+    'it': {'bigprint': 'BigPrint: impostazioni in tre colonne', 'bigprint-result': 'BigPrint: anteprima esplosa, filamento ed elenco dei pezzi'},
+    'zh': {'bigprint': 'BigPrint：三栏设置', 'bigprint-result': 'BigPrint：分解预览、耗材与部件列表'},
+    'ja': {'bigprint': 'BigPrint：3列の設定', 'bigprint-result': 'BigPrint：分解プレビュー・フィラメント・パーツ一覧'},
+}
+for _l, _c in CAPTIONS_V114.items():
+    CAPTIONS[_l].update(_c)
 CHANGELOG_MAX_VERSIONS = 25
 
 

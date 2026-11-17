@@ -159,6 +159,7 @@
 - 🖌️ **スプールの色をスライサーへ**：送信時に、選んだスプールの色と素材が OrcaSlicer・Bambu Studio・PrusaSlicer に読み込むフィラメントプロファイルへ反映されます（プリンターに関連付けたインポート済みのフィラメントプロファイルが必要。一括送信では、すべてのスプールが同じ場合のみ色を適用）。
 - 🔧 **メッシュ修復**（trimesh + pymeshfix）。**修復前後の比較**（水密性、三角形数、頂点数、サイズ）付き
 - 🔄 **フォーマット変換**（STL ↔ 3MF ↔ OBJ）
+- 📏 **BigPrint（ツール）**：モデルを実寸大（例：1.8 m）に拡大し、ベッドに収まるパーツに分割・中空化、ダボと番号を追加。分解表示の3Dプレビューとフィラメント/コスト見積もり付きで、STLパーツ・3MFプロジェクト・レポートをローカルまたはネットワークフォルダーに保存。オープンソースエンジン [bigprint](https://github.com/PooterTF/bigprint)（AGPL-3.0）を使用。
 - 🛡️ **整合性チェック**（破損・欠落ファイル）
 - 💰 **印刷コスト計算**：材料費、電気代、機械の摩耗（時間あたり）、固定費、利益率（％）、数量 — 単価と合計を1円単位まで計算
 - 🏷️ **マージンと販売価格**：設定 → 印刷料金で既定のマージン（%）を一度設定すると、履歴にコストの横に販売価格（コスト + マージン）が表示されます。統計は引き続き実コストで計算されます
@@ -220,6 +221,7 @@
 | ![サムネイル付きライブラリ](../../images/library.png) *サムネイル付きライブラリ* | ![プリンター監視](../../images/monitoring.png) *プリンター監視* |
 | ![AIによるプロファイル推奨](../../images/slicer.png) *AIによるプロファイル推奨* | ![自動ネスティング](../../images/nesting.png) *自動ネスティング* |
 | ![重複検出](../../images/duplicates.png) *重複検出* | ![高度なフィルター](../../images/filters.png) *高度なフィルター* |
+| ![BigPrint：実寸大に拡大しパーツに分割](../wiki/images/ja/bigprint.png) *BigPrint：実寸大に拡大しパーツに分割* | ![BigPrint：分解プレビュー・フィラメント・パーツ一覧](../wiki/images/ja/bigprint-result.png) *BigPrint：分解プレビュー・フィラメント・パーツ一覧* |
 
 ---
 
@@ -344,6 +346,7 @@ Stellioは以下を自動検出します：
 | **Duet / RepRapFirmware** | Duet 2/3 ボード全般 | HTTP：監視、アップロード |
 | **Repetier-Server** | Repetier-Server 管理のプリンター全般 | HTTP：監視、アップロード |
 | **レジン（ベータ）** 🧪 | Formlabs（Web API）· Anycubic Photon Wi-Fi · Chitubox / Phrozen / Uniformation (SDCP) | 監視のみ・ベータ — 実機での検証は未完了 · メンテナンス（FEP、タンク、LCD…） |
+| **USBプリンター（ベータ）🧪** | StellioのPCに接続したMarlin、Prusa、Creality、Klipper基板など | シリアルポートの検出（ポートは開きません）：接続中／未接続のみで、状態や温度なし |
 
 > 掲載しているモデルは、Stellio の「プリンターを追加」フォームで選べるものです。同じプロトコルを使う他のモデルも通常は動作しますが、すべてをテストしたわけではありません。お使いの機種が動作したかどうかを [GitHub でお知らせください](https://github.com/stellio-app/stellio/issues)。
 
@@ -483,6 +486,7 @@ Stellio は、NFC/RFID によるフィラメント識別システム [**TigerTag
 - フィラメントスプール管理の[Spoolman](https://github.com/Donkie/Spoolman)
 - NFC/RFIDによるフィラメント識別の[TigerTag](https://tigersystem.io)
 - フィラメントカタログ（MITライセンス）の[Open Filament Database](https://openfilamentdatabase.org)（Open Filament Collective）
+- [bigprint](https://github.com/PooterTF/bigprint)（Michael Christopher Stone / PooterTF）：BigPrintツール（実寸大モデルの分割、AGPL-3.0）
 - スプールNFCタグ標準（Prusa Research、MITライセンス）の[OpenPrintTag](https://specs.openprinttag.org/)
 - フィードバックや提案をくれたメイカーコミュニティ
 - すべてのコントリビューターに ❤️

@@ -268,6 +268,7 @@ except ImportError:
         ("pymeshfix",                               "pymeshfix",              "MeshFix",            None),
         ("defusedxml.ElementTree",                  "defusedxml",             "parse",              None),
         ("paho.mqtt.client",                        "paho-mqtt",              "Client",             None),
+        ("serial.tools.list_ports",                 "pyserial",               "comports",           None),
         ("rectpack",                                "rectpack",               "newPacker",          None),
         ("shapely.affinity",                        "shapely",                None,                 None),
         ("py7zr",                                   "py7zr",                  "SevenZipFile",       None),
@@ -284,6 +285,9 @@ except ImportError:
         ("openpyxl",                                "openpyxl",               "load_workbook",      None),
         ("xlrd",                                    "xlrd",                   "open_workbook",      None),
         ("cascadio",                                "cascadio",               "step_to_glb",        None),
+        ("manifold3d",                              "manifold3d",             "Manifold",           None),   # v1.1.4 : BigPrint
+        ("scipy.ndimage",                           "scipy",                  None,                 None),   # v1.1.4 : BigPrint
+        ("skimage.measure",                         "scikit-image",           None,                 None),   # v1.1.4 : BigPrint
     ]
 
 
@@ -451,7 +455,7 @@ def _frozen_install_wheel(dist, version, expected_sha256):
 # Noms d'import usuels quand ils diffèrent du nom de la distribution (dépendances transitives)
 _FROZEN_IMPORT_NAMES = {
     'pillow': 'PIL', 'pyyaml': 'yaml', 'pyopengl': 'OpenGL', 'smbprotocol': 'smbclient',
-    'paho-mqtt': 'paho', 'websocket-client': 'websocket', 'pywebview': 'webview',
+    'paho-mqtt': 'paho', 'pyserial': 'serial', 'websocket-client': 'websocket', 'pywebview': 'webview',
     'typing-extensions': 'typing_extensions', 'charset-normalizer': 'charset_normalizer',
     'python-dateutil': 'dateutil', 'beautifulsoup4': 'bs4', 'scikit-image': 'skimage',
 }
@@ -3540,6 +3544,62 @@ def _discover_bambu_ssdp(timeout=2.5):
     return found
 
 
+_SDCP_RESIN_RE = re.compile(r'saturn|mars|jupiter|mighty|sonic|phrozen|uniformation|gk\s?two|gktwo|halot|photon|resin|r[ée]sine|lcd|msla', re.I)
+
+
+def _sdcp_is_resin(attrs):
+    """v1.1.4 : une carte SDCP qui répond au broadcast est-elle une imprimante résine (Saturn, Mars, Phrozen, GKtwo…) ?
+    Détection par le nom/modèle/marque annoncés : les Elegoo FDM (Centauri Carbon…) restent en `elegoo_sdcp`."""
+    try:
+        txt = ' '.join(str(attrs.get(k, '')) for k in ('Name', 'MachineName', 'BrandName'))
+        return bool(_SDCP_RESIN_RE.search(txt))
+    except Exception:
+        return False
+
+
+def _discover_photon(timeout=0.6, max_parallel=128):
+    """v1.1.4 : détecte les anciens Anycubic Photon Wi‑Fi (TCP 6000, commande texte `getstatus,end`) sur le(s) réseau(x) local(aux)."""
+    prefixes = _get_all_lan_prefixes()[:4]
+    if not prefixes:
+        return []
+    found, lock = [], threading.Lock()
+
+    def _probe(ip):
+        try:
+            s = socket.create_connection((ip, 6000), timeout=timeout)
+        except Exception:
+            return
+        try:
+            s.settimeout(1.5)
+            s.sendall(b'getstatus,end')
+            data = s.recv(512).decode('utf-8', 'ignore').strip()
+            if data.lower().startswith('getstatus'):
+                with lock:
+                    found.append({'type': 'anycubic_photon', 'ip': ip, 'name': f"Anycubic Photon ({ip})",
+                                  'model': '', 'serial': '', 'source': 'scan'})
+        except Exception:
+            pass
+        finally:
+            try:
+                s.close()
+            except Exception:
+                pass
+
+    batch = []
+    for prefix in prefixes:
+        for i in range(1, 255):
+            t = threading.Thread(target=_probe, args=(f"{prefix}.{i}",), daemon=True)
+            batch.append(t)
+            t.start()
+            if len(batch) >= max_parallel:
+                for th in batch:
+                    th.join(timeout=3)
+                batch = []
+    for th in batch:
+        th.join(timeout=3)
+    return found
+
+
 def _discover_elegoo_broadcast(timeout=2.5):
     found = []
 
@@ -3565,7 +3625,7 @@ def _discover_elegoo_broadcast(timeout=2.5):
                 attrs = data_dict.get('Attributes', data_dict)
                 seen.add(ip)
                 found.append({
-                    'type': 'elegoo_sdcp', 'ip': ip,
+                    'type': 'chitu_sdcp' if _sdcp_is_resin(attrs) else 'elegoo_sdcp', 'ip': ip,
                     'name': attrs.get('Name', '') or f"Elegoo ({ip})",
                     'model': attrs.get('MachineName', ''),
                     'serial': attrs.get('MainboardID', ''),
@@ -4575,6 +4635,8 @@ class PrinterManager:
             elif ptype in ('formlabs', 'anycubic_photon'):   # v1.1.4 (bêta) : imprimantes résine
                 cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
                 return resin_printers.connect(ptype, ip, api_key, cfg)
+            elif ptype == 'usb_serial':   # v1.1.4 (bêta) : imprimante branchée en USB au PC de Stellio (présence seulement)
+                return usb_printers.connect(ip)
             elif ptype in ('duet', 'repetier'):   # v1.1.3 : Duet (RepRapFirmware) et Repetier-Server
                 cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
                 return printers_extra.connect(ptype, _pbase(ip, _extra_printer_port(ptype, cfg)), api_key, cfg)
@@ -4845,6 +4907,11 @@ class PrinterManager:
                     return resin_printers.status(ptype, ip, api_key, cfg)
                 except RuntimeError as e:
                     return {**default_result, 'status': 'offline' if str(e) == 'unreachable' else 'error'}
+            elif ptype == 'usb_serial':   # v1.1.4 (bêta) : USB, présence seulement (le port n'est jamais ouvert)
+                try:
+                    return usb_printers.status(ip)
+                except RuntimeError:
+                    return {**default_result, 'status': 'offline'}
             elif ptype in ('duet', 'repetier'):   # v1.1.3
                 cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
                 try:
@@ -8415,6 +8482,10 @@ def ui_script():
 @app.route('/v113.js')
 def ui_v113_script():
     return send_file(_ui_file('v113.js'), mimetype='application/javascript')
+
+@app.route('/bigprint.js')
+def ui_bigprint_script():
+    return send_file(_ui_file('bigprint.js'), mimetype='application/javascript')
 
 @app.route('/management.js')
 def ui_management_script():
@@ -20743,7 +20814,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.1.3"
+CURRENT_VERSION = "1.1.4"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -21088,6 +21159,7 @@ def check_for_updates(force=False):
             'download_url': download_url,
             'update_type': update_type,
             'release_notes': localized_notes,
+            'release_notes_all': raw_body,   # v1.1.4 : texte complet (toutes les langues) pour la fenêtre de mise à jour
             'published_at': release_data.get('published_at', ''),
             'release_url': release_data.get('html_url', ''),
             'expected_sha256': expected_sha256
@@ -21435,6 +21507,7 @@ def api_check_update():
             'current_version': update_info['current_version'],
             'update_type': update_info['update_type'],
             'release_notes': update_info['release_notes'],
+            'release_notes_all': update_info.get('release_notes_all', ''),
             'download_url': update_info['download_url'],
             'published_at': update_info['published_at'],
             'release_url': update_info['release_url']
@@ -21626,6 +21699,8 @@ def api_discover_printers():
         threading.Thread(target=_run, args=(_discover_elegoo_broadcast,), daemon=True),
         threading.Thread(target=_run, args=(_discover_flashforge,), daemon=True),
         threading.Thread(target=_run, args=(_scan_lan_for_printers,), daemon=True),
+        threading.Thread(target=_run, args=(_discover_photon,), daemon=True),
+        threading.Thread(target=_run, args=(usb_printers.discover,), daemon=True),   # v1.1.4 : imprimantes branchées en USB
     ]
     for t in threads:
         t.start()
@@ -29378,7 +29453,7 @@ printer_dispatch.init(globals())
 digest.init(globals())
 
 # ── v1.1.3 : versions de modèle, tarif heures creuses, Obico, imprimantes Duet / Repetier, statistiques d'échecs, collections ──
-from modules import model_versions, energy_tariff, obico, printers_extra, failure_stats, collections_sets, merge_3mf, resin_printers, resin_inventory
+from modules import model_versions, energy_tariff, obico, printers_extra, failure_stats, collections_sets, merge_3mf, resin_printers, resin_inventory, usb_printers, thumb_recent
 
 model_versions.init(globals())
 
@@ -29388,12 +29463,20 @@ obico.init(globals())
 
 printers_extra.init(globals())
 resin_printers.init(globals())
+usb_printers.init(globals())
+thumb_recent.init(globals())
 resin_inventory.init(globals())
 
 failure_stats.init(globals())
 
 collections_sets.init(globals())
 merge_3mf.init(globals())
+
+# ── v1.1.4 : BigPrint (mise à l'échelle grandeur nature + découpe en pièces, moteur AGPL-3.0 de PooterTF/bigprint) ──
+from modules import bigprint_i18n
+bigprint_i18n.init(globals())
+from modules import bigprint_tool
+bigprint_tool.init(globals())
 
 filament_weighing.init(globals())
 openprinttag.init(globals())

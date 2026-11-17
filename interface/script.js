@@ -3042,7 +3042,7 @@ document.addEventListener('visibilitychange', _syncAppHeight);
 _syncAppHeight();
 
 // --- Tableau de bord ---
-const DASHBOARD_WIDGET_IDS = ['printers', 'cameras', 'stock', 'restock', 'history', 'printed', 'recent', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'timelapses', 'mqtt', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues', 'gcodes', 'health', 'trash', 'changelog'];
+const DASHBOARD_WIDGET_IDS = ['printers', 'cameras', 'stock', 'restock', 'history', 'printed', 'recent', 'thumbs', 'sos', 'favorites', 'projects', 'projects_done', 'gallery', 'quotes', 'timelapses', 'mqtt', 'stats', 'maintenance', 'queue', 'downloads', 'update', 'instances', 'accounts', 'sources', 'suggestions', 'backups', 'issues', 'gcodes', 'health', 'trash', 'changelog'];
 let _dashboardEditMode = false;
 let _draggedDashboardWidget = null;
 
@@ -3053,7 +3053,7 @@ const DASHBOARD_REFRESH_MIN_MS = 10000;
 
 async function loadDashboard(force = false) {
     const now = Date.now();
-    if (!force && _dashboardLastLoad && now - _dashboardLastLoad < DASHBOARD_REFRESH_MIN_MS) return;
+    if (!force && _dashboardLastLoad && now - _dashboardLastLoad < DASHBOARD_REFRESH_MIN_MS) { _loadDashboardRecentFiles(); return; }
     _dashboardLastLoad = now;
     await applyDashboardConfig();
     _loadOnboardingChecklist();
@@ -3063,6 +3063,7 @@ async function loadDashboard(force = false) {
     _loadDashboardStock();
     _loadDashboardRestock();
     _loadDashboardRecentFiles();
+    _loadDashboardThumbs();
     _loadDashboardSos();
     _loadDashboardFavorites();
     _loadDashboardProjects();
@@ -6400,6 +6401,32 @@ window.restockSnooze = async function (i) {
     }
 };
 
+// v1.1.4 : « Fichiers récents » se met à jour tout seul. Les fichiers arrivés pendant la session passent en tête même si leur
+// date de modification est ancienne (copie qui conserve la date), et le widget suit la bibliothèque sans quitter le tableau de bord.
+const _recentFirstSeen = new Map();     // chemin -> date d'apparition dans cette session (s)
+let _recentBaselineDone = false;
+let _recentSig = '';
+function _recentRank(f) { return Math.max(f.mtime || 0, _recentFirstSeen.get(f.path) || 0); }
+function _recentFilesTop(files) { return [...files].sort((a, b) => _recentRank(b) - _recentRank(a)).slice(0, 5); }
+function _recentSignature(list) { return list.map(f => `${f.path}|${f.size}|${f.mtime || 0}|${f.has_thumb ? 1 : 0}`).join(';'); }
+function _recentTrackNewFiles() {
+    const files = Array.isArray(allFiles) ? allFiles : [];
+    if (!files.length) return;
+    if (!_recentBaselineDone) { files.forEach(f => _recentFirstSeen.set(f.path, 0)); _recentBaselineDone = true; return; }
+    const fresh = files.filter(f => !_recentFirstSeen.has(f.path));
+    const now = Date.now() / 1000;
+    // Un ajout massif (nouvelle source, rescan complet) n'est pas une « arrivée » de fichier : on ne le met pas en tête
+    fresh.forEach(f => _recentFirstSeen.set(f.path, fresh.length <= 50 ? now : 0));
+}
+setInterval(() => {
+    try {
+        _recentTrackNewFiles();
+        const body = document.getElementById('dashboard-recent-body');
+        if (!body || !body.offsetParent || document.hidden || !Array.isArray(allFiles) || !allFiles.length) return;
+        if (_recentSignature(_recentFilesTop(allFiles)) !== _recentSig) _loadDashboardRecentFiles();
+    } catch (e) { /* le widget se rafraîchira au prochain tour */ }
+}, 4000);
+
 async function _loadDashboardRecentFiles() {
     const body = document.getElementById('dashboard-recent-body');
     if (!body) return;
@@ -6414,7 +6441,8 @@ async function _loadDashboardRecentFiles() {
             body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-layer-group"></i><p>${I18N.t('library.no_files')}</p></div>`;
             return;
         }
-        const recent = [...files].sort((a, b) => (b.mtime || 0) - (a.mtime || 0)).slice(0, 5);
+        const recent = _recentFilesTop(files);
+        _recentSig = _recentSignature(recent);
         body.innerHTML = recent.map(f => `
             <div class="dashboard-row" onclick="goToFileInLibrary('${escapeJs(f.name)}')" style="cursor:pointer;">
                 <div class="dashboard-row-thumb">${f.has_thumb ? `<img src="${API}/api/thumb?path=${encodeURIComponent(f.path)}" loading="lazy">` : '<i class="fa-solid fa-cube"></i>'}</div>
@@ -6426,6 +6454,49 @@ async function _loadDashboardRecentFiles() {
         `).join('');
     } catch (err) {
         console.error('[Dashboard] Erreur fichiers récents:', err);
+        body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
+    }
+}
+
+// v1.1.4 : « Dernières miniatures » : la dernière miniature générée en grand + les 10 dernières en bandeau
+function _thumbAgo(epoch) {
+    const s = Math.max(0, Math.round(Date.now() / 1000 - epoch));
+    if (s < 60) return _t3('dashboard.thumbs_now', 'à l\'instant', null);
+    if (s < 3600) return _t3('dashboard.thumbs_min', 'il y a {n} min', { n: Math.round(s / 60) });
+    if (s < 86400) return _t3('dashboard.thumbs_hour', 'il y a {n} h', { n: Math.round(s / 3600) });
+    return _t3('dashboard.thumbs_day', 'il y a {n} j', { n: Math.round(s / 86400) });
+}
+window._thumbsSelect = function (i) {
+    const items = window._dashThumbs || [];
+    const it = items[i];
+    const hero = document.getElementById('dashboard-thumbs-hero');
+    if (!it || !hero) return;
+    const src = `${API}/api/thumb?path=${encodeURIComponent(it.path)}&t=${it.generated_at}`;
+    hero.innerHTML = `<img src="${src}" alt="">
+        <div class="dash-thumbs-cap"><strong title="${escapeHtml(it.name)}">${escapeHtml(it.name)}</strong><span>${escapeHtml(_thumbAgo(it.generated_at))}</span></div>`;
+    hero.onclick = () => goToFileInLibrary(it.name);
+    document.querySelectorAll('#dashboard-thumbs-strip .dash-thumbs-item').forEach((el, k) => el.classList.toggle('active', k === i));
+};
+async function _loadDashboardThumbs() {
+    const body = document.getElementById('dashboard-thumbs-body');
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/api/thumb/recent?limit=10`);
+        if (!res.ok) throw new Error('http');
+        const items = (await res.json()).items || [];
+        window._dashThumbs = items;
+        if (!items.length) {
+            body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-image"></i><p>${escapeHtml(_t3('dashboard.thumbs_empty', 'Aucune miniature générée pour le moment.', null))}</p></div>`;
+            return;
+        }
+        body.innerHTML = `<div class="dash-thumbs"><div id="dashboard-thumbs-hero" class="dash-thumbs-hero" style="cursor:pointer;"></div>
+            <div id="dashboard-thumbs-strip" class="dash-thumbs-strip">${items.map((it, i) => `
+                <button type="button" class="dash-thumbs-item" onclick="_thumbsSelect(${i})" title="${escapeHtml(it.name)} — ${escapeHtml(_thumbAgo(it.generated_at))}">
+                    <img src="${API}/api/thumb?path=${encodeURIComponent(it.path)}&t=${it.generated_at}" loading="lazy" alt="">
+                </button>`).join('')}</div></div>`;
+        _thumbsSelect(0);
+    } catch (err) {
+        console.error('[Dashboard] Erreur dernières miniatures:', err);
         body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${I18N.t('toast.connection_error')}</p></div>`;
     }
 }
@@ -6827,8 +6898,8 @@ const tagParams = activeTagFilters.size > 0 ? `&tags=${encodeURIComponent([...ac
 const filesRes = await fetch(`${API}/api/files?since=${lastKnownTimestamp}${tagParams}`);
 if (!filesRes.ok) return;
 const newFiles = _dedupeFilesByPath(await filesRes.json());
-const oldHash = allFiles.map(f => `${f.name}-${f.size}-${f.path}`).join('|');
-const newHash = newFiles.map(f => `${f.name}-${f.size}-${f.path}`).join('|');
+const oldHash = allFiles.map(f => `${f.name}-${f.size}-${f.mtime || 0}-${f.path}`).join('|');
+const newHash = newFiles.map(f => `${f.name}-${f.size}-${f.mtime || 0}-${f.path}`).join('|');
 if (oldHash !== newHash) {
 allFiles = newFiles;
 filteredFiles = rebuildFilteredFiles();
@@ -8279,6 +8350,10 @@ const multiPlateLabel = I18N.t('card.multi_plate') || 'Plateau multiple';
 const multiPlateBadgeHtml = f.multi_plate
     ? `<span class="file-multiplate-badge" title="${multiPlateLabel}${f.plate_count > 1 ? ' : ' + f.plate_count : ''}"><i class="fa-solid fa-table-cells"></i>${f.plate_count > 1 ? `<b>${f.plate_count}</b>` : ''}</span>`
     : '';
+const _isBigPrint = String(f.path || '').replace(/\\/g, '/').split('/').slice(0, -1).some(seg => /_bigprint$/i.test(seg));
+const bigprintBadgeHtml = _isBigPrint
+    ? `<span class="file-bigprint-badge" title="${escapeHtml(_t2('card.bigprint_tip', 'Généré par BigPrint'))}"><i class="fa-solid fa-ruler-combined"></i> BigPrint</span>`
+    : '';
 const viewedByOtherBadgeHtml = isFileViewedByOther(f.path)
     ? `<span class="file-viewed-by-other-badge" title="${_t2('presence.file_viewed_by_other', 'Consulté en ce moment sur un autre appareil')}"><i class="fa-solid fa-eye"></i></span>`
     : '';
@@ -8301,7 +8376,7 @@ if (currentView === 'details') {
     const sizeStr = formatSize(f.size || 0);
     const safeId = f.path.replace(/[^\w]/g, '-');
     return `<div class="file-card file-card--details${selectedClass}${offlineClass}${_psClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}>
-  <div class="dv-thumb">${checkboxHtml}${thumbContent}${isNew ? `<span class="file-new-badge file-new-badge--small"><i class="fa-solid fa-sparkles"></i></span>` : ''}${inArchiveBadgeHtml}${multiPlateBadgeHtml}${viewedByOtherBadgeHtml}</div>
+  <div class="dv-thumb">${checkboxHtml}${thumbContent}${isNew ? `<span class="file-new-badge file-new-badge--small"><i class="fa-solid fa-sparkles"></i></span>` : ''}${inArchiveBadgeHtml}${bigprintBadgeHtml}${multiPlateBadgeHtml}${viewedByOtherBadgeHtml}</div>
   <div class="dv-name">
     <span class="dv-filename" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
     <span class="dv-path" title="${dirPath}"><i class="fa-solid fa-folder"></i> ${dirPath}</span>
@@ -8325,7 +8400,7 @@ const isVirtualEntry = f.path.includes('::');
 const deleteBtnHtml = (!isVirtualEntry && !isSelectionMode)
     ? `<button type="button" class="file-delete-btn" onclick="event.stopPropagation(); openDeleteFileModal('${escapeJs(f.path)}', '${escapeJs(f.name)}')" title="${I18N.t('actions.delete') || 'Supprimer'}"><i class="fa-solid fa-xmark"></i></button>`
     : '';
-return `<div class="file-card${selectedClass}${offlineClass}${_psClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}><div class="file-thumb" style="position:relative;">${checkboxHtml}${fileMenuBtnHtml}${thumbContent}${tooltipHtml}<span class="file-ext-badge">${ext.replace('.', '')}</span>${deleteBtnHtml}${isArchive ? archiveEntryHtml : ''}${inArchiveBadgeHtml}${multiPlateBadgeHtml}${viewedByOtherBadgeHtml}${isNew ? newBadgeHtml : ''}${isArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); decompressFile('${escapeJs(f.path)}', event)" title="${I18N.t('toast.extract_success')}"><i class="fa-solid fa-file-zipper"></i> ${I18N.t('actions.add')}</button>` : ''}${inArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); extractArchiveEntry('${escapeJs(f.archive_path)}', '${escapeJs(f.internal_path)}', event)" title="${I18N.t('actions.extract_single_file') || 'Extraire uniquement ce fichier'}"><i class="fa-solid fa-download"></i></button>` : ''}<button type="button" class="file-favorite-btn ${isFav ? 'favorited' : ''}" onclick="toggleFavorite('${escapeJs(f.path)}', event); return false;" title="${isFav ? I18N.t('toast.favorites_removed') : I18N.t('toast.favorites_added')}"><i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-star"></i></button><button type="button" class="file-tag-btn" onclick="event.stopPropagation(); openTagModal('${escapeJs(f.path)}')" title="${I18N.t('modal.manage_tags')}"><i class="fa-solid fa-tag"></i></button></div><div class="file-info"><div class="file-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>${f.tags?.length ? `<div class="file-tags">${f.tags.map(t => `<span class="file-tag" style="background:${t.color}20;color:${t.color};border-color:${t.color}">${escapeHtml(t.name)}</span>`).join('')}</div>` : ''}</div></div>`;
+return `<div class="file-card${selectedClass}${offlineClass}${_psClass}" data-name="${escapeHtml(f.name)}" data-path="${escapeHtml(f.path)}" ${viewerClick}><div class="file-thumb" style="position:relative;">${checkboxHtml}${fileMenuBtnHtml}${thumbContent}${tooltipHtml}<span class="file-ext-badge">${ext.replace('.', '')}</span>${deleteBtnHtml}${isArchive ? archiveEntryHtml : ''}${inArchiveBadgeHtml}${bigprintBadgeHtml}${multiPlateBadgeHtml}${viewedByOtherBadgeHtml}${isNew ? newBadgeHtml : ''}${isArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); decompressFile('${escapeJs(f.path)}', event)" title="${I18N.t('toast.extract_success')}"><i class="fa-solid fa-file-zipper"></i> ${I18N.t('actions.add')}</button>` : ''}${inArchive ? `<button type="button" class="file-decompress-btn" onclick="event.stopPropagation(); extractArchiveEntry('${escapeJs(f.archive_path)}', '${escapeJs(f.internal_path)}', event)" title="${I18N.t('actions.extract_single_file') || 'Extraire uniquement ce fichier'}"><i class="fa-solid fa-download"></i></button>` : ''}<button type="button" class="file-favorite-btn ${isFav ? 'favorited' : ''}" onclick="toggleFavorite('${escapeJs(f.path)}', event); return false;" title="${isFav ? I18N.t('toast.favorites_removed') : I18N.t('toast.favorites_added')}"><i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-star"></i></button><button type="button" class="file-tag-btn" onclick="event.stopPropagation(); openTagModal('${escapeJs(f.path)}')" title="${I18N.t('modal.manage_tags')}"><i class="fa-solid fa-tag"></i></button></div><div class="file-info"><div class="file-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>${f.tags?.length ? `<div class="file-tags">${f.tags.map(t => `<span class="file-tag" style="background:${t.color}20;color:${t.color};border-color:${t.color}">${escapeHtml(t.name)}</span>`).join('')}</div>` : ''}</div></div>`;
 }
 
 
@@ -9603,7 +9678,7 @@ showToast(I18N.t('download.cancelled_toast'), 'info');
 }
 window.openCreateFolderModal = async function(selectId) {
 const _selId = (typeof selectId === 'string' && selectId) ? selectId : 'download-source';
-const _firstLabel = _selId === 'merge3mf-dest' ? _t2('merge3mf.same_folder', 'Dossier du premier fichier') : undefined;
+const _firstLabel = _selId === 'merge3mf-dest' ? _t2('merge3mf.same_folder', 'Dossier du premier fichier') : (_selId === 'bp-source' ? _t2('bigprint.dest_default', 'Dossier de données de Stellio') : undefined);
 const sourceSelect = document.getElementById(_selId);
 const selectedSourceId = sourceSelect ? sourceSelect.value : null;
 const _selOpt = sourceSelect ? sourceSelect.options[sourceSelect.selectedIndex] : null;
@@ -17246,6 +17321,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         if (page === 'gallery') loadGalleryPage();
         if (page === 'projects') loadProjects();
         if (page === 'sosprint') loadSosprintProfiles(true);
+        if (page === 'bigprint') window.StellioBigPrint?.onShow();
         if (page === 'print-queue') loadPrintQueue();
         if (page === 'management') window.StellioManagement?.load();
         if (page === 'settings') window.StellioV113?.onSettings();
@@ -20190,7 +20266,7 @@ function _stopPrinterCardCamera(el) {
 // Imprimante hors ligne : logo à la place de la caméra (un carré noir n'apprend rien), boutons « live » masqués, pas d'agrandissement
 const PRINTER_TYPE_LABELS = { klipper: 'Klipper', octoprint: 'OctoPrint', prusalink: 'PrusaLink', bambu: 'Bambu Lab', bambuddy: 'Bambuddy',
     elegoo_sdcp: 'Elegoo', elegoo_cc2: 'Elegoo', creality: 'Creality', flashforge: 'FlashForge', duet: 'Duet', repetier: 'Repetier',
-    chitu_sdcp: 'Chitubox (résine)', anycubic_photon: 'Anycubic Photon (résine)', formlabs: 'Formlabs (résine)' };
+    usb_serial: 'USB', chitu_sdcp: 'Chitubox (résine)', anycubic_photon: 'Anycubic Photon (résine)', formlabs: 'Formlabs (résine)' };
 // v1.1.4 : les imprimantes résine sont en bêta (badge partout où elles apparaissent)
 const RESIN_BETA_TYPES = ['chitu_sdcp', 'anycubic_photon', 'formlabs'];
 function _isResinBeta(p) { return !!p && (RESIN_BETA_TYPES.includes(p.type) || (p.type === 'elegoo_sdcp' && /saturn|mars|jupiter|resin|r[ée]sine/i.test(p.name || ''))); }
@@ -21577,6 +21653,10 @@ window.togglePrinterFields = function() {
         if (type === 'formlabs') { if (!_ipEl.value || _ipEl.value === 'api.formlabs.com') _ipEl.value = 'api.formlabs.com'; _ipGrp.style.display = 'none'; }
         else { if (_ipEl.value === 'api.formlabs.com') _ipEl.value = ''; _ipGrp.style.display = ''; }
     }
+    const _gusb = document.getElementById('group-usb-hint'); if (_gusb) _gusb.style.display = type === 'usb_serial' ? 'block' : 'none';
+    const _ipLbl = document.getElementById('printer-ip-label');   // v1.1.4 : USB = nom du port série
+    if (_ipLbl) _ipLbl.textContent = type === 'usb_serial' ? _t3('printers.usb_port', 'Port USB (COM3, /dev/ttyACM0…)', null) : (I18N.t('printers.ip_address') || 'Adresse IP');
+    if (_ipEl) _ipEl.placeholder = type === 'usb_serial' ? 'COM3  ·  /dev/ttyACM0' : '192.168.1.100';
     const _gduet = document.getElementById('group-duet-hint'); if (_gduet) _gduet.style.display = type === 'duet' ? 'block' : 'none';
     const _grep = document.getElementById('group-repetier-hint'); if (_grep) _grep.style.display = type === 'repetier' ? 'block' : 'none';
     const _gext = document.getElementById('group-external-url'); if (_gext) _gext.style.display = ['klipper', 'octoprint', 'prusalink', 'duet', 'repetier'].includes(type) ? 'block' : 'none';
@@ -21628,6 +21708,7 @@ window.manualCheckUpdate = async function () {
                     version: data.version,
                     current_version: data.current_version,
                     release_notes: data.release_notes,
+                    release_notes_all: data.release_notes_all,
                     download_url: data.download_url,
                     release_url: data.release_url,
                     published_at: data.published_at
@@ -21735,12 +21816,16 @@ overlay.className = 'modal-overlay update-modal-overlay';
 overlay.style.cssText = `position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.75); display: flex; align-items: center; justify-content: center; z-index: 100000; backdrop-filter: blur(5px); animation: fadeIn 0.3s ease;`;
 const modal = document.createElement('div');
 modal.style.cssText = `background: var(--bg-secondary, #1e2129); border-radius: 16px; padding: 32px; max-width: 600px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); border: 1px solid var(--border, #2a2f3a); animation: slideIn 0.3s ease;`;
-const releaseNotes = this.parseMarkdown(updateInfo.release_notes || I18N.t('update.default_notes'));
+const releaseNotes = this.buildReleaseNotesHtml(updateInfo) || this.parseMarkdown(updateInfo.release_notes || I18N.t('update.default_notes'));
 const hasInstaller = !!updateInfo.download_url;
 const releaseUrl = updateInfo.release_url || `https://github.com/stellio-app/stellio/releases/latest`;
 modal.innerHTML = `<div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;"><div style="width: 56px; height: 56px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #00d9ff); border-radius: 12px; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-download" style="font-size: calc(28px * var(--fs, 1)); color: white;"></i></div><div style="flex: 1;"><h3 style="margin: 0; color: var(--text-primary, #e6e6e6); font-size: calc(22px * var(--fs, 1)); font-weight: 700;">${I18N.t('update.available_title')}</h3><p style="margin: 4px 0 0 0; color: var(--text-muted, #9ca3af); font-size: calc(14px * var(--fs, 1));">${I18N.t('update.version_transition', { from: updateInfo.current_version, to: updateInfo.version })}</p></div></div><div style="background: var(--bg-primary, #15181e); padding: 20px; border-radius: 12px; margin-bottom: 24px; max-height: 300px; overflow-y: auto; border: 1px solid var(--border, #2a2f3a);"><h4 style="margin: 0 0 12px 0; color: var(--accent, #4ea1d3); font-size: calc(14px * var(--fs, 1)); text-transform: uppercase; letter-spacing: 1px;"><i class="fa-solid fa-list-check"></i> ${I18N.t('update.release_notes')}</h4><div style="color: var(--text-secondary, #b0b3b8); font-size: calc(14px * var(--fs, 1)); line-height: 1.7;" class="release-notes-content">${releaseNotes}</div></div><div id="update-progress-container" style="display: none; margin-bottom: 24px; padding: 16px; background: var(--bg-primary, #15181e); border-radius: 12px; border: 1px solid var(--border, #2a2f3a);"><div style="display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center;"><span style="color: var(--text-secondary, #b0b3b8); font-size: calc(13px * var(--fs, 1)); font-weight: 500;"><i class="fa-solid fa-download"></i> ${I18N.t('update.downloading')}</span><span id="update-percent" style="color: var(--accent, #4ea1d3); font-size: calc(14px * var(--fs, 1)); font-weight: 700;">0%</span></div><div style="height: 8px; background: var(--bg-tertiary, #2a2f3a); border-radius: 4px; overflow: hidden;"><div id="update-bar" style="height: 100%; background: linear-gradient(90deg, var(--accent, #4ea1d3), #00d9ff); width: 0%; transition: width 0.3s ease; border-radius: 4px;"></div></div></div><div style="display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap;">${!hasInstaller ? `<a href="${releaseUrl}" target="_blank" style="padding: 12px 24px; border: none; border-radius: 10px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #3d8fb8); color: white; cursor: pointer; font-weight: 600; font-size: calc(14px * var(--fs, 1)); box-shadow: 0 4px 12px rgba(78, 161, 211, 0.3); text-decoration: none; display: inline-flex; align-items: center; gap: 8px;"><i class="fa-solid fa-external-link-alt"></i> ${I18N.t('update.download_github')}</a>` : ''}<button id="update-later-btn" style="padding: 12px 24px; border: 1px solid var(--border, #363c4a); border-radius: 10px; background: var(--bg-tertiary, #2a2f3a); color: var(--text-primary, #e6e6e6); cursor: pointer; font-weight: 500; font-size: calc(14px * var(--fs, 1));">${I18N.t('update.later')}</button>${hasInstaller ? `<button id="update-now-btn" style="padding: 12px 28px; border: none; border-radius: 10px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #3d8fb8); color: white; cursor: pointer; font-weight: 600; font-size: calc(14px * var(--fs, 1)); box-shadow: 0 4px 12px rgba(78, 161, 211, 0.3);"><i class="fa-solid fa-download"></i> ${I18N.t('update.update_now')}</button>` : ''}</div>`;
 overlay.appendChild(modal);
 document.body.appendChild(overlay);
+requestAnimationFrame(() => {   // v1.1.4 : amène le bloc de la langue ouverte en haut de la zone des notes
+    const box = modal.querySelector('.release-notes-content')?.parentElement, op = modal.querySelector('details.rn-lang[open]');
+    if (box && op) box.scrollTop = Math.max(0, op.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 8);
+});
 const _closeUpdateOverlay = () => {
 overlay.classList.remove('update-modal-overlay');   // libère tout de suite le verrou « une seule fenêtre »
 overlay.style.animation = 'fadeOut 0.3s ease';
@@ -21834,6 +21919,40 @@ overlay.style.animation = 'fadeOut 0.3s ease';
 setTimeout(() => overlay.remove(), 300);
 }
 });
+},
+/** v1.1.4 : notes de version en blocs repliables par langue ; celui de la langue de Stellio est ouvert (et amené en haut de la zone). */
+buildReleaseNotesHtml(updateInfo) {
+const body = String(updateInfo.release_notes_all || '');
+if (!body) return '';
+const LANGS = [['fr', '🇫🇷 Français'], ['en', '🇬🇧 English'], ['de', '🇩🇪 Deutsch'], ['es', '🇪🇸 Español'], ['pt', '🇵🇹 Português'], ['it', '🇮🇹 Italiano'], ['zh', '🇨🇳 中文'], ['ja', '🇯🇵 日本語']];
+const blocks = {};
+const heading = new RegExp('^###[ \\t]+(.+)$', 'gm');
+const details = /<details>\s*<summary>\s*<b>([^<]+)<\/b>\s*<\/summary>([\s\S]*?)<\/details>/g;
+const grab = (label, text) => { const l = LANGS.find(x => label.includes(x[1].split(' ').slice(1).join(' '))); if (l && text.trim()) blocks[l[0]] = text.trim(); };
+let m;
+const heads = [];
+while ((m = heading.exec(body)) !== null) heads.push({ label: m[1], start: m.index, end: m.index + m[0].length });
+heads.forEach((h, i) => {
+    const stop = i + 1 < heads.length ? heads[i + 1].start : body.length;
+    let chunk = body.slice(h.end, stop);
+    const cut = chunk.search(/<details>|^Full changelog/m);
+    if (cut >= 0) chunk = chunk.slice(0, cut);
+    grab(h.label, chunk);
+});
+while ((m = details.exec(body)) !== null) grab(m[1], m[2]);
+if (Object.keys(blocks).length < 2) return '';
+const title = (body.match(/^##[ \t]+(.+)$/m) || [])[1] || '';
+const lang = (I18N && I18N.lang) || 'fr';
+const cur = blocks[lang] ? lang : (blocks.en ? 'en' : Object.keys(blocks)[0]);
+const row = t => `<div style="display: flex; align-items: flex-start; gap: 8px; margin: 6px 0;"><span style="color: var(--cb-ok, #10b981); flex-shrink: 0;">✓</span><span>${escapeHtml(t.replace(/^✓\s*/, ''))}</span></div>`;
+let html = title ? `<div style="font-weight:700; color: var(--accent, #4ea1d3); margin: 0 0 6px 0;">${escapeHtml(title)}</div>` : '';
+LANGS.forEach(([code, label]) => {
+    if (!blocks[code]) return;
+    const lines = blocks[code].split('\n').map(x => x.trim()).filter(Boolean);
+    html += `<details class="rn-lang" data-lang="${code}"${code === cur ? ' open' : ''} style="margin: 6px 0; border: 1px solid var(--border, #2a2f3a); border-radius: 8px; padding: 6px 12px;"><summary style="cursor: pointer; font-weight: 600; color: var(--accent, #4ea1d3); padding: 4px 0;">${escapeHtml(label)}</summary><div>${lines.map(row).join('')}</div></details>`;
+});
+html += `<div style="margin-top: 10px; font-size: calc(12px * var(--fs, 1)); color: var(--text-muted, #9ca3af);">${escapeHtml(I18N.t('update.full_changelog') || 'Full changelog / Historique complet')} : <a href="https://github.com/stellio-app/stellio/blob/main/changelog.json" target="_blank" rel="noopener" style="color: var(--accent, #4ea1d3);">changelog.json</a></div>`;
+return html;
 },
 parseMarkdown(text) {
 return text
@@ -22498,6 +22617,9 @@ startThumbAutoRefresh();
             if (el) el.style.display = isVirtualEntry ? 'none' : '';
         });
 
+        const bigprintBtn = document.getElementById('ctx-bigprint-btn');
+        if (bigprintBtn) bigprintBtn.style.display = (!isVirtualEntry && /\.(stl|3mf|obj|ply)$/i.test(filePath)) ? '' : 'none';
+
         const splitBtn = document.getElementById('ctx-split-btn');
         if (splitBtn) {
             const fileObj = (typeof allFiles !== 'undefined') ? allFiles.find(x => x.path === filePath) : null;
@@ -22568,6 +22690,11 @@ startThumbAutoRefresh();
         document.getElementById('ctx-versions-btn')?.addEventListener('click', () => {
             closeModal('modal-file-actions');
             window.StellioV113?.openVersions(_ctxPath, _ctxName);
+        });
+        document.getElementById('ctx-bigprint-btn')?.addEventListener('click', () => {
+            closeModal('modal-file-actions');
+            document.querySelector('.nav-btn[data-page="bigprint"]')?.click();
+            window.StellioBigPrint?.loadPath(_ctxPath);
         });
         document.getElementById('ctx-collection-btn')?.addEventListener('click', () => {
             closeModal('modal-file-actions');

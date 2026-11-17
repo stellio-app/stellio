@@ -232,6 +232,22 @@ Ogni funzione di Stellio: **a cosa serve e come usarla**. I dettagli tecnici son
 3. Se serve, spunta **Ripara automaticamente la mesh** ed **Elimina il file originale**.
 4. Avvia. Una conversione in blocco può essere annullata in qualsiasi momento: i file già convertiti vengono mantenuti.
 
+## Ingrandire un modello a grandezza naturale (BigPrint)
+BigPrint (menu **Strumenti**) ingrandisce un modello alla misura desiderata — 1,8 m o più — e lo taglia in pezzi che stanno sul piatto: pezzi svuotati, perni di giunzione e un numero inciso su ogni pezzo. Il calcolo è svolto dal motore open source [bigprint](https://github.com/PooterTF/bigprint) (AGPL-3.0, di Michael Christopher Stone), integrato in Stellio.
+
+{{img:bigprint}}
+
+1. Scegli il modello: **Scegli dalla libreria**, **Importa un file**, oppure il pulsante **Invia a BigPrint** nel menu **Azioni** di un file (STL, 3MF, OBJ, PLY).
+2. Indica la **dimensione finale** (altezza, larghezza, profondità o fattore di scala) e la tua **stampante** (elenco di modelli o dimensioni personalizzate).
+3. Regola la **resistenza** (uso, materiale, svuotamento, spessore del guscio) e i **perni**; le opzioni avanzate (asse verticale, margine, levigatura…) sono ripiegate.
+4. Clicca **Anteprima**: Stellio mostra i pezzi in vista esplosa, il peso del filamento, il costo stimato e la tabella dei pezzi. Un calcolo può essere annullato in qualsiasi momento.
+
+{{img:bigprint-result}}
+
+Scegli dove salvare (sorgente della libreria, sottocartella, creazione di cartelle possibile, condivisioni di rete incluse), poi **Salva i file**: pezzi STL, progetto 3MF, perni, rapporto e anteprima vengono copiati nella cartella `<modello>_bigprint`.
+
+Se modifichi un'impostazione dopo l'anteprima, rilanciala prima di salvare.
+
 ## Fare ordine: duplicati e cestino
 
 1. Apri **Duplicati**: i file identici e quelli con **geometria simile** (lo stesso modello rinominato o riesportato) vengono raggruppati.
@@ -402,6 +418,7 @@ Raggruppa più file per un singolo oggetto.
 ## Visualizzatore 3D e strumenti
 - **Visualizzatore 3D** (Three.js, funziona offline), navigazione tra i piatti.
 - **Disposizione automatica** sul piatto (rectpack, o sagoma reale con shapely).
+- **BigPrint** (menu **Strumenti**): ingrandisce un modello alla misura desiderata e lo taglia in pezzi numerati con perni, anteprima 3D esplosa e stima di filamento e costo (motore open source bigprint).
 - **Unisci in 3MF**: seleziona più modelli (STL, 3MF, OBJ…) e Stellio crea un unico file 3MF — un piatto se entra tutto, altrimenti un file con più piatti (struttura compatibile con Bambu Studio / OrcaSlicer; PrusaSlicer mostra tutti i pezzi insieme). Scegli nome e cartella (condivisioni di rete incluse, con creazione cartella) e poi Stellio chiede se eliminare o conservare i file originali.
 - **Colore della bobina verso lo slicer**: all'invio, colore e materiale della bobina scelta vengono applicati al profilo filamento caricato in OrcaSlicer, Bambu Studio o PrusaSlicer (serve un profilo filamento importato e collegato alla stampante; nell'invio multiplo solo se tutte le bobine sono uguali).
 - **Barra di selezione**: tutti i pulsanti hanno la stessa dimensione e stanno su una sola riga (solo icone su schermi piccoli, nome nel suggerimento).
@@ -435,6 +452,7 @@ Nella home, il widget **Telecamere** mostra fino a **4 telecamere** (una per sta
 | **Creality** | Serie K1/K2, Ender-3 V3, Hi | WebSocket: monitoraggio, CFS, rilevamento UDP |
 | **Elegoo** | Centauri Carbon 1 e 2, serie resina Saturn/Mars (**beta**) | SDCP (WebSocket) |
 | **Resina Chitubox** *(beta)* | Phrozen, Uniformation GKtwo e altre schede Chitubox | SDCP v3: monitoraggio (stesso protocollo di Elegoo) |
+| **Stampante USB *(beta)*** | Marlin, Prusa, Creality, schede Klipper… collegate al PC di Stellio | Rilevamento delle porte seriali (la porta non viene mai aperta): collegata / assente, senza stato né temperature |
 | **Anycubic Photon** *(beta)* | Modelli Wi-Fi meno recenti: Mono X, Mono X 6K, Mono SQ (non le M5s / M7) | Comandi di testo TCP 6000: solo stato e file corrente |
 | **Formlabs** *(beta)* | Form 3 / 3L / 4 | API web ufficiale (client_id:client_secret): stato, avanzamento, strati; l'invio si fa con PreForm |
 | **FlashForge** | Adventurer 5M/5M Pro, AD5X | API proprietaria |

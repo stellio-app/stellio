@@ -232,6 +232,22 @@ Chaque fonction de Stellio, **à quoi elle sert et comment s'en servir**. Les d�
 3. Cochez au besoin **Réparer automatiquement le maillage** et **Supprimer le fichier d'origine**.
 4. Lancez. Une conversion en lot peut être annulée à tout moment : les fichiers déjà convertis sont conservés.
 
+## Agrandir un modèle grandeur nature (BigPrint)
+BigPrint (menu **Outils**) agrandit un modèle à la taille voulue — 1,8 m ou plus — et le découpe en pièces qui tiennent sur votre plateau : pièces évidées, goujons d'assemblage et numéro gravé sur chaque pièce. Le calcul est assuré par le moteur open source [bigprint](https://github.com/PooterTF/bigprint) (AGPL-3.0, de Michael Christopher Stone), intégré à Stellio.
+
+{{img:bigprint}}
+
+1. Choisissez le modèle : **Choisir dans la bibliothèque**, **Importer un fichier**, ou le bouton **Envoyer vers BigPrint** du menu **Actions** d'un fichier (STL, 3MF, OBJ, PLY).
+2. Indiquez la **taille finale** (hauteur, largeur, profondeur ou facteur d'échelle) et votre **imprimante** (liste de modèles ou dimensions personnalisées).
+3. Réglez la **solidité** (usage, matière, évidement, épaisseur de coque) et les **goujons** ; les options avancées (axe vertical, marge, lissage…) sont repliées.
+4. Cliquez **Aperçu** : Stellio affiche les pièces en vue éclatée, le poids de filament, le coût estimé et le tableau des pièces. Un calcul peut être annulé à tout moment.
+
+{{img:bigprint-result}}
+
+Choisissez où enregistrer (source de la bibliothèque, sous-dossier, création de dossier possible, partages réseau compris), puis **Enregistrer les fichiers** : pièces STL, projet 3MF, goujons, rapport et aperçu sont copiés dans le dossier `<modèle>_bigprint`.
+
+Si vous changez un réglage après l'aperçu, relancez-le avant d'enregistrer.
+
 ## Faire le ménage : doublons et corbeille
 
 1. Ouvrez **Doublons** : les fichiers identiques, et ceux de **géométrie proche** (même modèle renommé ou ré-exporté), sont regroupés.
@@ -402,6 +418,7 @@ Regroupez plusieurs fichiers pour un même objet.
 ## Visionneuse 3D et outils
 - **Visionneuse 3D** (Three.js, fonctionne hors ligne), navigation entre plateaux.
 - **Placement automatique** sur le plateau (rectpack, ou silhouette réelle avec shapely).
+- **BigPrint** (menu **Outils**) : agrandit un modèle à la taille voulue et le découpe en pièces numérotées avec goujons, aperçu 3D éclaté et estimation du filament et du coût (moteur open source bigprint).
 - **Fusion en 3MF** : sélectionnez plusieurs modèles (STL, 3MF, OBJ…) et Stellio en fait un seul fichier 3MF — un seul plateau si tout tient, sinon un fichier à plusieurs plateaux (structure compatible Bambu Studio / OrcaSlicer ; PrusaSlicer affiche toutes les pièces ensemble). Vous choisissez le nom et le dossier (partages réseau compris, création de dossier possible), puis Stellio propose de supprimer ou de garder les fichiers d'origine.
 - **Couleur de la bobine vers le slicer** : à l'envoi, la couleur et la matière de la bobine choisie sont appliquées au profil de filament chargé dans OrcaSlicer, Bambu Studio ou PrusaSlicer (un profil de filament importé et rattaché à l'imprimante est nécessaire ; en envoi groupé, la couleur n'est appliquée que si toutes les bobines sont identiques).
 - **Barre de sélection** : tous les boutons ont la même taille et tiennent sur une seule ligne (icônes seules sur petit écran, nom dans l'infobulle).
@@ -435,6 +452,7 @@ Sur l'accueil, le widget **Caméras** affiche jusqu'à **4 caméras** (une par i
 | **Creality** | Séries K1/K2, Ender-3 V3, Hi | WebSocket : suivi, CFS, découverte UDP |
 | **Elegoo** | Centauri Carbon 1 & 2, séries résine Saturn/Mars (**bêta**) | SDCP (WebSocket) |
 | **Résine Chitubox** *(bêta)* | Phrozen, Uniformation GKtwo et autres cartes Chitubox | SDCP v3 : suivi (même protocole qu'Elegoo) |
+| **Imprimante USB *(bêta)*** | Marlin, Prusa, Creality, cartes Klipper… branchées au PC de Stellio | Détection des ports série (le port n'est jamais ouvert) : branchée / absente, sans état ni températures |
 | **Anycubic Photon** *(bêta)* | Anciens Wi-Fi : Mono X, Mono X 6K, Mono SQ (pas les M5s / M7) | Commandes texte TCP 6000 : état et fichier en cours seulement |
 | **Formlabs** *(bêta)* | Form 3 / 3L / 4 | API web officielle (client_id:client_secret) : suivi, progression, couches ; l'envoi se fait avec PreForm |
 | **FlashForge** | Adventurer 5M/5M Pro, AD5X | API propriétaire |

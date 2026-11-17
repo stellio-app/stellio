@@ -159,6 +159,7 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 - 🖌️ **Cor da bobina para o slicer**: ao enviar, a cor e o material da bobina escolhida são aplicados ao perfil de filamento carregado no OrcaSlicer, Bambu Studio ou PrusaSlicer (é preciso um perfil de filamento importado e associado à impressora; no envio em lote, só se todas as bobinas forem iguais).
 - 🔧 **Reparo de mesh** (trimesh + pymeshfix) com **comparação antes/depois** (estanqueidade, triângulos, vértices, tamanho)
 - 🔄 **Conversor de formatos** (STL ↔ 3MF ↔ OBJ)
+- 📏 **BigPrint (Ferramentas)**: amplie um modelo para o tamanho real (ex. 1,8 m); é cortado em peças que cabem na mesa, esvaziado, com pinos e numerado, com pré-visualização 3D explodida e estimativa de filamento/custo; grava as peças STL, um projeto 3MF e um relatório numa pasta local ou de rede. Baseado no motor de código aberto [bigprint](https://github.com/PooterTF/bigprint) (AGPL-3.0).
 - 🛡️ **Verificação de integridade** (arquivos corrompidos/ausentes)
 - 💰 **Cálculo de custo de impressão**: material, eletricidade, desgaste da máquina (por hora), custos fixos, margem em % e quantidade — preço unitário e total calculados ao centavo
 - 🏷️ **Margem e preço de venda**: defina sua margem padrão (%) uma vez em Configurações → Tarifas de impressão; o histórico mostra o preço de venda (custo + margem) ao lado do custo, enquanto as estatísticas continuam usando o custo real
@@ -221,6 +222,7 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 | ![Biblioteca com miniaturas](../../images/library.png) *Biblioteca com miniaturas* | ![Monitoramento de impressoras](../../images/monitoring.png) *Monitoramento de impressoras* |
 | ![Recomendação de perfil por IA](../../images/slicer.png) *Recomendação de perfil por IA* | ![Nesting automático](../../images/nesting.png) *Nesting automático* |
 | ![Deteção de duplicados](../../images/duplicates.png) *Deteção de duplicados* | ![Filtros avançados](../../images/filters.png) *Filtros avançados* |
+| ![BigPrint: ampliar para o tamanho real e cortar em peças](../wiki/images/pt/bigprint.png) *BigPrint: ampliar para o tamanho real e cortar em peças* | ![BigPrint: vista explodida, filamento e lista de peças](../wiki/images/pt/bigprint-result.png) *BigPrint: vista explodida, filamento e lista de peças* |
 
 ---
 
@@ -345,6 +347,7 @@ O Stellio detecta automaticamente:
 | **Duet / RepRapFirmware** | Qualquer placa Duet 2/3 | HTTP: monitoramento, envio |
 | **Repetier-Server** | Qualquer impressora gerida pelo Repetier-Server | HTTP: monitoramento, envio |
 | **Resina (beta)** 🧪 | Formlabs (API web) · Anycubic Photon Wi-Fi · Chitubox / Phrozen / Uniformation (SDCP) | Apenas monitoramento, em beta — hardware real não totalmente testado · manutenção (FEP, cuba, LCD…) |
+| **Impressora USB (beta) 🧪** | Marlin, Prusa, Creality, placas Klipper… ligadas ao PC do Stellio | Deteção de portas série (a porta nunca é aberta): ligada / ausente, sem estado nem temperaturas |
 
 > Os modelos listados são os oferecidos no formulário «Adicionar impressora» do Stellio. Outros modelos que usam o mesmo protocolo geralmente funcionam, mas nem todos foram testados — [conte-nos no GitHub](https://github.com/stellio-app/stellio/issues) se a sua funciona ou não.
 
@@ -484,6 +487,7 @@ O Stellio é parceiro de integração da [**TigerTag**](https://tigersystem.io),
 - [Spoolman](https://github.com/Donkie/Spoolman) pela gestão de carretéis de filamento
 - [TigerTag](https://tigersystem.io) pela identificação NFC/RFID de filamentos
 - [Open Filament Database](https://openfilamentdatabase.org) (Open Filament Collective) pelo catálogo de carretéis (licença MIT)
+- [bigprint](https://github.com/PooterTF/bigprint) de Michael Christopher Stone (PooterTF) pela ferramenta BigPrint (corte de modelos em tamanho real, AGPL-3.0)
 - [OpenPrintTag](https://specs.openprinttag.org/) pelo padrão de etiquetas NFC de carretéis (Prusa Research, licença MIT)
 - À comunidade maker pelos comentários e sugestões
 - A todos os contribuidores ❤️

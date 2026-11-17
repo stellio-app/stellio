@@ -101,7 +101,7 @@ _PRELOAD_MODULES = [
     "pyrender", "OpenGL", "OpenGL.GL", "numpy", "PIL", "PIL.Image",
     "matplotlib", "mpl_toolkits.mplot3d", "mpl_toolkits.mplot3d.art3d",
     "fast_simplification", "pymeshfix", "shapely", "rectpack",
-    "smbclient", "smbprotocol", "paho.mqtt.client", "requests",
+    "smbclient", "smbprotocol", "paho.mqtt.client", "serial.tools.list_ports", "requests",
     "cryptography", "cryptography.hazmat.primitives.ciphers", "rarfile",
     "py7zr", "defusedxml", "defusedxml.ElementTree", "nest_asyncio",
     "psutil", "packaging", "packaging.version", "qrcode", "websocket",

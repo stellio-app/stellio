@@ -232,6 +232,22 @@ Cada funcionalidade do Stellio: **para que serve e como a usar**. Os detalhes t�
 3. Se necessário, assinale **Reparar automaticamente a malha** e **Eliminar o ficheiro original**.
 4. Inicie. Uma conversão em lote pode ser cancelada a qualquer momento: os ficheiros já convertidos são mantidos.
 
+## Ampliar um modelo para o tamanho real (BigPrint)
+O BigPrint (menu **Ferramentas**) amplia um modelo para o tamanho desejado — 1,8 m ou mais — e corta-o em peças que cabem na sua mesa: peças esvaziadas, pinos de união e um número gravado em cada peça. O cálculo é feito pelo motor de código aberto [bigprint](https://github.com/PooterTF/bigprint) (AGPL-3.0, de Michael Christopher Stone), integrado no Stellio.
+
+{{img:bigprint}}
+
+1. Escolha o modelo: **Escolher da biblioteca**, **Importar um ficheiro**, ou o botão **Enviar para o BigPrint** do menu **Ações** de um ficheiro (STL, 3MF, OBJ, PLY).
+2. Indique o **tamanho final** (altura, largura, profundidade ou fator de escala) e a sua **impressora** (lista de modelos ou dimensões personalizadas).
+3. Ajuste a **resistência** (uso, material, esvaziamento, espessura da casca) e os **pinos**; as opções avançadas (eixo vertical, margem, suavização…) estão recolhidas.
+4. Clique em **Pré-visualização**: o Stellio mostra as peças em vista explodida, o peso de filamento, o custo estimado e a tabela de peças. Um cálculo pode ser cancelado a qualquer momento.
+
+{{img:bigprint-result}}
+
+Escolha onde guardar (origem da biblioteca, subpasta, criação de pasta possível, partilhas de rede incluídas) e clique em **Guardar os ficheiros**: as peças STL, o projeto 3MF, os pinos, o relatório e a pré-visualização são copiados para a pasta `<modelo>_bigprint`.
+
+Se alterar uma definição depois da pré-visualização, execute-a novamente antes de guardar.
+
 ## Arrumar: duplicados e reciclagem
 
 1. Abra **Duplicados**: os ficheiros idênticos e os de **geometria semelhante** (o mesmo modelo renomeado ou reexportado) ficam agrupados.
@@ -402,6 +418,7 @@ Agrupe vários ficheiros para um mesmo objeto.
 ## Visualizador 3D e ferramentas
 - **Visualizador 3D** (Three.js, funciona offline), navegação entre placas.
 - **Disposição automática** na mesa (rectpack, ou silhueta real com shapely).
+- **BigPrint** (menu **Ferramentas**): amplia um modelo para o tamanho desejado e corta-o em peças numeradas com pinos, pré-visualização 3D explodida e estimativa de filamento e custo (motor de código aberto bigprint).
 - **Unir em 3MF**: selecione vários modelos (STL, 3MF, OBJ…) e o Stellio cria um único ficheiro 3MF — uma placa se tudo couber, caso contrário um ficheiro com várias placas (estrutura compatível com Bambu Studio / OrcaSlicer; o PrusaSlicer mostra todas as peças juntas). Escolhe o nome e a pasta (incluindo partilhas de rede, com criação de pasta) e o Stellio pergunta se quer eliminar ou manter os ficheiros originais.
 - **Cor da bobina para o slicer**: ao enviar, a cor e o material da bobina escolhida são aplicados ao perfil de filamento carregado no OrcaSlicer, Bambu Studio ou PrusaSlicer (é preciso um perfil de filamento importado e associado à impressora; no envio em lote, só se todas as bobinas forem iguais).
 - **Barra de seleção**: todos os botões têm o mesmo tamanho e cabem numa única linha (só ícones em ecrãs pequenos, nome na dica).
@@ -435,6 +452,7 @@ No início, o widget **Câmaras** mostra até **4 câmaras** (uma por impressora
 | **Creality** | Séries K1/K2, Ender-3 V3, Hi | WebSocket: acompanhamento, CFS, descoberta UDP |
 | **Elegoo** | Centauri Carbon 1 e 2, séries de resina Saturn/Mars (**beta**) | SDCP (WebSocket) |
 | **Resina Chitubox** *(beta)* | Phrozen, Uniformation GKtwo e outras placas Chitubox | SDCP v3: acompanhamento (mesmo protocolo da Elegoo) |
+| **Impressora USB *(beta)*** | Marlin, Prusa, Creality, placas Klipper… ligadas ao PC do Stellio | Deteção de portas série (a porta nunca é aberta): ligada / ausente, sem estado nem temperaturas |
 | **Anycubic Photon** *(beta)* | Modelos Wi-Fi antigos: Mono X, Mono X 6K, Mono SQ (não as M5s / M7) | Comandos de texto TCP 6000: só estado e ficheiro atual |
 | **Formlabs** *(beta)* | Form 3 / 3L / 4 | API web oficial (client_id:client_secret): estado, progresso, camadas; o envio faz-se com o PreForm |
 | **FlashForge** | Adventurer 5M/5M Pro, AD5X | API proprietária |

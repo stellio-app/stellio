@@ -46,7 +46,11 @@ ALL = (
     'printers_extra',
     'failure_stats',
     'resin_printers',
+    'usb_printers',
+    'thumb_recent',
     'resin_inventory',
     'collections_sets',
     'merge_3mf',
+    'bigprint_i18n',
+    'bigprint_tool',
 )

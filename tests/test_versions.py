@@ -2183,10 +2183,10 @@ def test_v110_no_update_done_popup():
     js = (root / 'interface/script.js').read_text(encoding='utf-8')
     body = js[js.index('async checkAndShowChangelog()'):js.index('async checkForUpdates(')]
     assert 'showChangelogModal(' not in body and 'stellio-last-seen-version' in body
-    assert 'CURRENT_VERSION = "1.1.3"' in (root / 'main.py').read_text(encoding='utf-8')
+    assert 'CURRENT_VERSION = "1.1.4"' in (root / 'main.py').read_text(encoding='utf-8')
     for p in ('changelog.json', 'languages/changelog.json'):
         d = json.loads((root / p).read_text(encoding='utf-8'))
-        assert d[0]['version'] == '1.1.3' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
+        assert d[0]['version'] == '1.1.4' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
 
 
 def test_v110_no_badge_on_likes_and_creations():
@@ -2269,7 +2269,7 @@ def test_v110_sidebar_line_not_through_logo():
 def test_v110_separator_on_open_panel_edge():
     from pathlib import Path as _P
     css = (_P(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
-    assert '.sidebar.panel-open::after { right: calc(-1 * var(--sidebar-width)); }' in css
+    assert '.sidebar.panel-open::after { right: calc(-1 * var(--sidebar-width));' in css   # + ombre (v1.1.4)
 
 
 def test_v110_printed_files_page_widget_and_remove():
@@ -2332,7 +2332,7 @@ def test_v111_changelog_entry():
     root = _P(__file__).resolve().parent.parent
     for p in ('changelog.json', 'languages/changelog.json'):
         d = json.loads((root / p).read_text(encoding='utf-8'))
-        assert d[2]['version'] == '1.1.1' and len(d[2]['items']['fr']) >= 15 and all(len(v) >= 2 for v in d[0]['items'].values())
+        assert d[3]['version'] == '1.1.1' and len(d[3]['items']['fr']) >= 15 and all(len(v) >= 2 for v in d[1]['items'].values())
 
 
 def test_v111_security_options_and_modules():
@@ -2459,7 +2459,7 @@ def test_v114_workflow_uses_notes_and_community_files():
     assert (root / 'CONTRIBUTING.md').is_file()
     for n in ('bug.yml', 'feature.yml', 'good-first-issue.yml', 'config.yml'):
         assert (root / '.github' / 'ISSUE_TEMPLATE' / n).is_file()
-    assert 'versionName \'1.1.3\'' in (root / 'apk-src' / 'app' / 'build.gradle').read_text(encoding='utf-8')
+    assert 'versionName \'1.1.4\'' in (root / 'apk-src' / 'app' / 'build.gradle').read_text(encoding='utf-8')
 
 
 # ── v1.1.1 (ajouts) : popup caméra, couleurs par plateau, boutiques OFD ─────
@@ -2633,7 +2633,7 @@ def test_v112_sidebar_footer_in_sync_with_panel():
 def test_v112_sidebar_line_under_footer():
     root = __import__("pathlib").Path(__file__).resolve().parent.parent
     css = (root / 'interface/style.css').read_text(encoding='utf-8')
-    assert 'pointer-events: none; z-index: 80; transition: right 0.2s ease;' in css
+    assert 'pointer-events: none; z-index: 80; transition: right 0.2s ease, box-shadow 0.2s ease;' in css
 
 
 def test_v112_account_avatar_stable():
@@ -2656,3 +2656,62 @@ def test_v112_demo_banner_sidebar_below_banner():
     css = (root / "interface" / "style.css").read_text(encoding="utf-8")
     assert "body.has-demo-banner .sidebar { top: var(--demo-banner-h, 32px)" in css
     assert "body.has-demo-banner .sidebar-overlay { top: var(--demo-banner-h, 32px)" in css
+
+
+# ── v1.1.4 : détection automatique des imprimantes résine ───────────────────
+def _resin_discovery_ns(prefixes):
+    import re as _re, socket as _socket, threading as _threading, logging as _logging
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    src = (root / 'main.py').read_text(encoding='utf-8')
+    block = src[src.index('_SDCP_RESIN_RE ='):src.index('def _discover_elegoo_broadcast')]
+    ns = {'re': _re, 'socket': _socket, 'threading': _threading, 'app_logger': _logging.getLogger('t'),
+          '_get_all_lan_prefixes': lambda: prefixes}
+    exec(block, ns)
+    return ns, src
+
+
+def test_v114_sdcp_resin_classification():
+    ns, src = _resin_discovery_ns([])
+    f = ns['_sdcp_is_resin']
+    assert f({'Name': 'Saturn 4 Ultra', 'MachineName': 'ELEGOO Saturn 4 Ultra'})
+    assert f({'Name': 'GKtwo', 'BrandName': 'Uniformation'}) and f({'MachineName': 'Phrozen Sonic Mighty 8K'})
+    assert not f({'Name': 'Centauri Carbon', 'MachineName': 'ELEGOO Centauri Carbon'})
+    assert not f({}) and not f(None)
+    assert "'chitu_sdcp' if _sdcp_is_resin(attrs) else 'elegoo_sdcp'" in src
+    assert '_discover_photon' in src[src.index('def api_discover_printers'):src.index('def api_discover_printers') + 2500]
+
+
+def test_v114_photon_discovery_finds_fake_printer():
+    import socket, threading
+    srv = socket.socket(); srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        srv.bind(('127.0.0.1', 6000))
+    except OSError:
+        import pytest
+        pytest.skip('port 6000 occupé')
+    srv.listen(5)
+
+    def serve():
+        for _ in range(2):
+            try:
+                c, _a = srv.accept()
+                c.recv(64)
+                c.sendall(b'getstatus,stop,,end')
+                c.close()
+            except Exception:
+                return
+    th = threading.Thread(target=serve, daemon=True); th.start()
+    try:
+        ns, _src = _resin_discovery_ns(['127.0.0'])
+        res = ns['_discover_photon'](timeout=0.5)
+    finally:
+        srv.close()
+    assert [r['ip'] for r in res] == ['127.0.0.1'] and res[0]['type'] == 'anycubic_photon'
+
+
+def test_v114_update_modal_collapsible_languages():
+    root = __import__("pathlib").Path(__file__).resolve().parent.parent
+    js = (root / 'interface/script.js').read_text(encoding='utf-8')
+    main = (root / 'main.py').read_text(encoding='utf-8')
+    assert 'buildReleaseNotesHtml(updateInfo)' in js and 'details class="rn-lang"' in js and "release_notes_all" in js
+    assert "'release_notes_all': update_info.get('release_notes_all', '')" in main

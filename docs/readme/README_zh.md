@@ -159,6 +159,7 @@
 - 🖌️ **耗材盘颜色传给切片软件**：发送时，所选耗材盘的颜色和材料会应用到 OrcaSlicer、Bambu Studio 或 PrusaSlicer 加载的耗材配置（需要已导入并关联到打印机的耗材配置；批量发送时仅当所有耗材盘相同才应用颜色）。
 - 🔧 **网格修复**（trimesh + pymeshfix），提供**修复前后对比**（水密性、三角面数、顶点数、大小）
 - 🔄 **格式转换器**（STL ↔ 3MF ↔ OBJ）
+- 📏 **BigPrint（工具）**：将模型放大到等身大小（如 1.8 米）；自动切成适合打印平台的部件、掏空、添加销钉并编号，提供分解式 3D 预览和耗材/成本估算；把 STL 部件、3MF 项目和报告保存到本地或网络文件夹。基于开源引擎 [bigprint](https://github.com/PooterTF/bigprint)（AGPL-3.0）。
 - 🛡️ **完整性检查**（损坏/缺失文件）
 - 💰 **打印成本计算**：材料、电费、机器损耗（按小时）、固定费用、利润率（%）和数量 — 单价与总价精确到分
 - 🏷️ **利润率与售价**：在 设置 → 打印价格 中一次性设置默认利润率（%）；历史记录会在成本旁显示售价（成本 + 利润率），统计仍按实际成本计算
@@ -220,6 +221,7 @@
 | ![带缩略图的文件库](../../images/library.png) *带缩略图的文件库* | ![打印机监控](../../images/monitoring.png) *打印机监控* |
 | ![AI配置推荐](../../images/slicer.png) *AI配置推荐* | ![自动嵌套排版](../../images/nesting.png) *自动嵌套排版* |
 | ![重复文件检测](../../images/duplicates.png) *重复文件检测* | ![高级筛选](../../images/filters.png) *高级筛选* |
+| ![BigPrint：放大到等身大小并切分为部件](../wiki/images/zh/bigprint.png) *BigPrint：放大到等身大小并切分为部件* | ![BigPrint：分解预览、耗材与部件列表](../wiki/images/zh/bigprint-result.png) *BigPrint：分解预览、耗材与部件列表* |
 
 ---
 
@@ -344,6 +346,7 @@ Stellio 可自动检测：
 | **Duet / RepRapFirmware** | 任何 Duet 2/3 主板 | HTTP：监控、上传 |
 | **Repetier-Server** | 任何由 Repetier-Server 管理的打印机 | HTTP：监控、上传 |
 | **树脂（测试版）** 🧪 | Formlabs（Web API）· Anycubic Photon Wi-Fi · Chitubox / Phrozen / Uniformation (SDCP) | 仅监控，测试版——真实硬件未充分测试 · 维护（FEP、料盒、LCD…） |
+| **USB 打印机（测试版）🧪** | 连接到 Stellio 所在电脑的 Marlin、Prusa、Creality、Klipper 主板等 | 串口检测（从不打开端口）：已插上 / 未连接，无状态和温度 |
 
 > 所列型号是 Stellio「添加打印机」表单中提供的型号。使用相同协议的其他型号通常也能工作，但并未全部测试——如果您的打印机能用或不能用，请[在 GitHub 上告诉我们](https://github.com/stellio-app/stellio/issues)。
 
@@ -483,6 +486,7 @@ Stellio 是 NFC/RFID 耗材识别系统 [**TigerTag**](https://tigersystem.io) �
 - [Spoolman](https://github.com/Donkie/Spoolman) 提供耗材卷轴管理
 - [TigerTag](https://tigersystem.io) 提供 NFC/RFID 耗材识别
 - [Open Filament Database](https://openfilamentdatabase.org)（Open Filament Collective）提供耗材目录（MIT 许可证）
+- [bigprint](https://github.com/PooterTF/bigprint)（Michael Christopher Stone / PooterTF）提供 BigPrint 工具（等身大模型切割，AGPL-3.0）
 - [OpenPrintTag](https://specs.openprinttag.org/) 提供耗材卷轴 NFC 标签标准（Prusa Research，MIT 许可证）
 - 感谢创客社区的反馈与建议
 - 感谢所有贡献者 ❤️

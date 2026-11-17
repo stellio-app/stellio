@@ -232,6 +232,22 @@ Every Stellio feature, **what it is for and how to use it**. Technical details a
 3. If needed, tick **Automatically repair the mesh** and **Delete the original file**.
 4. Start. A batch conversion can be cancelled at any time: files already converted are kept.
 
+## Scale a model to life size (BigPrint)
+BigPrint (**Tools** menu) scales a model to the size you want — 1.8 m or more — and cuts it into pieces that fit your print bed: hollowed pieces, assembly dowels and a number engraved on every piece. The calculation is done by the open-source [bigprint](https://github.com/PooterTF/bigprint) engine (AGPL-3.0, by Michael Christopher Stone), built into Stellio.
+
+{{img:bigprint}}
+
+1. Choose the model: **Pick from library**, **Import a file**, or the **Send to BigPrint** button in a file's **Actions** menu (STL, 3MF, OBJ, PLY).
+2. Enter the **final size** (height, width, depth or scale factor) and your **printer** (preset list or custom dimensions).
+3. Set the **strength** (purpose, material, hollowing, shell thickness) and the **dowels**; advanced options (up axis, margin, smoothing…) are folded away.
+4. Click **Preview**: Stellio shows the pieces in an exploded view, the filament weight, the estimated cost and the list of pieces. A calculation can be cancelled at any time.
+
+{{img:bigprint-result}}
+
+Choose where to save (library source, subfolder, folder creation available, network shares included), then **Save print files**: STL pieces, 3MF project, dowels, report and preview are copied to the `<model>_bigprint` folder.
+
+If you change a setting after the preview, run it again before saving.
+
 ## Tidy up: duplicates and trash
 
 1. Open **Duplicates**: identical files, and those with **similar geometry** (same model renamed or re-exported), are grouped.
@@ -402,6 +418,7 @@ Group several files for a single object.
 ## 3D viewer and tools
 - **3D viewer** (Three.js, works offline), plate navigation.
 - **Automatic bed nesting** (rectpack, or real silhouette with shapely).
+- **BigPrint** (**Tools** menu): scales a model to the size you want and cuts it into numbered pieces with dowels, an exploded 3D preview and a filament and cost estimate (open-source bigprint engine).
 - **Merge into 3MF**: select several models (STL, 3MF, OBJ…) and Stellio builds a single 3MF file — one plate if everything fits, otherwise a multi-plate file (structure compatible with Bambu Studio / OrcaSlicer; PrusaSlicer shows all parts together). You choose the file name and folder (network shares included, folder creation possible), then Stellio offers to delete or keep the original files.
 - **Spool colour sent to the slicer**: when sending, the colour and material of the chosen spool are applied to the filament profile loaded in OrcaSlicer, Bambu Studio or PrusaSlicer (an imported filament profile linked to the printer is required; in a batch send, the colour is applied only if all spools are identical).
 - **Selection bar**: all buttons have the same size and fit on a single line (icons only on small screens, name in the tooltip).
@@ -435,6 +452,7 @@ On the home page, the **Cameras** widget shows up to **4 cameras** (one per runn
 | **Creality** | K1/K2 series, Ender-3 V3, Hi | WebSocket: monitoring, CFS, UDP discovery |
 | **Elegoo** | Centauri Carbon 1 & 2, Saturn/Mars resin series (**beta**) | SDCP (WebSocket) |
 | **Chitubox resin** *(beta)* | Phrozen, Uniformation GKtwo and other Chitubox boards | SDCP v3: monitoring (same protocol as Elegoo) |
+| **USB printer *(beta)*** | Marlin, Prusa, Creality, Klipper boards… plugged into the Stellio PC | Serial port detection (the port is never opened): plugged in / absent, no status or temperatures |
 | **Anycubic Photon** *(beta)* | Older Wi-Fi models: Mono X, Mono X 6K, Mono SQ (not the M5s / M7) | TCP 6000 text commands: state and current file only |
 | **Formlabs** *(beta)* | Form 3 / 3L / 4 | Official web API (client_id:client_secret): status, progress, layers; sending is done with PreForm |
 | **FlashForge** | Adventurer 5M/5M Pro, AD5X | Proprietary API |

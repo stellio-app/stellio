@@ -159,6 +159,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 - 🖌️ **Spulenfarbe an den Slicer**: Beim Senden werden Farbe und Material der gewählten Spule auf das in OrcaSlicer, Bambu Studio oder PrusaSlicer geladene Filamentprofil angewendet (ein importiertes, dem Drucker zugeordnetes Filamentprofil ist nötig; beim Sammelversand nur, wenn alle Spulen gleich sind).
 - 🔧 **Mesh-Reparatur** (trimesh + pymeshfix) mit **Vorher/Nachher-Vergleich** (Wasserdichtheit, Dreiecke, Eckpunkte, Größe)
 - 🔄 **Formatkonverter** (STL ↔ 3MF ↔ OBJ)
+- 📏 **BigPrint (Werkzeuge)**: Modell auf Originalgröße skalieren (z. B. 1,8 m); es wird in bettgroße Teile zerlegt, ausgehöhlt, mit Stiften versehen und nummeriert – mit explodierter 3D-Vorschau und Filament-/Kostenschätzung; speichert STL-Teile, ein 3MF-Projekt und einen Bericht in einem lokalen oder Netzwerkordner. Basiert auf der Open-Source-Engine [bigprint](https://github.com/PooterTF/bigprint) (AGPL-3.0).
 - 🛡️ **Integritätsprüfung** (beschädigte/fehlende Dateien)
 - 💰 **Druckkostenberechnung**: Material, Strom, Maschinenverschleiß (pro Stunde), Fixkosten, Marge in % und Stückzahl — Stückpreis und Gesamtpreis auf den Cent genau
 - 🏷️ **Aufschlag & Verkaufspreis**: Standardaufschlag (%) einmal unter Einstellungen → Druckpreise festlegen; der Verlauf zeigt den Verkaufspreis (Kosten + Aufschlag) neben den Kosten, die Statistiken nutzen weiterhin die tatsächlichen Kosten
@@ -221,6 +222,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 | ![Bibliothek mit Vorschaubildern](../../images/library.png) *Bibliothek mit Vorschaubildern* | ![Drucker-Überwachung](../../images/monitoring.png) *Drucker-Überwachung* |
 | ![KI-Profilempfehlung](../../images/slicer.png) *KI-Profilempfehlung* | ![Automatisches Nesting](../../images/nesting.png) *Automatisches Nesting* |
 | ![Doppelte erkennen](../../images/duplicates.png) *Doppelte erkennen* | ![Erweiterte Filter](../../images/filters.png) *Erweiterte Filter* |
+| ![BigPrint: in Originalgröße vergrößern und in Teile zerlegen](../wiki/images/de/bigprint.png) *BigPrint: in Originalgröße vergrößern und in Teile zerlegen* | ![BigPrint: Explosionsansicht, Filament und Teileliste](../wiki/images/de/bigprint-result.png) *BigPrint: Explosionsansicht, Filament und Teileliste* |
 
 ---
 
@@ -345,6 +347,7 @@ Stellio erkennt automatisch:
 | **Duet / RepRapFirmware** | Jedes Duet-2/3-Board | HTTP: Überwachung, Upload |
 | **Repetier-Server** | Jeder von Repetier-Server verwaltete Drucker | HTTP: Überwachung, Upload |
 | **Harz (Beta)** 🧪 | Formlabs (Web-API) · Anycubic Photon WLAN · Chitubox / Phrozen / Uniformation (SDCP) | Nur Überwachung, noch Beta – echte Hardware nicht vollständig getestet · Wartung (FEP, Tank, LCD …) |
+| **USB-Drucker (Beta) 🧪** | Marlin, Prusa, Creality, Klipper-Boards… am Stellio-PC angeschlossen | Erkennung serieller Ports (der Port wird nie geöffnet): angesteckt / fehlt, ohne Status oder Temperaturen |
 
 > Die aufgeführten Modelle sind diejenigen, die im Formular „Drucker hinzufügen“ von Stellio angeboten werden. Andere Modelle mit demselben Protokoll funktionieren meist ebenfalls, wurden aber nicht alle getestet — [sagen Sie uns auf GitHub](https://github.com/stellio-app/stellio/issues) Bescheid, ob Ihr Drucker funktioniert.
 
@@ -484,6 +487,7 @@ Stellio ist Integrationspartner von [**TigerTag**](https://tigersystem.io), dem 
 - [Spoolman](https://github.com/Donkie/Spoolman) für die Verwaltung von Filamentspulen
 - [TigerTag](https://tigersystem.io) für die NFC/RFID-Filamenterkennung
 - [Open Filament Database](https://openfilamentdatabase.org) (Open Filament Collective) für den Filamentkatalog (MIT-Lizenz)
+- [bigprint](https://github.com/PooterTF/bigprint) von Michael Christopher Stone (PooterTF) für das BigPrint-Werkzeug (Modellzerlegung in Originalgröße, AGPL-3.0)
 - [OpenPrintTag](https://specs.openprinttag.org/) für den NFC-Standard für Filamentspulen (Prusa Research, MIT-Lizenz)
 - Der Maker-Community für Feedback und Vorschläge
 - Allen Mitwirkenden ❤️

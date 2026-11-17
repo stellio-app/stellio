@@ -314,6 +314,10 @@
 				  <i class="fa-solid fa-file-export"></i>
 				  <span data-i18n="nav.converter">Convertisseur</span>
 				</button>
+				<button class="nav-btn desktop-only-nav" data-nav-id="bigprint" data-page="bigprint" data-title-key="nav.bigprint" data-icon="fa-up-right-and-down-left-from-center" data-cat="tools">
+				  <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
+				  <span data-i18n="nav.bigprint">BigPrint</span>
+				</button>
 				<button class="nav-btn" data-nav-id="duplicates" onclick="openDuplicatesModal()" style="cursor:pointer;" data-cat="library">
 				  <i class="fa-solid fa-copy"></i>
 				  <span data-i18n="nav.duplicates">Doublons</span>
@@ -653,6 +657,18 @@
                                     <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('recent')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
                                 </div>
                                 <div class="dashboard-widget-body" id="dashboard-recent-body">
+                                    <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-widget" id="dashboard-widget-thumbs" data-widget-id="thumbs" draggable="false">
+                                <div class="dashboard-widget-header">
+                                    <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
+                                    <h3><i class="fa-solid fa-image"></i> <span data-i18n="dashboard.thumbs_title">Dernières miniatures</span></h3>
+                                    <a href="#" class="dashboard-widget-seeall" onclick="document.querySelector('.nav-btn[data-page=&quot;library&quot;]')?.click(); return false;" data-i18n="dashboard.see_all">Voir tout</a>
+                                    <button type="button" class="dashboard-widget-hide-btn" onclick="hideDashboardWidget('thumbs')" data-i18n-title="dashboard.hide_widget" title="Masquer"><i class="fa-solid fa-eye-slash"></i></button>
+                                </div>
+                                <div class="dashboard-widget-body" id="dashboard-thumbs-body">
                                     <div class="dashboard-widget-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
                                 </div>
                             </div>
@@ -2813,6 +2829,121 @@
 					<p data-i18n="repair.all_good">Aucun fichier ne nécessite de réparation.</p>
 				  </div>
 				</div>
+				<div id="page-bigprint" class="page">
+				  <div class="repair-header">
+					<h2><i class="fa-solid fa-up-right-and-down-left-from-center"></i> <span data-i18n="bigprint.title">BigPrint : impression grandeur nature</span></h2>
+					<p data-i18n="bigprint.subtitle">Agrandissez un modèle à la taille voulue : BigPrint le découpe en pièces qui tiennent sur votre plateau, les évide, ajoute des goujons d'assemblage et numérote chaque pièce.</p>
+				  </div>
+				  <div id="bp-unavailable" class="bp-banner" hidden></div>
+				  <div class="bp-layout">
+					<div class="bp-form">
+<div class="bp-col">
+<section class="bp-card">
+						<h3 data-i18n="bigprint.model">Modèle</h3>
+						<div class="bp-row">
+						  <button type="button" class="btn btn-primary" id="bp-pick-library"><i class="fa-solid fa-layer-group"></i> <span data-i18n="bigprint.from_library">Choisir dans la bibliothèque</span></button>
+						  <button type="button" class="btn btn-secondary" id="bp-pick-upload"><i class="fa-solid fa-upload"></i> <span data-i18n="bigprint.upload">Importer un fichier</span></button>
+						  <input type="file" id="bp-file" accept=".stl,.3mf,.obj,.ply" hidden>
+						</div>
+						<div id="bp-model-info" class="bp-muted" data-i18n="bigprint.no_model">Aucun modèle choisi (STL, 3MF, OBJ, PLY).</div>
+					  </section>
+<section class="bp-card">
+						<h3 data-i18n="bigprint.size">Taille finale</h3>
+						<div class="bp-row">
+						  <select id="bp-size_mode" class="settings-select">
+							<option value="height" data-i18n="bigprint.height">Hauteur</option>
+							<option value="width" data-i18n="bigprint.width">Largeur</option>
+							<option value="depth" data-i18n="bigprint.depth">Profondeur</option>
+							<option value="scale" data-i18n="bigprint.scale">Facteur d'échelle</option>
+						  </select>
+						  <input type="number" id="bp-size_value" value="1.8" min="0" step="any" class="settings-input">
+						  <select id="bp-size_unit" class="settings-select"><option>mm</option><option>cm</option><option selected>m</option><option>in</option><option>ft</option></select>
+						</div>
+						<div id="bp-size-note" class="bp-muted"></div>
+					  </section>
+<section class="bp-card">
+						<h3 data-i18n="bigprint.printer">Imprimante</h3>
+						<div class="bp-row"><select id="bp-printer" class="settings-select"></select></div>
+						<div class="bp-row" id="bp-custom-bed" hidden>
+						  <input type="number" id="bp-bed_w" value="250" class="settings-input" aria-label="X">
+						  <input type="number" id="bp-bed_d" value="250" class="settings-input" aria-label="Y">
+						  <input type="number" id="bp-bed_h" value="250" class="settings-input" aria-label="Z">
+						  <span class="bp-muted bp-bed-hint">X · Y · Z (mm)</span>
+						</div>
+					  </section>
+</div>
+<div class="bp-col">
+<section class="bp-card">
+						<h3 data-i18n="bigprint.strength">Solidité et filament</h3>
+						<div class="bp-grid">
+						  <label data-i18n="bigprint.purpose">Usage</label><select id="bp-purpose" class="settings-select"></select>
+						  <label data-i18n="bigprint.material">Matière</label><select id="bp-material" class="settings-select"></select>
+						  <label data-i18n="bigprint.hollow">Évidement</label>
+						  <select id="bp-hollow" class="settings-select">
+							<option value="auto" data-i18n="bigprint.hollow_auto">Auto (si ça économise du filament)</option>
+							<option value="on" data-i18n="bigprint.hollow_on">Toujours</option>
+							<option value="off" data-i18n="bigprint.hollow_off">Jamais</option>
+						  </select>
+						  <label data-i18n="bigprint.wall">Épaisseur de coque (mm)</label><input type="number" id="bp-wall" value="4" step="0.5" min="0.8" class="settings-input">
+						  <label data-i18n="bigprint.price">Prix du filament (par kg, facultatif)</label><input type="number" id="bp-price" min="0" step="any" class="settings-input">
+						</div>
+						<div id="bp-purpose-hint" class="bp-muted"></div>
+					  </section>
+<details class="bp-card bp-adv">
+						<summary data-i18n="bigprint.advanced">Options avancées</summary>
+						<div class="bp-grid">
+						  <label data-i18n="bigprint.up">Axe vertical du modèle</label>
+						  <select id="bp-up" class="settings-select"><option value="z">Z</option><option value="y">Y</option><option value="-y">−Y</option><option value="x">X</option><option value="-z">−Z</option></select>
+						  <label data-i18n="bigprint.margin">Marge sur le plateau (mm)</label><input type="number" id="bp-margin" value="5" min="0" class="settings-input">
+						  <label data-i18n="bigprint.nozzle">Buse (mm)</label><input type="number" id="bp-nozzle" value="0.4" step="0.1" min="0.1" class="settings-input">
+						</div>
+						<label class="bp-check"><input type="checkbox" id="bp-repair" checked> <span data-i18n="bigprint.repair">Réparer automatiquement les modèles abîmés</span></label>
+						<label class="bp-check"><input type="checkbox" id="bp-merge_small" checked> <span data-i18n="bigprint.merge_small">Fusionner les minuscules fragments avec leurs voisins</span></label>
+						<label class="bp-check"><input type="checkbox" id="bp-even_cuts"> <span data-i18n="bigprint.even_cuts">Coupes régulières (sans optimisation)</span></label>
+						<label class="bp-check"><input type="checkbox" id="bp-smooth"> <span data-i18n="bigprint.smooth">Lisser le modèle (utile pour les modèles basse résolution)</span></label>
+						<div class="bp-grid" id="bp-smooth-opts" hidden>
+						  <label data-i18n="bigprint.smooth_angle">Garder les arêtes plus vives que (°)</label><input type="number" id="bp-smooth_angle" value="60" min="1" max="180" class="settings-input">
+						  <label data-i18n="bigprint.smooth_edge">Taille des triangles (mm)</label><input type="number" id="bp-smooth_edge" value="5" step="0.5" min="0.5" class="settings-input">
+						</div>
+					  </details>
+</div>
+<div class="bp-col">
+<section class="bp-card">
+						<h3 data-i18n="bigprint.connectors">Goujons et repères</h3>
+						<label class="bp-check"><input type="checkbox" id="bp-dowels" checked> <span data-i18n="bigprint.dowels">Goujons d'assemblage entre les pièces</span></label>
+						<div class="bp-grid" id="bp-dowel-opts">
+						  <label data-i18n="bigprint.dowel_d">Diamètre du goujon (mm)</label><input type="number" id="bp-dowel_d" value="6" step="0.5" min="1" class="settings-input">
+						  <label data-i18n="bigprint.dowel_depth">Profondeur par côté (mm)</label><input type="number" id="bp-dowel_depth" value="15" step="1" min="3" class="settings-input">
+						  <label data-i18n="bigprint.clearance">Jeu du trou (mm)</label><input type="number" id="bp-clearance" value="0.4" step="0.05" min="0" class="settings-input">
+						</div>
+						<label class="bp-check"><input type="checkbox" id="bp-labels" checked> <span data-i18n="bigprint.labels">Graver le numéro de chaque pièce sur une face cachée</span></label>
+					  </section>
+<section class="bp-card">
+						<h3 data-i18n="bigprint.destination">Enregistrer dans</h3>
+						<div class="bp-grid">
+						  <label data-i18n="bigprint.dest_source">Dossier</label><select id="bp-source" class="settings-select"></select>
+						  <label></label><button type="button" class="btn btn-ghost btn-sm" onclick="openCreateFolderModal('bp-source')"><i class="fa-solid fa-folder-plus"></i> <span data-i18n="download.create_folder">Créer un dossier...</span></button>
+						  <label data-i18n="bigprint.dest_name">Nom du dossier créé</label><input type="text" id="bp-folder-name" class="settings-input">
+						</div>
+					  </section>
+</div>
+<div class="bp-row bp-actions">
+						<button type="button" class="btn btn-primary" id="bp-preview-btn" disabled><i class="fa-solid fa-eye"></i> <span data-i18n="bigprint.preview">Aperçu</span></button>
+						<button type="button" class="btn btn-secondary" id="bp-save-btn" disabled><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="bigprint.save">Enregistrer les fichiers</span></button>
+						<button type="button" class="btn btn-danger" id="bp-cancel-btn" hidden><i class="fa-solid fa-xmark"></i> <span data-i18n="bigprint.cancel">Annuler</span></button>
+					  </div>
+					  <div id="bp-status" class="bp-muted"></div>
+					  <div class="bp-progress" id="bp-progress" hidden><div id="bp-progress-bar"></div></div>
+					</div>
+					<div class="bp-result" id="bp-result" hidden>
+					  <div class="bp-stage"><iframe id="bp-viewer" title="BigPrint 3D" hidden></iframe></div>
+					  <div id="bp-summary" class="bp-card" hidden></div>
+					  <details id="bp-log-wrap" class="bp-card" hidden><summary data-i18n="bigprint.log">Journal</summary><pre id="bp-log"></pre></details>
+					</div>
+				  </div>
+				  <p class="bp-credit"><span data-i18n="bigprint.credit">Moteur de découpe :</span> <a href="https://github.com/PooterTF/bigprint" target="_blank" rel="noopener">bigprint</a> (Michael Christopher Stone, AGPL‑3.0)</p>
+				</div>
+
 				<div id="page-converter" class="page">
 				  <div class="repair-header">
 					<h2><i class="fa-solid fa-file-export"></i> <span data-i18n="converter.title">Convertisseur de fichiers 3D</span></h2>
@@ -3921,6 +4052,13 @@
                 </div>
                 </div>
                 <div class="about-section">
+                    <h4><i class="fa-solid fa-up-right-and-down-left-from-center"></i> <span data-i18n="about.bigprint_title">BigPrint</span></h4>
+                    <p class="about-legal" data-i18n="about.bigprint_desc">L'outil BigPrint repose sur le moteur open source bigprint de Michael Christopher Stone (PooterTF), licence AGPL-3.0. Merci à lui.</p>
+                    <div class="about-partner-links">
+                        <a class="about-link-btn" href="https://github.com/PooterTF/bigprint" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i><span>PooterTF/bigprint</span></a>
+                    </div>
+                </div>
+                <div class="about-section">
                     <h4><i class="fa-solid fa-database"></i> <span data-i18n="about.data_title">Données et standards ouverts</span></h4>
                     <p class="about-legal" data-i18n="about.data_desc">Le catalogue de bobines provient de l'Open Filament Database (Open Filament Collective, licence MIT).</p>
                     <div class="about-partner-links">
@@ -4587,6 +4725,7 @@
 							<option value="creality">Creality (K1 / K2 / Ender-3 V3 / Hi)</option>
 							<option value="flashforge">FlashForge (5M / 5M Pro / AD5X)</option>
 							<option value="chitu_sdcp" data-i18n="printers.chitu_sdcp_model">Résine Chitubox : Phrozen / Uniformation / autres (SDCP) — bêta</option>
+							<option value="usb_serial" data-i18n="printers.usb_serial_model">Imprimante branchée en USB au PC (Marlin, Prusa, Creality…) — bêta</option>
 							<option value="anycubic_photon" data-i18n="printers.anycubic_photon_model">Résine Anycubic Photon (Mono X, Mono SQ… Wi-Fi) — bêta</option>
 							<option value="formlabs" data-i18n="printers.formlabs_model">Résine Formlabs (Form 3 / 3L / 4, API cloud) — bêta</option>
 							<option value="duet">Duet (RepRapFirmware)</option>
@@ -4614,6 +4753,9 @@
 					<div id="group-photon-hint" style="display:none; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:12px;">
 						<small style="color:var(--text-secondary); font-size:calc(11px * var(--fs, 1)); line-height:1.5;" data-i18n="printers.photon_hint">Anciens Photon en Wi-Fi (Mono X, Mono X 6K, Mono SQ…) : saisissez l'adresse IP (port 6000). Suivi simplifié : état et fichier en cours, sans progression. Les Photon récents (M5s, M7…) ne sont pas gérés. (Bêta)</small>
 					</div>
+					<div id="group-usb-hint" style="display:none; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:12px;">
+						<small style="color:var(--text-secondary); font-size:calc(11px * var(--fs, 1)); line-height:1.5;" data-i18n="printers.usb_hint">Imprimante branchée en USB à l'ordinateur qui fait tourner Stellio : utilisez « Détecter mes imprimantes » ou saisissez le port (COM3, /dev/ttyACM0…). Stellio indique seulement si elle est branchée ; il n'ouvre jamais la liaison série (cela ferait redémarrer certaines cartes en pleine impression), donc pas d'état ni de températures. (Bêta)</small>
+					</div>
 					<div id="group-formlabs-hint" style="display:none; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:12px;">
 						<small style="color:var(--text-secondary); font-size:calc(11px * var(--fs, 1)); line-height:1.5;" data-i18n="printers.formlabs_hint">Formlabs via l'API web officielle : créez un client sur le portail développeur Formlabs et saisissez « client_id:client_secret » dans « Clé API ». Suivi seulement ; l'envoi des pièces se fait avec PreForm. (Bêta)</small>
 					</div>
@@ -4628,7 +4770,7 @@
 						<small style="color:var(--text-secondary); font-size:calc(11px * var(--fs, 1)); line-height:1.5;" data-i18n="printers.repetier_hint">Repetier-Server (port 3344 par défaut) : clé API de l'utilisateur dans « Clé API », nom court (slug) de l'imprimante ci-dessous.</small>
 					</div>
 					<div class="input-group">
-						<label data-i18n="printers.ip_address">Adresse IP</label>
+						<label id="printer-ip-label" data-i18n="printers.ip_address">Adresse IP</label>
 						<input type="text" id="printer-ip" placeholder="192.168.1.100" required>
 					</div>
 					<div class="input-group" id="group-api-key" style="display:none;">
@@ -4932,6 +5074,11 @@
                 <button class="file-action-row" id="ctx-repair-btn">
                     <span class="file-action-icon"><i class="fa-solid fa-screwdriver-wrench"></i></span>
                     <span class="file-action-label" data-i18n="modal.repair_file">Réparer le fichier</span>
+                    <i class="fa-solid fa-chevron-right file-action-arrow"></i>
+                </button>
+                <button class="file-action-row" id="ctx-bigprint-btn">
+                    <span class="file-action-icon"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></span>
+                    <span class="file-action-label" data-i18n="bigprint.action">Envoyer vers BigPrint</span>
                     <i class="fa-solid fa-chevron-right file-action-arrow"></i>
                 </button>
                 <button class="file-action-row" id="ctx-split-btn" style="display:none;">
@@ -5451,7 +5598,18 @@
 
     <script src="script.js"></script>
     <script src="management.js"></script>
+
+<div id="modal-bp-picker" class="modal hidden">
+  <div class="modal-content" style="max-width:640px;">
+    <div class="modal-header"><h3 data-i18n="bigprint.pick_title">Choisir un modèle</h3><button class="modal-close" onclick="closeModal('modal-bp-picker')">&times;</button></div>
+    <div class="modal-body">
+      <input type="search" id="bp-picker-search" class="settings-input" style="width:100%;" data-i18n-placeholder="bigprint.pick_search" placeholder="Rechercher…">
+      <div id="bp-picker-list" class="bp-picker-list"></div>
+    </div>
+  </div>
+</div>
     <script src="v113.js"></script>
+    <script src="bigprint.js"></script>
     <script src="filament_tags.js"></script>
 </body>
 </html>

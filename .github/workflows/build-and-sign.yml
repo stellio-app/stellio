@@ -120,6 +120,7 @@ jobs:
             --collect-all smbprotocol `
             --collect-all smbclient `
             --collect-all paho `
+            --collect-all serial `
             --collect-all cryptography `
             --collect-all requests `
             --collect-all rarfile `
@@ -137,6 +138,10 @@ jobs:
             --collect-all openpyxl `
             --collect-all xlrd `
             --collect-all cascadio `
+            --collect-all manifold3d `
+            --collect-all skimage `
+            --collect-all scipy `
+            --collect-all bigprint `
             --collect-all pyaes `
             --copy-metadata imageio `
             --copy-metadata pyrender `
@@ -382,6 +387,7 @@ jobs:
             --collect-all smbprotocol \
             --collect-all smbclient \
             --collect-all paho \
+            --collect-all serial \
             --collect-all cryptography \
             --collect-all requests \
             --collect-all rarfile \
@@ -399,6 +405,10 @@ jobs:
             --collect-all openpyxl \
             --collect-all xlrd \
             --collect-all cascadio \
+            --collect-all manifold3d \
+            --collect-all skimage \
+            --collect-all scipy \
+            --collect-all bigprint \
             --collect-all pyaes \
             --copy-metadata imageio \
             --copy-metadata pyrender \
@@ -652,6 +662,7 @@ jobs:
             --collect-all smbprotocol \
             --collect-all smbclient \
             --collect-all paho \
+            --collect-all serial \
             --collect-all cryptography \
             --collect-all requests \
             --collect-all rarfile \
@@ -669,6 +680,10 @@ jobs:
             --collect-all openpyxl \
             --collect-all xlrd \
             --collect-all cascadio \
+            --collect-all manifold3d \
+            --collect-all skimage \
+            --collect-all scipy \
+            --collect-all bigprint \
             --collect-all pyaes \
             --copy-metadata imageio \
             --copy-metadata pyrender \
