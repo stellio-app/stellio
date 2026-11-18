@@ -101,3 +101,53 @@ def test_build_copie_le_moteur_bigprint_a_cote_de_main():
     wf = open(os.path.join(ROOT, '.github', 'workflows', 'build-and-sign.yml'), encoding='utf-8').read()
     assert wf.count('Copy-Item -Recurse "bigprint"') == 1 and wf.count('cp -R bigprint "$APP_DIR/bigprint"') == 2
     assert os.path.isfile(os.path.join(ROOT, 'bigprint', 'gui.py'))
+
+
+def test_demo_invite_apercu_seulement(tmp_path):
+    """Démo / invité (rôle viewer) : calcul et aperçu autorisés par le garde-fou, mais ni enregistrement ni import de fichier."""
+    main = open(os.path.join(ROOT, 'main.py'), encoding='utf-8').read()
+    wl = main[main.index('_VIEWER_WRITE_WHITELIST = {'):main.index('_VIEWER_BLOCKED_GET_PREFIXES')]
+    for route in ('model', 'preview', 'cancel', 'close'):
+        assert f"('POST', '/api/bigprint/{route}')" in wl
+    assert '/api/bigprint/save' not in wl and '/api/bigprint/upload' not in wl
+    c, mod = _client(tmp_path)
+    mod.session['role'] = 'viewer'
+    assert c.post('/api/bigprint/save', json={'settings': {}}).status_code == 403
+    assert c.post('/api/bigprint/upload', data=b'x', headers={'X-Filename': 'a.stl'}).status_code == 403
+    info = c.post('/api/bigprint/model', json={'path': str(_sphere(tmp_path))}).get_json()
+    assert c.post('/api/bigprint/preview', json={'settings': _settings(info['id'])}).status_code == 200
+    _wait(c)
+    assert c.get('/api/bigprint/preview.html').status_code == 200
+    c.post('/api/bigprint/close')
+    html = open(os.path.join(ROOT, 'interface', 'index.html'), encoding='utf-8').read()
+    for el in ('id="bp-save-btn"', 'id="bp-pick-upload"'):
+        assert 'viewer-hide' in html[html.index(el) - 120:html.index(el)]
+
+
+def test_demo_limites(tmp_path):
+    """Invités / démo : modèle limité, délai entre deux aperçus, plafond horaire, calculs simultanés, sessions isolées par visiteur."""
+    c, mod = _client(tmp_path)
+    mod.session['role'] = 'viewer'
+    mod._VIEWER_HITS.clear()
+    with mod.app.test_request_context('/'):
+        mod.session['bp_vid'] = 'a'
+        assert mod._viewer_preview_allowed() is None                      # 1er aperçu accepté
+        msg, code = mod._viewer_preview_allowed()                         # tout de suite après : délai
+        assert code == 429 and 'patientez' in msg
+        mod._VIEWER_HITS[('v', ('viewer', 'a'))] = [mod.time.time() - mod.VIEWER_COOLDOWN_S - 1] * mod.VIEWER_PER_HOUR
+        assert 'limite' in mod._viewer_preview_allowed()[0]               # plafond horaire
+        mod._VIEWER_HITS.clear()
+        class Busy:
+            def busy(self): return True
+        for i in range(mod.VIEWER_MAX_ACTIVE):
+            mod._SESSIONS[('viewer', f'x{i}')] = {'session': Busy(), 'touched': 0}
+        assert 'occupé' in mod._viewer_preview_allowed()[0]               # trop de calculs simultanés
+        mod._SESSIONS.clear()
+        mod.session['bp_vid'] = 'a'; k1 = mod._sess_key(); mod.session['bp_vid'] = 'b'; k2 = mod._sess_key()
+        assert k1 != k2 and k1[0] == 'viewer'                             # visiteurs isolés
+    big = tmp_path / 'gros.stl'
+    big.write_bytes(b'0' * (mod.VIEWER_MAX_MODEL_BYTES + 10))
+    r = c.post('/api/bigprint/model', json={'path': str(big)})
+    assert r.status_code == 400 and 'démo' in r.get_json()['error']
+    mod.session['role'] = 'owner'
+    mod.session.pop('bp_vid', None)

@@ -54,6 +54,15 @@ MAX_MODEL_BYTES = 1 << 30       # 1 Go
 
 _SESSIONS = {}                  # user_id -> {'session': bigprint.gui.Session, 'touched': float}
 _SESSIONS_LOCK = threading.Lock()
+# Limites réservées aux comptes invités / à la démo publique (le calcul est coûteux : on évite qu'un visiteur ou un robot sature le serveur)
+VIEWER_MAX_MODEL_BYTES = 30 << 20      # modèle de 30 Mo maximum
+VIEWER_MAX_ACTIVE = 2                  # calculs simultanés, tous visiteurs confondus
+VIEWER_MAX_SESSIONS = 20               # sessions BigPrint de visiteurs ouvertes en même temps
+VIEWER_COOLDOWN_S = 20                 # délai minimum entre deux aperçus d'un même visiteur
+VIEWER_PER_HOUR = 12                   # aperçus par heure et par visiteur
+VIEWER_IP_PER_HOUR = 40                # aperçus par heure et par adresse IP (plusieurs navigateurs = même personne)
+VIEWER_JOB_TIMEOUT_S = 120             # un calcul de visiteur est annulé au bout de 2 min
+_VIEWER_HITS = {}                      # clé (visiteur ou IP) -> horodatages des aperçus de la dernière heure
 _COPY = {}                      # user_id -> {'state': 'copying'|'done'|'error', 'folder': str, 'error': str} (copie des fichiers vers la destination)
 
 
@@ -91,6 +100,43 @@ def _unc(path):
     return path.replace('\\', '/')
 
 
+def _is_viewer():
+    return session.get('role') == 'viewer'
+
+
+def _sess_key():
+    """Clé de session BigPrint : l'utilisateur ; pour un invité / la démo, un identifiant propre au navigateur
+    (tous les visiteurs de la démo partagent le même compte : sans cela ils verraient les modèles et aperçus des autres)."""
+    if _is_viewer():
+        import uuid
+        if 'bp_vid' not in session:
+            session['bp_vid'] = uuid.uuid4().hex
+        return ('viewer', session['bp_vid'])
+    return session['user_id']
+
+
+def _viewer_preview_allowed():
+    """None si l'aperçu d'un invité peut démarrer, sinon (message, code HTTP)."""
+    now = time.time()
+    key_v, key_ip = ('v', _sess_key()), ('ip', request.remote_addr or '?')
+    with _SESSIONS_LOCK:
+        active = sum(1 for k, e in _SESSIONS.items() if isinstance(k, tuple) and e['session'].busy())
+        for k in list(_VIEWER_HITS):
+            _VIEWER_HITS[k] = [t for t in _VIEWER_HITS[k] if now - t < 3600]
+            if not _VIEWER_HITS[k]:
+                del _VIEWER_HITS[k]
+        mine, ip = _VIEWER_HITS.get(key_v, []), _VIEWER_HITS.get(key_ip, [])
+        if mine and now - mine[-1] < VIEWER_COOLDOWN_S:
+            return f"Démo : patientez {int(VIEWER_COOLDOWN_S - (now - mine[-1])) + 1} s avant un nouvel aperçu", 429
+        if len(mine) >= VIEWER_PER_HOUR or len(ip) >= VIEWER_IP_PER_HOUR:
+            return "Démo : limite d'aperçus atteinte pour cette heure, réessayez plus tard", 429
+        if active >= VIEWER_MAX_ACTIVE:
+            return "Démo : le serveur est occupé par d'autres visiteurs, réessayez dans un instant", 429
+        _VIEWER_HITS.setdefault(key_v, []).append(now)
+        _VIEWER_HITS.setdefault(key_ip, []).append(now)
+    return None
+
+
 def _reap_idle():
     now = time.monotonic()
     with _SESSIONS_LOCK:
@@ -109,10 +155,12 @@ def _get_session():
     """Session BigPrint de l'utilisateur connecté (créée à la demande, sans processus « de réserve » pour économiser la mémoire)."""
     bp_gui, _s, _p = _engine()
     _reap_idle()
-    uid = session['user_id']
+    uid = _sess_key()
     with _SESSIONS_LOCK:
         entry = _SESSIONS.get(uid)
         if entry is None:
+            if isinstance(uid, tuple) and sum(1 for k in _SESSIONS if isinstance(k, tuple)) >= VIEWER_MAX_SESSIONS:
+                raise RuntimeError("Démo : trop de visiteurs en ce moment, réessayez dans quelques minutes")
             entry = {'session': bp_gui.Session(warm_spare=False), 'touched': time.monotonic()}
             _SESSIONS[uid] = entry
         entry['touched'] = time.monotonic()
@@ -142,7 +190,7 @@ def _spawn_safely(fn):
                 setattr(main_mod, attr, val)
 
 
-def _read_library_file(path):
+def _read_library_file(path, max_bytes=None):
     """Octets d'un fichier de la bibliothèque (local ou SMB)."""
     if not isinstance(path, str) or not path:
         raise ValueError("Chemin invalide")
@@ -151,21 +199,23 @@ def _read_library_file(path):
     ext = os.path.splitext(path)[1].lower()
     if ext not in MODEL_EXTS:
         raise ValueError("Format non pris en charge (STL, 3MF, OBJ ou PLY)")
+    cap = min(max_bytes or MAX_MODEL_BYTES, MAX_MODEL_BYTES)
+    too_big = f"Fichier trop volumineux (maximum {cap >> 20} Mo{' en démo' if max_bytes else ''})" if max_bytes else "Fichier trop volumineux (maximum 1 Go)"
     if _is_unc(path):
         kw = _smb_kwargs_for_path(session['user_id'], path)
         if kw is None:
             raise ValueError("Source réseau introuvable pour ce fichier")
         with smbclient.open_file(_unc(path), mode='rb', share_access='r', **kw) as fh:
-            data = fh.read(MAX_MODEL_BYTES + 1)
+            data = fh.read(cap + 1)
     else:
         if not os.path.isfile(path):
             raise ValueError("Fichier introuvable")
-        if os.path.getsize(path) > MAX_MODEL_BYTES:
-            raise ValueError("Fichier trop volumineux (maximum 1 Go)")
+        if os.path.getsize(path) > cap:
+            raise ValueError(too_big)
         with open(path, 'rb') as fh:
             data = fh.read()
-    if len(data) > MAX_MODEL_BYTES:
-        raise ValueError("Fichier trop volumineux (maximum 1 Go)")
+    if len(data) > cap:
+        raise ValueError(too_big)
     return data
 
 
@@ -257,11 +307,14 @@ def api_bigprint_model():
         bp_gui, _s, _p = _engine()
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 503
-    sess = _get_session()
+    try:
+        sess = _get_session()
+    except RuntimeError as e:   # démo : trop de visiteurs
+        return jsonify({"error": str(e)}), 429
     if sess.busy():
         return jsonify({"error": "Un calcul est déjà en cours"}), 409
     try:
-        raw = _read_library_file(data.get('path'))
+        raw = _read_library_file(data.get('path'), VIEWER_MAX_MODEL_BYTES if _is_viewer() else None)
         info = sess.add_model(os.path.basename(_unc(data['path'])), raw)
     except bp_gui.SettingsError as e:
         return jsonify({"error": str(e)}), 400
@@ -277,6 +330,8 @@ def api_bigprint_model():
 
 def api_bigprint_upload():
     """Charge un modèle envoyé depuis le navigateur (corps brut, nom dans l'en‑tête X-Filename)."""
+    if session.get('role') == 'viewer':   # démo publique / invité : aperçu seulement, aucun fichier ne sort ni n'entre
+        return jsonify({"error": "Compte invité : lecture seule", "code": "viewer_readonly"}), 403
     from urllib.parse import unquote
     try:
         bp_gui, _s, _p = _engine()
@@ -303,12 +358,23 @@ def api_bigprint_preview():
         bp_gui, _s, _p = _engine()
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 503
-    sess = _get_session()
+    try:
+        sess = _get_session()
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 429
+    if _is_viewer() and not sess.busy():
+        denied = _viewer_preview_allowed()
+        if denied:
+            return jsonify({"error": denied[0], "code": "viewer_limit"}), denied[1]
     try:
         with sess.lock:
             if sess.busy():
                 raise bp_gui.SettingsError("Un calcul est déjà en cours")
             _spawn_safely(lambda: sess.start_preview(data.get('settings') or {}))
+        if _is_viewer():
+            _t = threading.Timer(VIEWER_JOB_TIMEOUT_S, lambda: sess.cancel())   # calcul d'invité trop long : annulé
+            _t.daemon = True
+            _t.start()
     except bp_gui.SettingsError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
@@ -359,6 +425,8 @@ def api_bigprint_preview_html():
 def api_bigprint_save():
     """Écrit les fichiers (pièces STL, project.3mf, goujons, rapport, aperçu) dans le dossier choisi.
     Corps : {settings, source_id?, target_subfolder?, folder_name?}."""
+    if session.get('role') == 'viewer':   # démo publique / invité : aperçu seulement, aucun fichier ne sort ni n'entre
+        return jsonify({"error": "Compte invité : lecture seule", "code": "viewer_readonly"}), 403
     data = request.json or {}
     try:
         bp_gui, _s, _p = _engine()
@@ -424,7 +492,7 @@ def api_bigprint_save():
 
 
 def api_bigprint_close():
-    uid = session['user_id']
+    uid = _sess_key()
     with _SESSIONS_LOCK:
         entry = _SESSIONS.pop(uid, None)
     if entry:

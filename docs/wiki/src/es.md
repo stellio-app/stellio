@@ -340,6 +340,22 @@ Stellio le envía una notificación cuando un pedido va a superar su fecha de en
 
 El cálculo es deliberadamente sencillo: duraciones introducidas, pedidos encadenados por fecha de entrega, sin considerar cambios de material ni averías.
 
+## Encontrar la mejor combinación (trazabilidad)
+La página **Trazabilidad** (menú **Impresión**) vincula cada impresión con la **versión exacta del modelo** y el **perfil de slicer** utilizados, y muestra, para cada modelo, la combinación que mejor funciona.
+
+{{img:trace}}
+
+1. Imprima como siempre desde Stellio: la impresión se vincula automáticamente al modelo. Si el archivo cambió desde la última versión, Stellio guarda una versión «Antes de imprimir», así que la asociación siempre es exacta.
+2. Tras imprimir, **valore el resultado** (éxito, fallo, parcial) en el historial: esas valoraciones alimentan las tasas.
+3. Abra **Trazabilidad**: una fila por modelo con sus versiones y su **mejor combinación** (versión + perfil, éxitos sobre impresiones valoradas). Un clic abre **Versiones del modelo**.
+4. En **Versiones del modelo**, cada versión muestra sus éxitos, fallos y tasa, y la tabla cruza **versión × perfil**.
+
+{{img:trace_versions}}
+
+La clasificación no se deja engañar por muestras pequeñas: 8 éxitos de 9 van por delante de 1 de 1. La mejor combinación solo se propone a partir de 2 impresiones valoradas y una versión conocida.
+
+El seguimiento empieza con la v1.1.6: las impresiones anteriores no se reconstruyen.
+
 ## Mantener mis impresoras
 
 1. En la tarjeta de una impresora, abre **Mantenimiento** y elige la **marca**: se ofrecen tareas recomendadas.

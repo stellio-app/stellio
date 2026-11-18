@@ -3846,28 +3846,35 @@ kbd {
 }
 
 .modal-about-content {
-    max-width: 920px;
-    width: 92vw;
+    max-width: 1120px;
+    width: 94vw;
     text-align: center;
     overflow: hidden;
 }
-/* Fenêtre « À propos » : en-tête pleine largeur, puis 2 colonnes de même hauteur, licence en bas */
+/* Fenêtre « À propos » : en-tête pleine largeur, puis 3 colonnes de hauteur équilibrée — tout est visible sans défiler sur un écran standard */
 .about-body {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px 20px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px 16px;
     align-items: stretch;
-    max-height: calc(100vh - 120px);
+    max-height: calc(100vh - 100px);
     overflow-y: auto;
 }
 .about-body > .about-logo-section,
-.about-body > .about-description,
-.about-body > .about-section:last-child { grid-column: 1 / -1; }
-.about-body > .about-description { margin-bottom: 4px; }
+.about-body > .about-description { grid-column: 1 / -1; }
+.about-body > .about-description { margin-bottom: 0; }
 .about-body .about-section { margin-bottom: 0; }
-.about-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.about-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .about-col > .about-section:last-child { flex: 1; }
-@media (max-width: 760px) {
+.about-body .about-partner-links { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.about-body .about-link-btn span { min-width: 0; overflow-wrap: anywhere; }
+.about-body .about-logo-section { margin-bottom: 0; padding-bottom: 10px; }
+.about-body .stellio-logo-img { width: 56px; height: auto; }
+@media (max-width: 1000px) {
+    .about-body { grid-template-columns: 1fr 1fr; }
+    .about-body > .about-col:last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
     .about-body { grid-template-columns: 1fr; }
 }
 
@@ -8230,6 +8237,22 @@ kbd {
     justify-content: center;
 }
 
+.qty-needed {
+    width: 52px;
+    padding: 3px 4px;
+    text-align: center;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: calc(13px * var(--fs, 1));
+}
+
+.qty-needed:focus {
+    border-color: var(--accent);
+    outline: none;
+}
+
 .qty-btn:hover {
     border-color: var(--accent);
     color: var(--accent);
@@ -10810,3 +10833,47 @@ textarea.v13-in{width:100%;resize:vertical}
 .pl-days { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 100%; }
 .pl-day-chk { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: calc(12px * var(--fs, 1)); cursor: pointer; }
 @media (max-width: 760px) { .pl-row { grid-template-columns: 1fr; } .pl-gantt .pl-track { min-width: 520px; } }
+
+/* v1.1.6 — traçabilité */
+.tr-row { cursor: pointer; }
+.tr-row:hover td, .tr-row:focus td { background: var(--bg-hover, rgba(127,127,127,.12)); }
+.tr-rate.ok, .tr-badge.ok { color: var(--cb-ok, #10b981); }
+.tr-rate.warn, .tr-badge.warn { color: #f59e0b; }
+.tr-rate.bad, .tr-badge.bad { color: var(--danger, #e5484d); }
+.tr-rate { font-weight: 600; font-variant-numeric: tabular-nums; }
+.tr-badge { font-size: calc(12px * var(--fs, 1)); font-weight: 600; margin-top: 2px; }
+.tr-box { margin-bottom: 12px; }
+
+/* v1.1.6 — badge « Mise à jour disponible » (surveillance chaque minute) */
+.update-badge { display: inline-flex; align-items: center; gap: 8px; margin-right: 10px; padding: 6px 14px; border: 0; border-radius: 999px; background: linear-gradient(135deg, var(--accent), #00d9ff); color: #fff; font-family: inherit; font-size: calc(12.5px * var(--fs, 1)); font-weight: 600; cursor: pointer; white-space: nowrap; box-shadow: 0 0 0 0 rgba(78, 161, 211, .55); animation: updateBadgePulse 2.4s ease-in-out infinite; }
+.update-badge b { font-weight: 700; padding-left: 8px; border-left: 1px solid rgba(255, 255, 255, .45); }
+.update-badge:hover { filter: brightness(1.1); }
+@keyframes updateBadgePulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(78, 161, 211, .55); } 60% { box-shadow: 0 0 0 9px rgba(78, 161, 211, 0); } }
+@media (prefers-reduced-motion: reduce) { .update-badge { animation: none; } }
+@media (max-width: 760px) { .update-badge span { display: none; } .update-badge { margin-right: 6px; padding: 6px 10px; } }
+.rail-btn.has-update::after { content: ''; position: absolute; top: 6px; right: 14px; width: 9px; height: 9px; border-radius: 50%; background: var(--success, #3fb950); box-shadow: 0 0 0 2px var(--bg-secondary, #1e2129); }
+
+/* popup des alertes du widget Santé */
+button.dashboard-health-alert-btn { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: 0; font: inherit; text-align: left; cursor: pointer; }
+button.dashboard-health-alert-btn:hover { filter: brightness(1.15); }
+button.dashboard-health-alert-btn:focus-visible { outline: 2px solid var(--accent, #58a6ff); outline-offset: 2px; border-radius: 6px; }
+.health-alerts-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.health-alerts-list li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-tertiary); overflow-wrap: anywhere; }
+.health-alerts-list li i { color: var(--warning, #d29922); margin-top: 2px; }
+.health-alerts-list li.ok i { color: var(--success, #3fb950); }
+
+/* le bouton « retour en haut » ne masque pas les boutons d'une fenêtre ouverte */
+body:has(.modal:not(.hidden)) .scroll-to-top { display: none !important; }
+
+/* 1.1.6 — journal des connexions et badge de licence */
+.authlog-details { border-top: 1px solid var(--border); padding-top: 10px; }
+.authlog-details summary { cursor: pointer; font-size: calc(13px * var(--fs, 1)); font-weight: 500; }
+.authlog-box { margin-top: 8px; }
+.authlog-scroll { overflow-x: auto; max-height: 280px; overflow-y: auto; }
+.authlog-table { width: 100%; border-collapse: collapse; font-size: calc(12px * var(--fs, 1)); }
+.authlog-table td { padding: 4px 8px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.authlog-table tr.authlog-fail td { color: var(--danger, #f85149); }
+.license-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: calc(12px * var(--fs, 1)); border: 1px solid var(--border); }
+.license-chip.license-yes { color: var(--success, #3fb950); border-color: var(--success, #3fb950); }
+.license-chip.license-no { color: var(--danger, #f85149); border-color: var(--danger, #f85149); }
+.license-chip.license-unknown { color: var(--warning, #d29922); border-color: var(--warning, #d29922); }

@@ -118,6 +118,8 @@ function showModel(info) {
     updateDerived();
 }
 
+function isViewer() { return document.body.classList.contains('role-viewer'); }   // invité / démo : aperçu seulement
+
 function curLang() { try { return (window.I18N && I18N.lang) || 'fr'; } catch (e) { return 'fr'; } }
 
 async function loadConfig() {
@@ -296,6 +298,7 @@ async function uploadFile(file) {
 function wire() {
     if (wired) return;
     wired = true;
+    if (isViewer()) $('bp-viewer-note').hidden = false;
     [...FIELDS, ...CHECKS].forEach(f => {
         const el = $('bp-' + f);
         el.addEventListener('input', updateDerived);
@@ -319,7 +322,7 @@ function wire() {
     $('bp-cancel-btn').addEventListener('click', cancel);
     const page = $('page-bigprint');
     page.addEventListener('dragover', (e) => { e.preventDefault(); });
-    page.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer.files && e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]); });
+    page.addEventListener('drop', (e) => { e.preventDefault(); if (!isViewer() && e.dataTransfer.files && e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]); });
 }
 
 async function onShow() {

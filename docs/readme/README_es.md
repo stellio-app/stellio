@@ -161,6 +161,7 @@ Ya seas un maker principiante o un usuario experimentado con varias máquinas, S
 - 🔄 **Conversor de formatos** (STL ↔ 3MF ↔ OBJ)
 - 📏 **BigPrint (Herramientas)**: amplíe un modelo a tamaño real (p. ej. 1,8 m); se corta en piezas que caben en su cama, se vacía, se le añaden pasadores y se numera, con vista previa 3D explosionada y estimación de filamento/coste; guarda las piezas STL, un proyecto 3MF y un informe en una carpeta local o de red. Basado en el motor de código abierto [bigprint](https://github.com/PooterTF/bigprint) (AGPL-3.0).
 - 📅 **Planificación de producción** (menú **Impresión**): fecha de fin estimada por impresora, capacidad disponible frente a carga solicitada, alertas de sobrecarga y retraso previsible, cumplimiento de plazos.
+- 🧬 **Trazabilidad de impresión** (menú **Impresión**): cada impresión vinculada a la versión exacta del modelo y al perfil de slicer, mejor combinación por modelo.
 - 🛡️ **Verificación de integridad** (archivos dañados/faltantes)
 - 💰 **Cálculo del coste de impresión**: material, electricidad, desgaste de la máquina (por hora), gastos fijos, margen en % y cantidad — precio unitario y total calculados al céntimo
 - 🏷️ **Margen y precio de venta**: define tu margen por defecto (%) una vez en Ajustes → Tarifas de impresión; el historial muestra el precio de venta (coste + margen) junto al coste, mientras que las estadísticas siguen usando el coste real
@@ -225,6 +226,7 @@ Ya seas un maker principiante o un usuario experimentado con varias máquinas, S
 | ![Detección de duplicados](../../images/duplicates.png) *Detección de duplicados* | ![Filtros avanzados](../../images/filters.png) *Filtros avanzados* |
 | ![BigPrint: ampliar a tamaño real y cortar en piezas](../wiki/images/es/bigprint.png) *BigPrint: ampliar a tamaño real y cortar en piezas* | ![BigPrint: vista explosionada, filamento y lista de piezas](../wiki/images/es/bigprint-result.png) *BigPrint: vista explosionada, filamento y lista de piezas* |
 | ![Planificación de producción: fechas de fin por impresora, capacidad y alertas](../wiki/images/es/planning.png) *Planificación de producción: fechas de fin por impresora, capacidad y alertas* | |
+| ![Trazabilidad: mejor combinación de versión y perfil por modelo](../wiki/images/es/trace.png) *Trazabilidad: mejor combinación de versión y perfil por modelo* | ![Versiones del modelo: tasa de éxito por versión y perfil](../wiki/images/es/trace_versions.png) *Versiones del modelo: tasa de éxito por versión y perfil* |
 
 ---
 

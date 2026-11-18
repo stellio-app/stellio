@@ -1714,6 +1714,7 @@ os.makedirs(IMPORTED_PROFILES_DIR, exist_ok=True)
 CACHE_FILE = os.path.join(DATA_DIR, "file_cache.json")
 CACHE_DURATION = 18000
 CACHE_SCHEMA_VERSION = 2
+DB_SCHEMA_VERSION = 1   # à incrémenter quand le schéma change (init_db ou migrate_*) ; stocké dans PRAGMA user_version
 REPAIR_IGNORE_FILE = os.path.join(DATA_DIR, "repair_ignored.json")
 repair_ignored_cache = _load_repair_ignored()
 
@@ -3109,6 +3110,21 @@ def migrate_users_recovery_code():
         conn.close()
 
 migrate_users_recovery_code()
+
+
+def stamp_schema_version():
+    """Inscrit DB_SCHEMA_VERSION dans PRAGMA user_version une fois toutes les migrations passées."""
+    conn = get_db()
+    try:
+        conn.execute(f"PRAGMA user_version = {int(DB_SCHEMA_VERSION)}")
+        conn.commit()
+    except Exception as e:
+        app_logger.warning(f"[DB] Version de schéma non inscrite : {e}")
+    finally:
+        conn.close()
+
+
+stamp_schema_version()
 
 
 try:
@@ -5309,6 +5325,12 @@ _VIEWER_WRITE_WHITELIST = {
     ('POST', '/api/ollama/explain-orientation'),
     ('POST', '/api/nesting/arrange'),
     ('POST', '/api/demo/enter'),
+    # BigPrint en démo / invité : on peut calculer et voir l'aperçu 3D d'un modèle de la bibliothèque, jamais récupérer de fichiers
+    # (enregistrement et import restent interdits : voir aussi le refus explicite dans modules/bigprint_tool.py)
+    ('POST', '/api/bigprint/model'),
+    ('POST', '/api/bigprint/preview'),
+    ('POST', '/api/bigprint/cancel'),
+    ('POST', '/api/bigprint/close'),
 }
 _VIEWER_BLOCKED_GET_PREFIXES = (
     '/api/accounts', '/api/remote-access', '/api/remote-instances', '/api/peer',
@@ -8492,6 +8514,16 @@ def ui_bigprint_script():
 def ui_planning_script():
     return send_file(_ui_file('planning.js'), mimetype='application/javascript')
 
+
+@app.route('/loginlog.js')
+def ui_loginlog_script():
+    return send_file(_ui_file('loginlog.js'), mimetype='application/javascript')
+
+
+@app.route('/trace.js')
+def ui_trace_script():
+    return send_file(_ui_file('trace.js'), mimetype='application/javascript')
+
 @app.route('/management.js')
 def ui_management_script():
     return send_file(_ui_file('management.js'), mimetype='application/javascript')
@@ -8668,13 +8700,17 @@ def api_login():
         session['role'] = role
         if role == 'viewer':
             session['viewer_id'] = user['id']
+        login_log.log_event('login_ok', user['username'], effective_id)
         return jsonify({"message": "Connecté", "user": {"id": effective_id, "username": user['username'], "role": role}})
     conn.close()
     _record_failed_attempt('login', username)
+    login_log.log_event('login_fail', username, (user['owner_id'] if user['role'] == 'viewer' else user['id']) if user else None)
     return jsonify({"error": "Identifiants invalides"}), 401
 
 @app.route('/api/auth/logout', methods=['POST'])
 def api_logout():
+    if 'user_id' in session:
+        login_log.log_event('logout', session.get('username'), session.get('user_id'))
     session.clear()
     return jsonify({"message": "Déconnecté"})
 
@@ -13484,6 +13520,7 @@ def api_manual_print_history():
                 _sync_print_success_links(conn, session['user_id'], norm, prev_success, prev_success or result == 'success')
             except Exception as link_err:
                 app_logger.warning(f"[PrintHistory] Synchronisation projets/file d'attente échouée: {link_err}")
+            print_traceability.record(conn, session['user_id'], cur.lastrowid, norm, real)   # v1.1.6
             conn.commit()
             entry_id = cur.lastrowid
         finally:
@@ -15431,6 +15468,7 @@ def api_send_to_slicer():
                  fil['source_type'], fil['source_id'], fil['snapshot'])
             )
             history_id = cur.lastrowid
+            print_traceability.record(conn, session['user_id'], history_id, norm, file_path)   # v1.1.6 : version du modèle
             conn.commit()
             conn.close()
         except Exception as log_err:
@@ -15523,7 +15561,7 @@ def api_slicer_send_batch():
                     material_cost, elec_cost, total_cost, _w = _compute_estimated_cost(norm)
                     estimated_seconds_logged = _get_cached_slice_estimate_seconds(norm)
                     fil = _filament_info_for_file(conn, session['user_id'], norm)
-                    conn.execute(
+                    cur_b = conn.execute(
                         "INSERT INTO print_history (user_id, file_path, file_name, file_size, file_ext, slicer, source_platform, slicer_profile_id, material_cost, elec_cost, total_cost, printer_id, estimated_seconds, filament_material, filament_label, spool_source_type, spool_source_id, assignment_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (session['user_id'], norm, os.path.basename(fp),
                          os.path.getsize(fp) if os.path.exists(fp) else 0,
@@ -15532,6 +15570,7 @@ def api_slicer_send_batch():
                          printer_id, estimated_seconds_logged, fil['material'], fil['label'],
                          fil['source_type'], fil['source_id'], fil['snapshot'])
                     )
+                    print_traceability.record(conn, session['user_id'], cur_b.lastrowid, norm, fp)   # v1.1.6
                 conn.commit()
             finally:
                 conn.close()
@@ -18370,7 +18409,8 @@ def api_add_project_files(project_id):
         added = 0
         for i, (file_path, qty) in enumerate(_expand_project_file_items(data.get('files', []), session['user_id'])):
             conn.execute(
-                "INSERT OR IGNORE INTO project_files (project_id, file_path, quantity_needed, position) VALUES (?, ?, ?, ?)",
+                "INSERT INTO project_files (project_id, file_path, quantity_needed, position) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(project_id, file_path) DO UPDATE SET quantity_needed = quantity_needed + excluded.quantity_needed",   # même pièce ajoutée à nouveau : quantité cumulée
                 (project_id, file_path, qty, max_pos + 1 + i)
             )
             added += 1
@@ -18403,7 +18443,7 @@ def api_update_project_file(project_id):
         fields, params = [], []
         if 'quantity_needed' in data:
             fields.append("quantity_needed = ?")
-            params.append(max(1, int(data['quantity_needed'])))
+            params.append(min(9999, max(1, int(data['quantity_needed']))))
         if 'quantity_printed' in data:
             fields.append("quantity_printed = ?")
             params.append(max(0, int(data['quantity_printed'])))
@@ -19234,6 +19274,14 @@ def _collect_health_info():
         info['database_mb'] = round(os.path.getsize(DB_PATH) / (1024 ** 2), 1)
     except Exception:
         info['database_mb'] = None
+    try:
+        _sc = get_db()
+        try:
+            info['schema_version'] = _sc.execute("PRAGMA user_version").fetchone()[0]
+        finally:
+            _sc.close()
+    except Exception:
+        info['schema_version'] = None
     try:
         info['cache_files'] = len(load_file_cache() or [])
     except Exception:
@@ -20819,7 +20867,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.1.5"
+CURRENT_VERSION = "1.1.6"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -21501,10 +21549,28 @@ def download_update(download_url, progress_callback=None, expected_sha256=None):
         app_logger.info(f"[UPDATE] ❌ Erreur téléchargement: {e}")
         return None
 
+_UPDATE_POLL_TTL_S = 180
+_update_poll_cache = {'ts': 0.0, 'info': None}
+_update_poll_lock = threading.Lock()
+
+
+def _check_for_updates_cached(force=False):
+    """L'interface interroge /api/update/check chaque minute (badge « mise à jour disponible ») ; GitHub, lui, n'est contacté qu'au plus
+    toutes les 3 minutes (limite de 60 requêtes par heure sans clé). Une vérification manuelle (force) passe toujours et rafraîchit le cache."""
+    now = time.time()
+    with _update_poll_lock:
+        if not force and now - _update_poll_cache['ts'] < _UPDATE_POLL_TTL_S:
+            return _update_poll_cache['info']
+        info = check_for_updates(force=force)
+        _update_poll_cache['ts'] = time.time()
+        _update_poll_cache['info'] = info
+        return info
+
+
 @app.route('/api/update/check', methods=['GET'])
 @login_required
 def api_check_update():
-    update_info = check_for_updates(force=request.args.get('force') == '1')
+    update_info = _check_for_updates_cached(force=request.args.get('force') == '1')
     if update_info:
         return jsonify({
             'update_available': True,
@@ -29505,6 +29571,9 @@ workshop_watch.init(globals())
 from modules import production_planning   # v1.1.5 : planning et capacité de production
 production_planning.init(globals())
 
+from modules import print_traceability   # v1.1.6 : modèle → version → profil → résultat
+print_traceability.init(globals())
+
 globals().update(backup_restore.init(globals()))
 
 globals().update(integrity_check.init(globals()))
@@ -29518,6 +29587,9 @@ gcode_archive.init(globals())
 trash_core.init(globals())
 
 file_origin_delete.init(globals())
+
+from modules import login_log   # journal des connexions (1.1.6)
+login_log.init(globals())
 
 if __name__ in ('__main__', 'stellio_main'):
     import sys, os, threading, time, urllib.request, json

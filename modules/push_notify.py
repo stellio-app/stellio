@@ -24,7 +24,7 @@ _REQUIRED = (
     'printer_hub',
     'request',
 )
-_OPTIONAL = ()   # fournis seulement s'ils existent dans main.py (import facultatif)
+_OPTIONAL = ('IS_SERVER_EDITION',)   # fournis seulement s'ils existent dans main.py (import facultatif)
 _OVERRIDABLE = ('datetime', 're', 'requests', 'threading', 'time', )
 
 _MAIN = {}   # globals de main.py (vue vivante) : pour les noms définis plus tard, ex. _MAIN.get('SERVER_PORT')
@@ -32,6 +32,17 @@ _MAIN = {}   # globals de main.py (vue vivante) : pour les noms définis plus ta
 _PUSH_DEFAULT_TYPES = None
 _PUSH_TAGS = None
 _server_t = None
+IS_SERVER_EDITION = None   # fourni par main.py
+
+
+def _server_ok():
+    """v1.1.6+ : notifications push et résumé périodique réservés à l'édition serveur (Linux / headless).
+    Tant que main.py n'a pas fourni IS_SERVER_EDITION (modules chargés seuls, tests), on ne bloque rien."""
+    return IS_SERVER_EDITION is None or bool(IS_SERVER_EDITION)
+
+
+def _server_only_response():
+    return jsonify({"error": "Fonction réservée à l'édition serveur (Linux)", "code": "server_edition_only"}), 404
 app = None
 app_logger = None
 get_db = None
@@ -106,6 +117,8 @@ def _push_deliver(cfg, title, message, notif_type='info'):
         raise ValueError("Service inconnu")
 
 def _push_notify_async(notif_type, title, message):
+    if not _server_ok():
+        return
     cfg = load_settings() or {}
     if not cfg.get('push_enabled'):
         return
@@ -121,6 +134,8 @@ def _push_notify_async(notif_type, title, message):
     threading.Thread(target=_run, daemon=True).start()
 
 def api_push_test():
+    if not _server_ok():
+        return _server_only_response()
     cfg = dict(load_settings() or {})
     for k, v in (request.json or {}).items():
         if str(k).startswith('push_'):
@@ -214,7 +229,7 @@ def _push_watcher_loop():
     while True:
         try:
             cfg = load_settings() or {}
-            if cfg.get('push_enabled'):
+            if cfg.get('push_enabled') and _server_ok():
                 _push_watch_once(cfg)
         except Exception as e:
             app_logger.debug(f"[Push] Surveillance imprimantes: {e}")

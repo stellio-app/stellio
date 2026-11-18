@@ -340,6 +340,22 @@ Stellio sends a notification when an order is about to miss its delivery date or
 
 The calculation is deliberately simple: the times you enter, orders chained by delivery date, with no allowance for material changes or breakdowns.
 
+## Find the best combination (traceability)
+The **Traceability** page (**Printing** menu) links every print to the **exact model version** and the **slicer profile** used, then shows, for each model, the combination that works best.
+
+{{img:trace}}
+
+1. Print as usual from Stellio: the print is linked to the model automatically. If the file changed since the last version, Stellio saves a “Before print” version, so the link is always exact.
+2. After printing, **rate the result** (success, failure, partial) in the history: these ratings feed the rates.
+3. Open **Traceability**: one row per model with its versions and its **best combination** (version + profile, successes over rated prints). One click opens **Model versions**.
+4. In **Model versions**, each version shows its successes, failures and rate, and the table crosses **version × profile**.
+
+{{img:trace_versions}}
+
+The ranking is not fooled by small samples: 8 successes out of 9 rank ahead of 1 out of 1. A best combination is only suggested from 2 rated prints and a known version.
+
+Tracking starts with v1.1.6: older prints are not reconstructed.
+
 ## Maintain my printers
 
 1. On a printer card, open **Maintenance** and choose the **brand**: recommended tasks are offered.

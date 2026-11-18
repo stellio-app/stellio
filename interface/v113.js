@@ -22,7 +22,7 @@ const cur = () => { try { return (typeof printCostCurrency !== 'undefined' && pr
 const money = (v) => { const n = Number(v) || 0; return cur() === '$' ? '$' + n.toFixed(2) : n.toFixed(2) + ' €'; };
 const pct = (v) => Math.round((Number(v) || 0) * 100);
 const bytes = (n) => { n = Number(n) || 0; return n >= 1048576 ? (n / 1048576).toFixed(1) + ' Mo' : Math.max(1, Math.round(n / 1024)) + ' Ko'; };
-const dateFmt = (s) => { try { return new Date(String(s).replace(' ', 'T')).toLocaleString(lang()); } catch (e) { return s; } };
+const dateFmt = (s) => { try { const d = (typeof s === 'number') ? new Date(s * 1000) : new Date(String(s).replace(' ', 'T')); return isNaN(d) ? String(s || '') : d.toLocaleString(lang()); } catch (e) { return s; } };
 
 async function api(method, url, body) {
     const opt = { method, credentials: 'same-origin', headers: {} };
@@ -71,6 +71,7 @@ async function openVersions(path, name) {
         mb.innerHTML = `<p class="v13-muted">${esc(t('v_hint'))}</p>
           <div class="v13-form"><input type="text" class="v13-in" id="v13-note" maxlength="200" placeholder="${esc(t('v_note_ph'))}"><button type="button" class="v13-btn v13-primary" id="v13-vsave">${esc(t('v_save'))}</button></div>
           <div class="v13-list">${rows}</div><div id="v13-cmp"></div>`;
+        try { window.StellioTrace && window.StellioTrace.decorate(mb, path); } catch (e) { /* ignore */ }
         $('#v13-vsave', mb).onclick = async () => {
             const x = await api('POST', '/api/versions/save', { path, note: $('#v13-note', mb).value.trim() });
             if (x.ok) { toast(t('v_saved'), 'success'); render(); } else toast(errMsg(x.data), 'error');

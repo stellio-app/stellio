@@ -83,6 +83,44 @@ def _origin_path_allowed(raw_path, user_id):
     native = raw_path.replace('/', '\\') if os.name == 'nt' else raw_path.replace('\\', '/')
     return _is_path_within_sources(native, user_id)
 
+# ── Licence : usage commercial déduit du texte (v1.1.6) ──
+LICENSE_PRESETS = ('CC0', 'CC BY', 'CC BY-SA', 'CC BY-ND', 'CC BY-NC', 'CC BY-NC-SA', 'CC BY-NC-ND',
+                   'Standard Digital File License', 'Personal use only', 'MIT', 'GPL-3.0', 'All rights reserved')
+
+
+def license_info(text):
+    """Classe une licence saisie à la main : {'id', 'commercial': 'yes'|'no'|'unknown'}.
+    Prudent : 'no' dès qu'un signe de restriction apparaît (NC, usage personnel, tous droits réservés) ; 'unknown' si on ne sait pas."""
+    import unicodedata
+    plain = ''.join(ch for ch in unicodedata.normalize('NFKD', str(text or '').lower()) if not unicodedata.combining(ch))
+    t = ' ' + re.sub(r'[^a-z0-9]+', ' ', plain).strip() + ' '
+    if t.strip() == '':
+        return {'id': '', 'commercial': 'unknown'}
+    restricted = (' nc ' in t or ' non commercial ' in t or ' noncommercial ' in t or ' personal use ' in t or ' usage personnel ' in t
+                  or ' standard digital file ' in t or ' sdfl ' in t or ' all rights reserved ' in t or ' tous droits reserves ' in t
+                  or ' personal ' in t and ' only ' in t)
+    if restricted:
+        ident = 'CC BY-NC' if ' nc ' in t else ('Personal use' if ' personal ' in t or ' personnel ' in t or ' standard digital file ' in t or ' sdfl ' in t else 'All rights reserved')
+        if ' nc ' in t and ' sa ' in t:
+            ident = 'CC BY-NC-SA'
+        elif ' nc ' in t and ' nd ' in t:
+            ident = 'CC BY-NC-ND'
+        return {'id': ident, 'commercial': 'no'}
+    if ' cc0 ' in t or ' public domain ' in t or ' domaine public ' in t:
+        return {'id': 'CC0', 'commercial': 'yes'}
+    if ' cc ' in t and ' by ' in t or t.strip().startswith('cc by'):
+        ident = 'CC BY-SA' if ' sa ' in t else ('CC BY-ND' if ' nd ' in t else 'CC BY')
+        return {'id': ident, 'commercial': 'yes'}
+    for key, ident in ((' mit ', 'MIT'), (' gpl ', 'GPL'), (' lgpl ', 'LGPL'), (' agpl ', 'AGPL'), (' apache ', 'Apache'), (' bsd ', 'BSD')):
+        if key in t:
+            return {'id': ident, 'commercial': 'yes'}
+    return {'id': '', 'commercial': 'unknown'}
+
+
+def api_license_info():
+    return jsonify(dict(license_info(request.args.get('text', '')[:120]), presets=list(LICENSE_PRESETS)))
+
+
 def api_get_file_origin():
     try:
         raw = (request.args.get('path') or '').strip()
@@ -121,6 +159,7 @@ def api_get_file_origin():
             out["source_url"] = out["source_url"] or (dl["source_url"] or "")
             out["downloaded_at"] = out["downloaded_at"] or dl["downloaded_at"]
             out["platform"] = out["platform"] or (dl["platform"] or "")
+        out['license_info'] = license_info(out['license'])
         return jsonify(out), 200
     except Exception as e:
         app_logger.error(f"[ORIGIN] Erreur lecture: {e}")
@@ -412,6 +451,7 @@ def api_delete_files_batch():
 _ROUTES = (
     ('/api/files/origin', ['GET'], 'api_get_file_origin', ('login_required', )),
     ('/api/files/origin', ['POST'], 'api_set_file_origin', ('login_required', )),
+    ('/api/files/license-info', ['GET'], 'api_license_info', ('login_required', )),
     ('/api/files/delete', ['POST'], 'api_delete_file', ('login_required', )),
     ('/api/files/delete-batch', ['POST'], 'api_delete_files_batch', ('login_required', )),
 )

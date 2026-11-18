@@ -22,6 +22,9 @@
     <string name="addr_local">Interne</string>
     <string name="addr_remote">Externe</string>
     <string name="retry">Réessayer</string>
+    <string name="connecting">Connexion en cours…</string>
+    <string name="connecting_short">Connexion…</string>
+    <string name="still_unreachable">Toujours injoignable (%1$s). Nouvel essai automatique.</string>
     <string name="edit_addresses">Modifier les adresses</string>
     <string name="press_again">Appuyez encore sur retour pour quitter</string>
     <string name="update_title">Mise à jour disponible</string>

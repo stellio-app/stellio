@@ -340,6 +340,22 @@ O Stellio envia uma notificação quando uma encomenda vai falhar a data de entr
 
 O cálculo é propositadamente simples: durações introduzidas, encomendas encadeadas por data de entrega, sem considerar trocas de material nem avarias.
 
+## Encontrar a melhor combinação (rastreabilidade)
+A página **Rastreabilidade** (menu **Impressão**) liga cada impressão à **versão exata do modelo** e ao **perfil de slicer** usados e mostra, para cada modelo, a combinação que funciona melhor.
+
+{{img:trace}}
+
+1. Imprima como habitualmente no Stellio: a impressão fica ligada ao modelo automaticamente. Se o ficheiro mudou desde a última versão, o Stellio guarda uma versão «Antes de imprimir», por isso a associação é sempre exata.
+2. Depois de imprimir, **avalie o resultado** (sucesso, falha, parcial) no histórico: são estas avaliações que alimentam as taxas.
+3. Abra **Rastreabilidade**: uma linha por modelo com as suas versões e a **melhor combinação** (versão + perfil, sucessos em impressões avaliadas). Um clique abre **Versões do modelo**.
+4. Em **Versões do modelo**, cada versão mostra os seus sucessos, falhas e taxa, e a tabela cruza **versão × perfil**.
+
+{{img:trace_versions}}
+
+A classificação não se deixa enganar por amostras pequenas: 8 sucessos em 9 passam à frente de 1 em 1. A melhor combinação só é sugerida a partir de 2 impressões avaliadas e de uma versão conhecida.
+
+O acompanhamento começa com a v1.1.6: as impressões anteriores não são reconstruídas.
+
 ## Manter as minhas impressoras
 
 1. No cartão de uma impressora, abra **Manutenção** e escolha a **marca**: são propostas tarefas recomendadas.

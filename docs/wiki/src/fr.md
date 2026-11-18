@@ -340,6 +340,22 @@ Stellio vous envoie une notification quand une commande va dépasser sa date de 
 
 Le calcul est volontairement simple : durées saisies, commandes enchaînées par date de livraison, sans tenir compte des changements de matière ni des pannes.
 
+## Retrouver la meilleure combinaison (traçabilité)
+La page **Traçabilité** (menu **Impression**) relie chaque impression à la **version exacte du modèle** et au **profil de slicer** utilisés, puis vous montre, pour chaque modèle, la combinaison qui réussit le mieux.
+
+{{img:trace}}
+
+1. Imprimez comme d'habitude depuis Stellio : l'impression est automatiquement reliée au modèle. Si le fichier a changé depuis la dernière version, Stellio enregistre une version « Avant impression », donc l'association est toujours exacte.
+2. Après l'impression, **notez le résultat** (réussite, échec, partiel) dans l'historique : ce sont ces notes qui alimentent les taux.
+3. Ouvrez **Traçabilité** : une ligne par modèle avec ses versions et sa **meilleure combinaison** (version + profil, réussites sur impressions notées). Un clic ouvre **Versions du modèle**.
+4. Dans **Versions du modèle**, chaque version affiche ses réussites, échecs et son taux, et le tableau croise **version × profil**.
+
+{{img:trace_versions}}
+
+Le classement ne se laisse pas tromper par un petit échantillon : 8 réussites sur 9 passent avant 1 sur 1. La meilleure combinaison n'est proposée qu'à partir de 2 impressions notées et d'une version connue.
+
+Le suivi démarre avec la v1.1.6 : les impressions plus anciennes ne sont pas reconstituées.
+
 ## Entretenir mes imprimantes
 
 1. Sur la carte d'une imprimante, ouvrez **Maintenance** et choisissez la **marque** : des tâches recommandées sont proposées.

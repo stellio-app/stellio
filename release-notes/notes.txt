@@ -1,55 +1,128 @@
 <!--fr-->
-✓ Nouvelle page Planning (menu Impression) : date de fin estimée de chaque commande par imprimante, capacité disponible contre charge demandée, taux de charge, retards prévus et taux de respect des délais sur 90 jours ; horizon de 7, 14 ou 30 jours
-✓ Capacité des imprimantes réglable (heures par jour et jours travaillés, par imprimante) ; l'impression en cours est prise en compte grâce au temps restant lu sur l'imprimante
-✓ Commandes : nouvelle durée par pièce (reprise du chiffrage du devis) ; les commandes sans durée sont signalées et peuvent être renseignées directement depuis le Planning
-✓ Notifications de retard prévisible (une commande va dépasser sa date de livraison) et de surcharge d'une imprimante
-✓ Correctif BigPrint : l'outil indiquait « module Python manquant bigprint » sur l'application installée ; le moteur est maintenant livré avec l'application (Windows, macOS, Linux)
-
+✓ Nouvelle page Traçabilité (menu Impression) : pour chaque modèle, la meilleure combinaison version + profil de slicer (taux de réussite, classement fiable même avec peu d'impressions) ; recherche par nom
+✓ Chaque impression lancée depuis Stellio est reliée à la version exacte du modèle ; si le fichier a changé depuis la dernière version, une version automatique « Avant impression » est enregistrée
+✓ « Versions du modèle » : réussites, échecs et taux de chaque version, tableau version × profil et meilleure combinaison ; un G-code peut être associé à son modèle (et ses impressions déjà notées sont rattachées)
+✓ Le suivi démarre avec cette version : les anciennes impressions ne sont pas reconstituées
+✓ Correction : la date des versions de modèle s'affichait « Invalid Date »
+✓ Projets : une même pièce peut être mise en plusieurs exemplaires — quantité modifiable dans le projet et à l'ajout des fichiers ; ajouter à nouveau une pièce déjà présente cumule la quantité
+✓ Fenêtre « À propos » : tout le contenu (technologies, partenariat, BigPrint, données ouvertes, licence) est visible d'un coup, sur trois colonnes, sans défiler
+✓ Démo publique : BigPrint est utilisable (calcul et aperçu 3D du découpage) mais l'enregistrement et l'import de fichiers y sont désactivés ; calculs limités (modèle de 30 Mo max, délai entre deux aperçus, nombre de calculs simultanés)
+✓ Mises à jour : une fois connecté, Stellio vérifie chaque minute si une nouvelle version existe et affiche un badge « Mise à jour disponible » dans l'en-tête, qui reste tant que la mise à jour n'est pas installée ; un clic ouvre la fenêtre de mise à jour
+✓ Widget Santé : un clic sur « alerte(s) à vérifier » ouvre un popup qui liste les alertes (PC et téléphone)
+✓ Application téléphone : « Réessayer » affiche maintenant un cercle de chargement, « Connexion en cours… » et l'heure du dernier échec
+✓ Notifications push externes (ntfy, Telegram, Discord, Gotify, Pushover), résumé périodique et MQTT réservés à l'édition serveur (Linux) ; masqués et désactivés sous Windows
+✓ Licences : choix de licences courantes (CC0, CC BY, CC BY-NC…) et badge « usage commercial autorisé / interdit / à vérifier » sous le champ licence d'un modèle
+✓ Journal des connexions (Paramètres › Sécurité du compte) : connexions, échecs et déconnexions avec l'adresse et l'heure, résumé sur 24 h
+✓ Base de données : numéro de version du schéma (visible dans le diagnostic) et test qui vérifie qu'une ancienne base est bien mise à niveau
 <!--en-->
-✓ New Planning page (Printing menu): estimated end date of every order per printer, available capacity versus requested load, load rate, expected delays and on-time delivery rate over 90 days; 7, 14 or 30-day horizon
-✓ Adjustable printer capacity (hours per day and working days, per printer); the print in progress is taken into account through the remaining time read from the printer
-✓ Orders: new time per piece (taken from the quote costing); orders without a time are flagged and can be filled in directly from Planning
-✓ Notifications for a foreseeable delay (an order will miss its delivery date) and for an overloaded printer
-✓ BigPrint fix: the tool reported “missing Python module bigprint” on the installed app; the engine now ships with the application (Windows, macOS, Linux)
-
+✓ New Traceability page (Printing menu): for each model, the best version + slicer profile combination (success rate, reliable ranking even with few prints); search by name
+✓ Every print started from Stellio is linked to the exact model version; if the file changed since the last version, an automatic “Before print” version is saved
+✓ “Model versions”: successes, failures and rate of each version, a version × profile table and the best combination; a G-code can be linked to its model (and its already rated prints are attached)
+✓ Tracking starts with this version: older prints are not reconstructed
+✓ Fix: model version dates showed “Invalid Date”
+✓ Projects: the same part can be added several times — quantity editable in the project and when adding files; adding a part that is already there adds to its quantity
+✓ “About” window: all content (technologies, partnership, BigPrint, open data, license) is visible at once in three columns, with no scrolling
+✓ Public demo: BigPrint can be used (calculation and 3D preview of the split) but saving and importing files are disabled; calculations are limited (30 MB model max, delay between previews, number of simultaneous calculations)
+✓ Updates: once signed in, Stellio checks every minute for a new version and shows an “Update available” badge in the header that stays until the update is installed; clicking it opens the update window
+✓ Health widget: clicking "alert(s) to check" opens a popup listing the alerts (PC and phone)
+✓ Phone app: "Retry" now shows a spinner, "Connecting…" and the time of the last failure
+✓ External push notifications (ntfy, Telegram, Discord, Gotify, Pushover), periodic digest and MQTT are now server-edition only (Linux); hidden and disabled on Windows
+✓ Licenses: common licenses (CC0, CC BY, CC BY-NC…) and a "commercial use allowed / not allowed / to check" badge under a model's license field
+✓ Sign-in log (Settings › Account security): sign-ins, failures and sign-outs with address and time, 24 h summary
+✓ Database: schema version number (shown in diagnostics) and a test that checks an old database is upgraded correctly
 <!--de-->
-✓ Neue Seite Planung (Menü Druck): voraussichtliches Ende jedes Auftrags je Drucker, verfügbare Kapazität gegenüber geforderter Last, Auslastung, erwartete Verspätungen und Termintreue der letzten 90 Tage; Zeitraum 7, 14 oder 30 Tage
-✓ Einstellbare Druckerkapazität (Stunden pro Tag und Arbeitstage, je Drucker); der laufende Druck wird über die vom Drucker gelesene Restzeit berücksichtigt
-✓ Aufträge: neue Dauer pro Teil (aus der Angebotskalkulation übernommen); Aufträge ohne Dauer werden angezeigt und lassen sich direkt in der Planung ergänzen
-✓ Benachrichtigungen bei absehbarer Verspätung (ein Auftrag verfehlt sein Lieferdatum) und bei überlastetem Drucker
-✓ BigPrint-Korrektur: Das Werkzeug meldete in der installierten App „Python-Modul bigprint fehlt“; die Engine wird jetzt mit der App ausgeliefert (Windows, macOS, Linux)
-
+✓ Neue Seite Rückverfolgbarkeit (Menü Druck): je Modell die beste Kombination aus Version und Slicer-Profil (Erfolgsquote, verlässliche Rangfolge auch bei wenigen Drucken); Suche nach Name
+✓ Jeder aus Stellio gestartete Druck wird der genauen Modellversion zugeordnet; hat sich die Datei seit der letzten Version geändert, wird automatisch eine Version „Vor dem Druck“ gespeichert
+✓ „Modellversionen“: Erfolge, Fehlschläge und Quote jeder Version, Tabelle Version × Profil und beste Kombination; ein G-Code kann seinem Modell zugeordnet werden (bereits bewertete Drucke werden angehängt)
+✓ Die Erfassung beginnt mit dieser Version: ältere Drucke werden nicht rekonstruiert
+✓ Korrektur: Datum der Modellversionen zeigte „Invalid Date“
+✓ Projekte: Dasselbe Teil kann mehrfach vorkommen – Menge im Projekt und beim Hinzufügen von Dateien einstellbar; erneutes Hinzufügen eines vorhandenen Teils addiert die Menge
+✓ Fenster „Über“: Alle Inhalte (Technologien, Partnerschaft, BigPrint, offene Daten, Lizenz) sind in drei Spalten auf einen Blick sichtbar, ohne Scrollen
+✓ Öffentliche Demo: BigPrint ist nutzbar (Berechnung und 3D-Vorschau der Aufteilung), Speichern und Importieren von Dateien sind jedoch deaktiviert; Berechnungen sind begrenzt (Modell max. 30 MB, Wartezeit zwischen Vorschauen, Anzahl gleichzeitiger Berechnungen)
+✓ Updates: Nach der Anmeldung prüft Stellio jede Minute auf eine neue Version und zeigt in der Kopfzeile ein Badge „Update verfügbar“, das bis zur Installation bleibt; ein Klick öffnet das Update-Fenster
+✓ Gesundheits-Widget: Ein Klick auf „Warnung(en) prüfen“ öffnet ein Popup mit den Warnungen (PC und Handy)
+✓ Handy-App: „Erneut versuchen“ zeigt jetzt einen Ladekreis, „Verbindung wird hergestellt …“ und die Uhrzeit des letzten Fehlschlags
+✓ Externe Push-Benachrichtigungen (ntfy, Telegram, Discord, Gotify, Pushover), periodische Zusammenfassung und MQTT nur noch in der Server-Edition (Linux); unter Windows ausgeblendet und deaktiviert
+✓ Lizenzen: gängige Lizenzen (CC0, CC BY, CC BY-NC …) und Hinweis „kommerzielle Nutzung erlaubt / nicht erlaubt / prüfen“ unter dem Lizenzfeld eines Modells
+✓ Anmeldeprotokoll (Einstellungen › Kontosicherheit): Anmeldungen, Fehlversuche und Abmeldungen mit Adresse und Uhrzeit, 24-h-Übersicht
+✓ Datenbank: Schemaversion (im Diagnosebereich sichtbar) und ein Test, der prüft, dass eine alte Datenbank korrekt aktualisiert wird
 <!--es-->
-✓ Nueva página Planificación (menú Impresión): fecha de fin estimada de cada pedido por impresora, capacidad disponible frente a carga solicitada, tasa de carga, retrasos previstos y cumplimiento de plazos en 90 días; horizonte de 7, 14 o 30 días
-✓ Capacidad de las impresoras ajustable (horas por día y días laborables, por impresora); la impresión en curso se tiene en cuenta mediante el tiempo restante leído en la impresora
-✓ Pedidos: nueva duración por pieza (tomada del cálculo del presupuesto); los pedidos sin duración se señalan y se pueden rellenar directamente desde Planificación
-✓ Notificaciones de retraso previsible (un pedido superará su fecha de entrega) y de impresora sobrecargada
-✓ Corrección de BigPrint: la herramienta indicaba «falta el módulo Python bigprint» en la aplicación instalada; el motor ahora se incluye con la aplicación (Windows, macOS, Linux)
-
+✓ Nueva página Trazabilidad (menú Impresión): para cada modelo, la mejor combinación de versión + perfil de slicer (tasa de éxito, clasificación fiable incluso con pocas impresiones); búsqueda por nombre
+✓ Cada impresión lanzada desde Stellio se vincula a la versión exacta del modelo; si el archivo cambió desde la última versión, se guarda una versión automática «Antes de imprimir»
+✓ «Versiones del modelo»: éxitos, fallos y tasa de cada versión, tabla versión × perfil y mejor combinación; un G-code se puede asociar a su modelo (y se vinculan sus impresiones ya valoradas)
+✓ El seguimiento empieza con esta versión: las impresiones anteriores no se reconstruyen
+✓ Corrección: la fecha de las versiones del modelo mostraba «Invalid Date»
+✓ Proyectos: una misma pieza puede añadirse varias veces — cantidad editable en el proyecto y al añadir archivos; añadir otra vez una pieza ya presente suma la cantidad
+✓ Ventana «Acerca de»: todo el contenido (tecnologías, colaboración, BigPrint, datos abiertos, licencia) se ve de una vez en tres columnas, sin desplazarse
+✓ Demo pública: BigPrint se puede usar (cálculo y vista previa 3D del corte), pero guardar e importar archivos está desactivado; los cálculos están limitados (modelo de 30 MB máx., espera entre vistas previas, número de cálculos simultáneos)
+✓ Actualizaciones: tras iniciar sesión, Stellio comprueba cada minuto si hay una versión nueva y muestra una insignia «Actualización disponible» en la cabecera que permanece hasta instalarla; al hacer clic se abre la ventana de actualización
+✓ Widget Salud: al pulsar «alerta(s) por revisar» se abre un popup con las alertas (PC y móvil)
+✓ App móvil: «Reintentar» muestra ahora un indicador de carga, «Conectando…» y la hora del último fallo
+✓ Notificaciones push externas (ntfy, Telegram, Discord, Gotify, Pushover), resumen periódico y MQTT reservados a la edición servidor (Linux); ocultos y desactivados en Windows
+✓ Licencias: licencias habituales (CC0, CC BY, CC BY-NC…) y una insignia «uso comercial permitido / no permitido / por verificar» bajo el campo de licencia de un modelo
+✓ Registro de inicios de sesión (Ajustes › Seguridad de la cuenta): inicios, fallos y cierres con dirección y hora, resumen de 24 h
+✓ Base de datos: número de versión del esquema (visible en el diagnóstico) y una prueba que verifica que una base antigua se actualiza bien
 <!--pt-->
-✓ Nova página Planeamento (menu Impressão): data de fim estimada de cada encomenda por impressora, capacidade disponível face à carga pedida, taxa de carga, atrasos previstos e cumprimento de prazos em 90 dias; horizonte de 7, 14 ou 30 dias
-✓ Capacidade das impressoras ajustável (horas por dia e dias de trabalho, por impressora); a impressão em curso é tida em conta através do tempo restante lido na impressora
-✓ Encomendas: nova duração por peça (herdada do cálculo do orçamento); as encomendas sem duração são assinaladas e podem ser preenchidas diretamente no Planeamento
-✓ Notificações de atraso previsível (uma encomenda vai falhar a data de entrega) e de impressora sobrecarregada
-✓ Correção do BigPrint: a ferramenta indicava «módulo Python bigprint em falta» na aplicação instalada; o motor passa a ser incluído na aplicação (Windows, macOS, Linux)
-
+✓ Nova página Rastreabilidade (menu Impressão): para cada modelo, a melhor combinação de versão + perfil de slicer (taxa de sucesso, classificação fiável mesmo com poucas impressões); pesquisa por nome
+✓ Cada impressão iniciada no Stellio fica ligada à versão exata do modelo; se o ficheiro mudou desde a última versão, é guardada uma versão automática «Antes de imprimir»
+✓ «Versões do modelo»: sucessos, falhas e taxa de cada versão, tabela versão × perfil e melhor combinação; um G-code pode ser associado ao seu modelo (e as impressões já avaliadas ficam ligadas)
+✓ O acompanhamento começa com esta versão: as impressões anteriores não são reconstruídas
+✓ Correção: a data das versões do modelo mostrava «Invalid Date»
+✓ Projetos: a mesma peça pode ser adicionada várias vezes — quantidade editável no projeto e ao adicionar ficheiros; voltar a adicionar uma peça já presente soma a quantidade
+✓ Janela «Acerca de»: todo o conteúdo (tecnologias, parceria, BigPrint, dados abertos, licença) fica visível de uma vez em três colunas, sem deslocar
+✓ Demo pública: o BigPrint pode ser usado (cálculo e pré-visualização 3D do corte), mas guardar e importar ficheiros está desativado; os cálculos são limitados (modelo de 30 MB no máx., espera entre pré-visualizações, número de cálculos simultâneos)
+✓ Atualizações: depois de iniciar sessão, o Stellio verifica a cada minuto se há uma nova versão e mostra um selo «Atualização disponível» no cabeçalho que permanece até a instalar; um clique abre a janela de atualização
+✓ Widget Saúde: clicar em «alerta(s) a verificar» abre um popup com os alertas (PC e telemóvel)
+✓ App do telemóvel: «Tentar de novo» mostra agora um indicador de carregamento, «A ligar…» e a hora da última falha
+✓ Notificações push externas (ntfy, Telegram, Discord, Gotify, Pushover), resumo periódico e MQTT reservados à edição servidor (Linux); ocultos e desativados no Windows
+✓ Licenças: licenças comuns (CC0, CC BY, CC BY-NC…) e um selo «uso comercial permitido / não permitido / a verificar» sob o campo de licença de um modelo
+✓ Registo de inícios de sessão (Definições › Segurança da conta): inícios, falhas e saídas com endereço e hora, resumo de 24 h
+✓ Base de dados: número de versão do esquema (visível no diagnóstico) e um teste que verifica que uma base antiga é atualizada corretamente
 <!--it-->
-✓ Nuova pagina Pianificazione (menu Stampa): data di fine stimata di ogni ordine per stampante, capacità disponibile rispetto al carico richiesto, tasso di carico, ritardi previsti e rispetto dei termini su 90 giorni; orizzonte di 7, 14 o 30 giorni
-✓ Capacità delle stampanti regolabile (ore al giorno e giorni lavorativi, per stampante); la stampa in corso è considerata tramite il tempo residuo letto dalla stampante
-✓ Ordini: nuova durata per pezzo (ripresa dal calcolo del preventivo); gli ordini senza durata vengono segnalati e si possono compilare direttamente dalla Pianificazione
-✓ Notifiche di ritardo prevedibile (un ordine supererà la data di consegna) e di stampante sovraccarica
-✓ Correzione BigPrint: lo strumento segnalava «modulo Python bigprint mancante» nell'app installata; il motore ora è incluso nell'app (Windows, macOS, Linux)
-
+✓ Nuova pagina Tracciabilità (menu Stampa): per ogni modello, la migliore combinazione di versione + profilo slicer (tasso di successo, classifica affidabile anche con poche stampe); ricerca per nome
+✓ Ogni stampa avviata da Stellio è collegata alla versione esatta del modello; se il file è cambiato dall'ultima versione, viene salvata una versione automatica «Prima della stampa»
+✓ «Versioni del modello»: successi, fallimenti e tasso di ogni versione, tabella versione × profilo e migliore combinazione; un G-code può essere associato al suo modello (e le stampe già valutate vengono collegate)
+✓ Il monitoraggio parte con questa versione: le stampe precedenti non vengono ricostruite
+✓ Correzione: la data delle versioni del modello mostrava «Invalid Date»
+✓ Progetti: lo stesso pezzo può essere inserito più volte — quantità modificabile nel progetto e all'aggiunta dei file; aggiungere di nuovo un pezzo già presente somma la quantità
+✓ Finestra «Informazioni»: tutto il contenuto (tecnologie, partnership, BigPrint, dati aperti, licenza) è visibile in una volta su tre colonne, senza scorrere
+✓ Demo pubblica: BigPrint è utilizzabile (calcolo e anteprima 3D del taglio), ma salvataggio e importazione dei file sono disattivati; i calcoli sono limitati (modello max 30 MB, attesa tra le anteprime, numero di calcoli simultanei)
+✓ Aggiornamenti: dopo l'accesso, Stellio controlla ogni minuto se c'è una nuova versione e mostra un badge «Aggiornamento disponibile» nell'intestazione, che resta finché non è installato; un clic apre la finestra di aggiornamento
+✓ Widget Salute: un clic su «avviso/i da verificare» apre un popup con gli avvisi (PC e telefono)
+✓ App telefono: «Riprova» mostra ora un indicatore di caricamento, «Connessione in corso…» e l'ora dell'ultimo errore
+✓ Notifiche push esterne (ntfy, Telegram, Discord, Gotify, Pushover), riepilogo periodico e MQTT riservati all'edizione server (Linux); nascosti e disattivati su Windows
+✓ Licenze: licenze comuni (CC0, CC BY, CC BY-NC…) e un badge «uso commerciale consentito / non consentito / da verificare» sotto il campo licenza di un modello
+✓ Registro degli accessi (Impostazioni › Sicurezza dell'account): accessi, errori e disconnessioni con indirizzo e ora, riepilogo di 24 h
+✓ Database: numero di versione dello schema (visibile nella diagnostica) e un test che verifica che un vecchio database venga aggiornato correttamente
 <!--zh-->
-✓ 新增“计划”页面（打印菜单）：每台打印机上各订单的预计完成日期、可用产能与需求负载对比、负载率、预计延误以及 90 天按时交付率；范围可选 7、14 或 30 天
-✓ 可按打印机设置产能（每天小时数和工作日）；进行中的打印会根据从打印机读取的剩余时间计入
-✓ 订单：新增单件耗时（取自报价成本核算）；没有耗时的订单会被提示，并可直接在计划页面补填
-✓ 新增通知：预计延误（订单将超过交付日期）和打印机过载
-✓ BigPrint 修复：已安装的应用中该工具提示“缺少 Python 模块 bigprint”；现在引擎随应用一并提供（Windows、macOS、Linux）
-
+✓ 新增“可追溯性”页面（打印菜单）：为每个模型给出最佳“版本 + 切片配置”组合（成功率；即使打印次数少也能可靠排序）；支持按名称搜索
+✓ 从 Stellio 发起的每次打印都会关联到确切的模型版本；若文件自上一版本以来有变化，会自动保存“打印前”版本
+✓ “模型版本”：显示各版本的成功、失败次数和成功率、版本 × 配置表以及最佳组合；G-code 可关联到其模型（已评分的打印会一并关联）
+✓ 追踪从此版本开始：更早的打印不会被还原
+✓ 修复：模型版本日期显示为“Invalid Date”
+✓ 项目：同一零件可多次加入——可在项目中和添加文件时设置数量；再次添加已有零件会累加数量
+✓ “关于”窗口：所有内容（技术、合作、BigPrint、开放数据、许可证）以三栏一次性显示，无需滚动
+✓ 公开演示版：可使用 BigPrint（计算并 3D 预览切割结果），但保存和导入文件已禁用；计算有限制（模型最大 30 MB、两次预览之间有间隔、同时计算数量受限）
+✓ 更新：登录后，Stellio 每分钟检查一次是否有新版本，并在顶部显示“有可用更新”徽章，安装前一直保留；点击即可打开更新窗口
+✓ 健康小组件：点击“有待检查的警报”会弹出警报列表（电脑和手机均可）
+✓ 手机应用：点击“重试”现在会显示加载圈、“正在连接…”以及上次失败的时间
+✓ 外部推送通知（ntfy、Telegram、Discord、Gotify、Pushover）、定期摘要和 MQTT 仅限服务器版（Linux）；在 Windows 上隐藏并停用
+✓ 许可证：常用许可证（CC0、CC BY、CC BY-NC 等），并在模型许可证字段下显示“允许商业使用 / 禁止商业使用 / 需确认”标记
+✓ 登录日志（设置 › 账户安全）：登录、失败和退出，含地址和时间，附 24 小时摘要
+✓ 数据库：架构版本号（在诊断中显示），以及验证旧数据库能正确升级的测试
 <!--ja-->
-✓ 新ページ「計画」（印刷メニュー）：プリンターごとの各注文の完了予定日、利用可能な能力と要求負荷の比較、負荷率、遅延見込み、直近90日の納期遵守率。期間は7・14・30日
-✓ プリンターごとに生産能力（1日の時間と稼働日）を設定可能。印刷中のものはプリンターから読み取った残り時間で考慮されます
-✓ 注文：1個あたりの時間を追加（見積の原価計算から引き継ぎ）。時間のない注文は表示され、計画画面から直接入力できます
-✓ 通知：納期遅延の見込み（注文が納期を過ぎそう）とプリンターの過負荷
-✓ BigPrint の修正：インストール版で「Python モジュール bigprint がありません」と表示される問題を修正し、エンジンをアプリに同梱しました（Windows、macOS、Linux）
+✓ 新ページ「トレーサビリティ」（印刷メニュー）：モデルごとに最良の「バージョン＋スライサープロファイル」の組み合わせを表示（成功率、印刷数が少なくても信頼できる順位付け）。名前で検索可能
+✓ Stellio から開始した印刷は正確なモデルバージョンに紐づきます。前回のバージョンからファイルが変わっていれば、自動で「印刷前」バージョンを保存します
+✓ 「モデルのバージョン」：各バージョンの成功・失敗数と成功率、バージョン×プロファイルの表、最良の組み合わせを表示。G-code をモデルに関連付けられます（評価済みの印刷も紐づきます）
+✓ 追跡はこのバージョンから開始します。過去の印刷は再構築されません
+✓ 修正：モデルバージョンの日付が「Invalid Date」と表示される問題
+✓ プロジェクト：同じパーツを複数個登録できます。数量はプロジェクト内とファイル追加時に変更可能で、登録済みのパーツを再度追加すると数量が加算されます
+✓ 「バージョン情報」ウィンドウ：技術、パートナーシップ、BigPrint、オープンデータ、ライセンスのすべてを3列でスクロールなしに一度に表示
+✓ 公開デモ：BigPrint を利用できます（分割の計算と3Dプレビュー）が、ファイルの保存とインポートは無効です。計算には制限があります（モデルは最大30 MB、プレビュー間の待ち時間、同時計算数の上限）
+✓ アップデート：サインイン後、Stellio は毎分新バージョンを確認し、ヘッダーに「アップデートあり」バッジを表示します。インストールするまで表示され、クリックするとアップデート画面が開きます
+✓ ヘルスウィジェット：「確認が必要なアラート」をクリックするとアラート一覧のポップアップを表示（PC・スマホ対応）
+✓ スマホアプリ：「再試行」で読み込みアイコン、「接続しています…」、最後に失敗した時刻を表示
+✓ 外部プッシュ通知（ntfy・Telegram・Discord・Gotify・Pushover）、定期ダイジェスト、MQTT はサーバー版（Linux）専用になりました。Windows では非表示・無効です
+✓ ライセンス：一般的なライセンス（CC0・CC BY・CC BY-NC など）を選択でき、モデルのライセンス欄の下に「商用利用可／不可／要確認」バッジを表示
+✓ サインインログ（設定 › アカウントのセキュリティ）：サインイン・失敗・サインアウトをアドレスと時刻付きで記録、24時間の概要
+✓ データベース：スキーマのバージョン番号（診断に表示）と、古いデータベースが正しく更新されることを確認するテスト

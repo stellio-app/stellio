@@ -108,6 +108,19 @@ CAPTIONS_V115 = {
 }
 for _l, _c in CAPTIONS_V115.items():
     CAPTIONS[_l].update(_c)
+# v1.1.6 : captures de la traçabilité
+CAPTIONS_V116 = {
+    'fr': {'trace': 'Traçabilité : meilleure combinaison version + profil par modèle', 'trace_versions': 'Versions du modèle : taux de réussite par version et par profil'},
+    'en': {'trace': 'Traceability: best version + profile combination per model', 'trace_versions': 'Model versions: success rate per version and per profile'},
+    'de': {'trace': 'Rückverfolgbarkeit: beste Kombination aus Version und Profil je Modell', 'trace_versions': 'Modellversionen: Erfolgsquote je Version und Profil'},
+    'es': {'trace': 'Trazabilidad: mejor combinación de versión y perfil por modelo', 'trace_versions': 'Versiones del modelo: tasa de éxito por versión y perfil'},
+    'pt': {'trace': 'Rastreabilidade: melhor combinação de versão e perfil por modelo', 'trace_versions': 'Versões do modelo: taxa de sucesso por versão e perfil'},
+    'it': {'trace': 'Tracciabilità: migliore combinazione di versione e profilo per modello', 'trace_versions': 'Versioni del modello: tasso di successo per versione e profilo'},
+    'zh': {'trace': '可追溯性：每个模型的最佳版本 + 配置组合', 'trace_versions': '模型版本：各版本与各配置的成功率'},
+    'ja': {'trace': 'トレーサビリティ：モデルごとの最良のバージョン＋プロファイル', 'trace_versions': 'モデルのバージョン：バージョン・プロファイル別の成功率'},
+}
+for _l, _c in CAPTIONS_V116.items():
+    CAPTIONS[_l].update(_c)
 CHANGELOG_MAX_VERSIONS = 25
 
 

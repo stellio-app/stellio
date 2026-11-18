@@ -7,6 +7,7 @@ import android.app.DownloadManager;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.ConnectivityManager;
@@ -39,6 +40,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -81,6 +83,10 @@ public class MainActivity extends Activity {
     private EditText remoteInput;
     private TextView setupStatus;
     private TextView offlineAddr;
+    private TextView offlineStatus;   // « Connexion en cours… » / « Toujours injoignable (heure) »
+    private ProgressBar offlineSpin;  // cercle animé pendant une tentative
+    private Button retryBtn;
+    private static final long MIN_TRY_MS = 900;   // une tentative reste visible au moins ce temps, même si l'échec est instantané
     private Button connectBtn;
 
     private String local = "";      // adresse interne, sans « / » final
@@ -329,8 +335,23 @@ public class MainActivity extends Activity {
         offlineAddr.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         offlineAddr.setPadding(0, 0, 0, dp(10));
         c.addView(offlineAddr);
+        offlineSpin = new ProgressBar(this);
+        offlineSpin.setIndeterminate(true);
+        offlineSpin.setIndeterminateTintList(ColorStateList.valueOf(getColor(R.color.accent)));
+        LinearLayout.LayoutParams spLp = new LinearLayout.LayoutParams(dp(36), dp(36));
+        spLp.gravity = Gravity.CENTER_HORIZONTAL; spLp.topMargin = dp(4);
+        offlineSpin.setLayoutParams(spLp);
+        offlineSpin.setVisibility(View.GONE);
+        c.addView(offlineSpin);
+        offlineStatus = text("", 13, getColor(R.color.muted), false);
+        offlineStatus.setGravity(Gravity.CENTER);
+        offlineStatus.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+        offlineStatus.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        offlineStatus.setPadding(0, dp(6), 0, dp(2));
+        c.addView(offlineStatus);
         Button retry = button(getString(R.string.retry), true);
         retry.setOnClickListener(v -> reach(true));
+        retryBtn = retry;
         c.addView(retry);
         Button edit = button(getString(R.string.edit_addresses), false);
         edit.setOnClickListener(v -> showSetup());
@@ -340,6 +361,18 @@ public class MainActivity extends Activity {
     }
 
     // ── Affichage ──
+    /** Retour visuel d'une tentative de connexion (écran « Serveur injoignable ») : cercle animé, bouton grisé, message. */
+    private void setTrying(boolean trying, boolean failed) {
+        if (offlineView == null) return;
+        offlineSpin.setVisibility(trying ? View.VISIBLE : View.GONE);
+        retryBtn.setEnabled(!trying);
+        retryBtn.setAlpha(trying ? 0.6f : 1f);
+        retryBtn.setText(trying ? R.string.connecting_short : R.string.retry);
+        if (trying) offlineStatus.setText(R.string.connecting);
+        else if (failed) offlineStatus.setText(getString(R.string.still_unreachable, new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date())));
+        else offlineStatus.setText("");
+    }
+
     private void showWeb() { setupView.setVisibility(View.GONE); offlineView.setVisibility(View.GONE); web.setVisibility(View.VISIBLE); ui.removeCallbacks(retryTask); }
 
     private void showSetup() {
@@ -375,11 +408,15 @@ public class MainActivity extends Activity {
         if (local.isEmpty() && remote.isEmpty()) { showSetup(); return; }
         if (!resolving.compareAndSet(false, true)) return;
         final String l = local, r = remote;
+        if (visible(offlineView)) setTrying(true, false);
+        final long t0 = android.os.SystemClock.elapsedRealtime();
         new Thread(() -> {
             String best = null;
             if (!l.isEmpty() && isStellio(l, 2500)) best = l;
             else if (!r.isEmpty() && isStellio(r, 6000)) best = r;
             final String pick = best;
+            long left = MIN_TRY_MS - (android.os.SystemClock.elapsedRealtime() - t0);
+            if (left > 0) { try { Thread.sleep(left); } catch (InterruptedException ignored) { } }
             ui.post(() -> { resolving.set(false); onReach(pick, forceReload); });
         }).start();
     }
@@ -390,8 +427,10 @@ public class MainActivity extends Activity {
         if (pick == null) {
             fails++;
             if (wasOffline || fails >= 2 || current.isEmpty()) showOffline();
+            if (visible(offlineView)) setTrying(false, true);
             return;
         }
+        if (wasOffline) setTrying(false, false);
         fails = 0;
         if (pick.equals(current) && !wasOffline && !forceReload) return;
         boolean switched = !current.isEmpty() && !pick.equals(current);

@@ -340,6 +340,22 @@ Stellio invia una notifica quando un ordine sta per superare la data di consegna
 
 Il calcolo è volutamente semplice: durate inserite, ordini in sequenza per data di consegna, senza considerare cambi di materiale o guasti.
 
+## Trovare la migliore combinazione (tracciabilità)
+La pagina **Tracciabilità** (menu **Stampa**) collega ogni stampa alla **versione esatta del modello** e al **profilo slicer** usati e mostra, per ogni modello, la combinazione che funziona meglio.
+
+{{img:trace}}
+
+1. Stampa come al solito da Stellio: la stampa viene collegata automaticamente al modello. Se il file è cambiato dall'ultima versione, Stellio salva una versione «Prima della stampa», quindi l'associazione è sempre esatta.
+2. Dopo la stampa, **valuta il risultato** (successo, fallimento, parziale) nello storico: sono queste valutazioni ad alimentare i tassi.
+3. Apri **Tracciabilità**: una riga per modello con le sue versioni e la **migliore combinazione** (versione + profilo, successi sulle stampe valutate). Un clic apre **Versioni del modello**.
+4. In **Versioni del modello**, ogni versione mostra successi, fallimenti e tasso, e la tabella incrocia **versione × profilo**.
+
+{{img:trace_versions}}
+
+La classifica non si lascia ingannare dai campioni piccoli: 8 successi su 9 passano davanti a 1 su 1. La migliore combinazione viene proposta solo da 2 stampe valutate e da una versione nota.
+
+Il monitoraggio parte con la v1.1.6: le stampe precedenti non vengono ricostruite.
+
 ## Fare manutenzione alle mie stampanti
 
 1. Sulla scheda di una stampante, apri **Manutenzione** e scegli la **marca**: vengono proposte attività consigliate.

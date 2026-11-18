@@ -340,6 +340,22 @@ Stellio benachrichtigt Sie, wenn ein Auftrag sein Lieferdatum zu verfehlen droht
 
 Die Berechnung ist bewusst einfach: eingegebene Dauern, Aufträge nach Lieferdatum aneinandergereiht, ohne Materialwechsel oder Ausfälle.
 
+## Die beste Kombination finden (Rückverfolgbarkeit)
+Die Seite **Rückverfolgbarkeit** (Menü **Druck**) verknüpft jeden Druck mit der **genauen Modellversion** und dem **Slicer-Profil** und zeigt je Modell die erfolgreichste Kombination.
+
+{{img:trace}}
+
+1. Drucken Sie wie gewohnt aus Stellio: Der Druck wird automatisch mit dem Modell verknüpft. Hat sich die Datei seit der letzten Version geändert, speichert Stellio eine Version „Vor dem Druck“ – die Zuordnung ist also immer exakt.
+2. **Bewerten Sie das Ergebnis** (Erfolg, Fehlschlag, teilweise) nach dem Druck im Verlauf: Diese Bewertungen speisen die Quoten.
+3. Öffnen Sie **Rückverfolgbarkeit**: eine Zeile je Modell mit Versionen und **bester Kombination** (Version + Profil, Erfolge bei bewerteten Drucken). Ein Klick öffnet **Modellversionen**.
+4. In **Modellversionen** zeigt jede Version Erfolge, Fehlschläge und Quote; die Tabelle kreuzt **Version × Profil**.
+
+{{img:trace_versions}}
+
+Die Rangfolge lässt sich nicht von kleinen Stichproben täuschen: 8 Erfolge bei 9 Drucken stehen vor 1 bei 1. Eine beste Kombination wird erst ab 2 bewerteten Drucken und bekannter Version vorgeschlagen.
+
+Die Erfassung beginnt mit v1.1.6: ältere Drucke werden nicht rekonstruiert.
+
 ## Meine Drucker warten
 
 1. Öffnen Sie auf einer Druckerkarte **Wartung** und wählen Sie die **Marke**: Empfohlene Aufgaben werden angeboten.

@@ -161,6 +161,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 - 🔄 **Formatkonverter** (STL ↔ 3MF ↔ OBJ)
 - 📏 **BigPrint (Werkzeuge)**: Modell auf Originalgröße skalieren (z. B. 1,8 m); es wird in bettgroße Teile zerlegt, ausgehöhlt, mit Stiften versehen und nummeriert – mit explodierter 3D-Vorschau und Filament-/Kostenschätzung; speichert STL-Teile, ein 3MF-Projekt und einen Bericht in einem lokalen oder Netzwerkordner. Basiert auf der Open-Source-Engine [bigprint](https://github.com/PooterTF/bigprint) (AGPL-3.0).
 - 📅 **Produktionsplanung** (Menü **Druck**): voraussichtliches Ende je Drucker, verfügbare Kapazität gegenüber geforderter Last, Warnungen bei Überlastung und absehbarer Verspätung, Termintreue.
+- 🧬 **Druck-Rückverfolgbarkeit** (Menü **Druck**): jeder Druck mit genauer Modellversion und Slicer-Profil verknüpft, beste Kombination je Modell.
 - 🛡️ **Integritätsprüfung** (beschädigte/fehlende Dateien)
 - 💰 **Druckkostenberechnung**: Material, Strom, Maschinenverschleiß (pro Stunde), Fixkosten, Marge in % und Stückzahl — Stückpreis und Gesamtpreis auf den Cent genau
 - 🏷️ **Aufschlag & Verkaufspreis**: Standardaufschlag (%) einmal unter Einstellungen → Druckpreise festlegen; der Verlauf zeigt den Verkaufspreis (Kosten + Aufschlag) neben den Kosten, die Statistiken nutzen weiterhin die tatsächlichen Kosten
@@ -225,6 +226,7 @@ Ob Einsteiger-Maker oder erfahrener Betreiber mehrerer Drucker — Stellio spart
 | ![Doppelte erkennen](../../images/duplicates.png) *Doppelte erkennen* | ![Erweiterte Filter](../../images/filters.png) *Erweiterte Filter* |
 | ![BigPrint: in Originalgröße vergrößern und in Teile zerlegen](../wiki/images/de/bigprint.png) *BigPrint: in Originalgröße vergrößern und in Teile zerlegen* | ![BigPrint: Explosionsansicht, Filament und Teileliste](../wiki/images/de/bigprint-result.png) *BigPrint: Explosionsansicht, Filament und Teileliste* |
 | ![Produktionsplanung: Enddaten je Drucker, Kapazität und Warnungen](../wiki/images/de/planning.png) *Produktionsplanung: Enddaten je Drucker, Kapazität und Warnungen* | |
+| ![Rückverfolgbarkeit: beste Kombination aus Version und Profil je Modell](../wiki/images/de/trace.png) *Rückverfolgbarkeit: beste Kombination aus Version und Profil je Modell* | ![Modellversionen: Erfolgsquote je Version und Profil](../wiki/images/de/trace_versions.png) *Modellversionen: Erfolgsquote je Version und Profil* |
 
 ---
 

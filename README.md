@@ -163,6 +163,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 🔄 **Format converter** (STL ↔ 3MF ↔ OBJ)
 - 📏 **BigPrint (Tools)**: scale a model to life size (e.g. 1.8 m); it is cut into pieces that fit your bed, hollowed, fitted with dowel pins and numbered, with an exploded 3D preview and filament/cost estimate; saves STL pieces, a 3MF project and a report to a local or network folder. Built on the open-source [bigprint](https://github.com/PooterTF/bigprint) engine (AGPL-3.0).
 - 📅 **Production planning** (**Printing** menu): estimated end date per printer, available capacity versus requested load, overload and foreseeable-delay alerts, on-time delivery rate.
+- 🧬 **Print traceability** (**Printing** menu): every print linked to the exact model version and slicer profile, best combination per model.
 - 🛡️ **Integrity check** (corrupted/missing files)
 - 💰 **Print cost calculation**: material, electricity, machine wear (per hour), fixed fee, margin in % and quantity — unit price and total computed to the cent
 - 🏷️ **Margin & sale price**: set your default margin (%) once in Settings → Print pricing; the history shows the sale price (cost + margin) next to the cost, while statistics keep using the real cost
@@ -227,6 +228,7 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 | ![Duplicate detection](images/duplicates.png) *Duplicate detection* | ![Advanced filters](images/filters.png) *Advanced filters* |
 | ![BigPrint: scale to life size and split into pieces](images/bigprint.png) *BigPrint: scale to life size and split into pieces* | ![BigPrint: exploded preview, filament and piece list](images/bigprint-result.png) *BigPrint: exploded preview, filament and piece list* |
 | ![Production planning: end dates per printer, capacity and alerts](images/planning.png) *Production planning: end dates per printer, capacity and alerts* | |
+| ![Traceability: best version + profile combination per model](images/trace.png) *Traceability: best version + profile combination per model* | ![Model versions: success rate per version and per profile](images/trace_versions.png) *Model versions: success rate per version and per profile* |
 
 ---
 

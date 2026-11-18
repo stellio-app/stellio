@@ -22,6 +22,9 @@
     <string name="addr_local">内网</string>
     <string name="addr_remote">外网</string>
     <string name="retry">重试</string>
+    <string name="connecting">正在连接…</string>
+    <string name="connecting_short">连接中…</string>
+    <string name="still_unreachable">仍无法连接（%1$s）。将自动重试。</string>
     <string name="edit_addresses">修改地址</string>
     <string name="press_again">再按一次返回键退出</string>
     <string name="update_title">有可用更新</string>

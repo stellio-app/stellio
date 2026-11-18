@@ -273,6 +273,10 @@
 				  <i class="fa-solid fa-calendar-days"></i>
 				  <span data-i18n="nav.planning">Planning</span>
 				</button>
+				<button class="nav-btn desktop-only-nav" data-nav-id="trace" data-page="trace" data-title-key="nav.trace" data-icon="fa-code-branch" data-cat="print">
+				  <i class="fa-solid fa-code-branch"></i>
+				  <span data-i18n="nav.trace">Traçabilité</span>
+				</button>
 				<button class="nav-btn" data-page="projects" data-nav-id="projects" data-icon="fa-diagram-project" data-title-key="nav.projects" data-cat="print">
 					<i class="fa-solid fa-diagram-project"></i>
 					<span data-i18n="nav.projects">Projets</span>
@@ -2217,7 +2221,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="accord-section viewer-hide">
+                        <div class="accord-section viewer-hide" id="push-server-block" style="display:none;">
                             <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-bell"></i> <span data-i18n="push.title">Notifications push</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
@@ -2821,6 +2825,15 @@
 					<p data-i18n="repair.all_good">Aucun fichier ne nécessite de réparation.</p>
 				  </div>
 				</div>
+				<div id="page-trace" class="page">
+				  <div class="repair-header">
+					<h2><i class="fa-solid fa-code-branch"></i> <span data-i18n="trace.page_title">Traçabilité d'impression</span></h2>
+					<p data-i18n="trace.subtitle">Retrouvez en quelques secondes la combinaison modèle, version et profil de slicer qui réussit le mieux. Chaque impression lancée depuis Stellio est reliée à la version exacte du modèle ; le résultat vient de l'historique noté.</p>
+				  </div>
+				  <div class="pl-toolbar"><input type="search" id="tr-search" class="settings-select" data-i18n-placeholder="trace.search" placeholder="Rechercher un modèle…" autocomplete="off"></div>
+				  <div id="tr-list"></div>
+				</div>
+
 				<div id="page-planning" class="page">
 				  <div class="repair-header">
 					<h2><i class="fa-solid fa-calendar-days"></i> <span data-i18n="planning.title">Planning de production</span></h2>
@@ -2868,7 +2881,7 @@
 						<h3 data-i18n="bigprint.model">Modèle</h3>
 						<div class="bp-row">
 						  <button type="button" class="btn btn-primary" id="bp-pick-library"><i class="fa-solid fa-layer-group"></i> <span data-i18n="bigprint.from_library">Choisir dans la bibliothèque</span></button>
-						  <button type="button" class="btn btn-secondary" id="bp-pick-upload"><i class="fa-solid fa-upload"></i> <span data-i18n="bigprint.upload">Importer un fichier</span></button>
+						  <button type="button" class="btn btn-secondary viewer-hide" id="bp-pick-upload"><i class="fa-solid fa-upload"></i> <span data-i18n="bigprint.upload">Importer un fichier</span></button>
 						  <input type="file" id="bp-file" accept=".stl,.3mf,.obj,.ply" hidden>
 						</div>
 						<div id="bp-model-info" class="bp-muted" data-i18n="bigprint.no_model">Aucun modèle choisi (STL, 3MF, OBJ, PLY).</div>
@@ -2944,7 +2957,7 @@
 						</div>
 						<label class="bp-check"><input type="checkbox" id="bp-labels" checked> <span data-i18n="bigprint.labels">Graver le numéro de chaque pièce sur une face cachée</span></label>
 					  </section>
-<section class="bp-card">
+<section class="bp-card viewer-hide">
 						<h3 data-i18n="bigprint.destination">Enregistrer dans</h3>
 						<div class="bp-grid">
 						  <label data-i18n="bigprint.dest_source">Dossier</label><select id="bp-source" class="settings-select"></select>
@@ -2955,9 +2968,10 @@
 </div>
 <div class="bp-row bp-actions">
 						<button type="button" class="btn btn-primary" id="bp-preview-btn" disabled><i class="fa-solid fa-eye"></i> <span data-i18n="bigprint.preview">Aperçu</span></button>
-						<button type="button" class="btn btn-secondary" id="bp-save-btn" disabled><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="bigprint.save">Enregistrer les fichiers</span></button>
+						<button type="button" class="btn btn-secondary viewer-hide" id="bp-save-btn" disabled><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="bigprint.save">Enregistrer les fichiers</span></button>
 						<button type="button" class="btn btn-danger" id="bp-cancel-btn" hidden><i class="fa-solid fa-xmark"></i> <span data-i18n="bigprint.cancel">Annuler</span></button>
 					  </div>
+					  <p id="bp-viewer-note" class="bp-muted" hidden data-i18n="bigprint.viewer_note">Démo : vous pouvez calculer et visualiser le découpage, mais l'enregistrement des fichiers est réservé aux installations Stellio.</p>
 					  <div id="bp-status" class="bp-muted"></div>
 					  <div class="bp-progress" id="bp-progress" hidden><div id="bp-progress-bar"></div></div>
 					</div>
@@ -4064,6 +4078,19 @@
                     </div>
                 </div>
                 <div class="about-section">
+                    <h4><i class="fa-solid fa-up-right-and-down-left-from-center"></i> <span data-i18n="about.bigprint_title">BigPrint</span></h4>
+                    <p class="about-legal" data-i18n="about.bigprint_desc">L'outil BigPrint repose sur le moteur open source bigprint de Michael Christopher Stone (PooterTF), licence AGPL-3.0. Merci à lui.</p>
+                    <div class="about-partner-links">
+                        <a class="about-link-btn" href="https://github.com/PooterTF/bigprint" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i><span>PooterTF/bigprint</span></a>
+                    </div>
+                </div>
+                <div class="about-section">
+                    <h4><i class="fa-solid fa-copyright"></i> <span data-i18n="about.license">Licence & Droits</span></h4>
+                    <p class="about-legal" data-i18n="about.legal">© 2026 Stellio Project. Distribué sous licence GNU AGPL v3</p>
+                </div>
+                </div>
+                <div class="about-col">
+                <div class="about-section">
                     <h4><i class="fa-solid fa-handshake"></i> <span data-i18n="about.partner_title">Partenariat</span></h4>
                     <div class="about-partner">
                         <img src="assets/tigertag-logo.svg" alt="TigerTag" class="about-partner-logo" onerror="this.style.display='none'">
@@ -4077,13 +4104,7 @@
                     </div>
                 </div>
                 </div>
-                <div class="about-section">
-                    <h4><i class="fa-solid fa-up-right-and-down-left-from-center"></i> <span data-i18n="about.bigprint_title">BigPrint</span></h4>
-                    <p class="about-legal" data-i18n="about.bigprint_desc">L'outil BigPrint repose sur le moteur open source bigprint de Michael Christopher Stone (PooterTF), licence AGPL-3.0. Merci à lui.</p>
-                    <div class="about-partner-links">
-                        <a class="about-link-btn" href="https://github.com/PooterTF/bigprint" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i><span>PooterTF/bigprint</span></a>
-                    </div>
-                </div>
+                <div class="about-col">
                 <div class="about-section">
                     <h4><i class="fa-solid fa-database"></i> <span data-i18n="about.data_title">Données et standards ouverts</span></h4>
                     <p class="about-legal" data-i18n="about.data_desc">Le catalogue de bobines provient de l'Open Filament Database (Open Filament Collective, licence MIT).</p>
@@ -4097,9 +4118,6 @@
                         <a class="about-link-btn" href="https://github.com/OpenPrintTag/openprinttag-specification" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i><span>openprinttag-specification</span></a>
                     </div>
                 </div>
-                <div class="about-section">
-                    <h4><i class="fa-solid fa-copyright"></i> <span data-i18n="about.license">Licence & Droits</span></h4>
-                    <p class="about-legal" data-i18n="about.legal">© 2026 Stellio Project. Distribué sous licence GNU AGPL v3</p>
                 </div>
             </div>
         </div>
@@ -5637,6 +5655,8 @@
     <script src="v113.js"></script>
     <script src="bigprint.js"></script>
     <script src="planning.js"></script>
+    <script src="trace.js"></script>
+    <script src="loginlog.js"></script>
     <script src="filament_tags.js"></script>
 </body>
 </html>

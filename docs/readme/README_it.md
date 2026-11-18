@@ -161,6 +161,7 @@ Che tu sia un maker alle prime armi o un utente esperto con più macchine, Stell
 - 🔄 **Convertitore di formato** (STL ↔ 3MF ↔ OBJ)
 - 📏 **BigPrint (Strumenti)**: ingrandisci un modello a grandezza naturale (es. 1,8 m); viene tagliato in pezzi che stanno sul piatto, svuotato, dotato di perni e numerato, con anteprima 3D esplosa e stima di filamento/costo; salva i pezzi STL, un progetto 3MF e un rapporto in una cartella locale o di rete. Basato sul motore open source [bigprint](https://github.com/PooterTF/bigprint) (AGPL-3.0).
 - 📅 **Pianificazione della produzione** (menu **Stampa**): data di fine stimata per stampante, capacità disponibile rispetto al carico richiesto, avvisi di sovraccarico e ritardo prevedibile, rispetto dei termini.
+- 🧬 **Tracciabilità di stampa** (menu **Stampa**): ogni stampa collegata alla versione esatta del modello e al profilo slicer, migliore combinazione per modello.
 - 🛡️ **Verifica dell'integrità** (file corrotti/mancanti)
 - 💰 **Calcolo del costo di stampa**: materiale, elettricità, usura della macchina (all'ora), costi fissi, margine in % e quantità — prezzo unitario e totale calcolati al centesimo
 - 🏷️ **Margine e prezzo di vendita**: imposta il margine predefinito (%) una volta in Impostazioni → Tariffe di stampa; la cronologia mostra il prezzo di vendita (costo + margine) accanto al costo, mentre le statistiche restano basate sul costo reale
@@ -225,6 +226,7 @@ Che tu sia un maker alle prime armi o un utente esperto con più macchine, Stell
 | ![Rilevamento dei duplicati](../../images/duplicates.png) *Rilevamento dei duplicati* | ![Filtri avanzati](../../images/filters.png) *Filtri avanzati* |
 | ![BigPrint: ingrandire a grandezza naturale e tagliare in pezzi](../wiki/images/it/bigprint.png) *BigPrint: ingrandire a grandezza naturale e tagliare in pezzi* | ![BigPrint: anteprima esplosa, filamento ed elenco dei pezzi](../wiki/images/it/bigprint-result.png) *BigPrint: anteprima esplosa, filamento ed elenco dei pezzi* |
 | ![Pianificazione della produzione: date di fine per stampante, capacità e avvisi](../wiki/images/it/planning.png) *Pianificazione della produzione: date di fine per stampante, capacità e avvisi* | |
+| ![Tracciabilità: migliore combinazione di versione e profilo per modello](../wiki/images/it/trace.png) *Tracciabilità: migliore combinazione di versione e profilo per modello* | ![Versioni del modello: tasso di successo per versione e profilo](../wiki/images/it/trace_versions.png) *Versioni del modello: tasso di successo per versione e profilo* |
 
 ---
 

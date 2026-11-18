@@ -27,10 +27,21 @@ _REQUIRED = (
     'save_settings',
     'session',
 )
-_OPTIONAL = ('_system_ui_lang',)
+_OPTIONAL = ('_system_ui_lang', 'IS_SERVER_EDITION')
 _OVERRIDABLE = ('datetime', 'threading', 'time')
 
 _MAIN = {}
+IS_SERVER_EDITION = None   # fourni par main.py
+
+
+def _server_ok():
+    """v1.1.6+ : notifications push et résumé périodique réservés à l'édition serveur (Linux / headless).
+    Tant que main.py n'a pas fourni IS_SERVER_EDITION (modules chargés seuls, tests), on ne bloque rien."""
+    return IS_SERVER_EDITION is None or bool(IS_SERVER_EDITION)
+
+
+def _server_only_response():
+    return jsonify({"error": "Fonction réservée à l'édition serveur (Linux)", "code": "server_edition_only"}), 404
 _insert_notification_once = None
 _is_low_stock = None
 _push_notify_async = None
@@ -225,7 +236,7 @@ def tick(now=None):
             parts_stock.check_low_stock(uid)
     except Exception as e:
         app_logger.debug(f"[RÉSUMÉ] Stock de pièces ignoré : {e}")
-    if not cfg['enabled']:
+    if not cfg['enabled'] or not _server_ok():
         return False
     now = now or datetime.datetime.now()
     key = period_key(now, cfg)
@@ -267,6 +278,8 @@ def start_worker():
 
 # ── Routes ──────────────────────────────────────────────────────────────────────────────────
 def api_digest_settings():
+    if not _server_ok():
+        return _server_only_response()
     if request.method == 'GET':
         return jsonify(get_config())
     data = request.get_json(silent=True) or {}
@@ -286,6 +299,8 @@ def api_digest_settings():
 
 
 def api_digest_preview():
+    if not _server_ok():
+        return _server_only_response()
     freq = 'weekly' if request.args.get('frequency') == 'weekly' else 'daily'
     data = collect(session['user_id'], 7 if freq == 'weekly' else 1)
     title, text = render(data, freq)
@@ -293,6 +308,8 @@ def api_digest_preview():
 
 
 def api_digest_send_now():
+    if not _server_ok():
+        return _server_only_response()
     freq = 'weekly' if (request.get_json(silent=True) or {}).get('frequency') == 'weekly' else 'daily'
     sent, title, text = send_digest(session['user_id'], freq, force=True)
     return jsonify({'success': True, 'sent': sent, 'title': title, 'text': text})

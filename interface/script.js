@@ -583,7 +583,7 @@ function balanceSettingsColumns() {
 // Fonctions réservées à l'édition serveur (Linux : Raspberry Pi, VM, LXC, Docker). Sous Windows, ces blocs restent masqués.
 function applyServerEditionUI() {
     const on = !!(stellioAppConfig && stellioAppConfig.server_edition);
-    const blocks = { 'slicer-profiles-server-block': 'block', 'ai-provider-server-block': 'flex', 'tigertag-server-block': 'block', 'mqtt-server-block': 'block' };
+    const blocks = { 'slicer-profiles-server-block': 'block', 'ai-provider-server-block': 'flex', 'tigertag-server-block': 'block', 'mqtt-server-block': 'block', 'push-server-block': 'block' };
     Object.keys(blocks).forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = on ? blocks[id] : 'none';
@@ -17282,6 +17282,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         if (page === 'sosprint') loadSosprintProfiles(true);
         if (page === 'bigprint') window.StellioBigPrint?.onShow();
         if (page === 'planning') window.StellioPlanning?.onShow();
+        if (page === 'trace') window.StellioTrace?.onShow();
         if (page === 'print-queue') loadPrintQueue();
         if (page === 'management') window.StellioManagement?.load();
         if (page === 'settings') window.StellioV113?.onSettings();
@@ -21689,7 +21690,7 @@ window.manualCheckUpdate = async function () {
 
 const UpdateManager = {
 lastCheck: 0,
-checkInterval: 6 * 60 * 60 * 1000,
+checkInterval: 60 * 1000,   // chaque minute une fois connecté ; le serveur met GitHub en cache 3 min
 currentVersion: '1.0.0',
 _timerStarted: false,
 _initRunning: false,
@@ -21724,6 +21725,7 @@ await this.checkForUpdates(true);
 if (!this._timerStarted) {
 this._timerStarted = true;
 setInterval(() => this.checkForUpdates(false), this.checkInterval);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) this.checkForUpdates(false); });
 }
 } finally {
 this._initRunning = false;
@@ -21744,7 +21746,7 @@ console.warn('[UpdateManager] Erreur check changelog:', e);
 }
 },
 async checkForUpdates(showModal = true) {
-if (!this._isAuthenticated()) return;
+if (!this._isAuthenticated()) { this.renderBadge(null); return; }
 try {
 console.log('[UpdateManager] 🔍 Vérification des mises à jour...');
 const res = await fetch(`${API}/api/update/check`);
@@ -21756,13 +21758,19 @@ const data = await res.json();
 console.log('[UpdateManager] Réponse:', data);
 if (data.update_available) {
 console.log(`[UpdateManager] ✅ Nouvelle version: ${data.version}`);
+this._updateInfo = data;
+this.renderBadge(data);
 if (showModal) {
+this._toastedVersion = data.version;
 this.showUpdateModal(data);
-} else {
+} else if (this._toastedVersion !== data.version) {   // une seule bulle par version détectée ; le badge, lui, reste
+this._toastedVersion = data.version;
 this.showUpdateToast(data);
 }
 } else {
 console.log('[UpdateManager] ✅ Application à jour');
+this._updateInfo = null;
+this.renderBadge(null);
 }
 } catch (err) {
 console.error('[UpdateManager] Erreur:', err);
@@ -21838,6 +21846,35 @@ document.getElementById('update-progress-container').style.display = 'none';
 overlay.addEventListener('click', (e) => {
 if (e.target === overlay) _closeUpdateOverlay();
 });
+},
+// Badge « Mise à jour disponible » : dans l'en-tête, il reste tant que la mise à jour n'est pas installée ; un clic ouvre la fenêtre de mise à jour.
+renderBadge(data) {
+const old = document.getElementById('update-badge');
+const dot = document.getElementById('update-available-dot');
+const rails = document.querySelectorAll('.rail-btn[data-rail-click="#nav-check-update-btn"]');
+if (!data || !data.update_available) {
+if (old) old.remove();
+if (dot) dot.classList.add('hidden');
+rails.forEach(b => b.classList.remove('has-update'));
+return;
+}
+window._dashboardUpdateCache = data;
+if (dot) dot.classList.remove('hidden');
+rails.forEach(b => b.classList.add('has-update'));
+let b = old;
+if (!b) {
+const host = document.querySelector('.app-header .header-right');
+if (!host) return;
+b = document.createElement('button');
+b.type = 'button';
+b.id = 'update-badge';
+b.className = 'update-badge';
+b.addEventListener('click', () => { const info = this._updateInfo; if (info) this.showUpdateModal(info); });
+host.prepend(b);
+}
+const v = String(data.version || '').replace(/[<>&"']/g, '');
+b.innerHTML = `<i class="fa-solid fa-download"></i><span>${I18N.t('update.badge')}</span><b>v${v}</b>`;
+b.title = I18N.t('update.badge_title', { version: v });
 },
 showUpdateToast(updateInfo) {
 if (document.querySelector('.update-modal-overlay') || document.querySelector('.toast.update-toast')) return;
@@ -22185,9 +22222,10 @@ async function _loadDashboardHealth() {
         if (!res.ok) throw new Error(res.status);
         const d = await res.json();
         const warns = Array.isArray(d.warnings) ? d.warnings : [];
+        window._healthWarnings = warns;
         const rows = _healthRows(d).slice(2, 9);   // sans version ni durée de fonctionnement (déjà visibles ailleurs)
         const status = warns.length
-            ? `<div class="dashboard-health-status warn"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(I18N.t('dashboard.health_alerts', { n: warns.length }))}</div>`
+            ? `<button type="button" class="dashboard-health-status warn dashboard-health-alert-btn" onclick="openHealthAlertsPopup()" title="${escapeHtml(_t3('dashboard.health_popup_open', 'Voir les alertes'))}"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(I18N.t('dashboard.health_alerts', { n: warns.length }))} <i class="fa-solid fa-chevron-right" style="margin-left:auto;opacity:.7;"></i></button>`
             : `<div class="dashboard-health-status ok"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(_t3('dashboard.health_ok', 'Tout va bien'))}</div>`;
         body.innerHTML = status + rows.map(([k, v]) => `<div class="dashboard-health-row"><span>${escapeHtml(k)}</span><strong>${escapeHtml(String(v))}</strong></div>`).join('')
             + `<div style="margin-top:8px;"><button type="button" class="btn btn-ghost btn-sm" onclick="document.querySelector('.nav-btn[data-page=\\'settings\\']')?.click()"><i class="fa-solid fa-stethoscope"></i> ${escapeHtml(_t3('dashboard.health_details', 'Détails dans Diagnostic'))}</button></div>`;
@@ -22195,6 +22233,38 @@ async function _loadDashboardHealth() {
         body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${escapeHtml(I18N.t('toast.connection_error'))}</p></div>`;
     }
 }
+
+// ---- Popup des alertes du widget Santé (PC et téléphone) : clic sur « n alerte(s) à vérifier »
+function openHealthAlertsPopup() {
+    let dlg = document.getElementById('modal-health-alerts');
+    if (!dlg) {
+        dlg = document.createElement('div');
+        dlg.id = 'modal-health-alerts';
+        dlg.className = 'modal hidden';
+        dlg.innerHTML = `<div class="modal-content" style="width:min(560px,95vw);max-width:560px;">
+            <div class="modal-header"><h3><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning,#d29922);"></i> <span id="health-alerts-title"></span></h3>
+              <button class="modal-close" type="button" id="health-alerts-x">×</button></div>
+            <div class="modal-body"><ul class="health-alerts-list" id="health-alerts-list"></ul></div>
+            <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:0 20px 16px;">
+              <button type="button" class="btn btn-ghost btn-sm" id="health-alerts-diag"><i class="fa-solid fa-stethoscope"></i> <span id="health-alerts-diag-t"></span></button>
+              <button type="button" class="btn btn-primary btn-sm" id="health-alerts-close"></button></div></div>`;
+        document.body.appendChild(dlg);
+        const close = () => (typeof closeModal === 'function' ? closeModal('modal-health-alerts') : dlg.classList.add('hidden'));
+        document.getElementById('health-alerts-x').onclick = close;
+        document.getElementById('health-alerts-close').onclick = close;
+        document.getElementById('health-alerts-diag').onclick = () => { close(); document.querySelector(".nav-btn[data-page='settings']")?.click(); };
+        dlg.addEventListener('click', (e) => { if (e.target === dlg) close(); });
+    }
+    const warns = Array.isArray(window._healthWarnings) ? window._healthWarnings : [];
+    document.getElementById('health-alerts-title').textContent = I18N.t('dashboard.health_alerts', { n: warns.length });
+    document.getElementById('health-alerts-diag-t').textContent = _t3('dashboard.health_details', 'Détails dans Diagnostic');
+    document.getElementById('health-alerts-close').textContent = _t3('actions.close', 'Fermer');
+    document.getElementById('health-alerts-list').innerHTML = warns.length
+        ? warns.map(w => `<li><i class="fa-solid fa-circle-exclamation"></i><span>${escapeHtml(String(w))}</span></li>`).join('')
+        : `<li class="ok"><i class="fa-solid fa-circle-check"></i><span>${escapeHtml(_t3('dashboard.health_ok', 'Tout va bien'))}</span></li>`;
+    if (typeof openModal === 'function') openModal('modal-health-alerts'); else dlg.classList.remove('hidden');
+}
+window.openHealthAlertsPopup = openHealthAlertsPopup;
 
 // ---- Corbeille (devis, factures, clients, commandes, projets, bobines et fichiers)
 const _TRASH_ICONS = { files: 'fa-file', quote: 'fa-file-invoice', client: 'fa-address-book', order: 'fa-box', project: 'fa-diagram-project', spool: 'fa-circle-nodes' };
@@ -24236,14 +24306,17 @@ startThumbAutoRefresh();
                 <input type="text" id="origin-author" maxlength="120" value="${_originAttr(o.author)}" placeholder="${_originAttr(I18N.t('modal.origin_author'))}" autocomplete="off">
             </div>
             <div class="input-group" style="margin-bottom:10px;"><i class="fa-solid fa-scale-balanced"></i>
-                <input type="text" id="origin-license" maxlength="120" value="${_originAttr(o.license)}" placeholder="${_originAttr(I18N.t('modal.origin_license'))}" autocomplete="off">
+                <input type="text" id="origin-license" maxlength="120" list="origin-license-list" value="${_originAttr(o.license)}" placeholder="${_originAttr(I18N.t('modal.origin_license'))}" autocomplete="off">
             </div>
+            <datalist id="origin-license-list">${['CC0', 'CC BY', 'CC BY-SA', 'CC BY-ND', 'CC BY-NC', 'CC BY-NC-SA', 'CC BY-NC-ND', 'Standard Digital File License', 'Personal use only', 'MIT', 'GPL-3.0', 'All rights reserved'].map(x => `<option value="${x}">`).join('')}</datalist>
+            <div id="origin-license-badge" class="license-badge" style="margin:-4px 0 10px;"></div>
             <div class="input-group" style="margin-bottom:10px;">
                 <textarea id="origin-notes" rows="2" maxlength="1000" placeholder="${_originAttr(I18N.t('modal.origin_notes'))}">${escapeHtml(o.notes || '')}</textarea>
             </div>
             <button class="btn btn-primary btn-sm" id="origin-save-btn"><i class="fa-solid fa-floppy-disk"></i> ${escapeHtml(I18N.t('modal.origin_save'))}</button>`;
 
         document.getElementById('origin-save-btn')?.addEventListener('click', () => _saveFileOrigin(filePath));
+        _initLicenseBadge();
     };
 
     window._saveFileOrigin = async function (filePath) {
@@ -25728,7 +25801,7 @@ async function refreshProjectDetail(projectId) {
                 </div>
                 <div class="project-file-qty">
                     <button type="button" class="qty-btn" onclick="updateProjectFileQty(${projectId}, '${escapeJs(f.file_path)}', -1)">−</button>
-                    <span>${f.quantity_printed}/${f.quantity_needed}</span>
+                    <span>${f.quantity_printed}/</span><input type="number" class="qty-needed" min="1" max="9999" value="${f.quantity_needed}" title="${escapeHtml(I18N.t('projects.quantity_needed'))}" aria-label="${escapeHtml(I18N.t('projects.quantity_needed'))}" onchange="setProjectFileNeeded(${projectId}, this.closest('.project-file-row').dataset.path, this.value)">
                     <button type="button" class="qty-btn" onclick="updateProjectFileQty(${projectId}, '${escapeJs(f.file_path)}', 1)">+</button>
                 </div>
                 ${known ? `<button type="button" class="dv-btn" title="${I18N.t('modal.send_to_slicer')}" onclick="openProjectFileInSlicer('${escapeJs(f.file_path)}', '${escapeJs(fileName)}')"><i class="fa-solid fa-paper-plane"></i></button>` : ''}
@@ -25806,6 +25879,21 @@ window.updateProjectFileQty = async function (projectId, filePath, delta) {
     }
 };
 
+window.setProjectFileNeeded = async function (projectId, filePath, value) {
+    const needed = Math.min(9999, Math.max(1, parseInt(value, 10) || 1));
+    try {
+        const p = await fetch(`${API}/api/projects/${projectId}`).then(r => r.json()).catch(() => null);
+        const f = p && p.files.find(x => x.file_path === filePath);
+        const body = { path: filePath, quantity_needed: needed };
+        if (f && f.quantity_printed > needed) body.quantity_printed = needed;   // jamais plus d'imprimées que demandées
+        await fetch(`${API}/api/projects/${projectId}/files`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        await refreshProjectDetail(projectId);
+        refreshProjectsViews();
+    } catch (err) {
+        showToast(I18N.t('toast.connection_error'), 'error');
+    }
+};
+
 window.removeProjectFile = async function (projectId, filePath) {
     try {
         await fetch(`${API}/api/projects/${projectId}/files`, {
@@ -25825,6 +25913,8 @@ window.openProjectFilePicker = function (projectId) {
     openAddToProjectModal(null, null, projectId);
 };
 
+window._projectPickerQty = new Map();   // chemin -> quantité choisie dans le sélecteur (conservée pendant la recherche)
+
 window.openAddToProjectModal = async function (filePath, fileName, forceProjectId = null) {
     let modal = document.getElementById('modal-add-to-project');
     if (!modal) {
@@ -25843,6 +25933,7 @@ window.openAddToProjectModal = async function (filePath, fileName, forceProjectI
     }
     const body = document.getElementById('add-to-project-body');
     _projectPickerSelected = new Set();
+    _projectPickerQty.clear();
 
     if (forceProjectId) {
         document.getElementById('add-to-project-title').textContent = I18N.t('projects.add_files');
@@ -25864,7 +25955,8 @@ window.openAddToProjectModal = async function (filePath, fileName, forceProjectI
             list.innerHTML = filtered.slice(0, 200).map(f => `
                 <label class="checkbox-label" style="display:flex; align-items:center; gap:8px; padding:6px 4px; border-bottom:1px solid var(--border);">
                     <input type="checkbox" value="${escapeHtml(f.path)}" class="project-picker-checkbox">
-                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(f.name)}</span>
+                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;">${escapeHtml(f.name)}</span>
+                    <input type="number" class="qty-needed project-picker-qty" min="1" max="9999" value="${_projectPickerQty.get(f.path) || 1}" title="${escapeHtml(I18N.t('projects.quantity_needed'))}" onclick="event.stopPropagation()" onchange="_projectPickerQty.set(this.closest('label').querySelector('.project-picker-checkbox').value, Math.max(1, parseInt(this.value, 10) || 1))">
                 </label>`).join('') || `<p style="color:var(--text-muted); font-size:calc(13px * var(--fs, 1)); padding:10px;">${I18N.t('library.no_files')}</p>`;
         };
         renderList();
@@ -25931,7 +26023,7 @@ window.confirmAddFileToProjects = async function (filePath) {
 };
 
 window.confirmAddFilesToProject = async function (projectId) {
-    const checked = [...document.querySelectorAll('.project-picker-checkbox:checked')].map(el => ({ path: el.value, quantity: 1 }));
+    const checked = [...document.querySelectorAll('.project-picker-checkbox:checked')].map(el => ({ path: el.value, quantity: _projectPickerQty.get(el.value) || 1 }));
     if (checked.length === 0) { _pickerShowError('project-picker-error', I18N.t('projects.select_at_least_one')); return; }
     try {
         const addRes = await fetch(`${API}/api/projects/${projectId}/files`, {
@@ -28062,3 +28154,27 @@ window.runMerge3mf = runMerge3mf;
     document.addEventListener('stellio:language-changed', apply);
     document.getElementById('select-all-btn')?.addEventListener('click', () => setTimeout(apply, 50));
 })();
+
+
+// ---- Licence : badge « usage commercial » sous le champ licence (1.1.6)
+let _licenseBadgeTimer = null;
+async function _refreshLicenseBadge() {
+    const inp = document.getElementById('origin-license'), badge = document.getElementById('origin-license-badge');
+    if (!inp || !badge) return;
+    const text = inp.value.trim();
+    if (!text) { badge.innerHTML = ''; return; }
+    try {
+        const r = await fetch(`${API}/api/files/license-info?text=${encodeURIComponent(text)}`, { cache: 'no-store' });
+        const d = await r.json();
+        const key = d.commercial === 'yes' ? 'license.commercial_yes' : d.commercial === 'no' ? 'license.commercial_no' : 'license.commercial_unknown';
+        const fb = { 'license.commercial_yes': 'Usage commercial autorisé', 'license.commercial_no': 'Usage commercial interdit', 'license.commercial_unknown': 'Usage commercial : à vérifier' }[key];
+        let txt = I18N.t(key); if (!txt || txt === key) txt = fb;
+        badge.innerHTML = `<span class="license-chip license-${escapeHtml(d.commercial || 'unknown')}">${escapeHtml(txt)}${d.id ? ' · ' + escapeHtml(d.id) : ''}</span>`;
+    } catch (e) { badge.innerHTML = ''; }
+}
+function _initLicenseBadge() {
+    const inp = document.getElementById('origin-license');
+    if (!inp) return;
+    inp.addEventListener('input', () => { clearTimeout(_licenseBadgeTimer); _licenseBadgeTimer = setTimeout(_refreshLicenseBadge, 300); });
+    _refreshLicenseBadge();
+}

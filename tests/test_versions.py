@@ -2183,10 +2183,10 @@ def test_v110_no_update_done_popup():
     js = (root / 'interface/script.js').read_text(encoding='utf-8')
     body = js[js.index('async checkAndShowChangelog()'):js.index('async checkForUpdates(')]
     assert 'showChangelogModal(' not in body and 'stellio-last-seen-version' in body
-    assert 'CURRENT_VERSION = "1.1.5"' in (root / 'main.py').read_text(encoding='utf-8')
+    assert 'CURRENT_VERSION = "1.1.6"' in (root / 'main.py').read_text(encoding='utf-8')
     for p in ('changelog.json', 'languages/changelog.json'):
         d = json.loads((root / p).read_text(encoding='utf-8'))
-        assert d[0]['version'] == '1.1.5' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
+        assert d[0]['version'] == '1.1.6' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
 
 
 def test_v110_no_badge_on_likes_and_creations():
@@ -2248,10 +2248,10 @@ def test_v110_default_background_settings():
     assert "const d = { dim: 70, blur: 0, alpha: 80, fit: 'cover', zoom: 100, x: 50, y: 50 }" in js
 
 
-def test_v110_about_two_columns():
+def test_v110_about_two_columns():   # 1.1.6 : trois colonnes, tout visible sans défiler
     from pathlib import Path as _P
     css = (_P(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
-    assert 'max-width: 920px' in css and '.about-body {' in css and '.about-col' in css
+    assert 'max-width: 1120px' in css and '.about-body {' in css and '.about-col' in css and 'repeat(3, minmax(0, 1fr))' in css
 
 
 def test_v110_no_seam_between_logo_and_title():
@@ -2332,7 +2332,7 @@ def test_v111_changelog_entry():
     root = _P(__file__).resolve().parent.parent
     for p in ('changelog.json', 'languages/changelog.json'):
         d = json.loads((root / p).read_text(encoding='utf-8'))
-        assert d[4]['version'] == '1.1.1' and len(d[4]['items']['fr']) >= 15 and all(len(v) >= 2 for v in d[1]['items'].values())
+        assert d[5]['version'] == '1.1.1' and len(d[5]['items']['fr']) >= 15 and all(len(v) >= 2 for v in d[1]['items'].values())
 
 
 def test_v111_security_options_and_modules():
@@ -2459,7 +2459,7 @@ def test_v114_workflow_uses_notes_and_community_files():
     assert (root / 'CONTRIBUTING.md').is_file()
     for n in ('bug.yml', 'feature.yml', 'good-first-issue.yml', 'config.yml'):
         assert (root / '.github' / 'ISSUE_TEMPLATE' / n).is_file()
-    assert 'versionName \'1.1.5\'' in (root / 'apk-src' / 'app' / 'build.gradle').read_text(encoding='utf-8')
+    assert 'versionName \'1.1.6\'' in (root / 'apk-src' / 'app' / 'build.gradle').read_text(encoding='utf-8')
 
 
 # ── v1.1.1 (ajouts) : popup caméra, couleurs par plateau, boutiques OFD ─────
