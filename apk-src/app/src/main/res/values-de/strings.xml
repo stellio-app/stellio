@@ -22,7 +22,6 @@
     <string name="addr_local">Intern</string>
     <string name="addr_remote">Extern</string>
     <string name="retry">Erneut versuchen</string>
-    <string name="connecting">Verbindung wird hergestellt …</string>
     <string name="connecting_short">Verbinden …</string>
     <string name="still_unreachable">Weiterhin nicht erreichbar (%1$s). Automatischer neuer Versuch.</string>
     <string name="edit_addresses">Adressen ändern</string>

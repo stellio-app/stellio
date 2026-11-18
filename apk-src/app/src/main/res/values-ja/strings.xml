@@ -22,7 +22,6 @@
     <string name="addr_local">内部</string>
     <string name="addr_remote">外部</string>
     <string name="retry">再試行</string>
-    <string name="connecting">接続しています…</string>
     <string name="connecting_short">接続中…</string>
     <string name="still_unreachable">まだ接続できません（%1$s）。自動的に再試行します。</string>
     <string name="edit_addresses">アドレスを変更</string>
