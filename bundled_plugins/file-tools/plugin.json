@@ -1,0 +1,37 @@
+{
+  "id": "file-tools",
+  "name": "Outils de fichiers 3D",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-screwdriver-wrench",
+  "description": {
+    "fr": "Réparation de maillage, convertisseur de formats 3D et fusion de plusieurs modèles en un 3MF.",
+    "en": "Mesh repair, 3D format converter and merging several models into one 3MF.",
+    "de": "Netzreparatur, 3D-Formatkonverter und Zusammenführen mehrerer Modelle in eine 3MF.",
+    "es": "Reparación de mallas, conversor de formatos 3D y fusión de varios modelos en un 3MF.",
+    "pt": "Reparação de malhas, conversor de formatos 3D e fusão de vários modelos num 3MF.",
+    "it": "Riparazione delle mesh, convertitore di formati 3D e unione di più modelli in un 3MF.",
+    "zh": "网格修复、3D 格式转换，以及将多个模型合并为一个 3MF。",
+    "ja": "メッシュ修復、3D 形式の変換、複数モデルの 3MF への統合。"
+  },
+  "host": {
+    "modules": [
+      "file_convert",
+      "merge_3mf"
+    ],
+    "migrate": {
+      "always": true
+    }
+  },
+  "name_i18n": {
+    "fr": "Outils de fichiers 3D",
+    "en": "3D file tools",
+    "de": "3D-Dateiwerkzeuge",
+    "es": "Herramientas de archivos 3D",
+    "pt": "Ferramentas de ficheiros 3D",
+    "it": "Strumenti per file 3D",
+    "zh": "3D 文件工具",
+    "ja": "3D ファイルツール"
+  }
+}

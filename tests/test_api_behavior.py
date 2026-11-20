@@ -10,6 +10,7 @@ PUBLIC_ROUTES = {
     ('GET', '/api/ping'), ('GET', '/api/update/version'), ('POST', '/api/auth/logout'),
     ('POST', '/api/auth/register'), ('POST', '/api/auth/reset-with-recovery'),
     ('GET', '/api/auth/security-question'), ('GET', '/api/slicer-fetch/<token>/<path:fname>'),
+    ('GET', '/api/v1/docs'), ('GET', '/api/v1/openapi.json'),     # v1.1.8 : documentation publique de l'API (les routes /api/v1/* elles-mêmes exigent un jeton)
 }
 NEEDS_NETWORK = {'/api/ollama/models'}          # 502 normal sans Ollama
 # Routes qui arrêtent, mettent à jour ou redémarrent l'application : jamais appelées avec une session valide dans les tests.

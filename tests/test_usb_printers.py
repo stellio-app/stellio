@@ -5,7 +5,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _mod():
-    spec = importlib.util.spec_from_file_location('usb_printers_t', os.path.join(ROOT, 'modules', 'usb_printers.py'))
+    spec = importlib.util.spec_from_file_location('usb_printers_t', __import__('conftest').mod_path('usb_printers'))
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m

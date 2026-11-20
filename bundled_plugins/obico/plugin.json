@@ -1,0 +1,39 @@
+{
+  "id": "obico",
+  "name": "Obico",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-eye",
+  "description": {
+    "fr": "Alertes d'échec d'impression détectées par Obico.",
+    "en": "Print failure alerts detected by Obico.",
+    "de": "Von Obico erkannte Druckfehler-Warnungen.",
+    "es": "Alertas de fallo de impresión detectadas por Obico.",
+    "pt": "Alertas de falha de impressão detetados pelo Obico.",
+    "it": "Avvisi di errore di stampa rilevati da Obico.",
+    "zh": "来自 Obico 的打印失败警报。",
+    "ja": "Obico が検出した印刷失敗のアラート。"
+  },
+  "host": {
+    "modules": [
+      "obico"
+    ],
+    "migrate": {
+      "settings": [
+        "obico_enabled",
+        "obico_url"
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "Obico",
+    "en": "Obico",
+    "de": "Obico",
+    "es": "Obico",
+    "pt": "Obico",
+    "it": "Obico",
+    "zh": "Obico",
+    "ja": "Obico"
+  }
+}

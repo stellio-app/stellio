@@ -30,7 +30,7 @@ function mount() {
     const det = document.createElement('details');
     det.id = 'authlog-details';
     det.className = 'authlog-details';
-    det.innerHTML = `<summary><i class="fa-solid fa-clock-rotate-left"></i> <span>${esc(tr('title', 'Journal des connexions'))}</span></summary><div id="authlog-box" class="authlog-box"></div>`;
+    det.innerHTML = `<summary><i class="fa-solid fa-clock-rotate-left"></i> <span data-i18n="authlog.title">${esc(tr('title', 'Journal des connexions'))}</span></summary><div id="authlog-box" class="authlog-box"></div>`;
     body.appendChild(det);
     det.addEventListener('toggle', () => { if (det.open) load(document.getElementById('authlog-box')); });
 }

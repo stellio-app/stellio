@@ -1,0 +1,47 @@
+{
+  "id": "resin",
+  "name": "Résine",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-droplet",
+  "description": {
+    "fr": "Inventaire de résine et imprimantes résine (Formlabs, Anycubic Photon).",
+    "en": "Resin inventory and resin printers (Formlabs, Anycubic Photon).",
+    "de": "Harzbestand und Harzdrucker (Formlabs, Anycubic Photon).",
+    "es": "Inventario de resina e impresoras de resina (Formlabs, Anycubic Photon).",
+    "pt": "Inventário de resina e impressoras de resina (Formlabs, Anycubic Photon).",
+    "it": "Inventario della resina e stampanti a resina (Formlabs, Anycubic Photon).",
+    "zh": "树脂库存与树脂打印机（Formlabs、Anycubic Photon）。",
+    "ja": "レジンの在庫とレジンプリンター（Formlabs、Anycubic Photon）。"
+  },
+  "host": {
+    "modules": [
+      "resin_printers",
+      "resin_inventory"
+    ],
+    "migrate": {
+      "tables": [
+        "resin_bottles"
+      ],
+      "printer_types": [
+        "formlabs",
+        "anycubic_photon",
+        "chitu_sdcp"
+      ],
+      "settings_prefix": [
+        "resin_"
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "Résine",
+    "en": "Resin",
+    "de": "Resin",
+    "es": "Resina",
+    "pt": "Resina",
+    "it": "Resina",
+    "zh": "树脂",
+    "ja": "レジン"
+  }
+}

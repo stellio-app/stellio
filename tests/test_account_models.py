@@ -258,3 +258,27 @@ def test_printables_likes_use_bearer_and_cookie_forms():
     seen.clear()
     ns['_acct_fetch_printables']('{"handle": "@B_1", "token": "a=1; b=2"}', 'likes')
     assert any(h.get('Cookie') for h in seen)
+
+
+def test_makerworld_pagination_fonctionne_avec_le_module_reel_importe_avant_l_injection():
+    """Régression 1.1.6 : `limit=ACCT_MODELS_PAGE_SIZE` en valeur par défaut était figé à None à l'import
+    (la constante est injectée après) → TypeError '<' not supported between int and NoneType, aucun like importé."""
+    import importlib
+    ap = importlib.import_module('modules.account_platforms')
+    old = (ap.ACCT_MODELS_MAX_ITEMS, ap.ACCT_MODELS_PAGE_SIZE, ap._mw_get, ap._acct_extract_list, ap._acct_deep_items)
+    try:
+        ap.ACCT_MODELS_MAX_ITEMS, ap.ACCT_MODELS_PAGE_SIZE = 600, 30
+        pages = {0: [{'id': i, 'title': 't%d' % i} for i in range(30)], 30: [{'id': 99, 'title': 'z'}]}
+        seen = []
+        class R:
+            status_code, ok = 200, True
+        def fake_get(path, token, params=None, label=''):
+            seen.append(params)
+            return R(), {'hits': pages.get(params['offset'], [])}
+        ap._mw_get = fake_get
+        ap._acct_extract_list = lambda js: js.get('hits')
+        ap._acct_deep_items = lambda js: []
+        rows = ap._mw_paged('/v1/design-service/my/design/like', 'tok')
+        assert len(rows) == 31 and [p['limit'] for p in seen] == [30, 30]
+    finally:
+        ap.ACCT_MODELS_MAX_ITEMS, ap.ACCT_MODELS_PAGE_SIZE, ap._mw_get, ap._acct_extract_list, ap._acct_deep_items = old

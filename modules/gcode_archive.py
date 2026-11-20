@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import secrets
 import subprocess
 import sys
@@ -99,19 +100,80 @@ def _extract_gcode_meta(path):
             try:
                 sec = int(float(body.split(':', 1)[1]))
                 meta.setdefault('time', f"{sec // 3600}h {(sec % 3600) // 60:02d}m")
+                meta.setdefault('time_s', sec)
             except Exception:
                 pass
             continue
-        if '=' not in body:
+        if '=' in body:
+            key, _, val = body.partition('=')
+        elif ':' in body:                                  # Bambu Studio : « total filament weight [g] : 5.64 »
+            key, _, val = body.partition(':')
+            if key.strip().lower() not in _GCODE_META_KEYS:
+                continue
+        else:
             continue
-        key, _, val = body.partition('=')
         k = _GCODE_META_KEYS.get(key.strip().lower())
         if not k or k in meta:
             continue
-        v = val.strip().split(';')[0].split(',')[0].strip().strip('"')
+        raw = val.strip().split(';')[0].strip().strip('"')
+        v = raw.split(',')[0].strip().strip('"')
         if v:
             meta[k] = v[:80]
+            if k == 'weight':
+                meta['weight_g'] = _to_grams(raw)          # tous les filaments du travail (multicolore), pas seulement le premier
+            elif k == 'time':
+                meta['time_s'] = _to_seconds(raw)
     return meta
+
+
+def _to_seconds(v):
+    """« 1d 2h 3m 4s », « 2h 03m », « 3723 » ou 3723 → secondes (0 si illisible)."""
+    s = str(v or '').strip().lower()
+    if not s:
+        return 0
+    try:
+        return int(float(s))
+    except ValueError:
+        pass
+    total, found = 0, False
+    for num, unit in re.findall(r'(\d+(?:\.\d+)?)\s*([dhms])', s):
+        found = True
+        total += float(num) * {'d': 86400, 'h': 3600, 'm': 60, 's': 1}[unit]
+    return int(total) if found else 0
+
+
+def _to_grams(v):
+    """« 12.3 » ou « 12.3, 4.5 » → total en grammes (0 si illisible)."""
+    total = 0.0
+    for part in re.split(r'[,;]', str(v or '')):
+        try:
+            total += float(part.strip().strip('"'))
+        except ValueError:
+            pass
+    return round(total, 2)
+
+
+def gcode_estimate_for(file_path, user_id):
+    """Poids et durée réels d'un fichier d'après le G-code qui lui est joint (le plus récent qui les contient), ou None.
+    C'est le tranchage réel : plus proche de la vérité qu'une estimation du slicer ou de la géométrie."""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, name, meta FROM project_gcodes WHERE user_id = ? AND file_path = ? ORDER BY created_at DESC, id DESC",
+            (user_id, file_path)).fetchall()
+    finally:
+        conn.close()
+    for r in rows:
+        try:
+            m = json.loads(r['meta'] or '{}')
+        except Exception:
+            m = {}
+        w = float(m.get('weight_g') or 0) or _to_grams(m.get('weight'))     # anciens enregistrements : seulement le texte
+        s = int(m.get('time_s') or 0) or _to_seconds(m.get('time'))
+        if w > 0 and s > 0:
+            return {'id': r['id'], 'name': r['name'], 'weight_g': w, 'time_seconds': s, 'material': m.get('material', ''),
+                    'nozzle': m.get('nozzle', ''), 'layer': m.get('layer', ''), 'slicer': m.get('slicer', '')}
+    return None
 
 def _project_gcodes_list(project_id, user_id):
     conn = get_db()
@@ -241,6 +303,13 @@ def api_file_gcodes_list():
     if not file_path:
         return jsonify({"error": "Chemin requis"}), 400
     return jsonify({"gcodes": _file_gcodes_rows(file_path)})
+
+def api_file_gcode_estimate():
+    file_path = (request.args.get('path') or '').strip()
+    if not file_path:
+        return jsonify({"error": "Chemin requis"}), 400
+    est = gcode_estimate_for(file_path, session['user_id'])
+    return jsonify({"found": bool(est), "estimate": est})
 
 def api_file_gcode_upload():
     """G-code personnel rattaché à un fichier 3D (menu Actions du fichier)."""
@@ -411,6 +480,7 @@ _ROUTES = (
     ('/api/projects/<int:project_id>/gcodes', ['POST'], 'api_project_gcode_upload', ('login_required', )),
     ('/api/gcodes', ['GET'], 'api_gcodes_all', ('login_required', )),
     ('/api/files/gcodes', ['GET'], 'api_file_gcodes_list', ('login_required', )),
+    ('/api/files/gcode-estimate', ['GET'], 'api_file_gcode_estimate', ('login_required', )),
     ('/api/files/gcodes', ['POST'], 'api_file_gcode_upload', ('login_required', )),
     ('/api/projects/gcodes/<int:gid>', ['PUT'], 'api_project_gcode_update', ('login_required', )),
     ('/api/projects/gcodes/<int:gid>', ['DELETE'], 'api_project_gcode_delete', ('login_required', )),

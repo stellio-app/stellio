@@ -468,6 +468,11 @@ BigPrint（**工具**菜单）可将模型放大到所需尺寸——1.8 米甚�
 - **我的 G-code**：与文件关联的 G-code、下载，以及**在切片软件中打开**按钮。
 - 资料库的**备份**：参见 [设置与数据](zh-Settings-and-Data)。
 
+## 大型模型
+STL 加载到内存后约占其大小的 12 倍。超过阈值（256 MB；电脑空闲内存充足时最高 1 GB）后，Stellio 不再完整加载：以流式方式分析（二进制和文本 STL），缩略图和查看器使用**简化版本**（约 300,000 个三角形），写入操作（修复、转换等）会被拒绝并给出明确提示。
+若仍需处理：右键 › **创建轻量版本**。Stellio 会在原文件旁写入一个简化副本（`名称（轻量）.stl`），原文件绝不修改。该副本用于查看、测量、修复或建立索引，不适合以完整精度打印。当修复因文件过大被拒绝时也会提示此操作；仅适用于本地 STL 文件。从切片软件（OrcaSlicer 等）导出的 STL 或 3MF 通常小得多。
+在高级工坊中，每个「模型路径」字段都提供**从库中选择**：来源、搜索、格式筛选（STL、3MF…）、缩略图和分页。
+
 @@@ Printers | 打印机
 # 打印机
 {{img:printers}}
@@ -482,18 +487,18 @@ BigPrint（**工具**菜单）可将模型放大到所需尺寸——1.8 米甚�
 | **Bambu Lab** | X1/X1C/X1E、X2D、P1P/P1S、P2S、A1/A1 mini、H2D/H2S/H2C | MQTT（局域网 + 云）：监控、AMS、摄像头、SSDP 发现 |
 | **Prusa** | MK4、MK3.9、MK3.5、MINI+、XL、CORE One | PrusaLink（HTTP） |
 | **Creality** | K1/K2 系列、Ender-3 V3、Hi | WebSocket：监控、CFS、UDP 发现 |
-| **Elegoo** | Centauri Carbon 1 和 2、Saturn/Mars 光固化系列（**测试版**） | SDCP（WebSocket） |
-| **Chitubox 树脂机** *(测试版)* | Phrozen、Uniformation GKtwo 及其他 Chitubox 主板 | SDCP v3：监控（与 Elegoo 相同的协议） |
-| **USB 打印机 *(测试版)*** | 连接到 Stellio 所在电脑的 Marlin、Prusa、Creality、Klipper 主板等 | 串口检测（从不打开端口）：已插上 / 未连接，无状态和温度 |
-| **Anycubic Photon** *(测试版)* | 较早的 Wi-Fi 机型：Mono X、Mono X 6K、Mono SQ（不含 M5s / M7） | TCP 6000 文本命令：仅状态和当前文件 |
-| **Formlabs** *(测试版)* | Form 3 / 3L / 4 | 官方 Web API（client_id:client_secret）：状态、进度、层数；通过 PreForm 发送 |
+| **Elegoo** | Centauri Carbon 1 和 2、Saturn/Mars 光固化系列 | SDCP（WebSocket） |
+| **Chitubox 树脂机** | Phrozen、Uniformation GKtwo 及其他 Chitubox 主板 | SDCP v3：监控（与 Elegoo 相同的协议） |
+| **USB 打印机** | 连接到 Stellio 所在电脑的 Marlin、Prusa、Creality、Klipper 主板等 | 串口检测（从不打开端口）：已插上 / 未连接，无状态和温度 |
+| **Anycubic Photon** | 较早的 Wi-Fi 机型：Mono X、Mono X 6K、Mono SQ（不含 M5s / M7） | TCP 6000 文本命令：仅状态和当前文件 |
+| **Formlabs** | Form 3 / 3L / 4 | 官方 Web API（client_id:client_secret）：状态、进度、层数；通过 PreForm 发送 |
 | **FlashForge** | Adventurer 5M/5M Pro、AD5X | 专有 API |
 | **Klipper / Moonraker** | 任何运行 Klipper 的机器（Voron 等） | HTTP：监控、上传、摄像头、精确小时数 |
 | **OctoPrint** | 任何由 OctoPrint 控制的打印机 | HTTP |
 | **Duet / RepRapFirmware** | Duet 2/3，独立模式或搭配 SBC (DSF) | HTTP：状态、上传文件、温度 |
 | **Repetier-Server** | 任何由 Repetier-Server 管理的打印机 | HTTP：状态、上传文件、温度（不支持通过 USB 串口连接的 Marlin） |
 
-> 🧪 **树脂打印机：测试版。** 尚未能在所有机型上测试：状态监控可能不完整或有误。Stellio 绝不会开始或停止树脂打印。如有问题请在 GitHub 上反馈（Creality Halot：暂不支持）。
+> **树脂打印机：仅监控。** Stellio 绝不会开始或停止树脂打印。如有问题请在 GitHub 上反馈（Creality Halot：暂不支持）。
 
 使用相同协议的其他型号通常也能工作。欢迎在 GitHub 上告诉我们您的机型是否可用。
 
@@ -514,7 +519,7 @@ BigPrint（**工具**菜单）可将模型放大到所需尺寸——1.8 米甚�
 - **轻量协作模式**：当另一台设备正在查看该文件，或在重复发送前给出提醒。
 - 在“我的 G-code”中**在切片软件中打开**。
 - **每台打印机独立的切片软件**：每台打印机都可以设置自己的默认切片软件（OrcaSlicer、QIDIStudio、Bambu Studio…）。发送时使用它以及绑定到该打印机的配置（设置、耗材），配置列表也会随之调整。
-- **树脂软件（测试版）**：Stellio 可检测 CHITUBOX、CHITUBOX Pro、Anycubic Photon Workshop、PreForm（Formlabs）、Voxeldance Tango 和 Lychee Slicer。未选择切片软件的树脂打印机会自动打开检测到的第一个树脂软件；你也可以手动选择（设置 → 切片软件，或打印机表单）。Stellio 会检查常见安装路径：若未识别你的软件，请手动选择。
+- **树脂软件**：Stellio 可检测 CHITUBOX、CHITUBOX Pro、Anycubic Photon Workshop、PreForm（Formlabs）、Voxeldance Tango 和 Lychee Slicer。未选择切片软件的树脂打印机会自动打开检测到的第一个树脂软件；你也可以手动选择（设置 → 切片软件，或打印机表单）。Stellio 会检查常见安装路径：若未识别你的软件，请手动选择。
 
 {{img:printer-slicer}}
 
@@ -530,7 +535,7 @@ BigPrint（**工具**菜单）可将模型放大到所需尺寸——1.8 米甚�
 在*设置 → Obico* 中填写 Obico 服务器地址（自建或 obico.io）和 API 令牌。Stellio 会定期检查警报，Obico 一检测到失败就向你发送**推送通知**。暂停、取消等动作仍由 Obico 执行：Stellio 绝不会自行中断打印。*测试连接*按钮可检查地址和令牌。
 
 ## 维护
-- **树脂维护（测试版）**：树脂打印机卡片上的**维护**按钮提供合适的任务（FEP/nFEP 离型膜、树脂过滤、打印平台、LCD 屏幕、活性炭滤芯、Z 轴、清洗用 IPA、UV/LCD 损耗）。
+- **树脂维护**：树脂打印机卡片上的**维护**按钮提供合适的任务（FEP/nFEP 离型膜、树脂过滤、打印平台、LCD 屏幕、活性炭滤芯、Z 轴、清洗用 IPA、UV/LCD 损耗）。
 - **预测性维护**，任务因品牌而异。
 - **易损件**（喷嘴、平台、皮带等），带库存提醒，并与维护任务关联。
 - 按耗材和打印机保存的**校准**（流量、压力提前、温度）。
@@ -538,8 +543,8 @@ BigPrint（**工具**菜单）可将模型放大到所需尺寸——1.8 米甚�
 @@@ Filament | 耗材
 # 耗材
 
-## 树脂（测试版）🧪
-侧边栏的分类现在名为**材料**，包含两个页面：**耗材**（料盘库存）和**树脂** *(测试版)*。树脂库存为**手动管理**：添加树脂瓶（名称、品牌、类型、颜色、容量、剩余量、价格、存放位置、备注），并用“使用”按钮扣除指定毫升数。Stellio 目前不会将树脂瓶与树脂打印机关联，也不会自动扣减。测试版功能。
+## 树脂
+侧边栏的分类现在名为**材料**，包含两个页面：**耗材**（料盘库存）和**树脂**。树脂库存为**手动管理**：添加树脂瓶（名称、品牌、类型、颜色、容量、剩余量、价格、存放位置、备注），并用“使用”按钮扣除指定毫升数。Stellio 目前不会将树脂瓶与树脂打印机关联，也不会自动扣减。
 
 与耗材一样，**“待补货”**提醒也适用于树脂：当某种树脂（品牌 + 名称 + 颜色，所有瓶合计）的剩余量低于页面上设置的阈值（默认 200 ml，0 = 关闭），或你在某瓶上勾选“待补货”时，就会进入列表。它也会显示在仪表盘的“待补货”小组件中；**订购**会打开指向你的商店的搜索链接（树脂不会自动检查库存），**已订购**会将提醒推迟 14 天。
 
@@ -712,6 +717,53 @@ Ollama 服务器地址在设置中配置（`ollama_url`）：您可以指向性�
 ## 智能家居
 - **MQTT / Home Assistant**：状态发布和自动发现；“Stellio” MQTT 设备和传感器。
 
+@@@ Desktop-Edition | 桌面版
+# 桌面版
+
+**桌面版**即桌面应用：在您的电脑（Windows、macOS）上打开的 Stellio 窗口。它保持原有行为；只缺少少数为常开服务器设计的功能。
+
+## 我用的是哪个版本？
+| 系统 | 默认版本 |
+|---|---|
+| Windows、macOS | 桌面版 |
+| Linux、Raspberry Pi、VM、LXC、Docker | 服务器版 |
+
+如需强制选择（测试，或把 Linux 电脑当桌面使用）：
+```bash
+STELLIO_SERVER_EDITION=0   # 桌面版
+STELLIO_SERVER_EDITION=1   # 服务器版（STELLIO_HEADLESS=1 也会进入服务器版）
+```
+
+## 桌面版的特点
+- **内置窗口**（pywebview）。在 Windows 上，禁止在同一台电脑的浏览器中打开 Stellio（内部令牌）：请使用应用窗口。手机、APK 和隧道仍然允许。
+- 原生 **Windows 通知**。
+- 自动检测电脑上的**切片软件**（OrcaSlicer、Bambu Studio、PrusaSlicer、Cura 等）。
+- **来源**：本地文件夹、文件、SMB 和 NFS。
+- **数据**在 Windows 上位于 `%APPDATA%\Stellio`；便携版位于 `Stellio.exe` 旁的 `data` 文件夹。
+- **更新**通过 GitHub 的 `.zip` 补丁，安装前会校验。
+
+## 仅限服务器版的功能
+这些功能在桌面应用中会提示“仅限服务器版”：
+
+| 功能 | 用途 |
+|---|---|
+| 在线 AI | 使用您自己的密钥调用 Claude、ChatGPT 或 Gemini |
+| 导入切片配置 | 导入从切片软件导出的配置 |
+| 推送通知 | ntfy、Telegram、Discord、Webhook 等 |
+| MQTT / Home Assistant | 状态发布与自动发现 |
+| 定期摘要 | 每日或每周 |
+| 两个实例之间的同步 | 工具 › 同步 |
+| 出站 Webhook | 向您的服务发送签名消息（HMAC-SHA256） |
+| 公共 API 与移动访问 | 限定范围的令牌、/api/v1 路由 |
+
+桌面版会隐藏「工具」菜单中的**同步**条目，因为它只会显示这条消息。
+
+## 桌面版的高级工坊
+其余功能与服务器版相同。高级工坊的工具按类别放在侧边栏中：**库**（整理、3D 对比、相似件、许可证、零件档案）、**打印**（兼容性、打印检查、G-code 归档）、**材料**（材料需求）、**工具**（打印板、制造助手）和**管理**（任务、数据库、审计日志、团队、会话）。它们仅限所有者账户使用；每个条目在*设置 › 导航项*中都有独立开关。
+
+## 切换到服务器版
+如需常开、可通过浏览器访问的 Stellio，请参阅[服务器版](zh-Server-Edition)和[安装](zh-Installation)。
+
 @@@ Server-Edition | 服务器版
 # 服务器版
 
@@ -758,6 +810,20 @@ pct exec <CTID> -- journalctl -u stellio -f    # 日志
 - 📥 **切片配置**：Stellio 看不到您电脑上的切片软件，也不会连接切片软件云（Orca Cloud、Bambu Cloud 等）。请导出您的配置（OrcaSlicer：文件 → 导出 → 导出预设包），然后在 *设置 → 我的切片配置* 中导入，或使用**受监视的配置文件夹**（Syncthing、网络共享、scp 等）。
 - 🐯 **TigerTag**：使用邮箱和密码官方登录；使用 Google 账户？请先在 TigerTag 应用中通过“忘记密码”设置密码。备用方案：把 TigerTag Studio 数据文件夹复制到服务器。
 - 更新后，浏览器会自动刷新。
+
+## 仅限服务器的功能（1.1.7）
+这些功能在桌面应用中不存在，相关路由会返回“仅限服务器版”：
+
+| 功能 | 用途 |
+|---|---|
+| 在线 AI | 使用您自己的密钥调用 Claude、ChatGPT 或 Gemini，代替 Ollama（参见[人工智能](zh-AI)） |
+| 切片配置 | 导入从切片软件导出的配置 |
+| 推送通知 | ntfy、Gotify、Pushover、Telegram、Discord、Slack 或 Webhook，窗口关闭时也可用 |
+| MQTT / Home Assistant | 状态发布与自动发现 |
+| 定期摘要 | 每日或每周，以通知和推送发送 |
+| 同步（高级工坊） | 将一个文件夹与已配对实例的文件夹同步：先出计划，再确认应用，不传播任何删除，冲突时保留两个版本。两个实例都必须是服务器版 |
+
+其余工具（打印板、打印检查、G-code 归档等）在两个版本中的表现完全一致。
 
 ## 环境变量
 | 变量 | 用途 |
@@ -862,6 +928,183 @@ pct exec <CTID> -- journalctl -u stellio -f    # 日志
 
 ## 获取帮助
 [GitHub Issues](https://github.com/stellio-app/stellio/issues)、[Discord](https://discord.gg/ySxpHvS6bd)，或应用内的**建议与错误**。请注明：Stellio 版本、系统、复现步骤、导出的日志。
+
+@@@ Plugins | 插件
+# 插件
+
+插件是一个小型 Python 程序，用于响应 Stellio 的事件（打印完成、打印失败、订单逾期、打印机过载）：发送通知、写入电子表格、打开灯……插件由作者发布在 **GitHub** 上；Stellio 在 **插件 › 目录** 菜单中显示**公共目录**（徽标 + 描述），一键即可安装。
+
+每个插件都带有徽章：托管于 `stellio-app/stellio-plugins` 仓库的为**官方**，托管在其他位置（或通过 .zip 安装）的为**社区**。Stellio 根据压缩包的真实地址决定徽章：请务必查看社区插件的权限和代码。
+
+**内置插件。** Stellio 的部分功能以内置插件形式提供（BigPrint、树脂、USB 打印机、延时摄影、文件工具、打印板工作室、推送通知、Webhook、定期摘要、MQTT / Home Assistant、Obico、共享与同步、Spoolman、AI 提供商与 AI 助手、Stellio Pro）。它们包含在应用中，但只有启用后才会加载（插件页面的“内置插件”部分；更改在重启后生效）。**从旧版本升级：无需任何操作。** 首次启动 1.1.7 时，你正在使用的插件（例如已启用的 MQTT、USB 打印机、Webhook、延时摄影）会自动启用，并完全保留原有设置；没有设置的工具（BigPrint、文件工具、打印板工作室）保持原样。全新安装不会启用其中任何一个。停用插件不会删除其设置。 其他内置插件：共享与同步、Spoolman、每个 AI 提供商一个插件 + AI 助手（启用全部 AI 功能），以及 **Stellio Pro**（客户、报价、发票、订单、会计、电价、排程、物料需求、零件库存）：仅在启用时添加各自的页面和按钮。
+
+## 使用插件
+1. 打开 **插件 › 目录**（仅限所有者账户）。
+2. 浏览目录并点击 **安装**：Stellio 会下载压缩包并校验其 SHA-256 校验和。
+3. 阅读所请求的**权限**并予以接受。插件安装后处于**停用**状态。
+4. 如有需要，填写其配置，启用后点击 **测试**，用测试事件触发它。运行日志会显示输出和错误。
+
+您也可以安装本地 `.zip` 压缩包（开发中的插件），或把目录来源改为其他目录的 URL。
+
+## 创建插件
+### 1. 结构
+插件是一个扁平文件夹，包含一个 `plugin.json` 文件和一个 Python 脚本：
+```
+mon-plugin/
+├── plugin.json     清单（必需）
+├── main.py         入口脚本（名称任意，在 "entry" 中指定）
+└── ...             其他文件：最多 100 个，解压后 8 MB
+```
+
+### 2. 清单 plugin.json
+```json
+{
+  "id": "mon-plugin",
+  "name": "Mon plugin",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Écrit une ligne à chaque impression terminée.",
+  "author": "Votre nom",
+  "entry": "main.py",
+  "events": ["print.finished", "print.failed"],
+  "permissions": ["events"]
+}
+```
+| 字段 | 作用 |
+|---|---|
+| `id` | 唯一标识：小写字母、数字、`-` 或 `_`，2 到 40 个字符 |
+| `name`、`description`、`author` | 在 Stellio 中显示的文字 |
+| `version` | 数字版本，例如 `1.2.0`；用于检测更新 |
+| `api` | 插件 API 版本：`1` |
+| `entry` | 根目录下的 Python 脚本（默认 `main.py`） |
+| `events` | 监听的事件 |
+| `permissions` | 请求的权限 |
+| `ui` | 在 Stellio 中显示的页面：`title`、`icon`（Font Awesome）和 `entry`（`.html` 文件） |
+
+### 3. 事件与权限
+| 事件 | 触发时机 |
+|---|---|
+| `print.finished` | 打印完成 |
+| `print.failed` | 打印失败 |
+| `order.late` | 订单超过期限 |
+| `printer.overload` | 打印机过载 |
+
+| 权限 | 作用 |
+|---|---|
+| `events` | 接收事件（声明 `events` 时必须） |
+| `api:read` | 通过 Stellio 公共 API 读取数据 |
+| `api:write` | 通过公共 API 修改数据 |
+| `network` | 说明性权限：插件会访问互联网 |
+| `ui` | 在插件菜单中显示插件页面 |
+
+### 4. 脚本
+Stellio 在单独的进程中运行 `python -I main.py <事件>`，并通过标准输入发送 JSON `{"event": "...", "data": {...}}`。`-I`（隔离）模式不会把插件文件夹加入 Python 路径：若要导入插件中的文件，请自行添加该路径。标准输出会记录到日志中。
+```python
+import json, os, sys
+
+payload = json.loads(sys.stdin.read() or "{}")
+event, data = payload.get("event", ""), payload.get("data", {})
+config = json.loads(os.environ.get("STELLIO_PLUGIN_CONFIG") or "{}")
+
+print(f"{event}: {data.get('file_name') or data.get('printer') or '-'}")
+```
+要操作 Stellio（`api:*` 权限），脚本会收到 `STELLIO_API_URL` 和 `STELLIO_API_TOKEN`（取自插件配置中的 `api_url` 和 `token`）。Python SDK `stellio_sdk.py`（仓库的 `sdk/python` 文件夹）提供 `plugin_event()`、`plugin_config()` 和现成的客户端：把它复制到您的插件中，并在导入前加入 `sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))`。完整示例见 `sdk/examples/hello-plugin`。
+
+限制：每次运行 10 秒，内存 512 MB，环境最小化（仅 `STELLIO_*` 变量和 `PATH`）。运行 Stellio 的机器上必须安装 Python 3。配置是键/值对列表（文本、数字、布尔值），最多 4000 个字符。
+
+### 5. 测试
+把文件夹的**内容**压缩为 `mon-plugin.zip`（最大 2 MB），在 **插件 › 目录** 中安装（本地压缩包），接受权限，启用并使用 **测试**。通过阅读日志来排查问题。
+
+## 带页面的插件：G-code 查看器示例
+
+插件还可以在 Stellio 中显示**自己的页面**。它会出现在侧边栏的 **插件** 菜单中，位于“目录”下方的“已安装”列表里：点击即可打开其页面。示例 `sdk/examples/gcode-viewer` 是一个3D G-code 查看器：3D 视图（旋转、缩放）、层范围、移动回放、按类型/速度/流量着色、空走与回抽；支持 8 种语言。
+
+```json
+{
+  "id": "gcode-viewer",
+  "name": "G-code viewer",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Shows your archived G-code files layer by layer.",
+  "author": "Stellio",
+  "permissions": ["ui", "api:read"],
+  "ui": {
+    "title": "G-code viewer",
+    "icon": "fa-layer-group",
+    "entry": "viewer.html"
+  }
+}
+```
+
+- 页面是**单个独立的 HTML 文件**（CSS 和 JavaScript 内嵌，图片使用 `data:`），最大 1 MB。没有事件时，插件不需要 Python 脚本。
+- 页面显示在**隔离**的框架中：无法访问网络、Cookie 或 Stellio 的其他部分。
+- 页面通过 `window.stellio.api(路径)` 读取 Stellio 的数据：只读（GET），必须有 `api:read` 权限，结果为 JSON；第二个参数传 `'text'` 则返回文本。设置、账户、安全和插件相关数据不可访问。
+- 主题通过 CSS 变量 `--st-bg`、`--st-panel`、`--st-card`、`--st-text`、`--st-muted`、`--st-border`、`--st-accent`、`--st-success`、`--st-warning` 和 `--st-danger` 提供，语言通过 `window.stellio.lang` 提供。
+
+```js
+document.addEventListener('stellio-ready', async () => {
+  const list = await window.stellio.api('/api/gcodes?limit=50');
+  const id = list.gcodes[0].id;
+  const text = await window.stellio.api('/api/projects/gcodes/' + id + '/download', 'text');
+});
+```
+
+试用方法：压缩 `gcode-viewer` 文件夹的内容，在 **插件 › 目录** 中安装压缩包，接受权限并启用，然后从 **插件** 菜单打开。至少需要一个已归档的 G-code（文件详情或项目中）。已停用的插件在列表中显示为灰色。
+
+## 发布到 GitHub
+1. 为您的插件创建公开仓库，包含代码、`README` 和许可证。
+2. 每个版本创建一个 GitHub **release**，并附上压缩包 `mon-plugin-1.0.0.zip`。
+3. 计算压缩包的 SHA-256 校验和，目录需要它：
+```bash
+sha256sum mon-plugin-1.0.0.zip
+```
+4. 每次发布新 release 之前，务必提高 `plugin.json` 中的 `version`。
+
+## 进入 Stellio 目录
+官方目录是仓库 `stellio-app/stellio-plugins` 中的 `catalog.json` 文件。通过 **Pull Request** 把您的插件加进去。
+
+1. Fork 仓库 `stellio-app/stellio-plugins`。
+2. 在 `catalog.json` 中添加您插件的条目：
+```json
+{
+  "id": "mon-plugin",
+  "name": "Mon plugin",
+  "version": "1.0.0",
+  "description": {"fr": "Écrit une ligne à chaque impression terminée.", "en": "Writes a line when a print finishes."},
+  "author": "Votre nom",
+  "url": "https://github.com/vous/mon-plugin/releases/download/v1.0.0/mon-plugin-1.0.0.zip",
+  "sha256": "64 caractères hexadécimaux",
+  "permissions": ["events"],
+  "logo": "https://raw.githubusercontent.com/vous/mon-plugin/main/logo.png",
+  "homepage": "https://github.com/vous/mon-plugin"
+}
+```
+3. 提交 Pull Request：自动检查会验证链接、SHA-256 校验和与徽标，随后 Stellio 团队审阅插件。
+
+| 字段 | 规则 |
+|---|---|
+| `description` | 简短（约 140 个字符）；纯文本，或每种语言一段文本（`fr`、`en`、`de`、`es`、`pt`、`it`、`zh`、`ja`） |
+| `url` | 指向压缩包的 `https` 直链；`sha256` 必须完全一致 |
+| `logo` | `https`，PNG、JPEG 或 WebP，最大 200 KB，建议 128 × 128（不接受 SVG） |
+| `homepage` | 指向插件页面的 `https` 链接（可选） |
+| `permissions` | 必须与清单中的权限一致 |
+
+**更新**：发布新的 release，然后提交 Pull Request，修改 `version`、`url` 和 `sha256`。如果新版本请求额外权限，用户端的插件会被停用，直到用户接受这些权限；其配置会保留。
+
+## 安全
+- 插件**不在沙箱中运行**：它以 Stellio 在本机上的权限执行。请只安装您信任其作者的插件。
+- 插件安装后处于停用状态，且必须接受其权限。
+- 下载只通过 `https` 访问公共地址，并校验 SHA-256。
+- 目录在发布前会经过审阅，但这不能代替您自己的谨慎：请阅读代码和权限。
+
+延伸阅读：[参与贡献](zh-Contributing)、仓库中的 `docs/plugins.md` 文件以及示例 `sdk/examples/hello-plugin`。
+
+## 管理与被监督实例
+**管理**插件（默认启用）把**访客账户及其角色**、团队、会话、审计日志和**实例**集中在一个页面（管理 › 管理）。
+- **独立实例**（默认）：完全控制，一切照旧。
+- **主实例**：“实例”子页列出已配对的 Stellio 实例，并可对其进行监督。
+- **被监督实例**：其所有者**接受**后，账户、角色和权限只能从主实例管理；本地内容（库、打印机）保持私有，除非所有者在接受时另行选择；所有者可随时**退出监督**。
+被监督实例不能监督其他实例，主实例也不能被监督。其余设置仍可在本地修改。
 
 @@@ Contributing | 参与贡献
 # 参与贡献

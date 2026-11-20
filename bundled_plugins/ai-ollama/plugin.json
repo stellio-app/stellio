@@ -1,0 +1,44 @@
+{
+  "id": "ai-ollama",
+  "name": "Ollama (IA locale)",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-server",
+  "description": {
+    "fr": "Fournisseur d'IA local : les modèles tournent sur ta machine via Ollama, rien ne sort de chez toi. Recommande un modèle adapté à ton matériel.",
+    "en": "Local AI provider: models run on your machine through Ollama, nothing leaves your network. Recommends a model suited to your hardware.",
+    "de": "Lokaler KI-Anbieter: Die Modelle laufen über Ollama auf deinem Rechner, nichts verlässt dein Netzwerk. Empfiehlt ein zur Hardware passendes Modell.",
+    "es": "Proveedor de IA local: los modelos se ejecutan en tu equipo con Ollama, nada sale de tu red. Recomienda un modelo adecuado a tu hardware.",
+    "pt": "Fornecedor de IA local: os modelos correm no teu computador via Ollama, nada sai da tua rede. Recomenda um modelo adequado ao teu hardware.",
+    "it": "Provider IA locale: i modelli girano sul tuo computer tramite Ollama, nulla esce dalla tua rete. Consiglia un modello adatto al tuo hardware.",
+    "zh": "本地 AI 提供商：模型通过 Ollama 在你的电脑上运行，数据不会离开你的网络。可按硬件推荐合适的模型。",
+    "ja": "ローカル AI プロバイダー：モデルは Ollama 経由で自分の PC 上で動作し、データは外に出ません。ハードウェアに合うモデルを提案します。"
+  },
+  "host": {
+    "modules": [
+      "ai_ollama"
+    ],
+    "migrate": {
+      "settings_match": [
+        {
+          "ai_enabled": true,
+          "ai_provider": [
+            null,
+            "ollama"
+          ]
+        }
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "Ollama (IA locale)",
+    "en": "Ollama (local AI)",
+    "de": "Ollama (lokale KI)",
+    "es": "Ollama (IA local)",
+    "pt": "Ollama (IA local)",
+    "it": "Ollama (IA locale)",
+    "zh": "Ollama（本地 AI）",
+    "ja": "Ollama（ローカル AI）"
+  }
+}

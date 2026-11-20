@@ -1,0 +1,36 @@
+{
+  "id": "plate-studio",
+  "name": "Atelier plateau",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-table-cells-large",
+  "description": {
+    "fr": "Dispose plusieurs pièces sur un ou plusieurs plateaux et exporte en 3MF.",
+    "en": "Arranges several parts on one or more build plates and exports to 3MF.",
+    "de": "Ordnet mehrere Teile auf einer oder mehreren Druckplatten an und exportiert als 3MF.",
+    "es": "Distribuye varias piezas en una o varias placas y exporta a 3MF.",
+    "pt": "Distribui várias peças por uma ou mais mesas e exporta para 3MF.",
+    "it": "Dispone più pezzi su uno o più piatti ed esporta in 3MF.",
+    "zh": "将多个零件排布到一个或多个打印板上，并导出为 3MF。",
+    "ja": "複数のパーツを 1 枚または複数のビルドプレートに配置し、3MF に書き出します。"
+  },
+  "host": {
+    "modules": [
+      "plate_studio"
+    ],
+    "migrate": {
+      "always": true
+    }
+  },
+  "name_i18n": {
+    "fr": "Atelier plateau",
+    "en": "Plate studio",
+    "de": "Plattenstudio",
+    "es": "Estudio de placa",
+    "pt": "Estúdio de mesa",
+    "it": "Studio del piatto",
+    "zh": "打印板工作室",
+    "ja": "プレートスタジオ"
+  }
+}

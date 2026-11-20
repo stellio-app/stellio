@@ -1,0 +1,40 @@
+{
+  "id": "mqtt",
+  "name": "MQTT / Home Assistant",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-house-signal",
+  "description": {
+    "fr": "Publie l'état des imprimantes, des bobines et de Stellio sur ton broker MQTT (découverte Home Assistant).",
+    "en": "Publishes printers, spools and Stellio status to your MQTT broker (Home Assistant discovery).",
+    "de": "Veröffentlicht Drucker-, Spulen- und Stellio-Status an deinen MQTT-Broker (Home-Assistant-Discovery).",
+    "es": "Publica el estado de impresoras, bobinas y Stellio en tu broker MQTT (descubrimiento de Home Assistant).",
+    "pt": "Publica o estado das impressoras, bobinas e do Stellio no teu broker MQTT (descoberta do Home Assistant).",
+    "it": "Pubblica lo stato di stampanti, bobine e Stellio sul tuo broker MQTT (discovery di Home Assistant).",
+    "zh": "将打印机、耗材盘和 Stellio 的状态发布到你的 MQTT 代理（支持 Home Assistant 自动发现）。",
+    "ja": "プリンター・スプール・Stellio の状態を MQTT ブローカーに公開します（Home Assistant ディスカバリー対応）。"
+  },
+  "host": {
+    "modules": [
+      "mqtt_publisher"
+    ],
+    "migrate": {
+      "settings": [
+        "mqtt_enabled",
+        "mqtt_host"
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "MQTT / Home Assistant",
+    "en": "MQTT / Home Assistant",
+    "de": "MQTT / Home Assistant",
+    "es": "MQTT / Home Assistant",
+    "pt": "MQTT / Home Assistant",
+    "it": "MQTT / Home Assistant",
+    "zh": "MQTT / Home Assistant",
+    "ja": "MQTT / Home Assistant"
+  },
+  "server_only": true
+}

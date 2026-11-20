@@ -1,0 +1,11 @@
+{
+  "id": "hello-plugin",
+  "name": "Hello plugin",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Exemple : écrit une ligne dans la sortie à chaque impression terminée ou échouée.",
+  "author": "Stellio",
+  "entry": "main.py",
+  "events": ["print.finished", "print.failed"],
+  "permissions": ["events"]
+}

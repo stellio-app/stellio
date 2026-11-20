@@ -1,3 +1,14 @@
+/* 1.1.7 — session révoquée depuis « Sessions » : le serveur répond 401 {code:'session_revoked'} ; on revient à l'écran de connexion au lieu de laisser une interface inerte. */
+(function () {
+    const nativeFetch = window.fetch; let done = false;
+    window.fetch = async function () {
+        const r = await nativeFetch.apply(this, arguments);
+        if (r.status === 401 && !done) {
+            try { const d = await r.clone().json(); if (d && d.code === 'session_revoked') { done = true; location.reload(); } } catch (e) { /* corps non JSON : rien à faire */ }
+        }
+        return r;
+    };
+})();
 /* ===== Garde-fous anti-gel (0.8.0) =====
    - setInterval : un tick asynchrone n'est pas relancé tant que le précédent n'est pas terminé
      (sinon, après une veille ou un serveur bloqué, les requêtes s'empilent et saturent les 6 connexions du navigateur).
@@ -583,12 +594,13 @@ function balanceSettingsColumns() {
 // Fonctions réservées à l'édition serveur (Linux : Raspberry Pi, VM, LXC, Docker). Sous Windows, ces blocs restent masqués.
 function applyServerEditionUI() {
     const on = !!(stellioAppConfig && stellioAppConfig.server_edition);
-    const blocks = { 'slicer-profiles-server-block': 'block', 'ai-provider-server-block': 'flex', 'tigertag-server-block': 'block', 'mqtt-server-block': 'block', 'push-server-block': 'block' };
+    const blocks = { 'slicer-profiles-server-block': 'block', 'ai-provider-server-block': 'flex', 'tigertag-server-block': 'block', 'mqtt-server-block': 'block', 'push-server-block': 'block', 'api-settings-section': 'block', 'webhooks-settings-section': 'block', 'mobile-access-section': 'block' };
     Object.keys(blocks).forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = on ? blocks[id] : 'none';
     });
     // Le démarrage avec la session Windows n'a pas de sens sur un serveur (Proxmox, Docker, Raspberry Pi…) : le service démarre avec la machine.
+    document.querySelectorAll('.nav-btn[data-suite-tab="sync"]').forEach(b => { b.style.display = on ? '' : 'none'; });   // Synchro : édition serveur seulement
     const startupSection = document.getElementById('startup-settings-section');
     if (startupSection) startupSection.style.display = on ? 'none' : '';
     if (on && typeof loadAiProviderSettings === 'function') loadAiProviderSettings();
@@ -2126,12 +2138,10 @@ window.toggleReduceMotion = function (enabled) {
 };
 
 async function _checkSettingsUndoAvailable() {
-    const banner = document.getElementById('settings-undo-banner');
-    if (!banner) return;
     try {
         const res = await fetch(`${API}/api/settings`);
         const data = await res.json();
-        banner.classList.toggle('hidden', !data.has_settings_undo);
+        document.documentElement.classList.toggle('settings-undo-ready', !!data.has_settings_undo);
     } catch (err) {
         console.debug('[SettingsUndo] Erreur:', err);
     }
@@ -2146,7 +2156,7 @@ window.undoLastSettingsChange = async function () {
             setTimeout(() => location.reload(), 900);
         } else {
             showToast(data.error || I18N.t('toast.error'), 'error');
-            document.getElementById('settings-undo-banner')?.classList.add('hidden');
+            document.documentElement.classList.remove('settings-undo-ready');
         }
     } catch (err) {
         showToast(I18N.t('toast.connection_error'), 'error');
@@ -3252,6 +3262,10 @@ function _renderHiddenWidgetsPanel(hiddenIds) {
         panel.classList.add('hidden');
         return;
     }
+    // un widget fourni par un plugin intégré désactivé n'est pas proposé à la réaffichage
+    const _f = window.STELLIO_FEATURES || {};
+    hiddenIds = hiddenIds.filter(id => { const p = document.querySelector(`#dashboard-grid [data-widget-id="${id}"]`)?.dataset.hostPlugin; return !(p && _f[p] === false); });
+    if (!hiddenIds.length) { panel.classList.add('hidden'); return; }
     panel.classList.remove('hidden');
     list.innerHTML = hiddenIds.map(id => `
         <div class="dashboard-hidden-widget-chip" onclick="showDashboardWidget('${id}')">
@@ -4418,6 +4432,8 @@ async function _ordersRender() {
             </div>
             <div class="order-qty">${j.qty_done}/${j.quantity}</div>
             <input type="number" class="settings-select order-hours" min="0" step="0.25" value="${j.est_hours ? j.est_hours : ''}" placeholder="${j.hours_piece ? j.hours_piece : 'h'}" title="${escapeHtml(_t3('orders.hours_piece', 'Durée par pièce (heures) : sert au planning'))}" onchange="_orderSet(${j.id}, {est_hours: this.value || 0})">
+            <input type="number" class="settings-select order-labor" min="0" step="1" value="${j.labor_setup_min ? j.labor_setup_min : ''}" placeholder="min" title="${escapeHtml(_t3('orders.labor_setup', 'Travail humain : préparation de la commande (minutes)'))}" onchange="_orderSet(${j.id}, {labor_setup_min: this.value || 0})">
+            <input type="number" class="settings-select order-labor" min="0" step="0.5" value="${j.labor_min_piece ? j.labor_min_piece : ''}" placeholder="min/p" title="${escapeHtml(_t3('orders.labor_piece', 'Travail humain par pièce : retrait, finition, emballage (minutes)'))}" onchange="_orderSet(${j.id}, {labor_min_piece: this.value || 0})">
             <select class="settings-select order-printer" onchange="_orderSet(${j.id}, {printer_id: this.value})">${pOpts(j.printer_id)}</select>
             <input type="date" class="settings-select order-due${j.late ? ' order-late' : ''}" value="${escapeHtml(j.due_date || '')}" onchange="_orderSet(${j.id}, {due_date: this.value})" title="${escapeHtml(_t3('orders.due', 'Livraison prévue'))}">
             <select class="quote-status st-${j.status === 'done' ? 'paid' : j.status === 'printing' ? 'sent' : j.status === 'cancelled' ? 'refused' : 'accepted'}" onchange="_orderSet(${j.id}, {status: this.value})">
@@ -4435,6 +4451,8 @@ async function _ordersRender() {
             <input type="text" id="ord-part" class="settings-select" style="flex:2; min-width:140px;" maxlength="200" placeholder="${escapeHtml(_t3('orders.part', 'Pièce'))}" autocomplete="off">
             <input type="number" id="ord-qty" class="settings-select" style="width:70px;" min="1" value="1" title="${escapeHtml(_t3('orders.qty', 'Quantité'))}">
             <input type="number" id="ord-hours" class="settings-select order-hours" min="0" step="0.25" placeholder="h" title="${escapeHtml(_t3('orders.hours_piece', 'Durée par pièce (heures) : sert au planning'))}">
+            <input type="number" id="ord-lsetup" class="settings-select order-labor" min="0" step="1" placeholder="min" title="${escapeHtml(_t3('orders.labor_setup', 'Travail humain : préparation de la commande (minutes)'))}">
+            <input type="number" id="ord-lpiece" class="settings-select order-labor" min="0" step="0.5" placeholder="min/p" title="${escapeHtml(_t3('orders.labor_piece', 'Travail humain par pièce : retrait, finition, emballage (minutes)'))}">
             <input type="text" id="ord-mat" class="settings-select" style="width:90px;" maxlength="40" placeholder="${escapeHtml(_t3('orders.material', 'Matière'))}" autocomplete="off">
             <select id="ord-printer" class="settings-select">${pOpts('')}</select>
             <input type="date" id="ord-due" class="settings-select">
@@ -4451,7 +4469,8 @@ function _orderMarginHtml(j) {
         ? ` · <strong class="${m.real_margin < 0 ? 'margin-neg' : 'margin-pos'}">${escapeHtml(_t3('orders.margin_real', 'réelle à ce jour'))} ${escapeHtml(eur(m.real_margin))}${escapeHtml(pct(m.real_margin_pct))}</strong>` : '';
     const scrap = j.scrap ? ` · ${escapeHtml(_tf('orders.scrap_n', '{{n}} rebut(s)', { n: j.scrap }))}` : '';
     const hrs = j.actual_hours ? ` · ${escapeHtml(_tf('orders.hours_measured', '{{h}} h mesurées', { h: j.actual_hours }))}` : '';
-    return `<div class="order-margin">${escapeHtml(_t3('orders.margin_est', 'Marge prévue'))} ${escapeHtml(eur(m.est_margin))}${escapeHtml(pct(m.est_margin_pct))}${real}${scrap}${hrs}</div>`;
+    const lab = (m.labor_est || m.labor_real) ? ` · ${escapeHtml(_tf('orders.labor_cost', 'travail {{c}} inclus', { c: eur(m.labor_real || m.labor_est) }))}` : '';
+    return `<div class="order-margin">${escapeHtml(_t3('orders.margin_est', 'Marge prévue'))} ${escapeHtml(eur(m.est_margin))}${escapeHtml(pct(m.est_margin_pct))}${real}${scrap}${hrs}${lab}</div>`;
 }
 window._orderAdd = async function () {
     const part = document.getElementById('ord-part').value.trim();
@@ -4459,7 +4478,8 @@ window._orderAdd = async function () {
     const r = await _ordersApi('POST', '/api/orders', {
         part, quantity: document.getElementById('ord-qty').value, material: document.getElementById('ord-mat').value,
         printer_id: document.getElementById('ord-printer').value, due_date: document.getElementById('ord-due').value,
-        est_hours: document.getElementById('ord-hours').value || 0 });
+        est_hours: document.getElementById('ord-hours').value || 0,
+        labor_setup_min: document.getElementById('ord-lsetup').value || 0, labor_min_piece: document.getElementById('ord-lpiece').value || 0 });
     if (!r.ok) showToast(_t3('toast.error', 'Erreur'), 'error');
     _ordersRender();
 };
@@ -5231,6 +5251,7 @@ window.toggleNotificationPanel = async function () {
     _notifPanelOpen = panel.classList.contains('hidden');
     if (_notifPanelOpen) {
         panel.classList.remove('hidden');
+        const ft = document.getElementById('notif-panel-footer'); if (ft) ft.hidden = !!(typeof IS_VIEWER !== 'undefined' && IS_VIEWER);
         const data = await loadNotifications();
         _renderNotifList(data.notifications || []);
     } else {
@@ -5259,6 +5280,12 @@ window.handleNotificationClick = async function (id, linkPage) {
         _notifPanelOpen = false;
         document.querySelector(`.nav-btn[data-page="${linkPage}"]`)?.click();
     }
+};
+
+window.openAllNotifications = function () {
+    document.getElementById('notif-panel')?.classList.add('hidden');
+    _notifPanelOpen = false;
+    if (window.StellioSuite && StellioSuite.open) StellioSuite.open('notifications');
 };
 
 window.markAllNotificationsRead = async function () {
@@ -6139,7 +6166,7 @@ async function openCameraPicker() {
     body.innerHTML = list.map(p => `
         <div class="dashboard-row" style="cursor:pointer;" onclick="closeModal('modal-camera-picker'); openCameraPopup(${p.id});">
             <div class="dashboard-row-icon"><i class="mdi ${getPrinterIcon(p.type)}"></i></div>
-            <div class="dashboard-row-body"><div class="dashboard-row-title">${escapeHtml(p.name)}${_isResinBeta(p) ? ' ' + _betaBadgeHtml() : ''}</div></div>
+            <div class="dashboard-row-body"><div class="dashboard-row-title">${escapeHtml(p.name)}</div></div>
             <div class="dashboard-row-meta"><i class="fa-solid fa-video"></i></div>
         </div>`).join('');
 }
@@ -6329,7 +6356,7 @@ async function _loadDashboardRestock() {
         if (!res.ok) throw new Error('http');
         const data = await res.json();
         _restockItems = data.items || [];
-        // Résines (bêta) : même liste « À commander », en ml
+        // Résines : même liste « À commander », en ml
         try {
             const rr = await fetch(`${API}/api/resin/restock`);
             if (rr.ok) _restockItems = _restockItems.concat(((await rr.json()).items || []).map(x => ({ ...x, resin: true, total_g: x.total_ml, spool_count: x.bottle_count })));
@@ -7200,6 +7227,7 @@ document.getElementById('add-remote-instance-form')?.addEventListener('submit', 
         closeModal('modal-add-remote-instance');
         showToast(_t2('settings.remote_instances_added', 'Instance ajoutée'), 'success');
         loadRemoteInstances();
+        try { window.StellioSuite && window.StellioSuite._applyHostFeatures(); } catch (e) { /* facultatif */ }
     } catch (err) {
         showToast(_t2('toast.connection_error', 'Erreur de connexion'), 'error');
     }
@@ -7227,7 +7255,7 @@ async function deleteRemoteInstance(id) {
     if (!ok) return;
     try {
         const res = await fetch(`${API}/api/remote-instances/${id}`, { method: 'DELETE' });
-        if (res.ok) { showToast(_t2('toast.deleted', 'Supprimé'), 'success'); loadRemoteInstances(); }
+        if (res.ok) { showToast(_t2('toast.deleted', 'Supprimé'), 'success'); loadRemoteInstances(); try { window.StellioSuite && window.StellioSuite._applyHostFeatures(); } catch (e) { /* facultatif */ } }
     } catch (e) {
         showToast(_t2('toast.connection_error', 'Erreur de connexion'), 'error');
     }
@@ -8026,7 +8054,7 @@ window.openFileInfoModal = async function (path, opts) {
 
     let savedProfile = '__geo';
     if (!demo) { try { savedProfile = localStorage.getItem('stellio_fileinfo_profile') || '__geo'; } catch (err) { /* stockage indisponible */ } }
-    const st = { meta: null, cost: null, scale: 100, profile: savedProfile, slicer: null, failReason: '', timer: null, poll: null };
+    const st = { meta: null, cost: null, gcode: null, scale: 100, profile: savedProfile, slicer: null, failReason: '', timer: null, poll: null };
 
     body.innerHTML = `<div class="file-info-layout">
         <div class="file-info-left">
@@ -8094,8 +8122,14 @@ window.openFileInfoModal = async function (path, opts) {
                          speed: parseFloat(opt.dataset.speed) || 150, walls: parseInt(opt.dataset.walls, 10) || 2 };
             }
         }
+        // G-code joint au fichier (tranchage réel) : prioritaire, tant que la taille est celle du modèle et qu'aucun autre profil n'est demandé
+        const gc = st.gcode && st.scale === 100 && (st.profile === '__geo' || !st.profile) ? st.gcode : null;
         let weightG, timeSec, source;
-        if (prof) {
+        if (gc) {
+            weightG = Number(gc.weight_g) || 0;
+            timeSec = Number(gc.time_seconds) || 0;
+            source = `${e(_t3('fileinfo.source_gcode', 'G-code joint'))} : ${e(gc.name)}${gc.slicer ? ' · ' + e(gc.slicer) : ''}`;
+        } else if (prof) {
             const LINE_W = 0.42;                                  // largeur de ligne moyenne (mm)
             const surfaceMm2 = Number(meta.surface_cm2) * 100 * k * k;
             const volumeMm3 = Number(meta.volume_cm3) * 1000 * k * k * k;
@@ -8276,6 +8310,12 @@ window.openFileInfoModal = async function (path, opts) {
     if (token !== _fileInfoToken) return;
     st.meta = meta;
     st.cost = cost;
+    if (!demo) {   // G-code joint à ce fichier : poids et durée réels, affichés dès qu'ils arrivent
+        fetch(`${API}/api/files/gcode-estimate?path=${encodeURIComponent(path)}`).then(r => r.ok ? r.json() : null).then(j => {
+            if (token !== _fileInfoToken || !j || !j.found) return;
+            st.gcode = j.estimate; renderRows();
+        }).catch(() => { /* sans G-code joint : estimation habituelle */ });
+    }
     if (!meta) {
         const rowsEl = $('file-info-rows');
         if (rowsEl) rowsEl.innerHTML = baseRows.join('') + row(_t3('fileinfo.analysis', 'Analyse'), `<span style="color:var(--text-muted)">${e(_t3('fileinfo.unavailable', 'Informations indisponibles pour ce fichier'))}</span>`) + tailRows;
@@ -8790,7 +8830,37 @@ window.toggleFolderBlock = function(uid) {
     }
 };
 
-function renderChunk() {
+const LAZY_RENDER_AFTER = 1000;
+const LAZY_CHUNK = 250;
+function armMoreSentinel() {
+    const old = document.getElementById('files-more-sentinel');
+    if (old) old.remove();
+    if (idx >= filesToRender.length) return;
+    const sentinel = document.createElement('div');
+    sentinel.id = 'files-more-sentinel';
+    sentinel.className = 'files-more-sentinel';
+    sentinel.style.cssText = 'grid-column:1/-1;width:100%;padding:18px;text-align:center;opacity:.7;font-size:13px;';
+    sentinel.textContent = idx + ' / ' + filesToRender.length;
+    grid.appendChild(sentinel);
+    if (window._filesMoreObserver) window._filesMoreObserver.disconnect();
+    const more = () => {
+        if (_seq !== _renderFilesSeq) return;
+        sentinel.remove();
+        renderChunk(LAZY_CHUNK);
+    };
+    if ('IntersectionObserver' in window) {
+        window._filesMoreObserver = new IntersectionObserver(entries => {
+            if (entries.some(e => e.isIntersecting)) { window._filesMoreObserver.disconnect(); more(); }
+        }, { rootMargin: '1500px' });
+        window._filesMoreObserver.observe(sentinel);
+    } else {
+        sentinel.style.cursor = 'pointer';
+        sentinel.onclick = more;
+    }
+}
+
+function renderChunk(size) {
+    if (size) chunkSize = size;
     if (_seq !== _renderFilesSeq) return;      // la liste a été redessinée entre-temps (ex. clics rapides sur un filtre) : on n'ajoute plus de cartes périmées
     const end = Math.min(idx + chunkSize, filesToRender.length);
     let chunkHtml = '';
@@ -8806,9 +8876,16 @@ function renderChunk() {
     }
     grid.insertAdjacentHTML('beforeend', chunkHtml);
     idx = end;
+    if (idx < filesToRender.length && idx >= LAZY_RENDER_AFTER) {
+        // Grosse bibliothèque (50 000 modèles = ~1,8 M d'éléments si tout est dessiné) : on s'arrête
+        // et on n'ajoute la suite que lorsque l'utilisateur approche du bas de la grille.
+        I18N.apply();
+        armMoreSentinel();
+        return;
+    }
     if (idx < filesToRender.length) {
         if ('requestIdleCallback' in window) {
-            requestIdleCallback(renderChunk, { timeout: 100 });
+            requestIdleCallback(() => renderChunk(), { timeout: 100 });
         } else {
             setTimeout(renderChunk, 0);
         }
@@ -9957,7 +10034,9 @@ function renderSmartCollections() {
     }).join('');
     const saved = (typeof _loadSavedFilters === 'function' ? _loadSavedFilters() : []).map(f =>
         `<button type="button" class="sc-chip sc-saved" onclick="applySavedFilterSet('${f.id}')"><i class="fa-solid fa-bookmark"></i> ${escapeHtml(f.name)}</button>`).join('');
-    el.innerHTML = chips + saved + (window.StellioV113 ? window.StellioV113.chipsHtml() : '');
+    const ai = (window.aiEnabled && !(typeof IS_VIEWER !== 'undefined' && IS_VIEWER) && window.StellioAssistant)
+        ? `<button type="button" class="sc-chip sc-assistant" data-host-plugin="ai-assistant" id="assistant-btn" onclick="window.StellioAssistant && StellioAssistant.open()" title="${escapeHtml(I18N.t('assistant.title'))}"><i class="fa-solid fa-wand-magic-sparkles"></i> ${escapeHtml(I18N.t('assistant.title'))}</button>` : '';
+    el.innerHTML = ai + chips + saved + (window.StellioV113 ? window.StellioV113.chipsHtml() : '');
 }
 
 window.toggleSmartCollection = function (id) {
@@ -10127,8 +10206,8 @@ function _refreshSlicerPrinterHint() {
     };
     if (ds) { show(ds); return; }
     box.classList.add('hidden'); box.textContent = '';
-    // Imprimante résine sans slicer choisi : le logiciel résine détecté sur la machine est utilisé (bêta)
-    if (p && _isResinBeta(p)) {
+    // Imprimante résine sans slicer choisi : le logiciel résine détecté sur la machine est utilisé
+    if (p && _isResin(p)) {
         fetch(`${API}/api/slicers/installed`).then(r => r.json()).then(d => {
             if (d && d.resin_default && String(document.getElementById('slicer-ai-printer-select')?.value) === String(p.id)) show(d.resin_default);
         }).catch(() => {});
@@ -12324,10 +12403,45 @@ loadNavOrder();
 }
 
 
+// Paramètres : une section de premier niveau s'ouvre dans une fenêtre (tous ses réglages visibles d'un coup) au lieu de se déplier dans la colonne.
+// La section reste à sa place dans le DOM (identifiants, écouteurs et chargements inchangés) : seul le style la fait passer en fenêtre.
+function _accordIsPopup(section) {
+    return !!section.closest('#page-settings') && !section.parentElement.closest('.accord-body');
+}
+function _accordPopupKey(e) { if (e.key === 'Escape') _accordClosePopup(); }
+function _accordClosePopup() {
+    document.querySelectorAll('.accord-section.accord-popup').forEach(s => {
+        s.classList.add('accord-closing');                                    // pas d'animation de repli au retour dans la colonne
+        s.classList.remove('accord-popup', 'open');
+        setTimeout(() => s.classList.remove('accord-closing'), 80);
+        if (s.id === 'accord-diagnostic' && typeof stopDiagnosticConsolePoll === 'function') stopDiagnosticConsolePoll();
+    });
+    document.getElementById('accord-backdrop')?.remove();
+    document.removeEventListener('keydown', _accordPopupKey);
+}
+function _accordOpenPopup(section) {
+    _accordClosePopup();
+    const bd = document.createElement('div');
+    bd.id = 'accord-backdrop';
+    bd.addEventListener('click', _accordClosePopup);
+    document.body.appendChild(bd);
+    section.classList.add('accord-popup', 'open');
+    document.addEventListener('keydown', _accordPopupKey);
+    const body = section.querySelector(':scope > .accord-body');
+    if (body) body.scrollTop = 0;
+}
+window.closeAccordPopup = _accordClosePopup;
+
 function toggleAccord(headerEl) {
     const section = headerEl.closest('.accord-section');
     if (!section) return;
     const isOpening = !section.classList.contains('open');
+
+    if (_accordIsPopup(section)) {
+        if (isOpening) _accordOpenPopup(section); else _accordClosePopup();
+        if (isOpening && section.id === 'save-data-section') { loadAutoBackupSettings(); loadBackupList(); }
+        return;
+    }
 
     if (isOpening) {
         const grid = headerEl.closest('.settings-grid');
@@ -12461,6 +12575,7 @@ window.aiEnabled = false;
 
 function applyAiEnabledUI(enabled) {
     window.aiEnabled = enabled;
+    try { if (typeof renderSmartCollections === 'function') renderSmartCollections(); } catch (e) {}
 
     const configBlock = document.getElementById('ollama-config-block');
     if (configBlock) {
@@ -17277,10 +17392,13 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         if (page === 'stats') { loadStats(); window.StellioV113?.onStats(); }
         if (page === 'history') { loadHistory(); loadDownloadHistory(); }
         if (page === 'printed') loadPrintedPage();
+        if (page === 'timelapses') loadTimelapsesPage();
         if (page === 'gallery') loadGalleryPage();
         if (page === 'projects') loadProjects();
         if (page === 'sosprint') loadSosprintProfiles(true);
         if (page === 'bigprint') window.StellioBigPrint?.onShow();
+        if (page === 'suite') window.StellioSuite?.onShow();
+        if (page === 'plugins') window.StellioSuite?.onShowPlugins();
         if (page === 'planning') window.StellioPlanning?.onShow();
         if (page === 'trace') window.StellioTrace?.onShow();
         if (page === 'print-queue') loadPrintQueue();
@@ -19880,6 +19998,7 @@ window.loadHistory = async function (reset = true) {
                             <span class="history-entry-ext" style="color:${extColor};">${(entry.file_ext||'').replace('.','').toUpperCase()}</span>
                             ${costBadge}
                             ${platformBadge}
+                            ${_historyTraceChip(entry)}
                         </div>
                     </div>
                     <div class="history-entry-time">${timeStr}</div>
@@ -19887,6 +20006,7 @@ window.loadHistory = async function (reset = true) {
                     <button class="history-entry-view" onclick="viewHistoryFile('${escapeJs(entry.file_path)}', '${escapeJs(entry.file_name)}')" title="${I18N.t('history.view_file') || 'Voir le fichier'}">
                         <i class="fa-solid fa-eye"></i>
                     </button>
+                    ${_historyTraceButton(entry)}
                     <button class="history-entry-reprint" onclick="openPrintReport(${entry.id})" title="${escapeHtml(_t3('history.share_report', 'Créer un rapport à partager'))}">
                         <i class="fa-solid fa-share-nodes"></i>
                     </button>
@@ -19913,6 +20033,24 @@ function _refreshHistoryDay(dayEl) {
     if (n === 0) { dayEl.remove(); return; }
     const badge = dayEl.querySelector('.history-day-count');
     if (badge) badge.textContent = n;
+}
+
+// v1.1.7 : version du modèle dans la ligne d'historique + rattachement (anciennes impressions) / association d'un G-code à son modèle
+const _GCODE_EXT = ['.gcode', '.gco', '.gc', '.bgcode'];
+function _historyTraceChip(entry) {
+    if (!entry.trace_model) return '';
+    const name = String(entry.trace_model).split('/').pop();
+    const title = entry.trace_version != null
+        ? _t3('trace.chip_title', 'Modèle : {m} · version {v}', { m: name, v: entry.trace_version })
+        : _t3('trace.chip_model_only', 'Modèle : {m} (version inconnue)', { m: name });
+    return `<span class="history-trace-chip" title="${escapeHtml(title)}"><i class="fa-solid fa-code-branch"></i> ${entry.trace_version != null ? 'v' + entry.trace_version : '—'}</span>`;
+}
+function _historyTraceButton(entry) {
+    const isG = _GCODE_EXT.includes(String(entry.file_ext || '').toLowerCase());
+    if (isG && !entry.trace_model) {
+        return `<button class="history-entry-reprint" onclick="StellioTrace.openAttach({filePath:'${escapeJs(String(entry.file_path || '').replace(/\\/g, '/'))}', onDone: () => loadHistory && loadHistory()})" title="${escapeHtml(_t3('trace.link_title', 'Associer à un modèle'))}"><i class="fa-solid fa-link"></i></button>`;
+    }
+    return `<button class="history-entry-reprint" onclick="StellioTrace.openAttach({historyId:${entry.id}, onDone: () => loadHistory && loadHistory()})" title="${escapeHtml(_t3('trace.attach_title', 'Rattacher à une version du modèle'))}"><i class="fa-solid fa-code-branch"></i></button>`;
 }
 
 window.toggleHistoryDay = function (dayKey) {
@@ -20138,7 +20276,7 @@ function renderPrinters() {
         <div class="printer-card${p.is_connected ? '' : ' is-offline'}" data-id="${p.id}" onclick="if (!this.classList.contains('is-offline')) openPrinterMonitor(${p.id})">
             <div class="printer-header">
                 <i class="mdi ${getPrinterIcon(p.type)}" style="font-size:calc(22px * var(--fs, 1));"></i>
-                <span class="printer-name">${escapeHtml(p.name)}</span>${_isResinBeta(p) ? _betaBadgeHtml() : ''}
+                <span class="printer-name">${escapeHtml(p.name)}</span>
                 <span id="printer-status-${p.id}" class="printer-status ${p.is_connected ? 'connected' : 'disconnected'}">${p.is_connected ? I18N.t('printers.online') : I18N.t('printers.offline')}</span>
             </div>
             <div class="printer-body">
@@ -20161,7 +20299,7 @@ function renderPrinters() {
             </div>
             <div class="printer-actions" onclick="event.stopPropagation()">
                 <button class="btn btn-ghost btn-sm printer-action-live" onclick="openPrinterMonitor(${p.id})" title="${I18N.t('printers.monitoring')}"><i class="fa-solid fa-chart-line"></i></button>
-                <button class="btn btn-ghost btn-sm" style="position:relative;" onclick="openMaintenanceModal(${p.id}, '${escapeHtml(p.name).replace(/'/g, "\\'")}', '${(p.brand || (_isResinBeta(p) ? 'resin' : '')).replace(/'/g, "\\'")}')" title="${_t3('printers.maintenance', 'Maintenance')}">
+                <button class="btn btn-ghost btn-sm" style="position:relative;" onclick="openMaintenanceModal(${p.id}, '${escapeHtml(p.name).replace(/'/g, "\\'")}', '${(p.brand || (_isResin(p) ? 'resin' : '')).replace(/'/g, "\\'")}')" title="${_t3('printers.maintenance', 'Maintenance')}">
                     <i class="fa-solid fa-wrench"></i>
                     <span id="maintenance-badge-${p.id}" style="display:none; position:absolute; top:2px; right:2px; width:7px; height:7px; border-radius:50%; background:var(--danger);"></span>
                 </button>
@@ -20228,10 +20366,8 @@ function _stopPrinterCardCamera(el) {
 const PRINTER_TYPE_LABELS = { klipper: 'Klipper', octoprint: 'OctoPrint', prusalink: 'PrusaLink', bambu: 'Bambu Lab', bambuddy: 'Bambuddy',
     elegoo_sdcp: 'Elegoo', elegoo_cc2: 'Elegoo', creality: 'Creality', flashforge: 'FlashForge', duet: 'Duet', repetier: 'Repetier',
     usb_serial: 'USB', chitu_sdcp: 'Chitubox (résine)', anycubic_photon: 'Anycubic Photon (résine)', formlabs: 'Formlabs (résine)' };
-// v1.1.4 : les imprimantes résine sont en bêta (badge partout où elles apparaissent)
-const RESIN_BETA_TYPES = ['chitu_sdcp', 'anycubic_photon', 'formlabs'];
-function _isResinBeta(p) { return !!p && (RESIN_BETA_TYPES.includes(p.type) || (p.type === 'elegoo_sdcp' && /saturn|mars|jupiter|resin|r[ée]sine/i.test(p.name || ''))); }
-function _betaBadgeHtml() { return `<span class="beta-badge" title="${escapeHtml(I18N.t('printers.resin_beta_warning') || '')}">${escapeHtml(I18N.t('printers.resin_beta') || 'Bêta')}</span>`; }
+const RESIN_TYPES = ['chitu_sdcp', 'anycubic_photon', 'formlabs'];
+function _isResin(p) { return !!p && (RESIN_TYPES.includes(p.type) || (p.type === 'elegoo_sdcp' && /saturn|mars|jupiter|resin|r[ée]sine/i.test(p.name || ''))); }
 function _printerOfflineLogoHtml(type) {
     const label = PRINTER_TYPE_LABELS[type] || '';
     const generic = `<svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true"><g fill="none" stroke="#6b7280" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="8" width="44" height="6" rx="2"/><path d="M16 14v36M48 14v36"/><rect x="24" y="22" width="16" height="9" rx="2" fill="#6b7280"/><path d="M32 31v6"/><rect x="12" y="50" width="40" height="6" rx="2"/></g></svg>`;
@@ -20596,7 +20732,7 @@ function openMaintenanceModal(pid, printerName, brand) {
                             <option value="creality">Creality</option>
                             <option value="anycubic">Anycubic</option>
                             <option value="elegoo">Elegoo</option>
-                            <option value="resin" data-i18n="printers.maintenance_brand_resin">Imprimante résine (bêta)</option>
+                            <option value="resin" data-i18n="printers.maintenance_brand_resin">Imprimante résine</option>
                             <option value="voron" data-i18n="printers.maintenance_brand_voron">Voron / DIY</option>
                             <option value="generic" data-i18n="printers.maintenance_brand_generic">Autre / Générique</option>
                         </select>
@@ -20659,7 +20795,7 @@ function openMaintenanceModal(pid, printerName, brand) {
 }
 
 const PRINTER_MAINTENANCE_RECOMMENDATIONS = {
-    // Imprimantes résine (bêta) : intervalles indicatifs, à adapter à ta machine et à ta résine
+    // Imprimantes résine : intervalles indicatifs, à adapter à ta machine et à ta résine
     resin: [
         { nameKey: 'printers.maintenance_task.controler_le_film_fep', interval: '~50h', hours: 50 },
         { nameKey: 'printers.maintenance_task.remplacer_le_film_fep', interval: '~200h', hours: 200 },
@@ -21260,7 +21396,7 @@ function openPrinterMonitor(pid) {
         document.body.appendChild(modal);
         modal.addEventListener('click', (e) => { if (e.target === modal) closePrinterMonitor(); });
     }
-    { const _mt = document.getElementById('monitor-title'); _mt.textContent = `🖨️ ${printer.name}`; if (_isResinBeta(printer)) _mt.insertAdjacentHTML('beforeend', ' ' + _betaBadgeHtml()); }
+    { const _mt = document.getElementById('monitor-title'); _mt.textContent = `🖨️ ${printer.name}`;  }
     initMonitorUI(printer);
     openModal('modal-printer-monitor');
     if (printerMonitorInterval) clearInterval(printerMonitorInterval);
@@ -21600,9 +21736,7 @@ window.togglePrinterFields = function() {
     if (_portEl && PRINTER_DEFAULT_PORTS[type] && Object.values(PRINTER_DEFAULT_PORTS).includes(_portEl.value)) { _portEl.value = PRINTER_DEFAULT_PORTS[type]; _portEl.placeholder = PRINTER_DEFAULT_PORTS[type]; }
     if (_portLbl) _portLbl.textContent = type === 'klipper' ? (I18N.t('printers.port_moonraker') || 'Port Moonraker') : (I18N.t('printers.port_generic') || 'Port');
     const _gslug = document.getElementById('group-repetier-slug'); if (_gslug) _gslug.style.display = (type === 'repetier' || type === 'formlabs') ? 'block' : 'none';
-    // v1.1.4 : imprimantes résine (bêta)
-    const _resin = ['elegoo_sdcp', 'chitu_sdcp', 'anycubic_photon', 'formlabs'].includes(type);
-    const _gbeta = document.getElementById('group-resin-beta'); if (_gbeta) _gbeta.style.display = _resin ? 'flex' : 'none';
+        const _resin = ['elegoo_sdcp', 'chitu_sdcp', 'anycubic_photon', 'formlabs'].includes(type);
     [['chitu_sdcp', 'group-chitu-hint'], ['anycubic_photon', 'group-photon-hint'], ['formlabs', 'group-formlabs-hint']].forEach(([t, id]) => { const el = document.getElementById(id); if (el) el.style.display = type === t ? 'block' : 'none'; });
     const _slugLbl = document.getElementById('printer-slug-label'), _slugIn = document.getElementById('printer-repetier-slug');
     if (_slugLbl && _slugIn) {
@@ -22647,6 +22781,12 @@ startThumbAutoRefresh();
             if (el) el.style.display = isVirtualEntry ? 'none' : '';
         });
 
+        const lightenBtn = document.getElementById('ctx-lighten-btn');      // STL volumineux seulement : la copie allégée sert à réparer / indexer / comparer
+        if (lightenBtn) {
+            const lf = (typeof allFiles !== 'undefined') ? allFiles.find(x => x.path === filePath) : null;
+            lightenBtn.style.display = (!isVirtualEntry && /\.stl$/i.test(filePath) && lf && (lf.size || 0) >= LIGHTEN_MIN_BYTES && !(typeof IS_VIEWER !== 'undefined' && IS_VIEWER)) ? '' : 'none';
+        }
+
         const bigprintBtn = document.getElementById('ctx-bigprint-btn');
         if (bigprintBtn) bigprintBtn.style.display = (!isVirtualEntry && /\.(stl|3mf|obj|ply)$/i.test(filePath)) ? '' : 'none';
 
@@ -22708,6 +22848,10 @@ startThumbAutoRefresh();
         document.getElementById('ctx-repair-btn')?.addEventListener('click', () => {
             closeModal('modal-file-actions');
             repairFileFromMenu(_ctxPath, _ctxName);
+        });
+        document.getElementById('ctx-lighten-btn')?.addEventListener('click', () => {
+            closeModal('modal-file-actions');
+            lightenFile(_ctxPath, _ctxName);
         });
         document.getElementById('ctx-gcode-btn')?.addEventListener('click', () => {
             closeModal('modal-file-actions');
@@ -22844,6 +22988,36 @@ startThumbAutoRefresh();
         }
     }
 
+    /* 1.1.7 — version allégée d'un STL volumineux : copie simplifiée écrite À CÔTÉ de l'original (jamais remplacé), en tâche de fond. */
+    const LIGHTEN_MIN_BYTES = 50 * 1024 * 1024;
+    const _lt = (k, fb, p) => { let t = (typeof I18N !== 'undefined' && I18N.t(k)) || fb; if (t === k) t = fb; Object.keys(p || {}).forEach(n => { t = t.split('{{' + n + '}}').join(p[n]); }); return t; };
+    window.lightenFile = async function (filePath, fileName) {
+        const name = fileName || filePath.split(/[\\/]/).pop();
+        const ok = await showConfirmDialog(_lt('lighten.confirm', 'Une copie simplifiée de « {{name}} » (environ 300 000 triangles) sera créée à côté de l\'original, qui n\'est pas modifié. Elle est approximative : gardez l\'original pour imprimer.', { name }),
+            { title: _lt('lighten.menu', 'Créer une version allégée'), confirmLabel: _lt('lighten.go', 'Créer la copie'), icon: 'fa-compress' });
+        if (!ok) return;
+        try {
+            const res = await fetch(`${API}/api/files/lighten`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: filePath }) });
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) { showToast(d.error || _lt('lighten.failed', 'Impossible de créer la version allégée.'), 'error'); return; }
+            showToast(_lt('lighten.running', 'Simplification de « {{name}} » en cours… (tâche de fond)', { name }), 'info');
+            for (let i = 0; i < 3600; i++) {                                           // jusqu'à 2 h : un fichier de 10 Go prend plusieurs minutes
+                await new Promise(r => setTimeout(r, 2000));
+                const j = await fetch(`${API}/api/jobs/${d.job_id}`, { cache: 'no-store' }).then(r => r.json()).catch(() => null);
+                if (!j) continue;
+                if (j.state === 'done') {
+                    const r = j.result || {};
+                    showToast(_lt('lighten.done', '✓ {{name}} créé ({{before}} → {{after}} triangles)', { name: r.name || '', before: (r.triangles_before || 0).toLocaleString(), after: (r.triangles_after || 0).toLocaleString() }), 'success');
+                    if (typeof loadFiles === 'function') loadFiles();
+                    return;
+                }
+                if (j.state === 'failed' || j.state === 'cancelled') { showToast(j.error || _lt('lighten.failed', 'Impossible de créer la version allégée.'), 'error'); return; }
+            }
+        } catch (err) {
+            showToast(I18N.t('toast.connection_error') || 'Erreur de connexion', 'error');
+        }
+    };
+
     window.repairFileFromMenu = async function (filePath, fileName) {
         showToast(`${I18N.t('actions.repairing') || 'Réparation...'} ${fileName}`, 'info');
         try {
@@ -22861,6 +23035,9 @@ startThumbAutoRefresh();
                 const partial = data.watertight === false;
                 showToast(data.message || (partial ? I18N.t('toast.repair_partial') : I18N.t('toast.repair_success')) || 'Fichier réparé', partial ? 'warning' : 'success');
                 if (typeof loadFiles === 'function') loadFiles();
+            } else if (data.code === 'model_too_large' && data.lightenable) {
+                showToast(data.error, 'warning');
+                lightenFile(filePath, fileName);                                         // propose directement la version allégée
             } else {
                 showToast(data.error || I18N.t('toast.repair_failed') || 'Échec de la réparation', 'error');
             }
@@ -24977,7 +25154,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                     </div>
                 </div>
                 <div id="pcost-results"></div>
-                <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:10px;">
+                <div data-host-plugin="stellio-pro" style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:10px;">
                     <div>
                         <label style="${labelStyle}">${I18N.t('cost.quote_client')}</label>
                         <input type="text" id="pcost-quote-client" list="quote-clients-list" maxlength="120" style="${fieldStyle}" autocomplete="off">
@@ -25224,7 +25401,7 @@ ${ctx.notes ? `<div class="notes">${nl(ctx.notes)}</div>` : ''}
                     </div>
                 </div>
                 <div id="cost-results"></div>
-                <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:10px;">
+                <div data-host-plugin="stellio-pro" style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:10px;">
                     <div>
                         <label style="${labelStyle}">${I18N.t('cost.quote_client')}</label>
                         <input type="text" id="cost-quote-client" list="quote-clients-list" maxlength="120" style="${fieldStyle}" autocomplete="off">
@@ -26494,7 +26671,7 @@ window.copyRemoteUrl = function () {
             if (!page) return;
             setTimeout(() => {
                 document.querySelectorAll(`.nav-btn[data-page]`).forEach(el => {
-                    el.classList.toggle('active', el.dataset.page === page);
+                    el.classList.toggle('active', btn.dataset.suiteTab ? el === btn : el.dataset.page === page);   // les outils de l'Atelier partagent la page « suite » : seule l'entrée cliquée s'allume
                 });
             }, 0);
         });
@@ -26911,7 +27088,7 @@ window.openWorkshopMode = function () {
         <div class="ws-top">
             <div class="ws-title"><i class="fa-solid fa-tablet-screen-button"></i> ${escapeHtml(_t3('nav.workshop', 'Mode atelier'))} <span id="workshop-count" class="ws-count"></span></div>
             <div id="workshop-clock" class="ws-clock"></div>
-            <button type="button" class="ws-btn viewer-hide" id="workshop-share" title="${escapeHtml(_t3('statuslink.title', 'Liens de partage en lecture seule'))}"><i class="fa-solid fa-link"></i></button>
+            <button type="button" class="ws-btn viewer-hide" data-host-plugin="sharing" id="workshop-share" title="${escapeHtml(_t3('statuslink.title', 'Liens de partage en lecture seule'))}"><i class="fa-solid fa-link"></i></button>
             <button type="button" class="ws-btn" id="workshop-fs" title="${escapeHtml(_t3('workshop.fullscreen', 'Plein écran'))}"><i class="fa-solid fa-expand"></i></button>
             <button type="button" class="ws-btn" id="workshop-close" title="${escapeHtml(_t3('workshop.exit', 'Quitter'))}"><i class="fa-solid fa-xmark"></i></button>
         </div>
@@ -27155,8 +27332,8 @@ async function _renderTimelapseList(selectedId) {
         </div>` : `<div class="ws-empty" style="color:var(--text-muted);padding:30px 10px;"><i class="fa-solid fa-film"></i><p>${escapeHtml(_t3('timelapse.empty', "Aucun timelapse pour l'instant. Active « Timelapse automatique » dans la fiche d'une imprimante."))}</p></div>`}
         <div class="tl-settings">
             <label>${escapeHtml(_t3('timelapse.interval', 'Une photo toutes les'))}
-                <input type="number" id="tl-interval" min="5" max="300" step="5" value="${data.interval}" style="width:80px;"> s</label>
-            <button type="button" class="btn btn-ghost" onclick="saveTimelapseInterval()">${escapeHtml(_t3('actions.save', 'Enregistrer'))}</button>
+                <input type="number" id="tl-interval" class="settings-select tl-interval" min="5" max="300" step="5" value="${data.interval}"> s</label>
+            <button type="button" class="btn btn-primary btn-sm" onclick="saveTimelapseInterval()">${escapeHtml(_t3('actions.save', 'Enregistrer'))}</button>
         </div>`;
 }
 window._renderTimelapseList = _renderTimelapseList;
@@ -27172,10 +27349,38 @@ window.deleteTimelapse = function (id) {
     showConfirmModal(_t3('timelapse.confirm_delete', 'Supprimer ce timelapse ?'), async () => {
         try {
             const res = await fetch(`${API}/api/timelapses/${id}`, { method: 'DELETE' });
-            if (res.ok) _renderTimelapseList();
+            if (res.ok) { _renderTimelapseList(); loadTimelapsesPage(); }
         } catch (e) { showToast(I18N.t('toast.connection_error'), 'error'); }
     });
 };
+// Page « Timelapses » (menu Impression) : tous les timelapses sous forme de cartes lisibles directement.
+async function loadTimelapsesPage() {
+    const body = document.getElementById('tlp-body');
+    if (!body) return;
+    let data;
+    try { data = await (await fetch(`${API}/api/timelapses`, { cache: 'no-store' })).json(); }
+    catch (e) { body.innerHTML = `<p style="color:var(--danger)">${escapeHtml(I18N.t('toast.connection_error'))}</p>`; return; }
+    const list = data.timelapses || [];
+    const rec = (data.recording || []).map(r => `<div class="tl-rec"><span class="tl-dot"></span> ${escapeHtml(_t3('timelapse.recording', 'Enregistrement en cours'))} : ${escapeHtml(r.printer_name)} · ${r.frames} ${escapeHtml(_t3('timelapse.frames', 'images'))}</div>`).join('');
+    const warn = data.ffmpeg ? '' : `<div class="tl-warn"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(_t3('timelapse.no_ffmpeg', 'ffmpeg est introuvable : les vidéos ne peuvent pas être créées (placez ffmpeg dans le dossier bin/ de Stellio).'))}</div>`;
+    const cards = list.map(t => `
+        <div class="tlp-card">
+            <video controls playsinline preload="metadata" src="${API}/api/timelapses/${t.id}/video#t=0.1"></video>
+            <div class="tlp-info">
+                <div class="tl-item-name" title="${escapeHtml(t.file_name)}">${escapeHtml(String(t.file_name || '—').replace(/\.[^.]+$/, ''))}</div>
+                <div class="tl-item-meta">${escapeHtml(t.printer_name || '')} · ${escapeHtml(new Date(String(t.started_at).replace(' ', 'T')).toLocaleString(I18N.lang, { dateStyle: 'medium', timeStyle: 'short' }))} · ${_fmtBytes(t.size)}</div>
+                <div class="tl-actions">
+                    <a class="btn btn-ghost btn-sm" href="${API}/api/timelapses/${t.id}/video?download=1"><i class="fa-solid fa-download"></i> ${escapeHtml(_t3('history.share_download', 'Télécharger'))}</a>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="deleteTimelapse(${t.id})"><i class="fa-solid fa-trash"></i> ${escapeHtml(_t3('actions.delete', 'Supprimer'))}</button>
+                </div>
+            </div>
+        </div>`).join('');
+    body.innerHTML = `${warn}${rec}` + (list.length ? `<div class="tlp-grid">${cards}</div>` :
+        `<div class="ws-empty" style="color:var(--text-muted);padding:30px 10px;"><i class="fa-solid fa-film"></i><p>${escapeHtml(_t3('timelapse.empty', "Aucun timelapse pour l'instant. Active « Timelapse automatique » dans la fiche d'une imprimante."))}</p></div>`) +
+        `<div class="tl-settings"><label>${escapeHtml(_t3('timelapse.interval', 'Une photo toutes les'))} <input type="number" id="tl-interval" class="settings-select tl-interval" min="5" max="300" step="5" value="${data.interval}"> s</label>
+            <button type="button" class="btn btn-primary btn-sm" onclick="saveTimelapseInterval()">${escapeHtml(_t3('actions.save', 'Enregistrer'))}</button></div>`;
+}
+window.loadTimelapsesPage = loadTimelapsesPage;
 
 
 // ── Liens d'état partageables (page publique en lecture seule) ──────────────────────────────────
@@ -27777,10 +27982,10 @@ window.openFilamentCatalogModal = openFilamentCatalogModal;
     const sidebar = document.getElementById('app-sidebar');
     const rail = document.getElementById('sidebar-rail');
     if (!sidebar || !rail) return;
-    const CATS = ['library', 'print', 'filament', 'tools', 'track', 'help'];
+    const CATS = ['library', 'print', 'filament', 'tools', 'plugins', 'track', 'admin', 'help'];
     const KEY = 'stellio-nav-cat';
     const TITLES = { library: ['nav.library', 'Bibliothèque'], print: ['nav.cat_print', 'Impression'], filament: ['nav.cat_filament', 'Matières'],
-        tools: ['nav.cat_tools', 'Outils'], track: ['nav.cat_track', 'Suivi'], help: ['nav.cat_help', 'Aide'] };
+        tools: ['nav.cat_tools', 'Outils'], plugins: ['nav.cat_plugins', 'Plugins'], track: ['nav.cat_track', 'Suivi'], admin: ['nav.cat_admin_title', 'Administration'], help: ['nav.cat_help', 'Aide'] };
     function refreshSel() {
         const open = sidebar.classList.contains('panel-open');
         rail.querySelectorAll('[data-rail]').forEach(b => {
@@ -27788,7 +27993,14 @@ window.openFilamentCatalogModal = openFilamentCatalogModal;
             b.setAttribute('aria-expanded', open && b.dataset.rail === sidebar.dataset.cat ? 'true' : 'false');
         });
     }
-    function setOpen(open) { sidebar.classList.toggle('panel-open', !!open); refreshSel(); }
+    // Les transitions du volet ne sont actives que pendant l'ouverture/fermeture (classe nav-anim, retirée ensuite) : si le navigateur en gèle une
+    // à mi-course (volet à moitié rogné, trait vertical resté au milieu), le retrait de la classe la termine aussitôt.
+    let animTimer = 0;
+    function setOpen(open) {
+        sidebar.classList.add('nav-anim');
+        sidebar.classList.toggle('panel-open', !!open); refreshSel();
+        clearTimeout(animTimer); animTimer = setTimeout(() => sidebar.classList.remove('nav-anim'), 320);
+    }
     function setCat(cat, remember) {
         if (!CATS.includes(cat)) return;
         sidebar.dataset.cat = cat;
@@ -27847,7 +28059,7 @@ window.openFilamentCatalogModal = openFilamentCatalogModal;
                 if (n > 0) total += n;
             });
             // v1.1.2 : une catégorie sans aucune entrée visible (ex. « Outils » sur téléphone, où réparation et convertisseur sont réservés à l'ordinateur) disparaît de la barre
-            const _any = [...sidebar.querySelectorAll('.sidebar-nav .nav-btn[data-cat="' + b.dataset.rail + '"]')].some(el => el.style.display !== 'none' && !el.classList.contains('hidden') && !(el.classList.contains('desktop-only-nav') && window.matchMedia('(max-width: 860px)').matches));
+            const _any = [...sidebar.querySelectorAll('.sidebar-nav .nav-btn[data-cat="' + b.dataset.rail + '"]')].some(el => el.style.display !== 'none' && (!el.hasAttribute('data-admin-net') || document.documentElement.hasAttribute('data-net-ok')) && !el.classList.contains('hidden') && !(el.classList.contains('desktop-only-nav') && window.matchMedia('(max-width: 860px)').matches));
             b.style.display = _any ? '' : 'none';
             let pill = b.querySelector('.rail-badge');
             if (!total) { if (pill) pill.remove(); return; }
@@ -27858,6 +28070,7 @@ window.openFilamentCatalogModal = openFilamentCatalogModal;
     let _rbT = null;
     const _rbSched = () => { clearTimeout(_rbT); _rbT = setTimeout(refreshRailBadges, 80); };
     new MutationObserver(_rbSched).observe(sidebar.querySelector('.sidebar-nav'), { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['style', 'class'] });
+    document.addEventListener('stellio-features', _rbSched);   // un plugin ou le menu Administration vient d'apparaître / de disparaître
     window.addEventListener('resize', _rbSched);   // passage téléphone ↔ ordinateur : les catégories vides se masquent / réapparaissent
     refreshRailBadges();
     [800, 2500].forEach(ms => setTimeout(refreshRailBadges, ms));

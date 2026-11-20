@@ -1,0 +1,39 @@
+{
+  "id": "webhooks",
+  "name": "Webhooks sortants",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-diagram-project",
+  "description": {
+    "fr": "Envoie des évènements signés (HMAC) à tes services : impression terminée ou échouée, commande en retard…",
+    "en": "Sends signed (HMAC) events to your services: print finished or failed, late order…",
+    "de": "Sendet signierte (HMAC) Ereignisse an deine Dienste: Druck fertig oder fehlgeschlagen, verspätete Bestellung …",
+    "es": "Envía eventos firmados (HMAC) a tus servicios: impresión terminada o fallida, pedido retrasado…",
+    "pt": "Envia eventos assinados (HMAC) aos teus serviços: impressão concluída ou falhada, encomenda atrasada…",
+    "it": "Invia eventi firmati (HMAC) ai tuoi servizi: stampa terminata o fallita, ordine in ritardo…",
+    "zh": "向你的服务发送带签名（HMAC）的事件：打印完成或失败、订单延期等。",
+    "ja": "署名付き（HMAC）イベントをあなたのサービスへ送信します：印刷完了・失敗、注文の遅延など。"
+  },
+  "host": {
+    "modules": [
+      "webhooks"
+    ],
+    "migrate": {
+      "tables": [
+        "webhooks"
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "Webhooks sortants",
+    "en": "Outgoing webhooks",
+    "de": "Ausgehende Webhooks",
+    "es": "Webhooks salientes",
+    "pt": "Webhooks de saída",
+    "it": "Webhook in uscita",
+    "zh": "出站 Webhook",
+    "ja": "送信 Webhook"
+  },
+  "server_only": true
+}

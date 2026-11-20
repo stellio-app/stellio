@@ -1,0 +1,48 @@
+{
+  "id": "timelapse",
+  "name": "Timelapse",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-film",
+  "description": {
+    "fr": "Images périodiques de la caméra pendant l'impression, assemblées en vidéo (ffmpeg).",
+    "en": "Periodic camera frames during a print, assembled into a video (ffmpeg).",
+    "de": "Regelmäßige Kamerabilder während des Drucks, als Video zusammengefügt (ffmpeg).",
+    "es": "Imágenes periódicas de la cámara durante la impresión, montadas en vídeo (ffmpeg).",
+    "pt": "Imagens periódicas da câmara durante a impressão, reunidas num vídeo (ffmpeg).",
+    "it": "Immagini periodiche della telecamera durante la stampa, assemblate in un video (ffmpeg).",
+    "zh": "打印期间定时拍摄摄像头画面，并合成视频（ffmpeg）。",
+    "ja": "印刷中にカメラの画像を定期的に撮影し、動画にまとめます（ffmpeg）。"
+  },
+  "host": {
+    "modules": [
+      "timelapse"
+    ],
+    "migrate": {
+      "tables": [
+        "timelapses"
+      ],
+      "dirs": [
+        "timelapse"
+      ],
+      "printer_config_like": [
+        "\"timelapse\": true",
+        "\"timelapse\":true"
+      ],
+      "settings": [
+        "timelapse_interval"
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "Timelapse",
+    "en": "Timelapse",
+    "de": "Zeitraffer",
+    "es": "Timelapse",
+    "pt": "Timelapse",
+    "it": "Timelapse",
+    "zh": "延时摄影",
+    "ja": "タイムラプス"
+  }
+}

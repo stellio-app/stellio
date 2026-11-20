@@ -1,0 +1,70 @@
+{
+  "id": "stellio-pro",
+  "name": "Stellio Pro",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-briefcase",
+  "description": {
+    "fr": "Toute la partie commerciale et financière : clients, devis et portail de devis, factures, commandes et suivi, compta (ZIP), tarif d'énergie, planning de production avec coûts et marge, besoins en matière et stock de pièces. Ajoute les pages et boutons associés.",
+    "en": "The whole business and finance side: clients, quotes and quote portal, invoices, orders and tracking, accounting (ZIP), energy tariff, production planning with costs and margin, material needs and parts stock. Adds the related pages and buttons.",
+    "de": "Der gesamte kaufmännische und finanzielle Teil: Kunden, Angebote und Angebotsportal, Rechnungen, Aufträge und Tracking, Buchhaltung (ZIP), Stromtarif, Produktionsplanung mit Kosten und Marge, Materialbedarf und Teilelager. Fügt die zugehörigen Seiten und Schaltflächen hinzu.",
+    "es": "Toda la parte comercial y financiera: clientes, presupuestos y portal de presupuestos, facturas, pedidos y seguimiento, contabilidad (ZIP), tarifa eléctrica, planificación de producción con costes y margen, necesidades de material y stock de piezas. Añade las páginas y botones asociados.",
+    "pt": "Toda a parte comercial e financeira: clientes, orçamentos e portal de orçamentos, faturas, encomendas e acompanhamento, contabilidade (ZIP), tarifa de energia, planeamento de produção com custos e margem, necessidades de material e stock de peças. Adiciona as páginas e botões associados.",
+    "it": "Tutta la parte commerciale e finanziaria: clienti, preventivi e portale preventivi, fatture, ordini e tracciamento, contabilità (ZIP), tariffa energetica, pianificazione della produzione con costi e margine, fabbisogno di materiale e magazzino ricambi. Aggiunge le pagine e i pulsanti associati.",
+    "zh": "全部商务与财务功能：客户、报价与报价门户、发票、订单与跟踪、会计（ZIP）、电价、含成本与利润的生产排程、物料需求与零件库存。并添加相关页面和按钮。",
+    "ja": "営業・財務まわりの機能一式：顧客、見積と見積ポータル、請求書、注文と追跡、会計（ZIP）、電力料金、コストと利益つきの生産計画、材料所要量、部品在庫。関連するページとボタンを追加します。"
+  },
+  "host": {
+    "modules": [
+      "pro_quotes",
+      "pro_orders",
+      "clients",
+      "quote_portal",
+      "order_tracking",
+      "accounting_zip",
+      "energy_tariff",
+      "production_planning",
+      "material_needs",
+      "parts_stock"
+    ],
+    "migrate": {
+      "tables": [
+        "quotes",
+        "clients",
+        "print_jobs",
+        "parts_stock",
+        "parts_stock_moves",
+        "planning_capacity"
+      ],
+      "dirs": [
+        "quotes"
+      ],
+      "settings": [
+        "labor_min_piece",
+        "labor_rate",
+        "labor_setup_min",
+        "planning_hours_per_day",
+        "portal_payment_info",
+        "portal_payment_link",
+        "quote_company",
+        "quote_logo",
+        "smtp_host",
+        "tariff_enabled",
+        "tariff_offpeak_price",
+        "tariff_offpeak_ranges",
+        "tariff_peak_price"
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "Stellio Pro",
+    "en": "Stellio Pro",
+    "de": "Stellio Pro",
+    "es": "Stellio Pro",
+    "pt": "Stellio Pro",
+    "it": "Stellio Pro",
+    "zh": "Stellio Pro",
+    "ja": "Stellio Pro"
+  }
+}

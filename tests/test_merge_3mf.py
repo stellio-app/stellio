@@ -16,7 +16,7 @@ def _client(tmp_path):
     ns = load_from_main(['_pack_footprints_shelf', '_pack_footprints', '_get_polygon_footprint', '_pack_polygons'],
                         extra_ns={'MultiPoint': MultiPoint, 'shapely_affinity': shapely_affinity, 'HAS_SHAPELY': True,
                                   'math': __import__('math')})
-    spec = importlib.util.spec_from_file_location('merge_3mf_t', os.path.join(ROOT, 'modules', 'merge_3mf.py'))
+    spec = importlib.util.spec_from_file_location('merge_3mf_t', __import__('conftest').mod_path('merge_3mf'))
     mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
     app = flask.Flask('t'); app.secret_key = 'x'
     import trimesh.transformations as tra

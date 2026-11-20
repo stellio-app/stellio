@@ -145,7 +145,8 @@ _MW_HDR = {"User-Agent": "BambuStudio/01.09.00.00", "Accept": "application/json"
 def _mw_get(path, token, params=None, label='MakerWorld'):
     return _acct_probe(label, 'GET', MAKERWORLD_API + path, headers={**_MW_HDR, "Authorization": f"Bearer {token}"}, params=params)
 
-def _mw_paged(path, token, limit=ACCT_MODELS_PAGE_SIZE):
+def _mw_paged(path, token, limit=None):
+    limit = limit or ACCT_MODELS_PAGE_SIZE      # lu à l'appel : la valeur est injectée par main.py après l'import du module
     out, offset = [], 0
     while len(out) < ACCT_MODELS_MAX_ITEMS:
         r, js = _mw_get(path, token, {"offset": offset, "limit": limit}, label=f"MakerWorld o{offset}")

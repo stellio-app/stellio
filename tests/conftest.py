@@ -4,13 +4,28 @@ import ast, os, sys
 import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.environ.setdefault('STELLIO_ENABLE_PLUGINS', 'all')   # les tests exercent les routes des plugins intégrés (activés d'office ici)
+os.environ.setdefault('STELLIO_THUMB_ISOLATE', '0')   # les tests de rendu appellent le rendu intégré ; l'isolation a ses propres tests
 MAIN = os.path.join(ROOT, 'main.py')
 
 
+import glob as _glob
+for _d in sorted(_glob.glob(os.path.join(ROOT, 'bundled_plugins', '*'))):     # plugins intégrés : leurs modules et paquets s'importent comme en production
+    if os.path.isfile(os.path.join(_d, 'plugin.json')) and _d not in sys.path:
+        sys.path.append(_d)
+
+
+def mod_path(name):
+    """Chemin du fichier d'un module, qu'il soit dans modules/ ou dans un plugin intégré (bundled_plugins/<id>/)."""
+    for p in [os.path.join(ROOT, 'modules', name + '.py')] + sorted(_glob.glob(os.path.join(ROOT, 'bundled_plugins', '*', name + '.py'))):
+        if os.path.isfile(p):
+            return p
+    raise FileNotFoundError(name)
+
+
 def _source_files():
-    """main.py puis les modules/*.py (le code a été déplacé de main.py vers des modules au fil des versions)."""
-    import glob
-    return [MAIN] + sorted(glob.glob(os.path.join(ROOT, 'modules', '*.py')))
+    """main.py puis les modules/*.py et ceux des plugins intégrés (le code a été déplacé de main.py vers des modules au fil des versions)."""
+    return [MAIN] + sorted(_glob.glob(os.path.join(ROOT, 'modules', '*.py'))) + sorted(_glob.glob(os.path.join(ROOT, 'bundled_plugins', '*', '*.py')))
 
 
 def load_from_main(names, extra_ns=None):
@@ -50,9 +65,8 @@ def main_src():
     return open(MAIN, encoding='utf-8').read()
 
 
-@pytest.fixture(scope='session')
-def stellio_app():
-    """Charge le VRAI main.py (sans démarrer le serveur, dossier de données temporaire) et renvoie l'application Flask.
+def boot_main(data_dir=None, skip_on_error=True):
+    """Charge le VRAI main.py (sans démarrer le serveur ; `data_dir` ou dossier temporaire) et renvoie son espace de noms.
     Même principe que tools/smoke_boot.py ; permet de tester les routes avec le client de test Flask."""
     import runpy, tempfile, types
     s = open(MAIN, encoding='utf-8').read()
@@ -63,16 +77,24 @@ def stellio_app():
     open(tmp, 'w', encoding='utf-8').write(s)
     old_env, old_cwd = dict(os.environ), os.getcwd()
     try:
-        os.environ.update(STELLIO_DATA_DIR=tempfile.mkdtemp(), STELLIO_HEADLESS='1')
+        os.environ.update(STELLIO_DATA_DIR=data_dir or tempfile.mkdtemp(), STELLIO_HEADLESS='1')
         sys.modules.setdefault('pyrender', types.ModuleType('pyrender'))
         sys.path.insert(0, ROOT); os.chdir(ROOT)
         ns = runpy.run_path(tmp, run_name='pytest_boot')
     except BaseException as e:      # dépendances absentes (CI minimale) : on saute plutôt que d'échouer
+        if not skip_on_error:
+            raise
         pytest.skip(f"main.py ne se charge pas dans cet environnement : {type(e).__name__}: {e}")
     finally:
         try: os.remove(tmp)
         except OSError: pass
         os.chdir(old_cwd)
-    app = ns['app']
+    return ns
+
+
+@pytest.fixture(scope='session')
+def stellio_app():
+    """L'application Flask du VRAI main.py (voir boot_main)."""
+    app = boot_main()['app']
     app.config['PROPAGATE_EXCEPTIONS'] = False
     return app

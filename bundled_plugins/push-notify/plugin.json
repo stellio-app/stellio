@@ -1,0 +1,40 @@
+{
+  "id": "push-notify",
+  "name": "Notifications push",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-bell",
+  "description": {
+    "fr": "Alertes sur ton téléphone : ntfy, Telegram, Discord, Slack ou webhook générique (édition serveur).",
+    "en": "Phone alerts: ntfy, Telegram, Discord, Slack or generic webhook (server edition).",
+    "de": "Warnungen aufs Handy: ntfy, Telegram, Discord, Slack oder generischer Webhook (Server-Edition).",
+    "es": "Alertas en el móvil: ntfy, Telegram, Discord, Slack o webhook genérico (edición servidor).",
+    "pt": "Alertas no telemóvel: ntfy, Telegram, Discord, Slack ou webhook genérico (edição servidor).",
+    "it": "Avvisi sul telefono: ntfy, Telegram, Discord, Slack o webhook generico (edizione server).",
+    "zh": "手机提醒：ntfy、Telegram、Discord、Slack 或通用 webhook（服务器版）。",
+    "ja": "スマートフォン通知：ntfy、Telegram、Discord、Slack、汎用 Webhook（サーバー版）。"
+  },
+  "host": {
+    "modules": [
+      "push_notify"
+    ],
+    "migrate": {
+      "settings": [
+        "push_enabled",
+        "push_provider"
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "Notifications push",
+    "en": "Push notifications",
+    "de": "Push-Benachrichtigungen",
+    "es": "Notificaciones push",
+    "pt": "Notificações push",
+    "it": "Notifiche push",
+    "zh": "推送通知",
+    "ja": "プッシュ通知"
+  },
+  "server_only": true
+}

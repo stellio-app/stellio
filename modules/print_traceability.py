@@ -1,4 +1,4 @@
-"""Stellio — traçabilité d'impression : modèle → version → profil de slicer → résultat (v1.1.6)
+"""Stellio — traçabilité d'impression : modèle → version → profil de slicer → résultat (v1.1.6 ; empreinte du profil de slicer : v1.1.7)
 
 Chaque impression lancée (ou ajoutée à la main dans l'historique) est reliée à la VERSION exacte du modèle qui a servi :
   · le « modèle » est le fichier envoyé s'il s'agit d'un maillage (.stl, .3mf…), ou le modèle explicitement associé à un
@@ -15,6 +15,7 @@ Module séparé de main.py (même schéma que production_planning.py) : main.py 
 Les fonctions de calcul (`wilson_low`, `aggregate`, `pick_best`, `resolve_version`) sont pures : testées sans base.
 """
 import hashlib
+import json
 import math
 import os
 import time
@@ -62,6 +63,26 @@ def wilson_low(success, total, z=1.96):
     return max(0.0, (centre - spread) / d)
 
 
+# Réglages qui définissent un profil de slicer : leur empreinte distingue deux profils portant le même nom (v1.1.7).
+FP_KEYS = ('slicer', 'profile_type', 'layer_height', 'nozzle_diameter', 'material_type', 'infill_density', 'infill_pattern',
+           'wall_count', 'top_layers', 'bottom_layers', 'supports_enabled', 'print_speed', 'first_layer_speed', 'outer_wall_speed',
+           'inner_wall_speed', 'infill_speed', 'travel_speed', 'retraction_distance', 'retraction_speed', 'fan_speed',
+           'prime_tower_width', 'nozzle_temp', 'bed_temp')
+
+
+def profile_fingerprint(profile):
+    """Empreinte courte (10 caractères) des réglages d'un profil de slicer ; '' si le profil est inconnu.
+    Le nom, l'identifiant, le chemin source et les dates n'y entrent pas : seuls les réglages comptent, donc renommer un profil ne
+    change pas son empreinte alors que modifier une température ou une hauteur de couche la change."""
+    if not isinstance(profile, dict):
+        return ''
+    keep = {k: profile.get(k) for k in FP_KEYS if profile.get(k) is not None}
+    if len(keep) <= 1:      # seulement le logiciel de découpe : rien de comparable
+        return ''
+    raw = json.dumps(keep, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
+    return hashlib.sha256(raw.encode('utf-8')).hexdigest()[:10]
+
+
 def resolve_version(versions, sha):
     """Numéro de la version dont l'empreinte est `sha` (la plus récente en cas de doublon), sinon None.
     versions : liste de dicts {version, sha256}."""
@@ -75,15 +96,15 @@ def resolve_version(versions, sha):
 
 
 def aggregate(rows):
-    """rows : dicts {model_path, model_version, profile_name, result, sent_at}. Seules les impressions notées comptent.
+    """rows : dicts {model_path, model_version, profile_name, profile_fp, result, sent_at}. Seules les impressions notées comptent.
     Retourne les combinaisons (modèle, version, profil) avec leurs compteurs, taux et score de classement."""
     groups = {}
     for r in rows:
         res = r.get('result')
         if res not in RATED:
             continue
-        key = (r.get('model_path') or '', r.get('model_version'), (r.get('profile_name') or '').strip())
-        g = groups.setdefault(key, {'model_path': key[0], 'version': key[1], 'profile': key[2],
+        key = (r.get('model_path') or '', r.get('model_version'), (r.get('profile_name') or '').strip(), r.get('profile_fp') or '')
+        g = groups.setdefault(key, {'model_path': key[0], 'version': key[1], 'profile': key[2], 'profile_fp': key[3],
                                     'success': 0, 'failed': 0, 'partial': 0, 'last': ''})
         g[res] += 1
         g['last'] = max(g['last'], str(r.get('sent_at') or ''))
@@ -137,7 +158,10 @@ def _ensure_tables(conn=None):
             model_version INTEGER,
             model_sha TEXT DEFAULT '',
             file_sha TEXT DEFAULT '',
+            profile_fp TEXT DEFAULT '',
             created_at REAL)""")
+        if 'profile_fp' not in {r['name'] for r in conn.execute("PRAGMA table_info(print_trace)").fetchall()}:
+            conn.execute("ALTER TABLE print_trace ADD COLUMN profile_fp TEXT DEFAULT ''")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_print_trace_model ON print_trace(user_id, model_path)")
         conn.execute("""CREATE TABLE IF NOT EXISTS trace_links (
             user_id INTEGER NOT NULL,
@@ -211,6 +235,24 @@ def _version_of(conn, uid, model_path, allow_snapshot=True):
     return v, sha
 
 
+def _profiles_by_id():
+    try:
+        from modules import slicer_import
+        return {p.get('id'): p for p in (slicer_import.load_slicer_profiles() or []) if isinstance(p, dict)}
+    except Exception:
+        return {}
+
+
+def _fp_for_history(conn, uid, history_id):
+    """Empreinte du profil de slicer noté sur une ligne d'historique (vide si aucun profil connu)."""
+    try:
+        row = conn.execute("SELECT slicer_profile_id FROM print_history WHERE id = ? AND user_id = ?", (history_id, uid)).fetchone()
+        pid = (row['slicer_profile_id'] if row else '') or ''
+        return profile_fingerprint(_profiles_by_id().get(pid)) if pid else ''
+    except Exception:
+        return ''
+
+
 def record(conn, uid, history_id, file_path, real_path=None):
     """Relie une ligne d'historique à la version du modèle. Ne lève jamais : l'impression ne doit pas échouer pour ça."""
     try:
@@ -223,8 +265,8 @@ def record(conn, uid, history_id, file_path, real_path=None):
         if model:
             version, msha = _version_of(conn, uid, model)
         fsha = msha if model == fp else _sha(real_path or _native(fp))
-        conn.execute("INSERT OR REPLACE INTO print_trace (history_id, user_id, model_path, model_version, model_sha, file_sha, created_at) "
-                     "VALUES (?,?,?,?,?,?,?)", (history_id, uid, model, version, msha, fsha, time.time()))
+        conn.execute("INSERT OR REPLACE INTO print_trace (history_id, user_id, model_path, model_version, model_sha, file_sha, profile_fp, created_at) "
+                     "VALUES (?,?,?,?,?,?,?,?)", (history_id, uid, model, version, msha, fsha, _fp_for_history(conn, uid, history_id), time.time()))
         return {'model_path': model, 'version': version}
     except Exception as e:
         try:
@@ -235,7 +277,7 @@ def record(conn, uid, history_id, file_path, real_path=None):
 
 
 def _rows(conn, uid, model_path=None):
-    sql = ("SELECT t.history_id, t.model_path, t.model_version, h.result, h.slicer_profile_name AS profile_name, "
+    sql = ("SELECT t.history_id, t.model_path, t.model_version, t.profile_fp, h.result, h.slicer_profile_name AS profile_name, "
            "h.sent_at, h.printer_id, h.file_name FROM print_trace t JOIN print_history h ON h.id = t.history_id "
            "WHERE t.user_id = ? AND h.user_id = ?")
     params = [uid, uid]
@@ -277,7 +319,7 @@ def api_trace_model():
         v['stats'] = stats.get(v['version'])
         v['prints'] = sum(1 for r in rows if r['model_version'] == v['version'])
     recent = [{'history_id': r['history_id'], 'sent_at': r['sent_at'], 'result': r['result'] or '', 'version': r['model_version'],
-               'profile': r['profile_name'] or '', 'printer': printers.get(r['printer_id']) or ''} for r in rows[:20]]
+               'profile': r['profile_name'] or '', 'profile_fp': r.get('profile_fp') or '', 'printer': printers.get(r['printer_id']) or ''} for r in rows[:20]]
     return jsonify({'path': path, 'versions': vers, 'combos': combos, 'best': best, 'recent': recent, 'prints': len(rows)})
 
 
@@ -366,8 +408,8 @@ def api_trace_entry():
             mv._ensure_table(conn)
             if not conn.execute("SELECT 1 FROM model_versions WHERE path = ? AND version = ?", (mp, version)).fetchone():
                 return jsonify({'error': 'version_not_found'}), 404
-        conn.execute("INSERT OR REPLACE INTO print_trace (history_id, user_id, model_path, model_version, model_sha, file_sha, created_at) "
-                     "VALUES (?,?,?,?,?,?,?)", (hid, uid, mp, version, '', '', time.time()))
+        conn.execute("INSERT OR REPLACE INTO print_trace (history_id, user_id, model_path, model_version, model_sha, file_sha, profile_fp, created_at) "
+                     "VALUES (?,?,?,?,?,?,?,?)", (hid, uid, mp, version, '', '', _fp_for_history(conn, uid, hid), time.time()))
         conn.commit()
     finally:
         conn.close()

@@ -1,0 +1,433 @@
+<!doctype html>
+<!-- Stellio plugin « G-code viewer » — GNU AGPL v3 or later — https://github.com/stellio-app/stellio-plugins -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>G-code viewer</title>
+<style>
+  :root { --bg: var(--st-bg, #1a1d23); --panel: var(--st-panel, #22262e); --card: var(--st-card, #2d3240); --hover: var(--st-hover, #363c4a); --text: var(--st-text, #e8e9eb); --muted: var(--st-muted, #9ca0ab); --border: var(--st-border, #363c4a); --accent: var(--st-accent, #4ea1d3); }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body { background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, sans-serif; display: flex; }
+  button, input, select { font: inherit; color: var(--text); }
+  /* liste des fichiers */
+  #files { width: 250px; flex: none; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+  #files.off { display: none; }
+  #stage.drag::after { content: attr(data-drop); position: absolute; inset: 8px; border: 2px dashed var(--accent); border-radius: 14px; display: grid; place-items: center; font-size: 16px; background: color-mix(in srgb, var(--bg) 80%, transparent); pointer-events: none; z-index: 9; }
+  #pick { width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis; }
+  #q { margin: 10px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); }
+  #list { overflow: auto; flex: 1; padding: 0 8px 10px; }
+  .item { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 7px 10px; border-radius: 8px; cursor: pointer; }
+  .item:hover { background: var(--card); }
+  .item.on { background: var(--accent); color: #fff; }
+  .item span, .item small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item small { color: var(--muted); }
+  .item.on small { color: rgba(255,255,255,.82); }
+  /* scène */
+  #main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  #stage { flex: 1; min-height: 0; position: relative; background: var(--bg); touch-action: none; }
+  canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; }
+  canvas#gl:active { cursor: grabbing; }
+  .ov { position: absolute; background: color-mix(in srgb, var(--panel) 90%, transparent); border: 1px solid var(--border); border-radius: 10px; padding: 6px; backdrop-filter: blur(4px); }
+  .ov.row { display: flex; gap: 4px; align-items: center; }
+  .b { border: 1px solid var(--border); background: var(--card); border-radius: 7px; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
+  .b:hover { border-color: var(--accent); }
+  .b.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #views { top: 10px; left: 10px; }
+  #opts { top: 10px; right: 64px; width: 210px; padding: 8px 10px; max-height: calc(100% - 24px); overflow: auto; }
+  #opts.off .body { display: none; }
+  #opts h4 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); display: flex; justify-content: space-between; cursor: pointer; }
+  #opts label { display: flex; gap: 7px; align-items: center; padding: 3px 0; color: var(--text); }
+  #opts .sel, #opts .rng { width: 100%; margin: 3px 0 6px; }
+  #opts select { width: 100%; padding: 5px 6px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg); margin: 3px 0 6px; }
+  #opts input[type=range], #moves, .vs input { accent-color: var(--accent); }
+  #legend { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; align-items: center; margin-top: 4px; font-size: 12px; color: var(--muted); }
+  #legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  #lay { top: 10px; right: 10px; bottom: 10px; width: 46px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  #lay .vs { flex: 1; display: flex; gap: 2px; min-height: 0; }
+  #lay input[type=range] { writing-mode: vertical-lr; direction: rtl; width: 18px; height: 100%; margin: 0; accent-color: var(--accent); }
+  #lay small { color: var(--muted); font-size: 11px; text-align: center; line-height: 1.15; }
+  #info { left: 10px; bottom: 10px; font-size: 12px; max-width: 460px; font-family: ui-monospace, Menlo, Consolas, monospace; line-height: 1.5; }
+  #info .k { color: var(--muted); }
+  #code { margin-top: 4px; color: var(--muted); white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+  #code b { color: var(--text); font-weight: 600; }
+  #msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); text-align: center; padding: 24px; pointer-events: none; }
+  .bar { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--panel); }
+  #moves { flex: 1; min-width: 100px; }
+  .bar select { padding: 5px 6px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg); }
+  .stats { display: flex; gap: 16px; flex-wrap: wrap; padding: 6px 12px; color: var(--muted); font-size: 12px; background: var(--panel); border-top: 1px solid var(--border); }
+  .stats b { color: var(--text); font-weight: 600; }
+  @media (max-width: 800px) { #files { position: absolute; z-index: 5; inset: 0 auto 0 0; width: 78%; } #opts { right: 62px; width: 180px; } #info { max-width: 60%; } }
+</style>
+</head>
+<body>
+<aside id="files"><button class="b" id="pick" type="button" style="margin:10px 10px 0"></button><input id="fin" type="file" accept=".gcode,.gco,.g,.nc,.txt,text/plain" hidden><input id="q" type="search" autocomplete="off"><div id="list"></div></aside>
+<div id="main">
+  <div id="stage">
+    <canvas id="gl"></canvas>
+    <div id="msg"></div>
+    <div id="views" class="ov row">
+      <button class="b" id="tf" title="Files">☰</button>
+      <button class="b" data-v="iso">Iso</button><button class="b" data-v="top" id="vtop"></button><button class="b" data-v="front" id="vfront"></button><button class="b" data-v="side" id="vside"></button><button class="b" data-v="reset" id="vreset">⟲</button>
+    </div>
+    <div id="opts" class="ov">
+      <h4 id="otitle"><span></span><span>▾</span></h4>
+      <div class="body">
+        <label><input type="checkbox" id="oext" checked><span id="loext"></span></label>
+        <label><input type="checkbox" id="otrav"><span id="lotrav"></span></label>
+        <label><input type="checkbox" id="oret"><span id="loret"></span></label>
+        <label><input type="checkbox" id="obed" checked><span id="lobed"></span></label>
+        <label><input type="checkbox" id="oaxes" checked><span id="loaxes"></span></label>
+        <div id="lcol" class="k"></div><select id="ocol"></select>
+        <div id="lbedsel"></div><select id="obedsel"></select>
+        <div id="lw"></div><input id="ow" class="rng" type="range" min="1" max="6" step="0.5" value="2.5">
+        <div id="legend"></div>
+      </div>
+    </div>
+    <div id="lay" class="ov">
+      <small id="lmaxl"></small>
+      <div class="vs"><input id="lmin" type="range" min="1" max="1" value="1"><input id="lmax" type="range" min="1" max="1" value="1"></div>
+      <small id="lminl"></small>
+    </div>
+    <div id="info" class="ov"><div id="pos"></div><div id="code"></div></div>
+  </div>
+  <div class="bar">
+    <button class="b" id="play">▶</button>
+    <select id="spd"><option value="0.25">×0.25</option><option value="1" selected>×1</option><option value="4">×4</option><option value="16">×16</option></select>
+    <input id="moves" type="range" min="0" max="1" value="1">
+    <span id="mlbl"></span>
+  </div>
+  <div class="stats" id="stats"></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  var T = {
+    fr: { openpc: 'Ouvrir un G-code de l\'ordinateur', drop: 'Déposez un fichier G-code ici', search: 'Rechercher un G-code…', none: 'Aucun G-code archivé. Ajoutez-en depuis une fiche de fichier ou un projet.', pick: 'Choisissez un G-code dans la liste.', load: 'Lecture du G-code… ', parse: 'Analyse… ', err: 'Impossible de lire ce fichier : ', empty: 'Aucun mouvement d\'extrusion trouvé dans ce fichier.', nogl: 'WebGL 2 est indisponible dans ce navigateur.',
+      top: 'Dessus', front: 'Face', side: 'Côté', opts: 'Affichage', ext: 'Extrusions', trav: 'Déplacements', ret: 'Rétractions', bed: 'Plateau', axes: 'Axes', color: 'Couleur', bedsel: 'Taille du plateau', width: 'Épaisseur du trait',
+      ctype: 'Type d\'extrusion', clayer: 'Couche', cspeed: 'Vitesse', cflow: 'Débit', cuni: 'Unie', layer: 'Couche', layers: 'Couches', height: 'Hauteur', fil: 'Filament', size: 'Zone', time: 'Durée estimée', moves: 'Mouvements', segs: 'segments',
+      t0: 'Autre', t1: 'Paroi externe', t2: 'Paroi interne', t3: 'Support', t4: 'Jupe / bord', t5: 'Remplissage', t6: 'Dessus / peau', t7: 'Pont', def: 'Standard', mm: 'mm', cur: 'Position' },
+    en: { openpc: 'Open a G-code from your computer', drop: 'Drop a G-code file here', search: 'Search G-code…', none: 'No archived G-code yet. Add one from a file sheet or a project.', pick: 'Pick a G-code from the list.', load: 'Reading G-code… ', parse: 'Parsing… ', err: 'Cannot read this file: ', empty: 'No extrusion moves found in this file.', nogl: 'WebGL 2 is not available in this browser.',
+      top: 'Top', front: 'Front', side: 'Side', opts: 'Display', ext: 'Extrusions', trav: 'Travel moves', ret: 'Retractions', bed: 'Bed', axes: 'Axes', color: 'Color', bedsel: 'Bed size', width: 'Line width',
+      ctype: 'Feature type', clayer: 'Layer', cspeed: 'Speed', cflow: 'Flow', cuni: 'Solid', layer: 'Layer', layers: 'Layers', height: 'Height', fil: 'Filament', size: 'Area', time: 'Estimated time', moves: 'Moves', segs: 'segments',
+      t0: 'Other', t1: 'Outer wall', t2: 'Inner wall', t3: 'Support', t4: 'Skirt / brim', t5: 'Infill', t6: 'Top / skin', t7: 'Bridge', def: 'Default', mm: 'mm', cur: 'Position' },
+    de: { openpc: 'G-Code vom Computer öffnen', drop: 'G-Code-Datei hier ablegen', search: 'G-Code suchen…', none: 'Noch kein archivierter G-Code. Fügen Sie einen über eine Dateikarte oder ein Projekt hinzu.', pick: 'Wählen Sie einen G-Code aus der Liste.', load: 'G-Code wird gelesen… ', parse: 'Analyse… ', err: 'Datei nicht lesbar: ', empty: 'Keine Extrusionsbewegungen in dieser Datei gefunden.', nogl: 'WebGL 2 ist in diesem Browser nicht verfügbar.', top: 'Oben', front: 'Vorne', side: 'Seite', opts: 'Anzeige', ext: 'Extrusionen', trav: 'Leerfahrten', ret: 'Retractions', bed: 'Druckbett', axes: 'Achsen', color: 'Farbe', bedsel: 'Druckbettgröße', width: 'Linienbreite', ctype: 'Strukturtyp', clayer: 'Schicht', cspeed: 'Geschwindigkeit', cflow: 'Fluss', cuni: 'Einfarbig', layer: 'Schicht', layers: 'Schichten', height: 'Höhe', fil: 'Filament', size: 'Bereich', time: 'Geschätzte Dauer', moves: 'Bewegungen', segs: 'Segmente', t0: 'Sonstiges', t1: 'Außenwand', t2: 'Innenwand', t3: 'Stützen', t4: 'Schürze / Rand', t5: 'Füllung', t6: 'Deckschicht', t7: 'Brücke', def: 'Standard', mm: 'mm', cur: 'Position' },
+    es: { openpc: 'Abrir un G-code del ordenador', drop: 'Suelte aquí un archivo G-code', search: 'Buscar G-code…', none: 'Aún no hay G-code archivado. Añada uno desde una ficha de archivo o un proyecto.', pick: 'Elija un G-code de la lista.', load: 'Leyendo el G-code… ', parse: 'Análisis… ', err: 'No se puede leer este archivo: ', empty: 'No se encontraron movimientos de extrusión en este archivo.', nogl: 'WebGL 2 no está disponible en este navegador.', top: 'Superior', front: 'Frontal', side: 'Lateral', opts: 'Visualización', ext: 'Extrusiones', trav: 'Desplazamientos', ret: 'Retracciones', bed: 'Cama', axes: 'Ejes', color: 'Color', bedsel: 'Tamaño de la cama', width: 'Grosor de línea', ctype: 'Tipo de estructura', clayer: 'Capa', cspeed: 'Velocidad', cflow: 'Flujo', cuni: 'Uniforme', layer: 'Capa', layers: 'Capas', height: 'Altura', fil: 'Filamento', size: 'Área', time: 'Duración estimada', moves: 'Movimientos', segs: 'segmentos', t0: 'Otro', t1: 'Pared exterior', t2: 'Pared interior', t3: 'Soporte', t4: 'Falda / borde', t5: 'Relleno', t6: 'Superficie superior', t7: 'Puente', def: 'Estándar', mm: 'mm', cur: 'Posición' },
+    pt: { openpc: 'Abrir um G-code do computador', drop: 'Largue aqui um ficheiro G-code', search: 'Procurar G-code…', none: 'Ainda não há G-code arquivado. Adicione um a partir de uma ficha de ficheiro ou de um projeto.', pick: 'Escolha um G-code na lista.', load: 'A ler o G-code… ', parse: 'A analisar… ', err: 'Não é possível ler este ficheiro: ', empty: 'Não foram encontrados movimentos de extrusão neste ficheiro.', nogl: 'O WebGL 2 não está disponível neste navegador.', top: 'Topo', front: 'Frente', side: 'Lado', opts: 'Visualização', ext: 'Extrusões', trav: 'Deslocações', ret: 'Retrações', bed: 'Mesa', axes: 'Eixos', color: 'Cor', bedsel: 'Tamanho da mesa', width: 'Espessura da linha', ctype: 'Tipo de estrutura', clayer: 'Camada', cspeed: 'Velocidade', cflow: 'Fluxo', cuni: 'Uniforme', layer: 'Camada', layers: 'Camadas', height: 'Altura', fil: 'Filamento', size: 'Área', time: 'Duração estimada', moves: 'Movimentos', segs: 'segmentos', t0: 'Outro', t1: 'Parede externa', t2: 'Parede interna', t3: 'Suporte', t4: 'Saia / borda', t5: 'Preenchimento', t6: 'Superfície superior', t7: 'Ponte', def: 'Padrão', mm: 'mm', cur: 'Posição' },
+    it: { openpc: 'Apri un G-code dal computer', drop: 'Trascina qui un file G-code', search: 'Cerca G-code…', none: 'Nessun G-code archiviato. Aggiungetene uno da una scheda file o da un progetto.', pick: 'Scegliete un G-code dalla lista.', load: 'Lettura del G-code… ', parse: 'Analisi… ', err: 'Impossibile leggere questo file: ', empty: 'Nessun movimento di estrusione trovato in questo file.', nogl: 'WebGL 2 non è disponibile in questo browser.', top: 'Alto', front: 'Fronte', side: 'Lato', opts: 'Visualizzazione', ext: 'Estrusioni', trav: 'Spostamenti', ret: 'Retrazioni', bed: 'Piatto', axes: 'Assi', color: 'Colore', bedsel: 'Dimensione del piatto', width: 'Spessore della linea', ctype: 'Tipo di struttura', clayer: 'Strato', cspeed: 'Velocità', cflow: 'Flusso', cuni: 'Tinta unita', layer: 'Strato', layers: 'Strati', height: 'Altezza', fil: 'Filamento', size: 'Area', time: 'Durata stimata', moves: 'Movimenti', segs: 'segmenti', t0: 'Altro', t1: 'Parete esterna', t2: 'Parete interna', t3: 'Supporto', t4: 'Skirt / brim', t5: 'Riempimento', t6: 'Superficie superiore', t7: 'Ponte', def: 'Standard', mm: 'mm', cur: 'Posizione' },
+    zh: { openpc: '从电脑打开 G-code', drop: '将 G-code 文件拖放到此处', search: '搜索 G-code…', none: '尚无已归档的 G-code。请从文件详情或项目中添加。', pick: '请从列表中选择一个 G-code。', load: '正在读取 G-code… ', parse: '正在解析… ', err: '无法读取此文件：', empty: '此文件中未找到挤出移动。', nogl: '此浏览器不支持 WebGL 2。', top: '顶视', front: '前视', side: '侧视', opts: '显示', ext: '挤出', trav: '空走', ret: '回抽', bed: '热床', axes: '坐标轴', color: '颜色', bedsel: '热床尺寸', width: '线宽', ctype: '结构类型', clayer: '层', cspeed: '速度', cflow: '流量', cuni: '单色', layer: '层', layers: '层数', height: '高度', fil: '耗材', size: '范围', time: '预计时间', moves: '移动', segs: '线段', t0: '其他', t1: '外墙', t2: '内墙', t3: '支撑', t4: '裙边 / 边缘', t5: '填充', t6: '顶面', t7: '搭桥', def: '默认', mm: 'mm', cur: '位置' },
+    ja: { openpc: 'パソコンから G-code を開く', drop: 'G-code ファイルをここにドロップ', search: 'G-code を検索…', none: 'アーカイブ済みの G-code がありません。ファイルの詳細またはプロジェクトから追加してください。', pick: 'リストから G-code を選んでください。', load: 'G-code を読み込み中… ', parse: '解析中… ', err: 'このファイルを読み込めません：', empty: 'このファイルに押出し移動が見つかりません。', nogl: 'このブラウザでは WebGL 2 を利用できません。', top: '上面', front: '正面', side: '側面', opts: '表示', ext: '押出し', trav: '移動（非押出し）', ret: 'リトラクション', bed: 'ベッド', axes: '軸', color: '色', bedsel: 'ベッドサイズ', width: '線の太さ', ctype: '構造タイプ', clayer: 'レイヤー', cspeed: '速度', cflow: '流量', cuni: '単色', layer: 'レイヤー', layers: 'レイヤー数', height: '高さ', fil: 'フィラメント', size: '範囲', time: '推定時間', moves: '移動', segs: 'セグメント', t0: 'その他', t1: '外壁', t2: '内壁', t3: 'サポート', t4: 'スカート / ブリム', t5: 'インフィル', t6: 'トップ面', t7: 'ブリッジ', def: '標準', mm: 'mm', cur: '位置' }
+  };
+  var L = T.en, $ = function (id) { return document.getElementById(id); };
+  var TYPE_RGB = [[150, 155, 165], [255, 196, 64], [236, 128, 52], [80, 170, 225], [140, 200, 150], [190, 70, 80], [250, 228, 120], [190, 120, 230]];
+  var files = [], cur = null, M = null, beds = [], bed = { x: 220, y: 220 };
+  var S = { lo: 1, hi: 1, moves: 0, ext: true, trav: false, ret: false, bed: true, axes: true, col: 'type', w: 2.5 };
+  var timer = 0, loadId = 0, text = '';
+
+  function fmt(n) { return n >= 1e6 ? (n / 1e6).toFixed(1) + ' MB' : n >= 1e3 ? Math.round(n / 1e3) + ' kB' : n + ' B'; }
+  function hms(s) { s = Math.round(s); var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? h + ' h ' + (m < 10 ? '0' : '') + m + ' min' : m + ' min ' + (s % 60) + ' s'; }
+  function msg(t) { $('msg').textContent = t || ''; }
+
+  /* ───────── Lecture du G-code ───────── */
+  function G(Type) { var a = new Type(1 << 15), n = 0; return { push: function (v) { if (n === a.length) { var b = new Type(a.length * 2); b.set(a); a = b; } a[n++] = v; }, done: function () { return a.slice(0, n); }, get n() { return n; } }; }
+  function classify(s) {
+    s = s.toLowerCase();
+    if (/skirt|brim/.test(s)) return 4; if (/support/.test(s)) return 3; if (/bridge/.test(s)) return 7;
+    if (/top|skin|ironing/.test(s)) return 6; if (/solid|infill|fill/.test(s)) return 5;
+    if (/external|outer|wall-outer/.test(s)) return 1; if (/inner|perimeter|wall/.test(s)) return 2; return 0;
+  }
+  function parse(txt, progress) {
+    return new Promise(function (resolve) {
+      var P = G(Float32Array), LY = G(Uint32Array), TY = G(Uint8Array), FD = G(Float32Array), FL = G(Float32Array), OF = G(Uint32Array), TM = G(Float32Array);
+      var TP = G(Float32Array), TL = G(Uint32Array), RT = G(Float32Array);
+      var layerStart = [0], layerZ = [], tStart = [0], layerOf = -1;
+      var x = 0, y = 0, z = 0, e = 0, f = 25, absXYZ = true, absE = true, type = 0, time = 0, fil = 0;
+      var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9, maxZ = 0, pos = 0, n = txt.length, curZ = -1;
+      var reNum = /([XYZEFIJR])\s*(-?\d*\.?\d+)/g, reType = /^;\s*(?:TYPE|FEATURE)\s*[:=]\s*(.+)$/i;
+      function newLayer(zz) { layerOf++; layerStart.push(P.n / 6); tStart.push(TP.n / 6); layerZ.push(zz); }
+      function seg(ax, ay, az, bx, by, bz, de, off, kind) {
+        var len = Math.sqrt((bx - ax) * (bx - ax) + (by - ay) * (by - ay) + (bz - az) * (bz - az)); time += len / Math.max(1, f);
+        if (kind === 0) {                                  // extrusion
+          if (layerOf < 0 || bz > curZ + 0.0005) { if (layerOf >= 0) layerStart[layerStart.length - 1] = P.n / 6; curZ = bz; layerStart.pop(); tStart.pop(); layerStart.push(P.n / 6); tStart.push(TP.n / 6); layerZ.push(bz); layerOf++; layerStart.push(0); tStart.push(0); }
+          P.push(ax); P.push(ay); P.push(az); P.push(bx); P.push(by); P.push(bz); LY.push(layerOf); TY.push(type); FD.push(f); FL.push(len > 0 ? de / len : 0); OF.push(off); TM.push(time);
+          fil += de;
+          if (bx < minX) minX = bx; if (bx > maxX) maxX = bx; if (by < minY) minY = by; if (by > maxY) maxY = by; if (ax < minX) minX = ax; if (ax > maxX) maxX = ax; if (ay < minY) minY = ay; if (ay > maxY) maxY = ay; if (bz > maxZ) maxZ = bz;
+        } else { TP.push(ax); TP.push(ay); TP.push(az); TP.push(bx); TP.push(by); TP.push(bz); TL.push(Math.max(0, layerOf)); }
+      }
+      function step() {
+        var t0 = Date.now();
+        while (pos < n && Date.now() - t0 < 25) {
+          var end = txt.indexOf('\n', pos); if (end < 0) end = n;
+          var off = pos, line = txt.substring(pos, end); pos = end + 1;
+          var c = line.charAt(0);
+          if (c === ';') { var mt = reType.exec(line.trim()); if (mt) type = classify(mt[1]); continue; }
+          var sc = line.indexOf(';'); if (sc >= 0) line = line.substring(0, sc);
+          line = line.trim(); if (!line) continue;
+          c = line.charAt(0); if (c !== 'G' && c !== 'M') continue;
+          var cmd = line.split(/\s+/)[0];
+          if (cmd === 'G90') { absXYZ = true; continue; } if (cmd === 'G91') { absXYZ = false; continue; }
+          if (cmd === 'M82') { absE = true; continue; } if (cmd === 'M83') { absE = false; continue; }
+          if (cmd === 'G92') { var m92 = /E\s*(-?\d*\.?\d+)/.exec(line); if (m92) e = parseFloat(m92[1]); continue; }
+          var arc = (cmd === 'G2' || cmd === 'G02') ? -1 : (cmd === 'G3' || cmd === 'G03') ? 1 : 0;
+          if (!arc && cmd !== 'G0' && cmd !== 'G00' && cmd !== 'G1' && cmd !== 'G01') continue;
+          var nx = x, ny = y, nz = z, ne = e, hasE = false, hasXY = false, I = 0, J = 0, hasIJ = false, m;
+          reNum.lastIndex = 0;
+          while ((m = reNum.exec(line))) {
+            var v = parseFloat(m[2]), k = m[1];
+            if (k === 'X') { nx = absXYZ ? v : x + v; hasXY = true; } else if (k === 'Y') { ny = absXYZ ? v : y + v; hasXY = true; } else if (k === 'Z') nz = absXYZ ? v : z + v;
+            else if (k === 'E') { ne = absE ? v : e + v; hasE = true; } else if (k === 'F') f = v / 60; else if (k === 'I') { I = v; hasIJ = true; } else if (k === 'J') { J = v; hasIJ = true; }
+          }
+          var de = ne - e;
+          if (hasE && de < -0.001 && !hasXY) { RT.push(x); RT.push(y); RT.push(z); }
+          else if (hasXY || nz !== z) {
+            var kind = (hasE && de > 0) ? 0 : 1;
+            if (arc && hasIJ && hasXY) {                              // arc G2/G3 : découpé en petits segments
+              var cx = x + I, cy = y + J, r = Math.sqrt(I * I + J * J), a0 = Math.atan2(y - cy, x - cx), a1 = Math.atan2(ny - cy, nx - cx), da = a1 - a0;
+              if (arc > 0 && da <= 0) da += 2 * Math.PI; if (arc < 0 && da >= 0) da -= 2 * Math.PI;
+              var ns = Math.max(2, Math.min(90, Math.ceil(Math.abs(da) * r / 1.0))), px = x, py = y, pz = z;
+              for (var s = 1; s <= ns; s++) { var qa = a0 + da * s / ns, qx = s === ns ? nx : cx + r * Math.cos(qa), qy = s === ns ? ny : cy + r * Math.sin(qa), qz = z + (nz - z) * s / ns; seg(px, py, pz, qx, qy, qz, de / ns, off, kind); px = qx; py = qy; pz = qz; }
+            } else seg(x, y, z, nx, ny, nz, de, off, kind);
+          }
+          x = nx; y = ny; z = nz; e = ne;
+        }
+        progress(pos / n);
+        if (pos < n) { setTimeout(step, 0); return; }
+        var ns2 = P.n / 6; if (!ns2) return resolve(null);
+        layerStart.pop(); tStart.pop(); layerStart.push(ns2); tStart.push(TP.n / 6);
+        var ls = layerStart.slice(0, layerZ.length + 1); ls[layerZ.length] = ns2; var ts = tStart.slice(0, layerZ.length + 1); ts[layerZ.length] = TP.n / 6;
+        resolve({ n: ns2, pos: P.done(), layer: LY.done(), type: TY.done(), feed: FD.done(), flow: FL.done(), off: OF.done(), tm: TM.done(), tpos: TP.done(), tlayer: TL.done(), ret: RT.done(),
+          layerStart: Uint32Array.from(ls), tStart: Uint32Array.from(ts), layerZ: Float32Array.from(layerZ), minX: minX, minY: minY, maxX: maxX, maxY: maxY, maxZ: maxZ, fil: fil, time: time });
+      }
+      step();
+    });
+  }
+
+  /* ───────── WebGL 2 : traits épais (une instance = un segment) ───────── */
+  var cv = $('gl'), gl = cv.getContext('webgl2', { antialias: true, preserveDrawingBuffer: true }), prog, U = {}, quad;
+  var VS = '#version 300 es\nin vec2 a_c; in vec3 a_a; in vec3 a_b; in vec4 a_col;\nuniform mat4 u_mvp; uniform vec2 u_vp; uniform float u_w; uniform float u_boost;\nout vec3 v_col;\n' +
+    'void main(){ vec4 pa=u_mvp*vec4(a_a,1.0), pb=u_mvp*vec4(a_b,1.0); vec2 sa=pa.xy/pa.w*u_vp, sb=pb.xy/pb.w*u_vp; vec2 d=sb-sa; float l=length(d); vec2 dir=l>1e-4?d/l:vec2(1.0,0.0); vec2 nr=vec2(-dir.y,dir.x);\n' +
+    ' vec4 p=a_c.x<0.5?pa:pb; vec2 off=(nr*a_c.y*u_w*0.5+dir*(a_c.x<0.5?-1.0:1.0)*u_w*0.5)/u_vp; gl_Position=vec4(p.xy+off*p.w,p.z,p.w); v_col=a_col.rgb*u_boost; }';
+  var FS = '#version 300 es\nprecision mediump float; in vec3 v_col; uniform float u_alpha; out vec4 o; void main(){ o=vec4(v_col,u_alpha); }';
+  function sh(t, s) { var o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; }
+  function initGL() {
+    prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    ['u_mvp', 'u_vp', 'u_w', 'u_boost', 'u_alpha'].forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
+    quad = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, quad); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, -1, 1, -1, 1, 1, 0, -1, 1, 1, 0, 1]), gl.STATIC_DRAW);
+  }
+  /* un « jeu » = positions (6 floats par segment) + couleurs (4 octets par segment) */
+  function mkSet(pos, col) { var o = { n: pos.length / 6, pb: gl.createBuffer(), cb: gl.createBuffer() }; gl.bindBuffer(gl.ARRAY_BUFFER, o.pb); gl.bufferData(gl.ARRAY_BUFFER, pos, gl.STATIC_DRAW); gl.bindBuffer(gl.ARRAY_BUFFER, o.cb); gl.bufferData(gl.ARRAY_BUFFER, col, gl.STATIC_DRAW); return o; }
+  function freeSet(o) { if (!o) return; gl.deleteBuffer(o.pb); gl.deleteBuffer(o.cb); }
+  function drawSet(o, first, count, width, boost, alpha) {
+    if (!o || count <= 0) return;
+    var A = gl.getAttribLocation(prog, 'a_a'), B = gl.getAttribLocation(prog, 'a_b'), C = gl.getAttribLocation(prog, 'a_col'), Q = gl.getAttribLocation(prog, 'a_c');
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad); gl.enableVertexAttribArray(Q); gl.vertexAttribPointer(Q, 2, gl.FLOAT, false, 0, 0); gl.vertexAttribDivisor(Q, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, o.pb); gl.enableVertexAttribArray(A); gl.vertexAttribPointer(A, 3, gl.FLOAT, false, 24, first * 24); gl.vertexAttribDivisor(A, 1);
+    gl.enableVertexAttribArray(B); gl.vertexAttribPointer(B, 3, gl.FLOAT, false, 24, first * 24 + 12); gl.vertexAttribDivisor(B, 1);
+    gl.bindBuffer(gl.ARRAY_BUFFER, o.cb); gl.enableVertexAttribArray(C); gl.vertexAttribPointer(C, 4, gl.UNSIGNED_BYTE, true, 4, first * 4); gl.vertexAttribDivisor(C, 1);
+    gl.uniform1f(U.u_w, width); gl.uniform1f(U.u_boost, boost); gl.uniform1f(U.u_alpha, alpha);
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, count);
+  }
+  function solidCol(n, r, g, b) { var a = new Uint8Array(n * 4); for (var i = 0; i < n; i++) { a[i * 4] = r; a[i * 4 + 1] = g; a[i * 4 + 2] = b; a[i * 4 + 3] = 255; } return a; }
+  function hsl(h, s, l) { h /= 360; var q = l < .5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q, f = function (t) { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < .5 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; }; return [f(h + 1 / 3) * 255, f(h) * 255, f(h - 1 / 3) * 255]; }
+  function extColors() {
+    var n = M.n, a = new Uint8Array(n * 4), i, c, t, acc = [78, 161, 211];
+    var fmax = 1, flmax = 0.0001; for (i = 0; i < n; i++) { if (M.feed[i] > fmax && M.feed[i] < 400) fmax = M.feed[i]; if (M.flow[i] > flmax && M.flow[i] < 1) flmax = M.flow[i]; }
+    var NL = Math.max(1, M.layerZ.length - 1);
+    for (i = 0; i < n; i++) {
+      if (S.col === 'type') c = TYPE_RGB[M.type[i]] || TYPE_RGB[0];
+      else if (S.col === 'layer') c = hsl(215 + 140 * (M.layer[i] / NL), .7, .58);
+      else if (S.col === 'speed') c = hsl(230 - 230 * Math.min(1, M.feed[i] / fmax), .75, .55);
+      else if (S.col === 'flow') c = hsl(230 - 230 * Math.min(1, M.flow[i] / flmax), .75, .55);
+      else c = acc;
+      a[i * 4] = c[0]; a[i * 4 + 1] = c[1]; a[i * 4 + 2] = c[2]; a[i * 4 + 3] = 255;
+    }
+    return a;
+  }
+  var setExt = null, setTrav = null, setRet = null, setBed = null, setAxes = null, setHead = null;
+  function buildModelSets() {
+    freeSet(setExt); freeSet(setTrav); freeSet(setRet);
+    setExt = mkSet(M.pos, extColors());
+    setTrav = M.tpos.length ? mkSet(M.tpos, solidCol(M.tpos.length / 6, 130, 140, 160)) : null;
+    var r = M.ret, rp = new Float32Array(r.length / 3 * 6); for (var i = 0; i < r.length / 3; i++) { rp.set([r[i * 3], r[i * 3 + 1], r[i * 3 + 2], r[i * 3], r[i * 3 + 1], r[i * 3 + 2] + 0.6], i * 6); }
+    setRet = r.length ? mkSet(rp, solidCol(r.length / 3, 240, 90, 90)) : null;
+  }
+  function buildBed() {
+    freeSet(setBed); freeSet(setAxes);
+    var P = [], C = [], X = bed.x, Y = bed.y, i, push = function (a, b, c, d, w) { P.push(a, b, 0, c, d, 0); C.push(w, w, w, 255); };
+    for (i = 0; i <= X; i += 10) push(i, 0, i, Y, i % 50 === 0 ? 90 : 52);
+    for (i = 0; i <= Y; i += 10) push(0, i, X, i, i % 50 === 0 ? 90 : 52);
+    push(0, 0, X, 0, 150); push(X, 0, X, Y, 150); push(X, Y, 0, Y, 150); push(0, Y, 0, 0, 150);
+    setBed = { n: P.length / 6, pb: gl.createBuffer(), cb: gl.createBuffer() };
+    gl.bindBuffer(gl.ARRAY_BUFFER, setBed.pb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(P), gl.STATIC_DRAW); gl.bindBuffer(gl.ARRAY_BUFFER, setBed.cb); gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array(C), gl.STATIC_DRAW);
+    setAxes = mkSet(new Float32Array([0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 40]), new Uint8Array([230, 70, 70, 255, 70, 200, 90, 255, 80, 130, 240, 255]));
+  }
+
+  /* ───────── Caméra ───────── */
+  var cam = { yaw: -2.2, pitch: 0.62, dist: 300, tx: 110, ty: 110, tz: 0 };
+  function mmul(a, b) { var o = new Float32Array(16); for (var i = 0; i < 4; i++) for (var j = 0; j < 4; j++) { var s = 0; for (var k = 0; k < 4; k++) s += a[k * 4 + j] * b[i * 4 + k]; o[i * 4 + j] = s; } return o; }
+  function mvp() {
+    var ce = Math.cos(cam.pitch), ex = cam.tx + cam.dist * ce * Math.cos(cam.yaw), ey = cam.ty + cam.dist * ce * Math.sin(cam.yaw), ez = cam.tz + cam.dist * Math.sin(cam.pitch);
+    var fx = cam.tx - ex, fy = cam.ty - ey, fz = cam.tz - ez, fl = Math.hypot(fx, fy, fz); fx /= fl; fy /= fl; fz /= fl;
+    var sx = fy * 1 - fz * 0, sy = fz * 0 - fx * 1, sz = 0, sl = Math.hypot(sx, sy, sz) || 1; sx /= sl; sy /= sl; sz /= sl;
+    var ux = sy * fz - sz * fy, uy = sz * fx - sx * fz, uz = sx * fy - sy * fx;
+    var V = new Float32Array([sx, ux, -fx, 0, sy, uy, -fy, 0, sz, uz, -fz, 0, -(sx * ex + sy * ey + sz * ez), -(ux * ex + uy * ey + uz * ez), (fx * ex + fy * ey + fz * ez), 1]);
+    var asp = cv.width / Math.max(1, cv.height), fov = 0.75, f = 1 / Math.tan(fov / 2), near = Math.max(0.3, cam.dist * 0.02), far = cam.dist * 12 + 2000;
+    var Pm = new Float32Array([f / asp, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) / (near - far), -1, 0, 0, 2 * far * near / (near - far), 0]);
+    return mmul(Pm, V);
+  }
+  var VIEWS = { iso: [-2.2, 0.62], top: [-Math.PI / 2, 1.5], front: [-Math.PI / 2, 0.03], side: [0, 0.03] };
+  function fitCam() {
+    var b = M ? [M.minX, M.maxX, M.minY, M.maxY, M.maxZ] : [0, bed.x, 0, bed.y, 0]; if (S.bed) { b[0] = Math.min(b[0], 0); b[1] = Math.max(b[1], bed.x); b[2] = Math.min(b[2], 0); b[3] = Math.max(b[3], bed.y); }
+    cam.tx = (b[0] + b[1]) / 2; cam.ty = (b[2] + b[3]) / 2; cam.tz = (M ? M.maxZ : 0) / 3; cam.dist = Math.max(60, Math.hypot(b[1] - b[0], b[3] - b[2], b[4]) * 1.15);
+  }
+  function setView(v) { if (v === 'reset') { fitCam(); v = 'iso'; } cam.yaw = VIEWS[v][0]; cam.pitch = VIEWS[v][1]; draw(); }
+
+  /* ───────── Dessin ───────── */
+  var raf = 0;
+  function draw() { if (!raf) raf = requestAnimationFrame(render); }
+  function head() { return M ? M.layerStart[S.hi - 1] + S.moves : 0; }
+  function render() {
+    raf = 0; if (!gl || !prog) return;
+    var d = window.devicePixelRatio || 1, r = cv.getBoundingClientRect(), w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d));
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    gl.viewport(0, 0, w, h); var cs = getComputedStyle(document.documentElement).getPropertyValue('--st-bg').trim() || '#1a1d23';
+    var bg = /^#([0-9a-f]{6})$/i.exec(cs); var br = bg ? parseInt(bg[1].slice(0, 2), 16) / 255 : .1, bgc = bg ? parseInt(bg[1].slice(2, 4), 16) / 255 : .11, bb = bg ? parseInt(bg[1].slice(4, 6), 16) / 255 : .14;
+    gl.clearColor(br, bgc, bb, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); gl.enable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.useProgram(prog); gl.uniformMatrix4fv(U.u_mvp, false, mvp()); gl.uniform2f(U.u_vp, w / 2, h / 2);
+    var lw = S.w * d;
+    if (S.bed && setBed) drawSet(setBed, 0, setBed.n, 1.2 * d, 1, 1);
+    if (S.axes && setAxes) drawSet(setAxes, 0, 3, 2.5 * d, 1, 1);
+    if (M) {
+      var lo = M.layerStart[S.lo - 1], top = M.layerStart[S.hi - 1], hd = top + S.moves;
+      if (S.trav && setTrav) { var t0 = M.tStart[S.lo - 1], t1 = M.tStart[S.hi]; drawSet(setTrav, t0, t1 - t0, Math.max(1, lw * 0.4), 1, 0.45); }
+      if (S.ext) { drawSet(setExt, lo, top - lo, lw, 1, 1); drawSet(setExt, top, hd - top, lw, 1.25, 1); }
+      if (S.ret && setRet) { drawSet(setRet, 0, setRet.n, Math.max(3, lw * 1.4), 1, 1); }
+      if (hd > 0) {
+        var i = hd - 1, hp = new Float32Array([M.pos[i * 6 + 3], M.pos[i * 6 + 4], M.pos[i * 6 + 5], M.pos[i * 6 + 3], M.pos[i * 6 + 4], M.pos[i * 6 + 5] + 14]);
+        freeSet(setHead); setHead = mkSet(hp, new Uint8Array([255, 255, 255, 255])); gl.disable(gl.DEPTH_TEST); drawSet(setHead, 0, 1, 4 * d, 1, 1);
+      }
+    }
+  }
+
+  /* ───────── Interface ───────── */
+  function legend() {
+    var l = $('legend'); l.textContent = '';
+    if (S.col !== 'type') { var s = document.createElement('span'); s.textContent = { layer: L.clayer, speed: L.cspeed, flow: L.cflow, uni: L.cuni }[S.col] || ''; l.appendChild(s); return; }
+    for (var i = 0; i < 8; i++) { var sw = document.createElement('i'); sw.style.background = 'rgb(' + TYPE_RGB[i].join(',') + ')'; var t = document.createElement('span'); t.textContent = L['t' + i]; l.appendChild(sw); l.appendChild(t); }
+  }
+  function info() {
+    var p = $('pos'), cd = $('code'); if (!M) { p.textContent = ''; cd.textContent = ''; return; }
+    var hd = head(), i = Math.max(0, hd - 1), top = S.hi - 1;
+    $('lmaxl').textContent = S.hi + '/' + M.layerZ.length; $('lminl').textContent = S.lo;
+    p.textContent = '';
+    [[L.layer, S.hi + ' / ' + M.layerZ.length + '  (Z ' + M.layerZ[top].toFixed(2) + ')'], ['X Y Z', M.pos[i * 6 + 3].toFixed(1) + '  ' + M.pos[i * 6 + 4].toFixed(1) + '  ' + M.pos[i * 6 + 5].toFixed(2)], [L.cspeed, M.feed[i].toFixed(0) + ' mm/s']].forEach(function (r) { var d = document.createElement('div'), k = document.createElement('span'); k.className = 'k'; k.textContent = r[0] + ' '; d.appendChild(k); d.appendChild(document.createTextNode(r[1])); p.appendChild(d); });
+    var o = M.off[i], b0 = text.indexOf('\n', o), line = text.substring(o, b0 < 0 ? text.length : b0).trim().slice(0, 70);
+    cd.textContent = ''; var bt = document.createElement('b'); bt.textContent = line; cd.appendChild(bt);
+    $('mlbl').textContent = S.moves + ' / ' + (M.layerStart[S.hi] - M.layerStart[S.hi - 1]) + ' ' + L.moves.toLowerCase();
+  }
+  function stats() {
+    var s = $('stats'); s.textContent = ''; if (!M) return;
+    var grams = M.fil * Math.PI * 0.875 * 0.875 * 1.24 / 1000;
+    [[L.layers, M.layerZ.length], [L.height, M.maxZ.toFixed(1) + ' mm'], [L.size, (M.maxX - M.minX).toFixed(0) + ' × ' + (M.maxY - M.minY).toFixed(0) + ' mm'], [L.fil, (M.fil / 1000).toFixed(2) + ' m ≈ ' + grams.toFixed(0) + ' g'], [L.time, hms(M.time)], [L.segs, M.n.toLocaleString()]].forEach(function (p) {
+      var sp = document.createElement('span'); sp.textContent = p[0] + ' '; var b = document.createElement('b'); b.textContent = p[1]; sp.appendChild(b); s.appendChild(sp);
+    });
+  }
+  function sync() {
+    if (!M) return; var nl = M.layerZ.length;
+    ['lmin', 'lmax'].forEach(function (id) { $(id).max = nl; }); $('lmin').value = S.lo; $('lmax').value = S.hi;
+    var cnt = M.layerStart[S.hi] - M.layerStart[S.hi - 1]; $('moves').max = cnt; $('moves').value = S.moves; info(); draw();
+  }
+  function setHi(v, full) { S.hi = Math.max(S.lo, Math.min(M.layerZ.length, v)); S.moves = full === false ? 0 : M.layerStart[S.hi] - M.layerStart[S.hi - 1]; sync(); }
+  function stop() { clearInterval(timer); timer = 0; $('play').textContent = '▶'; }
+  $('play').onclick = function () {
+    if (!M) return; if (timer) return stop();
+    if (S.hi >= M.layerZ.length && S.moves >= M.layerStart[S.hi] - M.layerStart[S.hi - 1]) { S.hi = S.lo; S.moves = 0; }
+    $('play').textContent = '⏸';
+    timer = setInterval(function () {
+      var per = Math.max(1, Math.round(M.n / 1500 * parseFloat($('spd').value))), cnt = M.layerStart[S.hi] - M.layerStart[S.hi - 1];
+      S.moves += per;
+      while (S.moves >= cnt) { if (S.hi >= M.layerZ.length) { S.moves = cnt; stop(); break; } S.moves -= cnt; S.hi++; cnt = M.layerStart[S.hi] - M.layerStart[S.hi - 1]; }
+      sync();
+    }, 33);
+  };
+  $('lmax').oninput = function () { stop(); setHi(parseInt(this.value, 10) || 1); };
+  $('lmin').oninput = function () { stop(); S.lo = Math.min(parseInt(this.value, 10) || 1, S.hi); sync(); };
+  $('moves').oninput = function () { stop(); S.moves = parseInt(this.value, 10) || 0; info(); draw(); };
+  [['oext', 'ext'], ['otrav', 'trav'], ['oret', 'ret'], ['obed', 'bed'], ['oaxes', 'axes']].forEach(function (p) { $(p[0]).onchange = function () { S[p[1]] = this.checked; draw(); }; });
+  $('ocol').onchange = function () { S.col = this.value; if (M) { freeSet(setExt); setExt = mkSet(M.pos, extColors()); } legend(); draw(); };
+  $('ow').oninput = function () { S.w = parseFloat(this.value); draw(); };
+  $('obedsel').onchange = function () { var v = this.value.split('x'); bed = { x: +v[0], y: +v[1] }; buildBed(); if (M) { fitCam(); } draw(); };
+  $('otitle').onclick = function () { $('opts').classList.toggle('off'); };
+  $('tf').onclick = function () { $('files').classList.toggle('off'); setTimeout(draw, 30); };
+  Array.prototype.forEach.call(document.querySelectorAll('[data-v]'), function (b) { b.onclick = function () { setView(this.dataset.v); }; });
+  document.addEventListener('keydown', function (e) { if (!M || e.target.tagName === 'INPUT' && e.target.type === 'search') return; if (e.key === 'ArrowUp') { setHi(S.hi + 1); e.preventDefault(); } else if (e.key === 'ArrowDown') { setHi(S.hi - 1); e.preventDefault(); } else if (e.key === 'ArrowRight') { S.moves = Math.min(+$('moves').max, S.moves + 1); sync(); } else if (e.key === 'ArrowLeft') { S.moves = Math.max(0, S.moves - 1); sync(); } else if (e.key === ' ') { $('play').click(); e.preventDefault(); } });
+
+  // souris / tactile : rotation, déplacement (clic droit ou Maj), zoom (molette / pincement)
+  var ptrs = {}, lastPinch = 0;
+  cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  cv.addEventListener('pointerdown', function (e) { cv.setPointerCapture(e.pointerId); ptrs[e.pointerId] = { x: e.clientX, y: e.clientY, b: e.button, s: e.shiftKey }; lastPinch = 0; });
+  cv.addEventListener('pointerup', function (e) { delete ptrs[e.pointerId]; }); cv.addEventListener('pointercancel', function (e) { delete ptrs[e.pointerId]; });
+  cv.addEventListener('pointermove', function (e) {
+    var p = ptrs[e.pointerId]; if (!p) return; var ids = Object.keys(ptrs), dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+    if (ids.length >= 2) { var a = ptrs[ids[0]], b = ptrs[ids[1]], dd = Math.hypot(a.x - b.x, a.y - b.y); if (lastPinch) cam.dist = Math.max(15, Math.min(4000, cam.dist * lastPinch / dd)); lastPinch = dd; draw(); return; }
+    if (p.b === 2 || p.s) { var k = cam.dist * 0.0016, sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw); cam.tx += (dx * sy - dy * cy * Math.sin(cam.pitch)) * k; cam.ty += (-dx * cy - dy * sy * Math.sin(cam.pitch)) * k; cam.tz += dy * Math.cos(cam.pitch) * k; }
+    else { cam.yaw -= dx * 0.006; cam.pitch = Math.max(-1.5, Math.min(1.5, cam.pitch + dy * 0.006)); }
+    draw();
+  });
+  cv.addEventListener('wheel', function (e) { e.preventDefault(); cam.dist = Math.max(15, Math.min(4000, cam.dist * Math.exp(e.deltaY * 0.0012))); draw(); }, { passive: false });
+  window.addEventListener('resize', draw);
+
+  /* ───────── Fichiers ───────── */
+  function renderList() {
+    var q = $('q').value.trim().toLowerCase(), box = $('list'); box.textContent = '';
+    files.filter(function (f) { return !q || f.name.toLowerCase().indexOf(q) >= 0; }).forEach(function (f) {
+      var b = document.createElement('button'); b.className = 'item' + (cur && cur.id === f.id ? ' on' : ''); b.type = 'button'; b.title = f.name; var nm = document.createElement('span'); nm.textContent = f.name; b.appendChild(nm);
+      var s = document.createElement('small'); s.textContent = fmt(f.size || 0) + (f.project_name ? ' · ' + f.project_name : ''); b.appendChild(s); b.onclick = function () { open(f); }; box.appendChild(b);
+    });
+  }
+  function load(f, getText) {
+    stop(); cur = f; M = null; var my = ++loadId; renderList(); msg(L.load); stats(); info(); draw();
+    getText().then(function (t) { text = t; return parse(t, function (p) { if (my === loadId) msg(L.parse + Math.round(p * 100) + ' %'); }); }).then(function (m) {
+      if (my !== loadId) return; if (!m) { msg(L.empty); return; }
+      M = m; msg(''); S.lo = 1; fitCam(); buildModelSets(); stats(); setHi(M.layerZ.length); if (window.innerWidth < 800) $('files').classList.add('off');
+    }).catch(function (e) { msg(L.err + e.message); });
+  }
+  function open(f) { load(f, function () { return window.stellio.api('/api/projects/gcodes/' + f.id + '/download', 'text'); }); }
+  function openLocal(file) {
+    if (!file) return; var f = { id: 'pc:' + file.name, name: file.name, size: file.size, project_name: '💻', local: true };
+    files = files.filter(function (x) { return !x.local || x.id !== f.id; }); files.unshift(f);
+    load(f, function () { return new Promise(function (ok, ko) { var r = new FileReader(); r.onload = function () { ok(String(r.result)); }; r.onerror = function () { ko(new Error(file.name)); }; r.readAsText(file); }); });
+  }
+  $('pick').onclick = function () { $('fin').click(); };
+  $('fin').onchange = function () { openLocal(this.files && this.files[0]); this.value = ''; };
+  var st = $('stage');
+  ['dragenter', 'dragover'].forEach(function (n) { st.addEventListener(n, function (e) { e.preventDefault(); st.classList.add('drag'); }); });
+  ['dragleave', 'drop'].forEach(function (n) { st.addEventListener(n, function (e) { e.preventDefault(); st.classList.remove('drag'); if (n === 'drop' && e.dataTransfer && e.dataTransfer.files[0]) openLocal(e.dataTransfer.files[0]); }); });
+  function setLang() {
+    L = T[(window.stellio && window.stellio.lang || 'en').slice(0, 2)] || T.en; $('q').placeholder = L.search; $('pick').textContent = '📂 ' + L.openpc; $('stage').setAttribute('data-drop', L.drop);
+    $('otitle').firstChild.textContent = L.opts; $('vtop').textContent = L.top; $('vfront').textContent = L.front; $('vside').textContent = L.side;
+    $('loext').textContent = L.ext; $('lotrav').textContent = L.trav; $('loret').textContent = L.ret; $('lobed').textContent = L.bed; $('loaxes').textContent = L.axes; $('lcol').textContent = L.color; $('lbedsel').textContent = L.bedsel; $('lw').textContent = L.width;
+    var oc = $('ocol'), v = oc.value || 'type'; oc.textContent = '';
+    [['type', L.ctype], ['layer', L.clayer], ['speed', L.cspeed], ['flow', L.cflow], ['uni', L.cuni]].forEach(function (p) { var o = document.createElement('option'); o.value = p[0]; o.textContent = p[1]; oc.appendChild(o); }); oc.value = v;
+    legend(); if (!M) msg(files.length ? L.pick : L.none); stats(); info();
+  }
+  function fillBeds(printers) {
+    var sel = $('obedsel'); sel.textContent = ''; var seen = {};
+    function add(label, x, y) { var k = x + 'x' + y; if (seen[k]) return; seen[k] = 1; var o = document.createElement('option'); o.value = k; o.textContent = label + ' (' + x + '×' + y + ')'; sel.appendChild(o); }
+    (Array.isArray(printers) ? printers : printers && printers.printers || []).forEach(function (p) { var c = p.config || p || {}, x = Math.round(+c.bed_x), y = Math.round(+c.bed_y); if (x > 0 && y > 0) add(p.name, x, y); });
+    [[180, 180], [220, 220], [256, 256], [300, 300], [350, 350]].forEach(function (b) { add(L.def, b[0], b[1]); });
+    sel.selectedIndex = 0; var v = sel.value.split('x'); bed = { x: +v[0], y: +v[1] }; buildBed(); fitCam(); draw();
+  }
+  function start() {
+    try { initGL(); } catch (e) { msg(L.nogl); return; }
+    setLang(); fillBeds([]); $('q').oninput = renderList;
+    window.stellio.api('/api/printers').then(fillBeds, function () { /* facultatif */ });
+    window.stellio.api('/api/gcodes?limit=200').then(function (d) { files = d.gcodes || []; renderList(); if (!M) msg(files.length ? L.pick : L.none); }).catch(function (e) { msg(L.err + e.message); });
+  }
+  if (!gl) { msg(T.en.nogl); } else if (window.stellio && window.stellio.ready) start(); else document.addEventListener('stellio-ready', start);
+})();
+</script>
+</body>
+</html>

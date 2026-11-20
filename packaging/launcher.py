@@ -139,7 +139,8 @@ def _preload_dependencies(log) -> None:
 def main() -> int:
     app_dir = _app_dir()
     logger = _setup_bootstrap_logger(app_dir)
-    log = logger.info
+    # Processus de rendu de miniature lancé par l'application : on n'écrit rien (sinon launcher.log se remplit de faux « Demarrage »)
+    log = (lambda *_a, **_k: None) if "--stellio-thumb-worker" in sys.argv else logger.info
 
     main_py = app_dir / "main.py"
     if not main_py.exists():

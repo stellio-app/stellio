@@ -7,7 +7,7 @@ flask = pytest.importorskip('flask')
 
 
 def _mod():
-    spec = importlib.util.spec_from_file_location('production_planning_t', os.path.join(ROOT, 'modules', 'production_planning.py'))
+    spec = importlib.util.spec_from_file_location('production_planning_t', __import__('conftest').mod_path('production_planning'))
     m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
     return m
 
@@ -175,3 +175,170 @@ def test_alertes_retard_dedoublonnees(tmp_path):
     m.planning_alerts_once(NOW)
     m.planning_alerts_once(NOW)
     assert [t for t, _k in sent].count('planning_late') == 1
+
+
+# ── v1.1.7 : coût total, rendement, retards ──────────────────────────────────
+def JC(id, qty=10, done=0, scrap=0, status='queued', due='', done_at='', **kw):
+    j = J(id, qty=qty, done=done, status=status, due=due, model={'m': 1.0, 'e': 0.2, 'w': 0.3, 'f': 0.5, 'weight_g': 20, 'hours': 1})
+    j.update({'scrap': scrap, 'actual_hours': None, 'actual_weight_g': None, 'done_at': done_at})
+    j.update(kw)
+    return j
+
+
+class _Row(dict):
+    pass
+
+
+def test_order_cost_estime_et_rendement():
+    m = _mod()
+    c = m.order_cost(_Row(JC(1, qty=10, done=8, scrap=2, status='done')))
+    assert c['est']['total'] == pytest.approx(20.0)           # (1+0.2+0.3+0.5) × 10
+    assert c['done'] == 8 and c['scrap'] == 2
+    assert c['yield_pct'] == pytest.approx(80.0)
+    assert c['waste'] > 0
+
+
+def test_order_cost_sans_devis_chiffre():
+    m = _mod()
+    assert m.order_cost(_Row(J(1))) is None
+
+
+def test_production_stats_ignore_annulees_et_compte_retards():
+    m = _mod()
+    jobs = [
+        _Row(JC(1, qty=10, done=10, status='done', due='2026-11-05', done_at='2026-11-08 10:00:00')),     # 3 j de retard
+        _Row(JC(2, qty=5, done=4, scrap=1, status='done', due='2026-11-10', done_at='2026-11-09 10:00:00')),   # à l'heure
+        _Row(JC(3, qty=5, status='cancelled')),
+    ]
+    s = m.production_stats(jobs, '2026-11-01', '2026-11-16')
+    assert s['cost']['orders'] == 2
+    assert s['yield']['done'] == 14 and s['yield']['scrap'] == 1
+    assert s['delays']['late'] == 1 and s['delays']['max_days'] == 3
+    assert s['cost']['est'] > 0
+
+
+def test_production_stats_vide():
+    m = _mod()
+    s = m.production_stats([], '2026-11-01', '2026-11-16')
+    assert s['cost']['orders'] == 0 and s['by_order'] == []
+
+
+def test_notify_emet_le_webhook_une_seule_fois_par_cle():
+    m = _mod()
+    seen, got = set(), []
+    m._insert_notification_once = lambda uid, t, ti, msg, page, key: (key not in seen) and not seen.add(key)
+    m._webhook_emit = lambda ev, data, uid: got.append((ev, data, uid))
+    m._notify(3, 'planning_late', 'T', 'M', 'k1', 'order.late', {'x': 1})
+    m._notify(3, 'planning_late', 'T', 'M', 'k1', 'order.late', {'x': 1})      # même clé : notification dédoublonnée, donc pas de second webhook
+    m._notify(3, 'planning_late', 'T', 'M', 'k2')                              # sans évènement : rien
+    assert got == [('order.late', {'x': 1}, 3)]
+
+
+def test_rentabilite_par_imprimante():
+    m = _mod()
+    # devis 1 : 100 € pour 10 pièces réparties sur deux commandes (imprimante 1 : 6 pièces, imprimante 2 : 4)
+    a = JC(1, qty=6, done=6, status='done', printer_id=1, done_at='2026-11-10', quote_id=7, actual_hours=6.0)
+    b = JC(2, qty=4, done=2, scrap=1, status='printing', printer_id=2, quote_id=7, actual_hours=2.0)
+    c = J(3, qty=2, done=2, status='done', printer=2); c['done_at'] = '2026-11-11'              # sans devis chiffré : ni revenu ni coût
+    old = JC(4, qty=5, done=5, status='done', printer_id=1, done_at='2026-01-01', quote_id=8)   # hors période
+    ann = JC(5, status='cancelled', printer_id=1, quote_id=7)
+    rows = m.printer_profit([_Row(x) for x in (a, b, c, old, ann)], {7: 100.0, 8: 500.0}, PR, '2026-09-01')
+    by = {r['printer_id']: r for r in rows}
+    assert set(by) == {1, 2} and by[1]['orders'] == 1 and by[2]['orders'] == 2
+    p1, p2 = by[1], by[2]
+    assert p1['revenue'] == pytest.approx(100.0 * 6 / 10) and p1['done'] == 6 and p1['hours'] == 6.0 and p1['unpriced'] == 0
+    assert p1['cost'] == pytest.approx(6 * 2.0) and p1['margin'] == pytest.approx(60 - 12) and p1['margin_per_hour'] == pytest.approx(8.0)
+    assert p2['revenue'] == pytest.approx(100.0 * 2 / 10) and p2['unpriced'] == 1 and p2['scrap'] == 1 and p2['waste'] == pytest.approx(1 * 1.5)
+    assert p2['done'] == 4 and p2['hours'] == 4.0 and p2['cost'] == pytest.approx(5.5) and p2['margin'] == pytest.approx(14.5) and p2['yield_pct'] == pytest.approx(80.0)
+    assert rows[0]['printer_id'] == 1                                                      # meilleure marge par heure d'abord
+    assert m.printer_profit([], {}, PR, '2026-09-01') == []
+    # imprimante non attribuée : ligne à part, jamais fusionnée avec une autre
+    n = m.printer_profit([_Row(JC(6, qty=1, done=1, status='done', printer_id=None, done_at='2026-11-12'))], {}, PR, '2026-09-01')
+    assert len(n) == 1 and n[0]['printer_id'] is None and n[0]['revenue'] == 0 and n[0]['name'] == '—'
+
+
+def test_route_expose_la_rentabilite_meme_sans_table_de_devis(tmp_path):
+    c, m, get_db = _client(tmp_path)
+    d = c.get('/api/planning').get_json()
+    assert 'printer_profit' in d and isinstance(d['printer_profit'], list)
+    assert d['printer_profit'][0]['printer_id'] == 1 and d['printer_profit'][0]['revenue'] == 0 and d['printer_profit'][0]['unpriced'] == 1
+    # avec devis et colonnes complètes
+    x = get_db()
+    x.execute("CREATE TABLE quotes (id INTEGER PRIMARY KEY, user_id INTEGER, total_value REAL)"); x.execute("INSERT INTO quotes VALUES (9, 1, 80.0)")
+    for col in ("quote_id INTEGER DEFAULT 0", "scrap INTEGER DEFAULT 0", "actual_hours REAL DEFAULT 0", "actual_weight_g REAL"):
+        x.execute("ALTER TABLE print_jobs ADD COLUMN " + col)
+    x.execute("UPDATE print_jobs SET quote_id = 9, qty_done = 2, est_hours = 1.5, cost_model = ?", (json.dumps({'m': 1, 'e': 0, 'w': 1, 'f': 0, 'weight_g': 10, 'hours': 1.5}),))
+    x.commit(); x.close()
+    r = c.get('/api/planning').get_json()['printer_profit'][0]
+    assert r['revenue'] == pytest.approx(80.0 * 2 / 4) and r['cost'] == pytest.approx(2 * 2.0) and r['margin'] == pytest.approx(36.0) and r['hours'] == 3.0 and r['margin_per_hour'] == pytest.approx(12.0)
+
+
+# ── temps de travail humain (v1.1.7) ───────────────────────────────────────────────────────────────────────────────
+
+def test_temps_de_travail_estime_et_reel():
+    m = _mod()
+    j = _Row(JC(1, qty=10, done=4, status='printing', labor_setup_min=30, labor_min_piece=6))
+    assert m.labor_minutes(j, 'est') == 30 + 6 * 10                  # préparation + toutes les pièces demandées
+    assert m.labor_minutes(j, 'real') == 30 + 6 * 4                  # préparation (commencée) + pièces faites
+    pas_commencee = _Row(JC(2, qty=10, done=0, status='queued', labor_setup_min=30, labor_min_piece=6))
+    assert m.labor_minutes(pas_commencee, 'real') == 0               # rien de fait : rien de compté
+    mesure = _Row(JC(3, qty=10, done=4, status='printing', labor_setup_min=30, labor_min_piece=6, labor_hours_actual=2.0))
+    assert m.labor_minutes(mesure, 'real') == 120                    # un temps mesuré remplace l'estimation réelle
+    assert m.labor_minutes(_Row(JC(4)), 'est') == 0 and m.labor_minutes(_Row(JC(5, labor_min_piece=-5)), 'est') == 0   # absent / négatif : 0
+
+
+def test_taux_horaire_borne():
+    m = _mod()
+    assert m.clean_rate('abc') == 0 and m.clean_rate(None) == 0 and m.clean_rate(-3) == 0
+    assert m.clean_rate(25.456) == 25.46 and m.clean_rate(99999) == 1000.0 and m.clean_rate(float('nan')) == 0
+
+
+def test_le_travail_s_ajoute_au_cout_sans_changer_le_reste():
+    m = _mod()
+    base = m.order_cost(_Row(JC(1, qty=10, done=5, status='printing')))
+    sans = m.order_cost(_Row(JC(1, qty=10, done=5, status='printing', labor_min_piece=6)), 0)       # taux 0 : rien ne change
+    assert sans == base and 'labor' not in sans['real']
+    avec = m.order_cost(_Row(JC(1, qty=10, done=5, status='printing', labor_setup_min=30, labor_min_piece=6)), 30.0)
+    assert avec['est']['labor'] == pytest.approx((30 + 60) / 60 * 30) and avec['est']['total'] == pytest.approx(base['est']['total'] + 45.0)
+    assert avec['real']['labor'] == pytest.approx((30 + 30) / 60 * 30) and avec['real']['total'] == pytest.approx(base['real']['total'] + 30.0)
+
+
+def test_rentabilite_avec_travail_humain():
+    m = _mod()
+    a = JC(1, qty=6, done=6, status='done', printer_id=1, done_at='2026-11-10', quote_id=7, actual_hours=6.0, labor_setup_min=60, labor_min_piece=10)
+    sans_devis = J(3, qty=2, done=2, status='done', printer=2); sans_devis['done_at'] = '2026-11-11'; sans_devis['labor_min_piece'] = 30
+    rows = m.printer_profit([_Row(a), _Row(sans_devis)], {7: 100.0}, PR, '2026-09-01', labor_rate=24.0)
+    by = {r['printer_id']: r for r in rows}
+    h = (60 + 6 * 10) / 60                                           # 2 h de travail sur la commande chiffrée
+    assert by[1]['labor_hours'] == pytest.approx(h) and by[1]['labor_cost'] == pytest.approx(h * 24)
+    assert by[1]['cost'] == pytest.approx(6 * 2.0 + h * 24) and by[1]['margin'] == pytest.approx(100 - 12 - 48)   # revenu 100 (le seul lot du devis)
+    assert by[2]['labor_hours'] == pytest.approx(1.0) and by[2]['labor_cost'] == 0 and by[2]['unpriced'] == 1      # heures comptées, pas valorisées sans devis
+    zero = {r['printer_id']: r for r in m.printer_profit([_Row(a)], {7: 100.0}, PR, '2026-09-01')}
+    assert zero[1]['labor_cost'] == 0 and zero[1]['margin'] == pytest.approx(88.0)                                     # taux 0 : marge inchangée
+
+
+def test_route_taux_horaire_et_commandes(tmp_path):
+    c, m, get_db = _client(tmp_path)
+    assert c.get('/api/planning/settings').get_json()['labor_rate'] == 0
+    assert c.put('/api/planning/settings', json={'default': {'hours_per_day': 6, 'days': [0, 1]}, 'printers': []}).status_code == 200
+    assert c.put('/api/planning/settings', json={'labor_rate': 27.5}).status_code == 200                     # seul le taux change
+    s = c.get('/api/planning/settings').get_json()
+    assert s['labor_rate'] == 27.5 and s['default']['hours_per_day'] == 6 and s['default']['days'] == [0, 1]   # heures et jours conservés
+    assert c.put('/api/planning/settings', json={'labor_rate': 5000}).status_code == 200
+    assert c.get('/api/planning/settings').get_json()['labor_rate'] == 1000.0                                # borné
+    assert c.get('/api/planning').get_json()['labor_rate'] == 1000.0
+
+
+def test_marge_des_commandes_avec_travail():
+    from conftest import load_from_main
+    import importlib.util, os, sys
+    sys.path.insert(0, os.path.dirname(__file__))
+    ns = load_from_main(['_job_margin'], {'json': json, 'production_planning': _mod()})
+    r = JC(1, qty=10, done=5, status='printing', labor_setup_min=30, labor_min_piece=6)
+    r = _Row(r)
+    r['cost_model'] = json.dumps({'m': 1.0, 'e': 0.2, 'w': 0.3, 'f': 0.5, 'weight_g': 20, 'hours': 1})
+    base = ns['_job_margin'](r, 100.0)
+    avec = ns['_job_margin'](r, 100.0, 30.0)
+    assert base['labor_est'] == 0 and base['labor_real'] == 0
+    assert avec['labor_est'] == pytest.approx(45.0) and avec['labor_real'] == pytest.approx(30.0)
+    assert avec['est_margin'] == pytest.approx(base['est_margin'] - 45.0) and avec['real_margin'] == pytest.approx(base['real_margin'] - 30.0)

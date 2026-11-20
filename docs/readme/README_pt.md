@@ -129,9 +129,10 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 - 🔁 **Reimprimir como da última vez**: a partir do histórico, um clique reabre a janela de envio com a mesma impressora, perfil e carretel
 - 🎛️ **Calibrações**: salve flow, pressure advance, temperaturas… por filamento e por impressora, recuperadas na janela de envio ao slicer
 - 👥 **Modo colaborativo leve**: veja se outro dispositivo conectado já está consultando um arquivo, e um aviso evita enviar o mesmo arquivo duas vezes ao slicer por engano
+- 🛡️ **Plugin Administração e instâncias supervisionadas**: uma página para contas de convidado e funções, equipas, sessões, registo de auditoria e instâncias emparelhadas. Uma instância principal pode supervisionar outra **após a aceitação do seu proprietário**: contas, funções e permissões passam a ser geridas a partir da principal, o conteúdo local fica privado por predefinição e o proprietário pode sair da supervisão a qualquer momento. Uma instância não ligada mantém o controlo total.
 
 ### 🧵 Materiais: filamento e resina
-- 🧪 **Inventário de resina (beta)**: a categoria da barra lateral passa a **Materiais** (Filamento + Resina). Adicione seus frascos à mão (marca, tipo, cor, volume, restante, preço, local), subtraia o que usar em ml e receba o mesmo lembrete **«A encomendar»** do filamento (limite baixo, caixa manual, links de busca de lojas, «já encomendado»), também no widget do painel. Ainda sem ligação às impressoras, nada é descontado automaticamente
+- **Inventário de resina**: a categoria da barra lateral passa a **Materiais** (Filamento + Resina). Adicione seus frascos à mão (marca, tipo, cor, volume, restante, preço, local), subtraia o que usar em ml e receba o mesmo lembrete **«A encomendar»** do filamento (limite baixo, caixa manual, links de busca de lojas, «já encomendado»), também no widget do painel. Ainda sem ligação às impressoras, nada é descontado automaticamente
 - 🔗 Integração com **Spoolman** (servidor de gestão de carretéis), com detecção automática na sua rede
 - 🟠 Suporte a **AMS da Bambu Lab** (leitura dos slots)
 - 🟢 Suporte a **CFS da Creality**
@@ -154,6 +155,12 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 - 🛒 **Links úteis**: lojas, fabricantes, sites de modelos 3D e recursos agrupados em seções recolhíveis
 
 ### 🧩 Ferramentas avançadas
+- 🧩 **Plugins integrados (1.1.7)**: BigPrint, impressoras de resina, impressoras USB, timelapse, ferramentas de ficheiros (conversão / fusão 3MF), estúdio de mesa, notificações push, webhooks, resumo semanal, MQTT e Obico passam a ser plugins distribuídos com o Stellio e só carregam se ativados (separador Plugins). A atualização desde a 1.1.6 é invisível: o que já usava é ativado automaticamente, com as definições intactas; uma instalação nova arranca leve. Também integrados: **Partilha e sincronização**, **Spoolman**, um plugin por fornecedor de IA mais o **assistente de IA**, e **Stellio Pro** (clientes, orçamentos, faturas, encomendas, contabilidade, tarifa de energia, planeamento, necessidades de material, stock de peças) — cada um só adiciona as suas páginas e botões quando ativado.
+- 🗂️ **Oficina avançada (1.1.7)**: ferramentas na barra lateral por categoria (conta proprietária) — **Biblioteca** (organização automática por regras, diff 3D visual incluindo STEP, peças semelhantes pela forma com miniaturas, licenças com notificações de validade, ficha da peça), **Impressão** (compatibilidade modelo ↔ impressora, verificação antes de imprimir com orientação aconselhada, arquivo do G-code de cada impressão), **Materiais** (necessidades de material face ao stock), **Ferramentas** (mesa multimodelo com encaixe da geometria real, assistente de fabrico) e **Administração** (tarefas, base de dados, registo de auditoria, equipas, sessões). Cada entrada pode ser desativada em Definições › Elementos de navegação.
+- 🔑 **API pública e webhooks**: tokens de âmbito limitado, rotas `/api/v1` com documentação OpenAPI, SDK Python e JavaScript; webhooks de saída assinados (HMAC-SHA256) com novas tentativas e registo.
+- 👥 **Equipas e segurança**: funções (administrador, gestor, operador, utilizador simples, convidado), permissões por pasta, projeto e impressora, espaços de trabalho partilhados, sessões ativas revogáveis, registo de ligações, registo de auditoria paginado com exportação CSV.
+- 🧠 **Stellio Intelligence** (Estatísticas): perfil de slicer recomendado por material / impressora e causas prováveis de falha, aprendidos com as suas impressões avaliadas (estatísticas, não um modelo de IA). O planeamento de produção ganha ainda rentabilidade por impressora e tempo de trabalho humano.
+- 🪶 **STL gigantes**: análise em fluxo, miniatura e visualizador simplificados, limiar de carregamento adaptado à memória livre e **Criar uma versão leve** (cópia simplificada junto ao original, que nunca é alterado). As miniaturas de ficheiros grandes são desenhadas num processo separado: uma falha já não derruba a aplicação.
 - 🎨 **Nesting automático** na mesa (rectpack ou silhueta real via shapely)
 - 🧩 **Unir em 3MF**: selecione vários modelos (STL, 3MF, OBJ…) e o Stellio cria um único ficheiro 3MF — uma placa se tudo couber, caso contrário um ficheiro com várias placas (estrutura compatível com Bambu Studio / OrcaSlicer; o PrusaSlicer mostra todas as peças juntas). Escolhe o nome e a pasta (incluindo partilhas de rede, com criação de pasta) e o Stellio pergunta se quer eliminar ou manter os ficheiros originais.
 - 🖌️ **Cor da bobina para o slicer**: ao enviar, a cor e o material da bobina escolhida são aplicados ao perfil de filamento carregado no OrcaSlicer, Bambu Studio ou PrusaSlicer (é preciso um perfil de filamento importado e associado à impressora; no envio em lote, só se todas as bobinas forem iguais).
@@ -309,6 +316,7 @@ Modo sem menu: todas as opções podem ser definidas por variáveis de ambiente,
 
 > A versão para Windows não é afetada: estes recursos só aparecem em Raspberry Pi, VM, LXC, Docker e Linux.
 
+- 🧱 **Apenas edição servidor na 1.1.7**: notificações push externas, resumo periódico, MQTT / Home Assistant, webhooks de saída, API pública, sincronização entre instâncias e acesso móvel ficam ocultos e desativados no Windows.
 - ☁️ **IA online (opcional)**: no lugar do Ollama, use Claude (Anthropic), ChatGPT (OpenAI) ou Gemini (Google) com a sua própria chave de API (Configurações → Inteligência artificial). A chave é criptografada no servidor e nunca devolvida ao navegador; o Ollama continua sendo a opção padrão, 100% local. As solicitações (nomes de arquivos, tags, descrições, fotos do S.O.S Print) vão para o provedor escolhido e são cobradas na sua chave.
 - 📥 **Perfis do fatiador**: o Stellio não enxerga os fatiadores do seu PC nem se conecta às nuvens dos fatiadores (Orca Cloud, Bambu Cloud…). Exporte seus perfis do fatiador (OrcaSlicer: Arquivo → Exportar → Exportar pacote de predefinições) e importe-os em Configurações → Meus perfis de fatiador; no Orca Cloud você também pode colar o «Copy raw JSON» de um perfil. Também é possível uma **pasta de perfis monitorada** que o Stellio relê automaticamente (Syncthing, compartilhamento de rede, scp…).
 - 🐯 [**TigerTag**](https://tigersystem.io): login oficial com e-mail e senha em Configurações → Inventário de filamento → TigerTag (a senha não é guardada, apenas um token de sessão criptografado). Conta criada com o Google? Defina primeiro uma senha com «Esqueci a senha» no aplicativo TigerTag. Alternativa: copiar para o servidor a pasta de dados do TigerTag Studio (Windows: pasta «TigerTag…» em `%APPDATA%`, pelo menos `Local Storage` e `IndexedDB`) e informar o caminho.
@@ -329,7 +337,7 @@ O Stellio detecta automaticamente:
 - ✅ ideaMaker
 - ✅ FlashPrint
 - ✅ Lychee Slicer
-- ✅ CHITUBOX / CHITUBOX Pro / Anycubic Photon Workshop / PreForm / Voxeldance Tango *(resina, beta)*
+- ✅ CHITUBOX / CHITUBOX Pro / Anycubic Photon Workshop / PreForm / Voxeldance Tango 
 - ✅ CraftWare
 - ✅ MatterControl
 - ✅ MakerBot Print
@@ -350,8 +358,8 @@ O Stellio detecta automaticamente:
 | **OctoPrint** | Qualquer impressora controlada pelo OctoPrint | HTTP: monitoramento, envio, câmera |
 | **Duet / RepRapFirmware** | Qualquer placa Duet 2/3 | HTTP: monitoramento, envio |
 | **Repetier-Server** | Qualquer impressora gerida pelo Repetier-Server | HTTP: monitoramento, envio |
-| **Resina (beta)** 🧪 | Formlabs (API web) · Anycubic Photon Wi-Fi · Chitubox / Phrozen / Uniformation (SDCP) | Apenas monitoramento, em beta — hardware real não totalmente testado · manutenção (FEP, cuba, LCD…) |
-| **Impressora USB (beta) 🧪** | Marlin, Prusa, Creality, placas Klipper… ligadas ao PC do Stellio | Deteção de portas série (a porta nunca é aberta): ligada / ausente, sem estado nem temperaturas |
+| **Resina** | Formlabs (API web) · Anycubic Photon Wi-Fi · Chitubox / Phrozen / Uniformation (SDCP) | Apenas monitoramento · manutenção (FEP, cuba, LCD…) |
+| **Impressora USB** | Marlin, Prusa, Creality, placas Klipper… ligadas ao PC do Stellio | Deteção de portas série (a porta nunca é aberta): ligada / ausente, sem estado nem temperaturas |
 
 > Os modelos listados são os oferecidos no formulário «Adicionar impressora» do Stellio. Outros modelos que usam o mesmo protocolo geralmente funcionam, mas nem todos foram testados — [conte-nos no GitHub](https://github.com/stellio-app/stellio/issues) se a sua funciona ou não.
 
@@ -403,7 +411,8 @@ stellio/
 ├── release-notes/          # notes.txt (release text, replaced at each release)
 ├── tests/  tools/          # pytest tests, maintenance tools (incl. stellio_manager.bat)
 ├── check_deps.py       # Verificador de dependências autorreparável
-├── modules/            # Módulos separados do main.py (print_session, share_link, timelapse, mqtt_publisher…)
+├── modules/            # Módulos do núcleo separados do main.py (print_session, share_link, plugin_host, print_events…)
+├── bundled_plugins/    # Plugins integrados (BigPrint, MQTT, webhooks, timelapse…), carregados só se ativados
 ├── worker.py           # Esqueleto de worker 3MF sem uso (provisório)
 ├── assets/             # Logos, ícones
 ├── languages/          # Arquivos de tradução (JSON)

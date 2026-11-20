@@ -1,0 +1,42 @@
+{
+  "id": "ai-gemini",
+  "name": "Gemini (Google)",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-gem",
+  "description": {
+    "fr": "Fournisseur d'IA en ligne : Gemini (Google). Utilise ta propre clé API (Paramètres › IA).",
+    "en": "Online AI provider: Gemini (Google). Uses your own API key (Settings › AI).",
+    "de": "Online-KI-Anbieter: Gemini (Google). Verwendet deinen eigenen API-Schlüssel (Einstellungen › KI).",
+    "es": "Proveedor de IA en línea: Gemini (Google). Usa tu propia clave API (Ajustes › IA).",
+    "pt": "Fornecedor de IA online: Gemini (Google). Usa a tua própria chave API (Definições › IA).",
+    "it": "Provider IA online: Gemini (Google). Usa la tua chiave API (Impostazioni › IA).",
+    "zh": "在线 AI 提供商：Gemini (Google)。使用你自己的 API 密钥（设置 › AI）。",
+    "ja": "オンライン AI プロバイダー：Gemini (Google)。ご自身の API キーを使用します（設定 › AI）。"
+  },
+  "host": {
+    "modules": [
+      "ai_gemini"
+    ],
+    "migrate": {
+      "settings_match": [
+        {
+          "ai_enabled": true,
+          "ai_provider": "gemini"
+        }
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "Gemini (Google)",
+    "en": "Gemini (Google)",
+    "de": "Gemini (Google)",
+    "es": "Gemini (Google)",
+    "pt": "Gemini (Google)",
+    "it": "Gemini (Google)",
+    "zh": "Gemini (Google)",
+    "ja": "Gemini (Google)"
+  },
+  "server_only": true
+}

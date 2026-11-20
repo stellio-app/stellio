@@ -7,6 +7,14 @@
 - Chemins limités aux sources configurées (anti `../`) · Paths restricted to configured sources
 - Cookies `HttpOnly` + `SameSite=Lax`, en-têtes `X-Frame-Options`, `nosniff`, CSP · Hardened cookies and headers
 
+## Ajouts 1.1.7 / Added in 1.1.7
+- **Sessions** : liste des appareils connectés, révocation (coupure à la requête suivante, 15 s au plus) · Active-session list and revocation
+- **Plugins** : processus séparé, environnement nettoyé, 10 s, 512 Mo — **pas un bac à sable** ; catalogue https public + SHA-256 obligatoire · Plugins are separate processes, **not a sandbox**; catalog needs public https + mandatory SHA-256
+- **Rôles** (admin / gestionnaire / opérateur / utilisateur simple / invité) et permissions par imprimante, projet, dossier · Roles and fine-grained permissions
+- **Journal d'audit** : adresse IP et acteur masqués pour les invités · Audit log hides IP and actor from guests
+- **Archive G-code** et **plateau** : réservés au propriétaire (le démo n'y accède pas) · Owner-only
+- **Démo publique** : lecture seule, aucun fichier récupérable · Read-only public demo
+
 ## Mettre Stellio derrière HTTPS (édition serveur) / Serving Stellio over HTTPS
 Ne publiez jamais Stellio en HTTP simple sur Internet. / Never expose plain HTTP to the Internet.
 

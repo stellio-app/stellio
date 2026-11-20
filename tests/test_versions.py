@@ -515,7 +515,7 @@ ROOT_106 = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def load_module(name):
-    spec = importlib.util.spec_from_file_location(f'_t_{name}', os.path.join(ROOT_106, 'modules', f'{name}.py'))
+    spec = importlib.util.spec_from_file_location(f'_t_{name}', __import__('conftest').mod_path(name))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -875,7 +875,7 @@ ROOT_106fixes = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _load(name):
-    spec = importlib.util.spec_from_file_location(name + '_fix_test', os.path.join(ROOT_106fixes, 'modules', name + '.py'))
+    spec = importlib.util.spec_from_file_location(name + '_fix_test', __import__('conftest').mod_path(name))
     mod = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(mod)
@@ -965,11 +965,20 @@ def _tl(**services):
     return tl
 
 
+def _grab(**services):
+    """Capture d'une image de caméra : service du cœur (main.py) depuis la 1.1.7, partagé avec le plugin timelapse."""
+    import re as _re, requests as _rq, types as _ty
+    from conftest import load_from_main
+    ns = load_from_main(['_extract_jpeg', '_grab_mjpeg_frame', '_timelapse_grab_frame'],
+                        dict(re=_re, requests=_rq, BAMBU_RTSP_PORT322_MODELS=(), FFMPEG_TOOL=None, **services))
+    return _ty.SimpleNamespace(**ns)
+
+
 def test_grab_frame_reads_mjpeg_stream_without_ffmpeg(cam):
     srv, h = cam
     h.routes = {'/webcam/?action=stream': 'mjpeg'}
     url = f'http://127.0.0.1:{srv.server_port}/webcam/?action=stream'
-    tl = _tl(_resolve_printer_camera=lambda p, pid, host: {'available': True, 'stream_url': url, 'snapshot_url': ''})
+    tl = _grab(_resolve_printer_camera=lambda p, pid, host: {'available': True, 'stream_url': url, 'snapshot_url': ''})
     jpg = tl._timelapse_grab_frame({'id': 1, 'type': 'klipper', 'ip': '127.0.0.1', 'config': {}})
     assert jpg and jpg[:2] == b'\xff\xd8' and jpg[-2:] == b'\xff\xd9'
 
@@ -978,7 +987,7 @@ def test_grab_frame_derives_snapshot_from_stream_url(cam):
     srv, h = cam
     h.routes = {'/webcam/?action=snapshot': 'snapshot'}           # le flux, lui, n'existe pas : seul l'instantané déduit répond
     url = f'http://127.0.0.1:{srv.server_port}/webcam/?action=stream'
-    tl = _tl(_resolve_printer_camera=lambda p, pid, host: {'available': True, 'stream_url': url, 'snapshot_url': ''})
+    tl = _grab(_resolve_printer_camera=lambda p, pid, host: {'available': True, 'stream_url': url, 'snapshot_url': ''})
     assert tl._timelapse_grab_frame({'id': 1, 'type': 'klipper', 'ip': '127.0.0.1', 'config': {}})[:2] == b'\xff\xd8'
 
 
@@ -986,7 +995,7 @@ def test_grab_frame_none_when_camera_dead(cam):
     srv, h = cam
     h.routes = {}
     url = f'http://127.0.0.1:{srv.server_port}/webcam/?action=stream'
-    tl = _tl(_resolve_printer_camera=lambda p, pid, host: {'available': True, 'stream_url': url, 'snapshot_url': ''})
+    tl = _grab(_resolve_printer_camera=lambda p, pid, host: {'available': True, 'stream_url': url, 'snapshot_url': ''})
     assert tl._timelapse_grab_frame({'id': 1, 'type': 'klipper', 'ip': '127.0.0.1', 'config': {}}) is None
 
 
@@ -1180,7 +1189,7 @@ def _read(root, *p):
 
 def test_management_tab_only_when_commercial_enabled(root):
     html = _read(root, 'interface', 'index.html')
-    assert 'class="nav-btn commercial-only" data-page="management"' in html
+    assert 'class="nav-btn commercial-only" data-host-plugin="stellio-pro" data-page="management"' in html
     assert 'body.commercial-off .commercial-only { display: none !important; }' in _read(root, 'interface', 'style.css')
     assert "document.getElementById('page-management')?.classList.contains('active')" in _read(root, 'interface', 'script.js')
 
@@ -2090,7 +2099,7 @@ def test_docs_site_builds(tmp_path):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     broken, pages, _ = mod.build(str(tmp_path / 'out'), '/docs/')
-    assert broken == [] and pages == 16 * 8
+    assert broken == [] and pages == 18 * 8
     html = (tmp_path / 'out/fr/Library/index.html').read_text(encoding='utf-8')
     assert 'class="toc"' in html and 'id="ov"' in html and 'Déjà imprimé' in html
     assert (tmp_path / 'out/ja/search.json').stat().st_size > 1000
@@ -2183,10 +2192,10 @@ def test_v110_no_update_done_popup():
     js = (root / 'interface/script.js').read_text(encoding='utf-8')
     body = js[js.index('async checkAndShowChangelog()'):js.index('async checkForUpdates(')]
     assert 'showChangelogModal(' not in body and 'stellio-last-seen-version' in body
-    assert 'CURRENT_VERSION = "1.1.6"' in (root / 'main.py').read_text(encoding='utf-8')
+    assert 'CURRENT_VERSION = "1.1.7"' in (root / 'main.py').read_text(encoding='utf-8')
     for p in ('changelog.json', 'languages/changelog.json'):
         d = json.loads((root / p).read_text(encoding='utf-8'))
-        assert d[0]['version'] == '1.1.6' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
+        assert d[0]['version'] == '1.1.7' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
 
 
 def test_v110_no_badge_on_likes_and_creations():
@@ -2332,7 +2341,7 @@ def test_v111_changelog_entry():
     root = _P(__file__).resolve().parent.parent
     for p in ('changelog.json', 'languages/changelog.json'):
         d = json.loads((root / p).read_text(encoding='utf-8'))
-        assert d[5]['version'] == '1.1.1' and len(d[5]['items']['fr']) >= 15 and all(len(v) >= 2 for v in d[1]['items'].values())
+        assert d[6]['version'] == '1.1.1' and len(d[6]['items']['fr']) >= 15 and all(len(v) >= 2 for v in d[1]['items'].values())
 
 
 def test_v111_security_options_and_modules():
@@ -2341,9 +2350,9 @@ def test_v111_security_options_and_modules():
     main = (root / 'main.py').read_text(encoding='utf-8')
     assert "STELLIO_COOKIE_SECURE" in main and "Strict-Transport-Security" in main
     assert (root / 'docs/SECURITY.md').exists()
-    for m in ('ai_features', 'ai_providers', 'account_platforms', 'backup_restore', 'file_convert', 'file_origin_delete',
+    for m in ('ai_features', 'ai_providers', 'account_platforms', 'backup_restore', 'file_origin_delete',
               'gcode_archive', 'integrity_check', 'photo_search', 'slicer_import', 'trash_core', 'workshop_watch'):
-        assert (root / 'modules' / f'{m}.py').exists(), m
+        assert (root / 'modules' / f'{m}.py').exists() or list(root.glob(f'bundled_plugins/*/{m}.py')), m      # dans le cœur ou dans un plugin intégré
     assert 'integrity_check.integrity_check_state' in main      # régression corrigée : /api/diagnostic/health
 
 
@@ -2367,7 +2376,7 @@ def test_v112_lazy_thumbs_collections_and_a11y():
 def _push_mod():
     import importlib.util
     from pathlib import Path as _P
-    path = _P(__file__).resolve().parent.parent / 'modules' / 'push_notify.py'
+    path = _P(__import__('conftest').mod_path('push_notify'))
     spec = importlib.util.spec_from_file_location('push_notify_under_test', path)
     m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
     m._PUSH_TAGS = {}; m._PUSH_DEFAULT_TYPES = ['print_finished', 'print_failed']
@@ -2375,8 +2384,15 @@ def _push_mod():
     return m
 
 
+def _events_mod():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('print_events_under_test', __import__('conftest').mod_path('print_events'))
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+    return m
+
+
 def test_v113_duration_and_job_message():
-    m = _push_mod()
+    m = _events_mod()
     assert m._push_fmt_duration(3725) == '1 h 02 min' and m._push_fmt_duration(540) == '9 min'
     assert m._push_fmt_duration(0) == '' and m._push_fmt_duration(None) == '' and m._push_fmt_duration('x') == ''
     assert m._push_job_message('Ender', {'file': 'boite.3mf', 'elapsed': 5040}) == 'Ender — boite.3mf (1 h 24 min)'
@@ -2399,7 +2415,8 @@ def test_v113_new_providers_payloads():
 
 
 def test_v113_offline_alert_only_after_being_seen_online():
-    m = _push_mod()
+    m = _events_mod()
+    m._server_t = lambda key, default: default
     got = []
     m._push_notify_async = lambda *a: got.append(a)
     types = ['printer_offline']
@@ -2459,7 +2476,7 @@ def test_v114_workflow_uses_notes_and_community_files():
     assert (root / 'CONTRIBUTING.md').is_file()
     for n in ('bug.yml', 'feature.yml', 'good-first-issue.yml', 'config.yml'):
         assert (root / '.github' / 'ISSUE_TEMPLATE' / n).is_file()
-    assert 'versionName \'1.1.6\'' in (root / 'apk-src' / 'app' / 'build.gradle').read_text(encoding='utf-8')
+    assert 'versionName \'1.1.7\'' in (root / 'apk-src' / 'app' / 'build.gradle').read_text(encoding='utf-8')
 
 
 # ── v1.1.1 (ajouts) : popup caméra, couleurs par plateau, boutiques OFD ─────

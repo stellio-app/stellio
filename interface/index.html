@@ -233,7 +233,9 @@
                 <button type="button" class="rail-btn" data-rail="print" aria-expanded="false"><i class="fa-solid fa-print"></i><span data-i18n="nav.cat_print">Impression</span><i class="fa-solid fa-chevron-right rail-caret"></i></button>
                 <button type="button" class="rail-btn" data-rail="filament" aria-expanded="false"><i class="fa-solid fa-circle-nodes"></i><span data-i18n="nav.cat_filament">Matières</span><i class="fa-solid fa-chevron-right rail-caret"></i></button>
                 <button type="button" class="rail-btn" data-rail="tools" aria-expanded="false"><i class="fa-solid fa-screwdriver-wrench"></i><span data-i18n="nav.cat_tools">Outils</span><i class="fa-solid fa-chevron-right rail-caret"></i></button>
+                <button type="button" class="rail-btn" data-rail="plugins" aria-expanded="false"><i class="fa-solid fa-puzzle-piece"></i><span data-i18n="nav.cat_plugins">Plugins</span><i class="fa-solid fa-chevron-right rail-caret"></i></button>
                 <button type="button" class="rail-btn" data-rail="track" aria-expanded="false"><i class="fa-solid fa-chart-pie"></i><span data-i18n="nav.cat_track">Suivi</span><i class="fa-solid fa-chevron-right rail-caret"></i></button>
+                <button type="button" class="rail-btn" data-rail="admin" aria-expanded="false"><i class="fa-solid fa-user-shield"></i><span data-i18n="nav.cat_admin">Administration</span><i class="fa-solid fa-chevron-right rail-caret"></i></button>
                 <div class="rail-spacer"></div>
                 <button type="button" class="rail-btn" data-rail-click="#nav-workshop-btn"><i class="fa-solid fa-tablet-screen-button"></i><span data-i18n="nav.workshop">Mode atelier</span></button>
                 <button type="button" class="rail-btn" data-rail="help" aria-expanded="false"><i class="fa-solid fa-circle-question"></i><span data-i18n="nav.cat_help">Aide</span><i class="fa-solid fa-chevron-right rail-caret"></i></button>
@@ -269,7 +271,7 @@
 				    <i class="fa-solid fa-chart-pie"></i>
 				    <span data-i18n="nav.stats">Statistiques</span>
 				</button>
-				<button class="nav-btn desktop-only-nav" data-nav-id="planning" data-page="planning" data-title-key="nav.planning" data-icon="fa-calendar-days" data-cat="print">
+				<button class="nav-btn desktop-only-nav" data-host-plugin="stellio-pro" data-nav-id="planning" data-page="planning" data-title-key="nav.planning" data-icon="fa-calendar-days" data-cat="print">
 				  <i class="fa-solid fa-calendar-days"></i>
 				  <span data-i18n="nav.planning">Planning</span>
 				</button>
@@ -286,7 +288,7 @@
 					<span data-i18n="nav.print_queue">À imprimer bientôt</span>
 					<span class="badge" id="print-queue-count" style="display:none;">0</span>
 				</button>
-				<button class="nav-btn commercial-only" data-page="management" data-nav-id="management" data-icon="fa-briefcase" data-title-key="nav.management" data-cat="track">
+				<button class="nav-btn commercial-only" data-host-plugin="stellio-pro" data-page="management" data-nav-id="management" data-icon="fa-briefcase" data-title-key="nav.management" data-cat="track">
 					<i class="fa-solid fa-briefcase"></i>
 					<span data-i18n="nav.management">Gestion</span>
 				</button>
@@ -299,6 +301,10 @@
 				    <i class="fa-solid fa-circle-check"></i>
 				    <span data-i18n="nav.printed">Déjà imprimés</span>
 				    <span class="badge" id="printed-count" style="display:none;">0</span>
+				</button>
+				<button class="nav-btn" data-host-plugin="timelapse" data-page="timelapses" data-nav-id="timelapses" data-icon="fa-film" data-title-key="nav.timelapses" data-cat="print">
+				    <i class="fa-solid fa-film"></i>
+				    <span data-i18n="nav.timelapses">Timelapses</span>
 				</button>
 				<button class="nav-btn" data-page="gallery" data-nav-id="gallery" data-icon="fa-camera" data-title-key="nav.gallery" data-cat="library">
 				    <i class="fa-solid fa-camera"></i>
@@ -313,19 +319,88 @@
                     <i class="fa-solid fa-cloud-arrow-down"></i>
                     <span data-i18n="nav.download">Télécharger</span>
                 </button>
-				<button class="nav-btn desktop-only-nav" data-nav-id="repair" data-page="repair" data-titleKey="nav.repair" data-icon="fa-screwdriver-wrench" data-cat="tools">
+				<button class="nav-btn desktop-only-nav" data-host-plugin="file-tools" data-nav-id="repair" data-page="repair" data-titleKey="nav.repair" data-icon="fa-screwdriver-wrench" data-cat="tools">
 				  <i class="fa-solid fa-screwdriver-wrench"></i>
 				  <span data-i18n="nav.repair">Réparation</span>
 				  <span class="badge" id="repair-count" style="display:none;">0</span>
 				</button>
-				<button class="nav-btn desktop-only-nav" data-nav-id="converter" data-page="converter" data-icon="fa-file-export" data-cat="tools">
+				<button class="nav-btn desktop-only-nav" data-host-plugin="file-tools" data-nav-id="converter" data-page="converter" data-icon="fa-file-export" data-cat="tools">
 				  <i class="fa-solid fa-file-export"></i>
 				  <span data-i18n="nav.converter">Convertisseur</span>
 				</button>
-				<button class="nav-btn desktop-only-nav" data-nav-id="bigprint" data-page="bigprint" data-title-key="nav.bigprint" data-icon="fa-up-right-and-down-left-from-center" data-cat="tools">
+				<button class="nav-btn desktop-only-nav" data-host-plugin="bigprint" data-nav-id="bigprint" data-page="bigprint" data-title-key="nav.bigprint" data-icon="fa-up-right-and-down-left-from-center" data-cat="tools">
 				  <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
 				  <span data-i18n="nav.bigprint">BigPrint</span>
 				</button>
+				<button class="nav-btn desktop-only-nav" data-nav-id="suite-collections" data-page="suite" data-suite-tab="collections" data-title-key="suite.tab_collections" data-icon="fa-layer-group" data-cat="library">
+				  <i class="fa-solid fa-layer-group"></i>
+				  <span data-i18n="suite.tab_collections">Collections</span>
+				</button>
+				<button class="nav-btn desktop-only-nav" data-nav-id="suite-organize" data-page="suite" data-suite-tab="organize" data-title-key="suite.tab_organize" data-icon="fa-folder-tree" data-cat="library">
+				  <i class="fa-solid fa-folder-tree"></i>
+				  <span data-i18n="suite.tab_organize">Organisation</span>
+				</button>
+				<button class="nav-btn desktop-only-nav" data-nav-id="suite-diff" data-page="suite" data-suite-tab="diff" data-title-key="suite.tab_diff" data-icon="fa-code-compare" data-cat="library">
+				  <i class="fa-solid fa-code-compare"></i>
+				  <span data-i18n="suite.tab_diff">Diff 3D</span>
+				</button>
+				<button class="nav-btn desktop-only-nav" data-nav-id="suite-similar" data-page="suite" data-suite-tab="similar" data-title-key="suite.tab_similar" data-icon="fa-clone" data-cat="library">
+				  <i class="fa-solid fa-clone"></i>
+				  <span data-i18n="suite.tab_similar">Similaires</span>
+				</button>
+				<button class="nav-btn desktop-only-nav" data-nav-id="suite-licenses" data-page="suite" data-suite-tab="licenses" data-title-key="suite.tab_licenses" data-icon="fa-file-contract" data-cat="library">
+				  <i class="fa-solid fa-file-contract"></i>
+				  <span data-i18n="suite.tab_licenses">Licences</span>
+				</button>
+				<button class="nav-btn desktop-only-nav" data-nav-id="suite-part" data-page="suite" data-suite-tab="part" data-title-key="suite.tab_part" data-icon="fa-cube" data-cat="library">
+				  <i class="fa-solid fa-cube"></i>
+				  <span data-i18n="suite.tab_part">Fiche pièce</span>
+				</button>
+				<button class="nav-btn desktop-only-nav" data-nav-id="suite-compat" data-page="suite" data-suite-tab="compat" data-title-key="suite.tab_compat" data-icon="fa-print" data-cat="print">
+				  <i class="fa-solid fa-print"></i>
+				  <span data-i18n="suite.tab_compat">Compatibilité</span>
+				</button>
+				<button class="nav-btn desktop-only-nav" data-nav-id="suite-check" data-page="suite" data-suite-tab="check" data-title-key="suite.tab_check" data-icon="fa-clipboard-check" data-cat="print">
+				  <i class="fa-solid fa-clipboard-check"></i>
+				  <span data-i18n="suite.tab_check">Vérif. impression</span>
+				</button>
+				<button class="nav-btn desktop-only-nav" data-nav-id="suite-gcode" data-page="suite" data-suite-tab="gcode" data-title-key="suite.tab_gcode" data-icon="fa-file-zipper" data-cat="print">
+				  <i class="fa-solid fa-file-zipper"></i>
+				  <span data-i18n="suite.tab_gcode">Archives G-code</span>
+				</button>
+				<button class="nav-btn desktop-only-nav" data-nav-id="suite-needs" data-page="suite" data-suite-tab="needs" data-title-key="suite.tab_needs" data-icon="fa-weight-hanging" data-cat="filament">
+				  <i class="fa-solid fa-weight-hanging"></i>
+				  <span data-i18n="suite.tab_needs">Besoins matière</span>
+				</button>
+				<button class="nav-btn desktop-only-nav" data-host-plugin="plate-studio" data-nav-id="suite-plate" data-page="suite" data-suite-tab="plate" data-title-key="suite.tab_plate" data-icon="fa-table-cells-large" data-cat="tools">
+				  <i class="fa-solid fa-table-cells-large"></i>
+				  <span data-i18n="suite.tab_plate">Plateau</span>
+				</button>
+				<button class="nav-btn desktop-only-nav" data-host-plugin="sharing" data-nav-id="suite-sync" data-page="suite" data-suite-tab="sync" data-title-key="suite.tab_sync" data-icon="fa-arrows-rotate" data-cat="tools">
+				  <i class="fa-solid fa-arrows-rotate"></i>
+				  <span data-i18n="suite.tab_sync">Synchro</span>
+				</button>
+				<button class="nav-btn desktop-only-nav" data-nav-id="suite-fab" data-page="suite" data-suite-tab="fab" data-title-key="suite.tab_fab" data-icon="fa-robot" data-cat="tools">
+				  <i class="fa-solid fa-robot"></i>
+				  <span data-i18n="suite.tab_fab">Assistant fabrication</span>
+				</button>
+				<button class="nav-btn desktop-only-nav" data-nav-id="suite-jobs" data-admin-net data-page="suite" data-suite-tab="jobs" data-title-key="suite.tab_jobs" data-icon="fa-list-check" data-cat="admin">
+				  <i class="fa-solid fa-list-check"></i>
+				  <span data-i18n="suite.tab_jobs">Tâches</span>
+				</button>
+				<button class="nav-btn desktop-only-nav" data-nav-id="suite-db" data-admin-net data-page="suite" data-suite-tab="db" data-title-key="suite.tab_db" data-icon="fa-database" data-cat="admin">
+				  <i class="fa-solid fa-database"></i>
+				  <span data-i18n="suite.tab_db">Base de données</span>
+				</button>
+				<button class="nav-btn desktop-only-nav" data-host-plugin="administration" data-nav-id="suite-admin" data-admin-net data-page="suite" data-suite-tab="admin" data-title-key="suite.tab_admin" data-icon="fa-user-shield" data-cat="admin">
+				  <i class="fa-solid fa-user-shield"></i>
+				  <span data-i18n="suite.tab_admin">Administration</span>
+				</button>
+				<button class="nav-btn" id="plugins-btn" data-nav-id="plugins" data-page="plugins" data-title-key="nav.plugins" data-icon="fa-puzzle-piece" data-cat="plugins">
+				  <i class="fa-solid fa-puzzle-piece"></i>
+				  <span data-i18n="plugins.manage">Catalogue et gestion</span>
+				</button>
+				<div id="plugin-nav-list" class="plugin-nav-list"></div>
 				<button class="nav-btn" data-nav-id="duplicates" onclick="openDuplicatesModal()" style="cursor:pointer;" data-cat="library">
 				  <i class="fa-solid fa-copy"></i>
 				  <span data-i18n="nav.duplicates">Doublons</span>
@@ -342,9 +417,9 @@
 					<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="22"/><line x1="2" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="22" y2="12"/></svg>
 					<span data-i18n="nav.spoolman">Filament</span>
 				</button>
-				<button class="nav-btn" data-nav-id="resin" data-page="resin" data-title-key="nav.resin" data-icon="fa-droplet" data-cat="filament">
+				<button class="nav-btn" data-host-plugin="resin" data-nav-id="resin" data-page="resin" data-title-key="nav.resin" data-icon="fa-droplet" data-cat="filament">
 					<i class="fa-solid fa-droplet"></i>
-					<span data-i18n="nav.resin">Résine (bêta)</span>
+					<span data-i18n="nav.resin">Résine</span>
 				</button>
                 </div>
                 </div>
@@ -354,7 +429,7 @@
 						<span data-i18n="nav.trash">Corbeille</span>
 						<span class="badge" id="trash-count" style="display:none;">0</span>
 					</button>
-					<button class="nav-btn" id="nav-workshop-btn" onclick="openWorkshopMode()" data-i18n-title="workshop.hint" title="Affichage plein écran des imprimantes, pensé pour tablette et téléphone" data-cat="print">
+					<button class="nav-btn" id="nav-workshop-btn" style="display:none" onclick="openWorkshopMode()" data-i18n-title="workshop.hint" title="Affichage plein écran des imprimantes, pensé pour tablette et téléphone" data-cat="print">
 						<i class="fa-solid fa-tablet-screen-button"></i>
 						<span data-i18n="nav.workshop">Mode atelier</span>
 					</button>
@@ -430,7 +505,7 @@
                         <button type="button" id="global-search-clear" class="search-clear-btn" data-i18n-aria="actions.clear_search" aria-label="Effacer la recherche" title="Effacer">
                             <i class="fa-solid fa-xmark"></i>
                         </button>
-                        <button type="button" id="photo-search-btn" class="photo-search-btn" data-i18n-aria="photosearch.title" aria-label="Recherche par photo" title="Recherche par photo">
+                        <button type="button" id="photo-search-btn" data-host-plugin="ai-assistant" class="photo-search-btn" data-i18n-aria="photosearch.title" aria-label="Recherche par photo" title="Recherche par photo">
                             <i class="fa-solid fa-camera"></i>
                         </button>
                         <div id="search-recent-dropdown" class="search-recent-dropdown hidden"></div>
@@ -463,6 +538,9 @@
 					</div>
                 </div>
                 <div class="header-right">
+                    <button type="button" id="settings-undo-btn" class="btn btn-ghost btn-sm settings-undo-btn" onclick="undoLastSettingsChange()" data-i18n-title="settings.undo_available" title="Un changement de paramètres a été effectué récemment.">
+                        <i class="fa-solid fa-rotate-left"></i> <span data-i18n="settings.undo_last_change">Annuler ce changement</span>
+                    </button>
                     <select id="spool-header-material" class="header-select header-hide" style="width:auto;">
                         <option value="" data-i18n="spoolman.filter_material_all">Toute matière</option>
                     </select>
@@ -526,6 +604,9 @@
 						</div>
 						<div id="notif-panel-list" class="notif-panel-list">
 							<div class="dashboard-widget-empty"><i class="fa-solid fa-bell-slash"></i><p data-i18n="notif.empty">Aucune notification</p></div>
+						</div>
+						<div class="notif-panel-footer" id="notif-panel-footer">
+							<button type="button" onclick="openAllNotifications()"><span data-i18n="notif.see_all">Tout voir</span> <i class="fa-solid fa-arrow-right"></i></button>
 						</div>
 					</div>
 					<button id="global-logout-btn" data-i18n-title="nav.logout" title="Déconnexion" style="
@@ -729,7 +810,7 @@
                                 </div>
                             </div>
 
-                            <div class="dashboard-widget commercial-only" id="dashboard-widget-quotes" data-widget-id="quotes" draggable="false">
+                            <div class="dashboard-widget commercial-only" data-host-plugin="stellio-pro" id="dashboard-widget-quotes" data-widget-id="quotes" draggable="false">
                                 <div class="dashboard-widget-header">
                                     <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
                                     <h3><i class="fa-solid fa-file-invoice"></i> <span data-i18n="dashboard.quotes_title">Devis</span></h3>
@@ -741,7 +822,7 @@
                                 </div>
                             </div>
 
-                            <div class="dashboard-widget" id="dashboard-widget-timelapses" data-widget-id="timelapses" draggable="false">
+                            <div class="dashboard-widget" data-host-plugin="timelapse" id="dashboard-widget-timelapses" data-widget-id="timelapses" draggable="false">
                                 <div class="dashboard-widget-header">
                                     <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
                                     <h3><i class="fa-solid fa-film"></i> <span data-i18n="dashboard.timelapses_title">Timelapses</span></h3>
@@ -753,7 +834,7 @@
                                 </div>
                             </div>
 
-                            <div class="dashboard-widget" id="dashboard-widget-mqtt" data-widget-id="mqtt" draggable="false" style="display:none;">
+                            <div class="dashboard-widget" data-host-plugin="mqtt" id="dashboard-widget-mqtt" data-widget-id="mqtt" draggable="false" style="display:none;">
                                 <div class="dashboard-widget-header">
                                     <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
                                     <h3><i class="fa-solid fa-house-signal"></i> <span data-i18n="dashboard.mqtt_title">MQTT / Home Assistant</span></h3>
@@ -825,7 +906,7 @@
                                 </div>
                             </div>
 
-                            <div class="dashboard-widget" id="dashboard-widget-instances" data-widget-id="instances" draggable="false">
+                            <div class="dashboard-widget" data-host-plugin="sharing" id="dashboard-widget-instances" data-widget-id="instances" draggable="false">
                                 <div class="dashboard-widget-header">
                                     <i class="fa-solid fa-grip-vertical dashboard-widget-drag-handle" aria-hidden="true"></i>
                                     <h3><i class="fa-solid fa-network-wired"></i> <span data-i18n="dashboard.instances_title">Instances Stellio</span></h3>
@@ -1137,6 +1218,15 @@
                     </div>
                 </div>
 
+                <div id="page-timelapses" class="page" data-host-plugin="timelapse">
+                    <div class="history-page tlp-page">
+                        <div class="history-header">
+                            <h2><i class="fa-solid fa-film"></i> <span data-i18n="timelapse.title">Timelapses</span></h2>
+                        </div>
+                        <p class="settings-hint" data-i18n="timelapse.page_hint">Tous les timelapses enregistrés pendant vos impressions. Lisez, téléchargez ou supprimez-les ici.</p>
+                        <div id="tlp-body"></div>
+                    </div>
+                </div>
                 <div id="page-printed" class="page">
                     <div class="history-page">
                         <div class="history-header">
@@ -1272,20 +1362,13 @@
                     <div class="settings-grid">
                         <div class="settings-col">
 
-                        <div id="settings-undo-banner" class="settings-undo-banner hidden">
-                            <span><i class="fa-solid fa-clock-rotate-left"></i> <span data-i18n="settings.undo_available">Un changement de paramètres a été effectué récemment.</span></span>
-                            <button type="button" class="btn btn-ghost btn-sm" onclick="undoLastSettingsChange()">
-                                <i class="fa-solid fa-rotate-left"></i> <span data-i18n="settings.undo_last_change">Annuler ce changement</span>
-                            </button>
-                        </div>
-
                         <div class="accord-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-palette"></i> <span data-i18n="settings.appearance">Apparence</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
                             </div>
                             <div class="accord-body">
-                                <div class="settings-row">
+                                                                <div class="settings-row">
                                     <label data-i18n="settings.theme">Thème</label>
                                     <select id="theme-selector" class="settings-select">
                                         <option value="dark" data-i18n="settings.theme_dark">Sombre</option>
@@ -1344,6 +1427,15 @@
                                         <option value="fast" data-i18n="settings.thumb_perf_fast">Rapide (tous les cœurs)</option>
                                     </select>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="accord-section">
+                            <div class="accord-header" onclick="toggleAccord(this)">
+                                <span><i class="fa-solid fa-language"></i> <span data-i18n="settings.language">Langue</span></span>
+                                <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                            </div>
+                            <div class="accord-body">
                                 <div class="settings-row">
                                     <label data-i18n="settings.language">Langue</label>
                                     <select id="language-selector" class="settings-select">
@@ -1442,6 +1534,8 @@
                             </div>
                         </div>
 
+                        
+
                         <div class="accord-section">
                             <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-arrows-rotate"></i> <span data-i18n="settings.auto_scan">Scan automatique</span></span>
@@ -1533,7 +1627,7 @@
                                 </button>
                             </div>
                         </div>
-<div class="accord-section" style="box-shadow:none; margin-top:10px;">
+<div class="accord-section" data-host-plugin="stellio-pro" style="box-shadow:none; margin-top:10px;">
                             <div class="accord-header" onclick="toggleAccord(this)" style="background:var(--bg-input);">
                                 <span><i class="fa-solid fa-file-invoice"></i> <span data-i18n="settings.quote_title">Devis : en-tête et mentions légales</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
@@ -1609,7 +1703,7 @@
                                 </button>
                             </div>
                         </div>
-<div class="accord-section viewer-hide" style="box-shadow:none; margin-top:10px;">
+<div class="accord-section viewer-hide" data-host-plugin="stellio-pro" style="box-shadow:none; margin-top:10px;">
                             <div class="accord-header" onclick="toggleAccord(this)" style="background:var(--bg-input);">
                                 <span><i class="fa-solid fa-envelope"></i> <span data-i18n="smtp.title">E-mail (SMTP)</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
@@ -1654,7 +1748,7 @@
                             </div>
                         </div>
 
-                        <div class="accord-section">
+                        <div class="accord-section" data-host-plugin="ai-assistant">
                             <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="settings.ai">Intelligence artificielle</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
@@ -1675,10 +1769,10 @@
                                         <label style="font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary); font-weight:500;" data-i18n="settings.ai_provider_label">Fournisseur d'IA</label>
                                         <select id="ai-provider-select" onchange="onAiProviderChange(this.value)"
                                             style="width:100%; margin-top:6px; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:calc(13px * var(--fs, 1));">
-                                            <option value="ollama" data-i18n="settings.ai_provider_ollama">Ollama (local, 100 % privé)</option>
-                                            <option value="anthropic" data-i18n="settings.ai_provider_anthropic">Claude (Anthropic) : en ligne</option>
-                                            <option value="openai" data-i18n="settings.ai_provider_openai">ChatGPT (OpenAI) : en ligne</option>
-                                            <option value="gemini" data-i18n="settings.ai_provider_gemini">Gemini (Google) : en ligne</option>
+                                            <option value="ollama" data-host-plugin="ai-ollama" data-i18n="settings.ai_provider_ollama">Ollama (local, 100 % privé)</option>
+                                            <option value="anthropic" data-host-plugin="ai-anthropic" data-i18n="settings.ai_provider_anthropic">Claude (Anthropic) : en ligne</option>
+                                            <option value="openai" data-host-plugin="ai-openai" data-i18n="settings.ai_provider_openai">ChatGPT (OpenAI) : en ligne</option>
+                                            <option value="gemini" data-host-plugin="ai-gemini" data-i18n="settings.ai_provider_gemini">Gemini (Google) : en ligne</option>
                                         </select>
                                     </div>
                                     <div id="ai-cloud-block" style="display:none; flex-direction:column; gap:12px;">
@@ -1705,7 +1799,7 @@
                                         <div id="ai-cloud-status" style="display:none; padding:8px 12px; border-radius:var(--radius); font-size:calc(12px * var(--fs, 1));"></div>
                                     </div>
                                 </div>
-                                <div id="ollama-config-block" style="display:flex; flex-direction:column; gap:12px;">
+                                <div id="ollama-config-block" data-host-plugin="ai-ollama" style="display:flex; flex-direction:column; gap:12px;">
 
                                     <div>
                                         <label style="font-size:calc(13px * var(--fs, 1)); color:var(--text-secondary); font-weight:500;" data-i18n="settings.ollama_model">Modèle</label>
@@ -1954,7 +2048,7 @@
                                     </div>
                                 </div>
 
-                                <div class="account-card" style="margin-top:12px;">
+                                <div class="account-card" data-host-plugin="spoolman" style="margin-top:12px;">
                                     <div class="account-card-header">
                                         <div style="display:flex;align-items:center;gap:10px;">
                                             <div class="account-icon-badge" style="background:rgba(0,130,200,0.15);color:#0082c8;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="22"/><line x1="2" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="22" y2="12"/></svg></div>
@@ -2066,20 +2160,38 @@
 								<div class="nav-toggle-row" draggable="true" data-nav-id="print-queue"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.print_queue">À imprimer bientôt</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="print-queue" onchange="toggleNavItem('print-queue',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 				<div class="nav-toggle-row" draggable="true" data-nav-id="history"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.history">Historique</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="history" onchange="toggleNavItem('history',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 				<div class="nav-toggle-row" draggable="true" data-nav-id="printed"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.printed">Déjà imprimés</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="printed" onchange="toggleNavItem('printed',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+				<div class="nav-toggle-row" draggable="true" data-nav-id="timelapses"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.timelapses">Timelapses</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="timelapses" onchange="toggleNavItem('timelapses',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 				<div class="nav-toggle-row" draggable="true" data-nav-id="gallery"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.gallery">Galerie</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="gallery" onchange="toggleNavItem('gallery',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 								<div class="nav-toggle-row" draggable="true" data-nav-id="duplicates"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.duplicates">Doublons</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="duplicates" onchange="toggleNavItem('duplicates',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="suite-collections"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="suite.tab_collections">Collections</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="suite-collections" onchange="toggleNavItem('suite-collections',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="suite-organize"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="suite.tab_organize">Organisation</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="suite-organize" onchange="toggleNavItem('suite-organize',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="suite-diff"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="suite.tab_diff">Diff 3D</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="suite-diff" onchange="toggleNavItem('suite-diff',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="suite-similar"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="suite.tab_similar">Similaires</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="suite-similar" onchange="toggleNavItem('suite-similar',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="suite-licenses"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="suite.tab_licenses">Licences</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="suite-licenses" onchange="toggleNavItem('suite-licenses',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="suite-part"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="suite.tab_part">Fiche pièce</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="suite-part" onchange="toggleNavItem('suite-part',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="suite-compat"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="suite.tab_compat">Compatibilité</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="suite-compat" onchange="toggleNavItem('suite-compat',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="suite-check"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="suite.tab_check">Vérif. impression</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="suite-check" onchange="toggleNavItem('suite-check',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="suite-gcode"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="suite.tab_gcode">Archives G-code</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="suite-gcode" onchange="toggleNavItem('suite-gcode',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="suite-needs"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="suite.tab_needs">Besoins matière</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="suite-needs" onchange="toggleNavItem('suite-needs',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="suite-plate"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="suite.tab_plate">Plateau</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="suite-plate" onchange="toggleNavItem('suite-plate',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="suite-sync"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="suite.tab_sync">Synchro</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="suite-sync" onchange="toggleNavItem('suite-sync',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="suite-fab"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="suite.tab_fab">Assistant fabrication</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="suite-fab" onchange="toggleNavItem('suite-fab',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="suite-jobs" data-admin-net><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="suite.tab_jobs">Tâches</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="suite-jobs" onchange="toggleNavItem('suite-jobs',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="suite-db" data-admin-net><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="suite.tab_db">Base de données</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="suite-db" onchange="toggleNavItem('suite-db',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="suite-admin" data-admin-net data-host-plugin="administration"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="suite.tab_admin">Administration</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="suite-admin" onchange="toggleNavItem('suite-admin',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="plugins"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.plugins">Plugins</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="plugins" onchange="toggleNavItem('plugins',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 								<div class="nav-toggle-row" draggable="true" data-nav-id="filters"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.filters">Filtres</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="filters" onchange="toggleNavItem('filters',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 								<div class="nav-toggle-row" draggable="true" data-nav-id="download"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.download">Télécharger</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="download" onchange="toggleNavItem('download',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 								<div class="nav-toggle-row" draggable="true" data-nav-id="repair"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.repair">Réparation</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="repair" onchange="toggleNavItem('repair',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 							<div class="nav-toggle-row" draggable="true" data-nav-id="converter"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.converter">Convertisseur</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="converter" onchange="toggleNavItem('converter',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 								<div class="nav-toggle-row" draggable="true" data-nav-id="printers"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.printers">Imprimantes</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="printers" onchange="toggleNavItem('printers',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 								<div class="nav-toggle-row" draggable="true" data-nav-id="spoolman"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.spoolman">Filament</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="spoolman" onchange="toggleNavItem('spoolman',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
-								<div class="nav-toggle-row" draggable="true" data-nav-id="resin"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.resin">Résine (bêta)</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="resin" onchange="toggleNavItem('resin',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
+								<div class="nav-toggle-row" draggable="true" data-nav-id="resin"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.resin">Résine</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="resin" onchange="toggleNavItem('resin',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 								<div class="nav-toggle-row" draggable="true" data-nav-id="sosprint"><div class="nav-toggle-label"><i class="fa-solid fa-grip-vertical nav-drag-handle" aria-hidden="true"></i><span data-i18n="nav.sosprint">S.O.S print</span></div><label class="nav-toggle-switch"><input type="checkbox" class="nav-visibility-toggle" data-nav-id="sosprint" onchange="toggleNavItem('sosprint',this.checked)" checked><span class="nav-toggle-slider"></span></label></div>
 								</div>
                             </div>
                         </div>
-                        <div class="accord-section">
+                        <div class="accord-section" id="mobile-access-section" style="display:none;">
                             <div class="accord-header" onclick="toggleAccord(this); loadRemoteAccess();">
                                 <span><i class="fa-solid fa-mobile-screen"></i> <span data-i18n="settings.mobile_remote_access">Accès mobile &amp; à distance</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
@@ -2194,7 +2306,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="accord-section">
+                        <div class="accord-section" data-host-plugin="sharing">
                             <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-network-wired"></i> <span data-i18n="settings.remote_instances">Instances Stellio</span></span>
                                 <button id="add-remote-instance-btn" class="btn btn-primary btn-sm" onclick="event.stopPropagation(); openAddRemoteInstanceModal()"><i class="fa-solid fa-plus"></i> <span data-i18n="actions.add">Ajouter</span></button>
@@ -2221,7 +2333,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="accord-section viewer-hide" id="push-server-block" style="display:none;">
+                        <div class="accord-section viewer-hide" data-host-plugin="push-notify" id="push-server-block" style="display:none;">
                             <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-bell"></i> <span data-i18n="push.title">Notifications push</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
@@ -2290,10 +2402,10 @@
                                     <button type="button" class="btn btn-ghost btn-sm" onclick="testPush()"><i class="fa-solid fa-paper-plane"></i> <span data-i18n="push.test">Envoyer un test</span></button>
                                     <button type="button" class="btn btn-primary btn-sm" onclick="savePushSettings()"><i class="fa-solid fa-check"></i> <span data-i18n="push.save">Enregistrer</span></button>
                                 </div>
-                                <div class="mg-slot viewer-hide" style="border-top:1px solid var(--border);padding-top:12px;"><div class="mg-slot-title" data-mg-slot-title="digest" style="font-weight:600;font-size:calc(14px * var(--fs, 1));margin-bottom:8px;"></div><div class="mg-body" data-mg-slot="digest"></div></div>
+                                <div class="mg-slot viewer-hide" data-host-plugin="digest" style="border-top:1px solid var(--border);padding-top:12px;"><div class="mg-slot-title" data-mg-slot-title="digest" style="font-weight:600;font-size:calc(14px * var(--fs, 1));margin-bottom:8px;"></div><div class="mg-body" data-mg-slot="digest"></div></div>
                             </div>
                         </div>
-                        <div class="accord-section viewer-hide" id="mqtt-server-block" style="display:none;">
+                        <div class="accord-section viewer-hide" data-host-plugin="mqtt" id="mqtt-server-block" style="display:none;">
                             <div class="accord-header" onclick="toggleAccord(this)">
                                 <span><i class="fa-solid fa-house-signal"></i> <span data-i18n="mqtt.title">MQTT / Home Assistant</span></span>
                                 <i class="fa-solid fa-chevron-down accord-arrow"></i>
@@ -2365,6 +2477,28 @@
                                     <div id="sources-list" class="sources-list">
                                         <div class="empty-state small"><p data-i18n="settings.no_sources">Aucune source configurée</p></div>
                                     </div>
+                                </div>
+                            </div>
+
+                            <div class="accord-section" id="api-settings-section" style="display:none;">
+                                <div class="accord-header" onclick="toggleAccord(this); window.StellioApi && StellioApi.load()">
+                                    <span><i class="fa-solid fa-plug"></i> <span data-i18n="api.title">API publique</span></span>
+                                    <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                                </div>
+                                <div class="accord-body">
+                                    <p class="settings-hint" style="margin-bottom:14px;"><span data-i18n="api.hint">Des jetons pour que vos scripts lisent vos fichiers, imprimantes et tâches (et, avec le droit d'écriture, créent ou mettent à jour des tâches). Chaque jeton se révoque à tout moment.</span> <a href="/api/v1/docs" target="_blank" rel="noopener" data-i18n="api.docs">Documentation</a></p>
+                                    <div id="api-tokens-box"></div>
+                                </div>
+                            </div>
+
+                            <div class="accord-section" data-host-plugin="webhooks" id="webhooks-settings-section" style="display:none;">
+                                <div class="accord-header" onclick="toggleAccord(this); window.StellioWebhooks && StellioWebhooks.load()">
+                                    <span><i class="fa-solid fa-bolt"></i> <span data-i18n="wh.title">Webhooks</span></span>
+                                    <i class="fa-solid fa-chevron-down accord-arrow"></i>
+                                </div>
+                                <div class="accord-body">
+                                    <p class="settings-hint" style="margin-bottom:14px;" data-i18n="wh.hint">Stellio prévient votre serveur ou votre automatisation (Home Assistant, Node-RED, Discord via un relais…) quand une impression se termine ou échoue, qu'une commande est en retard ou qu'une imprimante est surchargée. Chaque envoi est signé ; en cas d'échec il est retenté avec un délai croissant. L'envoi ne se fait que lorsque Stellio est lancé.</p>
+                                    <div id="wh-box"></div>
                                 </div>
                             </div>
 
@@ -2759,7 +2893,7 @@
                     </div>
                 </div>
 
-				<div id="page-repair" class="page">
+				<div id="page-repair" class="page" data-host-plugin="file-tools">
 				  <div class="repair-hero">
 					<div class="repair-hero-text">
 					  <h2><i class="fa-solid fa-screwdriver-wrench"></i> <span data-i18n="repair.title">Réparation de maillage</span></h2>
@@ -2834,7 +2968,25 @@
 				  <div id="tr-list"></div>
 				</div>
 
-				<div id="page-planning" class="page">
+				<div id="page-plugin-view" class="page">
+				  <div id="pv-msg" class="settings-hint" hidden></div>
+				  <iframe id="pv-frame" class="pv-frame" sandbox="allow-scripts" title="Plugin" referrerpolicy="no-referrer"></iframe>
+				</div>
+				<div id="page-plugins" class="page">
+				  <div class="repair-header">
+					<h2><i class="fa-solid fa-puzzle-piece"></i> <span data-i18n="nav.plugins">Plugins</span></h2>
+					<p data-i18n="plugins.subtitle">Étendez Stellio avec des plugins de la communauté : choisissez-en un dans le catalogue, installez-le, puis activez-le après avoir lu ses permissions.</p>
+				  </div>
+				  <div id="plugins-root"></div>
+				</div>
+				<div id="page-suite" class="page">
+				  <div class="repair-header">
+					<h2 id="suite-page-title"><i class="fa-solid fa-toolbox"></i> <span data-i18n="suite.title">Atelier avancé</span></h2>
+				  </div>
+				  <div id="suite-root"></div>
+				</div>
+
+				<div id="page-planning" data-host-plugin="stellio-pro" class="page">
 				  <div class="repair-header">
 					<h2><i class="fa-solid fa-calendar-days"></i> <span data-i18n="planning.title">Planning de production</span></h2>
 					<p data-i18n="planning.subtitle">Date de fin estimée de chaque commande par imprimante, capacité disponible contre charge demandée, et alertes de surcharge ou de retard prévisible.</p>
@@ -2860,15 +3012,23 @@
 					<h3 data-i18n="planning.jobs_title">Commandes planifiées</h3>
 					<div id="pl-table"></div>
 				  </section>
+				  <section class="pl-card">
+					<h3 data-i18n="planning.stats_title">Coût et rendement par commande</h3>
+					<div id="pl-stats"></div>
+				  </section>
+				  <section class="pl-card">
+					<h3 data-i18n="planning.profit_title">Rentabilité par imprimante</h3>
+					<div id="pl-profit"></div>
+				  </section>
 				</div>
-				<div id="modal-planning-settings" class="modal hidden">
+				<div id="modal-planning-settings" data-host-plugin="stellio-pro" class="modal hidden">
 				  <div class="modal-content" style="max-width:720px;">
 					<div class="modal-header"><h3><i class="fa-solid fa-gauge-high"></i> <span data-i18n="planning.capacity_settings">Capacité des imprimantes</span></h3>
 					  <button class="modal-close" onclick="closeModal('modal-planning-settings')">×</button></div>
 					<div class="modal-body" id="pl-settings-body"></div>
 				  </div>
 				</div>
-				<div id="page-bigprint" class="page">
+				<div id="page-bigprint" class="page" data-host-plugin="bigprint">
 				  <div class="repair-header">
 					<h2><i class="fa-solid fa-up-right-and-down-left-from-center"></i> <span data-i18n="bigprint.title">BigPrint : impression grandeur nature</span></h2>
 					<p data-i18n="bigprint.subtitle">Agrandissez un modèle à la taille voulue : BigPrint le découpe en pièces qui tiennent sur votre plateau, les évide, ajoute des goujons d'assemblage et numérote chaque pièce.</p>
@@ -2984,7 +3144,7 @@
 				  <p class="bp-credit"><span data-i18n="bigprint.credit">Moteur de découpe :</span> <a href="https://github.com/PooterTF/bigprint" target="_blank" rel="noopener">bigprint</a> (Michael Christopher Stone, AGPL‑3.0)</p>
 				</div>
 
-				<div id="page-converter" class="page">
+				<div id="page-converter" class="page" data-host-plugin="file-tools">
 				  <div class="repair-header">
 					<h2><i class="fa-solid fa-file-export"></i> <span data-i18n="converter.title">Convertisseur de fichiers 3D</span></h2>
 					<p data-i18n="converter.subtitle">Convertissez vos fichiers entre les formats STL, 3MF et OBJ.</p>
@@ -3352,11 +3512,11 @@
 						<i class="fa-solid fa-toolbox"></i> <span data-i18n="parts.open_btn">Pièces &amp; consommables</span>
 					</button>
 				</div>
-				<div id="page-resin" class="page">
+				<div id="page-resin" class="page" data-host-plugin="resin">
 					<div id="v13-resin-host" class="v13-section"></div>
 				</div>
 				<div id="page-spoolman" class="page">
-					<div id="spoolman-section" class="inv-section" data-inv-key="spoolman" style="display:none; margin-top:24px;">
+					<div id="spoolman-section" data-host-plugin="spoolman" class="inv-section" data-inv-key="spoolman" style="display:none; margin-top:24px;">
 						<div class="source-banner source-banner-spoolman">
 							<div class="source-banner-icon"><i class="fa-solid fa-circle-nodes"></i></div>
 							<div style="flex:1; min-width:0;">
@@ -3457,7 +3617,7 @@
             <button id="nesting-btn" class="btn btn-sm">
                 <i class="fa-solid fa-border-all"></i> <span data-i18n="actions.nesting">Nester + IA</span>
             </button>
-            <button id="merge-3mf-btn" class="btn btn-sm" data-i18n-title="merge3mf.hint" title="Fusionner les fichiers sélectionnés en un seul fichier 3MF">
+            <button id="merge-3mf-btn" data-host-plugin="file-tools" class="btn btn-sm" data-i18n-title="merge3mf.hint" title="Fusionner les fichiers sélectionnés en un seul fichier 3MF">
                 <i class="fa-solid fa-object-group"></i> <span data-i18n="merge3mf.btn">Fusionner en 3MF</span>
             </button>
             <button id="add-selected-to-project-btn" class="btn btn-sm">
@@ -4431,7 +4591,7 @@
                     <div id="tag-modal-list" style="display:flex; flex-direction:column; gap:6px; margin-top:8px;"></div>
                 </div>
 
-                <div id="ollama-autotag-section" style="display:none; margin-bottom:14px;">
+                <div id="ollama-autotag-section" data-host-plugin="ai-assistant" style="display:none; margin-bottom:14px;">
                     <button type="button" id="ollama-autotag-btn"
                         style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; padding:9px 14px; background:transparent; border:1px dashed var(--accent); border-radius:var(--radius); color:var(--accent); font-size:calc(13px * var(--fs, 1)); cursor:pointer; transition:background .2s;"
                         onmouseover="this.style.background='var(--accent)20'" onmouseout="this.style.background='transparent'"
@@ -4764,14 +4924,14 @@
 							<option value="prusalink">PrusaLink (Prusa MK4 / MK3.9 / MK3.5 / MINI+ / XL / CORE One)</option>
 							<option value="bambu">Bambu Lab (X1 / X2D / P1 / P2S / A1 / H2)</option>
 							<option value="bambuddy">Bambuddy (Bambu Lab via Bambuddy)</option>
-							<option value="elegoo_sdcp" data-i18n="printers.elegoo_sdcp_model">Elegoo (résine Saturn/Mars — bêta, ou Centauri Carbon 1)</option>
+							<option value="elegoo_sdcp" data-i18n="printers.elegoo_sdcp_model">Elegoo (résine Saturn/Mars, ou Centauri Carbon 1)</option>
 							<option value="elegoo_cc2">Elegoo Centauri Carbon 2</option>
 							<option value="creality">Creality (K1 / K2 / Ender-3 V3 / Hi)</option>
 							<option value="flashforge">FlashForge (5M / 5M Pro / AD5X)</option>
-							<option value="chitu_sdcp" data-i18n="printers.chitu_sdcp_model">Résine Chitubox : Phrozen / Uniformation / autres (SDCP) — bêta</option>
-							<option value="usb_serial" data-i18n="printers.usb_serial_model">Imprimante branchée en USB au PC (Marlin, Prusa, Creality…) — bêta</option>
-							<option value="anycubic_photon" data-i18n="printers.anycubic_photon_model">Résine Anycubic Photon (Mono X, Mono SQ… Wi-Fi) — bêta</option>
-							<option value="formlabs" data-i18n="printers.formlabs_model">Résine Formlabs (Form 3 / 3L / 4, API cloud) — bêta</option>
+							<option value="chitu_sdcp" data-i18n="printers.chitu_sdcp_model">Résine Chitubox : Phrozen / Uniformation / autres (SDCP)</option>
+							<option value="usb_serial" data-host-plugin="usb-printers" data-i18n="printers.usb_serial_model">Imprimante branchée en USB au PC (Marlin, Prusa, Creality…)</option>
+							<option value="anycubic_photon" data-host-plugin="resin" data-i18n="printers.anycubic_photon_model">Résine Anycubic Photon (Mono X, Mono SQ… Wi-Fi)</option>
+							<option value="formlabs" data-host-plugin="resin" data-i18n="printers.formlabs_model">Résine Formlabs (Form 3 / 3L / 4, API cloud)</option>
 							<option value="duet">Duet (RepRapFirmware)</option>
 							<option value="repetier">Repetier-Server</option>
 						</select>
@@ -4792,20 +4952,16 @@
 						</small>
 					</div>
 					<div id="group-chitu-hint" style="display:none; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:12px;">
-						<small style="color:var(--text-secondary); font-size:calc(11px * var(--fs, 1)); line-height:1.5;" data-i18n="printers.chitu_hint">Cartes Chitubox en SDCP v3 (Phrozen, Uniformation GKtwo, Elegoo et autres) : saisissez l'adresse IP, aucun code d'accès. Suivi seulement. (Bêta)</small>
+						<small style="color:var(--text-secondary); font-size:calc(11px * var(--fs, 1)); line-height:1.5;" data-i18n="printers.chitu_hint">Cartes Chitubox en SDCP v3 (Phrozen, Uniformation GKtwo, Elegoo et autres) : saisissez l'adresse IP, aucun code d'accès. Suivi seulement.</small>
 					</div>
 					<div id="group-photon-hint" style="display:none; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:12px;">
-						<small style="color:var(--text-secondary); font-size:calc(11px * var(--fs, 1)); line-height:1.5;" data-i18n="printers.photon_hint">Anciens Photon en Wi-Fi (Mono X, Mono X 6K, Mono SQ…) : saisissez l'adresse IP (port 6000). Suivi simplifié : état et fichier en cours, sans progression. Les Photon récents (M5s, M7…) ne sont pas gérés. (Bêta)</small>
+						<small style="color:var(--text-secondary); font-size:calc(11px * var(--fs, 1)); line-height:1.5;" data-i18n="printers.photon_hint">Anciens Photon en Wi-Fi (Mono X, Mono X 6K, Mono SQ…) : saisissez l'adresse IP (port 6000). Suivi simplifié : état et fichier en cours, sans progression. Les Photon récents (M5s, M7…) ne sont pas gérés.</small>
 					</div>
 					<div id="group-usb-hint" style="display:none; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:12px;">
-						<small style="color:var(--text-secondary); font-size:calc(11px * var(--fs, 1)); line-height:1.5;" data-i18n="printers.usb_hint">Imprimante branchée en USB à l'ordinateur qui fait tourner Stellio : utilisez « Détecter mes imprimantes » ou saisissez le port (COM3, /dev/ttyACM0…). Stellio indique seulement si elle est branchée ; il n'ouvre jamais la liaison série (cela ferait redémarrer certaines cartes en pleine impression), donc pas d'état ni de températures. (Bêta)</small>
+						<small style="color:var(--text-secondary); font-size:calc(11px * var(--fs, 1)); line-height:1.5;" data-i18n="printers.usb_hint">Imprimante branchée en USB à l'ordinateur qui fait tourner Stellio : utilisez « Détecter mes imprimantes » ou saisissez le port (COM3, /dev/ttyACM0…). Stellio indique seulement si elle est branchée ; il n'ouvre jamais la liaison série (cela ferait redémarrer certaines cartes en pleine impression), donc pas d'état ni de températures.</small>
 					</div>
 					<div id="group-formlabs-hint" style="display:none; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:12px;">
-						<small style="color:var(--text-secondary); font-size:calc(11px * var(--fs, 1)); line-height:1.5;" data-i18n="printers.formlabs_hint">Formlabs via l'API web officielle : créez un client sur le portail développeur Formlabs et saisissez « client_id:client_secret » dans « Clé API ». Suivi seulement ; l'envoi des pièces se fait avec PreForm. (Bêta)</small>
-					</div>
-					<div id="group-resin-beta" style="display:none; background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.45); border-radius:8px; padding:10px 12px; margin-bottom:12px; gap:8px; align-items:flex-start;">
-						<span class="beta-badge" data-i18n="printers.resin_beta">Bêta</span>
-						<small style="color:var(--text-secondary); font-size:calc(11px * var(--fs, 1)); line-height:1.5;" data-i18n="printers.resin_beta_warning">Imprimantes résine : fonction en bêta. Elle n'a pas pu être testée sur toutes les machines ; le suivi peut être incomplet ou se tromper. Stellio ne lance ni n'arrête jamais une impression résine. Signalez ce qui ne marche pas sur GitHub.</small>
+						<small style="color:var(--text-secondary); font-size:calc(11px * var(--fs, 1)); line-height:1.5;" data-i18n="printers.formlabs_hint">Formlabs via l'API web officielle : créez un client sur le portail développeur Formlabs et saisissez « client_id:client_secret » dans « Clé API ». Suivi seulement ; l'envoi des pièces se fait avec PreForm.</small>
 					</div>
 					<div id="group-duet-hint" style="display:none; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:12px;">
 						<small style="color:var(--text-secondary); font-size:calc(11px * var(--fs, 1)); line-height:1.5;" data-i18n="printers.duet_hint">Duet 2 / 3 / Mini 5+ sous RepRapFirmware 3. Saisissez l'adresse IP de la carte ; mot de passe éventuel dans « Clé API ».</small>
@@ -5060,7 +5216,7 @@
                     <span class="file-action-label" data-i18n="actions.share_file">Partager le fichier</span>
                     <i class="fa-solid fa-chevron-right file-action-arrow"></i>
                 </button>
-                <button class="file-action-row" id="ctx-send-instance-btn">
+                <button class="file-action-row" id="ctx-send-instance-btn" data-host-plugin="sharing">
                     <span class="file-action-icon"><i class="fa-solid fa-network-wired"></i></span>
                     <span class="file-action-label" data-i18n="settings.remote_instances_send_action">Envoyer vers une instance Stellio</span>
                     <i class="fa-solid fa-chevron-right file-action-arrow"></i>
@@ -5118,6 +5274,11 @@
                 <button class="file-action-row" id="ctx-repair-btn">
                     <span class="file-action-icon"><i class="fa-solid fa-screwdriver-wrench"></i></span>
                     <span class="file-action-label" data-i18n="modal.repair_file">Réparer le fichier</span>
+                    <i class="fa-solid fa-chevron-right file-action-arrow"></i>
+                </button>
+                <button class="file-action-row" id="ctx-lighten-btn" style="display:none">
+                    <span class="file-action-icon"><i class="fa-solid fa-compress"></i></span>
+                    <span class="file-action-label" data-i18n="lighten.menu">Créer une version allégée</span>
                     <i class="fa-solid fa-chevron-right file-action-arrow"></i>
                 </button>
                 <button class="file-action-row" id="ctx-bigprint-btn">
@@ -5649,6 +5810,7 @@
     <div class="modal-body">
       <input type="search" id="bp-picker-search" class="settings-input" style="width:100%;" data-i18n-placeholder="bigprint.pick_search" placeholder="Rechercher…">
       <div id="bp-picker-list" class="bp-picker-list"></div>
+      <div id="bp-picker-pager" class="bp-pager"></div>
     </div>
   </div>
 </div>
@@ -5657,6 +5819,11 @@
     <script src="planning.js"></script>
     <script src="trace.js"></script>
     <script src="loginlog.js"></script>
+    <script src="api_tokens.js"></script>
+    <script src="webhooks.js"></script>
+    <script src="assistant.js"></script>
+    <script src="suite.js"></script>
+    <script src="administration.js"></script>
     <script src="filament_tags.js"></script>
 </body>
 </html>

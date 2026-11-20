@@ -1,0 +1,42 @@
+{
+  "id": "ai-openai",
+  "name": "ChatGPT (OpenAI)",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-comments",
+  "description": {
+    "fr": "Fournisseur d'IA en ligne : ChatGPT (OpenAI). Utilise ta propre clé API (Paramètres › IA).",
+    "en": "Online AI provider: ChatGPT (OpenAI). Uses your own API key (Settings › AI).",
+    "de": "Online-KI-Anbieter: ChatGPT (OpenAI). Verwendet deinen eigenen API-Schlüssel (Einstellungen › KI).",
+    "es": "Proveedor de IA en línea: ChatGPT (OpenAI). Usa tu propia clave API (Ajustes › IA).",
+    "pt": "Fornecedor de IA online: ChatGPT (OpenAI). Usa a tua própria chave API (Definições › IA).",
+    "it": "Provider IA online: ChatGPT (OpenAI). Usa la tua chiave API (Impostazioni › IA).",
+    "zh": "在线 AI 提供商：ChatGPT (OpenAI)。使用你自己的 API 密钥（设置 › AI）。",
+    "ja": "オンライン AI プロバイダー：ChatGPT (OpenAI)。ご自身の API キーを使用します（設定 › AI）。"
+  },
+  "host": {
+    "modules": [
+      "ai_openai"
+    ],
+    "migrate": {
+      "settings_match": [
+        {
+          "ai_enabled": true,
+          "ai_provider": "openai"
+        }
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "ChatGPT (OpenAI)",
+    "en": "ChatGPT (OpenAI)",
+    "de": "ChatGPT (OpenAI)",
+    "es": "ChatGPT (OpenAI)",
+    "pt": "ChatGPT (OpenAI)",
+    "it": "ChatGPT (OpenAI)",
+    "zh": "ChatGPT (OpenAI)",
+    "ja": "ChatGPT (OpenAI)"
+  },
+  "server_only": true
+}

@@ -9,6 +9,7 @@ on:
       - 'packaging/**'
       - 'check_deps.py'
       - 'modules/**'
+      - 'bundled_plugins/**'
       - 'requirements.txt'
       - 'assets/**'
       - 'languages/**'
@@ -141,6 +142,7 @@ jobs:
             --collect-all manifold3d `
             --collect-all skimage `
             --collect-all scipy `
+            --paths bundled_plugins/bigprint `
             --collect-all bigprint `
             --collect-all pyaes `
             --copy-metadata imageio `
@@ -166,13 +168,13 @@ jobs:
           Copy-Item "main.py"          "dist\Stellio\app\main.py"
           Copy-Item "check_deps.py"    "dist\Stellio\app\check_deps.py"
           Copy-Item -Recurse "modules" "dist\Stellio\app\modules"   # modules séparés de main.py (dossier copié en bloc)
-          Copy-Item -Recurse "bigprint" "dist\Stellio\app\bigprint"   # moteur BigPrint : importé depuis le dossier app (sans cela : « module manquant bigprint »)
+          Copy-Item -Recurse "bundled_plugins" "dist\Stellio\app\bundled_plugins"   # plugins intégrés (dont le moteur BigPrint, importé depuis ce dossier : sans cela « module manquant bigprint »)
           Copy-Item -Recurse "interface" "dist\Stellio\app\interface"
           Copy-Item -Recurse "assets"    "dist\Stellio\app\assets"
           Copy-Item -Recurse "languages" "dist\Stellio\app\languages"
           if (Test-Path "bin\win") { Copy-Item -Recurse "bin\win" "dist\Stellio\app\bin" }
 
-          foreach ($f in @("main.py","check_deps.py","modules\__init__.py","bigprint\gui.py","interface\index.html","interface\script.js","interface\style.css")) {
+          foreach ($f in @("main.py","check_deps.py","modules\__init__.py","bundled_plugins\bigprint\bigprint\gui.py","interface\index.html","interface\script.js","interface\style.css")) {
             if (-not (Test-Path "dist\Stellio\app\$f")) {
               throw "Echec de copie : dist\Stellio\app\$f"
             }
@@ -409,6 +411,7 @@ jobs:
             --collect-all manifold3d \
             --collect-all skimage \
             --collect-all scipy \
+            --paths bundled_plugins/bigprint \
             --collect-all bigprint \
             --collect-all pyaes \
             --copy-metadata imageio \
@@ -433,7 +436,7 @@ jobs:
           cp main.py "$APP_DIR/main.py"
           cp check_deps.py "$APP_DIR/check_deps.py"
           cp -R modules "$APP_DIR/modules"   # modules séparés de main.py (dossier copié en bloc)
-          cp -R bigprint "$APP_DIR/bigprint"   # moteur BigPrint (importé depuis le dossier app)
+          cp -R bundled_plugins "$APP_DIR/bundled_plugins"   # plugins intégrés (dont le moteur BigPrint)
           cp -R interface "$APP_DIR/interface"
           cp -R assets "$APP_DIR/assets"
           cp -R languages "$APP_DIR/languages"
@@ -685,6 +688,7 @@ jobs:
             --collect-all manifold3d \
             --collect-all skimage \
             --collect-all scipy \
+            --paths bundled_plugins/bigprint \
             --collect-all bigprint \
             --collect-all pyaes \
             --copy-metadata imageio \
@@ -709,7 +713,7 @@ jobs:
           cp main.py "$APP_DIR/main.py"
           cp check_deps.py "$APP_DIR/check_deps.py"
           cp -R modules "$APP_DIR/modules"   # modules séparés de main.py (dossier copié en bloc)
-          cp -R bigprint "$APP_DIR/bigprint"   # moteur BigPrint (importé depuis le dossier app)
+          cp -R bundled_plugins "$APP_DIR/bundled_plugins"   # plugins intégrés (dont le moteur BigPrint)
           cp -R interface "$APP_DIR/interface"
           cp -R assets "$APP_DIR/assets"
           cp -R languages "$APP_DIR/languages"

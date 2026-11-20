@@ -1,0 +1,42 @@
+{
+  "id": "ai-anthropic",
+  "name": "Claude (Anthropic)",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-feather",
+  "description": {
+    "fr": "Fournisseur d'IA en ligne : Claude (Anthropic). Utilise ta propre clé API (Paramètres › IA).",
+    "en": "Online AI provider: Claude (Anthropic). Uses your own API key (Settings › AI).",
+    "de": "Online-KI-Anbieter: Claude (Anthropic). Verwendet deinen eigenen API-Schlüssel (Einstellungen › KI).",
+    "es": "Proveedor de IA en línea: Claude (Anthropic). Usa tu propia clave API (Ajustes › IA).",
+    "pt": "Fornecedor de IA online: Claude (Anthropic). Usa a tua própria chave API (Definições › IA).",
+    "it": "Provider IA online: Claude (Anthropic). Usa la tua chiave API (Impostazioni › IA).",
+    "zh": "在线 AI 提供商：Claude (Anthropic)。使用你自己的 API 密钥（设置 › AI）。",
+    "ja": "オンライン AI プロバイダー：Claude (Anthropic)。ご自身の API キーを使用します（設定 › AI）。"
+  },
+  "host": {
+    "modules": [
+      "ai_anthropic"
+    ],
+    "migrate": {
+      "settings_match": [
+        {
+          "ai_enabled": true,
+          "ai_provider": "anthropic"
+        }
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "Claude (Anthropic)",
+    "en": "Claude (Anthropic)",
+    "de": "Claude (Anthropic)",
+    "es": "Claude (Anthropic)",
+    "pt": "Claude (Anthropic)",
+    "it": "Claude (Anthropic)",
+    "zh": "Claude (Anthropic)",
+    "ja": "Claude (Anthropic)"
+  },
+  "server_only": true
+}

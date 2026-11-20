@@ -129,9 +129,10 @@
 - 🔁 **按上次设置重新打印**：在历史记录中一键重新打开发送窗口，沿用相同的打印机、配置和卷轴
 - 🎛️ **校准数据**：按耗材和打印机保存 flow、pressure advance、温度等，并在发送到切片软件的窗口中调用
 - 👥 **轻量协作模式**：可看到其他已连接设备是否正在查看某个文件，并通过提醒避免误将同一文件两次发送到切片软件
+- 🛡️ **管理插件与被监督实例**：一个页面管理访客账户与角色、团队、会话、审计日志和已配对实例。主实例可在**所有者接受后**监督另一实例：账户、角色和权限随后由主实例管理，本地内容默认保持私有，所有者可随时退出监督。未连接的实例保持完全控制。
 
 ### 🧵 材料：耗材与树脂
-- 🧪 **树脂库存（测试版）**：侧边栏分类现为**材料**（耗材 + 树脂）。手动添加树脂瓶（品牌、类型、颜色、容量、剩余量、价格、存放位置），按 ml 扣除用量，并享有与耗材相同的**“待补货”**提醒（低库存阈值、手动勾选、商店搜索链接、“已订购”），同样显示在仪表盘小组件中。尚未与打印机关联，不会自动扣减
+- **树脂库存**：侧边栏分类现为**材料**（耗材 + 树脂）。手动添加树脂瓶（品牌、类型、颜色、容量、剩余量、价格、存放位置），按 ml 扣除用量，并享有与耗材相同的**“待补货”**提醒（低库存阈值、手动勾选、商店搜索链接、“已订购”），同样显示在仪表盘小组件中。尚未与打印机关联，不会自动扣减
 - 🔗 **Spoolman** 集成（卷轴管理服务器），支持在局域网中自动发现
 - 🟠 支持 **Bambu Lab AMS**（插槽读取）
 - 🟢 支持 **Creality CFS**
@@ -154,6 +155,12 @@
 - 🛒 **实用链接**：商店、厂商、3D模型网站和资源，按可折叠分组展示
 
 ### 🧩 高级工具
+- 🧩 **内置插件 (1.1.7)**：BigPrint、树脂打印机、USB 打印机、延时摄影、文件工具（转换 / 合并 3MF）、打印板工作室、推送通知、Webhook、每周摘要、MQTT 和 Obico 现为随 Stellio 一同发布的插件，仅在启用时加载（插件标签页）。从 1.1.6 升级无感：您已在使用的功能会自动启用，设置保持不变；全新安装则保持精简。 另外内置：**共享与同步**、**Spoolman**、每个 AI 提供商一个插件加 **AI 助手**，以及 **Stellio Pro**（客户、报价、发票、订单、会计、电价、排程、物料需求、零件库存）——仅在启用时才添加各自的页面和按钮。
+- 🗂️ **高级工坊（1.1.7）**：工具按类别放入侧边栏（所有者账户）— **库**（按规则自动整理、可视化 3D 对比含 STEP、按形状查找相似件并带缩略图、带到期通知的许可证、零件档案）、**打印**（模型 ↔ 打印机兼容性、带建议朝向的打印前检查、每次打印的 G-code 归档）、**材料**（对照库存的材料需求）、**工具**（按真实几何嵌套的多模型打印板、制造助手）和**管理**（任务、数据库、审计日志、团队、会话）。每个条目都可在 设置 › 导航项 中关闭。
+- 🔑 **公共 API 与 Webhook**：限定范围的令牌、带 OpenAPI 文档的 `/api/v1` 路由、Python 和 JavaScript SDK；带重试和日志的签名出站 Webhook（HMAC-SHA256）。
+- 👥 **团队与安全**：角色（管理员、经理、操作员、普通用户、访客）、按文件夹、项目和打印机的权限、共享工作区、可撤销的活动会话、登录日志、可分页并导出 CSV 的审计日志。
+- 🧠 **Stellio Intelligence**（统计）：根据您已评分的打印，给出每种材料 / 打印机推荐的切片配置和可能的失败原因（统计而非 AI 模型）。生产排程还新增了按打印机的盈利能力和人工时间。
+- 🪶 **超大 STL 文件**：流式分析、简化的缩略图和查看器、随可用内存调整的加载阈值，以及**创建轻量版本**（在原文件旁生成简化副本，原文件绝不修改）。大文件的缩略图在独立进程中绘制，崩溃不再拖垮应用。
 - 🎨 **自动排版嵌套**（rectpack 或通过 shapely 计算真实轮廓）
 - 🧩 **合并为 3MF**：选择多个模型（STL、3MF、OBJ 等），Stellio 会生成一个 3MF 文件——全部放得下则为单个盘，否则生成多盘文件（结构兼容 Bambu Studio / OrcaSlicer；PrusaSlicer 会把所有零件一起显示）。可自选文件名和保存文件夹（支持网络共享，可新建文件夹），完成后 Stellio 会询问是删除还是保留原始文件。
 - 🖌️ **耗材盘颜色传给切片软件**：发送时，所选耗材盘的颜色和材料会应用到 OrcaSlicer、Bambu Studio 或 PrusaSlicer 加载的耗材配置（需要已导入并关联到打印机的耗材配置；批量发送时仅当所有耗材盘相同才应用颜色）。
@@ -308,6 +315,7 @@ pct exec <CTID> -- journalctl -u stellio -f       # 实时查看日志
 
 > Windows 版不受影响：这些功能只会出现在树莓派、虚拟机、LXC、Docker 和 Linux 上。
 
+- 🧱 **1.1.7 中仅限服务器版**：外部推送通知、定期摘要、MQTT / Home Assistant、出站 Webhook、公共 API、实例间同步和移动访问在 Windows 上隐藏并停用。
 - ☁️ **在线 AI（可选）**：可用您自己的 API 密钥以 Claude（Anthropic）、ChatGPT（OpenAI）或 Gemini（Google）代替 Ollama（设置 → 人工智能）。密钥在服务器上加密存储，绝不会回传给浏览器；默认仍为 100% 本地的 Ollama。请求（文件名、标签、描述、S.O.S Print 照片）会发送给所选提供商，并按您的密钥计费。
 - 📥 **切片软件配置文件**：Stellio 看不到您电脑上的切片软件，也不会连接切片软件的云（Orca Cloud、Bambu Cloud 等）。请先在切片软件中导出配置文件（OrcaSlicer：文件 → 导出 → 导出预设包），再在 设置 → 我的切片软件配置文件 中导入；对于 Orca Cloud，也可以粘贴配置文件的“Copy raw JSON”。还可以指定一个 Stellio 会自动重新读取的**监视配置文件夹**（Syncthing、网络共享、scp 等）。
 - 🐯 [**TigerTag**](https://tigersystem.io)：在 设置 → 耗材库存 → TigerTag 中使用邮箱和密码官方登录（不会保存密码，只保存加密的会话令牌）。账户是用 Google 创建的？请先在 TigerTag 应用中通过“忘记密码”设置密码。备用方法：把 TigerTag Studio 的数据文件夹（Windows：`%APPDATA%` 中的“TigerTag…”文件夹，至少包含 `Local Storage` 和 `IndexedDB`）复制到服务器并填写其路径。
@@ -328,7 +336,7 @@ Stellio 可自动检测：
 - ✅ ideaMaker
 - ✅ FlashPrint
 - ✅ Lychee Slicer
-- ✅ CHITUBOX / CHITUBOX Pro / Anycubic Photon Workshop / PreForm / Voxeldance Tango *（树脂，测试版）*
+- ✅ CHITUBOX / CHITUBOX Pro / Anycubic Photon Workshop / PreForm / Voxeldance Tango
 - ✅ CraftWare
 - ✅ MatterControl
 - ✅ MakerBot Print
@@ -349,8 +357,8 @@ Stellio 可自动检测：
 | **OctoPrint** | 任何由 OctoPrint 控制的打印机 | HTTP：监控、上传、摄像头 |
 | **Duet / RepRapFirmware** | 任何 Duet 2/3 主板 | HTTP：监控、上传 |
 | **Repetier-Server** | 任何由 Repetier-Server 管理的打印机 | HTTP：监控、上传 |
-| **树脂（测试版）** 🧪 | Formlabs（Web API）· Anycubic Photon Wi-Fi · Chitubox / Phrozen / Uniformation (SDCP) | 仅监控，测试版——真实硬件未充分测试 · 维护（FEP、料盒、LCD…） |
-| **USB 打印机（测试版）🧪** | 连接到 Stellio 所在电脑的 Marlin、Prusa、Creality、Klipper 主板等 | 串口检测（从不打开端口）：已插上 / 未连接，无状态和温度 |
+| **树脂** | Formlabs（Web API）· Anycubic Photon Wi-Fi · Chitubox / Phrozen / Uniformation (SDCP) | 仅监控 · 维护（FEP、料盒、LCD…） |
+| **USB 打印机** | 连接到 Stellio 所在电脑的 Marlin、Prusa、Creality、Klipper 主板等 | 串口检测（从不打开端口）：已插上 / 未连接，无状态和温度 |
 
 > 所列型号是 Stellio「添加打印机」表单中提供的型号。使用相同协议的其他型号通常也能工作，但并未全部测试——如果您的打印机能用或不能用，请[在 GitHub 上告诉我们](https://github.com/stellio-app/stellio/issues)。
 
@@ -402,7 +410,8 @@ stellio/
 ├── release-notes/          # notes.txt (release text, replaced at each release)
 ├── tests/  tools/          # pytest tests, maintenance tools (incl. stellio_manager.bat)
 ├── check_deps.py       # 自我修复式依赖检查工具
-├── modules/            # 从 main.py 拆分出的模块 (print_session, share_link, timelapse, mqtt_publisher…)
+├── modules/            # 从 main.py 拆分出的核心模块 (print_session, share_link, plugin_host, print_events…)
+├── bundled_plugins/    # 内置插件 (BigPrint, MQTT, Webhook, 延时摄影…)，仅在启用时加载
 ├── worker.py           # 未使用的 3MF 工作进程骨架（占位）
 ├── assets/             # 标志、图标
 ├── languages/          # 翻译文件（JSON）

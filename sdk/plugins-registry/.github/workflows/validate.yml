@@ -1,0 +1,14 @@
+name: Valider le catalogue
+on:
+  pull_request:
+    paths: ['catalog.json']
+  push:
+    branches: [main]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.x' }
+      - run: python validate_catalog.py catalog.json

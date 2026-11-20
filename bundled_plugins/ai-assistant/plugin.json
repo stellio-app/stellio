@@ -1,0 +1,43 @@
+{
+  "id": "ai-assistant",
+  "name": "Assistant IA",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-wand-magic-sparkles",
+  "description": {
+    "fr": "Active toutes les fonctions IA : assistant de bibliothèque et de fabrication, étiquettes et descriptions automatiques, correction du temps d'impression, recherche par photo, surveillance IA. Nécessite au moins un fournisseur d'IA.",
+    "en": "Enables every AI feature: library and fabrication assistants, automatic tags and descriptions, print-time correction, photo search, AI monitoring. Needs at least one AI provider.",
+    "de": "Aktiviert alle KI-Funktionen: Bibliotheks- und Fertigungsassistent, automatische Tags und Beschreibungen, Druckzeitkorrektur, Fotosuche, KI-Überwachung. Benötigt mindestens einen KI-Anbieter.",
+    "es": "Activa todas las funciones de IA: asistentes de biblioteca y fabricación, etiquetas y descripciones automáticas, corrección del tiempo de impresión, búsqueda por foto, supervisión con IA. Requiere al menos un proveedor de IA.",
+    "pt": "Ativa todas as funções de IA: assistentes de biblioteca e fabrico, etiquetas e descrições automáticas, correção do tempo de impressão, pesquisa por foto, vigilância por IA. Requer pelo menos um fornecedor de IA.",
+    "it": "Attiva tutte le funzioni IA: assistenti di libreria e produzione, tag e descrizioni automatici, correzione del tempo di stampa, ricerca per foto, monitoraggio IA. Richiede almeno un provider IA.",
+    "zh": "启用全部 AI 功能：库与制造助手、自动标签和描述、打印时间校正、图片搜索、AI 监控。至少需要一个 AI 提供商。",
+    "ja": "すべての AI 機能を有効にします：ライブラリ／製造アシスタント、自動タグと説明、印刷時間の補正、写真検索、AI 監視。AI プロバイダーが 1 つ以上必要です。"
+  },
+  "host": {
+    "modules": [
+      "ai_features",
+      "library_assistant",
+      "fab_assistant",
+      "photo_search"
+    ],
+    "migrate": {
+      "settings_match": [
+        {
+          "ai_enabled": true
+        }
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "Assistant IA",
+    "en": "AI assistant",
+    "de": "KI-Assistent",
+    "es": "Asistente de IA",
+    "pt": "Assistente de IA",
+    "it": "Assistente IA",
+    "zh": "AI 助手",
+    "ja": "AI アシスタント"
+  }
+}

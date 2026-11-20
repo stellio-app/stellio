@@ -10,18 +10,20 @@ stellio/
 ├── modules/                 Fonctions séparées de main.py (une fonction = un fichier)
 │   ├── __init__.py            liste ALL des modules
 │   ├── print_session.py       prise connectée, consommation réelle, photo de fin, surveillance IA
-│   ├── timelapse.py  mqtt_publisher.py  push_notify.py  share_link.py  order_tracking.py
+│   ├── plugin_host.py  print_events.py                              (1.1.7 : chargeur des plugins intégrés, surveillance des impressions)
+│   ├── share_link.py  order_tracking.py
 │   ├── auto_backup_routes.py  feedback.py  remote_instances.py  slicer_profiles.py
 │   ├── clients.py  trash_routes.py  tigertag.py  sosprint_helpers.py
 │   └── quote_portal.py  accounting_zip.py  parts_stock.py  printer_dispatch.py
-│       digest.py  filament_weighing.py  profile_share.py        (v1.0.6, écran « Gestion »)
+│       filament_weighing.py  profile_share.py        (v1.0.6, écran « Gestion »)
 │       openprinttag.py  open_filament_db.py                     (v1.0.8, étiquettes NFC + catalogue)
 │       model_versions.py  collections_sets.py  energy_tariff.py  (v1.1.3)
-│       obico.py  printers_extra.py  failure_stats.py
-│       resin_printers.py                                        (imprimantes résine, bêta)
-│       resin_inventory.py                                       (inventaire de résine manuel, bêta)
+│       printers_extra.py  failure_stats.py
+├── bundled_plugins/         Plugins intégrés (1.1.7) : <id>/plugin.json + modules, chargés seulement s'ils sont activés
+│   └── bigprint · resin · usb-printers · timelapse · file-tools · plate-studio · push-notify · webhooks · digest · mqtt · obico
+│       sharing · spoolman · ai-assistant · ai-ollama · ai-openai · ai-anthropic · ai-gemini · stellio-pro
 ├── interface/               Interface (JavaScript pur, sans compilation)
-│   ├── index.html  script.js  style.css
+│   ├── index.html  script.js  style.css  suite.js
 │   ├── management.js          écran « Gestion » (v1.0.6)
 │   ├── v113.js                versions, collections, causes d'échec, tarif, Obico (v1.1.3)
 │   └── sw.js                  service worker (servi à /sw.js)

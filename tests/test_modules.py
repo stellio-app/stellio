@@ -9,11 +9,25 @@ def _discover():
     return sorted(set(re.findall(r'^(?:globals\(\)\.update\()?(\w+)\.init\(globals\(\)\)', src, re.M)))
 
 
-MODULES = _discover()
+def _hosted():
+    """Modules des plugins intégrés (bundled_plugins/<id>/plugin.json → host.modules) : initialisés par plugin_host.init(globals())."""
+    import json
+    out = []
+    base = os.path.join(ROOT, 'bundled_plugins')
+    for pid in sorted(os.listdir(base)) if os.path.isdir(base) else []:
+        mf = os.path.join(base, pid, 'plugin.json')
+        if os.path.isfile(mf):
+            out += json.load(open(mf, encoding='utf-8'))['host']['modules']
+    return sorted(out)
+
+
+HOSTED = _hosted()
+MODULES = sorted(set(_discover()) | set(HOSTED))
 
 
 def _load(name):
-    spec = importlib.util.spec_from_file_location(name + '_under_test', os.path.join(ROOT, 'modules', name + '.py'))
+    from conftest import mod_path
+    spec = importlib.util.spec_from_file_location(name + '_under_test', mod_path(name))
     mod = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(mod)
@@ -31,7 +45,7 @@ def test_modules_package_lists_every_module_file():
     files = sorted(f[:-3] for f in os.listdir(os.path.join(ROOT, 'modules')) if f.endswith('.py') and f != '__init__.py')
     spec = importlib.util.spec_from_file_location('modules_pkg_under_test', os.path.join(ROOT, 'modules', '__init__.py'))
     pkg = importlib.util.module_from_spec(spec); spec.loader.exec_module(pkg)
-    assert sorted(pkg.ALL) == files == sorted(MODULES)
+    assert sorted(pkg.ALL) == files == sorted(set(MODULES) - set(HOSTED))
 
 
 @pytest.mark.parametrize('name', MODULES)
@@ -54,7 +68,8 @@ def test_init_registers_every_route(name):
 @pytest.mark.parametrize('name', MODULES)
 def test_main_provides_every_service_before_init(name, main_src):
     tree = ast.parse(main_src)
-    call = next(n.lineno for n in tree.body if isinstance(n, ast.Expr) and f'{name}.init' in ast.get_source_segment(main_src, n))
+    key = 'plugin_host' if name in HOSTED else name        # un module de plugin intégré est initialisé par plugin_host.init(globals())
+    call = next(n.lineno for n in tree.body if isinstance(n, ast.Expr) and f'{key}.init' in ast.get_source_segment(main_src, n))
     defined = set()
 
     def walk(nodes):
@@ -72,10 +87,16 @@ def test_main_provides_every_service_before_init(name, main_src):
                     walk(h.body)
 
     walk([n for n in tree.body if n.lineno < call])
+    if name in HOSTED:      # un module d'un plugin intégré reçoit aussi ce que les modules précédents du plugin rendent à `ns` (`_EXPORTS`)
+        import conftest
+        for h in HOSTED:
+            for n in ast.parse(open(conftest.mod_path(h), encoding='utf-8').read()).body:
+                if isinstance(n, ast.Assign) and any(getattr(t, 'id', '') == '_EXPORTS' for t in n.targets):
+                    defined.update(e.value for e in n.value.elts)
     assert not [x for x in _load(name)._REQUIRED if x not in defined]
 
 
 @pytest.mark.parametrize('name', MODULES)
 def test_module_defines_no_route_decorator_left(name):
     """Les routes passent par _ROUTES : aucun @app.route ne doit rester dans le module (il n'y a pas d'app à l'import)."""
-    assert '@app.route' not in open(os.path.join(ROOT, 'modules', name + '.py'), encoding='utf-8').read()
+    assert '@app.route' not in open(__import__('conftest').mod_path(name), encoding='utf-8').read()

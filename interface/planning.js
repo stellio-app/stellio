@@ -1,4 +1,4 @@
-/* Stellio — v1.1.5 : page « Planning » (Impression).
+/* Stellio — v1.1.5 : page « Planning » (Impression) ; v1.1.7 : coût des commandes, rendement, gaspillage, retards constatés.
    Fin estimée par imprimante, capacité contre charge, alertes de surcharge / retard prévisible, respect des délais.
    Données : GET /api/planning (calcul serveur, modules/production_planning.py). Dépend de script.js (I18N, openModal, closeModal, showToast, escapeHtml, API). */
 (function () {
@@ -29,7 +29,7 @@ async function load() {
     } catch (e) {
         data = null;
         $('pl-kpis').innerHTML = `<div class="pl-empty">${esc(T('load_error', 'Planning indisponible pour le moment.'))}</div>`;
-        $('pl-alerts').innerHTML = $('pl-gantt').innerHTML = $('pl-table').innerHTML = '';
+        $('pl-alerts').innerHTML = $('pl-gantt').innerHTML = $('pl-table').innerHTML = $('pl-stats').innerHTML = '';
         return;
     }
     render();
@@ -49,7 +49,21 @@ function renderKpis() {
         kpi(T('kpi_rate', 'Taux de charge'), load == null ? '—' : Math.round(load) + ' %', loadCls) +
         kpi(T('kpi_late', 'Retards prévus'), String(s.late_predicted + s.overdue), (s.late_predicted + s.overdue) ? 'bad' : 'ok') +
         kpi(T('kpi_ontime', 'Respect des délais'), ot.rate == null ? '—' : Math.round(ot.rate) + ' %', ot.rate == null ? '' : (ot.rate >= 90 ? 'ok' : (ot.rate >= 70 ? 'warn' : 'bad')),
-            ot.total ? T('kpi_ontime_sub', '{n} commandes sur 90 jours', { n: ot.total }) : T('kpi_ontime_none', 'pas encore de données'));
+            ot.total ? T('kpi_ontime_sub', '{n} commandes sur 90 jours', { n: ot.total }) : T('kpi_ontime_none', 'pas encore de données')) + statKpis();
+}
+
+const money = (v) => (typeof formatCost === 'function' ? formatCost(v) : (Number(v) || 0).toFixed(2) + ' €');
+
+function statKpis() {
+    const st = data.stats;
+    if (!st) return '';
+    const c = st.cost, y = st.yield, d = st.delays;
+    const over = c.est > 0 && c.real > c.est * 1.05;
+    const yCls = y.rate == null ? '' : (y.rate >= 95 ? 'ok' : (y.rate >= 85 ? 'warn' : 'bad'));
+    return kpi(T('kpi_cost', 'Coût des commandes'), c.orders ? money(c.real) : '—', over ? 'warn' : '', c.orders ? T('kpi_cost_sub', 'estimé {e} · 90 jours', { e: money(c.est) }) : T('kpi_yield_none', 'pas encore de données')) +
+        kpi(T('kpi_yield', 'Rendement'), y.rate == null ? '—' : (Math.round(y.rate * 10) / 10).toLocaleString(lang()) + ' %', yCls,
+            y.rate == null ? T('kpi_yield_none', 'pas encore de données') : T('kpi_yield_sub', '{n} rebut(s) · gaspillage {w}', { n: y.scrap, w: money(c.waste) })) +
+        (d.late ? kpi(T('kpi_delay', 'Retards constatés'), String(d.late), 'bad', T('kpi_delay_sub', '{n} commandes · retard moyen {d} j (max {m} j)', { n: d.total, d: d.avg_days, m: d.max_days })) : '');
 }
 
 function renderAlerts() {
@@ -123,14 +137,43 @@ function renderTable() {
         return `<tr class="${c}"><td>${esc(j.part)}${j.client ? `<div class="pl-sub">${esc(j.client)}</div>` : ''}</td>
             <td>${esc(j.printer_name)}${j.virtual ? ` <i class="fa-solid fa-wand-magic-sparkles" title="${esc(T('virtual', 'placée automatiquement (aucune imprimante choisie)'))}"></i>` : ''}</td>
             <td>${j.qty_done}/${j.quantity}</td><td>${hFmt(j.hours)} h</td><td>${j.end ? esc(dFmt(j.end)) : '—'}</td>
-            <td>${j.due_date ? esc(dFmt(j.due_date)) : '—'}</td><td>${slack}</td></tr>`;
+            <td>${j.due_date ? esc(dFmt(j.due_date)) : '—'}</td><td>${slack}</td><td>${j.cost_est == null ? '—' : esc(money(j.cost_est))}</td></tr>`;
     }).join('');
     $('pl-table').innerHTML = `<div class="pl-table-wrap"><table class="pl-table"><thead><tr>
         <th>${esc(T('col_job', 'Commande'))}</th><th>${esc(T('col_printer', 'Imprimante'))}</th><th>${esc(T('col_done', 'Faites'))}</th><th>${esc(T('col_hours', 'Reste'))}</th>
-        <th>${esc(T('col_end', 'Fin estimée'))}</th><th>${esc(T('col_due', 'Livraison'))}</th><th>${esc(T('col_slack', 'Marge'))}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+        <th>${esc(T('col_end', 'Fin estimée'))}</th><th>${esc(T('col_due', 'Livraison'))}</th><th>${esc(T('col_slack', 'Marge'))}</th><th>${esc(T('col_cost', 'Coût estimé'))}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
-function render() { renderKpis(); renderAlerts(); renderGantt(); renderTable(); }
+function renderStats() {
+    const rows = (data.stats && data.stats.by_order) || [];
+    if (!rows.length) { $('pl-stats').innerHTML = `<div class="pl-empty">${esc(T('stats_none', 'Aucune commande chiffrée sur la période.'))}</div>`; return; }
+    const body = rows.map(r => {
+        const diff = r.est > 0 ? (r.real - r.est) / r.est : 0;
+        const cls = diff > 0.05 ? 'pl-neg' : '';
+        return `<tr><td>${esc(r.part)}${r.client ? `<div class="pl-sub">${esc(r.client)}</div>` : ''}</td>
+            <td>${r.done}/${r.quantity}</td><td>${esc(money(r.est))}</td><td><b class="${cls}">${esc(money(r.real))}</b></td>
+            <td>${r.yield_pct == null ? '—' : esc(Math.round(r.yield_pct) + ' %')}${r.scrap ? `<div class="pl-sub">${esc(String(r.scrap))} ✕</div>` : ''}</td>
+            <td>${r.waste ? esc(money(r.waste)) : '—'}</td></tr>`;
+    }).join('');
+    $('pl-stats').innerHTML = `<p class="pl-sub">${esc(T('stats_help', 'Coût réel à ce jour comparé au coût estimé du devis.'))}</p><div class="pl-table-wrap"><table class="pl-table"><thead><tr>
+        <th>${esc(T('col_job', 'Commande'))}</th><th>${esc(T('col_done', 'Faites'))}</th><th>${esc(T('col_cost', 'Coût estimé'))}</th><th>${esc(T('col_cost_real', 'Coût réel'))}</th>
+        <th>${esc(T('col_yield', 'Rendement'))}</th><th>${esc(T('col_waste', 'Gaspillage'))}</th></tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+function renderProfit() {
+    const rows = (data.printer_profit || []).filter(r => r.priced || r.done);
+    const box = $('pl-profit'); if (!box) return;
+    if (!rows.length) { box.innerHTML = `<div class="pl-empty">${esc(T('profit_none', 'Pas encore de commande chiffrée sur la période.'))}</div>`; return; }
+    const body = rows.map(r => `<tr><td>${esc(r.printer_id == null ? T('profit_unassigned', 'Sans imprimante') : r.name)}</td><td>${esc(String(r.orders))}${r.unpriced ? `<div class="pl-sub">${esc(T('profit_unpriced', '{n} sans devis chiffré', { n: r.unpriced }))}</div>` : ''}</td>
+        <td>${esc(String(r.hours))} h</td><td>${r.labor_hours ? `${esc(String(r.labor_hours))} h${r.labor_cost ? `<div class="pl-sub">${esc(money(r.labor_cost))}</div>` : ''}` : '—'}</td><td>${esc(money(r.revenue))}</td><td>${esc(money(r.cost))}</td>
+        <td><b class="${r.margin < 0 ? 'pl-neg' : ''}">${esc(money(r.margin))}</b></td><td>${r.margin_per_hour == null ? '—' : esc(money(r.margin_per_hour))}</td>
+        <td>${r.yield_pct == null ? '—' : esc(Math.round(r.yield_pct) + ' %')}${r.waste ? `<div class="pl-sub">${esc(money(r.waste))}</div>` : ''}</td></tr>`).join('');
+    box.innerHTML = `<p class="pl-sub">${esc(T('profit_help', 'Revenu du devis réparti sur les pièces faites, moins le coût réel (matière, électricité, machine, frais fixes, rebuts). 90 jours.'))}</p><div class="pl-table-wrap"><table class="pl-table"><thead><tr>
+        <th>${esc(T('col_printer', 'Imprimante'))}</th><th>${esc(T('profit_orders', 'Commandes'))}</th><th>${esc(T('profit_hours', 'Heures'))}</th><th>${esc(T('profit_labor', 'Travail'))}</th><th>${esc(T('profit_revenue', 'Revenu'))}</th><th>${esc(T('col_cost_real', 'Coût réel'))}</th>
+        <th>${esc(T('profit_margin', 'Marge'))}</th><th>${esc(T('profit_margin_h', 'Marge / heure'))}</th><th>${esc(T('col_yield', 'Rendement'))}</th></tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+function render() { renderKpis(); renderAlerts(); renderGantt(); renderTable(); renderStats(); renderProfit(); }
 
 // ── réglages de capacité ──────────────────────────────────────────────────
 function dayChecks(prefix, selected) {
@@ -160,6 +203,9 @@ async function openSettings() {
           <input type="number" class="settings-select" id="pl-def-hpd" min="0.5" max="24" step="0.5" value="${d.hours_per_day}"><span class="pl-set-h">${esc(T('hours_day', 'h / jour'))}</span>
           ${dayChecks('def', d.days)}</div>
         ${rows || `<div class="pl-empty">${esc(T('no_printers', 'Ajoutez une imprimante pour planifier.'))}</div>`}
+        <div class="pl-set-row pl-set-labor"><strong class="pl-set-name">${esc(T('labor_rate', 'Taux horaire du travail humain'))}</strong>
+          <input type="number" class="settings-select" id="pl-labor-rate" min="0" max="1000" step="0.5" value="${s.labor_rate ? s.labor_rate : ''}" placeholder="0"><span class="pl-set-h">${esc(T('labor_rate_unit', '€ / h'))}</span></div>
+        <p class="pl-sub">${esc(T('labor_help', 'Temps de travail humain (préparation, retrait, finition, emballage) saisi sur chaque commande × ce taux : il s’ajoute au coût et réduit la marge. 0 = non compté.'))}</p>
         <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modal-planning-settings')">${esc(T('cancel', 'Annuler'))}</button>
           <button type="button" class="btn btn-primary" id="pl-save-settings">${esc(T('save', 'Enregistrer'))}</button></div>`;
@@ -173,7 +219,8 @@ async function openSettings() {
                      hours_per_day: row.querySelector('.pl-hpd').value, days: same ? [] : days };
         });
         const r = await fetch(`${API}/api/planning/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ default: { hours_per_day: defHpd, days: defDays.length ? defDays : [0, 1, 2, 3, 4, 5, 6] }, printers }) });
+            body: JSON.stringify({ default: { hours_per_day: defHpd, days: defDays.length ? defDays : [0, 1, 2, 3, 4, 5, 6] }, printers,
+                                   labor_rate: parseFloat($('pl-labor-rate').value) || 0 }) });
         if (!r.ok) { showToast(T('save_error', 'Enregistrement impossible'), 'error'); return; }
         closeModal('modal-planning-settings');
         load();

@@ -1,0 +1,38 @@
+{
+  "id": "spoolman",
+  "name": "Spoolman",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-circle-nodes",
+  "description": {
+    "fr": "Ajoute la section Spoolman dans l'inventaire des filaments : bobines lues sur ton serveur Spoolman, restes en grammes, découverte automatique sur le réseau.",
+    "en": "Adds the Spoolman section to the filament inventory: spools read from your Spoolman server, remaining grams, automatic discovery on the network.",
+    "de": "Fügt der Filamentverwaltung den Spoolman-Bereich hinzu: Spulen von deinem Spoolman-Server, Restgramm, automatische Erkennung im Netzwerk.",
+    "es": "Añade la sección Spoolman al inventario de filamentos: bobinas leídas de tu servidor Spoolman, gramos restantes, descubrimiento automático en la red.",
+    "pt": "Adiciona a secção Spoolman ao inventário de filamentos: bobinas lidas do teu servidor Spoolman, gramas restantes, deteção automática na rede.",
+    "it": "Aggiunge la sezione Spoolman all'inventario dei filamenti: bobine lette dal tuo server Spoolman, grammi residui, rilevamento automatico in rete.",
+    "zh": "为耗材库存添加 Spoolman 区域：读取你的 Spoolman 服务器上的料盘、剩余克数，并可在局域网自动发现。",
+    "ja": "フィラメント在庫に Spoolman セクションを追加：Spoolman サーバーのスプール、残量（g）、ネットワーク上の自動検出。"
+  },
+  "host": {
+    "modules": [
+      "spoolman"
+    ],
+    "migrate": {
+      "settings": [
+        "spoolman_url"
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "Spoolman",
+    "en": "Spoolman",
+    "de": "Spoolman",
+    "es": "Spoolman",
+    "pt": "Spoolman",
+    "it": "Spoolman",
+    "zh": "Spoolman",
+    "ja": "Spoolman"
+  }
+}

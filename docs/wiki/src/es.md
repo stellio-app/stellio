@@ -468,6 +468,11 @@ Agrupe varios archivos para un mismo objeto.
 - **Mis G-codes**: G-codes vinculados a un archivo, descarga y botón **Abrir en el slicer**.
 - **Copia de seguridad** de la biblioteca: ver [Ajustes y datos](es-Settings-and-Data).
 
+## Modelos voluminosos
+Un STL ocupa en memoria unas 12 veces su tamaño al cargarse. Por encima de un umbral (256 MB, hasta 1 GB si el ordenador tiene mucha memoria libre), Stellio ya no lo carga entero: análisis en flujo (STL binario y de texto), miniatura y visor sobre una **versión simplificada** (unos 300 000 triángulos), y las operaciones de escritura (reparación, conversión…) se rechazan con un mensaje claro.
+Para trabajar igualmente con él: clic derecho › **Crear una versión ligera**. Stellio escribe una copia simplificada junto al original (`nombre (ligero).stl`), que nunca se modifica. La copia sirve para ver, medir, reparar o indexar, no para imprimir a plena resolución. La acción también se propone cuando se rechaza una reparación por tamaño; solo se aplica a archivos STL locales. Una exportación del slicer (OrcaSlicer…) en STL o 3MF suele pesar mucho menos.
+En el Taller avanzado, cada campo «Ruta del modelo» ofrece **Elegir de la biblioteca**: origen, búsqueda, filtro por formato (STL, 3MF…), miniaturas y paginación.
+
 @@@ Printers | Impresoras
 # Impresoras
 {{img:printers}}
@@ -482,18 +487,18 @@ En el inicio, el widget **Cámaras** muestra hasta **4 cámaras** (una por impre
 | **Bambu Lab** | X1/X1C/X1E, X2D, P1P/P1S, P2S, A1/A1 mini, H2D/H2S/H2C | MQTT (LAN + nube): seguimiento, AMS, cámara, descubrimiento SSDP |
 | **Prusa** | MK4, MK3.9, MK3.5, MINI+, XL, CORE One | PrusaLink (HTTP) |
 | **Creality** | Series K1/K2, Ender-3 V3, Hi | WebSocket: seguimiento, CFS, descubrimiento UDP |
-| **Elegoo** | Centauri Carbon 1 y 2, series de resina Saturn/Mars (**beta**) | SDCP (WebSocket) |
-| **Resina Chitubox** *(beta)* | Phrozen, Uniformation GKtwo y otras placas Chitubox | SDCP v3: seguimiento (mismo protocolo que Elegoo) |
-| **Impresora USB *(beta)*** | Marlin, Prusa, Creality, placas Klipper… conectadas al PC de Stellio | Detección de puertos serie (el puerto nunca se abre): conectada / ausente, sin estado ni temperaturas |
-| **Anycubic Photon** *(beta)* | Modelos Wi-Fi antiguos: Mono X, Mono X 6K, Mono SQ (no las M5s / M7) | Comandos de texto TCP 6000: solo estado y archivo actual |
-| **Formlabs** *(beta)* | Form 3 / 3L / 4 | API web oficial (client_id:client_secret): estado, progreso, capas; el envío se hace con PreForm |
+| **Elegoo** | Centauri Carbon 1 y 2, series de resina Saturn/Mars | SDCP (WebSocket) |
+| **Resina Chitubox** | Phrozen, Uniformation GKtwo y otras placas Chitubox | SDCP v3: seguimiento (mismo protocolo que Elegoo) |
+| **Impresora USB** | Marlin, Prusa, Creality, placas Klipper… conectadas al PC de Stellio | Detección de puertos serie (el puerto nunca se abre): conectada / ausente, sin estado ni temperaturas |
+| **Anycubic Photon** | Modelos Wi-Fi antiguos: Mono X, Mono X 6K, Mono SQ (no las M5s / M7) | Comandos de texto TCP 6000: solo estado y archivo actual |
+| **Formlabs** | Form 3 / 3L / 4 | API web oficial (client_id:client_secret): estado, progreso, capas; el envío se hace con PreForm |
 | **FlashForge** | Adventurer 5M/5M Pro, AD5X | API propietaria |
 | **Klipper / Moonraker** | Cualquier máquina Klipper (Voron…) | HTTP: seguimiento, envío, cámara, horas exactas |
 | **OctoPrint** | Cualquier impresora controlada por OctoPrint | HTTP |
 | **Duet / RepRapFirmware** | Duet 2/3, standalone o con SBC (DSF) | HTTP: seguimiento, envío de archivos, temperaturas |
 | **Repetier-Server** | Cualquier impresora gestionada por Repetier-Server | HTTP: seguimiento, envío de archivos, temperaturas (Marlin por USB serie no está admitido) |
 
-> 🧪 **Impresoras de resina: beta.** No se han podido probar en todas las máquinas: el seguimiento puede estar incompleto o fallar. Stellio nunca inicia ni detiene una impresión de resina. Cuéntanos en GitHub lo que no funcione (Creality Halot: aún no admitida).
+> **Impresoras de resina: solo seguimiento.** Stellio nunca inicia ni detiene una impresión de resina. Cuéntanos en GitHub lo que no funcione (Creality Halot: aún no admitida).
 
 Los demás modelos que hablan el mismo protocolo suelen funcionar. Cuéntenos en GitHub si el suyo funciona.
 
@@ -514,7 +519,7 @@ Los demás modelos que hablan el mismo protocolo suelen funcionar. Cuéntenos en
 - **Modo colaborativo ligero**: avisa si otro dispositivo está viendo el archivo o antes de un doble envío.
 - **Abrir en el slicer** desde «Mis G-codes».
 - **Slicer por impresora**: cada impresora puede tener su propio slicer por defecto (OrcaSlicer, QIDIStudio, Bambu Studio…). El envío lo usa con los perfiles (ajustes, filamento) asociados a esa impresora y la lista de perfiles se adapta.
-- **Software de resina (beta)**: Stellio detecta CHITUBOX, CHITUBOX Pro, Anycubic Photon Workshop, PreForm (Formlabs), Voxeldance Tango y Lychee Slicer. Una impresora de resina sin slicer elegido abre automáticamente el primer software de resina detectado; también puedes elegir uno a mano (Ajustes → Slicer o la ficha de la impresora). Se comprueban las rutas de instalación habituales: si tu software no se reconoce, selecciónalo a mano.
+- **Software de resina**: Stellio detecta CHITUBOX, CHITUBOX Pro, Anycubic Photon Workshop, PreForm (Formlabs), Voxeldance Tango y Lychee Slicer. Una impresora de resina sin slicer elegido abre automáticamente el primer software de resina detectado; también puedes elegir uno a mano (Ajustes → Slicer o la ficha de la impresora). Se comprueban las rutas de instalación habituales: si tu software no se reconoce, selecciónalo a mano.
 
 {{img:printer-slicer}}
 
@@ -530,7 +535,7 @@ Los demás modelos que hablan el mismo protocolo suelen funcionar. Cuéntenos en
 En *Ajustes → Obico*, indica la dirección de tu servidor Obico (autoalojado u obico.io) y un token de API. Stellio comprueba las alertas con regularidad y te envía una **notificación push** en cuanto Obico detecta un fallo. La acción (pausa, cancelar) sigue siendo la de Obico: Stellio nunca detiene una impresión por sí solo. Un botón *Probar la conexión* verifica la dirección y el token.
 
 ## Mantenimiento
-- **Mantenimiento de resina (beta)**: el botón **Mantenimiento** de las tarjetas de impresoras de resina propone tareas adecuadas (lámina FEP/nFEP, filtrado de resina, plataforma, pantalla LCD, filtro de carbón, eje Z, IPA de lavado, desgaste UV/LCD).
+- **Mantenimiento de resina**: el botón **Mantenimiento** de las tarjetas de impresoras de resina propone tareas adecuadas (lámina FEP/nFEP, filtrado de resina, plataforma, pantalla LCD, filtro de carbón, eje Z, IPA de lavado, desgaste UV/LCD).
 - **Mantenimiento predictivo** con tareas propias de cada marca.
 - **Piezas de desgaste** (boquillas, placas, correas…) con alertas de stock, vinculadas a las tareas de mantenimiento.
 - **Calibraciones** (flujo, pressure advance, temperaturas) por filamento e impresora.
@@ -538,8 +543,8 @@ En *Ajustes → Obico*, indica la dirección de tu servidor Obico (autoalojado u
 @@@ Filament | Filamento
 # Filamento
 
-## Resina (beta) 🧪
-La categoría de la barra lateral ahora se llama **Materiales** y agrupa dos páginas: **Filamento** (inventario de bobinas) y **Resina** *(beta)*. El inventario de resina es **manual**: añade tus botes (nombre, marca, tipo, color, volumen, restante, precio, ubicación, notas) y usa el botón «Usar» para restar un volumen en ml. Stellio aún no enlaza los botes con las impresoras de resina y no descuenta nada automáticamente. Función en beta.
+## Resina
+La categoría de la barra lateral ahora se llama **Materiales** y agrupa dos páginas: **Filamento** (inventario de bobinas) y **Resina**. El inventario de resina es **manual**: añade tus botes (nombre, marca, tipo, color, volumen, restante, precio, ubicación, notas) y usa el botón «Usar» para restar un volumen en ml. Stellio aún no enlaza los botes con las impresoras de resina y no descuenta nada automáticamente.
 
 Como con el filamento, el recordatorio **«A pedir»** también funciona con la resina: una resina (marca + nombre + color, todos los botes juntos) entra en la lista cuando su total restante baja del umbral fijado en la página (200 ml por defecto, 0 = desactivado) o cuando marcas «A pedir» en un bote. También aparece en el widget «A pedir» del panel; **Pedir** abre enlaces de búsqueda a tus tiendas (el stock de resina no se comprueba automáticamente) y **Ya pedido** aplaza el recordatorio 14 días.
 
@@ -712,6 +717,53 @@ Visible cuando está marcada la opción *Activar las funciones de costes, presup
 ## Domótica
 - **MQTT / Home Assistant**: publicación del estado y descubrimiento automático; dispositivo MQTT «Stellio» y sensores.
 
+@@@ Desktop-Edition | Edición de escritorio
+# Edición de escritorio
+
+La **edición de escritorio** es la aplicación de escritorio: una ventana de Stellio en su PC (Windows, macOS). Conserva su comportamiento original; solo faltan algunas funciones pensadas para un servidor siempre encendido.
+
+## ¿Qué edición tengo?
+| Sistema | Edición por defecto |
+|---|---|
+| Windows, macOS | Escritorio |
+| Linux, Raspberry Pi, VM, LXC, Docker | Servidor |
+
+Para forzar la elección (pruebas, un PC Linux usado como escritorio):
+```bash
+STELLIO_SERVER_EDITION=0   # escritorio
+STELLIO_SERVER_EDITION=1   # servidor (STELLIO_HEADLESS=1 también lleva ahí)
+```
+
+## Lo propio del escritorio
+- **Ventana integrada** (pywebview). En Windows, abrir Stellio en un navegador del mismo PC está bloqueado (token interno): use la ventana. El teléfono, el APK y el túnel siguen permitidos.
+- **Notificaciones de Windows** nativas.
+- **Slicers del PC** detectados automáticamente (OrcaSlicer, Bambu Studio, PrusaSlicer, Cura…).
+- **Fuentes**: carpeta local, archivo, SMB y NFS.
+- **Datos** en `%APPDATA%\Stellio` en Windows; en la versión portátil, en la carpeta `data` junto a `Stellio.exe`.
+- **Actualizaciones** desde GitHub mediante parche `.zip`, verificado antes de instalar.
+
+## Funciones reservadas a la edición servidor
+Estas funciones responden «reservado a la edición servidor» en la aplicación de escritorio:
+
+| Función | Utilidad |
+|---|---|
+| IA en línea | Claude, ChatGPT o Gemini con su clave |
+| Perfiles de slicer importados | Importación de perfiles exportados desde sus slicers |
+| Notificaciones push | ntfy, Telegram, Discord, webhook… |
+| MQTT / Home Assistant | Publicación de estado y descubrimiento automático |
+| Resumen periódico | Diario o semanal |
+| Sincronización entre dos instancias | Herramientas › Sincronización |
+| Webhooks salientes | Mensajes firmados (HMAC-SHA256) a tus servicios |
+| API pública y acceso móvil | Tokens de alcance limitado, rutas /api/v1 |
+
+La entrada **Sincronización** del menú Herramientas se oculta en escritorio porque solo mostraría este mensaje.
+
+## Taller avanzado en escritorio
+Todo lo demás funciona como en un servidor. Las herramientas del Taller avanzado están en la barra lateral, cada una en su categoría: **Biblioteca** (Organización, Diff 3D, Similares, Licencias, Ficha de pieza), **Impresión** (Compatibilidad, Verificación de impresión, Archivos G-code), **Materiales** (Necesidades de material), **Herramientas** (Bandeja, Asistente de fabricación) y **Administración** (Tareas, Base de datos, Registro de auditoría, Equipos, Sesiones). Están reservadas a la cuenta propietaria; cada entrada tiene su interruptor en *Ajustes › Elementos de navegación*.
+
+## Pasar a la edición servidor
+Para un Stellio siempre encendido y accesible desde un navegador, vea [Edición servidor](es-Server-Edition) e [Instalación](es-Installation).
+
 @@@ Server-Edition | Edición servidor
 # Edición servidor
 
@@ -758,6 +810,20 @@ Intervenciones de la vigilancia: `journalctl -t stellio-watchdog`. Los contenedo
 - 📥 **Perfiles de slicer**: Stellio no ve los slicers de su PC y no se conecta a las nubes de los slicers (Orca Cloud, Bambu Cloud…). Exporte sus perfiles (OrcaSlicer: Archivo → Exportar → Exportar paquete de preajustes) e impórtelos en *Ajustes → Mis perfiles de slicer*, o use una **carpeta de perfiles vigilada** (Syncthing, recurso de red, scp…).
 - 🐯 **TigerTag**: inicio de sesión oficial con correo y contraseña; ¿cuenta de Google? Primero defina una contraseña con «Olvidé mi contraseña» en la app TigerTag. Alternativa: copiar la carpeta de datos de TigerTag Studio al servidor.
 - Tras una actualización, el navegador se recarga automáticamente.
+
+## Funciones reservadas al servidor (1.1.7)
+Estas funciones no existen en la aplicación de escritorio, donde sus rutas responden «reservado a la edición servidor»:
+
+| Función | Utilidad |
+|---|---|
+| IA en línea | Claude, ChatGPT o Gemini con su clave, en lugar de Ollama (véase [Inteligencia artificial](es-AI)) |
+| Perfiles de slicer | Importación de perfiles exportados desde sus slicers |
+| Notificaciones push | ntfy, Gotify, Pushover, Telegram, Discord, Slack o webhook, incluso con la ventana cerrada |
+| MQTT / Home Assistant | Publicación de estado y descubrimiento automático |
+| Resumen periódico | Diario o semanal, como notificación y push |
+| Sincronización (Taller avanzado) | Sincroniza una carpeta con la de una instancia emparejada: primero el plan, después la aplicación confirmada, ninguna eliminación se propaga, se conservan ambas versiones en caso de conflicto. Las dos instancias deben estar en edición servidor |
+
+El resto de las herramientas (bandeja, verificación de impresión, archivos G-code…) funciona igual en ambas ediciones.
 
 ## Variables de entorno
 | Variable | Función |
@@ -862,6 +928,183 @@ Los instaladores no están firmados. Compruebe el `.sha256` y luego *Más inform
 
 ## Obtener ayuda
 [GitHub Issues](https://github.com/stellio-app/stellio/issues), [Discord](https://discord.gg/ySxpHvS6bd) o **Sugerencias y errores** en la aplicación. Indique: versión de Stellio, sistema, pasos para reproducir, registro exportado.
+
+@@@ Plugins | Plugins
+# Plugins
+
+Un plugin es un pequeño programa Python que reacciona a un evento de Stellio (impresión terminada, impresión fallida, pedido atrasado, impresora sobrecargada): enviar una notificación, escribir en una hoja de cálculo, encender una luz… Los autores publican los plugins en **GitHub**; Stellio muestra un **catálogo público** (logotipo + descripción) en el menú **Plugins › Catálogo**, donde se instalan con un clic.
+
+Cada plugin lleva una insignia: **Oficial** si está alojado en el repositorio `stellio-app/stellio-plugins`, **Comunitario** si está alojado en otro lugar (o instalado desde un .zip). Stellio decide la insignia según la dirección real del archivo: lea siempre los permisos y el código de un plugin comunitario.
+
+**Plugins integrados.** Algunas funciones de Stellio se entregan como plugins integrados (BigPrint, resina, impresoras USB, timelapse, herramientas de archivos, estudio de placa, notificaciones push, webhooks, resumen periódico, MQTT / Home Assistant, Obico, compartir y sincronizar, Spoolman, proveedores de IA y asistente de IA, Stellio Pro). Forman parte de la aplicación, pero solo se cargan cuando están activados (sección «Plugins integrados» de la página Plugins; el cambio se aplica al reiniciar). **Actualización desde una versión anterior: no hay que hacer nada.** En el primer arranque de la 1.1.7, los plugins que usabas (por ejemplo MQTT activado, una impresora USB, webhooks, un timelapse) se activan automáticamente y conservan exactamente sus ajustes; las herramientas sin ajustes (BigPrint, herramientas de archivos, estudio de placa) se mantienen como estaban. Una instalación nueva no activa ninguno. Desactivar un plugin nunca borra sus ajustes. Otros plugins integrados: Compartir y sincronizar, Spoolman, un plugin por proveedor de IA + el asistente de IA (activa todas las funciones de IA) y **Stellio Pro** (clientes, presupuestos, facturas, pedidos, contabilidad, tarifa eléctrica, planificación, necesidades de material, stock de piezas): añaden sus páginas y botones solo si están activados.
+
+## Usar un plugin
+1. Abra **Plugins › Catálogo** (solo la cuenta propietaria).
+2. Explore el catálogo y haga clic en **Instalar**: Stellio descarga el archivo y comprueba su suma SHA-256.
+3. Lea los **permisos** solicitados y acéptelos. El plugin se instala **desactivado**.
+4. Rellene su configuración si hace falta, actívelo y pulse **Prueba** para lanzarlo con un evento de prueba. El registro de ejecuciones muestra la salida y los errores.
+
+También puede instalar un archivo `.zip` local (plugin en desarrollo) o cambiar la fuente del catálogo por la URL de otro catálogo.
+
+## Crear un plugin
+### 1. Estructura
+Un plugin es una carpeta plana con un archivo `plugin.json` y un script Python:
+```
+mon-plugin/
+├── plugin.json     Manifiesto (obligatorio)
+├── main.py         Punto de entrada (nombre libre, indicado en "entry")
+└── ...             Otros archivos: 100 como máximo, 8 MB descomprimido
+```
+
+### 2. El manifiesto plugin.json
+```json
+{
+  "id": "mon-plugin",
+  "name": "Mon plugin",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Écrit une ligne à chaque impression terminée.",
+  "author": "Votre nom",
+  "entry": "main.py",
+  "events": ["print.finished", "print.failed"],
+  "permissions": ["events"]
+}
+```
+| Campo | Función |
+|---|---|
+| `id` | Identificador único: minúsculas, dígitos, `-` o `_`, de 2 a 40 caracteres |
+| `name`, `description`, `author` | Texto mostrado en Stellio |
+| `version` | Numérica, por ejemplo `1.2.0`; sirve para detectar actualizaciones |
+| `api` | Versión de la API de plugins: `1` |
+| `entry` | Script Python en la raíz (por defecto `main.py`) |
+| `events` | Eventos escuchados |
+| `permissions` | Permisos solicitados |
+| `ui` | Página mostrada en Stellio: `title`, `icon` (Font Awesome) y `entry` (un archivo `.html`) |
+
+### 3. Eventos y permisos
+| Evento | Se dispara cuando |
+|---|---|
+| `print.finished` | Termina una impresión |
+| `print.failed` | Falla una impresión |
+| `order.late` | Un pedido supera su plazo |
+| `printer.overload` | Una impresora está sobrecargada |
+
+| Permiso | Efecto |
+|---|---|
+| `events` | Recibir eventos (obligatorio si se declara `events`) |
+| `api:read` | Leer datos mediante la API pública de Stellio |
+| `api:write` | Modificar datos mediante la API pública |
+| `network` | Información: el plugin accede a Internet |
+| `ui` | Mostrar una página del plugin en el menú Plugins |
+
+### 4. El script
+Stellio ejecuta `python -I main.py <evento>` en un proceso aparte y envía por la entrada estándar un JSON `{"event": "...", "data": {...}}`. El modo `-I` (aislado) no añade la carpeta del plugin a la ruta de Python: para importar un archivo de su plugin, añada esa ruta usted mismo. La salida estándar se guarda en el registro.
+```python
+import json, os, sys
+
+payload = json.loads(sys.stdin.read() or "{}")
+event, data = payload.get("event", ""), payload.get("data", {})
+config = json.loads(os.environ.get("STELLIO_PLUGIN_CONFIG") or "{}")
+
+print(f"{event}: {data.get('file_name') or data.get('printer') or '-'}")
+```
+Para actuar sobre Stellio (permisos `api:*`), el script recibe `STELLIO_API_URL` y `STELLIO_API_TOKEN` (las claves `api_url` y `token` de la configuración del plugin). El SDK de Python `stellio_sdk.py` (carpeta `sdk/python` del repositorio) ofrece `plugin_event()`, `plugin_config()` y un cliente listo para usar: cópielo en su plugin y añada `sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))` antes de importarlo. Hay un ejemplo completo en `sdk/examples/hello-plugin`.
+
+Límites: 10 segundos por ejecución, 512 MB de memoria, entorno mínimo (solo variables `STELLIO_*` y `PATH`). Python 3 debe estar instalado en el equipo que ejecuta Stellio. La configuración es una lista de pares clave/valor (texto, número, booleano) de 4.000 caracteres como máximo.
+
+### 5. Probar
+Comprima el **contenido** de la carpeta como `mon-plugin.zip` (2 MB máximo), instálelo desde **Plugins › Catálogo** (archivo local), acepte los permisos, actívelo y use **Prueba**. Corrija los problemas leyendo el registro.
+
+## Plugin con una página: ejemplo de visor de G-code
+
+Un plugin también puede mostrar **su propia página** en Stellio. Aparece entonces en el menú **Plugins** de la barra lateral, bajo «Catálogo», en la lista «Instalados»: un clic abre su página. El ejemplo `sdk/examples/gcode-viewer` es un visor 3D de G-code: vista 3D (rotación, zoom), rango de capas, reproducción de movimientos, colores por tipo, velocidad o flujo, desplazamientos y retracciones; en 8 idiomas.
+
+```json
+{
+  "id": "gcode-viewer",
+  "name": "G-code viewer",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Shows your archived G-code files layer by layer.",
+  "author": "Stellio",
+  "permissions": ["ui", "api:read"],
+  "ui": {
+    "title": "G-code viewer",
+    "icon": "fa-layer-group",
+    "entry": "viewer.html"
+  }
+}
+```
+
+- La página es **un único archivo HTML autónomo** (CSS y JavaScript dentro, imágenes en `data:`), 1 MB como máximo. Sin eventos, el plugin no necesita script Python.
+- Se muestra en un marco **aislado**: sin acceso a la red, a las cookies ni al resto de Stellio.
+- Lee los datos de Stellio con `window.stellio.api(ruta)`: solo lectura (GET), el permiso `api:read` es obligatorio, el resultado es JSON, o texto con `'text'` como segundo argumento. Los ajustes, las cuentas, la seguridad y los plugins no son accesibles.
+- El tema lo proporcionan las variables CSS `--st-bg`, `--st-panel`, `--st-card`, `--st-text`, `--st-muted`, `--st-border`, `--st-accent`, `--st-success`, `--st-warning` y `--st-danger`, y el idioma `window.stellio.lang`.
+
+```js
+document.addEventListener('stellio-ready', async () => {
+  const list = await window.stellio.api('/api/gcodes?limit=50');
+  const id = list.gcodes[0].id;
+  const text = await window.stellio.api('/api/projects/gcodes/' + id + '/download', 'text');
+});
+```
+
+Para probarlo: comprima el contenido de la carpeta `gcode-viewer`, instale el archivo desde **Plugins › Catálogo**, acepte los permisos, actívelo y ábralo desde el menú **Plugins**. Hace falta al menos un G-code archivado (ficha de archivo o proyecto). Un plugin desactivado aparece atenuado en la lista.
+
+## Publicar en GitHub
+1. Cree un repositorio público para su plugin con el código, un `README` y una licencia.
+2. Para cada versión, cree una **release** de GitHub y adjunte el archivo `mon-plugin-1.0.0.zip`.
+3. Calcule la suma SHA-256 del archivo, necesaria para el catálogo:
+```bash
+sha256sum mon-plugin-1.0.0.zip
+```
+4. Aumente siempre `version` en `plugin.json` antes de una nueva release.
+
+## Aparecer en el catálogo de Stellio
+El catálogo oficial es un archivo `catalog.json` del repositorio `stellio-app/stellio-plugins`. Su plugin se añade mediante una **Pull Request**.
+
+1. Haga un fork del repositorio `stellio-app/stellio-plugins`.
+2. Añada la entrada de su plugin en `catalog.json`:
+```json
+{
+  "id": "mon-plugin",
+  "name": "Mon plugin",
+  "version": "1.0.0",
+  "description": {"fr": "Écrit une ligne à chaque impression terminée.", "en": "Writes a line when a print finishes."},
+  "author": "Votre nom",
+  "url": "https://github.com/vous/mon-plugin/releases/download/v1.0.0/mon-plugin-1.0.0.zip",
+  "sha256": "64 caractères hexadécimaux",
+  "permissions": ["events"],
+  "logo": "https://raw.githubusercontent.com/vous/mon-plugin/main/logo.png",
+  "homepage": "https://github.com/vous/mon-plugin"
+}
+```
+3. Abra la Pull Request: una comprobación automática verifica los enlaces, la suma SHA-256 y el logotipo, y después el equipo de Stellio revisa el plugin.
+
+| Campo | Regla |
+|---|---|
+| `description` | Corta (unos 140 caracteres); texto simple o un texto por idioma (`fr`, `en`, `de`, `es`, `pt`, `it`, `zh`, `ja`) |
+| `url` | Enlace `https` directo al archivo; el `sha256` debe coincidir exactamente |
+| `logo` | `https`, PNG, JPEG o WebP, 200 KB como máximo, idealmente 128 × 128 (se rechaza el SVG) |
+| `homepage` | Enlace `https` a la página del plugin (opcional) |
+| `permissions` | Deben coincidir con las del manifiesto |
+
+**Actualizar**: publique una nueva release y abra una Pull Request que cambie `version`, `url` y `sha256`. Si la nueva versión pide permisos adicionales, el plugin queda desactivado para el usuario hasta que los acepte; su configuración se conserva.
+
+## Seguridad
+- Un plugin **no está aislado** en un entorno protegido: se ejecuta con los derechos de Stellio en el equipo. Instale solo plugins cuyo autor le inspire confianza.
+- Los plugins se instalan desactivados y sus permisos deben aceptarse.
+- Las descargas solo se hacen por `https` desde direcciones públicas, con verificación SHA-256.
+- El catálogo se revisa antes de publicarse, pero eso no sustituye su propia cautela: lea el código y los permisos.
+
+Para saber más: [Contribuir](es-Contributing), el archivo `docs/plugins.md` del repositorio y el ejemplo `sdk/examples/hello-plugin`.
+
+## Administración e instancias supervisadas
+El plugin **Administración** (activo por defecto) reúne en una página (Administración › Administración) las **cuentas de invitado y sus roles**, los equipos, las sesiones, el registro de auditoría y las **instancias**.
+- **Instancia autónoma** (por defecto): control total, nada cambia.
+- **Instancia principal**: la subpestaña Instancias lista las instancias Stellio emparejadas y permite supervisarlas.
+- **Instancia supervisada**: tras la **aceptación** de su propietario, sus cuentas, roles y permisos solo se gestionan desde la principal; el contenido local (biblioteca, impresoras) sigue siendo privado salvo que el propietario elija otra cosa al aceptar; el propietario puede **salir de la supervisión** en cualquier momento.
+Una instancia supervisada no puede supervisar otras, y una instancia principal no puede ser supervisada. El resto de ajustes sigue siendo editable localmente.
 
 @@@ Contributing | Contribuir
 # Contribuir

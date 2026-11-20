@@ -6,7 +6,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _load(name, edition):
-    spec = importlib.util.spec_from_file_location(name + '_t', os.path.join(ROOT, 'modules', name + '.py'))
+    spec = importlib.util.spec_from_file_location(name + '_t', __import__('conftest').mod_path(name))
     m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
     app = flask.Flask('t'); app.secret_key = 'x'
     ns = dict(app=app, app_logger=logging.getLogger('t'), get_db=lambda: None, jsonify=flask.jsonify, login_required=lambda f: f,
@@ -53,5 +53,5 @@ def test_interface_masque_push_hors_serveur_et_mqtt_deja_reserve():
     assert 'id="push-server-block" style="display:none;"' in html
     js = open(os.path.join(ROOT, 'interface', 'script.js'), encoding='utf-8').read()
     assert "'push-server-block': 'block'" in js and "'mqtt-server-block': 'block'" in js
-    mq = open(os.path.join(ROOT, 'modules', 'mqtt_publisher.py'), encoding='utf-8').read()
+    mq = open(__import__('conftest').mod_path('mqtt_publisher'), encoding='utf-8').read()
     assert 'if not IS_SERVER_EDITION or not HAS_MQTT' in mq and mq.count('_server_edition_only()') >= 3

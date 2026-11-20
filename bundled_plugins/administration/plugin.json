@@ -1,0 +1,39 @@
+{
+  "id": "administration",
+  "name": "Administration",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-user-shield",
+  "description": {
+    "fr": "Page d'administration : comptes invités et rôles, équipes, sessions, journal d'audit, et supervision des instances Stellio appairées depuis une instance principale.",
+    "en": "Administration page: guest accounts and roles, teams, sessions, audit log, and supervision of paired Stellio instances from a primary instance.",
+    "de": "Administrationsseite: Gastkonten und Rollen, Teams, Sitzungen, Audit-Protokoll und Überwachung gekoppelter Stellio-Instanzen von einer Hauptinstanz aus.",
+    "es": "Página de administración: cuentas de invitado y roles, equipos, sesiones, registro de auditoría y supervisión de instancias Stellio emparejadas desde una instancia principal.",
+    "pt": "Página de administração: contas de convidado e funções, equipas, sessões, registo de auditoria e supervisão de instâncias Stellio emparelhadas a partir de uma instância principal.",
+    "it": "Pagina di amministrazione: account ospite e ruoli, team, sessioni, registro di controllo e supervisione delle istanze Stellio abbinate da un'istanza principale.",
+    "zh": "管理页面：访客账户与角色、团队、会话、审计日志，以及从主实例监督已配对的 Stellio 实例。",
+    "ja": "管理ページ：ゲストアカウントとロール、チーム、セッション、監査ログ、およびプライマリインスタンスからのペアリング済み Stellio インスタンスの監督。"
+  },
+  "host": {
+    "modules": [
+      "admin_console"
+    ],
+    "default_on": true,
+    "migrate": {
+      "tables": [
+        "supervision_links"
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "Administration",
+    "en": "Administration",
+    "de": "Administration",
+    "es": "Administración",
+    "pt": "Administração",
+    "it": "Amministrazione",
+    "zh": "管理",
+    "ja": "管理"
+  }
+}

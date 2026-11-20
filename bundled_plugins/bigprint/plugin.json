@@ -1,0 +1,37 @@
+{
+  "id": "bigprint",
+  "name": "BigPrint",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-up-right-and-down-left-from-center",
+  "description": {
+    "fr": "Mise à l'échelle grandeur nature d'un modèle et découpe en pièces imprimables.",
+    "en": "Scale a model to life size and split it into printable parts.",
+    "de": "Skaliert ein Modell auf Originalgröße und teilt es in druckbare Teile.",
+    "es": "Escala un modelo a tamaño real y lo divide en piezas imprimibles.",
+    "pt": "Amplia um modelo para o tamanho real e divide-o em peças imprimíveis.",
+    "it": "Ingrandisce un modello a grandezza naturale e lo divide in parti stampabili.",
+    "zh": "将模型按真实尺寸放大，并拆分为可打印的零件。",
+    "ja": "モデルを実物大に拡大し、印刷可能なパーツに分割します。"
+  },
+  "host": {
+    "modules": [
+      "bigprint_i18n",
+      "bigprint_tool"
+    ],
+    "migrate": {
+      "always": true
+    }
+  },
+  "name_i18n": {
+    "fr": "BigPrint",
+    "en": "BigPrint",
+    "de": "BigPrint",
+    "es": "BigPrint",
+    "pt": "BigPrint",
+    "it": "BigPrint",
+    "zh": "BigPrint",
+    "ja": "BigPrint"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "id": "gcode-viewer",
+  "name": "G-code viewer",
+  "version": "1.0.1",
+  "api": 1,
+  "description": {
+    "fr": "Visionneuse de G-code.",
+    "en": "G-code viewer.",
+    "de": "G-Code-Viewer.",
+    "es": "Visor de G-code.",
+    "pt": "Visualizador de G-code.",
+    "it": "Visualizzatore di G-code.",
+    "zh": "G-code 查看器。",
+    "ja": "G-code ビューア。"
+  },
+  "author": "Stellio",
+  "permissions": [
+    "ui",
+    "api:read"
+  ],
+  "ui": {
+    "title": "G-code viewer",
+    "icon": "fa-layer-group",
+    "entry": "viewer.html"
+  }
+}

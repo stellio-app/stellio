@@ -206,3 +206,36 @@ def test_projets_meme_piece_plusieurs_fois():
     assert c.execute("SELECT COUNT(*) FROM project_files").fetchone()[0] == 2
     js = open(os.path.join(root, 'interface', 'script.js'), encoding='utf-8').read()
     assert 'window.setProjectFileNeeded' in js and 'class="qty-needed"' in js and '_projectPickerQty.get(el.value)' in js
+
+
+# ── v1.1.7 : empreinte du profil, historique, interface ──────────────────────
+def test_profile_fingerprint_ignore_le_nom_pas_les_reglages():
+    m = _mod()
+    a = {'name': 'Std', 'slicer': 'prusa', 'layer_height': 0.2, 'nozzle_temp': 210, 'bed_temp': 60}
+    b = dict(a, name='Renommé', id='x')
+    c = dict(a, nozzle_temp=230)
+    assert m.profile_fingerprint(a) == m.profile_fingerprint(b) != ''
+    assert m.profile_fingerprint(a) != m.profile_fingerprint(c)
+    assert m.profile_fingerprint(None) == '' and m.profile_fingerprint({'slicer': 'cura'}) == ''
+
+
+def test_aggregate_separe_deux_profils_homonymes():
+    m = _mod()
+    rows = [dict(R(1, 'success'), profile_fp='aaa'), dict(R(1, 'failed'), profile_fp='bbb')]
+    d = m.aggregate(rows)
+    assert len(d) == 2 and {c['profile_fp'] for c in d} == {'aaa', 'bbb'}
+
+
+def test_v117_interface_rattachement():
+    root = ROOT
+    t = open(os.path.join(root, 'interface', 'trace.js'), encoding='utf-8').read()
+    assert 'openAttach' in t and '/api/trace/entry' in t and '/api/trace/link' in t and 'tr-fp' in t
+    s = open(os.path.join(root, 'interface', 'script.js'), encoding='utf-8').read()
+    assert '_historyTraceChip' in s and '_historyTraceButton' in s and 'StellioTrace.openAttach' in s
+    main = open(os.path.join(root, 'main.py'), encoding='utf-8').read()
+    assert 'trace_model' in main and 'trace_version' in main
+    import json
+    for lg in ('fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'):
+        d = json.load(open(os.path.join(root, 'languages', lg + '.json'), encoding='utf-8'))
+        for k in ('trace.attach_title', 'trace.link_title', 'trace.chip_title', 'trace.fp_diff', 'planning.kpi_cost', 'planning.stats_title'):
+            assert d.get(k), (lg, k)

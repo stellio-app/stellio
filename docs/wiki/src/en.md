@@ -468,6 +468,11 @@ Group several files for a single object.
 - **My G-codes**: G-codes linked to a file, download, and an **Open in slicer** button.
 - Library **backup**: see [Settings and data](en-Settings-and-Data).
 
+## Large models
+An STL takes about 12 times its size in memory when loaded. Beyond a threshold (256 MB, up to 1 GB if the computer has plenty of free memory), Stellio no longer loads it entirely: streamed analysis (binary and text STL), thumbnail and viewer on a **simplified version** (about 300,000 triangles), write operations (repair, conversion…) refused with a clear message.
+To work on it anyway: right-click › **Create a lightweight version**. Stellio writes a simplified copy next to the original (`name (lightweight).stl`), which is never modified. The copy is for viewing, measuring, repairing or indexing, not for printing at full resolution. The action is also offered when a repair is refused because of size; it only applies to local STL files. A slicer export (OrcaSlicer…) as STL or 3MF is often much lighter.
+In the Advanced Workshop, every "Model path" field offers **Choose from the library**: source, search, format filter (STL, 3MF…), thumbnails and pagination.
+
 @@@ Printers | Printers
 # Printers
 {{img:printers}}
@@ -482,18 +487,18 @@ On the home page, the **Cameras** widget shows up to **4 cameras** (one per runn
 | **Bambu Lab** | X1/X1C/X1E, X2D, P1P/P1S, P2S, A1/A1 mini, H2D/H2S/H2C | MQTT (LAN + cloud): monitoring, AMS, camera, SSDP discovery |
 | **Prusa** | MK4, MK3.9, MK3.5, MINI+, XL, CORE One | PrusaLink (HTTP) |
 | **Creality** | K1/K2 series, Ender-3 V3, Hi | WebSocket: monitoring, CFS, UDP discovery |
-| **Elegoo** | Centauri Carbon 1 & 2, Saturn/Mars resin series (**beta**) | SDCP (WebSocket) |
-| **Chitubox resin** *(beta)* | Phrozen, Uniformation GKtwo and other Chitubox boards | SDCP v3: monitoring (same protocol as Elegoo) |
-| **USB printer *(beta)*** | Marlin, Prusa, Creality, Klipper boards… plugged into the Stellio PC | Serial port detection (the port is never opened): plugged in / absent, no status or temperatures |
-| **Anycubic Photon** *(beta)* | Older Wi-Fi models: Mono X, Mono X 6K, Mono SQ (not the M5s / M7) | TCP 6000 text commands: state and current file only |
-| **Formlabs** *(beta)* | Form 3 / 3L / 4 | Official web API (client_id:client_secret): status, progress, layers; sending is done with PreForm |
+| **Elegoo** | Centauri Carbon 1 & 2, Saturn/Mars resin series | SDCP (WebSocket) |
+| **Chitubox resin** | Phrozen, Uniformation GKtwo and other Chitubox boards | SDCP v3: monitoring (same protocol as Elegoo) |
+| **USB printer** | Marlin, Prusa, Creality, Klipper boards… plugged into the Stellio PC | Serial port detection (the port is never opened): plugged in / absent, no status or temperatures |
+| **Anycubic Photon** | Older Wi-Fi models: Mono X, Mono X 6K, Mono SQ (not the M5s / M7) | TCP 6000 text commands: state and current file only |
+| **Formlabs** | Form 3 / 3L / 4 | Official web API (client_id:client_secret): status, progress, layers; sending is done with PreForm |
 | **FlashForge** | Adventurer 5M/5M Pro, AD5X | Proprietary API |
 | **Klipper / Moonraker** | Any Klipper machine (Voron…) | HTTP: monitoring, upload, camera, exact hours |
 | **OctoPrint** | Any printer driven by OctoPrint | HTTP |
 | **Duet / RepRapFirmware** | Duet 2/3, standalone or SBC (DSF) | HTTP: status, file upload, temperatures |
 | **Repetier-Server** | Any printer managed by Repetier-Server | HTTP: status, file upload, temperatures (Marlin over USB serial is not supported) |
 
-> 🧪 **Resin printers: beta.** They could not be tested on every machine: monitoring may be incomplete or wrong. Stellio never starts or stops a resin print. Please report anything that does not work on GitHub (Creality Halot: not supported yet).
+> **Resin printers: monitoring only.** Stellio never starts or stops a resin print. Please report anything that does not work on GitHub (Creality Halot: not supported yet).
 
 Other models that speak the same protocol usually work. Tell us on GitHub if yours does.
 
@@ -514,7 +519,7 @@ Other models that speak the same protocol usually work. Tell us on GitHub if you
 - **Light collaborative mode**: warns if another device is viewing the file or before a double send.
 - **Open in slicer** from "My G-codes".
 - **Slicer per printer**: each printer can have its own default slicer (OrcaSlicer, QIDIStudio, Bambu Studio…). Sending uses it with the profiles (settings, filament) attached to that printer, and the profile list adapts.
-- **Resin software (beta)**: Stellio detects CHITUBOX, CHITUBOX Pro, Anycubic Photon Workshop, PreForm (Formlabs), Voxeldance Tango and Lychee Slicer. A resin printer with no slicer chosen automatically opens the first resin software detected; you can also pick one by hand (Settings → Slicer, or the printer's form). Common install locations are checked: if your software is not recognised, select it by hand.
+- **Resin software**: Stellio detects CHITUBOX, CHITUBOX Pro, Anycubic Photon Workshop, PreForm (Formlabs), Voxeldance Tango and Lychee Slicer. A resin printer with no slicer chosen automatically opens the first resin software detected; you can also pick one by hand (Settings → Slicer, or the printer's form). Common install locations are checked: if your software is not recognised, select it by hand.
 
 {{img:printer-slicer}}
 
@@ -530,7 +535,7 @@ Other models that speak the same protocol usually work. Tell us on GitHub if you
 In *Settings → Obico*, enter the address of your Obico server (self-hosted or obico.io) and an API token. Stellio regularly checks for alerts and sends you a **push notification** as soon as Obico detects a failure. The action (pause, cancel) stays Obico's: Stellio never stops a print by itself. A *Test the connection* button checks the address and token.
 
 ## Maintenance
-- **Resin maintenance (beta)**: the **Maintenance** button on resin printer cards offers suitable tasks (FEP/nFEP film, resin filtering, build plate, LCD screen, carbon filter, Z axis, wash IPA, UV/LCD wear).
+- **Resin maintenance**: the **Maintenance** button on resin printer cards offers suitable tasks (FEP/nFEP film, resin filtering, build plate, LCD screen, carbon filter, Z axis, wash IPA, UV/LCD wear).
 - **Predictive maintenance** with brand-specific tasks.
 - **Wear parts** (nozzles, plates, belts…) with stock alerts, linked to maintenance tasks.
 - **Calibrations** (flow, pressure advance, temperatures) per filament and printer.
@@ -538,8 +543,8 @@ In *Settings → Obico*, enter the address of your Obico server (self-hosted or 
 @@@ Filament | Filament
 # Filament
 
-## Resin (beta) 🧪
-The sidebar category is now called **Materials** and holds two pages: **Filament** (spool inventory) and **Resin** *(beta)*. The resin inventory is **manual**: add your bottles (name, brand, type, colour, volume, remaining, price, storage place, notes) and use the “Use” button to remove a volume in ml. Stellio does not link bottles to resin printers yet and never deducts anything automatically. Beta feature.
+## Resin
+The sidebar category is now called **Materials** and holds two pages: **Filament** (spool inventory) and **Resin**. The resin inventory is **manual**: add your bottles (name, brand, type, colour, volume, remaining, price, storage place, notes) and use the “Use” button to remove a volume in ml. Stellio does not link bottles to resin printers yet and never deducts anything automatically.
 
 As with filament, the **“To order”** reminder also works for resin: a resin (brand + name + colour, all bottles combined) is listed when its total remaining volume falls below the threshold set on the page (200 ml by default, 0 = off) or when you tick “To order” on a bottle. It also appears in the dashboard “To order” widget; **Order** opens search links to your shops (stock is not checked automatically for resin) and **Already ordered** postpones the reminder by 14 days.
 
@@ -712,6 +717,53 @@ Visible when *Enable cost, quote and invoicing features* is checked:
 ## Home automation
 - **MQTT / Home Assistant**: state publishing and automatic discovery; "Stellio" MQTT device and sensors.
 
+@@@ Desktop-Edition | Desktop edition
+# Desktop edition
+
+The **desktop edition** is the desktop app: a Stellio window on your PC (Windows, macOS). It keeps its original behavior; only a few features designed for an always-on server are absent.
+
+## Which edition do I have?
+| System | Default edition |
+|---|---|
+| Windows, macOS | Desktop |
+| Linux, Raspberry Pi, VM, LXC, Docker | Server |
+
+To force the choice (tests, a Linux PC used as a desktop):
+```bash
+STELLIO_SERVER_EDITION=0   # desktop
+STELLIO_SERVER_EDITION=1   # server (STELLIO_HEADLESS=1 also leads there)
+```
+
+## What is specific to desktop
+- **Built-in window** (pywebview). On Windows, opening Stellio in a browser on the same PC is blocked (internal token): use the window. Phone, APK and tunnel stay allowed.
+- Native **Windows notifications**.
+- **PC slicers** detected automatically (OrcaSlicer, Bambu Studio, PrusaSlicer, Cura…).
+- **Sources**: local folder, file, SMB and NFS.
+- **Data** in `%APPDATA%\Stellio` on Windows; in the portable version, in the `data` folder next to `Stellio.exe`.
+- **Updates** from GitHub as a `.zip` patch, verified before installation.
+
+## Features reserved for the server edition
+These features answer “reserved for the server edition” in the desktop app:
+
+| Feature | Purpose |
+|---|---|
+| Online AI | Claude, ChatGPT or Gemini with your key |
+| Imported slicer profiles | Import profiles exported from your slicers |
+| Push notifications | ntfy, Telegram, Discord, webhook… |
+| MQTT / Home Assistant | State publishing and auto-discovery |
+| Periodic digest | Daily or weekly |
+| Sync between two instances | Tools › Sync |
+| Outgoing webhooks | Signed messages (HMAC-SHA256) to your services |
+| Public API and mobile access | Scoped tokens, /api/v1 routes |
+
+The **Sync** entry of the Tools menu is hidden on desktop since it would only show this message.
+
+## Advanced Workshop on desktop
+Everything else works as on a server. The Advanced Workshop tools are placed in the sidebar, each in its own category: **Library** (Organization, 3D diff, Similar, Licenses, Part sheet), **Print** (Compatibility, Print check, G-code archives), **Materials** (Material needs), **Tools** (Plate, Fabrication assistant) and **Administration** (Tasks, Database, Audit log, Teams, Sessions). They are reserved for the owner account; each entry has its own switch in *Settings › Navigation items*.
+
+## Switching to the server edition
+For an always-on Stellio reachable from a browser, see [Server edition](en-Server-Edition) and [Installation](en-Installation).
+
 @@@ Server-Edition | Server edition
 # Server edition
 
@@ -758,6 +810,20 @@ Watchdog interventions: `journalctl -t stellio-watchdog`. Existing containers ge
 - 📥 **Slicer profiles**: Stellio cannot see the slicers on your PC and does not connect to slicer clouds (Orca Cloud, Bambu Cloud…). Export your profiles (OrcaSlicer: File → Export → Export Preset Bundle), then import them in *Settings → My slicer profiles*, or use a **watched profiles folder** (Syncthing, network share, scp…).
 - 🐯 **TigerTag**: official sign-in with email and password; Google account? First set a password with "Forgot password" in the TigerTag app. Fallback: copy the TigerTag Studio data folder to the server.
 - After an update, the browser reloads automatically.
+
+## Server-only features (1.1.7)
+These features do not exist in the desktop app, where their routes answer “reserved for the server edition”:
+
+| Feature | Purpose |
+|---|---|
+| Online AI | Claude, ChatGPT or Gemini with your key, instead of Ollama (see [Artificial intelligence](en-AI)) |
+| Slicer profiles | Import profiles exported from your slicers |
+| Push notifications | ntfy, Gotify, Pushover, Telegram, Discord, Slack or webhook, even with the window closed |
+| MQTT / Home Assistant | State publishing and auto-discovery |
+| Periodic digest | Daily or weekly, as a notification and push |
+| Sync (Advanced Workshop) | Syncs a folder with one on a paired instance: plan first, confirmed apply second, no deletion propagated, both versions kept on conflict. Both instances must be in server edition |
+
+The rest of the tools (plate, print check, G-code archives…) work identically on both editions.
 
 ## Environment variables
 | Variable | Purpose |
@@ -862,6 +928,183 @@ The installers are not signed. Check the `.sha256`, then *More info → Run anyw
 
 ## Getting help
 [GitHub Issues](https://github.com/stellio-app/stellio/issues), [Discord](https://discord.gg/ySxpHvS6bd), or **Suggestions & bugs** in the app. Include: Stellio version, system, steps to reproduce, exported log.
+
+@@@ Plugins | Plugins
+# Plugins
+
+A plugin is a small Python program that reacts to a Stellio event (print finished, print failed, order late, printer overload): send a notification, write to a spreadsheet, switch on a lamp… Plugins are published by their authors on **GitHub**; Stellio shows a **public catalog** (logo + description) in the **Plugins › Catalog** menu, where you install them in one click.
+
+Each plugin carries a badge: **Official** if it is hosted on the `stellio-app/stellio-plugins` repository, **Community** if it is hosted elsewhere (or installed from a .zip). Stellio decides the badge from the real address of the archive: always read the permissions and the code of a community plugin.
+
+**Built-in plugins.** Some Stellio features ship as built-in plugins (BigPrint, resin, USB printers, timelapse, file tools, plate studio, push notifications, webhooks, periodic digest, MQTT / Home Assistant, Obico, sharing & sync, Spoolman, AI providers and the AI assistant, Stellio Pro). They are part of the app but only load when enabled ("Built-in plugins" section of the Plugins page; the change applies after a restart). **Updating from an earlier version: nothing to do.** On the first start of 1.1.7, the plugins you were using (for example MQTT enabled, a USB printer, webhooks, a timelapse) are enabled automatically and keep exactly their settings; tools without settings (BigPrint, file tools, plate studio) are kept as they were. A fresh install enables none of them. Disabling a plugin never deletes its settings. Other built-in plugins: Sharing & sync, Spoolman, one plugin per AI provider + the AI assistant (which enables all AI features) and **Stellio Pro** (clients, quotes, invoices, orders, accounting, energy tariff, planning, material needs, parts stock): they add their pages and buttons only when enabled.
+
+## Using a plugin
+1. Open **Plugins › Catalog** (owner account only).
+2. Browse the catalog and click **Install**: Stellio downloads the archive and checks its SHA-256 checksum.
+3. Read the **permissions** requested and accept them. The plugin is installed **disabled**.
+4. Fill in its configuration if needed, enable it, then click **Test** to trigger it with a test event. The run log shows the output and any errors.
+
+You can also install a local `.zip` archive (a plugin under development) or point the catalog source to another catalog URL.
+
+## Creating a plugin
+### 1. Structure
+A plugin is a flat folder with a `plugin.json` file and a Python script:
+```
+mon-plugin/
+├── plugin.json     Manifest (required)
+├── main.py         Entry point (any name, set in "entry")
+└── ...             Other files: 100 maximum, 8 MB unpacked
+```
+
+### 2. The plugin.json manifest
+```json
+{
+  "id": "mon-plugin",
+  "name": "Mon plugin",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Écrit une ligne à chaque impression terminée.",
+  "author": "Votre nom",
+  "entry": "main.py",
+  "events": ["print.finished", "print.failed"],
+  "permissions": ["events"]
+}
+```
+| Field | Purpose |
+|---|---|
+| `id` | Unique identifier: lowercase letters, digits, `-` or `_`, 2 to 40 characters |
+| `name`, `description`, `author` | Text displayed in Stellio |
+| `version` | Numeric, for example `1.2.0`; used to detect updates |
+| `api` | Plugin API version: `1` |
+| `entry` | Python script at the root (default `main.py`) |
+| `events` | Events listened to |
+| `permissions` | Rights requested |
+| `ui` | Page shown inside Stellio: `title`, `icon` (Font Awesome) and `entry` (an `.html` file) |
+
+### 3. Events and permissions
+| Event | Triggered when |
+|---|---|
+| `print.finished` | A print finishes |
+| `print.failed` | A print fails |
+| `order.late` | An order passes its due date |
+| `printer.overload` | A printer is overloaded |
+
+| Permission | Effect |
+|---|---|
+| `events` | Receive events (required if `events` is declared) |
+| `api:read` | Read data through Stellio's public API |
+| `api:write` | Modify data through the public API |
+| `network` | Information: the plugin accesses the Internet |
+| `ui` | Show a plugin page in the Plugins menu |
+
+### 4. The script
+Stellio runs `python -I main.py <event>` in a separate process and sends a JSON `{"event": "...", "data": {...}}` on standard input. The `-I` (isolated) mode does not add the plugin folder to the Python path: to import a file from your plugin, add that path yourself. Standard output is recorded in the log.
+```python
+import json, os, sys
+
+payload = json.loads(sys.stdin.read() or "{}")
+event, data = payload.get("event", ""), payload.get("data", {})
+config = json.loads(os.environ.get("STELLIO_PLUGIN_CONFIG") or "{}")
+
+print(f"{event}: {data.get('file_name') or data.get('printer') or '-'}")
+```
+To act on Stellio (`api:*` permissions), the script receives `STELLIO_API_URL` and `STELLIO_API_TOKEN` (the `api_url` and `token` keys of the plugin configuration). The Python SDK `stellio_sdk.py` (the repository's `sdk/python` folder) provides `plugin_event()`, `plugin_config()` and a ready-to-use client: copy it into your plugin and add `sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))` before the import. A complete example is in `sdk/examples/hello-plugin`.
+
+Limits: 10 seconds per run, 512 MB of memory, minimal environment (`STELLIO_*` variables only, plus `PATH`). Python 3 must be installed on the machine running Stellio. The configuration is a list of key/value pairs (text, number, boolean) of at most 4,000 characters.
+
+### 5. Testing
+Zip the **contents** of the folder as `mon-plugin.zip` (2 MB maximum), install it from **Plugins › Catalog** (local archive), accept the permissions, enable it and use **Test**. Fix problems by reading the log.
+
+## Plugin with a page: G-code viewer example
+
+A plugin can also show **its own page** inside Stellio. It then appears in the **Plugins** menu of the sidebar, under "Catalog", in the "Installed" list: one click opens its page. The `sdk/examples/gcode-viewer` example is a 3D G-code viewer: 3D view (orbit, zoom), layer range, move playback, colors by type, speed or flow, travel moves and retractions; in 8 languages.
+
+```json
+{
+  "id": "gcode-viewer",
+  "name": "G-code viewer",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Shows your archived G-code files layer by layer.",
+  "author": "Stellio",
+  "permissions": ["ui", "api:read"],
+  "ui": {
+    "title": "G-code viewer",
+    "icon": "fa-layer-group",
+    "entry": "viewer.html"
+  }
+}
+```
+
+- The page is **a single self-contained HTML file** (CSS and JavaScript inside, images as `data:`), 1 MB maximum. Without events, the plugin does not need a Python script.
+- It is displayed in an **isolated** frame: no access to the network, cookies or the rest of Stellio.
+- It reads Stellio's data with `window.stellio.api(path)`: read-only (GET), the `api:read` permission is required, the result is JSON, or text with `'text'` as second argument. Settings, accounts, security and plugins are off limits.
+- The theme is provided by the CSS variables `--st-bg`, `--st-panel`, `--st-card`, `--st-text`, `--st-muted`, `--st-border`, `--st-accent`, `--st-success`, `--st-warning` and `--st-danger`, and the language by `window.stellio.lang`.
+
+```js
+document.addEventListener('stellio-ready', async () => {
+  const list = await window.stellio.api('/api/gcodes?limit=50');
+  const id = list.gcodes[0].id;
+  const text = await window.stellio.api('/api/projects/gcodes/' + id + '/download', 'text');
+});
+```
+
+To try it: zip the contents of the `gcode-viewer` folder, install the archive from **Plugins › Catalog**, accept the permissions, enable it, then open it from the **Plugins** menu. At least one archived G-code is needed (file sheet or project). A disabled plugin stays greyed out in the list.
+
+## Publishing on GitHub
+1. Create a public repository for your plugin with the code, a `README` and a license.
+2. For each version, create a GitHub **release** and attach the archive `mon-plugin-1.0.0.zip`.
+3. Compute the archive's SHA-256 checksum, needed by the catalog:
+```bash
+sha256sum mon-plugin-1.0.0.zip
+```
+4. Always increase `version` in `plugin.json` before a new release.
+
+## Getting listed in the Stellio catalog
+The official catalog is a `catalog.json` file in the `stellio-app/stellio-plugins` repository. You add your plugin to it with a **Pull Request**.
+
+1. Fork the `stellio-app/stellio-plugins` repository.
+2. Add your plugin's entry to `catalog.json`:
+```json
+{
+  "id": "mon-plugin",
+  "name": "Mon plugin",
+  "version": "1.0.0",
+  "description": {"fr": "Écrit une ligne à chaque impression terminée.", "en": "Writes a line when a print finishes."},
+  "author": "Votre nom",
+  "url": "https://github.com/vous/mon-plugin/releases/download/v1.0.0/mon-plugin-1.0.0.zip",
+  "sha256": "64 caractères hexadécimaux",
+  "permissions": ["events"],
+  "logo": "https://raw.githubusercontent.com/vous/mon-plugin/main/logo.png",
+  "homepage": "https://github.com/vous/mon-plugin"
+}
+```
+3. Open the Pull Request: an automatic check verifies the links, the SHA-256 checksum and the logo, then the Stellio team reviews the plugin.
+
+| Field | Rule |
+|---|---|
+| `description` | Short (about 140 characters); plain text or one text per language (`fr`, `en`, `de`, `es`, `pt`, `it`, `zh`, `ja`) |
+| `url` | Direct `https` link to the archive; the `sha256` must match exactly |
+| `logo` | `https`, PNG, JPEG or WebP, 200 KB maximum, ideally 128 × 128 (SVG is refused) |
+| `homepage` | `https` link to the plugin page (optional) |
+| `permissions` | Must match those of the manifest |
+
+**Updating**: publish a new release, then open a Pull Request that changes `version`, `url` and `sha256`. If the new version requests additional permissions, the plugin is disabled on the user's side until they accept them; its configuration is kept.
+
+## Security
+- A plugin is **not sandboxed**: it runs with Stellio's rights on the machine. Only install plugins whose author you trust.
+- Plugins are installed disabled, and their permissions must be accepted.
+- Downloads only go over `https` to public addresses, with SHA-256 verification.
+- The catalog is reviewed before publication, but this does not replace your own vigilance: read the code and the permissions.
+
+To go further: [Contributing](en-Contributing), the repository's `docs/plugins.md` file and the `sdk/examples/hello-plugin` example.
+
+## Administration and supervised instances
+The **Administration** plugin (on by default) groups in one page (Administration › Administration) the **guest accounts and their roles**, teams, sessions, the audit log and the **instances**.
+- **Standalone instance** (default): full control, nothing changes.
+- **Primary instance**: the Instances sub-tab lists the paired Stellio instances and lets you supervise them.
+- **Supervised instance**: once its owner **accepts**, its accounts, roles and permissions can only be managed from the primary; local content (library, printers) stays private unless the owner chooses otherwise when accepting; the owner can **leave supervision** at any time.
+A supervised instance cannot supervise others, and a primary instance cannot be supervised. All other settings remain editable locally.
 
 @@@ Contributing | Contributing
 # Contributing

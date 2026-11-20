@@ -7,7 +7,7 @@ LANGS = ('fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja')
 
 
 def _mod(name):
-    spec = importlib.util.spec_from_file_location(name + '_v113_test', ROOT / 'modules' / (name + '.py'))
+    spec = importlib.util.spec_from_file_location(name + '_v113_test', __import__('conftest').mod_path(name))
     m = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(m)
@@ -131,9 +131,9 @@ def test_repetier_helpers():
 # ── branchement ──────────────────────────────────────────────────────────────
 def test_v113_wiring_backend():
     main = (ROOT / 'main.py').read_text(encoding='utf-8')
-    assert 'CURRENT_VERSION = "1.1.6"' in main and "@app.route('/v113.js')" in main
+    assert 'CURRENT_VERSION = "1.1.7"' in main and "@app.route('/v113.js')" in main
     assert "('klipper','octoprint','prusalink','duet','repetier')" in main.replace(' ', '')
-    for m in ('model_versions', 'energy_tariff', 'obico', 'printers_extra', 'failure_stats', 'collections_sets'):
+    for m in ('model_versions', 'printers_extra', 'failure_stats', 'collections_sets'):
         assert f'{m}.init(globals())' in main
 
 
@@ -258,7 +258,7 @@ def test_v113_tariff_failure_obico_routes(v113_client):
     assert c.post('/api/obico', json={'enabled': False, 'url': 'ftp://x'}, headers=h).status_code == 400
 
 
-# ── imprimantes résine (bêta) ────────────────────────────────────────────────
+# ── imprimantes résine ────────────────────────────────────────────────
 def test_resin_formlabs_normalize():
     rp = _mod('resin_printers')
     p = {'serial': 'Form4-abc', 'alias': 'Atelier', 'printer_status': {'status': 'PRINTING', 'current_temperature': 31.46,
@@ -287,24 +287,24 @@ def test_resin_photon_parse_status():
     assert rp.photon_parse_status('n importe quoi')['status'] == 'unknown'
 
 
-def test_resin_beta_wiring_everywhere():
+def test_resin_wiring_everywhere():
     html = (ROOT / 'interface/index.html').read_text(encoding='utf-8')
     js = (ROOT / 'interface/script.js').read_text(encoding='utf-8')
     main = (ROOT / 'main.py').read_text(encoding='utf-8')
     for t in ('chitu_sdcp', 'anycubic_photon', 'formlabs'):
         assert f'<option value="{t}"' in html and t in js
-    assert 'resin_printers.init(globals())' in main and "('elegoo_sdcp', 'chitu_sdcp')" in main
-    assert 'group-resin-beta' in html and 'beta-badge' in (ROOT / 'interface/style.css').read_text(encoding='utf-8')
-    assert js.count('_isResinBeta(') >= 4                                                    # carte, moniteur, sélecteur de caméra, définition
+    assert "_hosted('resin_printers')" in main and "('elegoo_sdcp', 'chitu_sdcp')" in main
+    assert 'group-resin-beta' not in html and 'beta-badge' not in (ROOT / 'interface/style.css').read_text(encoding='utf-8') and '_betaBadgeHtml' not in js      # plus aucune mention « bêta » pour la résine
+    assert js.count('_isResin(') >= 2                                                         # sélecteur de caméra, définition (+ maintenance)
     for l in LANGS:
         d = json.loads((ROOT / 'languages' / f'{l}.json').read_text(encoding='utf-8'))
-        for k in ('printers.resin_beta', 'printers.resin_beta_warning', 'printers.chitu_sdcp_model', 'printers.anycubic_photon_model',
+        for k in ('printers.chitu_sdcp_model', 'printers.anycubic_photon_model',
                   'printers.formlabs_model', 'printers.chitu_hint', 'printers.photon_hint', 'printers.formlabs_hint', 'printers.note_elegoo_resin'):
             assert d.get(k), (l, k)
-        for k in ('printers.elegoo_sdcp_model', 'printers.chitu_sdcp_model', 'printers.anycubic_photon_model', 'printers.formlabs_model', 'printers.note_elegoo_resin'):
-            assert re.search(r'b[êe]ta|beta|测试版|ベータ', d[k], re.I), (l, k)             # chaque mention résine dit « bêta »
+        for k in ('printers.elegoo_sdcp_model', 'printers.chitu_sdcp_model', 'printers.anycubic_photon_model', 'printers.formlabs_model', 'printers.usb_serial_model', 'printers.usb_hint', 'printers.note_elegoo_resin'):
+            assert not re.search(r'b[êe]ta|beta|测试版|ベータ', d[k], re.I), (l, k)         # plus aucune mention « bêta » (résine, USB)
         doc = (ROOT / 'docs/wiki/src' / f'{l}.md').read_text(encoding='utf-8')
-        assert doc.count('🧪') >= 1 and re.search(r'Formlabs\*\* \*\((b[êe]ta|beta|测试版|ベータ)\)', doc, re.I), l
+        assert '🧪' not in doc and not re.search(r'Formlabs\*\* \*\((b[êe]ta|beta|测试版|ベータ)\)', doc, re.I), l
 
 
 def test_resin_inventory_flow(v113_client):
@@ -316,7 +316,7 @@ def test_resin_inventory_flow(v113_client):
     rid = c.post('/api/resin/save', json={'name': 'Grise', 'brand': 'Elegoo', 'kind': 'standard', 'volume_ml': 1000,
                                           'remaining_ml': 800, 'price': 25, 'color_hex': '#888888'}, headers=h).get_json()['id']
     d = c.get('/api/resin').get_json()
-    assert d['beta'] is True and any(b['id'] == rid for b in d['bottles']) and d['total_remaining_ml'] >= 800
+    assert any(b['id'] == rid for b in d['bottles']) and d['total_remaining_ml'] >= 800
     assert c.post('/api/resin/save', json={'id': rid, 'name': 'Grise v2', 'volume_ml': 1000, 'remaining_ml': 700}, headers=h).status_code == 200
     assert c.post('/api/resin/use', json={'id': rid, 'ml': 250}, headers=h).get_json()['remaining_ml'] == 450
     assert c.post('/api/resin/use', json={'id': rid, 'ml': 9999}, headers=h).get_json()['remaining_ml'] == 0     # jamais négatif
@@ -382,7 +382,7 @@ def test_logiciels_resine_declares_partout():
 
 def test_maintenance_resine_sur_les_cartes():
     js = (ROOT / 'interface/script.js').read_text(encoding='utf-8')
-    assert 'resin: [' in js and "(_isResinBeta(p) ? 'resin' : '')" in js and 'value="resin"' in js
+    assert 'resin: [' in js and "(_isResin(p) ? 'resin' : '')" in js and 'value="resin"' in js
     keys = re.findall(r"nameKey: '(printers\.maintenance_task\.[a-z_]+)'", js.split('resin: [')[1].split('],')[0])
     assert len(keys) == 9
     for l in LANGS:
@@ -395,7 +395,7 @@ def test_maintenance_resine_sur_les_cartes():
 def test_slicers_installed_route(v113_client):
     c, _ = v113_client
     d = c.get('/api/slicers/installed').get_json()
-    assert isinstance(d['slicers'], list) and d['beta_resin'] is True and 'resin_default' in d
+    assert isinstance(d['slicers'], list) and 'beta_resin' not in d and 'resin_default' in d
     for s in d['slicers']:
         assert {'id', 'name', 'default_value', 'resin'} <= set(s)
 

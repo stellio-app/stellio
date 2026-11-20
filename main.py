@@ -7,6 +7,26 @@ import importlib.util
 import warnings
 import math
 
+# ── Processus de rendu isolé ───────────────────────────────────────────────────────────────────────────────────
+# Les miniatures de gros fichiers sont dessinées dans un processus séparé (même exécutable, option --stellio-thumb-worker) :
+# si le rendu sature la mémoire ou fait planter une bibliothèque native, seul ce petit processus meurt, pas l'application.
+if '--stellio-thumb-worker' in sys.argv and __name__ in ('__main__', 'stellio_main'):
+    def _thumb_worker_entry():
+        import runpy
+        _i = sys.argv.index('--stellio-thumb-worker')
+        try:
+            _src, _out = sys.argv[_i + 1], sys.argv[_i + 2]
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            _g = runpy.run_path(os.path.abspath(__file__), run_name='stellio_thumb_worker')
+            _fn = _g['_generate_thumbnail_pyrender_impl']
+        except BaseException:
+            os._exit(4)                       # le processus n'a pas pu démarrer : l'application se rabat sur le rendu intégré
+        try:
+            os._exit(0 if _fn(_src, _out) else 3)
+        except BaseException:
+            os._exit(3)
+    _thumb_worker_entry()
+
 if sys.platform.startswith('linux'):
     os.environ['PYOPENGL_PLATFORM'] = 'osmesa'
     os.environ['PYRENDER_OFFSCREEN'] = '1'
@@ -27,6 +47,7 @@ def _portable_data_dir():
 
 
 def _early_extra_libs_dir():
+    # Même logique que get_data_path() (défini plus bas), sans créer de dossier.
     env_override = os.environ.get('STELLIO_DATA_DIR')
     if env_override:
         base = env_override
@@ -1931,6 +1952,15 @@ def setup_logging():
 
 app_logger = setup_logging()
 
+# Plantage natif (OpenGL, bibliothèque C) : Python n'a pas le temps d'écrire dans le journal. faulthandler écrit la pile
+# des threads dans crash_trace.log (dans le dossier de données) pour que le prochain rapport de bug contienne quelque chose.
+try:
+    import faulthandler
+    _crash_trace_fh = open(os.path.join(DATA_DIR, 'crash_trace.log'), 'a', encoding='utf-8')
+    faulthandler.enable(file=_crash_trace_fh, all_threads=True)
+except Exception:
+    pass
+
 
 def _check_required_modules(log=True):
     try:
@@ -2474,6 +2504,22 @@ def get_db():
     conn.execute("PRAGMA busy_timeout = 20000")
     conn.row_factory = sqlite3.Row
     return conn
+
+def _tags_for_paths(conn, paths, chunk=900):
+    """Étiquettes par chemin, requêtes découpées : SQLite refuse plus de ~32 000 variables, donc une
+    bibliothèque de 50 000 modèles perdait toutes ses étiquettes sans message d'erreur."""
+    out = {}
+    paths = list(paths)
+    for i in range(0, len(paths), chunk):
+        part = paths[i:i + chunk]
+        ph = ','.join('?' * len(part))
+        for row in conn.execute(
+            f"SELECT ft.file_path, t.name, t.color FROM file_tags ft JOIN tags t ON ft.tag_id = t.id WHERE ft.file_path IN ({ph})",
+            part
+        ).fetchall():
+            out.setdefault(row['file_path'], []).append({'name': row['name'], 'color': row['color']})
+    return out
+
 
 def init_db():
     conn = get_db()
@@ -3115,8 +3161,9 @@ def stamp_schema_version():
     """Inscrit DB_SCHEMA_VERSION dans PRAGMA user_version une fois toutes les migrations passées."""
     conn = get_db()
     try:
-        conn.execute(f"PRAGMA user_version = {int(DB_SCHEMA_VERSION)}")
-        conn.commit()
+        if conn.execute("PRAGMA user_version").fetchone()[0] < DB_SCHEMA_VERSION:   # ne jamais redescendre : modules/migrations.py peut avoir monté la version
+            conn.execute(f"PRAGMA user_version = {int(DB_SCHEMA_VERSION)}")
+            conn.commit()
     except Exception as e:
         app_logger.warning(f"[DB] Version de schéma non inscrite : {e}")
     finally:
@@ -3513,6 +3560,44 @@ def _elegoo_cc2_discover(ip, timeout=3):
     except Exception as e:
         app_logger.info(f"[Elegoo CC2] Découverte échouée pour {ip}: {e}")
         return None
+
+
+def _hosted(name):
+    """Module d'un plugin intégré ACTIVÉ (None sinon) : le cœur n'appelle jamais directement le code d'un plugin."""
+    from modules import plugin_host as _ph
+    return _ph.module(name)
+
+
+# ── plugin « Stellio Pro » (devis, commandes, clients, compta, tarif énergie, planning…) : passerelles du cœur ──
+QUOTE_LOGO_FILE = os.path.join(DATA_DIR, "quote_logo.png")
+QUOTES_DIR = os.path.join(DATA_DIR, 'quotes')
+
+
+def _safe_quote_pdf_filename(name):
+    """Nom de fichier PDF sûr (aussi utilisé par l'export des rapports, donc gardé dans le cœur)."""
+    name = os.path.basename(str(name or '')).strip()
+    name = re.sub(r'[\\/:*?"<>|\x00-\x1f]', '_', name)[:120]
+    if not name.lower().endswith('.pdf'):
+        name = (name or 'stellio-devis') + '.pdf'
+    return name
+
+
+def _ensure_quote_columns():
+    """Colonnes des devis : n'existent que si Stellio Pro est actif (sinon rien à migrer)."""
+    _pq = _hosted('pro_quotes')
+    if _pq:
+        _pq._ensure_quote_columns()
+
+
+def _migrate_legacy_quote_logo():
+    _pq = _hosted('pro_quotes')
+    if _pq:
+        _pq._migrate_legacy_quote_logo()
+
+
+def _discover_usb_if_loaded():
+    _up = _hosted('usb_printers')
+    return _up.discover() if _up else []
 
 
 def _discover_bambu_ssdp(timeout=2.5):
@@ -4647,11 +4732,13 @@ class PrinterManager:
                 cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
                 r = _bambuddy_get(ip, api_key, cfg, f"/printers/{_bambuddy_printer_id(cfg)}/status", timeout=5)
                 return r.status_code == 200
-            elif ptype in ('formlabs', 'anycubic_photon'):   # v1.1.4 (bêta) : imprimantes résine
+            elif ptype in ('formlabs', 'anycubic_photon'):   # v1.1.4 : imprimantes résine
                 cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
-                return resin_printers.connect(ptype, ip, api_key, cfg)
-            elif ptype == 'usb_serial':   # v1.1.4 (bêta) : imprimante branchée en USB au PC de Stellio (présence seulement)
-                return usb_printers.connect(ip)
+                _rp = _hosted('resin_printers')      # plugin intégré « résine » : absent = imprimante injoignable (elle reste enregistrée)
+                return bool(_rp) and _rp.connect(ptype, ip, api_key, cfg)
+            elif ptype == 'usb_serial':   # v1.1.4 : imprimante branchée en USB au PC de Stellio (présence seulement)
+                _up = _hosted('usb_printers')        # plugin intégré « imprimantes USB »
+                return bool(_up) and _up.connect(ip)
             elif ptype in ('duet', 'repetier'):   # v1.1.3 : Duet (RepRapFirmware) et Repetier-Server
                 cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
                 return printers_extra.connect(ptype, _pbase(ip, _extra_printer_port(ptype, cfg)), api_key, cfg)
@@ -4916,15 +5003,21 @@ class PrinterManager:
                     import traceback
                     traceback.print_exc()
                     return {**default_result, 'status': 'error'}
-            elif ptype in ('formlabs', 'anycubic_photon'):   # v1.1.4 (bêta) : imprimantes résine
+            elif ptype in ('formlabs', 'anycubic_photon'):   # v1.1.4 : imprimantes résine
                 cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
                 try:
-                    return resin_printers.status(ptype, ip, api_key, cfg)
+                    _rp = _hosted('resin_printers')
+                    if not _rp:
+                        return {**default_result, 'status': 'offline'}
+                    return _rp.status(ptype, ip, api_key, cfg)
                 except RuntimeError as e:
                     return {**default_result, 'status': 'offline' if str(e) == 'unreachable' else 'error'}
-            elif ptype == 'usb_serial':   # v1.1.4 (bêta) : USB, présence seulement (le port n'est jamais ouvert)
+            elif ptype == 'usb_serial':   # v1.1.4 : USB, présence seulement (le port n'est jamais ouvert)
                 try:
-                    return usb_printers.status(ip)
+                    _up = _hosted('usb_printers')
+                    if not _up:
+                        return {**default_result, 'status': 'offline'}
+                    return _up.status(ip)
                 except RuntimeError:
                     return {**default_result, 'status': 'offline'}
             elif ptype in ('duet', 'repetier'):   # v1.1.3
@@ -5277,6 +5370,9 @@ def _browser_blocked_response():
 def _desktop_only_guard():
     if not BLOCK_PC_BROWSER:
         return
+    # v1.1.7 : les scripts qui appellent l'API publique avec un jeton ne sont pas un navigateur
+    if (request.path or '').startswith('/api/v1/') and (request.headers.get('Authorization') or '').lower().startswith('bearer '):
+        return
     supplied = request.args.get('stellio_app', '')
     if supplied and secrets.compare_digest(supplied, DESKTOP_APP_TOKEN):
         request.environ['stellio.set_app_cookie'] = True
@@ -5324,6 +5420,10 @@ _VIEWER_WRITE_WHITELIST = {
     ('POST', '/api/ollama/explain-orientation'),
     ('POST', '/api/nesting/arrange'),
     ('POST', '/api/demo/enter'),
+    ('POST', '/api/plate/arrange'),      # 1.1.7 : calculs sans écriture, autorisés ensuite seulement en démo (voir `_demo_ok` des modules)
+    ('POST', '/api/plate/check'),        # 1.1.7 : contrôle pur d'une disposition (aucun fichier lu)
+    ('POST', '/api/organize/preview'),
+    ('POST', '/api/model-diff'),
     # BigPrint en démo / invité : on peut calculer et voir l'aperçu 3D d'un modèle de la bibliothèque, jamais récupérer de fichiers
     # (enregistrement et import restent interdits : voir aussi le refus explicite dans modules/bigprint_tool.py)
     ('POST', '/api/bigprint/model'),
@@ -5377,8 +5477,41 @@ def _viewer_guard():
         return
     if (request.method, path) in _VIEWER_WRITE_WHITELIST:
         return
+    try:
+        _team = access_control.team_decision()          # 1.1.7 : comptes d'équipe (operator / manager / admin) et permissions fines
+    except Exception as _e:
+        _team = None
+        app_logger.warning(f"[Équipe] décision ignorée : {type(_e).__name__}: {_e}")
+    if _team is True:
+        return
+    if isinstance(_team, str):
+        app_logger.info(f"[Équipe] Écriture refusée : {request.method} {path} — {_team}")
+        return jsonify({"error": _team, "code": "team_forbidden"}), 403
     app_logger.info(f"[Viewer] Écriture refusée (lecture seule) : {request.method} {path}")
     return jsonify({"error": "Compte invité : lecture seule", "code": "viewer_readonly"}), 403
+
+GZIP_JSON_MIN_BYTES = 64 * 1024
+
+
+@app.after_request
+def _gzip_big_json(response):
+    """La liste de 50 000 modèles pèse ~17 Mo en JSON : compressée, ~1,5 Mo. Uniquement pour les gros JSON
+    (les fichiers, vidéos et flux ne sont pas touchés) et seulement si le navigateur l'accepte."""
+    try:
+        if (response.status_code == 200 and not response.direct_passthrough and response.mimetype == 'application/json'
+                and 'gzip' in request.headers.get('Accept-Encoding', '').lower()
+                and 'Content-Encoding' not in response.headers):
+            data = response.get_data()
+            if len(data) >= GZIP_JSON_MIN_BYTES:
+                import gzip as _gz
+                response.set_data(_gz.compress(data, compresslevel=3))
+                response.headers['Content-Encoding'] = 'gzip'
+                response.headers['Content-Length'] = str(len(response.get_data()))
+                response.headers.add('Vary', 'Accept-Encoding')
+    except Exception:
+        pass
+    return response
+
 
 @app.after_request
 def _set_security_headers(response):
@@ -5530,7 +5663,218 @@ def _amf_to_trimesh(source):
     return meshes[0] if len(meshes) == 1 else trimesh.util.concatenate(meshes)
 
 
-def load_model_mesh(source, ext=None):
+# ── STL géants (1.1.7) ──────────────────────────────────────────────────────────────────────────────────────────
+# Un STL binaire de 200 Mo (4 millions de triangles) demande ≈ 2,4 Go pour être chargé et ≈ 3,4 Go pour être analysé (mesuré) :
+# à 2,7 Go (54 millions de triangles) il faudrait 30 à 45 Go de mémoire. Au-delà de STL_HUGE_BYTES on ne charge donc JAMAIS le
+# fichier entier : les statistiques se calculent par morceaux (mémoire constante), les aperçus utilisent une version simplifiée
+# par regroupement de sommets, et toute opération qui écrirait un fichier est refusée avec un message clair.
+STL_HUGE_BYTES = 256 * 1024 * 1024
+STL_HUGE_MAX_BYTES = 1024 * 1024 * 1024      # plafond du seuil adaptatif
+_STL_HUGE_DEFAULT = STL_HUGE_BYTES
+
+
+def _stl_huge_limit():
+    """Seuil au-delà duquel un STL n'est plus chargé en entier. 256 Mo au minimum ; sur une machine qui a beaucoup de mémoire libre il monte (jusqu'à 1 Go) :
+    un STL se charge à ≈ 12× sa taille et s'analyse à ≈ 16×, on n'utilise donc que 40 % de la mémoire disponible (marge pour le reste de Stellio)."""
+    if STL_HUGE_BYTES != _STL_HUGE_DEFAULT:           # seuil imposé (tests, réglage)
+        return STL_HUGE_BYTES
+    try:
+        import psutil
+        dyn = int(psutil.virtual_memory().available * 0.4 / 16)
+    except Exception:
+        return STL_HUGE_BYTES
+    return max(STL_HUGE_BYTES, min(STL_HUGE_MAX_BYTES, dyn))
+STL_CHUNK_TRIANGLES = 1_000_000
+STL_PREVIEW_FACES = 300_000
+
+
+class ModelTooLargeError(Exception):
+    """Fichier trop volumineux pour être chargé en mémoire sans le simplifier."""
+
+
+def _stl_is_huge(path):
+    try:
+        return os.path.splitext(path)[1].lower() == '.stl' and os.path.getsize(path) > _stl_huge_limit()
+    except OSError:
+        return False
+
+
+_STL_DTYPE = np.dtype([('n', '<f4', 3), ('v', '<f4', (3, 3)), ('a', '<u2')])
+
+
+def _stl_binary_count(path):
+    """Nombre de triangles d'un STL binaire (84 octets d'en-tête + 50 par triangle), ou None si ce n'est pas un STL binaire.
+    Tolérant : certains exportateurs écrivent un compteur faux ou nul alors que la taille du fichier est exactement 84 + 50 × n
+    (et que le fichier ne commence pas par « solid » suivi de facettes) : on se fie alors à la taille."""
+    size = os.path.getsize(path)
+    if size < 84:
+        return None
+    with open(path, 'rb') as f:
+        head = f.read(84)
+    n = int(np.frombuffer(head[80:84], dtype='<u4')[0])
+    if n and 84 + 50 * n == size:
+        return n
+    if (size - 84) % 50 == 0 and size > 84 and not _stl_looks_ascii(head):
+        return (size - 84) // 50
+    return None
+
+
+def _stl_looks_ascii(head):
+    h = bytes(head[:84]).lstrip()
+    return h[:5].lower() == b'solid'
+
+
+def _stl_is_ascii(path):
+    """STL texte : commence par « solid » et contient « facet » dans le premier Ko (un binaire peut aussi commencer par « solid »)."""
+    try:
+        with open(path, 'rb') as f:
+            h = f.read(2048)
+    except OSError:
+        return False
+    return _stl_looks_ascii(h) and b'facet' in h and _stl_binary_count(path) is None
+
+
+_ASCII_VERTEX = None
+
+
+def _stl_ascii_chunks(path, chunk=STL_CHUNK_TRIANGLES, block=48 * 1024 * 1024):
+    """STL texte lu par blocs de ~48 Mo coupés sur une fin de facette : mémoire constante, même forme de sortie que le binaire."""
+    import re
+    global _ASCII_VERTEX
+    if _ASCII_VERTEX is None:
+        _ASCII_VERTEX = re.compile(rb'vertex\s+(\S+)\s+(\S+)\s+(\S+)')
+    tail = b''
+    buf = []
+    have = 0
+    with open(path, 'rb') as f:
+        while True:
+            data = f.read(block)
+            if not data:
+                break
+            data = tail + data
+            cut = data.rfind(b'endfacet')
+            if cut < 0:
+                tail = data
+                continue
+            cut += len(b'endfacet')
+            tail = data[cut:]
+            vs = _ASCII_VERTEX.findall(data[:cut])
+            del data
+            k = (len(vs) // 3) * 3
+            if k == 0:
+                continue
+            arr = np.array(vs[:k], dtype='S40').astype(np.float32).reshape(-1, 3, 3)
+            buf.append(arr)
+            have += len(arr)
+            while have >= chunk:
+                allv = np.concatenate(buf) if len(buf) > 1 else buf[0]
+                yield allv[:chunk]
+                rest = allv[chunk:]
+                buf = [rest] if len(rest) else []
+                have = len(rest)
+    if tail:
+        vs = _ASCII_VERTEX.findall(tail)
+        k = (len(vs) // 3) * 3
+        if k:
+            buf.append(np.array(vs[:k], dtype='S40').astype(np.float32).reshape(-1, 3, 3)); have += k // 3
+    if have:
+        yield (np.concatenate(buf) if len(buf) > 1 else buf[0])
+
+
+def _stl_iter_chunks(path, chunk=STL_CHUNK_TRIANGLES):
+    """Lit un STL binaire par morceaux de `chunk` triangles (tableaux (k, 3, 3) en float32) : la mémoire ne dépend pas du fichier."""
+    n = _stl_binary_count(path)
+    if n is None:
+        if _stl_is_ascii(path):
+            yield from _stl_ascii_chunks(path, chunk)
+        return
+    with open(path, 'rb') as f:
+        f.seek(84)
+        left = n
+        while left > 0:
+            k = min(chunk, left)
+            rec = np.fromfile(f, dtype=_STL_DTYPE, count=k)
+            if len(rec) == 0:
+                break
+            yield rec['v']
+            left -= len(rec)
+
+
+def stl_stream_stats(path, chunk=STL_CHUNK_TRIANGLES):
+    """Dimensions, volume, surface et nombre de triangles d'un STL binaire, lus par morceaux (mémoire constante,
+    résultat exact : volume = somme des volumes signés des tétraèdres, surface = somme des aires). None si pas binaire."""
+    if _stl_binary_count(path) is None and not _stl_is_ascii(path):
+        return None
+    lo = np.full(3, np.inf)
+    hi = np.full(3, -np.inf)
+    vol = 0.0
+    area = 0.0
+    n = 0
+    for raw in _stl_iter_chunks(path, chunk):
+        v = raw.astype(np.float64)
+        n += len(v)
+        flat = v.reshape(-1, 3)
+        lo = np.minimum(lo, flat.min(axis=0))
+        hi = np.maximum(hi, flat.max(axis=0))
+        vol += float(np.einsum('ij,ij->i', v[:, 0], np.cross(v[:, 1], v[:, 2])).sum()) / 6.0
+        area += float(np.linalg.norm(np.cross(v[:, 1] - v[:, 0], v[:, 2] - v[:, 0]), axis=1).sum()) / 2.0
+    return {'triangles': n, 'bounds': (lo, hi), 'volume_mm3': abs(vol), 'area_mm2': area}
+
+
+def stl_cluster_decimate(path, target_faces=STL_PREVIEW_FACES, chunk=STL_CHUNK_TRIANGLES):
+    """Version simplifiée d'un STL binaire géant (regroupement de sommets par cellules d'une grille), en deux passes par
+    morceaux : la mémoire ne dépend pas de la taille du fichier. Sert aux miniatures et au viewer, jamais à écrire un fichier."""
+    st = stl_stream_stats(path, chunk)
+    if st is None:
+        raise ModelTooLargeError('STL invalide (ni binaire ni texte lisible) trop volumineux pour être simplifié')
+    lo, hi = st['bounds']
+    extent = np.maximum(hi - lo, 1e-9)
+    cell = max(float(np.sqrt(max(st['area_mm2'], 1e-9) / max(target_faces / 2.0, 1.0))), float(extent.max()) / 4096.0)
+    dims = np.minimum(np.floor(extent / cell).astype(np.int64) + 1, 4096)
+    def keys_of(v):
+        q = np.minimum(((v - lo) / cell).astype(np.int64), dims - 1)
+        return (q[:, 0] * dims[1] + q[:, 1]) * dims[2] + q[:, 2]
+    occupied = np.empty(0, dtype=np.int64)                                   # passe 1 : cellules occupées
+    for raw in _stl_iter_chunks(path, chunk):
+        occupied = np.union1d(occupied, np.unique(keys_of(raw.astype(np.float64).reshape(-1, 3))))
+    sums = np.zeros((len(occupied), 3))
+    cnt = np.zeros(len(occupied))
+    face_keys = []
+    for raw in _stl_iter_chunks(path, chunk):                                # passe 2 : position moyenne + triangles gardés
+        v = raw.astype(np.float64)
+        idx = np.searchsorted(occupied, keys_of(v.reshape(-1, 3)))
+        np.add.at(sums, idx, v.reshape(-1, 3))
+        np.add.at(cnt, idx, 1)
+        f = idx.reshape(-1, 3)
+        keep = (f[:, 0] != f[:, 1]) & (f[:, 1] != f[:, 2]) & (f[:, 0] != f[:, 2])
+        face_keys.append(np.unique(f[keep], axis=0))
+        del v, idx, f
+    faces = np.unique(np.concatenate(face_keys), axis=0) if face_keys else np.empty((0, 3), dtype=np.int64)
+    verts = sums / np.maximum(cnt, 1)[:, None]
+    mesh = trimesh.Trimesh(vertices=verts, faces=faces, process=False)
+    mesh.metadata['stellio_decimated_from'] = int(st['triangles'])
+    return mesh
+
+
+MESH_MEMORY_FACTOR = 12          # un maillage chargé occupe environ 12 fois la taille de son fichier (mesuré sur des STL)
+
+
+def _check_mesh_fits_in_memory(path, factor=MESH_MEMORY_FACTOR):
+    """Refuse de charger (ModelTooLargeError) un fichier de plus de 512 Mo dont le chargement dépasserait 80 % de la mémoire libre."""
+    try:
+        size = os.path.getsize(path)
+        if size < 512 * 1024 * 1024:
+            return
+        import psutil
+        avail = psutil.virtual_memory().available
+    except Exception:
+        return
+    if size * factor > avail * 0.8:
+        raise ModelTooLargeError(f"Fichier trop volumineux ({size / 1048576:.0f} Mo) : son chargement demanderait environ "
+                                 f"{size * factor / 1073741824:.0f} Go de mémoire, {avail / 1073741824:.1f} Go sont disponibles.")
+
+
+def load_model_mesh(source, ext=None, preview=False):
     """Chargeur unique pour les formats non 3MF : STL, OBJ, PLY, AMF, STEP/STP.
     `source` : chemin (str) ou octets ; `ext` obligatoire pour des octets. Peut renvoyer une Scene (OBJ)."""
     if ext is None and isinstance(source, str):
@@ -5555,6 +5899,15 @@ def load_model_mesh(source, ext=None):
                     pass
         return _step_to_trimesh(source)
     kind = ext.lstrip('.')
+    if not is_bytes and kind != 'stl':
+        _check_mesh_fits_in_memory(source)
+    if not is_bytes and _stl_is_huge(source):
+        mb = os.path.getsize(source) / (1024 * 1024)
+        if preview:                       # affichage seulement (miniature, viewer) : version simplifiée à mémoire bornée
+            app_logger.info(f"[RENDER] STL géant ({mb:.0f} Mo) : aperçu simplifié ({os.path.basename(source)})")
+            return stl_cluster_decimate(source)
+        raise ModelTooLargeError(f"Fichier trop volumineux ({mb:.0f} Mo, limite {_stl_huge_limit() // (1024 * 1024)} Mo) : "
+                                 "il ne peut pas être chargé en entier sans saturer la mémoire.")
     if is_bytes:
         return trimesh.load(io.BytesIO(bytes(source)), file_type=kind, force='mesh', process=(ext != '.obj'))
     return trimesh.load(source, force='mesh', process=(ext != '.obj'))
@@ -7093,14 +7446,6 @@ def create_fallback_thumbnail(thumb_path, resolution=(768, 768)):
         img = Image.new('RGBA', resolution, THUMB_BG_RGB + (255,))
         draw = ImageDraw.Draw(img)
         center = (resolution[0] // 2, resolution[1] // 2)
-        radius = min(resolution) // 3
-        for r in range(radius, 0, -2):
-            alpha = int(50 * (r / radius))
-            draw.ellipse([
-                center[0] - r, center[1] - r,
-                center[0] + r, center[1] + r
-            ], outline=(78, 161, 211, alpha), width=2)
-
         if os.path.exists(logo_path):
             try:
                 logo = Image.open(logo_path).convert('RGBA')
@@ -7110,9 +7455,9 @@ def create_fallback_thumbnail(thumb_path, resolution=(768, 768)):
                 img.paste(logo, logo_pos, logo)
             except Exception as e:
                 app_logger.info(f"    Erreur chargement logo: {e}")
-            _draw_fallback_cube(draw, center)
+                _draw_fallback_cube(draw, center)
         else:
-            _draw_fallback_cube(draw, center)
+            _draw_fallback_cube(draw, center)       # sans logo : seul repli, le cube (plus de losange bleu par-dessus le logo)
 
         draw.rectangle([0, 0, resolution[0]-1, resolution[1]-1],
                        outline=(60, 65, 75, 255), width=2)
@@ -7383,6 +7728,144 @@ def _wait_for_thumb_ghosts():
         app_logger.warning("[MEMOIRE] Rendus abandonnés toujours actifs après l'attente : la génération reprend quand même")
 
 
+# --- Garde-fou « plantage au démarrage » -------------------------------------------------------------------------
+# Un rendu qui tue le processus (mémoire saturée, plantage natif d'OpenGL) ne laisse aucune trace : l'application disparaît
+# au prochain démarrage, juste après « Préparation des miniatures 3D… ». Avant chaque rendu d'un gros fichier on note son
+# chemin dans thumb_inflight.json ; s'il y est encore au démarrage suivant, c'est que le processus est mort pendant ce
+# rendu : le fichier est mis de côté (miniature de remplacement) au lieu de replanter l'application en boucle.
+_THUMB_INFLIGHT_FILE = os.path.join(DATA_DIR, 'thumb_inflight.json')
+_THUMB_CRASHED_FILE = os.path.join(DATA_DIR, 'thumb_crashed.json')
+_thumb_crash_lock = threading.Lock()
+_thumb_crash_state = {'init': False, 'inflight': {}, 'crashed': {}}
+
+
+def _thumb_sig(path):
+    try:
+        st = os.stat(path)
+        return f"{st.st_size}:{st.st_mtime_ns}"
+    except OSError:
+        return ''
+
+
+def _thumb_json_load(path):
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def _thumb_json_save(path, data):
+    try:
+        tmp = path + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(data, f)
+        os.replace(tmp, path)
+    except Exception:
+        pass
+
+
+def _thumb_crash_init():
+    """À appeler sous _thumb_crash_lock. Les rendus encore « en cours » d'une exécution précédente sont ceux qui ont tué le processus."""
+    st = _thumb_crash_state
+    if st['init']:
+        return
+    st['init'] = True
+    st['crashed'] = _thumb_json_load(_THUMB_CRASHED_FILE)
+    left = _thumb_json_load(_THUMB_INFLIGHT_FILE)
+    if left:
+        for pth, sig in left.items():
+            st['crashed'][pth] = sig
+            try:
+                app_logger.warning(f"[THUMBS] ⚠️ L'application s'est arrêtée pendant le rendu de « {os.path.basename(pth)} » : "
+                                   f"ce fichier est mis de côté (miniature de remplacement).")
+            except Exception:
+                pass
+        _thumb_json_save(_THUMB_CRASHED_FILE, st['crashed'])
+        _thumb_json_save(_THUMB_INFLIGHT_FILE, {})
+
+
+def _thumb_crashed_before(path):
+    """True si ce fichier (même taille et même date) a déjà tué l'application pendant un rendu."""
+    key = path.replace('\\', '/')
+    with _thumb_crash_lock:
+        _thumb_crash_init()
+        sig = _thumb_crash_state['crashed'].get(key)
+    return bool(sig) and sig == _thumb_sig(path)
+
+
+def _thumb_inflight_mark(path, on):
+    key = path.replace('\\', '/')
+    with _thumb_crash_lock:
+        _thumb_crash_init()
+        inf = _thumb_crash_state['inflight']
+        if on:
+            inf[key] = _thumb_sig(path)
+        else:
+            inf.pop(key, None)
+        _thumb_json_save(_THUMB_INFLIGHT_FILE, inf)
+
+
+THUMB_ISOLATE = os.environ.get('STELLIO_THUMB_ISOLATE', '1').strip().lower() not in ('0', 'false', 'no')
+
+
+def _thumb_worker_cmd(src, out):
+    if getattr(sys, 'frozen', False):
+        return [sys.executable, '--stellio-thumb-worker', src, out]
+    return [sys.executable, os.path.abspath(__file__), '--stellio-thumb-worker', src, out]
+
+
+def _thumb_crash_record(path):
+    key = path.replace('\\', '/')
+    with _thumb_crash_lock:
+        _thumb_crash_init()
+        _thumb_crash_state['crashed'][key] = _thumb_sig(path)
+        _thumb_json_save(_THUMB_CRASHED_FILE, _thumb_crash_state['crashed'])
+
+
+def _render_thumb_isolated(path, thumb_path, timeout_s):
+    """Dessine la miniature dans un processus séparé qu'on peut vraiment arrêter. Renvoie True / False, ou None si le
+    processus n'a pas pu démarrer (l'appelant utilise alors le rendu intégré)."""
+    kw = {}
+    if os.name == 'nt':
+        kw['creationflags'] = 0x08000000      # CREATE_NO_WINDOW
+    try:
+        proc = subprocess.Popen(_thumb_worker_cmd(path, thumb_path), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL, **kw)
+    except Exception as e:
+        app_logger.warning(f"[THUMBS] Processus de rendu impossible à lancer ({type(e).__name__}: {e}) : rendu intégré")
+        return None
+    name = os.path.basename(path)
+    try:
+        code = proc.wait(timeout=timeout_s)
+    except subprocess.TimeoutExpired:
+        try:
+            proc.kill()
+            proc.wait(timeout=30)
+        except Exception:
+            pass
+        with _thumb_timed_out_lock:
+            _thumb_timed_out.add(path)
+        app_logger.warning(f"[TIMEOUT] Rendu miniature trop long (> {timeout_s:.0f}s), processus arrêté : {name}")
+        _sweep_thumb_tmp(min_age_s=60)
+        return False
+    if code == 0:
+        with _thumb_timed_out_lock:
+            _thumb_timed_out.discard(path)
+        return os.path.exists(thumb_path)
+    if code == 3:
+        return False
+    if code == 4:
+        app_logger.warning(f"[THUMBS] Le processus de rendu n'a pas démarré (code 4) : rendu intégré ({name})")
+        return None
+    _thumb_crash_record(path)
+    _sweep_thumb_tmp(min_age_s=60)
+    app_logger.warning(f"[THUMBS] ⚠️ Le rendu de « {name} » s'est arrêté brutalement (code {code & 0xFFFFFFFF:#x}) : "
+                       f"fichier mis de côté, l'application continue.")
+    return False
+
+
 def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(768, 768), timeout_s=None):
     if timeout_s is None:
         timeout_s = get_thumb_timeout(stl_path)
@@ -7397,20 +7880,39 @@ def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(768, 768), tim
     except OSError:
         heavy = False
     holds_heavy = False
+    if heavy and _thumb_crashed_before(stl_path):
+        app_logger.warning(f"[THUMBS] Rendu ignoré : ce fichier a déjà fait s'arrêter l'application ({os.path.basename(stl_path)})")
+        return False
     if heavy:
         holds_heavy = _thumb_heavy_sem.acquire(timeout=THUMB_HEAVY_WAIT_S)
         if not holds_heavy:
             app_logger.warning(f"[MEMOIRE] Jeton « gros fichier » toujours occupé après {THUMB_HEAVY_WAIT_S}s : "
                                f"rendu lancé quand même ({os.path.basename(stl_path)})")
+        if THUMB_ISOLATE:
+            try:
+                isolated = _render_thumb_isolated(stl_path, thumb_path, timeout_s)
+            finally:
+                if holds_heavy:
+                    try:
+                        _thumb_heavy_sem.release()
+                    except ValueError:
+                        pass
+                    holds_heavy = False
+            if isolated is not None:
+                return isolated
 
     result = {}
 
     def _run():
         try:
+            if heavy:
+                _thumb_inflight_mark(stl_path, True)
             result['value'] = _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution)
         except Exception as e:
             result['error'] = e
         finally:
+            if heavy:
+                _thumb_inflight_mark(stl_path, False)
             if holds_heavy:
                 try:
                     _thumb_heavy_sem.release()
@@ -7445,6 +7947,59 @@ def generate_thumbnail_pyrender(stl_path, thumb_path, resolution=(768, 768), tim
     return bool(result.get('value', False))
 
 
+def _thumb_tmp_path():
+    """Windows : dossier LOCAL (%LOCALAPPDATA%\\Stellio\\tmp_thumbs), jamais le dossier « Roaming » des données, que
+    OneDrive ou un profil d'entreprise peuvent synchroniser. Mode portable, macOS, Linux : dans le dossier de données."""
+    if os.name == 'nt' and not _portable_data_dir() and not os.environ.get('STELLIO_DATA_DIR'):
+        base = os.environ.get('LOCALAPPDATA')
+        if base:
+            return os.path.join(base, 'Stellio', 'tmp_thumbs')
+    return os.path.join(DATA_DIR, 'tmp_thumbs')
+
+
+def _thumb_tmp_dir():
+    """Dossier des copies temporaires faites pour dessiner une miniature (fichier SMB, entrée d'archive). Dans le dossier de
+    données et non dans /tmp : le disque concerné est celui de l'application, et on peut le nettoyer sans toucher aux fichiers des autres."""
+    d = _thumb_tmp_path()
+    try:
+        os.makedirs(d, exist_ok=True)
+    except OSError:
+        return None
+    return d
+
+
+def _sweep_thumb_tmp(min_age_s=600):
+    """Supprime les copies temporaires oubliées (rendu interrompu, processus tué). Renvoie le nombre d'octets libérés."""
+    freed = 0
+    d = _thumb_tmp_path()
+    try:
+        names = os.listdir(d)
+    except OSError:
+        return 0
+    now = time.time()
+    for n in names:
+        fp = os.path.join(d, n)
+        try:
+            st = os.stat(fp)
+            if os.path.isfile(fp) and now - st.st_mtime >= min_age_s:
+                os.unlink(fp)
+                freed += st.st_size
+        except OSError:
+            pass
+    if freed:
+        app_logger.info(f"[THUMBS] Copies temporaires oubliées supprimées : {freed / 1048576:.0f} Mo")
+    return freed
+
+
+def _thumb_tmp_space_ok(needed_bytes):
+    """Faux si la copie temporaire risque de remplir le disque (on garde 2 Go de marge) : on renonce à la miniature plutôt que de saturer la machine."""
+    try:
+        d = _thumb_tmp_dir() or DATA_DIR
+        return shutil.disk_usage(d).free > needed_bytes + 2 * 1024 ** 3
+    except Exception:
+        return True
+
+
 def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768)):
     global _pyrender_unavailable, _persistent_renderer, _persistent_renderer_size
     try:
@@ -7457,7 +8012,7 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
                 archive_path, internal_path = split_virtual_archive_path(stl_path)
                 try:
                     raw_bytes = read_archive_entry_bytes(archive_path, internal_path)
-                    tmp_fd, tmp_path = tempfile.mkstemp(suffix=os.path.splitext(internal_path)[1])
+                    tmp_fd, tmp_path = tempfile.mkstemp(suffix=os.path.splitext(internal_path)[1], dir=_thumb_tmp_dir())
                     with os.fdopen(tmp_fd, 'wb') as tmp_file:
                         tmp_file.write(raw_bytes)
                 except Exception as arch_err:
@@ -7469,13 +8024,21 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
                 if _smb_host_is_paused(stl_path):
                     app_logger.info(f"[SMB] Serveur en pause (injoignable), miniature différée : {os.path.basename(stl_path)}")
                     return False
+                try:
+                    _smb_size = smbclient.stat(smb_path).st_size
+                except Exception:
+                    _smb_size = 0
+                if _smb_size and not _thumb_tmp_space_ok(_smb_size):
+                    app_logger.warning(f"[THUMBS] Espace disque insuffisant pour copier {os.path.basename(stl_path)} "
+                                       f"({_smb_size / 1048576:.0f} Mo) : miniature différée")
+                    return False
                 max_retries = 3
                 copied = False
                 last_smb_err = None
                 with _smb_thumb_sem:
                     for attempt in range(max_retries):
                         try:
-                            tmp_fd, tmp_path = tempfile.mkstemp(suffix=os.path.splitext(stl_path)[1])
+                            tmp_fd, tmp_path = tempfile.mkstemp(suffix=os.path.splitext(stl_path)[1], dir=_thumb_tmp_dir())
                             os.close(tmp_fd)
                             with smbclient.open_file(smb_path, 'rb', share_access='r') as smb_file:
                                 with open(tmp_path, 'wb') as local_file:
@@ -7497,7 +8060,8 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
                             if attempt < max_retries - 1:
                                 time.sleep(1.5 * (attempt + 1))
                 if not copied:
-                    _smb_host_mark_down(stl_path, last_smb_err)
+                    if not (isinstance(last_smb_err, OSError) and getattr(last_smb_err, 'errno', None) == 28):   # disque local plein : le NAS n'y est pour rien
+                        _smb_host_mark_down(stl_path, last_smb_err)
                     app_logger.warning(f"[SMB] Lecture impossible pour miniature ({os.path.basename(stl_path)}): {last_smb_err}")
                     return False
                 file_to_load = tmp_path
@@ -7535,7 +8099,7 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
                     if mesh is None:
                         mesh = load_3mf_mesh(file_to_load, want_colors=True, max_faces=100000)
             else:
-                mesh = load_model_mesh(file_to_load, ext)
+                mesh = load_model_mesh(file_to_load, ext, preview=True)
 
             if _render_cancelled():   # abandonné pendant le chargement : on libère le maillage sans le dessiner
                 return False
@@ -7711,6 +8275,12 @@ def _generate_thumbnail_pyrender_impl(stl_path, thumb_path, resolution=(768, 768
             if tmp_path and os.path.exists(tmp_path):
                 os.unlink(tmp_path)
             return False
+        finally:
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)           # tous les chemins de sortie (dont le rendu CPU de secours) passent ici
+                except OSError:
+                    pass
 
     except Exception as e:
         app_logger.error(f"[ERROR] generate_thumbnail_pyrender {os.path.basename(stl_path)}: {e}")
@@ -8294,8 +8864,31 @@ def _take_integrity_hint(path):
     return None
 
 
+def _analyze_huge_stl(file_path):
+    """Analyse d'un STL binaire géant sans le charger : dimensions, volume, surface exacts (lecture par morceaux)."""
+    st = stl_stream_stats(file_path)
+    if st is None:
+        return None
+    lo, hi = st['bounds']
+    dim = hi - lo
+    volume_cm3 = st['volume_mm3'] / 1000
+    densities = {'pla': 1.24, 'petg': 1.27, 'abs': 1.04, 'tpu': 1.21, 'nylon': 1.14}
+    seconds = (st['volume_mm3'] / 10) * (1 + st['triangles'] / 100000) if st['volume_mm3'] > 0 else 0
+    h, m = int(seconds // 3600), int((seconds % 3600) // 60)
+    return {
+        'dimensions': {'x': round(float(dim[0]), 1), 'y': round(float(dim[1]), 1), 'z': round(float(dim[2]), 1)},
+        'volume_cm3': round(volume_cm3, 2), 'surface_cm2': round(st['area_mm2'] / 100, 2), 'triangle_count': st['triangles'],
+        'weights': {mat: round(volume_cm3 * d, 1) for mat, d in densities.items()},
+        'estimated_time': {'seconds': int(seconds), 'formatted': f"{h}h {m}min" if h > 0 else f"{m}min"},
+        'is_manifold': True, 'needs_repair': False, 'is_empty': False, 'integrity_checked': False,   # contrôle d'intégrité non fait (trop gros)
+        'estimate_source': 'geometric', 'streamed': True,
+    }
+
+
 def analyze_3d_file(file_path, fast=False):
     try:
+        if _stl_is_huge(file_path):
+            return _analyze_huge_stl(file_path)
         if file_path.lower().endswith('.3mf'):
             # même lecteur que le viewer : objets stockés dans des fichiers séparés (Bambu, Creality…), gros fichiers, plateaux
             mesh = load_3mf_mesh(file_path)
@@ -8357,15 +8950,84 @@ def analyze_3d_file(file_path, fast=False):
         app_logger.info(f"[WARN] Erreur analyse 3D {file_path}: {e}")
         return None
 
+_ANALYSIS_PENDING = {}
+_ANALYSIS_PENDING_LOCK = threading.Lock()
+_analysis_flush_timer = [None]
+_analysis_json_memo = [None, None]
+
+
+def _flush_analysis_pending():
+    """Écrit d'un coup, dans le fichier cache, les analyses en attente. Avant : chaque analyse relisait puis
+    réécrivait tout le fichier (≈ 20 Mo pour 50 000 modèles) — 250 analyses prenaient trois minutes."""
+    with _ANALYSIS_PENDING_LOCK:
+        pending = dict(_ANALYSIS_PENDING)
+        _ANALYSIS_PENDING.clear()
+        _analysis_flush_timer[0] = None
+    if not pending:
+        return
+    try:
+        with cache_file_lock:
+            cache_data = {}
+            if os.path.exists(CACHE_FILE):
+                with open(CACHE_FILE, 'r', encoding='utf-8') as f:
+                    cache_data = json.load(f)
+            cache_data.update(pending)
+            tmp_path = CACHE_FILE + '.tmp'
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(cache_data, f, ensure_ascii=False)
+            _atomic_replace(tmp_path, CACHE_FILE)
+    except Exception:
+        pass
+
+
+def _queue_analysis_for_cache(cache_key, ts_key, metadata):
+    with _ANALYSIS_PENDING_LOCK:
+        _ANALYSIS_PENDING[cache_key] = metadata if metadata else "FAILED"
+        _ANALYSIS_PENDING[ts_key] = time.time()
+        n = len(_ANALYSIS_PENDING)
+        if _analysis_flush_timer[0] is None and n < 200:
+            t = threading.Timer(5.0, _flush_analysis_pending)
+            t.daemon = True
+            _analysis_flush_timer[0] = t
+            t.start()
+            return
+    if n >= 200:
+        _flush_analysis_pending()
+
+
+try:
+    atexit.register(_flush_analysis_pending)
+except Exception:
+    pass
+
+
 def get_cached_3d_analysis(file_path):
     normalized_path = file_path.replace('\\', '/')
     cache_key = f"analysis_{hashlib.md5(normalized_path.encode()).hexdigest()}"
     ts_key = f"{cache_key}_ts"
 
+    with _ANALYSIS_PENDING_LOCK:
+        if cache_key in _ANALYSIS_PENDING:
+            v = _ANALYSIS_PENDING[cache_key]
+            return None if v == "FAILED" else v
+
+    # 1) base de données : une ligne, sans relire les 20 Mo du fichier cache
+    try:
+        meta, failed = analysis_db_get(file_path)
+        if meta is not None and meta.get('dimensions') and 'volume_cm3' in meta:
+            return meta
+    except Exception:
+        pass
+
     if os.path.exists(CACHE_FILE):
         try:
-            with open(CACHE_FILE, 'r', encoding='utf-8') as f:
-                cache = json.load(f)
+            st = os.stat(CACHE_FILE)
+            sig = (st.st_mtime, st.st_size)
+            if _analysis_json_memo[0] != sig:                 # relu seulement si le fichier a changé
+                with open(CACHE_FILE, 'r', encoding='utf-8') as f:
+                    _analysis_json_memo[1] = json.load(f)
+                _analysis_json_memo[0] = sig
+            cache = _analysis_json_memo[1] or {}
             if cache_key in cache and ts_key in cache:
                 age = time.time() - cache[ts_key]
                 if cache[cache_key] == "FAILED":
@@ -8377,22 +9039,12 @@ def get_cached_3d_analysis(file_path):
             pass
 
     metadata = analyze_3d_file(file_path)
-
-    try:
-        with cache_file_lock:
-            cache_data = {}
-            if os.path.exists(CACHE_FILE):
-                with open(CACHE_FILE, 'r', encoding='utf-8') as f:
-                    cache_data = json.load(f)
-            cache_data[cache_key] = metadata if metadata else "FAILED"
-            cache_data[ts_key] = time.time()
-            tmp_path = CACHE_FILE + '.tmp'
-            with open(tmp_path, 'w', encoding='utf-8') as f:
-                json.dump(cache_data, f, indent=2, ensure_ascii=False)
-            _atomic_replace(tmp_path, CACHE_FILE)
-    except Exception:
-        pass
-
+    if metadata:
+        try:
+            analysis_db_put(file_path, metadata)
+        except Exception:
+            pass
+    _queue_analysis_for_cache(cache_key, ts_key, metadata)
     return metadata
 
 
@@ -8504,14 +9156,28 @@ def ui_script():
 def ui_v113_script():
     return send_file(_ui_file('v113.js'), mimetype='application/javascript')
 
-@app.route('/bigprint.js')
-def ui_bigprint_script():
-    return send_file(_ui_file('bigprint.js'), mimetype='application/javascript')
 
 
 @app.route('/planning.js')
 def ui_planning_script():
     return send_file(_ui_file('planning.js'), mimetype='application/javascript')
+
+
+
+
+@app.route('/suite.js')
+def suite_js():
+    return send_file(_ui_file('suite.js'), mimetype='application/javascript')
+
+
+@app.route('/assistant.js')
+def ui_assistant_script():
+    return send_file(_ui_file('assistant.js'), mimetype='application/javascript')
+
+
+@app.route('/api_tokens.js')
+def ui_api_tokens_script():
+    return send_file(_ui_file('api_tokens.js'), mimetype='application/javascript')
 
 
 @app.route('/loginlog.js')
@@ -10284,7 +10950,7 @@ def api_file_mesh():
     ext = os.path.splitext(file_path)[1].lower()
 
     _viewer_cache_path = None
-    if ext == '.3mf':
+    if ext == '.3mf' or (ext == '.stl' and _stl_is_huge(file_path)):
         _viewer_cache_path = _viewer_cache_file(file_path, plate_index)
         if _viewer_cache_path and os.path.isfile(_viewer_cache_path):
             try:
@@ -10295,6 +10961,18 @@ def api_file_mesh():
                              download_name=os.path.splitext(os.path.basename(file_path))[0] + '.stl')
 
     try:
+        if ext == '.stl' and _stl_is_huge(file_path):
+            # STL géant : envoyer le fichier entier (plusieurs Go) ferait planter le navigateur → version simplifiée
+            _small = stl_cluster_decimate(file_path)
+            _buf = io.BytesIO()
+            _small.export(_buf, file_type='stl')
+            if _viewer_cache_path:
+                _viewer_cache_store(_viewer_cache_path, _buf.getvalue())
+            _buf.seek(0)
+            _resp = send_file(_buf, mimetype='application/octet-stream', download_name=os.path.splitext(os.path.basename(file_path))[0] + '.stl')
+            _resp.headers['X-Stellio-Decimated-From'] = str(_small.metadata.get('stellio_decimated_from', ''))
+            return _resp
+
         if ext == '.stl':
             return send_file(file_path, mimetype='application/octet-stream')
 
@@ -12024,14 +12702,7 @@ def _do_background_scan(sources_list, user_id, blocking=False):
             conn2 = get_db()
             file_paths = [f['path'] for f in all_files]
             if file_paths:
-                placeholders = ','.join('?' * len(file_paths))
-                tag_results = conn2.execute(
-                    f"SELECT ft.file_path, t.name, t.color FROM file_tags ft JOIN tags t ON ft.tag_id = t.id WHERE ft.file_path IN ({placeholders})",
-                    file_paths
-                ).fetchall()
-                tags_by_file = {}
-                for row in tag_results:
-                    tags_by_file.setdefault(row['file_path'], []).append({'name': row['name'], 'color': row['color']})
+                tags_by_file = _tags_for_paths(conn2, file_paths)
                 for f in all_files:
                     f['tags'] = tags_by_file.get(f['path'], [])
             conn2.close()
@@ -12071,15 +12742,8 @@ def _do_background_scan(sources_list, user_id, blocking=False):
                 _auto_tag_new_files(newly_seen_files, sources_list, user_id)
                 conn3 = get_db()
                 new_paths = [f['path'] for f in newly_seen_files]
-                placeholders = ','.join('?' * len(new_paths))
-                tag_results = conn3.execute(
-                    f"SELECT ft.file_path, t.name, t.color FROM file_tags ft JOIN tags t ON ft.tag_id = t.id WHERE ft.file_path IN ({placeholders})",
-                    new_paths
-                ).fetchall()
+                tags_by_new_path = _tags_for_paths(conn3, new_paths)
                 conn3.close()
-                tags_by_new_path = {}
-                for row in tag_results:
-                    tags_by_new_path.setdefault(row['file_path'], []).append({'name': row['name'], 'color': row['color']})
                 for f in newly_seen_files:
                     f['tags'] = tags_by_new_path.get(f['path'], f.get('tags', []))
             except Exception as e:
@@ -12221,14 +12885,7 @@ def api_get_files():
             file_paths = [f['path'] for f in cached_files]
             if file_paths:
                 try:
-                    placeholders = ','.join('?' * len(file_paths))
-                    tag_results = conn.execute(
-                        f"SELECT ft.file_path, t.name, t.color FROM file_tags ft JOIN tags t ON ft.tag_id = t.id WHERE ft.file_path IN ({placeholders})",
-                        file_paths
-                    ).fetchall()
-                    tags_by_file = {}
-                    for row in tag_results:
-                        tags_by_file.setdefault(row['file_path'], []).append({'name': row['name'], 'color': row['color']})
+                    tags_by_file = _tags_for_paths(conn, file_paths)
                     for f in cached_files:
                         f['tags'] = tags_by_file.get(f['path'], [])
                 except Exception as e:
@@ -12477,25 +13134,6 @@ def require_peer_key(f):
 
 
 # ── instances Stellio distantes (liste, envoi de fichiers, découverte du réseau local) : module séparé `modules/remote_instances.py` (services fournis par `remote_instances.init(globals())`) ──
-from modules import remote_instances
-from modules.remote_instances import (
-    _LAN_SCAN_CACHE,
-    _LAN_SCAN_CACHE_SECONDS,
-    _is_lan_request,
-    _lan_scan_lock,
-    _scan_lan_for_stellio,
-    _scan_lan_for_stellio_uncached,
-    api_peer_folders,
-    api_peer_identify,
-    api_remote_instances_add,
-    api_remote_instances_delete,
-    api_remote_instances_discover,
-    api_remote_instances_folders,
-    api_remote_instances_list,
-    api_remote_instances_ping,
-    api_remote_instances_send,
-    api_remote_instances_status,
-)
 
 
 
@@ -12583,7 +13221,26 @@ def api_peer_receive_file():
         return jsonify({"error": "Échec de la récupération du fichier"}), 502
 
 
+_bulk_src = threading.local()
+
+
+class _bulk_source_scope:
+    """Pendant un parcours de toute la bibliothèque (50 000 modèles), la liste des sources est lue une seule
+    fois au lieu d'une requête SQL par fichier — l'assistant mettait ~27 s à répondre."""
+    def __enter__(self):
+        self._prev = getattr(_bulk_src, 'cache', None)
+        _bulk_src.cache = {}
+        return self
+
+    def __exit__(self, *a):
+        _bulk_src.cache = self._prev
+        return False
+
+
 def _get_all_source_paths(user_id):
+    _memo = getattr(_bulk_src, 'cache', None)
+    if _memo is not None and user_id in _memo:
+        return _memo[user_id]
     try:
         conn = get_db()
         try:
@@ -12595,6 +13252,8 @@ def _get_all_source_paths(user_id):
 
         folders = [r['path'] for r in rows if r['type'] in ('folder', 'smb', 'nfs')]
         files = [r['path'] for r in rows if r['type'] == 'file']
+        if _memo is not None:
+            _memo[user_id] = (folders, files)
         return folders, files
     except Exception:
         return [], []
@@ -13338,12 +13997,15 @@ def api_get_print_history():
                 _monday = (_d - datetime.timedelta(days=_d.weekday())).strftime('%Y-%m-%d')
                 weeks_map[_monday] = weeks_map.get(_monday, 0) + _dr[1]
             weeks = [{"start": k, "count": v} for k, v in sorted(weeks_map.items(), reverse=True)]
+            print_traceability._ensure_tables(conn)   # v1.1.7 : version du modèle affichée dans chaque ligne d'historique
             rows = conn.execute(
                 f"""SELECT id, file_path, file_name, file_size, file_ext, slicer, sent_at, source_platform,
                           result, failure_reason, rating_notes, slicer_profile_id, slicer_profile_name, rated_at,
                           material_cost, elec_cost, total_cost, energy_wh, energy_measured,
                           printer_id, estimated_seconds, actual_seconds, spool_weight_used_g, filament_material, filament_label,
-                          (SELECT p.name FROM printers p WHERE p.id = print_history.printer_id) AS printer_name
+                          (SELECT p.name FROM printers p WHERE p.id = print_history.printer_id) AS printer_name,
+                          (SELECT t.model_path FROM print_trace t WHERE t.history_id = print_history.id) AS trace_model,
+                          (SELECT t.model_version FROM print_trace t WHERE t.history_id = print_history.id) AS trace_version
                    FROM print_history WHERE {where_sql}
                    ORDER BY sent_at DESC LIMIT ? OFFSET ?""",
                 (*params, limit, offset)
@@ -14398,7 +15060,7 @@ _SLICER_CANDIDATES = {
         'mac': ['Slic3r.app'],
         'linux': ['slic3r'],
     },
-    # --- Slicers résine (bêta) : chemins d'installation courants, non vérifiés sur toutes les versions ; à défaut, choisir le logiciel à la main
+    # --- Slicers résine : chemins d'installation courants, non vérifiés sur toutes les versions ; à défaut, choisir le logiciel à la main
     'chitubox': {
         'name': 'CHITUBOX',
         'win': (["CHITUBOX*/CHITUBOX*.exe", "CHITUBOX/CHITUBOX*.exe", "CBD Tech/CHITUBOX*/CHITUBOX*.exe", "CHITUBOX Basic*/CHITUBOX*.exe"],
@@ -14983,6 +15645,20 @@ def _slice_estimate_key(file_path, profile_id=None, printer_id=None, material_ty
     return f"{file_path}||{profile_id}|{printer_id or ''}|{(material_type or '').strip().lower()}" + (f"|s{scale}" if scale != 100 else '')
 
 
+def _attached_gcode_estimate(file_path, profile_id, scale):
+    """Résultat « done » tiré du G-code joint au fichier (tranchage réel), ou None. Seulement à l'échelle 100 % et sans profil imposé :
+    un autre profil ou une autre taille demandent une vraie estimation."""
+    if profile_id or _clean_scale_pct(scale) != 100:
+        return None
+    try:
+        est = gcode_archive.gcode_estimate_for(file_path, session['user_id'])
+    except Exception:
+        return None
+    if not est:
+        return None
+    return {'status': 'done', 'data': {'weight_g': est['weight_g'], 'time_seconds': est['time_seconds'],
+            'slicer_name': 'G-code · ' + est['name'], 'source': 'gcode'}}
+
 @app.route('/api/slicer/pre-slice-estimate', methods=['POST'])
 @login_required
 def api_request_slice_estimate():
@@ -14994,6 +15670,9 @@ def api_request_slice_estimate():
     printer_id = data.get('printer_id') or None
     material_type = (data.get('material_type') or '').strip() or None
     scale_pct = _clean_scale_pct(data.get('scale'))
+    attached = _attached_gcode_estimate(file_path, profile_id, scale_pct)
+    if attached:
+        return jsonify(attached), 200
     key = _slice_estimate_key(file_path, profile_id, printer_id, material_type, scale_pct)
     _sync_slicer_profiles(session['user_id'])   
 
@@ -15031,6 +15710,9 @@ def api_get_slice_estimate():
     file_path = (request.args.get('path') or '').strip()
     if not file_path:
         return jsonify({"error": "Chemin requis"}), 400
+    attached = _attached_gcode_estimate(file_path, (request.args.get('profile_id') or '').strip() or None, request.args.get('scale'))
+    if attached:
+        return jsonify(attached), 200
     key = _slice_estimate_key(file_path, request.args.get('profile_id'), request.args.get('printer_id'),
                               request.args.get('material_type'), request.args.get('scale'))
     with slice_estimate_lock:
@@ -15201,7 +15883,7 @@ def _resolve_slicer_profile_paths(slicer_family, printer_id, material_type=None,
     return settings_paths, filament_paths, matched_ids
 
 
-# Slicers dédiés à la résine (bêta) ; Lychee lit aussi les formats résine. Utilisés pour les imprimantes résine sans slicer choisi.
+# Slicers dédiés à la résine ; Lychee lit aussi les formats résine. Utilisés pour les imprimantes résine sans slicer choisi.
 RESIN_SLICER_IDS = ('chitubox', 'chituboxpro', 'photonworkshop', 'preform', 'voxeldance', 'lycheeslicer')
 RESIN_PRINTER_TYPES = ('formlabs', 'anycubic_photon', 'chitu_sdcp')
 
@@ -18004,17 +18686,54 @@ def _server_t(key, default):
     return data.get(key) or default
 
 
-# ── notifications push (ntfy, Telegram, Discord, webhook) : module séparé `modules/push_notify.py` (services fournis par `push_notify.init(globals())`) ──
-from modules import push_notify
-from modules.push_notify import (
-    _push_deliver,
-    _push_http_post,
-    _push_notify_async,
-    _push_watch_once,
-    _push_watch_state,
-    _push_watcher_loop,
-    api_push_test,
-)
+# ── v1.1.7 : webhooks sortants (modules/webhooks.py) — passerelles tolérantes appelées par les autres modules ──
+def _webhook_emit(event, data=None, user_id=None):
+    """Met un évènement en file pour les webhooks abonnés (plugin intégré « Webhooks », s'il est activé) et pour les plugins ; ne lève jamais
+    (un webhook en panne ne doit pas gêner une impression)."""
+    n = 0
+    try:
+        _wh = _hosted('webhooks')
+        if _wh:
+            n += _wh.emit(event, data, user_id)
+    except Exception as e:
+        try:
+            app_logger.debug(f"[WEBHOOKS] émission ignorée : {e}")
+        except Exception:
+            pass
+    try:
+        from modules import plugins as _pl       # 1.1.7 : les plugins reçoivent les mêmes évènements
+        n += _pl.dispatch(event, data, user_id)
+    except Exception:
+        pass
+    return n
+
+
+def _webhook_active():
+    try:
+        _wh = _hosted('webhooks')
+        if _wh and _wh.has_active():
+            return True
+        from modules import plugins as _pl
+        return _pl.has_active()
+    except Exception:
+        return False
+
+
+# ── notifications push (ntfy, Telegram, Discord, webhook) : plugin intégré « push-notify » (bundled_plugins/), appelé par la passerelle ci-dessous ──
+def _push_notify_async(notif_type, title, message):
+    """Passerelle vers le plugin intégré « Notifications push » : sans effet s'il n'est pas activé (jamais d'erreur pour l'appelant)."""
+    _pn = _hosted('push_notify')
+    if _pn:
+        _pn._push_notify_async(notif_type, title, message)
+
+
+def _push_wanted():
+    """Vrai si une notification push peut partir (plugin actif + réglage activé + édition serveur) : la surveillance des imprimantes reste sinon en veille."""
+    _pn = _hosted('push_notify')
+    return bool(_pn and (load_settings() or {}).get('push_enabled') and _pn._server_ok())
+
+
+from modules import print_events   # surveillance des imprimantes (évènements print.finished / print.failed / hors ligne) : reste dans le cœur
 
 
 
@@ -18117,6 +18836,98 @@ def api_mark_notification_read(notif_id):
     except Exception as e:
         app_logger.error(f"[API] Erreur api_mark_notification_read: {e}")
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+
+_NOTIF_CATEGORIES = ('filament_low', 'restock', 'parts', 'print', 'maintenance', 'planning', 'update', 'other')
+
+
+def _notif_category(ntype, dedup_key):
+    """Rubrique d'une notification, d'après sa clé de dédoublonnage (la plus fiable) puis son type."""
+    k = (dedup_key or '').lower()
+    if k.startswith('restock'):
+        return 'restock'
+    if k.startswith(('part_low', 'parts_low')):
+        return 'parts'
+    if k.startswith(('low_stock', 'spool')):
+        return 'filament_low'
+    if ntype in ('print_finished', 'print_failed') or k.startswith(('print_', 'obico')):
+        return 'print'
+    if ntype == 'maintenance' or k.startswith(('maintenance', 'drying')):
+        return 'maintenance'
+    if k.startswith(('plan', 'late')):
+        return 'planning'
+    if ntype == 'update' or k.startswith(('model', 'update')):
+        return 'update'
+    if ntype == 'low_stock':
+        return 'filament_low'
+    return 'other'
+
+
+def _notif_source(ntype, dedup_key):
+    """Origine d'une notification (affichée en pastille) : service externe (Spoolman, TigerTag, Obico…), extension Stellio Pro, ou Stellio.
+    '@license' et '@digest' sont traduits par l'interface."""
+    k = (dedup_key or '')
+    low = k.lower()
+    for tag, label in (('_spoolman_', 'Spoolman'), ('_tigertag_', 'TigerTag')):     # low_stock_<source>_<id>, drying_due_<source>_<id>
+        if tag in low:
+            return label
+    if low.startswith('obico'):
+        return 'Obico'
+    if low.startswith(('quote_portal', 'parts_low', 'tariff', 'plan', 'late')):
+        return 'Stellio Pro'
+    if low.startswith('lic:'):
+        return '@license'
+    if low.startswith('digest:'):
+        return '@digest'
+    if low.startswith('model_update_'):
+        parts = k.split('_')
+        return parts[2].title() if len(parts) > 3 and parts[2] else 'Stellio'
+    return 'Stellio'
+
+
+@app.route('/api/notifications/all', methods=['GET'])
+@login_required
+def api_notifications_all():
+    """Page « Toutes les notifications » : filtres par rubrique et lecture, recherche, pagination, compteurs par rubrique."""
+    try:
+        limit = max(1, min(int(request.args.get('limit', 25)), 100))
+        offset = max(0, int(request.args.get('offset', 0)))
+    except ValueError:
+        limit, offset = 25, 0
+    category = (request.args.get('category') or '').strip()
+    state = (request.args.get('state') or 'all').strip()
+    q = (request.args.get('q') or '').strip().lower()
+    source = (request.args.get('source') or '').strip()
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT id, type, title, message, link_page, dedup_key, is_read, created_at FROM notifications "
+                            "WHERE user_id = ? ORDER BY created_at DESC, id DESC", (session['user_id'],)).fetchall()
+    finally:
+        conn.close()
+    items = []
+    for r in rows:
+        d = dict(r); d['category'] = _notif_category(d['type'], d.get('dedup_key')); d['source'] = _notif_source(d['type'], d.get('dedup_key')); d.pop('dedup_key', None); items.append(d)
+    counts = {c: 0 for c in _NOTIF_CATEGORIES}
+    sources = {}
+    for d in items:
+        counts[d['category']] += 1
+        sources[d['source']] = sources.get(d['source'], 0) + 1
+    unread = sum(1 for d in items if not d['is_read'])
+    sel = [d for d in items if (not category or d['category'] == category) and (state != 'unread' or not d['is_read'])
+           and (state != 'read' or d['is_read']) and (not source or d['source'] == source) and (not q or q in (d['title'] or '').lower() or q in (d['message'] or '').lower())]
+    return jsonify({"notifications": sel[offset:offset + limit], "total": len(sel), "all": len(items), "unread": unread, "counts": counts, "sources": sources}), 200
+
+
+@app.route('/api/notifications/clear-read', methods=['POST'])
+@login_required
+def api_notifications_clear_read():
+    conn = get_db()
+    try:
+        cur = conn.execute("DELETE FROM notifications WHERE user_id = ? AND is_read = 1", (session['user_id'],))
+        conn.commit(); n = cur.rowcount
+    finally:
+        conn.close()
+    return jsonify({"deleted": n}), 200
 
 
 @app.route('/api/notifications/read-all', methods=['POST'])
@@ -18815,22 +19626,33 @@ from modules.account_platforms import (
     api_account_models_sync,
 )
 
-# ── Réparation de maillage et convertisseur de formats 3D : module séparé `modules/file_convert.py` (services fournis par `file_convert.init(globals())`) ──
-from modules import file_convert
-from modules.file_convert import (
-    CONVERT_SOURCE_FORMATS,
-    CONVERT_SUPPORTED_FORMATS,
-    CONVERT_TARGET_FORMATS,
-    CONVERT_UNIT_TO_MM,
-    _convert_single_file,
-    _load_mesh_for_conversion,
-    _repair_mesh_inplace,
-    api_convert_file,
-    api_convert_file_batch,
-    api_convert_file_batch_cancel,
-    api_convert_file_batch_status,
-    api_repair_file,
-)
+# ── Lecture d'un maillage pour conversion / contrôle d'intégrité : service du cœur (le plugin « outils de fichiers » et le contrôle d'intégrité s'en servent) ──
+CONVERT_SUPPORTED_FORMATS = ('stl', '3mf', 'obj')   # formats relus par le contrôle d'intégrité (rapides à charger)
+
+CONVERT_SOURCE_FORMATS = ('stl', '3mf', 'obj', 'ply', 'amf', 'step', 'stp')
+
+def _load_mesh_for_conversion(file_path):
+    ext = os.path.splitext(file_path)[1].lower().lstrip('.')
+    if ext == '3mf':
+        mesh = load_3mf_mesh(file_path)
+    elif f'.{ext}' in SUPPORTED_EXTENSIONS:
+        mesh = load_model_mesh(file_path, f'.{ext}')
+    else:
+        raise ValueError(f"Format d'entrée non supporté: .{ext}")
+
+    if mesh is None:
+        raise ValueError("Impossible de lire le maillage")
+
+    if isinstance(mesh, trimesh.Scene):
+        geoms = [m for m in mesh.geometry.values() if hasattr(m, 'vertices') and len(m.vertices) > 0]
+        if not geoms:
+            raise ValueError("Maillage vide")
+        mesh = trimesh.util.concatenate(geoms)
+
+    if mesh.is_empty or len(mesh.vertices) == 0:
+        raise ValueError("Maillage vide")
+
+    return mesh
 
 # ── Vérification d'intégrité des fichiers (état, progression, annulation) : module séparé `modules/integrity_check.py` (services fournis par `integrity_check.init(globals())`) ──
 from modules import integrity_check
@@ -19232,6 +20054,9 @@ def _log_tail_counts(max_bytes=400_000):
     return out
 
 
+_APP_STARTED = time.time()      # instant de démarrage de Stellio (durée de fonctionnement du diagnostic ; le plugin MQTT le republie)
+
+
 def _collect_health_info():
     """Instantané de l'état de Stellio (mémoire, miniatures, tâches, disque), sans secret ni chemin personnel."""
     info = {'version': CURRENT_VERSION, 'uptime_s': int(time.time() - _APP_STARTED)}
@@ -19354,1289 +20179,8 @@ def api_export_logs_native():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-def _quote_logo_image(data_url):
-    try:
-        if not isinstance(data_url, str) or not data_url.startswith('data:image/') or ',' not in data_url:
-            return None
-        raw = base64.b64decode(data_url.split(',', 1)[1])
-        if not raw or len(raw) > 1_500_000:
-            return None
-        from PIL import Image
-        img = Image.open(io.BytesIO(raw))
-        img.load()
-        img = img.convert('RGBA')
-        out = io.BytesIO()
-        img.save(out, format='PNG')
-        out.seek(0)
-        return out, img.width, img.height
-    except Exception as e:
-        app_logger.warning(f"[QUOTE] Logo ignoré (illisible) : {e}")
-        return None
+# ── devis : module séparé `modules/pro_quotes.py` (services fournis par `pro_quotes.init(globals())`) ──
 
-
-QUOTE_LOGO_FILE = os.path.join(DATA_DIR, "quote_logo.png")
-
-
-def _save_quote_logo_png(png_buf):
-    tmp = QUOTE_LOGO_FILE + '.tmp'
-    with open(tmp, 'wb') as f:
-        f.write(png_buf.getvalue())
-    os.replace(tmp, QUOTE_LOGO_FILE)
-
-
-def _migrate_legacy_quote_logo():
-    try:
-        settings = load_settings() or {}
-        prev = settings.get('_previous_settings')
-        has_main = 'quote_logo' in settings
-        has_prev = isinstance(prev, dict) and 'quote_logo' in prev
-        if not (has_main or has_prev):
-            return
-        legacy = settings.get('quote_logo') or (prev.get('quote_logo') if has_prev else None)
-        if legacy and not os.path.isfile(QUOTE_LOGO_FILE):
-            img = _quote_logo_image(legacy)
-            if img:
-                _save_quote_logo_png(img[0])
-        settings.pop('quote_logo', None)
-        if has_prev:
-            prev.pop('quote_logo', None)
-        save_settings(settings)
-    except Exception as e:
-        app_logger.warning(f"[QUOTE] Migration du logo impossible : {e}")
-
-
-def _load_quote_logo():
-    _migrate_legacy_quote_logo()
-    try:
-        if os.path.isfile(QUOTE_LOGO_FILE):
-            from PIL import Image
-            with open(QUOTE_LOGO_FILE, 'rb') as f:
-                raw = f.read()
-            img = Image.open(io.BytesIO(raw))
-            img.load()
-            return io.BytesIO(raw), img.width, img.height
-    except Exception as e:
-        app_logger.warning(f"[QUOTE] Logo illisible : {e}")
-    return None
-
-
-@app.route('/api/quote/logo', methods=['GET'])
-@login_required
-def api_quote_logo_get():
-    _migrate_legacy_quote_logo()
-    if not os.path.isfile(QUOTE_LOGO_FILE):
-        return jsonify({"error": "Aucun logo"}), 404
-    resp = send_file(QUOTE_LOGO_FILE, mimetype='image/png', conditional=False)
-    resp.headers['Cache-Control'] = 'no-store'
-    return resp
-
-
-@app.route('/api/quote/logo', methods=['POST'])
-@login_required
-def api_quote_logo_set():
-    data = request.get_json(silent=True) or {}
-    img = _quote_logo_image(data.get('data_url'))
-    if not img:
-        return jsonify({"error": "Logo invalide ou trop volumineux"}), 400
-    try:
-        _save_quote_logo_png(img[0])
-    except Exception as e:
-        app_logger.error(f"[QUOTE] Écriture du logo impossible : {e}")
-        return jsonify({"error": "Impossible d'enregistrer le logo"}), 500
-    return jsonify({"success": True}), 200
-
-
-@app.route('/api/quote/logo', methods=['DELETE'])
-@login_required
-def api_quote_logo_delete():
-    try:
-        if os.path.isfile(QUOTE_LOGO_FILE):
-            os.remove(QUOTE_LOGO_FILE)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    _migrate_legacy_quote_logo()  
-    return jsonify({"success": True}), 200
-
-
-def _quote_pdf_encryption(allow_annotate=False):
-    try:
-        from reportlab.lib.pdfencrypt import StandardEncryption
-        from reportlab.pdfgen import canvas as _rl_canvas
-    except Exception as e:
-        app_logger.warning(f"[QUOTE] Chiffrement PDF indisponible : {e}")
-        return None
-
-    class _LockedEncryption(StandardEncryption):
-        def permissionBits(self):
-            return super().permissionBits() & ~(1024 | (0 if allow_annotate else 256))
-
-    def make(strength):
-        return _LockedEncryption('', ownerPassword=secrets.token_hex(16), canPrint=1, canModify=0,
-                                 canCopy=0, canAnnotate=1 if allow_annotate else 0, strength=strength)
-
-    strengths = (256, 128) if importlib.util.find_spec('pyaes') else (128,)
-    for strength in strengths:
-        try:
-            probe = _rl_canvas.Canvas(io.BytesIO(), encrypt=make(strength))
-            probe.drawString(10, 10, 'x')
-            probe.save()
-            return make(strength)
-        except Exception as e:
-            app_logger.warning(f"[QUOTE] Chiffrement PDF {strength} bits indisponible : {e}")
-    return None
-
-
-def build_quote_pdf_bytes(data, encrypt=True):
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import ParagraphStyle
-    from reportlab.lib.units import mm
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
-    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Paragraph, Spacer, Table, TableStyle, Image as RLImage
-    from xml.sax.saxutils import escape
-
-    def s(key, limit=200):
-        return str(data.get(key) or '')[:limit]
-
-    def p_text(value, limit=200):
-        return escape(str(value or '')[:limit]).replace('\n', '<br/>')
-
-    try:
-        settings = load_settings() or {}
-    except Exception:
-        settings = {}
-
-    def cfg(key, limit):
-        return str(settings.get(key) or '')[:limit].strip()
-
-    company = cfg('quote_company', 120) or cfg('print_cost_quote_company', 120)
-    address = cfg('quote_address', 300)
-    phone = cfg('quote_phone', 40)
-    email = cfg('quote_email', 120)
-    website = cfg('quote_website', 120)
-    tax_id = cfg('quote_tax_id', 80)
-    legal = cfg('quote_legal', 1500)
-    logo = _load_quote_logo()
-
-    lang = s('lang', 8).lower()
-    if lang.startswith('ja'):
-        font = bold = 'HeiseiKakuGo-W5'
-    elif lang.startswith('zh'):
-        font = bold = 'STSong-Light'
-    else:
-        font, bold = 'Helvetica', 'Helvetica-Bold'
-    if font != 'Helvetica':
-        try:
-            pdfmetrics.registerFont(UnicodeCIDFont(font))
-        except Exception:
-            font, bold = 'Helvetica', 'Helvetica-Bold'
-
-    ink = colors.HexColor('#1a1d2e')
-    grey = colors.HexColor('#666666')
-    line = colors.HexColor('#dddddd')
-
-    st_title = ParagraphStyle('t', fontName=bold, fontSize=24, leading=28, textColor=ink, alignment=2, spaceAfter=2)
-    st_meta = ParagraphStyle('m', fontName=font, fontSize=10, leading=14, textColor=grey, alignment=2)
-    st_company = ParagraphStyle('c', fontName=bold, fontSize=13, leading=17, textColor=ink, spaceBefore=4)
-    st_issuer = ParagraphStyle('i', fontName=font, fontSize=9, leading=13, textColor=colors.HexColor('#444444'))
-    st_label = ParagraphStyle('l', fontName=font, fontSize=8, leading=11, textColor=grey)
-    st_body = ParagraphStyle('b', fontName=font, fontSize=10, leading=14, textColor=ink)
-    st_sub = ParagraphStyle('s', fontName=font, fontSize=8.5, leading=12, textColor=grey)
-    st_th = ParagraphStyle('th', fontName=bold, fontSize=8.5, leading=11, textColor=ink)
-    st_th_r = ParagraphStyle('thr', parent=st_th, alignment=2)
-    st_num = ParagraphStyle('n', parent=st_body, alignment=2)
-    st_total = ParagraphStyle('tot', fontName=bold, fontSize=14, leading=18, textColor=ink, alignment=2, spaceBefore=6)
-    st_notes = ParagraphStyle('nt', fontName=font, fontSize=9, leading=13, textColor=colors.HexColor('#444444'))
-    st_legal = ParagraphStyle('lg', fontName=font, fontSize=7.5, leading=10, textColor=grey)
-
-    width = A4[0] - 40 * mm
-
-    legal_para = Paragraph(p_text(legal, 1500), st_legal) if legal else None
-    bottom_margin = 20 * mm
-    if legal_para is not None:
-        _, legal_h = legal_para.wrap(width, 250 * mm)
-        bottom_margin = max(20 * mm, legal_h + 18 * mm)
-
-    def draw_footer(canvas, _doc):
-        if legal_para is None:
-            return
-        canvas.saveState()
-        _, h = legal_para.wrap(width, 250 * mm)
-        legal_para.drawOn(canvas, 20 * mm, 10 * mm)
-        canvas.setStrokeColor(line)
-        canvas.setLineWidth(0.5)
-        canvas.line(20 * mm, 10 * mm + h + 3 * mm, 20 * mm + width, 10 * mm + h + 3 * mm)
-        canvas.restoreState()
-
-    buf = io.BytesIO()
-    top_margin = 18 * mm
-    doc = BaseDocTemplate(
-        buf, pagesize=A4, leftMargin=20 * mm, rightMargin=20 * mm, topMargin=top_margin, bottomMargin=bottom_margin,
-        title=f"{s('title', 80)} {s('number', 40)}".strip(), author=company or 'Stellio',
-        encrypt=_quote_pdf_encryption(allow_annotate=bool(s('signature_label', 60))) if encrypt else None
-    )
-    frame = Frame(20 * mm, bottom_margin, width, A4[1] - top_margin - bottom_margin,
-                  leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, id='quote')
-    doc.addPageTemplates([PageTemplate(id='quote', frames=[frame], onPage=draw_footer)])
-
-    left = []
-    if logo is not None:
-        buf_logo, lw, lh = logo
-        scale = min((50 * mm) / lw, (24 * mm) / lh, 1.0)
-        img = RLImage(buf_logo, width=lw * scale, height=lh * scale, mask='auto')
-        img.hAlign = 'LEFT'
-        left.append(img)
-    if company:
-        left.append(Paragraph(p_text(company, 120), st_company))
-    if address:
-        left.append(Paragraph(p_text(address, 300), st_issuer))
-    contact = [c for c in (phone, email, website) if c]
-    if contact:
-        left.append(Paragraph('<br/>'.join(p_text(c, 120) for c in contact), st_issuer))
-    if tax_id:
-        label = s('tax_id_label', 40)
-        left.append(Paragraph((f"{p_text(label)} : " if label else '') + p_text(tax_id, 80), st_issuer))
-    if not left:
-        left = [Spacer(1, 1)]
-
-    right = [
-        Paragraph(p_text(s('title', 80)), st_title),
-        Paragraph(f"{p_text(s('number_label', 40))} {p_text(s('number', 40))}", st_meta),
-        Paragraph(p_text(s('date', 60)), st_meta),
-    ]
-    if s('due_date', 60):
-        right.append(Paragraph(f"{p_text(s('due_label', 40))} {p_text(s('due_date', 60))}", st_meta))
-    if s('ref_value', 60):
-        right.append(Paragraph(f"{p_text(s('ref_label', 40))} {p_text(s('ref_value', 60))}", st_meta))
-    header = Table([[left, right]], colWidths=[width * 0.58, width * 0.42])
-    header.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0), ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('LINEBELOW', (0, 0), (-1, 0), 0.5, line), ('BOTTOMPADDING', (0, 0), (-1, 0), 14),
-    ]))
-    flow = [header, Spacer(1, 16)]
-
-    dash = '&mdash;'
-    client_box = Table([
-        [Paragraph(p_text(s('to_label', 40)).upper(), st_label)],
-        [Paragraph(p_text(s('client', 120)) or dash, st_body)],
-    ] + ([[Paragraph('<br/>'.join(p_text(x, 120) for x in str(data.get('client_details') or '').splitlines()[:6] if x.strip()), st_issuer)]]
-         if str(data.get('client_details') or '').strip() else []), colWidths=[width * 0.5])
-    client_box.hAlign = 'LEFT'
-    client_box.setStyle(TableStyle([
-        ('LEFTPADDING', (0, 0), (-1, -1), 0), ('BOTTOMPADDING', (0, 0), (-1, 0), 2),
-    ]))
-    flow += [client_box, Spacer(1, 18)]
-
-    desc_cell = [Paragraph(p_text(s('item_desc', 200)), st_body), Paragraph(p_text(s('item_details', 200)), st_sub)]
-
-    # Miniatures des objets (optionnelles) : images JPEG/PNG envoyées par l'interface en data-URL
-    thumbs = []
-    raw_thumbs = data.get('thumbnails')
-    if isinstance(raw_thumbs, list):
-        import base64 as _b64
-        for item in raw_thumbs[:12]:
-            try:
-                head, _, b64 = str(item).partition(',')
-                if not head.startswith('data:image/') or len(b64) > 700000:
-                    continue
-                im = Image.open(io.BytesIO(_b64.b64decode(b64)))
-                im.load()
-                im = im.convert('RGB')
-                im.thumbnail((320, 320))
-                tb = io.BytesIO()
-                im.save(tb, 'JPEG', quality=88)
-                tb.seek(0)
-                thumbs.append((tb, im.size))
-            except Exception as thumb_err:
-                app_logger.info(f"[QUOTE] Miniature ignorée : {thumb_err}")
-    if thumbs:
-        cell_w = width * 0.48 - 8
-        per_row = 3 if len(thumbs) > 1 else 1
-        box = min(24 * mm, (cell_w - 4 * mm * (per_row - 1)) / per_row) if per_row > 1 else 34 * mm
-        rows, cur_row = [], []
-        for tb, (iw, ih) in thumbs:
-            sc = min(box / iw, box / ih)
-            cur_row.append(RLImage(tb, width=iw * sc, height=ih * sc))
-            if len(cur_row) == per_row:
-                rows.append(cur_row)
-                cur_row = []
-        if cur_row:
-            rows.append(cur_row + [''] * (per_row - len(cur_row)))
-        thumb_tbl = Table(rows, colWidths=[box + 4 * mm] * per_row)
-        thumb_tbl.hAlign = 'LEFT'
-        thumb_tbl.setStyle(TableStyle([
-            ('LEFTPADDING', (0, 0), (-1, -1), 0), ('RIGHTPADDING', (0, 0), (-1, -1), 4 * mm),
-            ('TOPPADDING', (0, 0), (-1, -1), 4), ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ]))
-        desc_cell += [Spacer(1, 4), thumb_tbl]
-    items = Table([
-        [Paragraph(p_text(s('description_label', 40)).upper(), st_th), Paragraph(p_text(s('qty_label', 20)).upper(), st_th_r),
-         Paragraph(p_text(s('unit_label', 40)).upper(), st_th_r), Paragraph(p_text(s('line_total_label', 40)).upper(), st_th_r)],
-        [desc_cell, Paragraph(p_text(s('qty', 12)), st_num), Paragraph(p_text(s('unit_price', 30)), st_num),
-         Paragraph(p_text(s('line_total', 30)), st_num)],
-    ], colWidths=[width * 0.48, width * 0.10, width * 0.21, width * 0.21])
-    items.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('LINEBELOW', (0, 0), (-1, 0), 1.5, ink),
-        ('LINEBELOW', (0, 1), (-1, 1), 0.5, line),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4), ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-        ('TOPPADDING', (0, 0), (-1, -1), 8), ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-    ]))
-    flow += [items]
-    if s('discount', 30):
-        st_sum_l = ParagraphStyle('sl', parent=st_body, alignment=2, textColor=grey)
-        sums = Table([[Paragraph(p_text(s('subtotal_label', 40)), st_sum_l), Paragraph(p_text(s('line_total', 30)), st_num)],
-                      [Paragraph(p_text(s('discount_label', 60)), st_sum_l), Paragraph(p_text(s('discount', 30)), st_num)]],
-                     colWidths=[width * 0.62, width * 0.38])
-        sums.setStyle(TableStyle([('LEFTPADDING', (0, 0), (-1, -1), 4), ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                                  ('TOPPADDING', (0, 0), (-1, -1), 3), ('BOTTOMPADDING', (0, 0), (-1, -1), 3)]))
-        flow += [Spacer(1, 6), sums]
-    if s('deposit', 30):
-        st_sum_l2 = ParagraphStyle('sl2', parent=st_body, alignment=2, textColor=grey)
-        sums2 = Table([[Paragraph(p_text(s('total_label', 40)), st_sum_l2), Paragraph(p_text(s('grand_total', 30) or s('line_total', 30)), st_num)],
-                       [Paragraph(p_text(s('deposit_label', 60)), st_sum_l2), Paragraph(p_text(s('deposit', 30)), st_num)]],
-                      colWidths=[width * 0.62, width * 0.38])
-        sums2.setStyle(TableStyle([('LEFTPADDING', (0, 0), (-1, -1), 4), ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                                   ('TOPPADDING', (0, 0), (-1, -1), 3), ('BOTTOMPADDING', (0, 0), (-1, -1), 3)]))
-        flow += [Spacer(1, 6), sums2,
-                 Paragraph(f"{p_text(s('net_label', 40))} : {p_text(s('net_total', 30))}", st_total)]
-    else:
-        flow += [Paragraph(f"{p_text(s('total_label', 40))} : {p_text(s('grand_total', 30) or s('line_total', 30))}", st_total)]
-
-    payment = s('payment_terms', 300).strip()
-    if payment:
-        pay_box = Table([[Paragraph(f"<b>{p_text(s('payment_label', 60))}</b><br/>{p_text(payment, 300)}", st_notes)]], colWidths=[width])
-        pay_box.setStyle(TableStyle([('LINEABOVE', (0, 0), (-1, 0), 0.5, line), ('LEFTPADDING', (0, 0), (-1, -1), 0),
-                                     ('TOPPADDING', (0, 0), (-1, -1), 10)]))
-        flow += [Spacer(1, 18), pay_box]
-
-    notes = s('notes', 500).strip()
-    if notes:
-        notes_box = Table([[Paragraph(p_text(notes, 500), st_notes)]], colWidths=[width])
-        notes_box.setStyle(TableStyle([
-            ('LINEABOVE', (0, 0), (-1, 0), 0.5, line), ('LEFTPADDING', (0, 0), (-1, -1), 0),
-            ('TOPPADDING', (0, 0), (-1, -1), 10),
-        ]))
-        flow += [Spacer(1, 22), notes_box]
-
-    sign_label = s('signature_label', 60).strip()
-    if sign_label:
-        from reportlab.platypus import KeepTogether
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.platypus.flowables import Flowable
-
-        class _CheckBox(Flowable):
-            def __init__(self, size=11):
-                Flowable.__init__(self); self.size = size; self.width = size; self.height = size
-            def draw(self):
-                self.canv.setLineWidth(0.8); self.canv.setStrokeColor(colors.HexColor('#333333'))
-                self.canv.rect(0, 0, self.size, self.size, stroke=1, fill=0)
-                try:  # case réellement cochable à l'écran
-                    ax, ay = self.canv.absolutePosition(0, 0)
-                    self.canv.acroForm.checkbox(name='approved', x=ax, y=ay, size=self.size, borderWidth=0, borderColor=None,
-                                                fillColor=None, textColor=colors.HexColor('#222222'), forceBorder=False, checked=False)
-                except Exception:
-                    pass
-
-
-        class _DateFields(Flowable):
-            """« Date : ../../.... » : seuls les points sont modifiables (champs de formulaire), le reste est figé."""
-            def __init__(self, label, fnt):
-                Flowable.__init__(self); self.label = label; self.fnt = fnt
-                self.width = 60 * mm; self.height = 7 * mm
-            def wrap(self, aw, ah):
-                return self.width, self.height
-            def draw(self):
-                c = self.canv
-                c.setFont(self.fnt, 9); c.setFillColor(colors.HexColor('#555555'))
-                x = pdfmetrics.stringWidth(self.label, self.fnt, 9) + 6
-                c.drawString(0, 2, self.label)
-                x_cur = x
-                for i, (nm, val, w) in enumerate((('date_day', '..', 6 * mm), ('date_month', '..', 6 * mm), ('date_year', '....', 11 * mm))):
-                    if i:
-                        c.setFont('Helvetica', 9); c.drawString(x_cur, 2, '/'); x_cur += 5
-                    try:
-                        ax, ay = c.absolutePosition(x_cur, -1.8)
-                        # Au clic les points disparaissent (script de focus), et reviennent si le champ reste vide.
-                        _orig_add = c._addAnnotation
-                        def _add_with_js(ann, _o=_orig_add, _v=val):
-                            try:
-                                from reportlab.pdfbase.pdfdoc import PDFDictionary, PDFName, PDFString
-                                def _act(js):
-                                    return PDFDictionary({'S': PDFName('JavaScript'), 'JS': PDFString(js)})
-                                ann.dict['AA'] = PDFDictionary({
-                                    'Fo': _act("if (event.target.value == '%s') event.target.value = '';" % _v),
-                                    'Bl': _act("if (event.target.value == '') event.target.value = '%s';" % _v)})
-                            except Exception:
-                                pass
-                            return _o(ann)
-                        c._addAnnotation = _add_with_js
-                        c.acroForm.textfield(name=nm, value=val, x=ax, y=ay, width=w, height=4.2 * mm, borderWidth=0,
-                                             fillColor=None, borderColor=None, textColor=colors.HexColor('#222222'),
-                                             fontName='Helvetica', fontSize=9, maxlen=len(val), forceBorder=False,
-                                             fieldFlags='')
-                    except Exception:
-                        c.setFont('Helvetica', 10); c.drawString(x_cur, 2, val)
-                    finally:
-                        c._addAnnotation = _orig_add
-                    x_cur += w
-
-        st_mention = ParagraphStyle('mn', fontName=font, fontSize=9.5, leading=13, textColor=colors.HexColor('#222222'))
-        st_sign_l = ParagraphStyle('sl', fontName=font, fontSize=9, leading=12, textColor=colors.HexColor('#555555'))
-        mention = Table([[_CheckBox(), Paragraph(p_text(s('signature_mention', 200)), st_mention)]], colWidths=[9 * mm, width * 0.5 - 9 * mm], hAlign='RIGHT')
-        mention.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'), ('LEFTPADDING', (0, 0), (-1, -1), 0),
-                                     ('TOPPADDING', (0, 0), (-1, -1), 1), ('BOTTOMPADDING', (0, 0), (-1, -1), 1)]))
-        sign_box = Table([[_DateFields(s('signature_date', 30), font)], [Paragraph(p_text(sign_label), st_sign_l)], ['']],
-                         colWidths=[width * 0.5], rowHeights=[None, None, 22 * mm], hAlign='RIGHT')
-        sign_box.setStyle(TableStyle([('LINEBELOW', (0, 2), (0, 2), 0.5, line), ('LEFTPADDING', (0, 0), (-1, -1), 0),
-                                      ('TOPPADDING', (0, 0), (-1, -1), 2), ('BOTTOMPADDING', (0, 0), (-1, -1), 2)]))
-        flow += [Spacer(1, 22), KeepTogether([mention, Spacer(1, 6), sign_box])]
-
-    terms_title = s('terms_title', 80).strip()
-    terms = (cfg('quote_terms', 6000) or str(data.get('terms') or '')[:6000]).strip()
-    if terms_title and terms:
-        from reportlab.platypus import PageBreak
-        st_t_title = ParagraphStyle('tt', fontName=bold, fontSize=15, leading=19, textColor=colors.HexColor('#1a1f2b'), spaceAfter=10)
-        st_t_body = ParagraphStyle('tb', fontName=font, fontSize=8.6, leading=11.6, textColor=colors.HexColor('#333333'), spaceAfter=5)
-        flow += [PageBreak(), Paragraph(p_text(terms_title, 80), st_t_title)]
-        for ln in terms.splitlines():
-            ln = ln.strip()
-            if not ln:
-                continue
-            head, sep, rest = ln.partition(' : ') if ' : ' in ln[:80] else ln.partition(': ') if ': ' in ln[:80] else (ln, '', '')
-            if sep and len(head) <= 70:
-                flow.append(Paragraph(f"<b>{p_text(head, 70)}</b> : {p_text(rest, 1500)}", st_t_body))
-            else:
-                flow.append(Paragraph(p_text(ln, 1500), st_t_body))
-
-    doc.build(flow)
-    return buf.getvalue()
-
-
-def _build_quote_pdf_with_repair(data, encrypt=True):
-    """Génère le devis ; si reportlab manque (version empaquetée mise à jour par patch), tente une réparation puis réessaie."""
-    try:
-        return build_quote_pdf_bytes(data, encrypt=encrypt)
-    except ImportError:
-        if _ensure_optional_module('reportlab.platypus', 'reportlab'):
-            return build_quote_pdf_bytes(data, encrypt=encrypt)
-        raise
-
-
-def _safe_quote_pdf_filename(name):
-    name = os.path.basename(str(name or '')).strip()
-    name = re.sub(r'[\\/:*?"<>|\x00-\x1f]', '_', name)[:120]
-    if not name.lower().endswith('.pdf'):
-        name = (name or 'stellio-devis') + '.pdf'
-    return name
-
-
-# --- Historique des devis (v0.7.6) ---
-QUOTES_DIR = os.path.join(DATA_DIR, 'quotes')
-
-
-_QUOTE_COLS_DONE = False
-
-
-def _ensure_quote_columns():
-    """Colonnes ajoutées en 0.8.7 : type de document (devis / facture), devis d'origine, remise, charge utile complète."""
-    global _QUOTE_COLS_DONE
-    if _QUOTE_COLS_DONE:
-        return
-    conn = get_db()
-    try:
-        cols = {r['name'] for r in conn.execute("PRAGMA table_info(quotes)").fetchall()}
-        for name, ddl in (('doc_type', "TEXT DEFAULT 'quote'"), ('source_quote_id', 'INTEGER DEFAULT 0'),
-                          ('discount_value', 'REAL DEFAULT 0'), ('payload_file', "TEXT DEFAULT ''"),
-                          ('status', "TEXT DEFAULT ''"), ('due_date', "TEXT DEFAULT ''"), ('paid_at', "TEXT DEFAULT ''"),
-                          ('sent_at', "TEXT DEFAULT ''"), ('client_id', 'INTEGER DEFAULT 0')):
-            if name not in cols:
-                conn.execute(f"ALTER TABLE quotes ADD COLUMN {name} {ddl}")
-        conn.execute("""CREATE TABLE IF NOT EXISTS clients (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL DEFAULT '',
-            email TEXT DEFAULT '', phone TEXT DEFAULT '', address TEXT DEFAULT '', tax_id TEXT DEFAULT '',
-            notes TEXT DEFAULT '', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
-        conn.commit()
-    finally:
-        conn.close()
-    _QUOTE_COLS_DONE = True
-
-
-def _iso_date(v):
-    v = str(v or '').strip()[:10]
-    return v if re.match(r'^\d{4}-\d{2}-\d{2}$', v) else ''
-
-
-def _int_or0(v):
-    try:
-        return max(0, int(v))
-    except (TypeError, ValueError):
-        return 0
-
-
-def _quote_eff_status(row):
-    """Statut affiché : brouillon / envoyé / accepté / refusé / payé / en retard (calculé d'après l'échéance)."""
-    dt = (row['doc_type'] or 'quote')
-    st = (row['status'] or 'draft')
-    if dt in ('invoice', 'deposit') and st != 'paid':
-        due = row['due_date'] or ''
-        if due and due < datetime.date.today().isoformat():
-            return 'overdue'
-    return st
-
-
-def _quote_payload_path(row):
-    name = os.path.basename((row['payload_file'] if 'payload_file' in row.keys() else '') or '')
-    return os.path.join(QUOTES_DIR, name) if name else ''
-
-
-def _write_quote_files(user_id, qid, data, pdf_bytes):
-    os.makedirs(QUOTES_DIR, exist_ok=True)
-    pdf_name = f"quote_{user_id}_{qid}.pdf"
-    json_name = f"quote_{user_id}_{qid}.json"
-    with open(os.path.join(QUOTES_DIR, pdf_name), 'wb') as f_pdf:
-        f_pdf.write(pdf_bytes)
-    with open(os.path.join(QUOTES_DIR, json_name), 'w', encoding='utf-8') as f_js:
-        json.dump(data, f_js, ensure_ascii=False)
-    return pdf_name, json_name
-
-
-def _quote_fields(data):
-    def t(key, limit):
-        return str(data.get(key) or '')[:limit]
-    try:
-        total_value = float(data.get('total_value') or 0)
-    except (TypeError, ValueError):
-        total_value = 0.0
-    try:
-        discount_value = float(data.get('discount_value') or 0)
-    except (TypeError, ValueError):
-        discount_value = 0.0
-    return (t('number', 40), t('client', 120), t('item_desc', 200), t('item_details', 200), t('qty', 20), t('unit_price', 40),
-            t('net_total', 40) or t('grand_total', 40) or t('line_total', 40), total_value, t('notes', 500), discount_value)
-
-
-def _record_quote(user_id, data, pdf_bytes, doc_type='quote', source_id=0):
-    """Enregistre un devis (ou une facture) dans l'historique, avec une copie du PDF et de ses données.
-    Ne doit jamais faire échouer l'export. Retourne l'id créé (ou None)."""
-    try:
-        _ensure_quote_columns()
-        number, client, desc, details, qty, unit_price, total, total_value, notes, discount = _quote_fields(data)
-        conn = get_db()
-        try:
-            cur = conn.execute(
-                """INSERT INTO quotes (user_id, number, client, item_desc, item_details, qty, unit_price,
-                                       total, total_value, notes, filename, doc_type, source_quote_id, discount_value,
-                                       status, due_date, client_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?)""",
-                (user_id, number, client, desc, details, qty, unit_price, total, total_value, notes,
-                 _safe_quote_pdf_filename(data.get('filename')), doc_type, int(source_id or 0), discount,
-                 _iso_date(data.get('due_iso')), _int_or0(data.get('client_id')))
-            )
-            qid = cur.lastrowid
-            pdf_name, json_name = _write_quote_files(user_id, qid, data, pdf_bytes)
-            conn.execute("UPDATE quotes SET pdf_file = ?, payload_file = ? WHERE id = ?", (pdf_name, json_name, qid))
-            conn.commit()
-            return qid
-        finally:
-            conn.close()
-    except Exception as e:
-        app_logger.warning(f"[QUOTE] Historique : enregistrement impossible : {e}")
-        return None
-
-
-@app.route('/api/quotes', methods=['GET'])
-@login_required
-def api_quotes_list():
-    _ensure_quote_columns()
-    try:
-        limit = max(1, min(int(request.args.get('limit', 200)), 500))
-    except (TypeError, ValueError):
-        limit = 200
-    conn = get_db()
-    try:
-        rows = conn.execute(
-            """SELECT q.id, q.number, q.client, q.item_desc, q.item_details, q.qty, q.unit_price, q.total, q.total_value, q.notes,
-                      q.filename, q.created_at, (q.pdf_file != '') AS has_pdf, q.doc_type, q.source_quote_id, q.discount_value,
-                      q.status, q.due_date, q.paid_at, q.sent_at, q.client_id,
-                      (SELECT i.id FROM quotes i WHERE i.source_quote_id = q.id AND i.doc_type = 'invoice' LIMIT 1) AS invoice_id,
-                      (SELECT COUNT(*) FROM quotes d WHERE d.source_quote_id = q.id AND d.doc_type = 'deposit') AS deposit_count,
-                      (SELECT COALESCE(SUM(-c.total_value), 0) FROM quotes c WHERE c.source_quote_id = q.id AND c.doc_type = 'credit') AS credited,
-                      (SELECT s.number FROM quotes s WHERE s.id = q.source_quote_id) AS source_number
-               FROM quotes q WHERE q.user_id = ? ORDER BY q.id DESC LIMIT ?""",
-            (session['user_id'], limit)
-        ).fetchall()
-        total = conn.execute("SELECT COUNT(*) FROM quotes WHERE user_id = ?", (session['user_id'],)).fetchone()[0]
-    finally:
-        conn.close()
-    out = []
-    for r in rows:
-        d = dict(r)
-        d['status'] = _quote_eff_status(r)
-        out.append(d)
-    return jsonify({"quotes": out, "total": total})
-
-
-def _stored_quote(qid):
-    conn = get_db()
-    try:
-        row = conn.execute("SELECT * FROM quotes WHERE id = ? AND user_id = ?", (qid, session['user_id'])).fetchone()
-    finally:
-        conn.close()
-    return row
-
-
-def _stored_quote_path(row):
-    name = os.path.basename(row['pdf_file'] or '')
-    path = os.path.join(QUOTES_DIR, name) if name else ''
-    return path if path and os.path.isfile(path) else None
-
-
-@app.route('/api/quotes/<int:qid>/payload', methods=['GET'])
-@login_required
-def api_quote_history_payload(qid):
-    """Données complètes d'un devis/facture (pour le modifier ou en tirer une facture)."""
-    _ensure_quote_columns()
-    row = _stored_quote(qid)
-    if not row:
-        return jsonify({"error": "Not found"}), 404
-    payload = {}
-    path = _quote_payload_path(row)
-    if path and os.path.isfile(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                payload = json.load(f)
-        except Exception:
-            payload = {}
-    conn = get_db()
-    try:
-        inv = conn.execute("SELECT id, number FROM quotes WHERE source_quote_id = ? AND doc_type = 'invoice' AND user_id = ?",
-                           (qid, session['user_id'])).fetchone()
-    finally:
-        conn.close()
-    meta = {k: row[k] for k in ('id', 'number', 'client', 'item_desc', 'item_details', 'qty', 'unit_price', 'total', 'total_value',
-                                 'notes', 'created_at', 'doc_type', 'discount_value')}
-    meta['invoice'] = dict(inv) if inv else None
-    conn = get_db()
-    try:
-        dep = conn.execute("SELECT COALESCE(SUM(total_value),0) FROM quotes WHERE source_quote_id = ? AND doc_type = 'deposit' AND user_id = ?",
-                           (qid, session['user_id'])).fetchone()[0]
-        cre = conn.execute("SELECT COALESCE(SUM(-total_value),0) FROM quotes WHERE source_quote_id = ? AND doc_type = 'credit' AND user_id = ?",
-                           (qid, session['user_id'])).fetchone()[0]
-        cl = conn.execute("SELECT * FROM clients WHERE id = ? AND user_id = ?", (row['client_id'] or 0, session['user_id'])).fetchone()
-    finally:
-        conn.close()
-    meta.update({'status': _quote_eff_status(row), 'due_date': row['due_date'], 'paid_at': row['paid_at'], 'client_id': row['client_id'],
-                 'deposits_total': round(dep, 2), 'credited_total': round(cre, 2), 'client_record': dict(cl) if cl else None})
-    return jsonify({"row": meta, "payload": payload})
-
-
-@app.route('/api/quotes/<int:qid>/update', methods=['POST'])
-@login_required
-def api_quote_history_update(qid):
-    """Modifie un devis déjà généré : le PDF est régénéré et remplace l'ancien (même numéro)."""
-    _ensure_quote_columns()
-    row = _stored_quote(qid)
-    if not row:
-        return jsonify({"success": False, "error": "not_found"}), 404
-    if (row['doc_type'] or 'quote') != 'quote':
-        return jsonify({"success": False, "error": "not_a_quote"}), 400
-    conn = get_db()
-    try:
-        has_invoice = conn.execute("SELECT 1 FROM quotes WHERE source_quote_id = ? AND doc_type IN ('invoice','deposit')", (qid,)).fetchone()
-    finally:
-        conn.close()
-    if has_invoice:
-        return jsonify({"success": False, "error": "invoice_exists"}), 409
-    data = request.get_json(silent=True) or {}
-    data['number'] = row['number']
-    data['filename'] = row['filename']
-    try:
-        pdf_bytes = _build_quote_pdf_with_repair(data)
-    except ImportError as e:
-        return jsonify({"success": False, "error": "missing_module", "module": getattr(e, 'name', None) or 'reportlab'}), 503
-    except Exception as e:
-        app_logger.error(f"[QUOTE] Modification : échec PDF : {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-    try:
-        number, client, desc, details, qty, unit_price, total, total_value, notes, discount = _quote_fields(data)
-        pdf_name, json_name = _write_quote_files(session['user_id'], qid, data, pdf_bytes)
-        conn = get_db()
-        try:
-            conn.execute("""UPDATE quotes SET client=?, item_desc=?, item_details=?, qty=?, unit_price=?, total=?, total_value=?,
-                            notes=?, discount_value=?, pdf_file=?, payload_file=?, client_id=? WHERE id=? AND user_id=?""",
-                         (client, desc, details, qty, unit_price, total, total_value, notes, discount, pdf_name, json_name,
-                          _int_or0(data.get('client_id')), qid, session['user_id']))
-            conn.commit()
-        finally:
-            conn.close()
-    except Exception as e:
-        app_logger.error(f"[QUOTE] Modification : enregistrement impossible : {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-    return jsonify({"success": True, "id": qid})
-
-
-def _next_invoice_number(conn, user_id, prefix, types=('invoice', 'deposit')):
-    year = datetime.datetime.now().year
-    best = 0
-    marks = ','.join('?' * len(types))
-    for r in conn.execute(f"SELECT number FROM quotes WHERE user_id = ? AND doc_type IN ({marks}) AND number LIKE ?",
-                          (user_id, *types, f"%-{year}-%")).fetchall():
-        mt = re.search(r'-(\d+)$', r['number'] or '')
-        if mt:
-            best = max(best, int(mt.group(1)))
-    return f"{prefix}-{year}-{best + 1:04d}"
-
-
-@app.route('/api/quotes/<int:qid>/invoice', methods=['POST'])
-@login_required
-def api_quote_history_invoice(qid):
-    """Crée la facture définitive d'un devis existant (numéro séquentiel attribué par le serveur)."""
-    _ensure_quote_columns()
-    row = _stored_quote(qid)
-    if not row:
-        return jsonify({"success": False, "error": "not_found"}), 404
-    if (row['doc_type'] or 'quote') != 'quote':
-        return jsonify({"success": False, "error": "not_a_quote"}), 400
-    data = request.get_json(silent=True) or {}
-    prefix = re.sub(r'[^A-Za-z0-9]', '', str(data.get('number_prefix') or ''))[:6].upper() or 'INV'
-    conn = get_db()
-    try:
-        existing = conn.execute("SELECT id, number FROM quotes WHERE source_quote_id = ? AND doc_type = 'invoice' AND user_id = ?",
-                                (qid, session['user_id'])).fetchone()
-        if existing:
-            return jsonify({"success": False, "error": "invoice_exists", "id": existing['id'], "number": existing['number']}), 409
-        number = _next_invoice_number(conn, session['user_id'], prefix)
-    finally:
-        conn.close()
-    data['number'] = number
-    data['ref_value'] = row['number']
-    data.setdefault('client_id', row['client_id'] or 0)
-    slug = re.sub(r'[^A-Za-z0-9]+', '-', _unicodedata.normalize('NFD', str(data.get('client') or '')).encode('ascii', 'ignore').decode()).strip('-')[:40]
-    file_prefix = re.sub(r'[^\w\- ]', '', str(data.get('filename_prefix') or 'Invoice'), flags=re.U)[:30] or 'Invoice'
-    data['filename'] = _safe_quote_pdf_filename('-'.join(x for x in (file_prefix, slug, number) if x))
-    try:
-        pdf_bytes = _build_quote_pdf_with_repair(data)
-    except ImportError as e:
-        return jsonify({"success": False, "error": "missing_module", "module": getattr(e, 'name', None) or 'reportlab'}), 503
-    except Exception as e:
-        app_logger.error(f"[QUOTE] Facture : échec PDF : {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-    new_id = _record_quote(session['user_id'], data, pdf_bytes, doc_type='invoice', source_id=qid)
-    if not new_id:
-        return jsonify({"success": False, "error": "record_failed"}), 500
-    app_logger.info(f"[QUOTE] 🧾 Facture {number} créée d'après le devis {row['number']}")
-    return jsonify({"success": True, "id": new_id, "number": number})
-
-
-# --- v0.8.8 : suivi des paiements, avoirs / acomptes, carnet de clients, e-mail, export comptable ---
-_QUOTE_STATUSES = {'quote': ('draft', 'sent', 'accepted', 'refused'), 'invoice': ('draft', 'sent', 'paid'),
-                   'deposit': ('draft', 'sent', 'paid'), 'credit': ('draft', 'sent')}
-
-
-@app.route('/api/quotes/<int:qid>/status', methods=['POST'])
-@login_required
-def api_quote_set_status(qid):
-    _ensure_quote_columns()
-    row = _stored_quote(qid)
-    if not row:
-        return jsonify({"success": False, "error": "not_found"}), 404
-    data = request.get_json(silent=True) or {}
-    dt = row['doc_type'] or 'quote'
-    sets, args = [], []
-    if 'status' in data:
-        st = str(data.get('status') or '')
-        if st not in _QUOTE_STATUSES.get(dt, ()):
-            return jsonify({"success": False, "error": "bad_status"}), 400
-        today = datetime.date.today().isoformat()
-        sets.append('status=?'); args.append(st)
-        sets.append('paid_at=?'); args.append(today if st == 'paid' else '')
-        if st == 'sent' and not row['sent_at']:
-            sets.append('sent_at=?'); args.append(today)
-    if 'due_date' in data:
-        sets.append('due_date=?'); args.append(_iso_date(data.get('due_date')))
-    if not sets:
-        return jsonify({"success": False, "error": "nothing"}), 400
-    conn = get_db()
-    try:
-        conn.execute(f"UPDATE quotes SET {', '.join(sets)} WHERE id=? AND user_id=?", (*args, qid, session['user_id']))
-        conn.commit()
-    finally:
-        conn.close()
-    created = 0
-    if data.get('status') == 'accepted':
-        try:
-            created = _create_jobs_from_quote(session['user_id'], row)
-        except Exception as e:
-            app_logger.warning(f"[Atelier] Création de tâches impossible : {e}")
-    return jsonify({"success": True, "jobs_created": created})
-
-
-@app.route('/api/quotes/summary', methods=['GET'])
-@login_required
-def api_quotes_summary():
-    """Résumé pour le tableau de bord : factures en retard, montant à encaisser, devis en attente."""
-    _ensure_quote_columns()
-    conn = get_db()
-    try:
-        rows = conn.execute("SELECT * FROM quotes WHERE user_id = ? AND doc_type IN ('invoice','deposit','quote')", (session['user_id'],)).fetchall()
-    finally:
-        conn.close()
-    today = datetime.date.today()
-    overdue, unpaid, pending = [], 0.0, 0
-    for r in rows:
-        dt = r['doc_type'] or 'quote'
-        if dt == 'quote':
-            if (r['status'] or 'draft') == 'sent':
-                pending += 1
-            continue
-        if (r['status'] or 'draft') == 'paid':
-            continue
-        unpaid += float(r['total_value'] or 0)
-        if _quote_eff_status(r) == 'overdue':
-            try:
-                late = (today - datetime.date.fromisoformat(r['due_date'])).days
-            except Exception:
-                late = 0
-            overdue.append({"id": r['id'], "number": r['number'], "client": r['client'], "total": r['total'],
-                            "due_date": r['due_date'], "days_late": late})
-    overdue.sort(key=lambda x: -x['days_late'])
-    return jsonify({"overdue": overdue, "unpaid_total": round(unpaid, 2), "pending_quotes": pending})
-
-
-def _derive_document(qid, doc_type, number_types, default_prefix):
-    """Crée un document dérivé (facture d'acompte, avoir) à partir d'un document existant ; numéro attribué par le serveur."""
-    _ensure_quote_columns()
-    row = _stored_quote(qid)
-    if not row:
-        return jsonify({"success": False, "error": "not_found"}), 404
-    src_type = row['doc_type'] or 'quote'
-    data = request.get_json(silent=True) or {}
-    try:
-        amount = float(data.get('total_value') or 0)
-    except (TypeError, ValueError):
-        amount = 0.0
-    conn = get_db()
-    try:
-        if doc_type == 'deposit':
-            if src_type != 'quote':
-                return jsonify({"success": False, "error": "not_a_quote"}), 400
-            if conn.execute("SELECT 1 FROM quotes WHERE source_quote_id = ? AND doc_type = 'invoice'", (qid,)).fetchone():
-                return jsonify({"success": False, "error": "invoice_exists"}), 409
-            done = conn.execute("SELECT COALESCE(SUM(total_value),0) FROM quotes WHERE source_quote_id = ? AND doc_type = 'deposit'", (qid,)).fetchone()[0]
-            if amount <= 0 or done + amount > float(row['total_value'] or 0) + 0.005:
-                return jsonify({"success": False, "error": "amount_too_high", "remaining": round(float(row['total_value'] or 0) - done, 2)}), 400
-        else:  # avoir
-            if src_type not in ('invoice', 'deposit'):
-                return jsonify({"success": False, "error": "not_an_invoice"}), 400
-            amount = -abs(amount)
-            done = conn.execute("SELECT COALESCE(SUM(-total_value),0) FROM quotes WHERE source_quote_id = ? AND doc_type = 'credit'", (qid,)).fetchone()[0]
-            if amount == 0 or done + abs(amount) > float(row['total_value'] or 0) + 0.005:
-                return jsonify({"success": False, "error": "amount_too_high", "remaining": round(float(row['total_value'] or 0) - done, 2)}), 400
-            data['total_value'] = amount
-        prefix = re.sub(r'[^A-Za-z0-9]', '', str(data.get('number_prefix') or ''))[:6].upper() or default_prefix
-        number = _next_invoice_number(conn, session['user_id'], prefix, number_types)
-    finally:
-        conn.close()
-    data['number'] = number
-    data['ref_value'] = row['number']
-    data['client_id'] = row['client_id'] or data.get('client_id') or 0
-    slug = re.sub(r'[^A-Za-z0-9]+', '-', _unicodedata.normalize('NFD', str(data.get('client') or '')).encode('ascii', 'ignore').decode()).strip('-')[:40]
-    file_prefix = re.sub(r'[^\w\- ]', '', str(data.get('filename_prefix') or doc_type), flags=re.U)[:30] or doc_type
-    data['filename'] = _safe_quote_pdf_filename('-'.join(x for x in (file_prefix, slug, number) if x))
-    try:
-        pdf_bytes = _build_quote_pdf_with_repair(data)
-    except ImportError as e:
-        return jsonify({"success": False, "error": "missing_module", "module": getattr(e, 'name', None) or 'reportlab'}), 503
-    except Exception as e:
-        app_logger.error(f"[QUOTE] {doc_type} : échec PDF : {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-    new_id = _record_quote(session['user_id'], data, pdf_bytes, doc_type=doc_type, source_id=qid)
-    if not new_id:
-        return jsonify({"success": False, "error": "record_failed"}), 500
-    app_logger.info(f"[QUOTE] Document {doc_type} {number} créé d'après {row['number']}")
-    return jsonify({"success": True, "id": new_id, "number": number})
-
-
-@app.route('/api/quotes/<int:qid>/deposit', methods=['POST'])
-@login_required
-def api_quote_deposit(qid):
-    return _derive_document(qid, 'deposit', ('invoice', 'deposit'), 'FAC')
-
-
-@app.route('/api/quotes/<int:qid>/credit', methods=['POST'])
-@login_required
-def api_quote_credit(qid):
-    return _derive_document(qid, 'credit', ('credit',), 'AV')
-
-
-# ---- Carnet de clients ----
-_CLIENT_FIELDS = (('name', 120), ('email', 120), ('phone', 40), ('address', 300), ('tax_id', 60), ('notes', 500))
-
-
-def _client_clean(data):
-    out = {}
-    for k, lim in _CLIENT_FIELDS:
-        out[k] = str(data.get(k) or '').strip()[:lim]
-    return out
-
-
-# ── clients (carnet de clients, import) : module séparé `modules/clients.py` (services fournis par `clients.init(globals())`) ──
-from modules import clients
-from modules.clients import (
-    api_client_delete,
-    api_client_detail,
-    api_client_update,
-    api_clients_create,
-    api_clients_import,
-    api_clients_list,
-)
-
-
-
-# ---- Export comptable (CSV) ----
-_CSV_HEAD = {
-    'fr': ['Numéro', 'Type', 'Date', 'Client', 'N° SIRET / TVA client', 'Désignation', 'Quantité', 'Sous-total', 'Remise', 'Total', 'Statut',
-           'Échéance', 'Date de paiement', 'Document d\'origine'],
-    'en': ['Number', 'Type', 'Date', 'Customer', 'Customer tax ID', 'Description', 'Quantity', 'Subtotal', 'Discount', 'Total', 'Status',
-           'Due date', 'Payment date', 'Source document']}
-_CSV_TYPES = {'fr': {'quote': 'Devis', 'invoice': 'Facture', 'deposit': 'Facture d\'acompte', 'credit': 'Avoir'},
-              'en': {'quote': 'Quote', 'invoice': 'Invoice', 'deposit': 'Deposit invoice', 'credit': 'Credit note'}}
-_CSV_STATUS = {'fr': {'draft': 'Brouillon', 'sent': 'Envoyé', 'accepted': 'Accepté', 'refused': 'Refusé', 'paid': 'Payé', 'overdue': 'En retard'},
-               'en': {'draft': 'Draft', 'sent': 'Sent', 'accepted': 'Accepted', 'refused': 'Refused', 'paid': 'Paid', 'overdue': 'Overdue'}}
-
-
-def _quotes_csv_bytes(user_id, date_from, date_to, types, lang):
-    import csv
-    lg = 'fr' if lang == 'fr' else 'en'
-    dec = ',' if lg == 'fr' else '.'
-    conn = get_db()
-    try:
-        rows = conn.execute("""SELECT q.*, s.number AS src_number, c.tax_id AS client_tax_id
-                               FROM quotes q LEFT JOIN quotes s ON s.id = q.source_quote_id
-                               LEFT JOIN clients c ON c.id = q.client_id
-                               WHERE q.user_id = ? ORDER BY q.created_at, q.id""", (user_id,)).fetchall()
-    finally:
-        conn.close()
-    buf = io.StringIO()
-    w = csv.writer(buf, delimiter=';', quoting=csv.QUOTE_MINIMAL)
-    w.writerow(_CSV_HEAD[lg])
-
-    def num(v):
-        return f"{float(v or 0):.2f}".replace('.', dec)
-    for r in rows:
-        dt = r['doc_type'] or 'quote'
-        day = str(r['created_at'] or '')[:10]
-        if types and dt not in types:
-            continue
-        if (date_from and day < date_from) or (date_to and day > date_to):
-            continue
-        tv = float(r['total_value'] or 0)
-        disc = float(r['discount_value'] or 0)
-        w.writerow([r['number'], _CSV_TYPES[lg].get(dt, dt), day, r['client'], r['client_tax_id'] or '', r['item_desc'], r['qty'],
-                    num(tv + disc), num(disc), num(tv), _CSV_STATUS[lg].get(_quote_eff_status(r), ''), r['due_date'] or '',
-                    r['paid_at'] or '', r['src_number'] or ''])
-    return ('﻿' + buf.getvalue()).encode('utf-8')
-
-
-def _csv_args(src):
-    types = [t for t in str(src.get('types') or '').split(',') if t in ('quote', 'invoice', 'deposit', 'credit')]
-    return _iso_date(src.get('from')), _iso_date(src.get('to')), types, str(src.get('lang') or 'fr')[:2]
-
-
-@app.route('/api/quotes/export.csv', methods=['GET'])
-@login_required
-def api_quotes_export_csv():
-    _ensure_quote_columns()
-    f, t, types, lang = _csv_args(request.args)
-    data = _quotes_csv_bytes(session['user_id'], f, t, types, lang)
-    return Response(data, mimetype='text/csv; charset=utf-8',
-                    headers={'Content-Disposition': f'attachment; filename="stellio-export-{datetime.date.today().isoformat()}.csv"'})
-
-
-@app.route('/api/quotes/export-csv-native', methods=['POST'])
-@login_required
-def api_quotes_export_csv_native():
-    _ensure_quote_columns()
-    f, t, types, lang = _csv_args(request.get_json(silent=True) or {})
-    data = _quotes_csv_bytes(session['user_id'], f, t, types, lang)
-    try:
-        import webview
-        result = webview.windows[0].create_file_dialog(
-            _wv_save_dialog(webview), directory=str(Path.home() / 'Documents'),
-            save_filename=f"stellio-export-{datetime.date.today().isoformat()}.csv", file_types=('Fichier CSV (*.csv)',))
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-    dest = result[0] if isinstance(result, (list, tuple)) and result else result
-    if not dest:
-        return jsonify({"success": False, "cancelled": True}), 200
-    dest = str(dest)
-    if not dest.lower().endswith('.csv'):
-        dest += '.csv'
-    try:
-        with open(dest, 'wb') as fh:
-            fh.write(data)
-        return jsonify({"success": True, "path": dest})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-# ---- E-mail (SMTP) ----
-def _smtp_cfg(override=None):
-    s = dict(load_settings() or {})
-    for k, v in (override or {}).items():
-        if str(k).startswith('smtp_'):
-            s[k] = v
-    host = str(s.get('smtp_host') or '').strip()
-    if not host:
-        return None
-    sec = str(s.get('smtp_security') or 'starttls')
-    try:
-        port = int(s.get('smtp_port') or (465 if sec == 'ssl' else 587 if sec == 'starttls' else 25))
-    except (TypeError, ValueError):
-        port = 587
-    user = str(s.get('smtp_user') or '').strip()
-    return {'host': host, 'port': port, 'user': user, 'password': str(s.get('smtp_password') or ''), 'security': sec,
-            'from': str(s.get('smtp_from') or user).strip(), 'from_name': str(s.get('smtp_from_name') or '').strip()}
-
-
-def _smtp_send(cfg, to, subject, body, attachment=None):
-    import smtplib
-    from email.message import EmailMessage
-    from email.utils import formataddr
-    if not cfg['from']:
-        raise ValueError('adresse expéditeur manquante')
-    msg = EmailMessage()
-    msg['From'] = formataddr((cfg['from_name'], cfg['from'])) if cfg['from_name'] else cfg['from']
-    msg['To'] = to
-    msg['Subject'] = subject
-    msg.set_content(body)
-    if attachment:
-        msg.add_attachment(attachment[1], maintype='application', subtype='pdf', filename=attachment[0])
-    ctx = ssl.create_default_context()
-    if cfg['security'] == 'ssl':
-        srv = smtplib.SMTP_SSL(cfg['host'], cfg['port'], timeout=20, context=ctx)
-    else:
-        srv = smtplib.SMTP(cfg['host'], cfg['port'], timeout=20)
-    try:
-        srv.ehlo()
-        if cfg['security'] == 'starttls':
-            srv.starttls(context=ctx)
-            srv.ehlo()
-        if cfg['user']:
-            srv.login(cfg['user'], cfg['password'])
-        srv.send_message(msg)
-    finally:
-        try:
-            srv.quit()
-        except Exception:
-            pass
-
-
-_EMAIL_RE = re.compile(r'^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$')
-
-
-@app.route('/api/smtp/test', methods=['POST'])
-@login_required
-def api_smtp_test():
-    body = request.get_json(silent=True) or {}
-    cfg = _smtp_cfg(body)
-    if not cfg:
-        return jsonify({"success": False, "error": "Serveur SMTP manquant"}), 200
-    to = str(body.get('to') or cfg['from']).strip()
-    if not _EMAIL_RE.match(to):
-        return jsonify({"success": False, "error": "Adresse de destination invalide"}), 200
-    try:
-        _smtp_send(cfg, to, 'Stellio - test e-mail', 'Ce message confirme que la configuration SMTP de Stellio fonctionne.')
-    except Exception as e:
-        return jsonify({"success": False, "error": f"{type(e).__name__}: {str(e)[:140]}"}), 200
-    return jsonify({"success": True, "to": to})
-
-
-@app.route('/api/quotes/<int:qid>/email', methods=['POST'])
-@login_required
-def api_quote_email(qid):
-    _ensure_quote_columns()
-    row = _stored_quote(qid)
-    path = _stored_quote_path(row) if row else None
-    if not path:
-        return jsonify({"success": False, "error": "PDF introuvable"}), 404
-    cfg = _smtp_cfg()
-    if not cfg:
-        return jsonify({"success": False, "error": "smtp_not_configured"}), 200
-    data = request.get_json(silent=True) or {}
-    to = str(data.get('to') or '').strip()
-    if not _EMAIL_RE.match(to):
-        return jsonify({"success": False, "error": "bad_recipient"}), 200
-    subject = str(data.get('subject') or row['number'])[:200]
-    message = str(data.get('message') or '')[:4000]
-    try:
-        with open(path, 'rb') as fh:
-            pdf = fh.read()
-        _smtp_send(cfg, to, subject, message, (_safe_quote_pdf_filename(row['filename'] or row['number']), pdf))
-    except Exception as e:
-        app_logger.warning(f"[SMTP] Envoi échoué : {type(e).__name__}: {str(e)[:120]}")
-        return jsonify({"success": False, "error": f"{type(e).__name__}: {str(e)[:140]}"}), 200
-    conn = get_db()
-    try:
-        conn.execute("UPDATE quotes SET status = CASE WHEN status IN ('', 'draft') THEN 'sent' ELSE status END, "
-                     "sent_at = CASE WHEN sent_at = '' THEN ? ELSE sent_at END WHERE id = ? AND user_id = ?",
-                     (datetime.date.today().isoformat(), qid, session['user_id']))
-        conn.commit()
-    finally:
-        conn.close()
-    return jsonify({"success": True})
-
-
-@app.route('/api/quotes/<int:qid>/pdf', methods=['GET'])
-@login_required
-def api_quote_history_pdf(qid):
-    row = _stored_quote(qid)
-    path = _stored_quote_path(row) if row else None
-    if not path:
-        return jsonify({"error": "PDF introuvable"}), 404
-    inline = request.args.get('inline') == '1'
-    name = _safe_quote_pdf_filename(row['filename'] or row['number'])
-    if inline:
-        # Les visionneuses intégrées (WebView, navigateurs mobiles) demandent un « code » pour tout PDF chiffré,
-        # même quand le mot de passe utilisateur est vide : l'aperçu est donc servi sans chiffrement.
-        # Le fichier téléchargé / enregistré reste verrouillé.
-        try:
-            pj = _quote_payload_path(row)
-            if pj and os.path.isfile(pj):
-                with open(pj, 'r', encoding='utf-8') as f:
-                    payload = json.load(f)
-                return send_file(io.BytesIO(_build_quote_pdf_with_repair(payload, encrypt=False)),
-                                 mimetype='application/pdf', as_attachment=False, download_name=name)
-        except Exception as e:
-            app_logger.warning(f"[QUOTE] Aperçu non chiffré indisponible, repli : {e}")
-        try:
-            from pypdf import PdfReader, PdfWriter
-            rd = PdfReader(str(path))
-            if rd.is_encrypted:
-                rd.decrypt('')
-            wr = PdfWriter()
-            for pg in rd.pages:
-                wr.add_page(pg)
-            out = io.BytesIO(); wr.write(out); out.seek(0)
-            return send_file(out, mimetype='application/pdf', as_attachment=False, download_name=name)
-        except Exception:
-            pass
-    return send_file(path, mimetype='application/pdf', as_attachment=not inline, download_name=name)
-
-
-@app.route('/api/quotes/<int:qid>/save-native', methods=['POST'])
-@login_required
-def api_quote_history_save_native(qid):
-    row = _stored_quote(qid)
-    path = _stored_quote_path(row) if row else None
-    if not path:
-        return jsonify({"success": False, "error": "PDF introuvable"}), 404
-    try:
-        import webview
-        result = webview.windows[0].create_file_dialog(
-            _wv_save_dialog(webview), directory=str(Path.home() / 'Documents'),
-            save_filename=_safe_quote_pdf_filename(row['filename'] or row['number']),
-            file_types=('Document PDF (*.pdf)',))
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-    dest = result[0] if isinstance(result, (list, tuple)) and result else result
-    if not dest:
-        return jsonify({"success": False, "cancelled": True}), 200
-    dest = str(dest)
-    if not dest.lower().endswith('.pdf'):
-        dest += '.pdf'
-    try:
-        shutil.copyfile(path, dest)
-        return jsonify({"success": True, "path": dest}), 200
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route('/api/quotes/<int:qid>', methods=['DELETE'])
-@login_required
-def api_quote_history_delete(qid):
-    row = _stored_quote(qid)
-    if not row:
-        return jsonify({"error": "Devis introuvable"}), 404
-    path = _stored_quote_path(row)
-    conn = get_db()
-    try:
-        keys = row.keys()
-        label = (row['number'] if 'number' in keys and row['number'] else '') or f"#{qid}"
-        who = (row['client'] if 'client' in keys else '') or ''
-        tid = trash_record(conn, session['user_id'], 'quote', f"{label}" + (f" — {who}" if who else ''),
-                           {'row': dict(row)}, detail=(row['doc_type'] if 'doc_type' in keys and row['doc_type'] else 'quote'),
-                           files=[path, _quote_payload_path(row)])
-        conn.execute("DELETE FROM quotes WHERE id = ? AND user_id = ?", (qid, session['user_id']))
-        conn.commit()
-    finally:
-        conn.close()
-    return jsonify({"success": True, "trash_key": f"row:{tid}"})
-
-
-@app.route('/api/quote/export-native', methods=['POST'])
-@login_required
-def api_quote_export_native():
-    data = request.get_json(silent=True) or {}
-    filename = _safe_quote_pdf_filename(data.get('filename'))
-    try:
-        pdf_bytes = _build_quote_pdf_with_repair(data)
-    except ImportError as e:
-        app_logger.error(f"[QUOTE] Échec génération PDF : {e}")
-        return jsonify({"success": False, "error": "missing_module", "module": getattr(e, 'name', None) or 'reportlab'}), 503
-    except Exception as e:
-        app_logger.error(f"[QUOTE] Échec génération PDF : {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-    try:
-        import webview
-        result = webview.windows[0].create_file_dialog(
-            _wv_save_dialog(webview),
-            directory=str(Path.home() / 'Documents'),
-            save_filename=filename,
-            file_types=('Document PDF (*.pdf)',)
-        )
-    except Exception as e:
-        app_logger.info(f"[QUOTE] Boîte de dialogue native indisponible : {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-    dest_path = result[0] if isinstance(result, (list, tuple)) and result else result
-    if not dest_path:
-        return jsonify({"success": False, "cancelled": True}), 200
-    dest_path = str(dest_path)
-    if not dest_path.lower().endswith('.pdf'):
-        dest_path += '.pdf'
-
-    try:
-        with open(dest_path, 'wb') as f:
-            f.write(pdf_bytes)
-        app_logger.info(f"[QUOTE] 🧾 Devis PDF enregistré : {dest_path}")
-        _record_quote(session['user_id'], data, pdf_bytes)
-        return jsonify({"success": True, "path": dest_path}), 200
-    except Exception as e:
-        app_logger.error(f"[QUOTE] Échec écriture fichier : {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route('/api/quote/export', methods=['POST'])
-@login_required
-def api_quote_export():
-    data = request.get_json(silent=True) or {}
-    try:
-        pdf_bytes = _build_quote_pdf_with_repair(data)
-    except ImportError as e:
-        app_logger.error(f"[QUOTE] Échec génération PDF : {e}")
-        return jsonify({"success": False, "error": "missing_module", "module": getattr(e, 'name', None) or 'reportlab'}), 503
-    except Exception as e:
-        app_logger.error(f"[QUOTE] Échec génération PDF : {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-    _record_quote(session['user_id'], data, pdf_bytes)
-    return send_file(io.BytesIO(pdf_bytes), mimetype='application/pdf', as_attachment=True,
-                     download_name=_safe_quote_pdf_filename(data.get('filename')))
 
 
 LOG_TAIL_INITIAL_BYTES = 50 * 1024
@@ -20712,6 +20256,8 @@ def api_get_settings():
         if not IS_SERVER_EDITION:
             settings.setdefault('lang', _system_ui_lang())
         settings.setdefault('ai_enabled', False)
+        if _hosted('ai_features') is None:
+            settings['ai_enabled'] = False        # plugin « Assistant IA » absent : les fonctions IA sont inactives (le réglage stocké est conservé)
         settings.setdefault('auto_scan_enabled', True)
         settings.setdefault('auto_scan_interval_minutes', 5)
         settings.setdefault('manual_inventory_enabled', True)
@@ -20866,7 +20412,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.1.6"
+CURRENT_VERSION = "1.1.7"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -21770,7 +21316,7 @@ def api_discover_printers():
         threading.Thread(target=_run, args=(_discover_flashforge,), daemon=True),
         threading.Thread(target=_run, args=(_scan_lan_for_printers,), daemon=True),
         threading.Thread(target=_run, args=(_discover_photon,), daemon=True),
-        threading.Thread(target=_run, args=(usb_printers.discover,), daemon=True),   # v1.1.4 : imprimantes branchées en USB
+        threading.Thread(target=_run, args=(_discover_usb_if_loaded,), daemon=True),   # v1.1.4 : imprimantes branchées en USB
     ]
     for t in threads:
         t.start()
@@ -22498,26 +22044,97 @@ def _printer_status_cached(printer, ttl=5.0):
     return status
 
 
-# ── timelapse des impressions (images périodiques, assemblage vidéo, lecture, suppression) : module séparé `modules/timelapse.py` (services fournis par `timelapse.init(globals())`) ──
-from modules import timelapse
-from modules.timelapse import (
-    TIMELAPSE_MAX_FRAMES,
-    TIMELAPSE_MIN_FRAMES,
-    _TL_STATE,
-    _extract_jpeg,
-    _start_timelapse_worker,
-    _timelapse_assemble,
-    _timelapse_grab_frame,
-    _timelapse_interval,
-    _timelapse_loop,
-    _timelapse_row,
-    _timelapse_safe_name,
-    _timelapse_tick,
-    api_delete_timelapse,
-    api_list_timelapses,
-    api_timelapse_settings,
-    api_timelapse_video,
-)
+# ── Image JPEG d'une caméra d'imprimante : service du cœur (suivi de session, plugin timelapse…) ──
+def _extract_jpeg(data):
+    if not data:
+        return None
+    s = data.find(b'\xff\xd8')
+    if s == -1:
+        return None
+    e = data.rfind(b'\xff\xd9')
+    return bytes(data[s:e + 2]) if e > s else None
+
+def _grab_mjpeg_frame(url, timeout=10):
+    """Première image JPEG d'un flux MJPEG http(s), lue directement (sans ffmpeg) ; None si le flux ne répond pas."""
+    deadline = time.time() + timeout
+    try:
+        with requests.get(url, stream=True, timeout=(4, 6)) as r:
+            if r.status_code != 200:
+                return None
+            buf = b''
+            for chunk in r.iter_content(4096):
+                if not chunk:
+                    break
+                buf += chunk
+                s = buf.find(b'\xff\xd8')
+                if s != -1:
+                    e = buf.find(b'\xff\xd9', s + 2)
+                    if e != -1:
+                        return bytes(buf[s:e + 2])
+                if len(buf) > 4_000_000 or time.time() > deadline:
+                    break
+    except Exception:
+        return None
+    return None
+
+def _timelapse_grab_frame(printer):
+    """Une image JPEG de la caméra de l'imprimante (octets) ou None."""
+    pid = printer.get('id')
+    ptype = printer.get('type')
+    cfg = printer.get('config') or {}
+    ip = printer.get('ip')
+    if ptype == 'bambu':
+        code = cfg.get('code') or printer.get('api_key') or ''
+        if not code or not ip:
+            return None
+        model = (cfg.get('model') or 'A1').upper()
+        gen = _generate_bambu_rtsp_mjpeg_stream(ip, code) if model in BAMBU_RTSP_PORT322_MODELS else _generate_bambu_mjpeg_stream(ip, code)
+        try:
+            return _extract_jpeg(next(gen, None))
+        finally:
+            try:
+                gen.close()
+            except Exception:
+                pass
+    if ptype == 'bambuddy':
+        try:
+            r = _bambuddy_get(ip, printer.get('api_key'), cfg, f"/printers/{_bambuddy_printer_id(cfg)}/camera/snapshot", timeout=8)
+            return _extract_jpeg(r.content) if r.status_code == 200 else None
+        except Exception:
+            return None
+    cam = _resolve_printer_camera(printer, pid, '')
+    if not cam.get('available'):
+        return None
+    snap = cam.get('snapshot_url')
+    stream = cam.get('stream_url')
+    candidates = []
+    if snap:
+        candidates.append(snap)
+    if stream and 'action=stream' in stream:          # mjpg-streamer / crowsnest : l'instantané se déduit du flux
+        candidates.append(stream.replace('action=stream', 'action=snapshot'))
+    for url in dict.fromkeys(candidates):
+        try:
+            r = requests.get(url, timeout=6)
+            if r.status_code == 200:
+                jpg = _extract_jpeg(r.content)
+                if jpg:
+                    return jpg
+        except Exception:
+            pass
+    if stream and re.match(r'^https?://', stream):    # flux MJPEG lu directement : fonctionne même sans ffmpeg
+        jpg = _grab_mjpeg_frame(stream)
+        if jpg:
+            return jpg
+    if stream and FFMPEG_TOOL:
+        try:
+            out = subprocess.run(
+                [FFMPEG_TOOL, '-loglevel', 'error', '-i', stream, '-frames:v', '1', '-f', 'image2pipe', '-vcodec', 'mjpeg', 'pipe:1'],
+                capture_output=True, timeout=20, **_popen_kwargs_silent())
+            return _extract_jpeg(out.stdout)
+        except Exception:
+            return None
+    return None
+
 
 
 
@@ -22536,17 +22153,6 @@ from modules.print_session import (
 
 
 # ── lien d'état partageable (lecture seule, sans compte) : module séparé `modules/share_link.py` (services fournis par `share_link.init(globals())`) ──
-from modules import share_link
-from modules.share_link import (
-    STATUS_MAX_LINKS,
-    _STATUS_SHARE_PAGE,
-    _status_link_by_token,
-    api_create_status_link,
-    api_delete_status_link,
-    api_list_status_links,
-    api_status_share_data,
-    status_share_page,
-)
 
 # ── Alertes de dérive de qualité ────────────────────────────────────────────────────────────
 def _compute_quality_drift(user_id, recent_days=30, baseline_days=120):
@@ -22598,41 +22204,6 @@ def _compute_quality_drift(user_id, recent_days=30, baseline_days=120):
     return out[:3]
 
 
-# ── publication MQTT / Home Assistant (imprimantes, bobines, état de l'application) : module séparé `modules/mqtt_publisher.py` (services fournis par `mqtt_publisher.init(globals())`) ──
-from modules import mqtt_publisher
-from modules.mqtt_publisher import (
-    HA_DISCOVERY_PREFIX,
-    _APP_STARTED,
-    _MQTT_APP_CACHE,
-    _MQTT_APP_ENTITIES,
-    _MQTT_APP_STATE_TOPIC,
-    _MQTT_PUB,
-    _MQTT_PUB_LOCK,
-    _MQTT_SPOOLS,
-    _MQTT_UPDATE,
-    _mqtt_app_discovery,
-    _mqtt_app_entities,
-    _mqtt_app_metrics,
-    _mqtt_app_publish,
-    _mqtt_app_state,
-    _mqtt_app_wanted,
-    _mqtt_discovery_configs,
-    _mqtt_last_backup_iso,
-    _mqtt_new_client,
-    _mqtt_pub_cfg,
-    _mqtt_pub_disconnect,
-    _mqtt_pub_loop,
-    _mqtt_pub_tick,
-    _mqtt_publish_all,
-    _mqtt_spool_key,
-    _mqtt_spool_slots,
-    _mqtt_state_payload,
-    _mqtt_update_probe,
-    _start_mqtt_publisher,
-    api_mqtt_entities,
-    api_mqtt_status,
-    api_mqtt_test,
-)
 
 
 
@@ -22999,7 +22570,8 @@ def _ensure_workshop_tables():
         for name, ddl in (('scrap', 'INTEGER DEFAULT 0'), ('actual_hours', 'REAL DEFAULT 0'),
                           ('actual_weight_g', 'REAL'), ('cost_model', "TEXT DEFAULT ''"),
                           ('track_token', "TEXT DEFAULT ''"), ('client_note', "TEXT DEFAULT ''"),
-                          ('est_hours', 'REAL DEFAULT 0')):
+                          ('est_hours', 'REAL DEFAULT 0'), ('labor_setup_min', 'REAL DEFAULT 0'),
+                          ('labor_min_piece', 'REAL DEFAULT 0'), ('labor_hours_actual', 'REAL DEFAULT 0')):
             if name not in cols:
                 conn.execute(f"ALTER TABLE print_jobs ADD COLUMN {name} {ddl}")
         conn.execute("""CREATE TABLE IF NOT EXISTS visual_index (
@@ -23040,237 +22612,11 @@ def _num(v):
         return 0.0
 
 
-def _job_margin(r, revenue):
-    """Marge prévue (devis) et marge réelle à ce jour : matière et temps selon ce qui a été réellement imprimé,
-    rebuts compris. Retourne None si la commande ne vient pas d'un devis chiffré."""
-    try:
-        m = json.loads(r['cost_model'] or '{}')
-    except Exception:
-        m = {}
-    if not m or not revenue or not (m.get('m') or m.get('e') or m.get('w') or m.get('f')):
-        return None
-    qty = max(1, r['quantity'] or 1)
-    done = min(r['qty_done'] or 0, qty)
-    scrap = r['scrap'] or 0
-    unit = m['m'] + m['e'] + m['w'] + m['f']
-    est_cost = unit * qty
-    time_cost = m['e'] + m['w']
-    w_act = r['actual_weight_g']
-    h_act = r['actual_hours'] or 0
-    mat_pieces = (w_act / m['weight_g']) if (w_act is not None and m['weight_g'] > 0) else done
-    time_pieces = (h_act / m['hours']) if (h_act > 0 and m['hours'] > 0) else done
-    real_cost = (mat_pieces + scrap) * m['m'] + (time_pieces + scrap) * time_cost + m['f'] * done
-    real_revenue = revenue * done / qty
-    return {
-        'revenue': round(revenue, 2), 'est_cost': round(est_cost, 2), 'est_margin': round(revenue - est_cost, 2),
-        'est_margin_pct': round(100 * (revenue - est_cost) / revenue, 1),
-        'real_cost': round(real_cost, 2), 'real_revenue': round(real_revenue, 2),
-        'real_margin': round(real_revenue - real_cost, 2),
-        'real_margin_pct': round(100 * (real_revenue - real_cost) / real_revenue, 1) if real_revenue else None,
-        'measured': bool(h_act > 0 or w_act is not None),
-    }
+# ── commandes : module séparé `modules/pro_orders.py` (services fournis par `pro_orders.init(globals())`) ──
 
-
-def _create_jobs_from_quote(user_id, row):
-    """Un devis accepté crée une tâche d'impression (pièce, quantité, matière), assignée à l'imprimante la moins chargée.
-    Idempotent : rien n'est créé si le devis a déjà des tâches."""
-    if (row['doc_type'] or 'quote') != 'quote':
-        return 0
-    conn = get_db()
-    try:
-        if conn.execute("SELECT 1 FROM print_jobs WHERE user_id=? AND quote_id=?", (user_id, row['id'])).fetchone():
-            return 0
-        data = {}
-        try:
-            with open(_quote_payload_path(row), 'r', encoding='utf-8') as f:
-                data = json.load(f)
-        except Exception:
-            data = {}
-        part = str(data.get('item_name') or data.get('item_desc') or row['item_desc'] or row['number'] or 'Pièce')[:200]
-        try:
-            qty = max(1, int(float(str(data.get('qty') or row['qty'] or 1).replace(',', '.'))))
-        except (TypeError, ValueError):
-            qty = 1
-        material = str(data.get('material') or '')[:40].upper()
-        due = _iso_date(data.get('delivery_iso')) or ''
-        model = data.get('cost_model') if isinstance(data.get('cost_model'), dict) else {}
-        model = {k: _num(model.get(k)) for k in ('m', 'e', 'w', 'f', 'weight_g', 'hours')}
-        conn.execute(
-            "INSERT INTO print_jobs (user_id, quote_id, client, part, quantity, material, printer_id, due_date, notes, cost_model) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (user_id, row['id'], str(row['client'] or '')[:120], part, qty, material,
-             _least_loaded_printer(conn, user_id), due, str(row['number'] or ''), json.dumps(model)))
-        conn.commit()
-        return 1
-    finally:
-        conn.close()
-
-
-def _job_dict(r, printer_names, revenue=0):
-    today = datetime.date.today().isoformat()
-    open_ = r['status'] in ('queued', 'printing')
-    return {
-        'scrap': r['scrap'] or 0, 'actual_hours': round(r['actual_hours'] or 0, 2), 'actual_weight_g': r['actual_weight_g'],
-        'est_hours': round(float(r['est_hours'] or 0), 3), 'hours_piece': round(production_planning.hours_per_piece(r), 3),
-        'margin': _job_margin(r, revenue),
-        'id': r['id'], 'quote_id': r['quote_id'], 'client': r['client'], 'part': r['part'],
-        'quantity': r['quantity'], 'qty_done': r['qty_done'], 'material': r['material'],
-        'printer_id': r['printer_id'], 'printer_name': printer_names.get(r['printer_id'], ''),
-        'due_date': r['due_date'], 'status': r['status'], 'notes': r['notes'],
-        'late': bool(open_ and r['due_date'] and r['due_date'] < today),
-        'created_at': r['created_at'], 'done_at': r['done_at'],
-        'track_token': r['track_token'] or '', 'client_note': r['client_note'] or '',
-    }
-
-
-@app.route('/api/orders', methods=['GET'])
-@login_required
-def api_orders_list():
-    conn = get_db()
-    try:
-        names = {p['id']: p['name'] for p in conn.execute("SELECT id, name FROM printers WHERE user_id=?", (session['user_id'],)).fetchall()}
-        totals = {q['id']: q['total_value'] or 0 for q in conn.execute("SELECT id, total_value FROM quotes WHERE user_id=?", (session['user_id'],)).fetchall()}
-        rows = conn.execute(
-            "SELECT * FROM print_jobs WHERE user_id=? ORDER BY CASE status WHEN 'printing' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END, "
-            "CASE WHEN due_date='' THEN 1 ELSE 0 END, due_date, id", (session['user_id'],)).fetchall()
-    finally:
-        conn.close()
-    jobs = [_job_dict(r, names, totals.get(r['quote_id'], 0)) for r in rows]
-    return jsonify({
-        'jobs': jobs,
-        'margin_real': round(sum(j['margin']['real_margin'] for j in jobs if j['margin'] and j['qty_done']), 2),
-        'margin_est': round(sum(j['margin']['est_margin'] for j in jobs if j['margin'] and j['status'] != 'cancelled'), 2),
-        'printers': [{'id': k, 'name': v} for k, v in names.items()],
-        'open': sum(1 for j in jobs if j['status'] in ('queued', 'printing')),
-        'late': sum(1 for j in jobs if j['late']),
-    })
-
-
-def _job_fields(data, partial=False):
-    out = {}
-    if 'part' in data or not partial:
-        part = str(data.get('part') or '').strip()[:200]
-        if not part and not partial:
-            return None
-        if part:
-            out['part'] = part
-    for k, lim in (('client', 120), ('material', 40), ('notes', 300), ('client_note', 300)):
-        if k in data:
-            out[k] = str(data.get(k) or '').strip()[:lim]
-    if 'quantity' in data:
-        out['quantity'] = max(1, min(100000, _int_or0(data.get('quantity')) or 1))
-    if 'qty_done' in data:
-        out['qty_done'] = max(0, min(100000, _int_or0(data.get('qty_done'))))
-    if 'scrap' in data:
-        out['scrap'] = max(0, min(100000, _int_or0(data.get('scrap'))))
-    if 'actual_hours' in data:
-        out['actual_hours'] = max(0.0, min(100000.0, _num(data.get('actual_hours'))))
-    if 'est_hours' in data:
-        out['est_hours'] = max(0.0, min(100000.0, _num(data.get('est_hours'))))   # v1.1.5 : durée par pièce (planning)
-    if 'actual_weight_g' in data:
-        out['actual_weight_g'] = None if data.get('actual_weight_g') in (None, '') else max(0.0, min(1e7, _num(data.get('actual_weight_g'))))
-    if 'due_date' in data:
-        out['due_date'] = _iso_date(data.get('due_date')) or ''
-    if 'printer_id' in data:
-        out['printer_id'] = _int_or0(data.get('printer_id')) or None
-    if 'status' in data and data.get('status') in _JOB_STATUSES:
-        out['status'] = data['status']
-    return out
-
-
-@app.route('/api/orders', methods=['POST'])
-@login_required
-def api_orders_create():
-    f = _job_fields(request.get_json(silent=True) or {})
-    if f is None:
-        return jsonify({'success': False, 'error': 'part_required'}), 400
-    conn = get_db()
-    try:
-        if f.get('printer_id') is None:
-            f['printer_id'] = _least_loaded_printer(conn, session['user_id'])
-        elif not conn.execute("SELECT 1 FROM printers WHERE id=? AND user_id=?", (f['printer_id'], session['user_id'])).fetchone():
-            f['printer_id'] = None
-        f.setdefault('quantity', 1)
-        cols = list(f.keys())
-        cur = conn.execute(
-            f"INSERT INTO print_jobs (user_id, {', '.join(cols)}) VALUES (?, {', '.join('?' * len(cols))})",
-            (session['user_id'], *[f[c] for c in cols]))
-        conn.commit()
-        return jsonify({'success': True, 'id': cur.lastrowid})
-    finally:
-        conn.close()
-
-
-@app.route('/api/orders/<int:jid>', methods=['PUT'])
-@login_required
-def api_orders_update(jid):
-    f = _job_fields(request.get_json(silent=True) or {}, partial=True)
-    conn = get_db()
-    try:
-        row = conn.execute("SELECT * FROM print_jobs WHERE id=? AND user_id=?", (jid, session['user_id'])).fetchone()
-        if not row:
-            return jsonify({'success': False, 'error': 'not_found'}), 404
-        if 'printer_id' in f and f['printer_id'] and not conn.execute(
-                "SELECT 1 FROM printers WHERE id=? AND user_id=?", (f['printer_id'], session['user_id'])).fetchone():
-            f['printer_id'] = None
-        qty = f.get('quantity', row['quantity'])
-        done = min(f.get('qty_done', row['qty_done']), qty)
-        f['qty_done'] = done
-        status = f.get('status', row['status'])
-        if 'qty_done' in f and status in ('queued', 'printing'):
-            if done >= qty:
-                status = 'done'
-            elif done > 0:
-                status = 'printing'
-        if status == 'done' and done < qty and 'qty_done' not in (request.get_json(silent=True) or {}):
-            f['qty_done'] = done = qty
-        f['status'] = status
-        f['done_at'] = datetime.date.today().isoformat() if status == 'done' else ''
-        conn.execute(f"UPDATE print_jobs SET {', '.join(k + '=?' for k in f)} WHERE id=?", (*f.values(), jid))
-        conn.commit()
-        return jsonify({'success': True, 'status': status})
-    finally:
-        conn.close()
-
-
-@app.route('/api/orders/<int:jid>', methods=['DELETE'])
-@login_required
-def api_orders_delete(jid):
-    conn = get_db()
-    try:
-        rows = _trash_snapshot(conn, 'print_jobs', 'id = ? AND user_id = ?', (jid, session['user_id']))
-        tid = None
-        if rows:
-            r = rows[0]
-            tid = trash_record(conn, session['user_id'], 'order', r.get('part') or r.get('client') or f"#{jid}", {'row': r},
-                               detail=str(r.get('client') or ''))
-        conn.execute("DELETE FROM print_jobs WHERE id=? AND user_id=?", (jid, session['user_id']))
-        conn.commit()
-    finally:
-        conn.close()
-    return jsonify({'success': True, 'trash_key': f"row:{tid}" if tid else None})
-
-
-@app.route('/api/orders/from-quote/<int:qid>', methods=['POST'])
-@login_required
-def api_orders_from_quote(qid):
-    row = _stored_quote(qid)
-    if not row:
-        return jsonify({'success': False, 'error': 'not_found'}), 404
-    return jsonify({'success': True, 'created': _create_jobs_from_quote(session['user_id'], row)})
 
 
 # ── page de suivi client (un lien public par commande) : module séparé `modules/order_tracking.py` (services fournis par `order_tracking.init(globals())`) ──
-from modules import order_tracking
-from modules.order_tracking import (
-    _ORDER_TRACK_PAGE,
-    _order_by_track_token,
-    _share_base_url,
-    api_order_track_data,
-    api_orders_track_create,
-    api_orders_track_revoke,
-    order_track_page,
-)
 
 # ── Surveillance atelier : maintenance prédictive, dérive, alertes d'impression : module séparé `modules/workshop_watch.py` (services fournis par `workshop_watch.init(globals())`) ──
 from modules import workshop_watch
@@ -23356,21 +22702,17 @@ from modules.ai_providers import (
     AI_MODEL_NAME_RE,
     AI_PROVIDER_IDS,
     LANG_NAMES,
-    OLLAMA_MODEL_TIERS,
-    OLLAMA_TIMEOUT_SECONDS,
     _ai_http_error,
     _ai_secrets_lock,
     _call_ai,
     _call_cloud_ai,
     _call_ollama,
     _cloud_generate,
-    _detect_hardware,
     _get_ai_key,
     _get_ai_model,
     _image_mime,
     _load_ai_secrets,
     _ollama_is_reachable,
-    _recommend_ollama_model,
     _save_ai_secrets,
     _server_edition_only,
     api_ai_cloud_models,
@@ -23378,8 +22720,6 @@ from modules.ai_providers import (
     api_ai_provider_key_save,
     api_ai_providers,
     api_ai_test,
-    api_ollama_models,
-    api_ollama_recommend_model,
     get_ai_provider,
     get_ollama_base_url,
     get_user_lang,
@@ -23387,20 +22727,31 @@ from modules.ai_providers import (
 )
 
 # ── Fonctions IA : correction du temps d'impression, étiquettes auto, descriptions : module séparé `modules/ai_features.py` (services fournis par `ai_features.init(globals())`) ──
-from modules import ai_features
-from modules.ai_features import (
-    CORRECTION_FACTOR_BOUNDS,
-    MATERIAL_RANGES,
-    MIN_SAMPLES_FOR_CORRECTION,
-    _autofill_actual_print_time,
-    _get_print_time_correction_factor,
-    _material_ref_block,
-    api_ai_predict_print_time,
-    api_get_file_description,
-    api_ollama_auto_tag,
-    api_ollama_describe_file,
-    api_ollama_explain_orientation,
-)
+
+# ── 1.1.7 : les fonctions IA sont des plugins intégrés (Assistant IA : ai-assistant ; fournisseurs : ai-ollama, ai-openai, ai-anthropic, ai-gemini).
+# Le cœur ne les appelle que par ces passerelles : plugin absent → « IA désactivée », jamais d'erreur.
+_visual_call_lock = threading.Lock()        # un seul appel au modèle de vision à la fois (partagé avec le plugin Assistant IA)
+
+
+def _visual_ollama_opts(mode):
+    _ps = _hosted('photo_search')
+    return _ps._visual_ollama_opts(mode) if _ps else {}
+
+
+def _visual_local_check():
+    _ps = _hosted('photo_search')
+    return _ps._visual_local_check() if _ps else 'ai_disabled'
+
+
+def _material_ref_block(material):
+    _af = _hosted('ai_features')
+    return _af._material_ref_block(material) if _af else f"No known reference ranges for {material}: use general knowledge of this material."
+
+
+def _autofill_actual_print_time(*a, **k):
+    _af = _hosted('ai_features')
+    return _af._autofill_actual_print_time(*a, **k) if _af else None
+
 
 # ── S.O.S Print : conversations, cas de référence, réglages : module séparé `modules/sosprint_helpers.py` (services fournis par `sosprint_helpers.init(globals())`) ──
 from modules import sosprint_helpers
@@ -24193,27 +23544,6 @@ def api_ollama_semantic_search():
 
 
 # ── Recherche par photo (modèle de vision local) : module séparé `modules/photo_search.py` (services fournis par `photo_search.init(globals())`) ──
-from modules import photo_search
-from modules.photo_search import (
-    _VISUAL_PROMPT,
-    _VISUAL_STOP_WORDS,
-    _VISUAL_SYSTEM,
-    _visual_call_lock,
-    _visual_counts,
-    _visual_index_worker,
-    _visual_library_paths,
-    _visual_local_check,
-    _visual_lock,
-    _visual_machine_busy,
-    _visual_ollama_opts,
-    _visual_state,
-    _visual_thumb_b64,
-    _visual_tokens,
-    _visual_unload_model,
-    api_photo_index_control,
-    api_photo_index_status,
-    api_photo_search,
-)
 
 
 # ── Profils de slicer : lecture, normalisation, import (base de slicer_profiles) : module séparé `modules/slicer_import.py` (services fournis par `slicer_import.init(globals())`) ──
@@ -24927,33 +24257,12 @@ def api_ollama_recommend_profile_batch():
         return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
 
 
-@app.route('/api/spoolman/spools', methods=['GET'])
-@login_required
-def api_spoolman_spools():
-    url = request.args.get('url', '').rstrip('/')
-    if not url:
-        return jsonify({"error": "URL manquante"}), 400
-    try:
-        app_logger.info(f"[Spoolman] GET {url}/api/v1/spool")
-        res = requests.get(f"{url}/api/v1/spool", timeout=8, headers={"Accept": "application/json"})
-        app_logger.info(f"[Spoolman] Status: {res.status_code}")
-        if res.status_code == 404:
-            res2 = requests.get(f"{url}/api/spool", timeout=5, headers={"Accept": "application/json"})
-            if res2.ok:
-                data = res2.json()
-                return jsonify(data.get('items', data) if isinstance(data, dict) else data), 200
-            return jsonify({"error": f"Endpoint introuvable sur {url}"}), 404
-        if not res.ok:
-            return jsonify({"error": f"Spoolman a répondu {res.status_code}"}), res.status_code
-        data = res.json()
-        return jsonify(data.get('items', data) if isinstance(data, dict) and 'items' in data else data), 200
-    except requests.exceptions.ConnectionError:
-        return jsonify({"error": f"Connexion refusée — Spoolman démarré sur {url} ?"}), 503
-    except requests.exceptions.Timeout:
-        return jsonify({"error": "Timeout"}), 504
-    except Exception as e:
-        app_logger.error(f"[Spoolman] Erreur: {e}")
-        return jsonify({"error": "Une erreur interne est survenue lors du traitement de la requête"}), 500
+
+# ── 1.1.7 : Spoolman est un plugin intégré (bobines lues sur le serveur Spoolman, découverte du réseau) ; le cœur garde l'assignation de bobines.
+def _get_spoolman_slots(url):
+    _sp = _hosted('spoolman')
+    return _sp.get_slots(url) if _sp else ([], None)
+
 
 def _get_spool_remaining_g(source_type, source_id, user_id):
     if source_type == 'manual':
@@ -24968,24 +24277,8 @@ def _get_spool_remaining_g(source_type, source_id, user_id):
         except Exception:
             return None
     elif source_type == 'spoolman':
-        try:
-            conn = get_db()
-            row = conn.execute(
-                """SELECT spoolman_url FROM filament_assignments
-                   WHERE source_type='spoolman' AND source_id=? AND user_id=?
-                   ORDER BY assigned_at DESC LIMIT 1""",
-                (str(source_id), user_id)
-            ).fetchone()
-            conn.close()
-            if not row or not row['spoolman_url']:
-                return None
-            r = requests.get(f"{row['spoolman_url']}/api/v1/spool/{source_id}", timeout=5,
-                              headers={"Accept": "application/json"})
-            if not r.ok:
-                return None
-            return r.json().get('remaining_weight')
-        except Exception:
-            return None
+        _sp = _hosted('spoolman')
+        return _sp.remaining_g(source_id, user_id) if _sp else None
     return None
 
 def _check_restock_for_files(file_paths, user_id):
@@ -25056,6 +24349,12 @@ def _get_required_weight_for_file(file_path):
             _parsed = parse_bambu_orca_gcode3mf(_gp) if _gl.endswith('.3mf') else parse_slic3r_derived_gcode(_gp)
             if _parsed and _parsed.get('weight_g'):
                 return _parsed['weight_g'], 'gcode'
+    except Exception:
+        pass
+    try:                                                   # base de données d'abord : ne relit pas les 20 Mo du fichier cache
+        _meta, _failed = analysis_db_get(file_path)
+        if _meta and (_meta.get('weights') or {}).get('pla') is not None:
+            return _meta['weights']['pla'], 'geometric'
     except Exception:
         pass
     try:
@@ -25620,42 +24919,6 @@ def tigertag_auto_detect_studio():
     return jsonify({"error": f"Jeton(s) trouvé(s) mais invalide(s) : {last_error}"}), 401
 
 
-def _get_spoolman_slots(url):
-    slots = []
-    if not url:
-        return slots, None
-    try:
-        res = requests.get(f"{url}/api/v1/spool", timeout=8, headers={"Accept": "application/json"})
-        if not res.ok:
-            return slots, f"Spoolman a répondu {res.status_code}"
-        data = res.json()
-        spools = data.get('items', data) if isinstance(data, dict) and 'items' in data else data
-        for s in spools:
-            if s.get('archived'):
-                continue
-            filament = s.get('filament', {}) or {}
-            vendor = filament.get('vendor', {}) or {}
-            color = filament.get('color_hex')
-            price = s.get('price')
-            if price is None:
-                price = filament.get('price')
-            slots.append({
-                'source_type': 'spoolman',
-                'source_id': str(s.get('id')),
-                'name': filament.get('name') or vendor.get('name') or f"Bobine #{s.get('id')}",
-                'vendor': vendor.get('name') or '',
-                'material': filament.get('material') or '',
-                'color_hex': f"#{str(color).replace('#', '')}" if color else '#888888',
-                'remaining_g': s.get('remaining_weight'),
-                'capacity_g': filament.get('weight') or s.get('initial_weight') or 1000,
-                'spoolman_url': url,
-                'price': price if isinstance(price, (int, float)) else None,
-            })
-    except requests.exceptions.ConnectionError:
-        return slots, f"Connexion refusée — Spoolman démarré sur {url} ?"
-    except Exception as e:
-        return slots, str(e)
-    return slots, None
 
 @app.route('/api/filament/spools', methods=['GET'])
 @login_required
@@ -28841,68 +28104,10 @@ def get_local_ip():
         return '127.0.0.1'
 
 
-def _scan_lan_for_spoolman(timeout=0.35, port=7912, max_parallel=64):
-    local_ip = get_local_ip()
-    if local_ip == '127.0.0.1' or local_ip.count('.') != 3:
-        return None
-    prefix = '.'.join(local_ip.split('.')[:3])
-    candidates = [f"{prefix}.{i}" for i in range(1, 255)]
-
-    found = {'url': None}
-    lock = threading.Lock()
-
-    def _check(ip):
-        if found['url']:
-            return
-        try:
-            r = requests.get(f"http://{ip}:{port}/api/v1/info", timeout=timeout)
-            if r.ok:
-                data = r.json()
-                if isinstance(data, dict) and ('version' in data or 'debug_mode' in data):
-                    with lock:
-                        if not found['url']:
-                            found['url'] = f"http://{ip}:{port}"
-        except Exception:
-            pass
-
-    batch = []
-    for ip in candidates:
-        if found['url']:
-            break
-        t = threading.Thread(target=_check, args=(ip,), daemon=True)
-        batch.append(t)
-        t.start()
-        if len(batch) >= max_parallel:
-            for th in batch:
-                th.join(timeout=timeout + 0.5)
-            batch = []
-    for th in batch:
-        th.join(timeout=timeout + 0.5)
-
-    return found['url']
 
 
-@app.route('/api/spoolman/discover', methods=['GET'])
-@login_required
-def api_spoolman_discover():
-    settings = load_settings() or {}
-    if settings.get('spoolman_url'):
-        return jsonify({"found": False, "reason": "already_configured"}), 200
-    if settings.get('spoolman_discover_declined'):
-        return jsonify({"found": False, "reason": "declined"}), 200
-    url = _scan_lan_for_spoolman()
-    if url:
-        return jsonify({"found": True, "url": url}), 200
-    return jsonify({"found": False}), 200
 
 
-@app.route('/api/spoolman/discover/decline', methods=['POST'])
-@login_required
-def api_spoolman_discover_decline():
-    settings = load_settings() or {}
-    settings['spoolman_discover_declined'] = True
-    save_settings(settings)
-    return jsonify({"ok": True}), 200
 
 
 SLICER_ID_TO_DEFAULT_VALUE = {
@@ -28937,7 +28142,7 @@ SLICER_ID_TO_DEFAULT_VALUE = {
 @app.route('/api/slicers/installed', methods=['GET'])
 @login_required
 def api_slicers_installed():
-    """Logiciels de découpe détectés sur la machine ; `resin` = logiciel dédié résine (bêta), `default_value` = valeur du sélecteur de slicer."""
+    """Logiciels de découpe détectés sur la machine ; `resin` = logiciel dédié résine, `default_value` = valeur du sélecteur de slicer."""
     try:
         installed = get_cached_installed_slicers(force=request.args.get('refresh') == '1') or []
     except Exception as e:
@@ -28945,7 +28150,7 @@ def api_slicers_installed():
         installed = []
     out = [{'id': f['id'], 'name': f['name'], 'default_value': SLICER_ID_TO_DEFAULT_VALUE.get(f['id']),
             'resin': f['id'] in RESIN_SLICER_IDS} for f in installed]
-    return jsonify({'slicers': out, 'resin_default': _installed_resin_slicer_value() or None, 'beta_resin': True}), 200
+    return jsonify({'slicers': out, 'resin_default': _installed_resin_slicer_value() or None}), 200
 
 
 @app.route('/api/slicers/discover', methods=['GET'])
@@ -29486,21 +28691,15 @@ def api_remote_access_disable_fixed():
 # ── Version 1.0.6 : nouveaux modules (portail client des devis, export comptable ZIP, stock de pièces, répartition des
 # imprimantes, résumé périodique, pesées de bobines, partage de profils). Leurs services sont fournis par `X.init(globals())`
 # (juste avant le démarrage) ; voir docs/ARCHITECTURE.md. ──
-from modules import quote_portal, accounting_zip, parts_stock, printer_dispatch, digest, filament_weighing, profile_share, openprinttag, open_filament_db
+from modules import printer_dispatch, filament_weighing, openprinttag, open_filament_db
 
 print_session.init(globals())   # v1.0.4 : fournit ses services au module et enregistre ses routes
 
-share_link.init(globals())
 
-order_tracking.init(globals())
-
-globals().update(timelapse.init(globals()))
-
-mqtt_publisher.init(globals())
 
 tigertag.init(globals())
 
-push_notify.init(globals())
+print_events.init(globals())
 
 auto_backup_routes.init(globals())
 
@@ -29508,76 +28707,55 @@ feedback.init(globals())
 
 sosprint_helpers.init(globals())
 
-remote_instances.init(globals())
 
 slicer_profiles.init(globals())
 
-clients.init(globals())
 
 trash_routes.init(globals())
 
-quote_portal.init(globals())
 
-accounting_zip.init(globals())
 
-parts_stock.init(globals())
 
 printer_dispatch.init(globals())
 
-digest.init(globals())
 
 # ── v1.1.3 : versions de modèle, tarif heures creuses, Obico, imprimantes Duet / Repetier, statistiques d'échecs, collections ──
-from modules import model_versions, energy_tariff, obico, printers_extra, failure_stats, collections_sets, merge_3mf, resin_printers, resin_inventory, usb_printers
+from modules import model_versions, printers_extra, failure_stats, collections_sets, intelligence
 
 model_versions.init(globals())
 
-energy_tariff.init(globals())
-
-obico.init(globals())
 
 printers_extra.init(globals())
-resin_printers.init(globals())
-usb_printers.init(globals())
-resin_inventory.init(globals())
 
 failure_stats.init(globals())
+intelligence.init(globals())
 
 collections_sets.init(globals())
-merge_3mf.init(globals())
 
-# ── v1.1.4 : BigPrint (mise à l'échelle grandeur nature + découpe en pièces, moteur AGPL-3.0 de PooterTF/bigprint) ──
-from modules import bigprint_i18n
-bigprint_i18n.init(globals())
-from modules import bigprint_tool
-bigprint_tool.init(globals())
 
 filament_weighing.init(globals())
 openprinttag.init(globals())
 open_filament_db.init(globals())
 
-profile_share.init(globals())
 
 globals().update(slicer_import.init(globals()))
 
-photo_search.init(globals())
 
-ai_features.init(globals())
 
 globals().update(ai_providers.init(globals()))
 
 workshop_watch.init(globals())
 
-from modules import production_planning   # v1.1.5 : planning et capacité de production
-production_planning.init(globals())
 
 from modules import print_traceability   # v1.1.6 : modèle → version → profil → résultat
 print_traceability.init(globals())
+from modules import public_api   # v1.1.7 : API publique (jetons, /api/v1, OpenAPI, journal)
+public_api.init(globals())
 
 globals().update(backup_restore.init(globals()))
 
 globals().update(integrity_check.init(globals()))
 
-file_convert.init(globals())
 
 account_platforms.init(globals())
 
@@ -29589,6 +28767,43 @@ file_origin_delete.init(globals())
 
 from modules import login_log   # journal des connexions (1.1.6)
 login_log.init(globals())
+from modules import session_manager   # 1.1.7 : sessions actives (liste, révocation)
+session_manager.init(globals())
+from modules import print_gcode_archive   # 1.1.7 : archive du G-code de chaque impression (historique)
+print_gcode_archive.init(globals())
+from modules import plugins   # 1.1.7 : plugins et SDK
+plugins.init(globals())
+from modules import model_lighten   # 1.1.7 : version allégée d'un STL géant (copie simplifiée à côté de l'original)
+model_lighten.init(globals())
+from modules import shape_search   # 1.1.7 : recherche de pièces similaires par empreinte de forme
+shape_search.init(globals())
+from modules import model_diff   # 1.1.7 : diff 3D visuel entre deux versions
+model_diff.init(globals())
+from modules import auto_organize   # 1.1.7 : règles d'auto-organisation de la bibliothèque
+auto_organize.init(globals())
+from modules import compat   # 1.1.7 : compatibilité modèle ↔ imprimante
+compat.init(globals())
+from modules import part_dossier   # 1.1.7 : fiche pièce (assemble versions, impressions, licence, G-code, photos)
+part_dossier.init(globals())
+from modules import print_check   # 1.1.7 : vérification avant impression + orientation conseillée (surplombs, base, supports estimés)
+print_check.init(globals())
+from modules import access_control   # 1.1.7 : équipes, rôles et permissions
+access_control.init(globals())
+from modules import audit_log   # 1.1.7 : journal d'audit général
+audit_log.init(globals())
+from modules import license_watch   # 1.1.7 : alertes d'expiration de licence
+license_watch.init(globals())
+from modules import print_enrich   # 1.1.7 : températures et version du slicer dans l'historique
+print_enrich.init(globals())
+from modules import migrations   # 1.1.7 : migrations de base versionnées
+migrations.init(globals())
+from modules import job_manager   # 1.1.7 : gestionnaire central des tâches de fond
+job_manager.init(globals())
+
+from modules import plugin_host   # 1.1.7 : plugins intégrés (BigPrint, MQTT, timelapse…) : migration invisible puis chargement de ceux qui sont activés
+plugin_host.init(globals())
+
+
 
 if __name__ in ('__main__', 'stellio_main'):
     import sys, os, threading, time, urllib.request, json
@@ -29661,20 +28876,15 @@ if __name__ in ('__main__', 'stellio_main'):
                 on_status('database')
             process_generation_queue()
             process_slice_estimate_queue()
-            _start_timelapse_worker()
             _start_v104_worker()
             threading.Thread(target=_acct_models_auto_loop, daemon=True, name='stellio-acct-models').start()
-            digest.start_worker()
-            energy_tariff.start_worker()
-            if obico._cfg()['enabled']:
-                obico.start_worker()
-            _start_mqtt_publisher()
             threading.Thread(target=_startup_sync_slicer_profiles, daemon=True).start()
             threading.Thread(target=_auto_backup_scheduler, daemon=True).start()
             threading.Thread(target=_auto_scan_scheduler, daemon=True).start()
-            threading.Thread(target=_push_watcher_loop, daemon=True).start()
+            threading.Thread(target=print_events._push_watcher_loop, daemon=True).start()
             threading.Thread(target=_workshop_watch_loop, daemon=True, name='stellio-workshop').start()
-            threading.Thread(target=production_planning._planning_loop, daemon=True, name='stellio-planning').start()
+            threading.Thread(target=license_watch._loop, daemon=True, name='stellio-licenses').start()   # 1.1.7 : alertes d'expiration de licence
+            plugin_host.autostart()   # 1.1.7 : tâches de fond des plugins intégrés activés
             if os.path.exists(CACHE_FILE):
                 try:
                     with open(CACHE_FILE, 'r', encoding='utf-8') as f: json.load(f)
@@ -29747,6 +28957,7 @@ if __name__ in ('__main__', 'stellio_main'):
 
                 def _background_library_prep():
                     try:
+                        _sweep_thumb_tmp(min_age_s=0)      # au démarrage rien ne tourne encore : toute copie temporaire est un reste
                         cached_count = 0
                         if os.path.exists(CACHE_FILE):
                             with open(CACHE_FILE, 'r', encoding='utf-8') as f:

@@ -1,0 +1,38 @@
+{
+  "id": "usb-printers",
+  "name": "Imprimantes USB",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-usb",
+  "description": {
+    "fr": "Détecte les imprimantes branchées en USB au PC qui fait tourner Stellio.",
+    "en": "Detects printers plugged in by USB to the PC running Stellio.",
+    "de": "Erkennt Drucker, die per USB am Stellio-PC angeschlossen sind.",
+    "es": "Detecta las impresoras conectadas por USB al PC que ejecuta Stellio.",
+    "pt": "Deteta as impressoras ligadas por USB ao PC que executa o Stellio.",
+    "it": "Rileva le stampanti collegate via USB al PC su cui gira Stellio.",
+    "zh": "检测通过 USB 连接到运行 Stellio 的电脑的打印机。",
+    "ja": "Stellio を実行している PC に USB 接続されたプリンターを検出します。"
+  },
+  "host": {
+    "modules": [
+      "usb_printers"
+    ],
+    "migrate": {
+      "printer_types": [
+        "usb_serial"
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "Imprimantes USB",
+    "en": "USB printers",
+    "de": "USB-Drucker",
+    "es": "Impresoras USB",
+    "pt": "Impressoras USB",
+    "it": "Stampanti USB",
+    "zh": "USB 打印机",
+    "ja": "USB プリンター"
+  }
+}

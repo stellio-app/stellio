@@ -1,0 +1,38 @@
+{
+  "id": "digest",
+  "name": "Résumé périodique",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-bell",
+  "description": {
+    "fr": "Résumé quotidien ou hebdomadaire de l'atelier (notification et push).",
+    "en": "Daily or weekly workshop summary (notification and push).",
+    "de": "Tägliche oder wöchentliche Werkstattzusammenfassung (Benachrichtigung und Push).",
+    "es": "Resumen diario o semanal del taller (notificación y push).",
+    "pt": "Resumo diário ou semanal da oficina (notificação e push).",
+    "it": "Riepilogo giornaliero o settimanale dell'officina (notifica e push).",
+    "zh": "每日或每周的工坊摘要（通知和推送）。",
+    "ja": "工房の日次・週次サマリー（通知とプッシュ）。"
+  },
+  "host": {
+    "modules": [
+      "digest"
+    ],
+    "migrate": {
+      "settings": [
+        "digest_enabled"
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "Résumé périodique",
+    "en": "Periodic digest",
+    "de": "Regelmäßige Zusammenfassung",
+    "es": "Resumen periódico",
+    "pt": "Resumo periódico",
+    "it": "Riepilogo periodico",
+    "zh": "定期摘要",
+    "ja": "定期ダイジェスト"
+  }
+}

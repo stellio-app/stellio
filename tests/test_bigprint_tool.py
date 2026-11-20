@@ -11,12 +11,12 @@ if ROOT not in sys.path:
 
 
 def _client(tmp_path):
-    spec = importlib.util.spec_from_file_location('bigprint_tool_t', os.path.join(ROOT, 'modules', 'bigprint_tool.py'))
+    spec = importlib.util.spec_from_file_location('bigprint_tool_t', __import__('conftest').mod_path('bigprint_tool'))
     mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
     app = flask.Flask('t'); app.secret_key = 'x'
     services = dict(DATA_DIR=str(tmp_path), _is_path_within_sources=lambda p, u: True, _smb_kwargs_for_path=lambda u, p: None, app=app,
                     app_logger=__import__('logging').getLogger('t'), get_db=lambda: None, invalidate_cache=lambda: None,
-                    jsonify=flask.jsonify, login_required=lambda f: f, request=flask.request, session={'user_id': 1}, smbclient=None)
+                    jsonify=flask.jsonify, login_required=lambda f: f, request=flask.request, session={'user_id': 1}, smbclient=None, send_file=flask.send_file)
     mod.init(services)
     return app.test_client(), mod
 
@@ -97,10 +97,11 @@ def test_apercu_puis_enregistrement_reels(tmp_path):
 
 
 def test_build_copie_le_moteur_bigprint_a_cote_de_main():
-    """Régression 1.1.4 : sans copie du dossier bigprint dans app/, l'app installée disait « module manquant bigprint »."""
+    """Régression 1.1.4 : sans copie du moteur dans app/, l'app installée disait « module manquant bigprint » (depuis 1.1.7 : dossier bundled_plugins/ copié en bloc)."""
     wf = open(os.path.join(ROOT, '.github', 'workflows', 'build-and-sign.yml'), encoding='utf-8').read()
-    assert wf.count('Copy-Item -Recurse "bigprint"') == 1 and wf.count('cp -R bigprint "$APP_DIR/bigprint"') == 2
-    assert os.path.isfile(os.path.join(ROOT, 'bigprint', 'gui.py'))
+    assert wf.count('Copy-Item -Recurse "bundled_plugins"') == 1 and wf.count('cp -R bundled_plugins "$APP_DIR/bundled_plugins"') == 2
+    assert wf.count('--paths bundled_plugins/bigprint') == 3
+    assert os.path.isfile(os.path.join(ROOT, 'bundled_plugins', 'bigprint', 'bigprint', 'gui.py'))
 
 
 def test_demo_invite_apercu_seulement(tmp_path):
@@ -151,3 +152,16 @@ def test_demo_limites(tmp_path):
     assert r.status_code == 400 and 'démo' in r.get_json()['error']
     mod.session['role'] = 'owner'
     mod.session.pop('bp_vid', None)
+
+
+def test_selecteur_pagine_par_10():
+    """Le sélecteur de la bibliothèque est paginé (10 par page), avec flèches et boutons première/dernière page."""
+    import os
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    js = open(os.path.join(root, 'bundled_plugins', 'bigprint', 'bigprint.js'), encoding='utf-8').read()
+    html = open(os.path.join(root, 'interface', 'index.html'), encoding='utf-8').read()
+    assert 'PICK_PER_PAGE = 10' in js and 'id="bp-picker-pager"' in html
+    assert ".slice(0, 200)" not in js[js.index('function renderPicker'):js.index('async function uploadFile')]
+    for icon in ('fa-angles-left', 'fa-angle-left', 'fa-angle-right', 'fa-angles-right'):
+        assert icon in js
+    assert "addEventListener('input', () => renderPicker())" in js         # une recherche revient à la page 1

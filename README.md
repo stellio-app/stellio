@@ -129,9 +129,10 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 🔁 **Reprint like last time**: from the history, one click reopens the send window with the same printer, profile and spool
 - 🎛️ **Calibrations**: save flow, pressure advance, temperatures… per filament and printer, recalled in the send-to-slicer window
 - 👥 **Light collaborative mode**: see if another connected device is already viewing a file, and get warned before accidentally sending the same file to the slicer twice
+- 🛡️ **Administration plugin & supervised instances**: one page for guest accounts and roles, teams, sessions, audit log and paired instances. A primary instance can supervise another one **once its owner accepts**: accounts, roles and permissions are then managed from the primary, local content stays private by default, and the owner can leave supervision at any time. An instance that is not connected keeps full control.
 
 ### 🧵 Materials: filament & resin
-- 🧪 **Resin inventory (beta)**: the sidebar category is now **Materials** (Filament + Resin). Add your resin bottles by hand (brand, type, colour, volume, remaining, price, storage place), subtract what you use in ml, and get the same **“To order”** reminder as for filament (low-stock threshold, manual checkbox, shop search links, “already ordered”) — also shown in the dashboard widget. Not linked to printers yet, nothing is deducted automatically
+- **Resin inventory**: the sidebar category is now **Materials** (Filament + Resin). Add your resin bottles by hand (brand, type, colour, volume, remaining, price, storage place), subtract what you use in ml, and get the same **“To order”** reminder as for filament (low-stock threshold, manual checkbox, shop search links, “already ordered”) — also shown in the dashboard widget. Not linked to printers yet, nothing is deducted automatically
 - 🔗 **Spoolman** integration (spool management server), with automatic detection on your network
 - 🟠 **Bambu Lab AMS** support (slot reading)
 - 🟢 **Creality CFS** support
@@ -156,6 +157,12 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 - 🛒 **Useful links**: shops, printer manufacturers, 3D model sites and resources grouped in collapsible sections
 
 ### 🧩 Advanced tools
+- 🧩 **Built-in plugins (1.1.7)**: BigPrint, resin printers, USB printers, timelapse, file tools (convert / merge 3MF), plate studio, push notifications, webhooks, weekly digest, MQTT and Obico are now plugins shipped with Stellio and loaded only when enabled (Plugins tab). Upgrading from 1.1.6 is invisible: whatever you already use is enabled automatically with its settings intact; a fresh install starts lean. Also built-in: **Sharing & sync**, **Spoolman**, one plugin per AI provider plus the **AI assistant**, and **Stellio Pro** (clients, quotes, invoices, orders, accounting export, energy tariff, production planning, material needs, parts stock) — each adds its own pages and buttons only when enabled.
+- 🗂️ **Advanced workshop (1.1.7)**: tools placed in the sidebar by category (owner account) — **Library** (automatic organization with rules, visual 3D diff incl. STEP, similar parts by shape with thumbnails, licenses with expiry notifications, part sheet), **Print** (model ↔ printer compatibility, pre-print check with suggested orientation, G-code archive per print), **Materials** (material needs against stock), **Tools** (multi-model plate with real-geometry nesting, fabrication assistant) and **Administration** (tasks, database, audit log, teams, sessions). Each entry can be switched off in Settings › Navigation items.
+- 🔑 **Public API & webhooks**: scoped tokens, `/api/v1` routes with OpenAPI docs, Python and JavaScript SDKs; signed outgoing webhooks (HMAC-SHA256) with retries and a log.
+- 👥 **Teams & security**: roles (administrator, manager, operator, simple user, guest), per-folder, project and printer permissions, shared workspaces, revocable active sessions, login log, paginated audit log with CSV export.
+- 🧠 **Stellio Intelligence** (Statistics): recommended slicer profile per material / printer and likely failure causes, learned from your rated prints (statistics, not an AI model). Production planning also gains profitability per printer and human labor time.
+- 🪶 **Giant STL files**: streamed analysis, simplified thumbnail and viewer, load threshold adapted to free memory and **Create a lightweight version** (a simplified copy next to the original, never modified). Thumbnails of large files are drawn in a separate process, so a crash can no longer take the app down.
 - 🎨 **Automatic bed nesting** (rectpack or real silhouette via shapely)
 - 🧩 **Merge into 3MF**: select several models (STL, 3MF, OBJ…) and Stellio builds a single 3MF file — one plate if everything fits, otherwise a multi-plate file (structure compatible with Bambu Studio / OrcaSlicer; PrusaSlicer shows all parts together). You choose the file name and folder (network shares included, folder creation possible), then Stellio offers to delete or keep the original files.
 - 🖌️ **Spool colour sent to the slicer**: when sending, the colour and material of the chosen spool are applied to the filament profile loaded in OrcaSlicer, Bambu Studio or PrusaSlicer (an imported filament profile linked to the printer is required; in a batch send, the colour is applied only if all spools are identical).
@@ -311,6 +318,7 @@ Non-interactive mode: every option can be set with environment variables, e.g. `
 
 > The Windows version is not affected: these features only appear on Raspberry Pi, VM, LXC, Docker and Linux.
 
+- 🧱 **Server-only in 1.1.7**: external push notifications, periodic digest, MQTT / Home Assistant, outgoing webhooks, public API, sync between instances and mobile access are hidden and disabled on Windows.
 - ☁️ **Online AI (optional)**: instead of Ollama, use Claude (Anthropic), ChatGPT (OpenAI) or Gemini (Google) with your own API key (Settings → Artificial Intelligence). The key is encrypted on the server and never sent back to the browser; Ollama remains the default, 100% local. Requests (file names, tags, descriptions, S.O.S Print photos) go to the provider you chose and are billed on your key.
 - 📥 **Slicer profiles**: Stellio cannot see the slicers on your PC and does not connect to slicer clouds (Orca Cloud, Bambu Cloud…). Export your profiles from the slicer (OrcaSlicer: File → Export → Export Preset Bundle), then import them from Settings → My slicer profiles; for Orca Cloud you can also paste a profile's “Copy raw JSON”. A **watched profiles folder** that Stellio rereads automatically is also possible (Syncthing, network share, scp…).
 - 🐯 [**TigerTag**](https://tigersystem.io): official sign-in with e-mail and password in Settings → Filament inventory → TigerTag (your password is not kept, only an encrypted session token is). Account created with Google? First set a password with “Forgot password” in the TigerTag app. Fallback: copy the TigerTag Studio data folder to the server (Windows: the “TigerTag…” folder in `%APPDATA%`, at least `Local Storage` and `IndexedDB`) and set its path.
@@ -331,7 +339,7 @@ Stellio automatically detects:
 - ✅ ideaMaker
 - ✅ FlashPrint
 - ✅ Lychee Slicer
-- ✅ CHITUBOX / CHITUBOX Pro / Anycubic Photon Workshop / PreForm / Voxeldance Tango *(resin, beta)*
+- ✅ CHITUBOX / CHITUBOX Pro / Anycubic Photon Workshop / PreForm / Voxeldance Tango **
 - ✅ CraftWare
 - ✅ MatterControl
 - ✅ MakerBot Print
@@ -352,8 +360,8 @@ Stellio automatically detects:
 | **OctoPrint** | Any printer driven by OctoPrint | HTTP: monitoring, upload, camera |
 | **Duet / RepRapFirmware** | Any Duet 2/3 board | HTTP: monitoring, upload |
 | **Repetier-Server** | Any printer managed by Repetier-Server | HTTP: monitoring, upload |
-| **Resin (beta)** 🧪 | Formlabs (web API) · Anycubic Photon Wi-Fi · Chitubox / Phrozen / Uniformation (SDCP) | Monitoring only, still in beta — real hardware not fully tested · maintenance (FEP, vat, LCD…) |
-| **USB printer (beta) 🧪** | Marlin, Prusa, Creality, Klipper boards… plugged into the Stellio PC | Serial port detection (the port is never opened): plugged in / absent, no status or temperatures |
+| **Resin** | Formlabs (web API) · Anycubic Photon Wi-Fi · Chitubox / Phrozen / Uniformation (SDCP) | Monitoring only · maintenance (FEP, vat, LCD…) |
+| **USB printer** | Marlin, Prusa, Creality, Klipper boards… plugged into the Stellio PC | Serial port detection (the port is never opened): plugged in / absent, no status or temperatures |
 
 > The models listed are those offered in Stellio's “Add a printer” form. Other models that speak the same protocol usually work too, but have not all been tested — [tell us on GitHub](https://github.com/stellio-app/stellio/issues) if yours works or not.
 
@@ -405,7 +413,8 @@ stellio/
 ├── release-notes/          # notes.txt (release text, replaced at each release)
 ├── tests/  tools/          # pytest tests, maintenance tools (incl. stellio_manager.bat)
 ├── check_deps.py           # Self-healing dependency checker
-├── modules/                # Modules split out of main.py (print_session, share_link, timelapse, mqtt_publisher, quote_portal, digest…)
+├── modules/                # Core modules split out of main.py (print_session, share_link, plugin_host, print_events, quote_portal…)
+├── bundled_plugins/        # Built-in plugins (BigPrint, MQTT, webhooks, timelapse…), loaded only when enabled
 ├── worker.py               # Unused 3MF worker skeleton (placeholder, not wired in yet)
 ├── assets/                 # Logos, icons
 ├── languages/              # Translation files (JSON)

@@ -28,7 +28,7 @@ REPO = os.environ.get('GITHUB_REPOSITORY', 'stellio-app/stellio')
 LANGS = [('fr', 'Français', '🇫🇷'), ('en', 'English', '🇬🇧'), ('de', 'Deutsch', '🇩🇪'), ('es', 'Español', '🇪🇸'),
          ('pt', 'Português', '🇵🇹'), ('it', 'Italiano', '🇮🇹'), ('zh', '中文', '🇨🇳'), ('ja', '日本語', '🇯🇵')]
 PAGES = ['Home', 'Installation', 'Getting-Started', 'How-To', 'Library', 'Printers', 'Filament', 'Downloads', 'AI',
-         'Costs-and-Management', 'Remote-Access', 'Server-Edition', 'Settings-and-Data', 'Troubleshooting', 'Contributing']
+         'Costs-and-Management', 'Remote-Access', 'Desktop-Edition', 'Server-Edition', 'Settings-and-Data', 'Troubleshooting', 'Plugins', 'Contributing']
 CHANGELOG_TITLE = {'fr': 'Nouveautés', 'en': "What's new", 'de': 'Neuigkeiten', 'es': 'Novedades', 'pt': 'Novidades',
                    'it': 'Novità', 'zh': '更新日志', 'ja': '更新履歴'}
 CHANGELOG_INTRO = {

@@ -1,0 +1,48 @@
+{
+  "id": "sharing",
+  "name": "Partage & synchro",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Stellio",
+  "icon": "fa-share-nodes",
+  "description": {
+    "fr": "Liens d'état partageables, partage de profils de slicer, instances Stellio distantes (envoi de fichiers), synchronisation de bibliothèques et communauté (paquets .stlpack).",
+    "en": "Shareable status links, slicer-profile sharing, remote Stellio instances (file sending), library synchronisation and community packs (.stlpack).",
+    "de": "Teilbare Statuslinks, Teilen von Slicer-Profilen, entfernte Stellio-Instanzen (Dateiversand), Bibliotheks-Synchronisierung und Community-Pakete (.stlpack).",
+    "es": "Enlaces de estado compartibles, uso compartido de perfiles de slicer, instancias Stellio remotas (envío de archivos), sincronización de bibliotecas y paquetes de la comunidad (.stlpack).",
+    "pt": "Ligações de estado partilháveis, partilha de perfis de slicer, instâncias Stellio remotas (envio de ficheiros), sincronização de bibliotecas e pacotes da comunidade (.stlpack).",
+    "it": "Link di stato condivisibili, condivisione dei profili slicer, istanze Stellio remote (invio di file), sincronizzazione delle librerie e pacchetti della community (.stlpack).",
+    "zh": "可分享的状态链接、切片配置共享、远程 Stellio 实例（文件发送）、库同步和社区包（.stlpack）。",
+    "ja": "共有可能なステータスリンク、スライサープロファイルの共有、リモート Stellio インスタンス（ファイル送信）、ライブラリ同期、コミュニティパック（.stlpack）。"
+  },
+  "host": {
+    "modules": [
+      "share_link",
+      "profile_share",
+      "remote_instances",
+      "library_sync",
+      "community"
+    ],
+    "migrate": {
+      "tables": [
+        "share_links",
+        "remote_instances",
+        "sync_pairs"
+      ],
+      "dirs": [
+        "community",
+        "profile_share"
+      ]
+    }
+  },
+  "name_i18n": {
+    "fr": "Partage & synchro",
+    "en": "Sharing & sync",
+    "de": "Teilen & Synchronisierung",
+    "es": "Compartir y sincronizar",
+    "pt": "Partilha e sincronização",
+    "it": "Condivisione e sincronizzazione",
+    "zh": "共享与同步",
+    "ja": "共有と同期"
+  }
+}

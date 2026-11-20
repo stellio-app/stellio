@@ -33,9 +33,9 @@ GROUPS = [
     ('intro', ['Home', 'Installation', 'Getting-Started']),
     ('guides', ['How-To']),
     ('usage', ['Library', 'Printers', 'Filament', 'Downloads', 'AI', 'Costs-and-Management']),
-    ('config', ['Remote-Access', 'Server-Edition', 'Settings-and-Data']),
+    ('config', ['Remote-Access', 'Desktop-Edition', 'Server-Edition', 'Settings-and-Data']),
     ('help', ['Troubleshooting']),
-    ('dev', ['Contributing', 'Changelog']),
+    ('dev', ['Plugins', 'Contributing', 'Changelog']),
 ]
 UI = {
     'fr': dict(intro='Stellio', guides='Guides', usage='Utilisation', config='Configuration', help='Dépannage', dev='Développement',
@@ -73,7 +73,7 @@ UI = {
 }
 ICONS = {'Home': '🏠', 'Installation': '📦', 'Getting-Started': '🚀', 'How-To': '🧭', 'Library': '🗂️', 'Printers': '🖨️',
          'Filament': '🧵', 'Downloads': '⬇️', 'AI': '🤖', 'Costs-and-Management': '💶', 'Remote-Access': '📱',
-         'Server-Edition': '🖥️', 'Settings-and-Data': '⚙️', 'Troubleshooting': '🛟', 'Contributing': '🤝', 'Changelog': '📰'}
+         'Desktop-Edition': '💻', 'Server-Edition': '🖥️', 'Settings-and-Data': '⚙️', 'Troubleshooting': '🛟', 'Plugins': '🧩', 'Contributing': '🤝', 'Changelog': '📰'}
 
 
 def version():
