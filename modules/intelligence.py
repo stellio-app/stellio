@@ -36,6 +36,9 @@ MIN_PARAM_OK = 3         # réussites (avec ce réglage connu) minimum pour donn
 MIN_FAILED = 2           # échecs minimum pour parler de causes
 AVOID_MAX_RATE = 0.4     # un profil sous ce taux de réussite (avec ≥ 3 impressions) est déconseillé
 LEAD_MIN_GAP = 0.25      # écart de taux d'échec avec la moyenne pour signaler un contexte
+FB_MIN = 3               # retours « recommandation suivie » minimum pour corriger le classement (1.1.8)
+FB_DEMOTE_RATE = 0.4     # une recommandation suivie qui réussit moins souvent que ça est rétrogradée
+FB_PROMOTE_RATE = 0.8    # … et au-dessus de ça, légèrement favorisée
 REASONS = ('warping', 'stringing', 'layer_shift', 'spaghetti', 'support_failure', 'adhesion', 'other')
 
 # réglage → (unité, écart absolu minimum, écart relatif minimum) pour dire que deux groupes diffèrent
@@ -201,14 +204,50 @@ def _confidence(total, rate):
     return 'medium' if total >= MIN_SCOPE else 'low'
 
 
-def recommend(rows, profiles=None, material='', printer_id=None, model_path=''):
+def apply_feedback(combos, feedback):
+    """Corrige le classement avec le retour réel des recommandations déjà SUIVIES (1.1.8) : pas d'apprentissage opaque, une règle lisible.
+    Un profil recommandé puis utilisé au moins `FB_MIN` fois : taux de réussite ≤ 40 % → score × 0,5 ; ≥ 80 % → score × 1,1 (plafonné à 1).
+    Chaque combinaison porte `feedback` = {followed, success, effect} pour que l'écran explique la correction. Les recommandations ignorées ne servent qu'aux statistiques."""
+    if not feedback:
+        return combos
+    for c in combos:
+        mine = [f for f in feedback if f.get('followed') and f.get('result') in ('success', 'failed')
+                and ((c['profile'] and f.get('profile') == c['profile']) or (c['profile_fp'] and f.get('profile_fp') == c['profile_fp']))]
+        if not mine:
+            continue
+        ok = sum(1 for f in mine if f['result'] == 'success')
+        effect = 'none'
+        if len(mine) >= FB_MIN:
+            rate = ok / len(mine)
+            if rate <= FB_DEMOTE_RATE:
+                c['score'] = round(c['score'] * 0.5, 4)
+                effect = 'demoted'
+            elif rate >= FB_PROMOTE_RATE:
+                c['score'] = round(min(1.0, c['score'] * 1.1), 4)
+                effect = 'promoted'
+        c['feedback'] = {'followed': len(mine), 'success': ok, 'effect': effect}
+    combos.sort(key=lambda g: (g['score'], g['total'], g['last']), reverse=True)
+    return combos
+
+
+def feedback_stats(feedback):
+    """Résumé du retour d'expérience : combien de recommandations suivies / ignorées et leur taux de réussite (pour juger si Stellio avait raison)."""
+    def agg(items):
+        rated = [f for f in items if f.get('result') in ('success', 'failed')]
+        ok = sum(1 for f in rated if f['result'] == 'success')
+        return {'total': len(items), 'rated': len(rated), 'success': ok, 'rate': round(ok / len(rated), 3) if rated else None}
+    fb = feedback or []
+    return {'followed': agg([f for f in fb if f.get('followed')]), 'ignored': agg([f for f in fb if not f.get('followed')]), 'pending': sum(1 for f in fb if not f.get('result'))}
+
+
+def recommend(rows, profiles=None, material='', printer_id=None, model_path='', feedback=None):
     """Recommandation de réglages pour (modèle, matière, imprimante) — tous facultatifs ; le périmètre s'élargit si les données manquent."""
     rows = _prepare(rows, profiles)
     ready = readiness(rows)
     wanted = _scopes(material, printer_id, model_path)[0][0]
     sc, sel, _ = _pick_scope(rows, material, printer_id, model_path, lambda s: len(s) >= MIN_SCOPE and any(c['total'] >= MIN_BEST and c['success'] > 0 for c in _combos(s)))
     res = {'ok': True, 'readiness': ready, 'scope': _scope_info(sc, wanted), 'sample': len(sel), 'best': None, 'alternatives': [], 'avoid': [], 'params': [], 'reason': None}
-    combos = _combos(sel)
+    combos = apply_feedback(_combos(sel), feedback)
     cands = [c for c in combos if c['total'] >= MIN_BEST and c['success'] > 0]
     if len(sel) < MIN_SCOPE or not cands:
         res['reason'] = 'not_enough_data'
@@ -321,6 +360,53 @@ def _load_rows(conn, uid):
     return [dict(r) for r in conn.execute(sql, (uid, )).fetchall()]
 
 
+def _ensure_fb(conn):
+    conn.execute("""CREATE TABLE IF NOT EXISTS intel_feedback (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        run_id INTEGER,
+        printer_id INTEGER,
+        material TEXT DEFAULT '',
+        model_path TEXT DEFAULT '',
+        profile TEXT DEFAULT '',
+        profile_fp TEXT DEFAULT '',
+        used_profile TEXT DEFAULT '',
+        followed INTEGER DEFAULT 0,
+        result TEXT DEFAULT '',
+        created_at REAL,
+        ended_at REAL)""")
+
+
+def record_feedback(conn, uid, run_id, printer_id, material, model_path, rec_profile, rec_fp, used_profile, used_fp=''):
+    """Enregistre qu'une recommandation a été (ou non) suivie. Rien n'est écrit s'il n'y avait pas de recommandation. Retourne l'id ou None."""
+    import time as _t
+    if not (rec_profile or rec_fp):
+        return None
+    _ensure_fb(conn)
+    followed = int(bool((rec_profile and used_profile == rec_profile) or (rec_fp and used_fp == rec_fp)))
+    cur = conn.execute("INSERT INTO intel_feedback (user_id, run_id, printer_id, material, model_path, profile, profile_fp, used_profile, followed, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                       (uid, run_id, printer_id, material or '', model_path or '', rec_profile or '', rec_fp or '', used_profile or '', followed, _t.time()))
+    conn.commit()
+    return cur.lastrowid
+
+
+def finish_feedback(conn, run_id, result):
+    """Associe le résultat réel (success / failed / partial) au retour enregistré pour ce flux de production."""
+    import time as _t
+    if result not in RATED:
+        return 0
+    _ensure_fb(conn)
+    n = conn.execute("UPDATE intel_feedback SET result = ?, ended_at = ? WHERE run_id = ? AND result = ''", (result, _t.time(), run_id)).rowcount
+    conn.commit()
+    return n
+
+
+def load_feedback(conn, uid):
+    _ensure_fb(conn)
+    return [{'profile': r['profile'], 'profile_fp': r['profile_fp'], 'followed': bool(r['followed']), 'result': r['result'], 'printer_id': r['printer_id'], 'material': r['material']}
+            for r in conn.execute("SELECT * FROM intel_feedback WHERE user_id = ?", (uid, )).fetchall()]
+
+
 def _int(v):
     try:
         return int(v)
@@ -333,9 +419,10 @@ def api_intelligence_recommend():
     conn = get_db()
     try:
         rows = _load_rows(conn, session['user_id'])
+        fb = load_feedback(conn, session['user_id'])
     finally:
         conn.close()
-    return jsonify(recommend(rows, _profiles(), a.get('material') or '', _int(a.get('printer_id')), (a.get('path') or '').replace('\\', '/')))
+    return jsonify(recommend(rows, _profiles(), a.get('material') or '', _int(a.get('printer_id')), (a.get('path') or '').replace('\\', '/'), fb))
 
 
 def api_intelligence_diagnose():
@@ -367,7 +454,40 @@ def api_intelligence_overview():
     return jsonify({'readiness': readiness(rows), 'materials': mats, 'printers': [{'id': i, 'name': printers.get(i) or f'#{i}'} for i in pids]})
 
 
+def api_intelligence_feedback():
+    conn = get_db()
+    try:
+        fb = load_feedback(conn, session['user_id'])
+    finally:
+        conn.close()
+    return jsonify(feedback_stats(fb))
+
+
+def api_intelligence_feedback_add():
+    """Retour manuel (impression lancée hors du flux de production) : {profile, followed, result, material, printer_id}."""
+    d = request.get_json(silent=True) or {}
+    result = d.get('result') or ''
+    if result and result not in RATED:
+        return jsonify({'error': 'bad_result'}), 400
+    prof = str(d.get('profile') or '').strip()[:200]
+    if not prof:
+        return jsonify({'error': 'bad_profile'}), 400
+    import time as _t
+    conn = get_db()
+    try:
+        _ensure_fb(conn)
+        conn.execute("INSERT INTO intel_feedback (user_id, run_id, printer_id, material, profile, used_profile, followed, result, created_at, ended_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                     (session['user_id'], None, _int(d.get('printer_id')), str(d.get('material') or '')[:40], prof, prof if d.get('followed') else '', int(bool(d.get('followed'))),
+                      result, _t.time(), _t.time() if result else None))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({'success': True})
+
+
 _ROUTES = (
+    ('/api/intelligence/feedback', ['GET'], 'api_intelligence_feedback', ('login_required', )),
+    ('/api/intelligence/feedback/add', ['POST'], 'api_intelligence_feedback_add', ('login_required', )),
     ('/api/intelligence/overview', ['GET'], 'api_intelligence_overview', ('login_required', )),
     ('/api/intelligence/recommend', ['GET'], 'api_intelligence_recommend', ('login_required', )),
     ('/api/intelligence/diagnose', ['GET'], 'api_intelligence_diagnose', ('login_required', )),

@@ -259,7 +259,7 @@ class AIDisabledError(RuntimeError):
     pass
 
 
-# ── Registre des fournisseurs (1.1.7) ─────────────────────────────────────────────────────────────────────────────
+# ── Registre des fournisseurs ─────────────────────────────────────────────────────────────────────────────
 # Le cœur ne contient plus le code d'aucun fournisseur : chaque fournisseur est un plugin intégré (ai-ollama, ai-openai, ai-anthropic,
 # ai-gemini) qui s'enregistre ici à son activation. Sans plugin, `is_ai_enabled()` est faux et les fonctions IA répondent « désactivée ».
 PROVIDERS = {}            # id -> {'label', 'local', 'call' | 'generate', 'list_models', 'default_model', 'key_url', …}

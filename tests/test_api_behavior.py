@@ -170,6 +170,15 @@ def test_already_printed_keeps_one_color_per_plate(stellio_app, logged):
     assert h2[0]['plates'][0]['spools'][0]['name'] == 'PETG noir'
 
 
+def test_already_printed_failure_reason_only_when_failed(stellio_app, logged):
+    h = _csrf(logged)
+    assert logged.post('/api/print-history/manual', json={'path': '/x/raison-ko.stl', 'result': 'failed', 'failure_reason': '  Décollé du plateau  '}, headers=h).status_code == 200
+    assert logged.post('/api/print-history/manual', json={'path': '/x/raison-ok.stl', 'result': 'success', 'failure_reason': 'ignorée'}, headers=h).status_code == 200
+    ko = logged.get('/api/print-history/by-file', query_string={'path': '/x/raison-ko.stl'}).get_json()['history'][0]
+    ok = logged.get('/api/print-history/by-file', query_string={'path': '/x/raison-ok.stl'}).get_json()['history'][0]
+    assert ko['failure_reason'] == 'Décollé du plateau' and not ok.get('failure_reason')
+
+
 def test_open_filament_database_shops_are_merged(stellio_app, logged):
     links = logged.get('/api/links').get_json()['links']
     ofd = [l for l in links if l['group'] == 'Boutiques Open Filament Database']

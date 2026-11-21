@@ -185,3 +185,19 @@ def test_source_des_notifications_spoolman_tigertag_et_autres():
     assert s('warning', 'parts_low:3:1') == 'Stellio Pro' and s('warning', 'quote_portal:4:accepted') == 'Stellio Pro'
     assert s('info', 'lic:expired:ab12') == '@license' and s('info', 'digest:daily:2026-11-20') == '@digest'
     assert s('info', 'model_update_makerworld_55_2026') == 'Makerworld' and s('info', 'restock_pla') == 'Stellio' and s('info', None) == 'Stellio'
+
+
+def test_source_dialogs_sit_above_the_sources_list_and_work_indicator_exists():
+    import re, pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent
+    css = (root / 'interface/style.css').read_text(encoding='utf-8')
+    m = re.search(r'#modal-select-type[^{]*\{\s*z-index:\s*(\d+)', css)
+    assert m and int(m.group(1)) > 1000          # « Ajouter une source » ne passe plus derrière la liste des sources
+    js = (root / 'interface/suite.js').read_text(encoding='utf-8')
+    assert 'su-work-auto' in js and 'su-btn-busy' in js   # repère visuel pendant un calcul (Diff 3D, etc.)
+
+
+def test_project_picker_quantity_field_keeps_its_size_inside_checkbox_rows():
+    import pathlib
+    css = (pathlib.Path(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
+    assert '.checkbox-label input.qty-needed' in css and 'width: 52px; height: auto' in css

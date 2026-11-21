@@ -5175,6 +5175,10 @@
                     </select>
                 </div>
                 <div id="ap-plates" style="margin-bottom:14px;"></div>
+                <div style="margin-bottom:14px;">
+                    <label for="ap-reason" class="ap-label" data-i18n="printed.reason">Raison de l'échec (facultatif)</label>
+                    <input type="text" id="ap-reason" class="settings-select" maxlength="100" autocomplete="off" style="width:100%; max-width:none;" data-i18n-placeholder="printed.reason_ph" placeholder="Pris en compte seulement si vous cliquez sur « Raté »">
+                </div>
                 <div style="display:flex; gap:8px;">
                     <button type="button" class="btn ap-btn-success" id="ap-success-btn" style="flex:1; justify-content:center;"><i class="fa-solid fa-circle-check"></i> <span data-i18n="printed.success">Réussi</span></button>
                     <button type="button" class="btn ap-btn-failed" id="ap-failed-btn" style="flex:1; justify-content:center;"><i class="fa-solid fa-circle-xmark"></i> <span data-i18n="printed.failed">Raté</span></button>
@@ -5244,6 +5248,11 @@
                 <button class="file-action-row" id="ctx-printed-btn">
                     <span class="file-action-icon"><i class="fa-solid fa-circle-check"></i></span>
                     <span class="file-action-label" data-i18n="printed.action">Déjà imprimé</span>
+                    <i class="fa-solid fa-chevron-right file-action-arrow"></i>
+                </button>
+                <button class="file-action-row" id="ctx-production-btn">
+                    <span class="file-action-icon"><i class="fa-solid fa-industry"></i></span>
+                    <span class="file-action-label" data-i18n="v113.production_action">Produire avec assistance</span>
                     <i class="fa-solid fa-chevron-right file-action-arrow"></i>
                 </button>
                 <button class="file-action-row" id="ctx-versions-btn">

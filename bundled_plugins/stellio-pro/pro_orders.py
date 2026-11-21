@@ -69,7 +69,7 @@ def _job_margin(r, revenue, labor_rate=0.0):
     time_pieces = (h_act / m['hours']) if (h_act > 0 and m['hours'] > 0) else done
     real_cost = (mat_pieces + scrap) * m['m'] + (time_pieces + scrap) * time_cost + m['f'] * done
     labor_est = labor_real = 0.0
-    if labor_rate and labor_rate > 0:                         # v1.1.7 : temps de travail humain (préparation + par pièce) × taux horaire
+    if labor_rate and labor_rate > 0:                         # temps de travail humain (préparation + par pièce) × taux horaire
         labor_est = production_planning.labor_cost(r, labor_rate, 'est')
         labor_real = production_planning.labor_cost(r, labor_rate, 'real')
         est_cost += labor_est
@@ -181,9 +181,9 @@ def _job_fields(data, partial=False):
         out['actual_hours'] = max(0.0, min(100000.0, _num(data.get('actual_hours'))))
     for _k, _lim in (('labor_setup_min', 100000.0), ('labor_min_piece', 100000.0), ('labor_hours_actual', 100000.0)):
         if _k in data:
-            out[_k] = max(0.0, min(_lim, _num(data.get(_k))))     # v1.1.7 : temps de travail humain
+            out[_k] = max(0.0, min(_lim, _num(data.get(_k))))     # temps de travail humain
     if 'est_hours' in data:
-        out['est_hours'] = max(0.0, min(100000.0, _num(data.get('est_hours'))))   # v1.1.5 : durée par pièce (planning)
+        out['est_hours'] = max(0.0, min(100000.0, _num(data.get('est_hours'))))   # durée par pièce (planning)
     if 'actual_weight_g' in data:
         out['actual_weight_g'] = None if data.get('actual_weight_g') in (None, '') else max(0.0, min(1e7, _num(data.get('actual_weight_g'))))
     if 'due_date' in data:

@@ -22,6 +22,8 @@ function table(rows, cols) {
         `<tr>${cols.map(c => cell(c[2] ? c[2](r[c[0]], r) : r[c[0]])).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 const note = (box, msg, bad) => { const p = box.querySelector('.suite-msg') || box.insertAdjacentElement('afterbegin', Object.assign(document.createElement('p'), { className: 'suite-msg settings-hint' })); p.textContent = msg; p.style.color = bad ? 'var(--danger, #e5484d)' : ''; };
+/* Avancement d'une tâche longue : dans le bandeau d'activité s'il existe (Diff 3D…), sinon message ordinaire. */
+const prog = (box, msg) => { const wk = box.querySelector('.su-work-auto span'); if (!wk) return note(box, msg); const m = String(msg || '').trim().replace(/^[a-z_]+\s*/i, ''); wk.textContent = tr('working', 'Calcul en cours…') + (m ? ' ' + m : ''); };
 const field = (id, label, ph, cls) => `<label class="suite-field${cls ? ' ' + cls : ''}"><span>${esc(label)}</span><input type="text" id="${id}" class="settings-select" placeholder="${esc(ph || '')}" autocomplete="off"></label>`;
 const btn = (id, label, cls) => `<button type="button" id="${id}" class="btn ${cls || 'btn-primary'} btn-sm">${esc(label)}</button>`;
 /* Champ « chemin » : saisie libre + bouton qui ouvre la bibliothèque (source, recherche, miniatures). */
@@ -114,7 +116,21 @@ document.addEventListener('click', async (e) => {
 });
 const val = (id) => ($(id) ? $(id).value.trim() : '');
 const lines = (id) => val(id).split(/\n|;/).map(s => s.trim()).filter(Boolean);
-function wire(box, id, fn) { const b = $(id); if (b) b.onclick = async () => { b.disabled = true; try { await fn(); } catch (e) { note(box, e.message, true); } b.disabled = false; }; }
+function wire(box, id, fn) {
+    const b = $(id); if (!b) return;
+    b.onclick = async () => {
+        /* Repère visuel : bouton « occupé » + bandeau d'activité (roue, texte, barre) tant que la tâche tourne. */
+        const w = document.createElement('div');
+        w.className = 'su-work su-work-auto'; w.setAttribute('role', 'status'); w.setAttribute('aria-live', 'polite');
+        w.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>' + esc(tr('working', 'Calcul en cours…')) + '</span><span class="su-work-bar" aria-hidden="true"><i></i></span>';
+        const anchor = b.closest('.su-line') || b;
+        anchor.insertAdjacentElement('afterend', w);
+        b.disabled = true; b.classList.add('su-btn-busy'); b.setAttribute('aria-busy', 'true');
+        box.querySelectorAll('.suite-msg').forEach(m => { m.textContent = ''; });
+        try { await fn(); } catch (e) { note(box, e.message, true); }
+        w.remove(); b.disabled = false; b.classList.remove('su-btn-busy'); b.removeAttribute('aria-busy');
+    };
+}
 /* Avancement d'une tâche : { done, total, message } (ou un nombre 0..1) → texte lisible, jamais « NaN ». */
 function pct(p) {
     if (p == null) return '';
@@ -125,7 +141,7 @@ function pct(p) {
 async function waitJob(id, box) {
     for (let i = 0; i < 240; i++) {
         const j = await api(`/api/jobs/${id}`);
-        note(box, `${j.state || ''} ${pct(j.progress)}`);
+        prog(box, `${j.state || ''} ${pct(j.progress)}`);
         if (['done', 'failed', 'cancelled'].includes(j.state)) { if (j.state !== 'done') throw new Error(j.error || j.state); return j.result; }
         await new Promise(r => setTimeout(r, 1000));
     }
@@ -207,19 +223,27 @@ const H = {
 const COLORS = { removed: '#e5484d', added: '#30a46c', same: '#8b8d98' };
 
 /* Nuage de points 3D (diff coloré) : canvas, rotation au glisser, zoom à la molette. Retourne { draw, state }. */
-function cloudView(host, points) {
+function cloudView(host, points, edges) {
     const all = [].concat(points.removed || [], points.added || [], points.same || []);
     const { c, r } = H.bounds(all);
-    const st = { yaw: -0.6, pitch: 0.5, zoom: 1, show: { removed: true, added: true, same: true } };
+    const st = { yaw: -0.6, pitch: 0.5, zoom: 1, mode: 'points', show: { removed: true, added: true, same: true } };
+    const hasEdges = !!edges && ['removed', 'added', 'same'].some(k => (edges[k] || []).length);
     host.innerHTML = `<canvas class="suite-cloud" width="720" height="440" aria-label="${esc(tr('cloud_label', 'Comparaison 3D en nuage de points'))}"></canvas>
         <div class="suite-legend">${['removed', 'added', 'same'].map(k => `<label><input type="checkbox" data-k="${k}" checked> <span class="suite-dot" style="background:${COLORS[k]}"></span> ${esc(tr('cloud_' + k, { removed: 'Retiré', added: 'Ajouté', same: 'Inchangé' }[k]))} (${(points[k] || []).length})</label>`).join('')}
-        <button type="button" class="btn btn-ghost btn-sm" data-view="iso">${esc(tr('view_iso', 'Vue 3D'))}</button><button type="button" class="btn btn-ghost btn-sm" data-view="top">${esc(tr('view_top', 'Dessus'))}</button><button type="button" class="btn btn-ghost btn-sm" data-view="front">${esc(tr('view_front', 'Face'))}</button></div>`;
+        <button type="button" class="btn btn-ghost btn-sm" data-view="iso">${esc(tr('view_iso', 'Vue 3D'))}</button><button type="button" class="btn btn-ghost btn-sm" data-view="top">${esc(tr('view_top', 'Dessus'))}</button><button type="button" class="btn btn-ghost btn-sm" data-view="front">${esc(tr('view_front', 'Face'))}</button>
+        ${hasEdges ? `<span class="suite-mode"><button type="button" class="btn btn-primary btn-sm" data-mode="points">${esc(tr('mode_points', 'Points'))}</button><button type="button" class="btn btn-ghost btn-sm" data-mode="wire">${esc(tr('mode_wire', 'Fil de fer'))}</button></span>` : ''}</div>`;
     const cv = host.querySelector('canvas'), g = cv.getContext('2d');
     function draw() {
         g.clearRect(0, 0, cv.width, cv.height);
         const sc = Math.min(cv.width, cv.height) / (2.2 * r) * st.zoom, ox = cv.width / 2, oy = cv.height / 2;
         for (const k of ['same', 'removed', 'added']) {
             if (!st.show[k]) continue;
+            if (st.mode === 'wire') {
+                g.strokeStyle = COLORS[k]; g.globalAlpha = k === 'same' ? 0.4 : 0.95; g.lineWidth = k === 'same' ? 1 : 1.6; g.beginPath();
+                for (const e of ((edges || {})[k] || [])) { const p = H.project([e[0], e[1], e[2]], c, st.yaw, st.pitch), q = H.project([e[3], e[4], e[5]], c, st.yaw, st.pitch); g.moveTo(ox + p[0] * sc, oy + p[1] * sc); g.lineTo(ox + q[0] * sc, oy + q[1] * sc); }
+                g.stroke();
+                continue;
+            }
             g.fillStyle = COLORS[k]; g.globalAlpha = k === 'same' ? 0.35 : 0.95;
             const sz = k === 'same' ? 2 : 3;
             for (const p of (points[k] || [])) { const q = H.project(p, c, st.yaw, st.pitch); g.fillRect(ox + q[0] * sc - sz / 2, oy + q[1] * sc - sz / 2, sz, sz); }
@@ -233,6 +257,8 @@ function cloudView(host, points) {
     cv.onwheel = (e) => { e.preventDefault(); st.zoom = Math.max(0.3, Math.min(8, st.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); draw(); };
     host.querySelector('.suite-legend').onclick = (e) => {
         const cb = e.target.closest('input[data-k]'); if (cb) { st.show[cb.dataset.k] = cb.checked; draw(); return; }
+        const md = e.target.closest('[data-mode]');
+        if (md) { st.mode = md.dataset.mode; host.querySelectorAll('[data-mode]').forEach(x => { x.className = 'btn btn-sm ' + (x.dataset.mode === st.mode ? 'btn-primary' : 'btn-ghost'); }); draw(); return; }
         const b = e.target.closest('[data-view]'); if (!b) return;
         const v = { iso: [-0.6, 0.5], top: [0, 1.5], front: [0, 0] }[b.dataset.view]; st.yaw = v[0]; st.pitch = v[1]; st.zoom = 1; draw();
     };
@@ -431,7 +457,7 @@ TABS.diff = { fb: 'Diff 3D', icon: 'code-compare', async render(box) {
         $('su-dout').innerHTML = (r.identical ? `<p class="settings-hint"><b>${esc(tr('d_same', 'Les deux versions sont identiques (à la tolérance près).'))}</b></p>` : '') +
             `<div class="suite-scroll"><table class="suite-table"><tbody>${m.map(x => `<tr><th>${esc(x[0])}</th><td>${esc(x[1])}</td></tr>`).join('')}</tbody></table></div><div id="su-dcloud"></div>` +
             `<p class="settings-hint">${esc(tr('d_note', 'Comparaison par échantillonnage de la surface (rouge : matière retirée, vert : ajoutée). Glissez pour tourner, molette pour zoomer. Maillages STL/OBJ/3MF/PLY/OFF ; STEP non pris en charge.'))}</p>`;
-        cloudView($('su-dcloud'), r.points || {});
+        cloudView($('su-dcloud'), r.points || {}, r.edges);
     });
 } };
 TABS.similar = { fb: 'Similaires', icon: 'clone', async render(box) {
@@ -466,6 +492,35 @@ TABS.similar = { fb: 'Similaires', icon: 'clone', async render(box) {
     });
 } };
 const flash = (box, id) => { if (!id) return; box.querySelectorAll(`[data-pid="${id}"]`).forEach(el => { el.classList.add('su-flash'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); setTimeout(() => el.classList.remove('su-flash'), 2600); }); };
+const sigChip = (st) => {
+    const m = { valid: ['su-chip-ok', 'fa-signature', 'sig_valid', 'Signé'], invalid: ['su-chip-warn', 'fa-triangle-exclamation', 'sig_invalid', 'Signature invalide'],
+        unverifiable: ['su-chip-muted', 'fa-circle-question', 'sig_unverifiable', 'Signature non vérifiable'], unsigned: ['su-chip-muted', 'fa-circle-minus', 'sig_unsigned', 'Non signé'] }[st];
+    return m ? `<span class="su-chip ${m[0]}"><i class="fa-solid ${m[1]}"></i> ${esc(tr(m[2], m[3]))}</span>` : '';
+};
+const auditChip = (lv) => {
+    const m = { ok: ['su-chip-ok', 'audit_ok', 'Audit : rien à signaler'], warn: ['su-chip-muted', 'audit_warn', 'Audit : points à lire'], danger: ['su-chip-warn', 'audit_danger', 'Audit : code dangereux (risque accepté)'] }[lv];
+    return m ? `<span class="su-chip ${m[0]}">${esc(tr(m[1], m[2]))}</span>` : '';
+};
+const sandboxNotice = (sb) => !sb || !sb.enforced ? tr(sb && sb.reason === 'disabled' ? 'sb_off' : 'sb_none', sb && sb.reason === 'disabled' ? 'Restrictions du noyau désactivées (STELLIO_PLUGIN_SANDBOX) : les permissions des plugins sont déclaratives.' : "Aucune restriction du noyau sur ce système : les permissions des plugins sont déclaratives (audit + acceptation). N'activez que du code que vous avez lu.")
+    : (sb.filesystem ? tr('sb_full', "Sous Linux, le noyau restreint chaque plugin : fichiers (lecture seule, écriture dans son dossier data/) et réseau (selon ses permissions). Un plugin autorisé à utiliser le réseau n'est pas limité à certains sites.")
+        : tr('sb_net', "Le noyau restreint le réseau des plugins sans permission « network ». Les fichiers ne sont pas restreints sur ce noyau (Landlock absent) : n'activez que du code que vous avez lu."));
+/* Installation avec les deux confirmations explicites du serveur : risque détecté par l'audit, changement de clé de signature. */
+async function installFlow(send) {
+    let extra = {};
+    for (let i = 0; i < 3; i++) {
+        try { return await send(extra); } catch (e) {
+            const code = e.data && e.data.code;
+            if (code === 'audit_blocked' && !extra.accept_risk) {
+                const list = ((e.data.audit && e.data.audit.findings) || []).filter(f => f.blocking).slice(0, 6).map(f => `• ${f.file}${f.line ? ':' + f.line : ''} — ${f.detail}`).join('\n');
+                if (!await ask(`${tr('risk_title', 'Code dangereux détecté')}\n\n${list}\n\n${tr('risk_confirm', 'Installer malgré ce risque ?')}`, { danger: true })) throw e;
+                extra = Object.assign({}, extra, { accept_risk: true });
+            } else if (code === 'key_changed' && !extra.accept_key_change) {
+                if (!await ask(`${e.message}\n\n${tr('key_confirm', 'La clé de signature a changé. Installer quand même ?')}`, { danger: true })) throw e;
+                extra = Object.assign({}, extra, { accept_key_change: true });
+            } else throw e;
+        }
+    }
+}
 let plSource = null;      // source de catalogue choisie pendant la session (le stockage du navigateur n'est qu'un confort)
 TABS.plugins = { fb: 'Plugins', icon: 'puzzle-piece', async render(box) {
     const lang = (window.I18N && I18N.lang) || 'fr';
@@ -479,7 +534,7 @@ TABS.plugins = { fb: 'Plugins', icon: 'puzzle-piece', async render(box) {
     const srcQ = custom ? '&url=' + encodeURIComponent(custom) : '';
     const logo = (p) => p.has_logo ? `<img class="su-logo" src="${API}/api/plugins/logo?id=${encodeURIComponent(p.id)}${srcQ}${bust ? '&t=' + bust : ''}" loading="lazy" alt="">` : '<span class="su-logo su-logo-ph"><i class="fa-solid fa-puzzle-piece"></i></span>';
     const card = (p) => `<article class="su-store-card" data-pid="${esc(p.id)}">${logo(p)}<div class="su-store-body"><div class="su-plugin-head"><strong>${esc(p.name)}</strong><span class="su-chip">v${esc(p.version || '?')}</span></div><div class="su-plugin-tags">${badge(p.official)}` +
-        (p.installed_version ? `<span class="su-chip su-chip-ok">${esc(tr('installed', 'installé'))} ${esc(p.installed_version)}</span>` : '') + `</div>` +
+        (p.installed_version ? `<span class="su-chip su-chip-ok">${esc(tr('installed', 'installé'))} ${esc(p.installed_version)}</span>` : '') + sigChip(p.signature_status) + `</div>` +
         `<p class="su-store-desc">${esc(p.description || '')}</p>` +
         `<div class="su-plugin-perms">${perms(p.permissions)}</div>` +
         `<div class="su-actions su-store-actions"><div class="su-store-btns">${p.update_available || !p.installed_version ? `<button type="button" class="btn btn-primary btn-sm" data-cat="${esc(p.id)}">${esc(p.update_available ? tr('update', 'Mettre à jour') : tr('install', 'Installer'))}</button>` : `<button type="button" class="btn btn-secondary btn-sm" data-cat="${esc(p.id)}">${esc(tr('reinstall', 'Réinstaller'))}</button>`}` +
@@ -489,7 +544,8 @@ TABS.plugins = { fb: 'Plugins', icon: 'puzzle-piece', async render(box) {
         (d.plugins.length ? `<div class="su-plugins">${d.plugins.map(p => item(p,
             `<button type="button" class="btn btn-ghost btn-sm" data-pl="${p.enabled ? 'off' : 'on'}" data-id="${esc(p.id)}" data-perms="${esc((p.permissions || []).join(','))}">${esc(p.enabled ? tr('disable', 'Désactiver') : tr('enable', 'Activer'))}</button>` +
             `<button type="button" class="btn btn-ghost btn-sm" data-pl="test" data-id="${esc(p.id)}">${esc(tr('test', 'Essai'))}</button><button type="button" class="btn btn-ghost btn-sm su-danger" data-pl="del" data-id="${esc(p.id)}">${esc(tr('delete', 'Supprimer'))}</button>`,
-            `<span class="su-chip ${p.enabled ? 'su-chip-ok' : 'su-chip-muted'}">${esc(p.enabled ? tr('active', 'Actif') : tr('inactive', 'Inactif'))}</span>`)).join('')}</div>` : `<p class="settings-hint">${esc(tr('no_plugin', 'Aucun plugin installé.'))}</p>`);
+            `<span class="su-chip ${p.enabled ? 'su-chip-ok' : 'su-chip-muted'}">${esc(p.enabled ? tr('active', 'Actif') : tr('inactive', 'Inactif'))}</span>${p.security ? sigChip(p.security.signature) + auditChip(p.security.audit) : ''}`)).join('')}</div>` : `<p class="settings-hint">${esc(tr('no_plugin', 'Aucun plugin installé.'))}</p>`) +
+        ((d.trusted_keys || []).length ? '' : `<p class="settings-hint"><i class="fa-solid fa-circle-info"></i> ${esc(tr('keys_none', "Aucune clé de confiance configurée : les téléchargements ne sont protégés que par l'empreinte SHA-256 du catalogue."))}</p>`);
     const builtHtml = (d) => { const b = d.builtin || []; return `<summary><h4><i class="fa-solid fa-cubes"></i> ${esc(tr('builtin_title', 'Plugins intégrés'))} <span class="su-chip">${b.filter(x => x.enabled).length}/${b.length}</span></h4></summary>` +
         `<p class="settings-hint">${esc(tr('builtin_hint', 'Livrés avec Stellio, ils ne se chargent que lorsqu\'ils sont activés. Vos réglages sont conservés quand vous désactivez un plugin. Le changement s\'applique au redémarrage de Stellio.'))}</p>` +
         (b.length ? `<div class="su-plugins">${b.map(p => `<div class="su-plugin" data-pid="${esc(p.id)}"><div class="su-plugin-head"><i class="fa-solid ${esc(p.icon || 'fa-puzzle-piece')}"></i><strong>${esc(p.name)}</strong><span class="su-chip">v${esc(p.version)}</span></div><div class="su-plugin-tags">${badge(true)}` +
@@ -499,7 +555,7 @@ TABS.plugins = { fb: 'Plugins', icon: 'puzzle-piece', async render(box) {
         `<div class="su-actions"><button type="button" class="btn btn-${b.some(x => x.restart_required) ? 'primary' : 'ghost'} btn-sm" id="su-restart"><i class="fa-solid fa-rotate"></i> ${esc(tr('restart_btn', 'Redémarrer Stellio'))}</button></div>`; };
     const builtSection = (d) => `<details class="su-card su-fold" id="su-plbuilt" open>${builtHtml(d)}</details>`;
     const instSection = (d) => `<details class="su-card su-fold" id="su-plinst" open>${instHtml(d)}</details>`;
-    box.innerHTML = `<div class="su-notice"><i class="fa-solid fa-triangle-exclamation"></i><span>${esc(tr('plugin_warn', 'Un plugin tourne dans un processus séparé mais n\'est pas un bac à sable : n\'activez que du code que vous avez lu.'))}</span></div>` +
+    box.innerHTML = `<div class="su-notice"><i class="fa-solid fa-triangle-exclamation"></i><span>${esc(sandboxNotice(d.sandbox))}</span></div>` +
         `<section class="su-card"><h4><i class="fa-solid fa-store"></i> ${esc(tr('catalog', 'Catalogue'))} <span id="su-plcn" class="su-chip" hidden></span><button type="button" class="btn btn-ghost btn-sm su-refresh" id="su-plref" title="${esc(tr('refresh', 'Actualiser le catalogue'))}" aria-label="${esc(tr('refresh', 'Actualiser le catalogue'))}"><i class="fa-solid fa-rotate"></i> ${esc(tr('refresh_btn', 'Actualiser'))}</button></h4><p class="settings-hint">${esc(tr('store_hint', 'Plugins proposés par la communauté, hébergés sur GitHub. Installer un plugin ne l\'active pas : vous lisez ses permissions d\'abord.'))}</p><div id="su-plstore" class="su-store"><p class="settings-hint">…</p></div></section>` +
         builtSection(d) + instSection(d) +
         `<div class="su-two"><details class="su-card su-fold"><summary><h4><i class="fa-solid fa-file-zipper"></i> ${esc(tr('install_zip', 'Installer ou mettre à jour depuis un .zip'))}</h4></summary>` +
@@ -563,14 +619,18 @@ TABS.plugins = { fb: 'Plugins', icon: 'puzzle-piece', async render(box) {
         }
         const c = e.target.closest('[data-cat]'); if (c) {
             const label = c.innerHTML; c.disabled = true; c.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + esc(tr('installing', 'Installation…'));
-            try { const r = await api('/api/plugins/catalog/install', Object.assign({ id: c.dataset.cat }, custom ? { url: custom } : {})); await reloadInstalled(); await loadStore(); note(box, '✓ ' + (r.note || tr('installed_ok', 'Plugin installé'))); flash(box, c.dataset.cat); refreshPluginNav(); } catch (x) { c.disabled = false; c.innerHTML = label; note(box, x.message, true); }
+            try { const r = await installFlow((x) => api('/api/plugins/catalog/install', Object.assign({ id: c.dataset.cat }, custom ? { url: custom } : {}, x))); await reloadInstalled(); await loadStore(); note(box, '✓ ' + (r.note || tr('installed_ok', 'Plugin installé'))); flash(box, c.dataset.cat); refreshPluginNav(); } catch (x) { c.disabled = false; c.innerHTML = label; note(box, x.message, true); }
         }
     };
     wire(box, 'su-plup', async () => {
         const f = $('su-plf').files[0]; if (!f) throw new Error(tr('pick_zip', 'Choisissez un fichier .zip.'));
-        const fd = new FormData(); fd.append('file', f); if ($('su-pldg').checked) fd.append('allow_downgrade', '1');
-        const r = await fetch(`${API}/api/plugins/install`, { method: 'POST', body: fd }); const j = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(j.error || r.status);
+        const j = await installFlow(async (x) => {
+            const fd = new FormData(); fd.append('file', f); if ($('su-pldg').checked) fd.append('allow_downgrade', '1');
+            Object.keys(x).forEach(k => fd.append(k, '1'));
+            const r = await fetch(`${API}/api/plugins/install`, { method: 'POST', body: fd }); const jj = await r.json().catch(() => ({}));
+            if (!r.ok) { const e = new Error(jj.error || r.status); e.data = jj; throw e; }
+            return jj;
+        });
         await reloadInstalled(); loadStore(); note(box, '✓ ' + (j.note || tr('installed_ok', 'Plugin installé'))); flash(box, j.plugin && j.plugin.id); refreshPluginNav();
     });
     wire(box, 'su-plcat', async () => { custom = plSource = val('su-plcu'); try { localStorage.setItem('stellio-plugins-source', custom); } catch (e) { /* facultatif */ } await TABS.plugins.render(box); });

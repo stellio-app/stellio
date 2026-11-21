@@ -543,7 +543,7 @@ def _ensure_quote_columns():
             if name not in cols:
                 try:
                     conn.execute(f"ALTER TABLE quotes ADD COLUMN {name} {ddl}")
-                except sqlite3.OperationalError as e:      # 1.1.7 : deux requêtes simultanées au premier lancement (course) — la colonne existe alors déjà
+                except sqlite3.OperationalError as e:      # deux requêtes simultanées au premier lancement (course) — la colonne existe alors déjà
                     if 'duplicate column' not in str(e).lower():
                         raise
         conn.execute("""CREATE TABLE IF NOT EXISTS clients (
@@ -800,7 +800,7 @@ def api_quote_history_invoice(qid):
     app_logger.info(f"[QUOTE] 🧾 Facture {number} créée d'après le devis {row['number']}")
     return jsonify({"success": True, "id": new_id, "number": number})
 
-# --- v0.8.8 : suivi des paiements, avoirs / acomptes, carnet de clients, e-mail, export comptable ---
+# --- suivi des paiements, avoirs / acomptes, carnet de clients, e-mail, export comptable ---
 _QUOTE_STATUSES = {'quote': ('draft', 'sent', 'accepted', 'refused'), 'invoice': ('draft', 'sent', 'paid'),
                    'deposit': ('draft', 'sent', 'paid'), 'credit': ('draft', 'sent')}
 

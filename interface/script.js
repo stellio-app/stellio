@@ -1,4 +1,4 @@
-/* 1.1.7 — session révoquée depuis « Sessions » : le serveur répond 401 {code:'session_revoked'} ; on revient à l'écran de connexion au lieu de laisser une interface inerte. */
+/* session révoquée depuis « Sessions » : le serveur répond 401 {code:'session_revoked'} ; on revient à l'écran de connexion au lieu de laisser une interface inerte.*/
 (function () {
     const nativeFetch = window.fetch; let done = false;
     window.fetch = async function () {
@@ -3658,7 +3658,7 @@ async function _loadDashboardGallery() {
     }
 }
 
-// --- Devis : widget du tableau de bord et historique (v0.7.6) ---
+// --- Devis : widget du tableau de bord et historique ---
 function _quoteDateLabel(q) {
     const d = new Date(String(q.created_at || '').replace(' ', 'T') + 'Z');
     return isNaN(d) ? '' : d.toLocaleDateString(I18N.lang, { day: 'numeric', month: 'short', year: 'numeric' });
@@ -6430,7 +6430,7 @@ window.restockSnooze = async function (i) {
     }
 };
 
-// v1.1.4 : « Fichiers récents » se met à jour tout seul. Les fichiers arrivés pendant la session passent en tête même si leur
+// « Fichiers récents » se met à jour tout seul. Les fichiers arrivés pendant la session passent en tête même si leur
 // date de modification est ancienne (copie qui conserve la date), et le widget suit la bibliothèque sans quitter le tableau de bord.
 const _recentFirstSeen = new Map();     // chemin -> date d'apparition dans cette session (s)
 let _recentBaselineDone = false;
@@ -8359,7 +8359,7 @@ const viewedByOtherBadgeHtml = isFileViewedByOther(f.path)
 const _ps = f.print_status || 'never';
 const _sentToSlicer = _ps !== 'never';
 const _printedOk = _ps === 'success';
-const _psClass = _ps === 'success' ? ' ps-success' : (_ps === 'failed' ? ' ps-failed' : (_ps === 'printed' ? ' ps-sent' : ''));   // v1.0.9 : halo vert / rouge autour de la miniature
+const _psClass = _ps === 'success' ? ' ps-success' : (_ps === 'failed' ? ' ps-failed' : (_ps === 'printed' ? ' ps-sent' : ''));   // halo vert / rouge autour de la miniature
 const _yn = (ok) => `<span class="meta-val ${ok ? 'meta-yes' : 'meta-no'}"><i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${ok ? _t2('card.yes', 'Oui') : _t2('card.no', 'Non')}</span>`;
 const tooltipHtml = `<div class="file-metadata-tooltip" id="tooltip-${f.path.replace(/[^\w]/g, '-')}"><div class="meta-row"><i class="fa-solid fa-paper-plane"></i><span class="meta-label">${_t2('card.tooltip_sent_slicer', 'Envoyé au slicer')}</span>${_yn(_sentToSlicer)}</div><div class="meta-row"><i class="fa-solid fa-print"></i><span class="meta-label">${_t2('card.tooltip_printed', 'Imprimé')}</span>${_yn(_printedOk)}</div><div class="meta-row meta-source-row" data-source="${escapeHtml(f.source || '')}"><i class="fa-solid fa-hard-drive"></i><span class="meta-label">${_t2('card.tooltip_source', 'Source')}</span>${_sourceStateHtml(_sourceAvailability[f.source] !== false)}</div></div>`;
 const thumbContent = f.has_thumb
@@ -8717,7 +8717,7 @@ function buildLibraryEmptyStateHTML() {
     return `<div class="empty-state"><i class="fa-solid fa-inbox"></i><p>${I18N.t('library.no_files')}</p></div>`;
 }
 
-let _renderFilesSeq = 0;   // v1.0.9 : un rendu plus récent annule la suite (par morceaux) du précédent
+let _renderFilesSeq = 0;   // un rendu plus récent annule la suite (par morceaux) du précédent
 function renderFiles(chunkSize = 50) {
 const _seq = ++_renderFilesSeq;
 const grid = document.getElementById('files-grid');
@@ -10174,7 +10174,7 @@ try {
 }
 }
 
-// v1.0.8 : slicer par défaut propre à chaque imprimante (liste reprise de Paramètres → Slicer)
+// slicer par défaut propre à chaque imprimante (liste reprise de Paramètres → Slicer)
 function _fillPrinterSlicerSelect(value) {
     const sel = document.getElementById('printer-default-slicer');
     if (!sel) return;
@@ -10403,7 +10403,7 @@ async function _loadSlicerSpoolBox(path) {
         const slots = data.slots || [];
         if (!res.ok || !slots.length) return;
         _slicerSpoolState.required = data.required_weight_g;
-        // v1.1.0 : liste classée (compatibles d'abord, puis par nom) + recherche
+        // liste classée (compatibles d'abord, puis par nom) + recherche
         const _rank = s => s.compatible === true ? 0 : (s.compatible == null ? 1 : 2);
         const sorted = [...slots].sort((a, b) => _rank(a) - _rank(b) || String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base', numeric: true }));
         _slicerSpoolState.list = sorted.map(s => {
@@ -12001,7 +12001,7 @@ document.documentElement.style.removeProperty('--accent-hover');
 document.documentElement.style.removeProperty('--accent-glow');
 }
 
-// ---- Palettes et couleurs personnalisées (0.9.9)
+// ---- Palettes et couleurs personnalisées
 function _getPaletteId() {
     let id = 'default';
     try { id = localStorage.getItem('stellio-palette') || 'default'; } catch (_) {}
@@ -12049,7 +12049,7 @@ function _cssColorToHex(val) {
 
 // ---- Image de fond (0.9.9) : stockée sur l'appareil (localStorage), réduite à 1920 px max
 const BG_IMG_KEY = 'stellio-bg-image', BG_OPT_KEY = 'stellio-bg-opts', BG_OFF_KEY = 'stellio-bg-off';
-const BG_DEFAULT_URL = 'assets/default-bg.jpg';   // v1.1.0 : image de fond par défaut (désactivable)
+const BG_DEFAULT_URL = 'assets/default-bg.jpg';   // image de fond par défaut (désactivable)
 function _currentBgUrl() {
     let url = null, off = false;
     try { url = localStorage.getItem(BG_IMG_KEY); off = localStorage.getItem(BG_OFF_KEY) === '1'; } catch (_) {}
@@ -20035,7 +20035,7 @@ function _refreshHistoryDay(dayEl) {
     if (badge) badge.textContent = n;
 }
 
-// v1.1.7 : version du modèle dans la ligne d'historique + rattachement (anciennes impressions) / association d'un G-code à son modèle
+// version du modèle dans la ligne d'historique + rattachement (anciennes impressions) / association d'un G-code à son modèle
 const _GCODE_EXT = ['.gcode', '.gco', '.gc', '.bgcode'];
 function _historyTraceChip(entry) {
     if (!entry.trace_model) return '';
@@ -21749,7 +21749,7 @@ window.togglePrinterFields = function() {
         else { if (_ipEl.value === 'api.formlabs.com') _ipEl.value = ''; _ipGrp.style.display = ''; }
     }
     const _gusb = document.getElementById('group-usb-hint'); if (_gusb) _gusb.style.display = type === 'usb_serial' ? 'block' : 'none';
-    const _ipLbl = document.getElementById('printer-ip-label');   // v1.1.4 : USB = nom du port série
+    const _ipLbl = document.getElementById('printer-ip-label');   // USB = nom du port série
     if (_ipLbl) _ipLbl.textContent = type === 'usb_serial' ? _t3('printers.usb_port', 'Port USB (COM3, /dev/ttyACM0…)', null) : (I18N.t('printers.ip_address') || 'Adresse IP');
     if (_ipEl) _ipEl.placeholder = type === 'usb_serial' ? 'COM3  ·  /dev/ttyACM0' : '192.168.1.100';
     const _gduet = document.getElementById('group-duet-hint'); if (_gduet) _gduet.style.display = type === 'duet' ? 'block' : 'none';
@@ -21873,7 +21873,7 @@ const response = await fetch('https://api.github.com/repos/stellio-app/stellio/r
 if (!response.ok) return;
 const release = await response.json();
 const latestVersion = release.tag_name.replace('v', '');
-// v1.1.0 : plus de fenêtre « Stellio a été mis à jour ! » (doublon de « Quoi de neuf ») ; on mémorise seulement la version vue
+// plus de fenêtre « Stellio a été mis à jour ! » (doublon de « Quoi de neuf ») ; on mémorise seulement la version vue
 localStorage.setItem('stellio-last-seen-version', latestVersion);
 } catch (e) {
 console.warn('[UpdateManager] Erreur check changelog:', e);
@@ -21924,7 +21924,7 @@ const releaseUrl = updateInfo.release_url || `https://github.com/stellio-app/ste
 modal.innerHTML = `<div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;"><div style="width: 56px; height: 56px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #00d9ff); border-radius: 12px; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-download" style="font-size: calc(28px * var(--fs, 1)); color: white;"></i></div><div style="flex: 1;"><h3 style="margin: 0; color: var(--text-primary, #e6e6e6); font-size: calc(22px * var(--fs, 1)); font-weight: 700;">${I18N.t('update.available_title')}</h3><p style="margin: 4px 0 0 0; color: var(--text-muted, #9ca3af); font-size: calc(14px * var(--fs, 1));">${I18N.t('update.version_transition', { from: updateInfo.current_version, to: updateInfo.version })}</p></div></div><div style="background: var(--bg-primary, #15181e); padding: 20px; border-radius: 12px; margin-bottom: 24px; max-height: 300px; overflow-y: auto; border: 1px solid var(--border, #2a2f3a);"><h4 style="margin: 0 0 12px 0; color: var(--accent, #4ea1d3); font-size: calc(14px * var(--fs, 1)); text-transform: uppercase; letter-spacing: 1px;"><i class="fa-solid fa-list-check"></i> ${I18N.t('update.release_notes')}</h4><div style="color: var(--text-secondary, #b0b3b8); font-size: calc(14px * var(--fs, 1)); line-height: 1.7;" class="release-notes-content">${releaseNotes}</div></div><div id="update-progress-container" style="display: none; margin-bottom: 24px; padding: 16px; background: var(--bg-primary, #15181e); border-radius: 12px; border: 1px solid var(--border, #2a2f3a);"><div style="display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center;"><span style="color: var(--text-secondary, #b0b3b8); font-size: calc(13px * var(--fs, 1)); font-weight: 500;"><i class="fa-solid fa-download"></i> ${I18N.t('update.downloading')}</span><span id="update-percent" style="color: var(--accent, #4ea1d3); font-size: calc(14px * var(--fs, 1)); font-weight: 700;">0%</span></div><div style="height: 8px; background: var(--bg-tertiary, #2a2f3a); border-radius: 4px; overflow: hidden;"><div id="update-bar" style="height: 100%; background: linear-gradient(90deg, var(--accent, #4ea1d3), #00d9ff); width: 0%; transition: width 0.3s ease; border-radius: 4px;"></div></div></div><div style="display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap;">${!hasInstaller ? `<a href="${releaseUrl}" target="_blank" style="padding: 12px 24px; border: none; border-radius: 10px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #3d8fb8); color: white; cursor: pointer; font-weight: 600; font-size: calc(14px * var(--fs, 1)); box-shadow: 0 4px 12px rgba(78, 161, 211, 0.3); text-decoration: none; display: inline-flex; align-items: center; gap: 8px;"><i class="fa-solid fa-external-link-alt"></i> ${I18N.t('update.download_github')}</a>` : ''}<button id="update-later-btn" style="padding: 12px 24px; border: 1px solid var(--border, #363c4a); border-radius: 10px; background: var(--bg-tertiary, #2a2f3a); color: var(--text-primary, #e6e6e6); cursor: pointer; font-weight: 500; font-size: calc(14px * var(--fs, 1));">${I18N.t('update.later')}</button>${hasInstaller ? `<button id="update-now-btn" style="padding: 12px 28px; border: none; border-radius: 10px; background: linear-gradient(135deg, var(--accent, #4ea1d3), #3d8fb8); color: white; cursor: pointer; font-weight: 600; font-size: calc(14px * var(--fs, 1)); box-shadow: 0 4px 12px rgba(78, 161, 211, 0.3);"><i class="fa-solid fa-download"></i> ${I18N.t('update.update_now')}</button>` : ''}</div>`;
 overlay.appendChild(modal);
 document.body.appendChild(overlay);
-requestAnimationFrame(() => {   // v1.1.4 : amène le bloc de la langue ouverte en haut de la zone des notes
+requestAnimationFrame(() => {   // amène le bloc de la langue ouverte en haut de la zone des notes
     const box = modal.querySelector('.release-notes-content')?.parentElement, op = modal.querySelector('details.rn-lang[open]');
     if (box && op) box.scrollTop = Math.max(0, op.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 8);
 });
@@ -22288,7 +22288,7 @@ async function pollDiagnosticConsole() {
 }
 window.pollDiagnosticConsole = pollDiagnosticConsole;
 
-// ---- Journal des opérations (0.9.9)
+// ---- Journal des opérations
 const _JOURNAL_ICONS = { delete: 'fa-trash-can', restore: 'fa-rotate-left', undo: 'fa-rotate-left', move: 'fa-folder-tree', rename: 'fa-pen', convert: 'fa-arrows-rotate', split: 'fa-table-cells', add: 'fa-plus' };
 
 function _journalFolder(p) {
@@ -22861,6 +22861,10 @@ startThumbAutoRefresh();
             closeModal('modal-file-actions');
             openAlreadyPrintedModal(_ctxPath, _ctxName);
         });
+        document.getElementById('ctx-production-btn')?.addEventListener('click', () => {
+            closeModal('modal-file-actions');
+            window.StellioV113?.openProduction(_ctxPath);
+        });
         document.getElementById('ctx-versions-btn')?.addEventListener('click', () => {
             closeModal('modal-file-actions');
             window.StellioV113?.openVersions(_ctxPath, _ctxName);
@@ -22895,6 +22899,7 @@ startThumbAutoRefresh();
         if (!known && /\.3mf$/i.test(filePath)) {
             try { const r = await fetch(`${API}/api/file/plate-count?path=${encodeURIComponent(filePath)}`); if (r.ok) plateCount = (await r.json()).plate_count || 1; } catch (_) { /* 1 plateau */ }
         }
+        const _apReason = document.getElementById('ap-reason'); if (_apReason) _apReason.value = '';
         window._apState = { path: filePath, slots: {}, plates: Math.max(1, Math.min(plateCount, 64)), rows: {} };
         _apRenderPlates();
         openModal('modal-already-printed');
@@ -22959,7 +22964,8 @@ startThumbAutoRefresh();
             printer_id: pSel.value || null,
             slicer_profile_id: prSel.value || '',
             slicer_profile_name: prSel.value && opt ? (opt.dataset.name || '') : '',
-            plates
+            plates,
+            failure_reason: result === 'failed' ? ((document.getElementById('ap-reason') || {}).value || '').trim().slice(0, 100) : ''
         };
         try {
             const res = await fetch(`${API}/api/print-history/manual`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -22988,7 +22994,7 @@ startThumbAutoRefresh();
         }
     }
 
-    /* 1.1.7 — version allégée d'un STL volumineux : copie simplifiée écrite À CÔTÉ de l'original (jamais remplacé), en tâche de fond. */
+    /* version allégée d'un STL volumineux : copie simplifiée écrite À CÔTÉ de l'original (jamais remplacé), en tâche de fond.*/
     const LIGHTEN_MIN_BYTES = 50 * 1024 * 1024;
     const _lt = (k, fb, p) => { let t = (typeof I18N !== 'undefined' && I18N.t(k)) || fb; if (t === k) t = fb; Object.keys(p || {}).forEach(n => { t = t.split('{{' + n + '}}').join(p[n]); }); return t; };
     window.lightenFile = async function (filePath, fileName) {
@@ -27768,7 +27774,7 @@ window.savePrintablesAccount = savePrintablesAccount;
 window.disconnectPrintables = disconnectPrintables;
 
 
-// ── v1.0.8 : catalogue Open Filament Database + étiquettes NFC OpenPrintTag (inventaire manuel) ─────────────────
+// ── catalogue Open Filament Database + étiquettes NFC OpenPrintTag (inventaire manuel) ─────────────────
 function exportSpoolTag(id) {
     const a = document.createElement('a');
     a.href = `${API}/api/openprinttag/export/${id}`;
@@ -27976,7 +27982,7 @@ window.openFilamentCatalogModal = openFilamentCatalogModal;
 
 
 // ============================================================================
-// v1.0.9 : barre latérale « rail + panneau » — catégorie courante, synchronisée avec la page ouverte
+// barre latérale « rail + panneau » — catégorie courante, synchronisée avec la page ouverte
 // ============================================================================
 (function () {
     const sidebar = document.getElementById('app-sidebar');
@@ -28058,7 +28064,7 @@ window.openFilamentCatalogModal = openFilamentCatalogModal;
                 const n = parseInt((el.textContent || '').trim(), 10);
                 if (n > 0) total += n;
             });
-            // v1.1.2 : une catégorie sans aucune entrée visible (ex. « Outils » sur téléphone, où réparation et convertisseur sont réservés à l'ordinateur) disparaît de la barre
+            // une catégorie sans aucune entrée visible (ex. « Outils » sur téléphone, où réparation et convertisseur sont réservés à l'ordinateur) disparaît de la barre
             const _any = [...sidebar.querySelectorAll('.sidebar-nav .nav-btn[data-cat="' + b.dataset.rail + '"]')].some(el => el.style.display !== 'none' && (!el.hasAttribute('data-admin-net') || document.documentElement.hasAttribute('data-net-ok')) && !el.classList.contains('hidden') && !(el.classList.contains('desktop-only-nav') && window.matchMedia('(max-width: 860px)').matches));
             b.style.display = _any ? '' : 'none';
             let pill = b.querySelector('.rail-badge');
@@ -28102,7 +28108,7 @@ window.openFilamentCatalogModal = openFilamentCatalogModal;
     };
 })();
 
-// v1.1.0 : (re)applique l'image de fond une fois le script entièrement chargé (le premier appel, au tout début, précède la déclaration des constantes)
+// (re)applique l'image de fond une fois le script entièrement chargé (le premier appel, au tout début, précède la déclaration des constantes)
 (function () {
     const go = () => { try { applyBackgroundImage(); refreshBackgroundControls(); } catch (_) {} };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
@@ -28179,7 +28185,7 @@ function renderPrintedPage() {
     if (badge) badge.style.display = 'none';
 }
 window.renderPrintedPage = renderPrintedPage;
-// v1.1.2 : écran tactile (pas de survol) — un premier appui sur la miniature fait apparaître la croix (comme le survol), un second ouvre le fichier
+// écran tactile (pas de survol) — un premier appui sur la miniature fait apparaître la croix (comme le survol), un second ouvre le fichier
 (function () {
     const list = document.getElementById('printed-list');
     if (!list || list._touchBound) return;
@@ -28221,7 +28227,7 @@ async function _loadDashboardPrinted() {
 }
 
 
-// ===== v1.1.2 : accessibilité =====
+// ===== accessibilité =====
 // Boutons « icône seule » : le titre devient le nom accessible ; fenêtres : rôle dialog ; liste de fichiers : étiquettes de cartes.
 (function setupA11y() {
     const label = (el) => {
@@ -28369,7 +28375,7 @@ window.runMerge3mf = runMerge3mf;
 })();
 
 
-// ---- Licence : badge « usage commercial » sous le champ licence (1.1.6)
+// ---- Licence : badge « usage commercial » sous le champ licence
 let _licenseBadgeTimer = null;
 async function _refreshLicenseBadge() {
     const inp = document.getElementById('origin-license'), badge = document.getElementById('origin-license-badge');

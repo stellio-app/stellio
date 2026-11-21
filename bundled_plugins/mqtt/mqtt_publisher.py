@@ -79,7 +79,7 @@ version = None
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
-# v0.8.7 — Intégration MQTT / Home Assistant (publication d'état + découverte automatique)
+# Intégration MQTT / Home Assistant (publication d'état + découverte automatique)
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 _MQTT_PUB = {'client': None, 'sig': None, 'connected': False, 'error': '', 'discovered': set(),
              'prev': {}, 'last_publish': 0.0, 'count': 0}

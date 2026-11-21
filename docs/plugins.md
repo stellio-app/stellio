@@ -16,8 +16,21 @@ Le script reçoit l'évènement en JSON sur son entrée standard. Aide : `sdk/py
 `events` (recevoir les évènements) · `api:read` / `api:write` (Stellio fournit `STELLIO_API_URL` et le jeton saisi dans la configuration du plugin) · `network` (information). L'activation exige d'accepter les permissions ; un plugin est **désactivé à l'installation**.
 
 ## Isolation — ce qu'elle est et n'est pas
-Processus séparé, dossier de travail = celui du plugin, environnement nettoyé (aucune variable ni secret de Stellio), 10 s maximum, 512 Mo de mémoire (POSIX), sortie tronquée, aucun accès à la base de Stellio.
-**Ce n'est pas un bac à sable** : un plugin peut lire vos fichiers et utiliser le réseau comme n'importe quel programme. N'installez que du code que vous avez lu. Réservé au compte propriétaire ; menu **Plugins › Catalogue** (page dédiée), avec le journal des exécutions.
+Processus séparé, dossier de travail = celui du plugin, environnement nettoyé (aucune variable ni secret de Stellio), 10 s maximum, 512 Mo de mémoire (POSIX), sortie tronquée, aucun accès à la base de Stellio. Réservé au compte propriétaire ; menu **Plugins › Catalogue** (page dédiée), avec le journal des exécutions.
+
+**Restrictions du noyau (1.1.8) — réelles sous Linux seulement.**
+
+| | Linux (noyau ≥ 5.13) | Linux sans Landlock | Windows / macOS |
+|---|---|---|---|
+| Fichiers | lecture seule du système et du dossier du plugin, écriture uniquement dans `data/` (variable `STELLIO_PLUGIN_DATA`) ; le reste du disque et les données de Stellio sont inaccessibles ; le code du plugin ne peut plus se modifier | non restreints | non restreints |
+| Réseau | sans permission `network` ni `api:*` : création de sockets Internet refusée (seccomp) | idem | non restreint |
+
+Un plugin autorisé à utiliser le réseau n'est **pas** limité à certains sites. Là où le noyau n'applique rien, les permissions restent **déclaratives** (audit + acceptation) et la page Plugins l'affiche. `STELLIO_PLUGIN_SANDBOX=off` désactive les restrictions (dépannage). Les plugins qui écrivaient à la racine de leur dossier doivent écrire dans `data/`. N'installez que du code que vous avez lu.
+
+## Signature et audit (1.1.8)
+* **Signature Ed25519.** Le catalogue (`catalog.json.sig`, sur les octets exacts du fichier) et chaque plugin (`signature` dans l'entrée du catalogue : `stellio-plugin-v1\n<id>\n<version>\n<sha256>`) peuvent être signés. Clés de confiance : `OFFICIAL_PUBLIC_KEYS` (modules/plugin_security.py), `STELLIO_PLUGIN_PUBKEYS` (hex, séparées par des virgules) ou `<données>/plugins/trusted_keys.json`. **Sans clé configurée rien n'est exigé** (l'empreinte SHA-256 reste la seule protection ; la page l'indique). Avec une clé : signature invalide = refus ; catalogue ou plugin officiel non signé = refus ; mise à jour non signée d'un plugin signé = refus ; clé différente de celle de la version installée = refus sauf confirmation explicite. Une signature prouve l'origine de l'archive, pas l'innocuité du code.
+* **Outil de l'éditeur** : `python tools/plugin_sign.py keygen|plugin|catalog|verify` (la clé privée ne quitte jamais la machine de l'éditeur).
+* **Audit automatique** avant installation (analyse statique, le code n'est pas exécuté) : réseau non déclaré, lancement de processus, code dynamique (`eval`, `exec`, `__import__`, `ctypes`…), binaires, lecture hors du dossier, pages HTML chargeant du contenu externe. Les constats **bloquants** refusent l'installation sauf acceptation explicite du risque (ou signature d'une clé de confiance). Un audit peut rater du code obfusqué : c'est un filet, pas une preuve. Résultat visible par plugin (`Signé` / `Non signé`, `Audit : …`).
 
 ## Mises à jour
 Réinstaller une archive d'un plugin déjà présent la **met à jour** :

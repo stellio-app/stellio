@@ -1,7 +1,7 @@
 {
   "id": "resin",
   "name": "Résine",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "api": 1,
   "author": "Stellio",
   "icon": "fa-droplet",
@@ -18,11 +18,14 @@
   "host": {
     "modules": [
       "resin_printers",
-      "resin_inventory"
+      "resin_inventory",
+      "resin_usage"
     ],
     "migrate": {
       "tables": [
-        "resin_bottles"
+        "resin_bottles",
+        "resin_printer_bottle",
+        "resin_usage"
       ],
       "printer_types": [
         "formlabs",

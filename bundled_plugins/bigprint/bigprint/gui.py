@@ -169,7 +169,6 @@ def summarize(result: Result, price: float | None) -> dict:
 
 
 # ---------------------------------------------------------------- worker process
-#
 # Each preview runs in its own process, which keeps the Result in memory so a
 # later save is instant. Cancel kills that process outright, so it stops at
 # once even mid-way through a long geometry step, and a crash inside a native

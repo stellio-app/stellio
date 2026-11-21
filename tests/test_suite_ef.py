@@ -308,3 +308,13 @@ def test_diff_version_par_numero_et_table_absente(tmp_path):
     db.execute("INSERT INTO model_versions VALUES (7, 1, ?, 1, 'v1.stl')", (p.replace('\\', '/'),)); db.commit(); db.close()
     assert cl.post('/api/model-diff', json={'path': p, 'a': 7, 'b': 'current'}).status_code == 404      # 7 est l'id interne, pas un numéro de version
     assert cl.post('/api/model-diff', json={'path': p, 'a': 1, 'b': 'current'}).status_code in (200, 202)
+
+
+def test_diff3d_aretes_pour_la_vue_fil_de_fer():
+    md = _mod('model_diff'); a = _box((10, 10, 10)); b = _box((10, 10, 20), (0, 0, 5))
+    r = md.diff_meshes(a.vertices, a.faces, b.vertices, b.faces, n=3000)
+    e = r['edges']
+    assert set(e) == {'removed', 'added', 'same'} and all(len(x) <= md.SHOW_EDGES for x in e.values())
+    assert len(e['added']) > 0 and all(len(seg) == 6 for k in e for seg in e[k])
+    same = md.diff_meshes(a.vertices, a.faces, a.vertices.copy(), a.faces, n=1500)['edges']
+    assert same['removed'] == [] and same['added'] == [] and len(same['same']) > 0

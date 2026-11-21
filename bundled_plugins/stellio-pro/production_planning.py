@@ -46,7 +46,7 @@ _printer_status_cached = None
 _insert_notification_once = None
 _push_notify_async = None
 _send_native_notification = None
-_webhook_emit = None           # v1.1.7 : évènements order.late / printer.overload pour les webhooks
+_webhook_emit = None           # évènements order.late / printer.overload pour les webhooks
 _server_t = None
 app = None
 app_logger = None
@@ -321,7 +321,7 @@ def on_time_rate(done_rows, since_iso):
     return {'rate': round(100.0 * on_time / total, 1) if total else None, 'on_time': on_time, 'total': total}
 
 
-# ── coût, rendement, retards constatés (v1.1.7) ───────────────────────────
+# ── coût, rendement, retards constatés ───────────────────────────
 
 def _num(v):
     try:
@@ -529,7 +529,7 @@ def _ensure_tables():
         )""")
         pc = {r['name'] for r in conn.execute("PRAGMA table_info(planning_capacity)").fetchall()}
         if 'labor_rate' not in pc:
-            conn.execute("ALTER TABLE planning_capacity ADD COLUMN labor_rate REAL DEFAULT 0")     # v1.1.7 : taux horaire du temps de travail humain
+            conn.execute("ALTER TABLE planning_capacity ADD COLUMN labor_rate REAL DEFAULT 0")     # taux horaire du temps de travail humain
         cols = {r['name'] for r in conn.execute("PRAGMA table_info(print_jobs)").fetchall()}
         if cols and 'est_hours' not in cols:
             conn.execute("ALTER TABLE print_jobs ADD COLUMN est_hours REAL DEFAULT 0")
@@ -600,7 +600,7 @@ def build_plan(uid, horizon=14, now=None):
                   load_settings_for(uid), now, horizon)
     since = (now.date() - datetime.timedelta(days=90)).isoformat()
     result['on_time'] = on_time_rate([r for r in rows if r['status'] == 'done'], since)
-    result['stats'] = production_stats(rows, since, now.date().isoformat())   # v1.1.7
+    result['stats'] = production_stats(rows, since, now.date().isoformat())
     lrate = (load_settings_for(uid) or {}).get('labor_rate', 0.0)
     result['labor_rate'] = lrate
     result['printer_profit'] = printer_profit(rows, quote_totals, [{'id': p['id'], 'name': p.get('name')} for p in printers_cfg], since, lrate)

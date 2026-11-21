@@ -23,6 +23,9 @@ Carte de navigation du code. **Version décrite : 1.0.7** (`CURRENT_VERSION = "1
 | `modules/quote_portal.py` | lien de suivi client d'un devis : acceptation / refus en ligne, infos d'acompte | /api/quotes/<id>/portal, /api/quote-portal/*, /quote/<jeton>* (public) |
 | `modules/accounting_zip.py` | export comptable mensuel (ZIP : CSV, PDF, récapitulatif) | /api/quotes/export-zip, /api/quotes/export-zip-native |
 | `modules/parts_stock.py` | stock de pièces finies, seuil d'alerte, réassort | /api/parts-stock* |
+| `modules/production_flow.py` | production assistée : proposer (imprimante + profil), contrôler, valider (humain), envoyer, relever le résultat | /api/production* |
+| `modules/plugin_security.py` | plugins externes : signature Ed25519, audit statique, restrictions Landlock/seccomp (Linux) | /api/plugins/security |
+| `bundled_plugins/resin/resin_usage.py` | résine : flacon actif par imprimante, déduction automatique, historique annulable | /api/resin/printers, printer-bottle, usage |
 | `modules/printer_dispatch.py` | répartition intelligente des tâches entre imprimantes (assigne, ne lance jamais) | /api/dispatch/* |
 | `modules/digest.py` | résumé quotidien / hebdomadaire (notification + push), planificateur | /api/digest/* |
 | `modules/filament_weighing.py` | pesées de bobines (TigerTag, manuelle), prévision de rupture | /api/filament/forecast, weigh*, weighings |

@@ -15,6 +15,8 @@ if _os.path.isdir(_BUNDLED):
             __path__.append(_d)
 ALL = (
     'print_session',
+    'production_flow',
+    'plugin_security',
     'tigertag',
     'auto_backup_routes',
     'feedback',

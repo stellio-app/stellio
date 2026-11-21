@@ -9,8 +9,10 @@ Permissions déclarées (à accepter explicitement à l'activation) : `events` (
 au script `STELLIO_API_URL` et le jeton saisi dans la configuration du plugin, pour parler à l'API publique), `network` (information : accès réseau).
 
 Isolation, honnêtement : processus séparé, dossier de travail = celui du plugin, environnement NETTOYÉ (ni variables de Stellio ni secrets),
-durée limitée (10 s), mémoire limitée (512 Mo, systèmes POSIX), sortie tronquée, aucun accès à la base de Stellio. Ce n'est PAS un bac à sable :
-un plugin peut lire les fichiers de l'utilisateur et accéder au réseau comme n'importe quel programme. N'installez que des plugins de confiance.
+durée limitée (10 s), mémoire limitée (512 Mo, systèmes POSIX), sortie tronquée, aucun accès à la base de Stellio. 1.1.8 : sous LINUX le noyau
+restreint en plus les fichiers (Landlock : lecture seule du dossier du plugin, écriture dans `data/` seulement) et le réseau (seccomp : sans permission
+`network` ou `api:*`, pas de socket Internet) ; avant installation, signature Ed25519 et audit automatique du code (voir plugin_security.py).
+Sous Windows et macOS rien n'est appliqué par le noyau : les permissions restent déclaratives. N'installez que des plugins de confiance.
 Réservé au compte propriétaire. Journal des exécutions : table `plugin_log`.
 """
 import hashlib
@@ -226,12 +228,27 @@ def run_plugin(plugin_dir, manifest, event, payload, config, timeout=None):
     if not os.path.isfile(entry):
         return {'ok': False, 'ms': 0, 'output': '', 'error': "Fichier d'entrée absent."}
     try:
-        kw = {'preexec_fn': _limits} if os.name == 'posix' else {}
+        from modules import plugin_security
+        data_dir = os.path.join(plugin_dir, 'data')
+        os.makedirs(data_dir, exist_ok=True)
+        net_ok = bool(set(manifest['permissions']) & {'network', 'api:read', 'api:write'})
+        sandbox, sb = plugin_security.make_preexec(plugin_dir, data_dir, net_ok, py)
+        env = build_env(manifest, config)
+        env['STELLIO_PLUGIN_DATA'] = data_dir
+        if os.name == 'posix':
+            def _pre():
+                _limits()
+                if sandbox:
+                    sandbox()
+            kw = {'preexec_fn': _pre}
+        else:
+            kw = {}
         p = subprocess.run([py, '-I', entry, event], input=json.dumps({'event': event, 'data': payload}, ensure_ascii=False).encode('utf-8'),
-                           cwd=plugin_dir, env=build_env(manifest, config), capture_output=True, timeout=timeout or TIMEOUT_S, **kw)
+                           cwd=plugin_dir, env=env, capture_output=True, timeout=timeout or TIMEOUT_S, **kw)
         out = (p.stdout or b'').decode('utf-8', 'replace')[-OUTPUT_MAX:]
         err = (p.stderr or b'').decode('utf-8', 'replace')[-OUTPUT_MAX:]
-        return {'ok': p.returncode == 0, 'ms': int((time.time() - t0) * 1000), 'output': out, 'error': '' if p.returncode == 0 else (err or f'code {p.returncode}')[-500:]}
+        return {'ok': p.returncode == 0, 'ms': int((time.time() - t0) * 1000), 'output': out, 'error': '' if p.returncode == 0 else (err or f'code {p.returncode}')[-500:],
+                'sandbox': {'filesystem': bool(sb.get('filesystem_restricted')), 'network': bool(sb.get('network_restricted')), 'reason': sb.get('reason')}}
     except subprocess.TimeoutExpired:
         return {'ok': False, 'ms': int((time.time() - t0) * 1000), 'output': '', 'error': f'Délai dépassé ({timeout or TIMEOUT_S} s).'}
     except Exception as e:
@@ -517,14 +534,32 @@ def validate_catalog(obj):
         raw = it.get('description')
         i18n = {k: str(v)[:300] for k, v in raw.items() if k in LANGS and isinstance(v, str) and v.strip()} if isinstance(raw, dict) else {}
         seen.add(pid)
-        out.append({'id': pid, 'name': str(it.get('name') or pid)[:60], 'version': str(it.get('version') or '0')[:20],
+        sig = str(it.get('signature') or '').strip().lower()
+        out.append({'signature': sig if re.match(r'^[0-9a-f]{128}$', sig) else '', 'id': pid, 'name': str(it.get('name') or pid)[:60], 'version': str(it.get('version') or '0')[:20],
                     'description': (str(raw)[:300] if isinstance(raw, str) else (i18n.get('en') or i18n.get('fr') or next(iter(i18n.values()), ''))), 'description_i18n': i18n,
                     'author': str(it.get('author') or '')[:60], 'url': url, 'sha256': sha, 'permissions': [p for p in perms if p in PERMISSIONS],
                     'logo': _https(it.get('logo')), 'homepage': _https(it.get('homepage')), 'manifest': _https(it.get('manifest'))})
     return out
 
 
-def install_bytes(data, allow_downgrade=False, origin='community'):
+class PluginRefused(ValueError):
+    """Installation refusée par la signature ou l'audit : `code` pour l'interface, `audit` = constats éventuels."""
+    def __init__(self, message, code, audit=None):
+        super().__init__(message)
+        self.code = code
+        self.audit = audit
+
+
+REFUSALS = {
+    'signature_invalid': "Signature invalide : l'archive n'a pas été signée par une clé de confiance. Installation refusée.",
+    'signature_required': "Ce plugin officiel n'est pas signé (ou sa signature est inconnue) : installation refusée.",
+    'signature_downgrade': "Ce plugin était signé et cette version ne l'est pas : mise à jour refusée.",
+    'key_changed': "Cette version est signée par une autre clé que celle de la version installée : mise à jour refusée.",
+    'audit_blocked': "L'audit automatique a trouvé du code dangereux (voir le détail). Installation refusée, sauf acceptation explicite du risque.",
+}
+
+
+def install_bytes(data, allow_downgrade=False, origin='community', signature='', accept_risk=False, accept_key_change=False):
     """Installe ou met à jour un plugin depuis une archive. Remplacement atomique (l'ancienne version est restaurée si le déplacement échoue).
     Retourne {'manifest', 'action', 'previous_version', 'added_permissions'}. Lève ValueError."""
     tmp = os.path.join(_root(), '.install-tmp')
@@ -532,9 +567,17 @@ def install_bytes(data, allow_downgrade=False, origin='community'):
     os.makedirs(tmp)
     try:
         manifest = safe_extract(data, tmp)
-        from modules import plugin_host
+        from modules import plugin_host, plugin_security
         if plugin_host.manifest(manifest['id']):
             raise ValueError("Cet identifiant est celui d'un plugin intégré à Stellio : il ne peut pas être remplacé par une archive.")
+        keys = plugin_security.trusted_keys()
+        sig = plugin_security.signature_status(signature, manifest['id'], manifest['version'], hashlib.sha256(data).hexdigest(), keys)
+        ok, code = plugin_security.signature_policy(sig, origin == 'official', bool(keys), plugin_security.load_store().get(manifest['id']), accept_key_change)
+        if not ok:
+            raise PluginRefused(REFUSALS[code], code)
+        audit = plugin_security.audit_dir(tmp, manifest)
+        if audit['blocking'] and not accept_risk and sig['status'] != 'valid':
+            raise PluginRefused(REFUSALS['audit_blocked'], 'audit_blocked', audit)
         dest = os.path.join(_root(), manifest['id'])
         prev = {m['id']: m for _d, m in installed()}.get(manifest['id'])
         action, added = 'installed', []
@@ -556,7 +599,9 @@ def install_bytes(data, allow_downgrade=False, origin='community'):
             raise ValueError("Remplacement impossible, l'ancienne version est conservée.")
         shutil.rmtree(old, ignore_errors=True)
         _set_origin(manifest['id'], 'official' if origin == 'official' else 'community')
-        return {'manifest': manifest, 'action': action, 'previous_version': prev['version'] if prev else None, 'added_permissions': added}
+        plugin_security.save_record(manifest['id'], sig, audit, bool(audit['blocking'] and (accept_risk or sig['status'] == 'valid')))
+        return {'manifest': manifest, 'action': action, 'previous_version': prev['version'] if prev else None, 'added_permissions': added,
+                'security': {'signature': sig['status'], 'key': sig['key'], 'audit': audit['level'], 'findings': audit['findings'][:20], 'accepted_risk': bool(audit['blocking'])}}
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -598,10 +643,12 @@ def api_plugins_list():
         _ensure(conn)
         st = {x['plugin_id']: x for x in conn.execute("SELECT plugin_id, enabled, config FROM plugin_state WHERE user_id = ?", (session['user_id'],)).fetchall()}
         out, org = [], _origins()
+        from modules import plugin_security
+        _sec = plugin_security.load_store()
         for d, m in installed():
             s = st.get(m['id'])
             cfg = json.loads(s['config'] or '{}') if s else {}
-            out.append(dict(m, description=pick_description(m, request.args.get('lang')), origin=org.get(m['id']) if org.get(m['id']) == 'official' else 'community', enabled=bool(s and s['enabled']), config={k: ('••••' if k == 'token' and v else v) for k, v in cfg.items()}))
+            out.append(dict(m, security=_sec.get(m['id']), description=pick_description(m, request.args.get('lang')), origin=org.get(m['id']) if org.get(m['id']) == 'official' else 'community', enabled=bool(s and s['enabled']), config={k: ('••••' if k == 'token' and v else v) for k, v in cfg.items()}))
         from modules import plugin_host
         builtin = []
         for pid, _d, m in plugin_host.manifests():
@@ -611,8 +658,10 @@ def api_plugins_list():
             builtin.append({'id': pid, 'name': str(((m.get('name_i18n') or {}).get(str(request.args.get('lang') or '').lower()[:2])) or m.get('name') or pid)[:60], 'version': str(m.get('version') or '1.0.0')[:20], 'author': str(m.get('author') or 'Stellio')[:60],
                             'description': pick_description(m, request.args.get('lang')), 'icon': m.get('icon') or 'fa-puzzle-piece', 'origin': 'official', 'builtin': True,
                             'enabled': en, 'loaded': plugin_host.loaded(pid), 'restart_required': en != plugin_host.loaded(pid)})
+        keys = plugin_security.trusted_keys()
         return jsonify({'builtin': builtin, 'plugins': out, 'events': list(EVENTS), 'permissions': list(PERMISSIONS), 'python': bool(_python()),
-                        'isolation': "Processus séparé, environnement nettoyé, 10 s, 512 Mo. Pas un bac à sable : n'installez que des plugins de confiance."})
+                        'sandbox': plugin_security.sandbox_status(), 'trusted_keys': [plugin_security.fingerprint(k) for k in keys],
+                        'isolation': "Processus séparé, environnement nettoyé, 10 s, 512 Mo. Fichiers et réseau restreints par le noyau sous Linux seulement ; ailleurs, permissions déclaratives. N'installez que des plugins de confiance."})
     finally:
         conn.close()
 
@@ -626,16 +675,45 @@ def api_plugins_install():
         return jsonify({'error': 'Archive .zip manquante.'}), 400
     data = f.read(MAX_ZIP_BYTES + 1)
     allow = str(request.form.get('allow_downgrade') or '') in ('1', 'true', 'on')
+    flag = lambda k: str(request.form.get(k) or '') in ('1', 'true', 'on')
     try:
-        res = _after_install(install_bytes(data, allow))
+        res = _after_install(install_bytes(data, allow, 'community', str(request.form.get('signature') or ''), flag('accept_risk'), flag('accept_key_change')))
+    except PluginRefused as e:
+        return jsonify({'error': str(e), 'code': e.code, 'audit': e.audit}), 400
     except ValueError as e:
         return jsonify({'error': str(e)}), 409 if 'plus ancienne' in str(e) else 400
     return jsonify({'ok': True, 'plugin': res['manifest'], 'action': res['action'], 'previous_version': res['previous_version'],
-                    'added_permissions': res['added_permissions'], 'reack_required': res['reack_required'], 'note': res['note']})
+                    'added_permissions': res['added_permissions'], 'reack_required': res['reack_required'], 'note': res['note'], 'security': res['security']})
 
 
 def _fetch_catalog(url):
-    return validate_catalog(json.loads(http_get(url, MAX_CATALOG_BYTES).decode('utf-8', 'replace')))
+    """Catalogue validé. Signé (`<url>.sig`, Ed25519 sur les octets exacts du fichier) : si des clés de confiance existent, une signature invalide est
+    toujours refusée et le catalogue officiel doit être signé ; sans clé configurée, aucune exigence (l'écran indique « non vérifié »)."""
+    from modules import plugin_security
+    raw = http_get(url, MAX_CATALOG_BYTES)
+    keys = plugin_security.trusted_keys()
+    st = 'unsigned'
+    if keys:
+        try:
+            sigtxt = http_get(url + '.sig', 1024).decode('ascii', 'ignore').strip()
+        except ValueError:
+            sigtxt = ''
+        if sigtxt:
+            st = 'valid' if plugin_security.verify(sigtxt, plugin_security.catalog_message(raw), keys) else 'invalid'
+        if st == 'invalid' or (st != 'valid' and (url == default_catalog_url() or is_official(url))):
+            raise ValueError("Signature du catalogue absente ou invalide : catalogue refusé." if st != 'invalid' else "Signature du catalogue invalide : catalogue refusé.")
+    else:
+        st = 'unverified'
+    entries = validate_catalog(json.loads(raw.decode('utf-8', 'replace')))
+    for e in entries:
+        e['catalog_signature'] = st
+    return entries
+
+
+def plugin_security_status(entry):
+    """État de la signature d'une entrée du catalogue (sans télécharger l'archive) : valid | invalid | unsigned | unverifiable."""
+    from modules import plugin_security
+    return plugin_security.signature_status(entry.get('signature'), entry['id'], entry['version'], entry['sha256'])['status']
 
 
 def api_plugins_catalog():
@@ -658,6 +736,7 @@ def api_plugins_catalog():
     for e in entries:
         e['description'] = pick_description(e, d.get('lang'))
         e['official'] = is_official(e['url'])
+        e['signature_status'] = plugin_security_status(e)
         e['has_logo'] = bool(e.pop('logo', ''))
         e.pop('description_i18n', None)
         e.pop('manifest', None)
@@ -681,11 +760,14 @@ def api_plugins_catalog_install():
         data = http_get(entry['url'], MAX_ZIP_BYTES)
         if hashlib.sha256(data).hexdigest() != entry['sha256']:
             return jsonify({'error': "Empreinte SHA-256 différente de celle du catalogue : installation refusée.", 'code': 'sha_mismatch'}), 400
-        res = _after_install(install_bytes(data, bool(d.get('allow_downgrade')), 'official' if is_official(entry['url']) else 'community'))
+        res = _after_install(install_bytes(data, bool(d.get('allow_downgrade')), 'official' if is_official(entry['url']) else 'community',
+                                           entry.get('signature') or '', bool(d.get('accept_risk')), bool(d.get('accept_key_change'))))
+    except PluginRefused as e:
+        return jsonify({'error': str(e), 'code': e.code, 'audit': e.audit}), 400
     except (ValueError, TypeError) as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, 'plugin': res['manifest'], 'action': res['action'], 'previous_version': res['previous_version'],
-                    'added_permissions': res['added_permissions'], 'reack_required': res['reack_required'], 'note': res['note']})
+                    'added_permissions': res['added_permissions'], 'reack_required': res['reack_required'], 'note': res['note'], 'security': res['security']})
 
 
 _catalog_cache = {}        # url -> (heure, entrées) : la page lit le catalogue une fois, puis chaque logo réutilise cette lecture
@@ -799,6 +881,11 @@ def api_plugin_delete(pid):
         return jsonify({'error': 'Plugin introuvable.'}), 404
     shutil.rmtree(os.path.join(_root(), pid), ignore_errors=True)
     _set_origin(pid, None)
+    try:
+        from modules import plugin_security
+        plugin_security.drop_record(pid)
+    except Exception:
+        pass
     conn = get_db()
     try:
         _ensure(conn)
@@ -911,6 +998,12 @@ def init(ns, routes=True):
     for n in _REQUIRED + _OPTIONAL + _OVERRIDABLE:
         if n in ns:
             g[n] = ns[n]
+    try:
+        from modules import plugin_security
+        if plugin_security.DATA_DIR is None:
+            plugin_security.DATA_DIR = ns['DATA_DIR']          # même dossier de données, même quand plugin_security n'a pas encore reçu ses services
+    except Exception:
+        pass
     if routes:
         for rule, methods, fname, decos in _ROUTES:
             view = g[fname]

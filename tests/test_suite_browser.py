@@ -96,6 +96,22 @@ def test_nuage_3d_couleurs_bascule_et_rotation(page):
     assert page.evaluate("window.__cv.state.zoom") > z
 
 
+def test_nuage_3d_vue_fil_de_fer(page):
+    pts = {'removed': [[i, 0, 0] for i in range(0, 40, 4)], 'added': [[0, i, 10] for i in range(0, 40, 4)], 'same': [[i, i, i] for i in range(0, 40, 4)]}
+    edges = {'removed': [[0, 0, 0, 30, 0, 0], [0, 5, 0, 30, 5, 0]], 'added': [[0, 0, 10, 0, 30, 10], [5, 0, 10, 5, 30, 10]], 'same': [[0, 0, 0, 30, 30, 30]]}
+    page.evaluate("([pts, e]) => { document.getElementById('host').innerHTML = ''; window.__cv = window.StellioSuite._cloudView(document.getElementById('host'), pts, e); }", [pts, edges])
+    assert page.locator('[data-mode="points"]').count() == 1 and page.locator('[data-mode="wire"]').count() == 1
+    pointes = _count(page, (229, 72, 77))
+    page.click('[data-mode="wire"]')
+    fil = _count(page, (229, 72, 77))
+    assert fil > 20 and fil != pointes                                                   # des traits rouges sont dessinés à la place des points
+    page.click('input[data-k="removed"]'); assert _count(page, (229, 72, 77)) == 0       # les filtres restent actifs
+    page.click('input[data-k="removed"]'); page.click('[data-mode="points"]')
+    assert _count(page, (229, 72, 77)) == pointes
+    page.evaluate("() => { document.getElementById('host').innerHTML = ''; window.StellioSuite._cloudView(document.getElementById('host'), { removed: [[0, 0, 0]], added: [], same: [] }); }")
+    assert page.locator('[data-mode]').count() == 0                                      # sans arêtes (ancien résultat), pas de bouton
+
+
 def test_editeur_de_plateau_glisser_pivoter_aligner_controle(page):
     page.evaluate("""() => { window.__calls.length = 0; window.__routes['POST /api/plate/check'] = (b) => ({ ok: true, issues: [] });
         window.__routes['POST /api/plate/export'] = {};
@@ -785,3 +801,35 @@ def test_page_collections_style_filament_depliage_et_suppression(page):
     assert page.locator('.inv-section:not(.inv-collapsed)').count() == 1                                            # la section ouverte le reste
     page.click('[data-cdel="2"]'); page.wait_for_function("document.querySelectorAll('.inv-section').length === 2")
     assert [c['body'] for c in page.evaluate("window.__calls") if c['url'] == '/api/collections/delete'] == [{'id': 2}]
+
+
+def test_plugins_signature_audit_restrictions_et_confirmation_du_risque(page):
+    page.evaluate("""() => {
+      window.__calls.length = 0; const R = window.__routes; window.confirm = () => true;
+      R['GET /api/plugins'] = { sandbox: { platform: 'windows', enforced: false, filesystem: false, network: false, reason: 'platform' }, trusted_keys: [],
+        plugins: [{ id: 'a', name: 'Alpha', version: '1.0', enabled: false, origin: 'community', permissions: ['events'], security: { signature: 'valid', audit: 'warn' } },
+                  { id: 'b', name: 'Beta', version: '1.0', enabled: false, origin: 'community', permissions: ['events'], security: { signature: 'unsigned', audit: 'danger' } }] };
+      R['POST /api/plugins/catalog'] = { updates: 0, count: 1, plugins: [{ id: 'c', name: 'Gamma', version: '1.0', description: 'x', official: false, installed_version: null, update_available: false, permissions: ['events'], signature_status: 'invalid' }] };
+      let n = 0;
+      R['POST /api/plugins/catalog/install'] = (body) => body.accept_risk ? { ok: true, note: 'Installé' } : { __status: 400, error: 'Audit refuse', code: 'audit_blocked', audit: { findings: [{ blocking: true, file: 'main.py', line: 3, detail: 'import subprocess' }] } };
+    }""")
+    page.evaluate("document.getElementById('plugins-root') && document.getElementById('plugins-root').remove(); window.StellioSuite.open('plugins')")
+    page.wait_for_selector('#plugins-root .su-store-card')
+    txt = page.inner_text('#plugins-root')
+    assert 'Aucune restriction du noyau sur ce système' in txt and 'déclaratives' in txt                  # honnête hors Linux
+    assert 'Aucune clé de confiance configurée' in txt
+    alpha = page.inner_text('#plugins-root .su-plugin[data-pid="a"]')
+    beta = page.inner_text('#plugins-root .su-plugin[data-pid="b"]')
+    assert 'Signé' in alpha and 'Audit : points à lire' in alpha and 'Non signé' in beta and 'code dangereux (risque accepté)' in beta
+    assert 'Signature invalide' in page.inner_text('#plugins-root .su-store-card')
+    page.click('#plugins-root [data-cat="c"]')
+    page.wait_for_function("window.__calls.filter(c => c.url === '/api/plugins/catalog/install').length === 2")
+    bodies = [c['body'] for c in page.evaluate("window.__calls") if c['url'] == '/api/plugins/catalog/install']
+    assert bodies[0] == {'id': 'c'} and bodies[1] == {'id': 'c', 'accept_risk': True}                    # le risque n'est accepté qu'après confirmation
+    page.evaluate("document.getElementById('plugins-root').remove()")
+    page.evaluate("window.__routes['GET /api/plugins'] = { sandbox: { platform: 'linux', enforced: true, filesystem: true, network: true, reason: 'ok', landlock_abi: 7 }, trusted_keys: ['abc'], plugins: [] }")
+    page.evaluate("window.StellioSuite.open('plugins')")
+    page.wait_for_selector('#plugins-root .su-notice')
+    t2 = page.inner_text('#plugins-root .su-notice')
+    assert 'le noyau restreint chaque plugin' in t2 and 'pas limité à certains sites' in t2
+    page.evaluate("document.getElementById('plugins-root').remove()")

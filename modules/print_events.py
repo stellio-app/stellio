@@ -36,6 +36,41 @@ printer_hub = None
 
 
 _push_watch_state = {}
+_listeners = []
+_wanted = {}
+
+
+def register_listener(fn, wanted=None):
+    """Branche un écouteur d'évènements d'impression (1.1.8) : fn({'event': 'finished'|'failed', 'printer': {...}, 'file', 'progress', 'ts'}).
+    `wanted()` (facultatif) dit s'il y a quelque chose à surveiller : sans lui, l'écouteur compte toujours ; avec lui, la surveillance
+    des imprimantes ne tourne pour lui que quand il répond vrai. Les erreurs d'un écouteur n'arrêtent jamais la surveillance."""
+    if fn not in _listeners:
+        _listeners.append(fn)
+    _wanted[fn] = wanted
+
+
+def _listeners_need_watch():
+    for fn in _listeners:
+        w = _wanted.get(fn)
+        try:
+            if w is None or w():
+                return True
+        except Exception:
+            return True
+    return False
+
+
+def _emit_listeners(event, p, prev, now):
+    if not _listeners:
+        return
+    ev = {'event': event, 'printer': {'id': p['id'], 'name': p['name'], 'type': p['type'] if 'type' in p.keys() else '',
+                                      'user_id': p['user_id'] if 'user_id' in p.keys() else None},
+          'file': prev.get('file') or '', 'progress': prev.get('progress'), 'ts': now}
+    for fn in list(_listeners):
+        try:
+            fn(ev)
+        except Exception as e:
+            app_logger.debug(f"[PrintEvents] Écouteur ignoré : {e}")
 
 def _push_fmt_duration(seconds):
     """3725 -> « 1 h 02 min » ; 540 -> « 9 min » ; 0/inconnu -> chaîne vide."""
@@ -96,16 +131,17 @@ def _push_watch_once(cfg):
         if st == 'printing':
             tm = status.get('time') or {}
             _push_watch_state[pid] = {'status': 'printing', 'ts': now, 'file': status.get('file') or '',
-                                      'elapsed': tm.get('elapsed') or 0}
+                                      'elapsed': tm.get('elapsed') or 0, 'progress': status.get('progress')}
         elif st in ('idle', 'error'):
             if prev and prev['status'] == 'printing' and now - prev['ts'] < 600:
-                if _webhook_emit:      # v1.1.7 : indépendant des réglages push
+                if _webhook_emit:      # indépendant des réglages push
                     try:
                         _webhook_emit('print.finished' if st == 'idle' else 'print.failed',
                                       {'printer': {'id': pid, 'name': p['name']}, 'file': prev.get('file') or '',
                                        'duration_s': int(prev.get('elapsed') or 0)}, p['user_id'] if 'user_id' in p.keys() else None)
                     except Exception:
                         pass
+                _emit_listeners('finished' if st == 'idle' else 'failed', p, prev, now)
                 if st == 'idle' and 'print_finished' in types:
                     _push_notify_async('print_finished', _server_t('notif.print_finished_title', 'Impression terminée'), _push_job_message(p['name'], prev))
                 elif st == 'error' and 'print_failed' in types:
@@ -122,7 +158,7 @@ def _push_watcher_loop():
     while True:
         try:
             cfg = load_settings() or {}
-            if _push_wanted() or (_webhook_active and _webhook_active()):
+            if _listeners_need_watch() or _push_wanted() or (_webhook_active and _webhook_active()):
                 _push_watch_once(cfg)
         except Exception as e:
             app_logger.debug(f"[Push] Surveillance imprimantes: {e}")

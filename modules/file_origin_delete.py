@@ -83,7 +83,7 @@ def _origin_path_allowed(raw_path, user_id):
     native = raw_path.replace('/', '\\') if os.name == 'nt' else raw_path.replace('\\', '/')
     return _is_path_within_sources(native, user_id)
 
-# ── Licence : usage commercial déduit du texte (v1.1.6) ──
+# ── Licence : usage commercial déduit du texte ──
 LICENSE_PRESETS = ('CC0', 'CC BY', 'CC BY-SA', 'CC BY-ND', 'CC BY-NC', 'CC BY-NC-SA', 'CC BY-NC-ND',
                    'Standard Digital File License', 'Personal use only', 'MIT', 'GPL-3.0', 'All rights reserved')
 

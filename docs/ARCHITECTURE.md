@@ -11,6 +11,7 @@ stellio/
 │   ├── __init__.py            liste ALL des modules
 │   ├── print_session.py       prise connectée, consommation réelle, photo de fin, surveillance IA
 │   ├── plugin_host.py  print_events.py                              (1.1.7 : chargeur des plugins intégrés, surveillance des impressions)
+│   ├── production_flow.py  plugin_security.py                       (1.1.8 : production assistée, signatures / audit / bac à sable des plugins)
 │   ├── share_link.py  order_tracking.py
 │   ├── auto_backup_routes.py  feedback.py  remote_instances.py  slicer_profiles.py
 │   ├── clients.py  trash_routes.py  tigertag.py  sosprint_helpers.py

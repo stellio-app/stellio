@@ -59,9 +59,9 @@ REQUIRED_MODULES = [
     ("openpyxl",                                "openpyxl",               "load_workbook",      None),
     ("xlrd",                                    "xlrd",                   "open_workbook",      None),
     ("cascadio",                                "cascadio",               "step_to_glb",        None),
-    ("manifold3d",                              "manifold3d",             "Manifold",           None),   # v1.1.4 : BigPrint
-    ("scipy.ndimage",                           "scipy",                  None,                 None),   # v1.1.4 : BigPrint
-    ("skimage.measure",                         "scikit-image",           None,                 None),   # v1.1.4 : BigPrint
+    ("manifold3d",                              "manifold3d",             "Manifold",           None),   # BigPrint
+    ("scipy.ndimage",                           "scipy",                  None,                 None),   # BigPrint
+    ("skimage.measure",                         "scikit-image",           None,                 None),   # BigPrint
 ]
 
 TELEGRAM_MODULES = [

@@ -58,7 +58,7 @@ Image = None
 _OVERRIDABLE = ('requests', 'threading', 'time', 'io', 'base64', 'uuid', 're', 'json', 'datetime', 'os')
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
-# v1.0.4 — Consommation électrique réelle (prise connectée), photo de fin d'impression, surveillance IA
+# Consommation électrique réelle (prise connectée), photo de fin d'impression, surveillance IA
 # Un seul « suivi de session d'impression » (_V104_SESS) alimente les trois fonctions :
 #   · prise connectée (Shelly, Tasmota, Home Assistant) → watts en direct, énergie (Wh) et coût réel par impression ;
 #   · photo de fin d'impression → galerie existante (table print_photos) ;
@@ -141,7 +141,7 @@ def _v104_clean_config(incoming, old=None):
         out['end_photo'] = True
     if inc.get('ai_watch'):
         out['ai_watch'] = True
-    ds = str(inc.get('default_slicer') or '').strip()      # v1.0.8 : slicer par défaut de cette imprimante
+    ds = str(inc.get('default_slicer') or '').strip()      # slicer par défaut de cette imprimante
     if ds and ds != 'system_default' and re.fullmatch(r'[A-Za-z0-9 ._-]{1,60}', ds):
         out['default_slicer'] = ds
     m = inc.get('meter')
@@ -325,7 +325,7 @@ def _v104_record_energy(sess, energy_wh, by, duration_s):
         price = 0.0
     kwh = energy_wh / 1000.0
     cost = round(kwh * price, 4) if price > 0 else None
-    try:   # v1.1.3 : tarif heures creuses / pleines -> coût réel selon l'heure de l'impression
+    try:   # tarif heures creuses / pleines -> coût réel selon l'heure de l'impression
         from modules import energy_tariff as _et
         _cfg = _et.get_config(settings)
         if _cfg['enabled'] and kwh > 0:

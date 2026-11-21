@@ -43,6 +43,7 @@ STEP_DEFLECTION = 0.1        # mm : finesse du maillage tiré d'un solide STEP
 MAX_BYTES = 120 * 1024 * 1024
 SAMPLES = 6000
 SHOW_POINTS = 1200
+SHOW_EDGES = 4000            # arêtes envoyées par catégorie pour la vue fil de fer (allégées sur les gros maillages)
 DEFAULT_TOL = 0.005          # fraction de la diagonale de la boîte englobante
 
 
@@ -148,6 +149,18 @@ def nearest_dist(pts, ref, chunk=500):
     return out
 
 
+def wire_edges(vertices, faces, ref, eps, k=SHOW_EDGES):
+    """Arêtes uniques du maillage (au plus `k`, réparties régulièrement), chacune avec la distance de son milieu à `ref` : (segments Nx6, distances N)."""
+    np = _np()
+    v = np.asarray(vertices, dtype=float)
+    f = np.asarray(faces, dtype=int)
+    e = np.unique(np.sort(np.concatenate([f[:, [0, 1]], f[:, [1, 2]], f[:, [2, 0]]]), axis=1), axis=0)
+    if len(e) > 3 * k:
+        e = e[np.linspace(0, len(e) - 1, 3 * k).astype(int)]
+    seg = np.concatenate([v[e[:, 0]], v[e[:, 1]]], axis=1)
+    return seg, nearest_dist((seg[:, :3] + seg[:, 3:]) / 2, ref)
+
+
 def mesh_metrics(vertices, faces):
     np = _np()
     v = np.asarray(vertices, dtype=float)
@@ -193,6 +206,13 @@ def diff_meshes(va, fa, vb, fb, align='none', tol=DEFAULT_TOL, n=SAMPLES, show=S
     if progress:
         progress(4, 5, 'volumes')
     vol_a, vol_b = volume(va, fa), volume(vb, fb)
+    seg_a, dea = wire_edges(va, fa, pb, eps)
+    seg_b, deb = wire_edges(vb, fb, pa, eps)
+
+    def lines(seg, k):
+        if len(seg) > k:
+            seg = seg[np.linspace(0, len(seg) - 1, k).astype(int)]
+        return [[round(float(x), 2) for x in r] for r in seg]
 
     def cloud(points, k):
         if len(points) > k:
@@ -209,6 +229,7 @@ def diff_meshes(va, fa, vb, fb, align='none', tol=DEFAULT_TOL, n=SAMPLES, show=S
         'removed_pct': round(100 * len(removed) / n, 1), 'added_pct': round(100 * len(added) / n, 1),
         'identical': bool(len(removed) == 0 and len(added) == 0),
         'points': {'removed': cloud(removed, show), 'added': cloud(added, show), 'same': cloud(same, show)},
+        'edges': {'removed': lines(seg_a[dea > eps], SHOW_EDGES), 'added': lines(seg_b[deb > eps], SHOW_EDGES), 'same': lines(seg_b[deb <= eps], SHOW_EDGES)},
     }
     if progress:
         progress(5, 5, 'terminé')

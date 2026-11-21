@@ -9,7 +9,7 @@
 
 ## Ajouts 1.1.7 / Added in 1.1.7
 - **Sessions** : liste des appareils connectés, révocation (coupure à la requête suivante, 15 s au plus) · Active-session list and revocation
-- **Plugins** : processus séparé, environnement nettoyé, 10 s, 512 Mo — **pas un bac à sable** ; catalogue https public + SHA-256 obligatoire · Plugins are separate processes, **not a sandbox**; catalog needs public https + mandatory SHA-256
+- **Plugins** : processus séparé, environnement nettoyé, 10 s, 512 Mo ; catalogue https public + SHA-256 obligatoire ; 1.1.8 : signature Ed25519 (si une clé de confiance est configurée), audit automatique avant installation, et **sous Linux uniquement** fichiers (Landlock) et réseau (seccomp) restreints par le noyau — sous Windows/macOS les permissions restent déclaratives · Plugins are separate processes with mandatory SHA-256, Ed25519 signatures (when a trusted key is configured), a pre-install code audit, and kernel-enforced file (Landlock) and network (seccomp) limits **on Linux only**; on Windows/macOS permissions are declarative
 - **Rôles** (admin / gestionnaire / opérateur / utilisateur simple / invité) et permissions par imprimante, projet, dossier · Roles and fine-grained permissions
 - **Journal d'audit** : adresse IP et acteur masqués pour les invités · Audit log hides IP and actor from guests
 - **Archive G-code** et **plateau** : réservés au propriétaire (le démo n'y accède pas) · Owner-only

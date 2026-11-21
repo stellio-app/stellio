@@ -305,9 +305,9 @@ except ImportError:
         ("openpyxl",                                "openpyxl",               "load_workbook",      None),
         ("xlrd",                                    "xlrd",                   "open_workbook",      None),
         ("cascadio",                                "cascadio",               "step_to_glb",        None),
-        ("manifold3d",                              "manifold3d",             "Manifold",           None),   # v1.1.4 : BigPrint
-        ("scipy.ndimage",                           "scipy",                  None,                 None),   # v1.1.4 : BigPrint
-        ("skimage.measure",                         "scikit-image",           None,                 None),   # v1.1.4 : BigPrint
+        ("manifold3d",                              "manifold3d",             "Manifold",           None),   # BigPrint
+        ("scipy.ndimage",                           "scipy",                  None,                 None),   # BigPrint
+        ("skimage.measure",                         "scikit-image",           None,                 None),   # BigPrint
     ]
 
 
@@ -4732,14 +4732,14 @@ class PrinterManager:
                 cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
                 r = _bambuddy_get(ip, api_key, cfg, f"/printers/{_bambuddy_printer_id(cfg)}/status", timeout=5)
                 return r.status_code == 200
-            elif ptype in ('formlabs', 'anycubic_photon'):   # v1.1.4 : imprimantes résine
+            elif ptype in ('formlabs', 'anycubic_photon'):   # imprimantes résine
                 cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
                 _rp = _hosted('resin_printers')      # plugin intégré « résine » : absent = imprimante injoignable (elle reste enregistrée)
                 return bool(_rp) and _rp.connect(ptype, ip, api_key, cfg)
-            elif ptype == 'usb_serial':   # v1.1.4 : imprimante branchée en USB au PC de Stellio (présence seulement)
+            elif ptype == 'usb_serial':   # imprimante branchée en USB au PC de Stellio (présence seulement)
                 _up = _hosted('usb_printers')        # plugin intégré « imprimantes USB »
                 return bool(_up) and _up.connect(ip)
-            elif ptype in ('duet', 'repetier'):   # v1.1.3 : Duet (RepRapFirmware) et Repetier-Server
+            elif ptype in ('duet', 'repetier'):   # Duet (RepRapFirmware) et Repetier-Server
                 cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
                 return printers_extra.connect(ptype, _pbase(ip, _extra_printer_port(ptype, cfg)), api_key, cfg)
             elif ptype == 'klipper':
@@ -5003,7 +5003,7 @@ class PrinterManager:
                     import traceback
                     traceback.print_exc()
                     return {**default_result, 'status': 'error'}
-            elif ptype in ('formlabs', 'anycubic_photon'):   # v1.1.4 : imprimantes résine
+            elif ptype in ('formlabs', 'anycubic_photon'):   # imprimantes résine
                 cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
                 try:
                     _rp = _hosted('resin_printers')
@@ -5012,7 +5012,7 @@ class PrinterManager:
                     return _rp.status(ptype, ip, api_key, cfg)
                 except RuntimeError as e:
                     return {**default_result, 'status': 'offline' if str(e) == 'unreachable' else 'error'}
-            elif ptype == 'usb_serial':   # v1.1.4 : USB, présence seulement (le port n'est jamais ouvert)
+            elif ptype == 'usb_serial':   # USB, présence seulement (le port n'est jamais ouvert)
                 try:
                     _up = _hosted('usb_printers')
                     if not _up:
@@ -5020,7 +5020,7 @@ class PrinterManager:
                     return _up.status(ip)
                 except RuntimeError:
                     return {**default_result, 'status': 'offline'}
-            elif ptype in ('duet', 'repetier'):   # v1.1.3
+            elif ptype in ('duet', 'repetier'):
                 cfg = db_row['config'] if isinstance(db_row.get('config'), dict) else {}
                 try:
                     return printers_extra.status(ptype, _pbase(ip, _extra_printer_port(ptype, cfg)), api_key, cfg)
@@ -5188,7 +5188,7 @@ class PrinterManager:
                 except Exception as e:
                     app_logger.info(f"[Klipper Upload] Erreur: {e}")
                     return False
-            elif ptype in ('duet', 'repetier'):   # v1.1.3
+            elif ptype in ('duet', 'repetier'):
                 cfg = db_row['config'] if isinstance(db_row['config'], dict) else {}
                 return printers_extra.upload(ptype, _pbase(ip, _extra_printer_port(ptype, cfg)), api_key, cfg, file_path)
             elif ptype == 'bambu':
@@ -5304,7 +5304,7 @@ else:
 app.config['PERMANENT_SESSION_LIFETIME'] = datetime.timedelta(days=30)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-# v1.1.1 : derrière HTTPS (Caddy, Cloudflare, nginx…) le cookie de session ne doit voyager qu'en HTTPS : STELLIO_COOKIE_SECURE=1
+# derrière HTTPS (Caddy, Cloudflare, nginx…) le cookie de session ne doit voyager qu'en HTTPS : STELLIO_COOKIE_SECURE=1
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('STELLIO_COOKIE_SECURE', '').strip().lower() in ('1', 'true', 'yes', 'on')
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 
@@ -5370,7 +5370,7 @@ def _browser_blocked_response():
 def _desktop_only_guard():
     if not BLOCK_PC_BROWSER:
         return
-    # v1.1.7 : les scripts qui appellent l'API publique avec un jeton ne sont pas un navigateur
+    # les scripts qui appellent l'API publique avec un jeton ne sont pas un navigateur
     if (request.path or '').startswith('/api/v1/') and (request.headers.get('Authorization') or '').lower().startswith('bearer '):
         return
     supplied = request.args.get('stellio_app', '')
@@ -5420,8 +5420,8 @@ _VIEWER_WRITE_WHITELIST = {
     ('POST', '/api/ollama/explain-orientation'),
     ('POST', '/api/nesting/arrange'),
     ('POST', '/api/demo/enter'),
-    ('POST', '/api/plate/arrange'),      # 1.1.7 : calculs sans écriture, autorisés ensuite seulement en démo (voir `_demo_ok` des modules)
-    ('POST', '/api/plate/check'),        # 1.1.7 : contrôle pur d'une disposition (aucun fichier lu)
+    ('POST', '/api/plate/arrange'),      # calculs sans écriture, autorisés ensuite seulement en démo (voir `_demo_ok` des modules)
+    ('POST', '/api/plate/check'),        # contrôle pur d'une disposition (aucun fichier lu)
     ('POST', '/api/organize/preview'),
     ('POST', '/api/model-diff'),
     # BigPrint en démo / invité : on peut calculer et voir l'aperçu 3D d'un modèle de la bibliothèque, jamais récupérer de fichiers
@@ -5478,7 +5478,7 @@ def _viewer_guard():
     if (request.method, path) in _VIEWER_WRITE_WHITELIST:
         return
     try:
-        _team = access_control.team_decision()          # 1.1.7 : comptes d'équipe (operator / manager / admin) et permissions fines
+        _team = access_control.team_decision()          # comptes d'équipe (operator / manager / admin) et permissions fines
     except Exception as _e:
         _team = None
         app_logger.warning(f"[Équipe] décision ignorée : {type(_e).__name__}: {_e}")
@@ -5529,7 +5529,7 @@ def _set_security_headers(response):
     response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
     response.headers.setdefault('Referrer-Policy', 'same-origin')
     if request.is_secure or request.headers.get('X-Forwarded-Proto', '').split(',')[0].strip().lower() == 'https':
-        response.headers.setdefault('Strict-Transport-Security', 'max-age=15552000')   # v1.1.1 : 6 mois, uniquement quand la page est servie en HTTPS
+        response.headers.setdefault('Strict-Transport-Security', 'max-age=15552000')   # 6 mois, uniquement quand la page est servie en HTTPS
     response.headers.setdefault(
         'Content-Security-Policy',
         "default-src 'self'; "
@@ -5663,7 +5663,7 @@ def _amf_to_trimesh(source):
     return meshes[0] if len(meshes) == 1 else trimesh.util.concatenate(meshes)
 
 
-# ── STL géants (1.1.7) ──────────────────────────────────────────────────────────────────────────────────────────
+# ── STL géants ──────────────────────────────────────────────────────────────────────────────────────────
 # Un STL binaire de 200 Mo (4 millions de triangles) demande ≈ 2,4 Go pour être chargé et ≈ 3,4 Go pour être analysé (mesuré) :
 # à 2,7 Go (54 millions de triangles) il faudrait 30 à 45 Go de mémoire. Au-delà de STL_HUGE_BYTES on ne charge donc JAMAIS le
 # fichier entier : les statistiques se calculent par morceaux (mémoire constante), les aperçus utilisent une version simplifiée
@@ -10486,7 +10486,7 @@ def api_nexprint_browser_login_status():
     return jsonify({"state": nexprint_login_state.get(session['user_id'], 'idle')})
 
 
-# --- Connexion Creality Cloud / Snapmaker Space par fenêtre de connexion (v0.7.5) ---
+# --- Connexion Creality Cloud / Snapmaker Space par fenêtre de connexion ---
 # Même principe que Nexprint : une fenêtre Stellio ouvre la page de connexion officielle, le formulaire est
 # rempli avec l'email / mot de passe enregistrés (chiffrés), puis les cookies de session sont conservés.
 BROWSER_LOGIN_PLATFORMS = {
@@ -11047,7 +11047,7 @@ def api_file_plate_count():
         return jsonify({"plate_count": 1})
 
 
-# --- Découpe d'un fichier multi-plateaux (3MF) en un fichier par plateau (v0.7.5) ---
+# --- Découpe d'un fichier multi-plateaux (3MF) en un fichier par plateau ---
 _PLATE_META_FILE_RE = re.compile(r'^(metadata/)((?:plate|plate_no_light|top|pick)_)(\d+)(\.[A-Za-z0-9.]+)$', re.I)
 
 
@@ -12123,7 +12123,7 @@ def api_update_tag(tag_id):
             conn.execute("UPDATE tags SET name = ? WHERE id = ?", (name, tag_id))
         conn.commit()
         return jsonify({"message": "Mis à jour"}), 200
-    except sqlite3.IntegrityError:      # v1.1.1 : renommer vers un nom déjà pris = conflit (409), plus une erreur 500
+    except sqlite3.IntegrityError:      # renommer vers un nom déjà pris = conflit (409), plus une erreur 500
         return jsonify({"error": "Existant"}), 409
     except Exception:
         return jsonify({"error": "Erreur"}), 500
@@ -13997,7 +13997,7 @@ def api_get_print_history():
                 _monday = (_d - datetime.timedelta(days=_d.weekday())).strftime('%Y-%m-%d')
                 weeks_map[_monday] = weeks_map.get(_monday, 0) + _dr[1]
             weeks = [{"start": k, "count": v} for k, v in sorted(weeks_map.items(), reverse=True)]
-            print_traceability._ensure_tables(conn)   # v1.1.7 : version du modèle affichée dans chaque ligne d'historique
+            print_traceability._ensure_tables(conn)   # version du modèle affichée dans chaque ligne d'historique
             rows = conn.execute(
                 f"""SELECT id, file_path, file_name, file_size, file_ext, slicer, sent_at, source_platform,
                           result, failure_reason, rating_notes, slicer_profile_id, slicer_profile_name, rated_at,
@@ -14109,6 +14109,7 @@ def api_manual_print_history():
         printer_id = None
     profile_id = str(data.get('slicer_profile_id') or '')[:200]
     profile_name = (data.get('slicer_profile_name') or '').strip()[:200]
+    failure_reason = (str(data.get('failure_reason') or '').strip()[:100]) if result == 'failed' else ''
     # Bobines : une liste par plateau (3MF multi-plateaux) et plusieurs bobines par plateau (multicolore).
     # L'ancien format « spool » (une seule bobine) reste accepté.
     def _clean_spool(sp):
@@ -14171,17 +14172,17 @@ def api_manual_print_history():
             cur = conn.execute(
                 """INSERT INTO print_history (user_id, file_path, file_name, file_size, file_ext, slicer, source_platform,
                        spool_id, slicer_profile_id, slicer_profile_name, printer_id, filament_material, filament_label,
-                       spool_source_type, spool_source_id, assignment_json, result, rated_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)""",
+                       spool_source_type, spool_source_id, assignment_json, result, failure_reason, rated_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)""",
                 (session['user_id'], norm, os.path.basename(norm),
                  os.path.getsize(real) if os.path.exists(real) else 0,
                  os.path.splitext(norm)[1].lower(), 'manual', detect_platform_from_path(norm),
-                 spool_id, profile_id, profile_name, printer_id, s_mat, s_label, s_type, s_id, snapshot, result))
+                 spool_id, profile_id, profile_name, printer_id, s_mat, s_label, s_type, s_id, snapshot, result, failure_reason))
             try:
                 _sync_print_success_links(conn, session['user_id'], norm, prev_success, prev_success or result == 'success')
             except Exception as link_err:
                 app_logger.warning(f"[PrintHistory] Synchronisation projets/file d'attente échouée: {link_err}")
-            print_traceability.record(conn, session['user_id'], cur.lastrowid, norm, real)   # v1.1.6
+            print_traceability.record(conn, session['user_id'], cur.lastrowid, norm, real)
             conn.commit()
             entry_id = cur.lastrowid
         finally:
@@ -14258,7 +14259,7 @@ def api_print_history_by_file():
     conn = get_db()
     try:
         rows = conn.execute(
-            """SELECT id, sent_at, result, slicer, slicer_profile_name, printer_id, filament_material, filament_label,
+            """SELECT id, sent_at, result, failure_reason, slicer, slicer_profile_name, printer_id, filament_material, filament_label,
                       assignment_json,
                       (SELECT p.name FROM printers p WHERE p.id = print_history.printer_id) AS printer_name
                FROM print_history WHERE user_id=? AND (file_path=? OR file_path=?)
@@ -14519,7 +14520,7 @@ def api_browse_folder():
             return jsonify({"success": False, "path": None}), 200
 
     except (ImportError, IndexError, AttributeError) as e:
-        # v1.1.1 : pas de fenêtre de bureau (édition serveur, navigateur) = fonction indisponible (501), pas une erreur interne
+        # pas de fenêtre de bureau (édition serveur, navigateur) = fonction indisponible (501), pas une erreur interne
         app_logger.info(f"[BROWSE] Sélecteur de dossier indisponible : {e}")
         return jsonify({"error": "Le sélecteur de dossier n'est disponible que dans l'application de bureau"}), 501
     except Exception as e:
@@ -16149,7 +16150,7 @@ def api_send_to_slicer():
                  fil['source_type'], fil['source_id'], fil['snapshot'])
             )
             history_id = cur.lastrowid
-            print_traceability.record(conn, session['user_id'], history_id, norm, file_path)   # v1.1.6 : version du modèle
+            print_traceability.record(conn, session['user_id'], history_id, norm, file_path)   # version du modèle
             conn.commit()
             conn.close()
         except Exception as log_err:
@@ -16251,7 +16252,7 @@ def api_slicer_send_batch():
                          printer_id, estimated_seconds_logged, fil['material'], fil['label'],
                          fil['source_type'], fil['source_id'], fil['snapshot'])
                     )
-                    print_traceability.record(conn, session['user_id'], cur_b.lastrowid, norm, fp)   # v1.1.6
+                    print_traceability.record(conn, session['user_id'], cur_b.lastrowid, norm, fp)
                 conn.commit()
             finally:
                 conn.close()
@@ -16284,7 +16285,7 @@ def api_pick_folder():
             return jsonify({"error": "Annulé"}), 400
 
     except (ImportError, IndexError, AttributeError) as e:
-        app_logger.info(f"[PICKER] Sélecteur indisponible : {e}")      # v1.1.1 : pas de fenêtre de bureau = 501, sans détail technique
+        app_logger.info(f"[PICKER] Sélecteur indisponible : {e}")      # pas de fenêtre de bureau = 501, sans détail technique
         return jsonify({"error": "Le sélecteur n'est disponible que dans l'application de bureau"}), 501
     except Exception as e:
         app_logger.error(f"[PICKER] Erreur: {e}")
@@ -16308,7 +16309,7 @@ def api_pick_file():
             return jsonify({"error": "Annulé"}), 400
 
     except (ImportError, IndexError, AttributeError) as e:
-        app_logger.info(f"[PICKER] Sélecteur indisponible : {e}")      # v1.1.1 : pas de fenêtre de bureau = 501, sans détail technique
+        app_logger.info(f"[PICKER] Sélecteur indisponible : {e}")      # pas de fenêtre de bureau = 501, sans détail technique
         return jsonify({"error": "Le sélecteur n'est disponible que dans l'application de bureau"}), 501
     except Exception as e:
         app_logger.error(f"[PICKER] Erreur: {e}")
@@ -17190,7 +17191,7 @@ def makerworld_disconnect():
         conn.close()
     return jsonify({"message": "Compte MakerWorld supprimé"}), 200
 
-# --- Creality Cloud / Snapmaker Space (v0.7.5) ---
+# --- Creality Cloud / Snapmaker Space ---
 # Ces deux sites n'ont pas d'API publique documentée : Stellio lit la page du modèle (avec le cookie de
 # session optionnel de l'utilisateur) et en extrait les liens directs vers les fichiers 3D. Si le site charge
 # ses fichiers via une API privée après coup, rien n'est trouvé : le journal « [Creality Cloud] » /
@@ -17285,7 +17286,7 @@ def model_page_get_files(page_url, label, cookie):
     return files
 
 
-# --- Creality Cloud : API de téléchargement 3MF (v0.7.5) ---
+# --- Creality Cloud : API de téléchargement 3MF ---
 # Le bouton « Télécharger 3MF » du site appelle POST /api/cxy/v3/model/3mfDownload avec {"id": <profileId>}
 # et reçoit une URL signée temporaire. Les en-têtes d'authentification reprennent les cookies de session
 # (model_token / model_user_id).
@@ -17371,7 +17372,7 @@ def crealitycloud_get_model_files(page_url, cookie):
     return [{'name': name, 'url': url, 'size': 0}]
 
 
-# --- Snapmaker Space : API de téléchargement (v0.7.5) ---
+# --- Snapmaker Space : API de téléchargement ---
 # GET https://api-models.snapmaker.com/api/model/download/<id> avec « Authorization: Bearer <JWT> » renvoie
 # les fichiers du modèle (modelFiles) et ceux de chaque profil d'impression (printProfiles), avec des URL signées.
 SNAPMAKER_DOWNLOAD_API = "https://api-models.snapmaker.com/api/model/download/{model_id}"
@@ -18686,7 +18687,7 @@ def _server_t(key, default):
     return data.get(key) or default
 
 
-# ── v1.1.7 : webhooks sortants (modules/webhooks.py) — passerelles tolérantes appelées par les autres modules ──
+# ── webhooks sortants (modules/webhooks.py) — passerelles tolérantes appelées par les autres modules ──
 def _webhook_emit(event, data=None, user_id=None):
     """Met un évènement en file pour les webhooks abonnés (plugin intégré « Webhooks », s'il est activé) et pour les plugins ; ne lève jamais
     (un webhook en panne ne doit pas gêner une impression)."""
@@ -18701,7 +18702,7 @@ def _webhook_emit(event, data=None, user_id=None):
         except Exception:
             pass
     try:
-        from modules import plugins as _pl       # 1.1.7 : les plugins reçoivent les mêmes évènements
+        from modules import plugins as _pl       # les plugins reçoivent les mêmes évènements
         n += _pl.dispatch(event, data, user_id)
     except Exception:
         pass
@@ -20412,7 +20413,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.1.7"
+CURRENT_VERSION = "1.1.8"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -20757,7 +20758,7 @@ def check_for_updates(force=False):
             'download_url': download_url,
             'update_type': update_type,
             'release_notes': localized_notes,
-            'release_notes_all': raw_body,   # v1.1.4 : texte complet (toutes les langues) pour la fenêtre de mise à jour
+            'release_notes_all': raw_body,   # texte complet (toutes les langues) pour la fenêtre de mise à jour
             'published_at': release_data.get('published_at', ''),
             'release_url': release_data.get('html_url', ''),
             'expected_sha256': expected_sha256
@@ -21316,7 +21317,7 @@ def api_discover_printers():
         threading.Thread(target=_run, args=(_discover_flashforge,), daemon=True),
         threading.Thread(target=_run, args=(_scan_lan_for_printers,), daemon=True),
         threading.Thread(target=_run, args=(_discover_photon,), daemon=True),
-        threading.Thread(target=_run, args=(_discover_usb_if_loaded,), daemon=True),   # v1.1.4 : imprimantes branchées en USB
+        threading.Thread(target=_run, args=(_discover_usb_if_loaded,), daemon=True),   # imprimantes branchées en USB
     ]
     for t in threads:
         t.start()
@@ -21668,7 +21669,7 @@ def api_delete_printer(pid):
         conn.close()
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
-# v0.8.7 — Bambuddy (passerelle Bambu Lab auto-hébergée) : état, caméra, instantané
+# Bambuddy (passerelle Bambu Lab auto-hébergée) : état, caméra, instantané
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 BAMBUDDY_DEFAULT_PORT = 8000
 _BAMBUDDY_ARCHIVE_NAMES = {}
@@ -21976,7 +21977,7 @@ def _resolve_printer_camera(printer, pid, host_url=''):
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
-# v0.8.6 — Timelapse automatique, lien d'état partageable, alertes de dérive qualité
+# Timelapse automatique, lien d'état partageable, alertes de dérive qualité
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 _V086_TABLES_READY = False
 _V086_LOCK = threading.Lock()
@@ -22139,7 +22140,7 @@ def _timelapse_grab_frame(printer):
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
-# v1.0.4 — Suivi des sessions d'impression : module séparé `modules/print_session.py`
+# Suivi des sessions d'impression : module séparé `modules/print_session.py`
 # (prise connectée / consommation réelle, photo de fin d'impression, surveillance IA).
 # Les services de main.py lui sont fournis par `print_session.init(globals())` (juste avant le démarrage).
 # ══════════════════════════════════════════════════════════════════════════════════════════════
@@ -22728,7 +22729,7 @@ from modules.ai_providers import (
 
 # ── Fonctions IA : correction du temps d'impression, étiquettes auto, descriptions : module séparé `modules/ai_features.py` (services fournis par `ai_features.init(globals())`) ──
 
-# ── 1.1.7 : les fonctions IA sont des plugins intégrés (Assistant IA : ai-assistant ; fournisseurs : ai-ollama, ai-openai, ai-anthropic, ai-gemini).
+# ── les fonctions IA sont des plugins intégrés (Assistant IA : ai-assistant ; fournisseurs : ai-ollama, ai-openai, ai-anthropic, ai-gemini).
 # Le cœur ne les appelle que par ces passerelles : plugin absent → « IA désactivée », jamais d'erreur.
 _visual_call_lock = threading.Lock()        # un seul appel au modèle de vision à la fois (partagé avec le plugin Assistant IA)
 
@@ -24258,7 +24259,7 @@ def api_ollama_recommend_profile_batch():
 
 
 
-# ── 1.1.7 : Spoolman est un plugin intégré (bobines lues sur le serveur Spoolman, découverte du réseau) ; le cœur garde l'assignation de bobines.
+# ── Spoolman est un plugin intégré (bobines lues sur le serveur Spoolman, découverte du réseau) ; le cœur garde l'assignation de bobines.
 def _get_spoolman_slots(url):
     _sp = _hosted('spoolman')
     return _sp.get_slots(url) if _sp else ([], None)
@@ -24426,7 +24427,7 @@ def _compute_estimated_cost(file_path, weight_g_hint=None):
                                     conn.close()
                                 if row and row['power_w'] is not None:
                                     printer_power = float(row['power_w'])
-                                _measured_w = _measured_avg_power_w(printer_id)   # v1.0.4 : puissance réellement mesurée (prise connectée)
+                                _measured_w = _measured_avg_power_w(printer_id)   # puissance réellement mesurée (prise connectée)
                                 if _measured_w:
                                     printer_power = _measured_w
                         if printer_power is None:
@@ -24632,7 +24633,7 @@ def _tigertag_lookup_email(id_token):
 
 _TIGERTAG_STUDIO_TOKEN_RE = re.compile(r'"refreshToken"\s*:\s*"([^"]{20,600})"')
 _TIGERTAG_STUDIO_TOKEN_LOOSE_RE = re.compile(r'refreshToken.{0,60}?([A-Za-z0-9_-]{20,600})', re.DOTALL)
-_TIGERTAG_STUDIO_MAX_FILE_SIZE = 80 * 1024 * 1024  #
+_TIGERTAG_STUDIO_MAX_FILE_SIZE = 80 * 1024 * 1024
 
 
 TIGERTAG_STUDIO_EXTRA_ROOT_MAX_FILES = 20000
@@ -28688,18 +28689,24 @@ def api_remote_access_disable_fixed():
 
 
 
-# ── Version 1.0.6 : nouveaux modules (portail client des devis, export comptable ZIP, stock de pièces, répartition des
+# ── nouveaux modules (portail client des devis, export comptable ZIP, stock de pièces, répartition des
 # imprimantes, résumé périodique, pesées de bobines, partage de profils). Leurs services sont fournis par `X.init(globals())`
 # (juste avant le démarrage) ; voir docs/ARCHITECTURE.md. ──
 from modules import printer_dispatch, filament_weighing, openprinttag, open_filament_db
 
-print_session.init(globals())   # v1.0.4 : fournit ses services au module et enregistre ses routes
+print_session.init(globals())   # fournit ses services au module et enregistre ses routes
 
 
 
 tigertag.init(globals())
 
 print_events.init(globals())
+
+from modules import production_flow   # flux de production assisté (proposer, valider, envoyer, vérifier) : après print_events
+production_flow.init(globals())
+
+from modules import plugin_security   # durcissement des plugins externes : signature, audit, restrictions (Linux)
+plugin_security.init(globals())
 
 auto_backup_routes.init(globals())
 
@@ -28719,7 +28726,7 @@ trash_routes.init(globals())
 printer_dispatch.init(globals())
 
 
-# ── v1.1.3 : versions de modèle, tarif heures creuses, Obico, imprimantes Duet / Repetier, statistiques d'échecs, collections ──
+# ── versions de modèle, tarif heures creuses, Obico, imprimantes Duet / Repetier, statistiques d'échecs, collections ──
 from modules import model_versions, printers_extra, failure_stats, collections_sets, intelligence
 
 model_versions.init(globals())
@@ -28747,9 +28754,9 @@ globals().update(ai_providers.init(globals()))
 workshop_watch.init(globals())
 
 
-from modules import print_traceability   # v1.1.6 : modèle → version → profil → résultat
+from modules import print_traceability   # modèle → version → profil → résultat
 print_traceability.init(globals())
-from modules import public_api   # v1.1.7 : API publique (jetons, /api/v1, OpenAPI, journal)
+from modules import public_api   # API publique (jetons, /api/v1, OpenAPI, journal)
 public_api.init(globals())
 
 globals().update(backup_restore.init(globals()))
@@ -28765,42 +28772,42 @@ trash_core.init(globals())
 
 file_origin_delete.init(globals())
 
-from modules import login_log   # journal des connexions (1.1.6)
+from modules import login_log   # journal des connexions
 login_log.init(globals())
-from modules import session_manager   # 1.1.7 : sessions actives (liste, révocation)
+from modules import session_manager   # sessions actives (liste, révocation)
 session_manager.init(globals())
-from modules import print_gcode_archive   # 1.1.7 : archive du G-code de chaque impression (historique)
+from modules import print_gcode_archive   # archive du G-code de chaque impression (historique)
 print_gcode_archive.init(globals())
-from modules import plugins   # 1.1.7 : plugins et SDK
+from modules import plugins   # plugins et SDK
 plugins.init(globals())
-from modules import model_lighten   # 1.1.7 : version allégée d'un STL géant (copie simplifiée à côté de l'original)
+from modules import model_lighten   # version allégée d'un STL géant (copie simplifiée à côté de l'original)
 model_lighten.init(globals())
-from modules import shape_search   # 1.1.7 : recherche de pièces similaires par empreinte de forme
+from modules import shape_search   # recherche de pièces similaires par empreinte de forme
 shape_search.init(globals())
-from modules import model_diff   # 1.1.7 : diff 3D visuel entre deux versions
+from modules import model_diff   # diff 3D visuel entre deux versions
 model_diff.init(globals())
-from modules import auto_organize   # 1.1.7 : règles d'auto-organisation de la bibliothèque
+from modules import auto_organize   # règles d'auto-organisation de la bibliothèque
 auto_organize.init(globals())
-from modules import compat   # 1.1.7 : compatibilité modèle ↔ imprimante
+from modules import compat   # compatibilité modèle ↔ imprimante
 compat.init(globals())
-from modules import part_dossier   # 1.1.7 : fiche pièce (assemble versions, impressions, licence, G-code, photos)
+from modules import part_dossier   # fiche pièce (assemble versions, impressions, licence, G-code, photos)
 part_dossier.init(globals())
-from modules import print_check   # 1.1.7 : vérification avant impression + orientation conseillée (surplombs, base, supports estimés)
+from modules import print_check   # vérification avant impression + orientation conseillée (surplombs, base, supports estimés)
 print_check.init(globals())
-from modules import access_control   # 1.1.7 : équipes, rôles et permissions
+from modules import access_control   # équipes, rôles et permissions
 access_control.init(globals())
-from modules import audit_log   # 1.1.7 : journal d'audit général
+from modules import audit_log   # journal d'audit général
 audit_log.init(globals())
-from modules import license_watch   # 1.1.7 : alertes d'expiration de licence
+from modules import license_watch   # alertes d'expiration de licence
 license_watch.init(globals())
-from modules import print_enrich   # 1.1.7 : températures et version du slicer dans l'historique
+from modules import print_enrich   # températures et version du slicer dans l'historique
 print_enrich.init(globals())
-from modules import migrations   # 1.1.7 : migrations de base versionnées
+from modules import migrations   # migrations de base versionnées
 migrations.init(globals())
-from modules import job_manager   # 1.1.7 : gestionnaire central des tâches de fond
+from modules import job_manager   # gestionnaire central des tâches de fond
 job_manager.init(globals())
 
-from modules import plugin_host   # 1.1.7 : plugins intégrés (BigPrint, MQTT, timelapse…) : migration invisible puis chargement de ceux qui sont activés
+from modules import plugin_host   # plugins intégrés (BigPrint, MQTT, timelapse…) : migration invisible puis chargement de ceux qui sont activés
 plugin_host.init(globals())
 
 
@@ -28883,8 +28890,8 @@ if __name__ in ('__main__', 'stellio_main'):
             threading.Thread(target=_auto_scan_scheduler, daemon=True).start()
             threading.Thread(target=print_events._push_watcher_loop, daemon=True).start()
             threading.Thread(target=_workshop_watch_loop, daemon=True, name='stellio-workshop').start()
-            threading.Thread(target=license_watch._loop, daemon=True, name='stellio-licenses').start()   # 1.1.7 : alertes d'expiration de licence
-            plugin_host.autostart()   # 1.1.7 : tâches de fond des plugins intégrés activés
+            threading.Thread(target=license_watch._loop, daemon=True, name='stellio-licenses').start()   # alertes d'expiration de licence
+            plugin_host.autostart()   # tâches de fond des plugins intégrés activés
             if os.path.exists(CACHE_FILE):
                 try:
                     with open(CACHE_FILE, 'r', encoding='utf-8') as f: json.load(f)

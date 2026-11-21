@@ -7657,7 +7657,7 @@ html .accord-section.accord-popup {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    animation: recentSearchIn 0.15s ease;   /* v1.1.2 : le slideUp global décale de -50 % en X (le panneau arrivait de la gauche) */
+    animation: recentSearchIn 0.15s ease;   /* le slideUp global décale de -50 % en X (le panneau arrivait de la gauche)*/
 }
 
 .notif-panel-header {
@@ -8261,6 +8261,9 @@ html .accord-section.accord-popup {
     color: var(--text-primary);
     font-size: calc(13px * var(--fs, 1));
 }
+
+/* dans une ligne « checkbox-label », la règle `.checkbox-label input` (14×14 px) écrasait la taille : le champ quantité devenait une pastille */
+.checkbox-label input.qty-needed { width: 52px; height: auto; flex: 0 0 auto; }
 
 .qty-needed:focus {
     border-color: var(--accent);
@@ -8936,13 +8939,13 @@ body.role-viewer .nav-btn[data-page="settings"] {
 
 
 
-/* --- v0.7.5 : filtre des projets --- */
+/* --- filtre des projets ---*/
 .projects-filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 14px; }
 .projects-filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .projects-filter-count { display: inline-block; min-width: 18px; margin-left: 4px; padding: 0 5px; border-radius: 9px; background: rgba(127,127,127,0.22); font-size: calc(10px * var(--fs, 1)); font-weight: 600; text-align: center; }
 .projects-filter-btn.active .projects-filter-count { background: rgba(255,255,255,0.25); }
 
-/* --- v0.7.5 : widget galerie du tableau de bord (diaporama) --- */
+/* --- widget galerie du tableau de bord (diaporama) ---*/
 .dash-gallery { position: relative; }
 .dash-gallery-stage { position: relative; width: 100%; aspect-ratio: 16 / 10; border-radius: var(--radius); overflow: hidden; background: var(--bg-card); border: 1px solid var(--border); cursor: pointer; }
 .dash-gallery-slide { position: absolute; inset: 0; opacity: 0; transition: opacity 0.6s ease; pointer-events: none; }
@@ -8962,13 +8965,13 @@ body.role-viewer .nav-btn[data-page="settings"] {
 @media (hover: none) { .dash-gallery-nav { opacity: 1; } }
 
 
-/* --- v0.7.5 : miniature du fichier en cours dans les cartes imprimante --- */
+/* --- miniature du fichier en cours dans les cartes imprimante ---*/
 .printer-card-job { align-items: center; gap: 10px; margin-top: 8px; padding: 6px; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border); }
 .printer-card-job-thumb { flex: 0 0 auto; width: 48px; height: 48px; border-radius: 6px; overflow: hidden; background: var(--bg-input); display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
 .printer-card-job-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .printer-card-job-name { min-width: 0; font-size: calc(12px * var(--fs, 1)); font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* --- v0.7.5 : comptes externes dépliables --- */
+/* --- comptes externes dépliables ---*/
 .account-card[data-collapsible] > .account-card-header { cursor: pointer; user-select: none; gap: 8px; }
 .account-card-arrow { margin-left: 8px; font-size: calc(11px * var(--fs, 1)); color: var(--text-muted); transition: transform 0.2s ease; }
 .account-card.open .account-card-arrow { transform: rotate(180deg); }
@@ -8976,7 +8979,7 @@ body.role-viewer .nav-btn[data-page="settings"] {
 .account-card[data-collapsible].open > .account-card-body { display: block; }
 
 
-/* --- v0.7.6 : hauteur réelle de l'écran (évite que la barre du bas masque le contenu sur téléphone) --- */
+/* --- hauteur réelle de l'écran (évite que la barre du bas masque le contenu sur téléphone) ---*/
 body, .app-screen, .auth-screen {
     height: 100vh;
     height: 100dvh;
@@ -8988,7 +8991,7 @@ body, .app-screen, .auth-screen {
     .dashboard-widget { transition: none; }
 }
 
-/* --- v0.7.6 : tous les widgets du tableau de bord ont la même taille --- */
+/* --- tous les widgets du tableau de bord ont la même taille ---*/
 :root { --dashboard-widget-height: 320px; }   /* hauteur commune de tous les widgets : une seule valeur à changer */
 .dashboard-grid { grid-auto-rows: var(--dashboard-widget-height); }
 .dashboard-widget {
@@ -9003,7 +9006,7 @@ body, .app-screen, .auth-screen {
 #dashboard-gallery-body .dash-gallery { flex: 1; min-height: 0; }
 #dashboard-gallery-body .dash-gallery-stage { height: 100%; aspect-ratio: auto; }
 
-/* --- v0.7.6 : historique des devis --- */
+/* --- historique des devis ---*/
 .quote-history-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .quote-history-main { flex: 1; min-width: 0; }
 .quote-history-title { font-size: calc(13px * var(--fs, 1)); font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -9347,10 +9350,10 @@ body.has-demo-banner .app-screen,
 body.has-demo-banner .auth-screen { height: calc(100vh - var(--demo-banner-h, 32px)); height: calc(100dvh - var(--demo-banner-h, 32px)); height: calc(var(--app-height, 100dvh) - var(--demo-banner-h, 32px)); }
 
 
-/* --- v0.9.6 : téléphone, les éléments flottants du bas ne se chevauchent plus ---
+/* --- téléphone, les éléments flottants du bas ne se chevauchent plus ---
    Avant : la pastille « Mode invité », le widget d'impression en cours et le bouton « retour en haut » étaient tous
    posés au même endroit, au-dessus de la barre du bas, et se recouvraient. Ils sont maintenant empilés :
-   barre du bas → pastille invité → widget d'impression → bouton « retour en haut ». */
+   barre du bas → pastille invité → widget d'impression → bouton « retour en haut ».*/
 @media (max-width: 860px) {
     :root { --bottom-nav-h: calc(54px + env(safe-area-inset-bottom)); }
 
@@ -9380,7 +9383,7 @@ body.has-demo-banner .auth-screen { height: calc(100vh - var(--demo-banner-h, 32
 }
 
 
-/* v0.9.8 : toast avec barre de progression (conversion en lot, envoi de fichiers, import de sauvegarde) */
+/* toast avec barre de progression (conversion en lot, envoi de fichiers, import de sauvegarde)*/
 .toast.toast-progress { min-width: 260px; }
 .toast-progress-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .toast-progress .progress-track { height: 5px; }
@@ -9389,7 +9392,7 @@ body.has-demo-banner .auth-screen { height: calc(100vh - var(--demo-banner-h, 32
 
 .toast-progress .toast-progress-cancel { flex: none; padding: 2px 8px; font-size: calc(12px * var(--fs, 1)); }
 
-/* v0.9.9 : santé de Stellio, annulation des miniatures */
+/* santé de Stellio, annulation des miniatures*/
 .diag-health-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 18px; }
 .diag-health-row { display: flex; justify-content: space-between; gap: 10px; font-size: calc(13px * var(--fs, 1)); padding: 3px 0; border-bottom: 1px dashed var(--border); }
 .diag-health-row strong { font-weight: 600; text-align: right; }
@@ -9398,7 +9401,7 @@ body.has-demo-banner .auth-screen { height: calc(100vh - var(--demo-banner-h, 32
 .thumb-progress .thumb-cancel-btn { margin-left: 4px; }
 .thumb-progress .thumb-pause-btn + .thumb-cancel-btn { margin-left: 4px; }
 
-/* v0.9.9 : journal des opérations */
+/* journal des opérations*/
 .journal-modal-content { max-width: 760px; width: 94vw; }
 .journal-list { display: flex; flex-direction: column; max-height: 55vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; }
 .journal-row { display: grid; grid-template-columns: 24px 1fr auto auto; gap: 10px; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: calc(13px * var(--fs, 1)); }
@@ -9410,7 +9413,7 @@ body.has-demo-banner .auth-screen { height: calc(100vh - var(--demo-banner-h, 32
 .journal-undone { color: var(--text-secondary); font-style: italic; font-size: calc(12px * var(--fs, 1)); }
 @media (max-width: 600px) { .journal-row { grid-template-columns: 24px 1fr auto; } .journal-when { display: none; } }
 
-/* v0.9.9 : widgets santé / corbeille / nouveautés */
+/* widgets santé / corbeille / nouveautés*/
 .dashboard-health-status { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: calc(13px * var(--fs, 1)); margin-bottom: 8px; }
 .dashboard-health-status.ok { color: var(--success, var(--cb-ok, #22c55e)); }
 .dashboard-health-status.warn { color: var(--warning, var(--cb-warn, #f59e0b)); }
@@ -9422,7 +9425,7 @@ body.has-demo-banner .auth-screen { height: calc(100vh - var(--demo-banner-h, 32
 .dashboard-changelog-release li { margin-bottom: 4px; }
 .dashboard-changelog-badge { font-size: calc(10px * var(--fs, 1)); padding: 1px 7px; border-radius: 999px; background: var(--accent); color: #fff; margin-left: 6px; }
 
-/* v0.9.9 : sélecteur de palettes et éditeur de couleurs */
+/* sélecteur de palettes et éditeur de couleurs*/
 .palette-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin: 6px 0 14px; max-height: 340px; overflow-y: auto; padding: 4px 6px 4px 2px; overscroll-behavior: contain; scrollbar-width: thin; }
 .palette-card { border: 2px solid var(--border); border-radius: 10px; padding: 8px; background: var(--bg-card); cursor: pointer; text-align: left; color: var(--text-primary); font: inherit; font-size: calc(12px * var(--fs, 1)); transition: var(--transition); }
 .palette-card:hover { border-color: var(--accent); }
@@ -9439,7 +9442,7 @@ body.has-demo-banner .auth-screen { height: calc(100vh - var(--demo-banner-h, 32
 .color-editor-row.modified label::after { content: " •"; color: var(--accent); }
 .color-io-area { width: 100%; min-height: 84px; font-family: monospace; font-size: calc(11px * var(--fs, 1)); background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-top: 8px; }
 
-/* v0.9.9 : image de fond (les panneaux deviennent translucides, les fenêtres restent opaques) */
+/* image de fond (les panneaux deviennent translucides, les fenêtres restent opaques)*/
 #app-bg { position: fixed; inset: -20px; z-index: -1; background-size: cover; background-position: center; pointer-events: none; }
 #app-bg::after { content: ""; position: absolute; inset: 0; background: var(--bg-primary); opacity: var(--bg-image-dim, .7); }
 html.has-bg-image { background: var(--bg-primary); }
@@ -9458,10 +9461,10 @@ html.has-bg-image .dashboard-widget, html.has-bg-image .file-card, html.has-bg-i
 .bg-image-opts input[type=range] { width: 100%; accent-color: var(--accent); }
 
 
-/* --- v0.9.9 : pile unique des éléments flottants du bas ---
+/* --- pile unique des éléments flottants du bas ---
    Notifications, bandeau de mise à jour, widget d'impression, pastille « Mode invité » et bouton « retour en haut »
    sont empilés dans #bottom-stack (de haut en bas) : quand l'un disparaît, ceux du dessus descendent.
-   Ordre : #toast-container → bandeau de mise à jour → widget d'impression → pastille invité → retour en haut. */
+   Ordre : #toast-container → bandeau de mise à jour → widget d'impression → pastille invité → retour en haut.*/
 #bottom-stack {
     position: fixed;
     right: 20px;
@@ -9506,7 +9509,7 @@ html.has-bg-image .dashboard-widget, html.has-bg-image .file-card, html.has-bg-i
 }
 
 
-/* --- v0.9.9 : corbeille --- */
+/* --- corbeille ---*/
 .trash-modal-content { max-width: 720px; width: calc(100vw - 24px); }
 .trash-list { display: flex; flex-direction: column; gap: 6px; max-height: 52vh; overflow-y: auto; padding-right: 2px; }
 .trash-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--bg-surface, var(--bg-card)); border: 1px solid var(--border); border-radius: 10px; }
@@ -9717,7 +9720,7 @@ html[data-colorblind="by"][data-theme="light"] {
 .colorblind-preview .cb-bad { color: var(--danger); background: color-mix(in srgb, var(--danger) 15%, transparent); }
 #palette-details > summary { cursor:pointer; font-weight:600; }
 
-/* ---- Palettes noir / gris / argent (1.0.2) */
+/* ---- Palettes noir / gris / argent*/
 [data-palette="blackred"] {
     --bg-primary: #080707;
     --bg-secondary: #100f0f;
@@ -9872,7 +9875,7 @@ html[data-colorblind="by"][data-theme="light"] {
     --shadow: 0 4px 20px rgba(0, 0, 0, 0.07);
 }
 
-/* ---- Palettes noir/gris violet et orange (1.0.2) */
+/* ---- Palettes noir/gris violet et orange*/
 [data-palette="blackviolet"] {
     --bg-primary: #080708;
     --bg-secondary: #0f0f10;
@@ -9948,7 +9951,7 @@ html.thumbs-paused .thumb-pending .fa-spin, html.thumbs-paused .thumb-pending .f
 html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
 
 
-/* ── Écran Gestion (v1.0.6) ── */
+/* ── Écran Gestion ──*/
 .mg-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
 .mg-tab{background:var(--bg-card,transparent);border:1px solid var(--border,#444);color:var(--text-muted,inherit);padding:7px 12px;border-radius:8px;cursor:pointer;font:inherit;font-size:calc(13px * var(--fs,1))}
 .mg-tab.active{color:var(--text,inherit);border-color:var(--accent,#3b82f6);background:color-mix(in srgb,var(--accent,#3b82f6) 14%,transparent)}
@@ -9985,7 +9988,7 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
 .spool-card .spool-auto { font-size: calc(11px * var(--fs, 1)); color: var(--text-muted); margin-top: 6px; }
 .mg-weigh-card { margin-top: 16px; }
 
-/* v1.0.7 : quand la flèche « haut de page » est affichée, le badge d'impression se place juste à sa gauche (même ligne), sur toutes les pages */
+/* quand la flèche « haut de page » est affichée, le badge d'impression se place juste à sa gauche (même ligne), sur toutes les pages*/
 #bottom-stack:has(> .scroll-to-top.visible) > .mini-printer-widget {
     position: absolute !important;
     right: 60px !important;
@@ -9996,7 +9999,7 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
 }
 
 
-/* ── v1.0.9 : halo extérieur autour de la carte (miniature) — vert = déjà réussi, rouge = échec à retenter ── */
+/* ── halo extérieur autour de la carte (miniature) — vert = déjà réussi, rouge = échec à retenter ──*/
 .file-card.ps-success {
     border-color: rgba(52, 211, 153, 0.95);
     box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.7), 0 0 14px 3px rgba(52, 211, 153, 0.5);
@@ -10012,21 +10015,21 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
 .ap-btn-failed { background: rgba(248,113,113,0.16); color:#f87171; border:1px solid rgba(248,113,113,0.6); }
 .ap-btn-failed:hover { background: rgba(248,113,113,0.28); }
 
-/* v1.0.9 : fiche du fichier — boutons sous la miniature, colonne gauche fixe pendant le défilement */
+/* fiche du fichier — boutons sous la miniature, colonne gauche fixe pendant le défilement*/
 .file-info-left { flex: 0 0 52%; max-width: 560px; position: sticky; top: 0; align-self: flex-start; }
 .file-info-left .file-info-thumb { flex: none; width: 100%; max-width: none; }
 .file-info-left .file-info-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 @media (max-width: 640px) { .file-info-left { flex: none; width: 100%; max-width: none; position: static; } }
 
-/* v1.0.9 : fiche du fichier plus compacte (imprimante / réglages / bobine tiennent sans défilement) et sans barre de défilement visible */
+/* fiche du fichier plus compacte (imprimante / réglages / bobine tiennent sans défilement) et sans barre de défilement visible*/
 .file-info-table th { padding: 4px 10px 4px 0; }
 .file-info-table td { padding: 4px 0; }
 .file-info-controls { margin-bottom: 8px; }
 #modal-file-info .modal-body { scrollbar-width: none; -ms-overflow-style: none; }
 #modal-file-info .modal-body::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
-/* v1.0.9 : barre latérale « catégories + volet » (ordinateur) — l'en-tête (logo + nom) ne change pas ; sous lui, les catégories ;
-   un clic ouvre le volet à droite, qui se referme après le choix. Les boutons restent les mêmes : seule leur visibilité suit la catégorie. */
+/* barre latérale « catégories + volet » (ordinateur) — l'en-tête (logo + nom) ne change pas ; sous lui, les catégories ;
+   un clic ouvre le volet à droite, qui se referme après le choix. Les boutons restent les mêmes : seule leur visibilité suit la catégorie.*/
 .sidebar-rail, .sidebar-panel-title { display: none; }
 @media all {
     :root { --rail-width: 76px; --foot-h: 120px; }
@@ -10048,9 +10051,9 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
     /* pied de page : réduit quand le volet est fermé, élargi avec lui quand il s'ouvre */
     .sidebar-footer { order: 2; position: absolute; left: 0; bottom: 0; z-index: 85; width: var(--rail-width); height: auto; box-sizing: border-box; padding: 14px 10px; gap: 10px; background: var(--bg-secondary); border-top: 1px solid var(--border); border-right: 1px solid var(--border); overflow: hidden; transition: width 0.2s ease; }
     .sidebar.panel-open .sidebar-footer { width: calc(var(--rail-width) + var(--sidebar-width)); }
-    /* v1.1.2 : l'avatar du compte garde exactement la même place volet fermé ou ouvert (plus de sursaut : marges fixes, plus de centrage qui bascule d'un coup) */
+    /* l'avatar du compte garde exactement la même place volet fermé ou ouvert (plus de sursaut : marges fixes, plus de centrage qui bascule d'un coup)*/
     .sidebar-footer .user-info { justify-content: flex-start; padding-left: calc((var(--rail-width) - 21px - 32px) / 2); box-sizing: border-box; }
-    /* v1.1.2 : les textes (nom du compte, « Soutenir sur Ko-fi ») se déploient avec la largeur du pied de page au lieu d'apparaître d'un coup (le bouton ne s'élargissait plus puis se coupait) */
+    /* les textes (nom du compte, « Soutenir sur Ko-fi ») se déploient avec la largeur du pied de page au lieu d'apparaître d'un coup (le bouton ne s'élargissait plus puis se coupait)*/
     .sidebar-footer #current-username, .sidebar-footer .kofi-btn span { white-space: nowrap; overflow: hidden; max-width: 220px; opacity: 1; transition: max-width 0.2s ease, opacity 0.2s ease; }
     .sidebar:not(.panel-open) #current-username, .sidebar:not(.panel-open) .kofi-btn span { max-width: 0; opacity: 0; flex: 0 0 auto; }
     .sidebar:not(.panel-open) .sidebar-footer .user-info, .sidebar:not(.panel-open) .kofi-btn { gap: 0; }
@@ -10081,34 +10084,34 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
     .rail-btn.sel:not(.active) { background: var(--bg-hover); color: var(--text-primary); }
 }
 
-/* v1.1.0 : avec une image de fond, le logo (opaque) tranchait avec la barre du titre (translucide) → il devient transparent */
+/* avec une image de fond, le logo (opaque) tranchait avec la barre du titre (translucide) → il devient transparent*/
 @media (min-width: 861px) {
     html.has-bg-image .sidebar-header { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
-/* v1.1.0 : le logo étant transparent, le trait vertical de la barre le traversait → on ne le trace que sous l'en-tête */
+/* le logo étant transparent, le trait vertical de la barre le traversait → on ne le trace que sous l'en-tête*/
 @media all {
     .sidebar { border-right: 0; }
-    .sidebar::after { content: ""; position: absolute; right: 0; bottom: 0; top: var(--topbar-h, var(--header-height)); width: 1px; background: var(--border); pointer-events: none; z-index: 80; transition: right 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 0 0 rgba(0, 0, 0, 0); }   /* v1.1.2 : sous le pied de page (z 85) et animé comme le volet : à la fermeture le trait ne traverse plus le bouton Ko-fi */
+    .sidebar::after { content: ""; position: absolute; right: 0; bottom: 0; top: var(--topbar-h, var(--header-height)); width: 1px; background: var(--border); pointer-events: none; z-index: 80; transition: right 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 0 0 rgba(0, 0, 0, 0); }   /* sous le pied de page (z 85) et animé comme le volet : à la fermeture le trait ne traverse plus le bouton Ko-fi*/
 }
 
 /* volet ouvert : le séparateur vertical se place sur le bord droit du volet */
 @media all {
-    .sidebar.panel-open::after { right: calc(-1 * var(--sidebar-width)); box-shadow: 8px 0 24px rgba(0, 0, 0, 0.35); }   /* v1.1.4 : l'ombre suit le séparateur (même courbe) : le fond du volet et le trait se replient exactement ensemble */
+    .sidebar.panel-open::after { right: calc(-1 * var(--sidebar-width)); box-shadow: 8px 0 24px rgba(0, 0, 0, 0.35); }   /* l'ombre suit le séparateur (même courbe) : le fond du volet et le trait se replient exactement ensemble*/
 }
 
-/* v1.1.0 : page « Déjà imprimés » */
+/* page « Déjà imprimés »*/
 .printed-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); grid-auto-rows: 1fr; align-items: stretch; gap: 16px; margin-top: 12px; padding: 4px; }
 .printed-card { display: flex; flex-direction: column; gap: 8px; min-width: 0; position: relative; }
 .printed-card { height: 100%; }
 .printed-card .file-card { margin: 0; flex: 1 1 auto; height: auto; min-height: 0; align-self: stretch; }
-/* v1.1.2 : même comportement que la croix de la bibliothèque — cachée, elle apparaît au survol de la miniature (sur écran tactile : un appui l'affiche, un second ouvre le fichier) */
+/* même comportement que la croix de la bibliothèque — cachée, elle apparaît au survol de la miniature (sur écran tactile : un appui l'affiche, un second ouvre le fichier)*/
 .printed-card-remove { position: absolute; top: 6px; right: 6px; z-index: 5; width: 22px; height: 22px; padding: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.75); color: var(--cb-bad, #f87171); border: 1px solid rgba(248,113,113,0.5); border-radius: 4px; font-size: calc(12px * var(--fs, 1)); cursor: pointer; opacity: 0; transition: var(--transition); }
 .printed-card:hover .printed-card-remove, .printed-card-remove:focus-visible { opacity: 1; }
 .printed-card-remove:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
 .printed-card.touch-active .printed-card-remove { opacity: 1; }   /* écran tactile : 1er appui = survol, 2e appui = ouvre le fichier */
 .printed-card .file-ext-badge { transition: opacity .15s ease; }
-.printed-card:hover .file-ext-badge, .printed-card.touch-active .file-ext-badge { opacity: 0; }   /* v1.1.2 : le badge de format s'efface au survol, la croix prend sa place */
+.printed-card:hover .file-ext-badge, .printed-card.touch-active .file-ext-badge { opacity: 0; }   /* le badge de format s'efface au survol, la croix prend sa place*/
 .printed-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); }
 .printed-row-icon { color: var(--accent); font-size: calc(18px * var(--fs, 1)); }
 .printed-row-body { flex: 1; min-width: 0; }
@@ -10116,12 +10119,12 @@ html.thumbs-paused .thumb-progress .progress-bar { animation: none; }
 .printed-row-sub { font-size: calc(12px * var(--fs, 1)); color: var(--text-muted); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .printed-remove-btn { margin-left: 6px; }
 #page-printed .history-page { max-width: none; }
-#page-gallery .history-page { max-width: none; }   /* v1.1.2 : la galerie occupe toute la largeur, comme la bibliothèque */
+#page-gallery .history-page { max-width: none; }   /* la galerie occupe toute la largeur, comme la bibliothèque*/
 .history-filters #printed-search { min-width: 240px; font-family: inherit; color: var(--text-primary); }
 .history-filters #printed-search::placeholder { color: var(--text-muted); }
 
 
-/* ===== v1.1.2 : accessibilité ===== */
+/* ===== accessibilité =====*/
 /* focus clavier toujours visible (sans gêner la souris) */
 a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible,
 [tabindex]:focus-visible, .nav-btn:focus-visible, .file-card:focus-visible, .sc-chip:focus-visible {
@@ -10147,31 +10150,31 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
     }
 }
 
-/* v1.1.1 — popup « caméra seule » et sélecteur de caméras */
+/* popup « caméra seule » et sélecteur de caméras*/
 .camera-popup-content { width: min(860px, 94vw); max-width: 94vw; }
 .camera-popup-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: var(--radius); overflow: hidden; display: flex; align-items: center; justify-content: center; color: #fff; }
 .camera-popup-frame img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .camera-popup-off { text-align: center; color: var(--text-muted); }
 #modal-camera-picker .camera-popup-content { width: min(460px, 94vw); }
 
-/* v1.1.1 — « Déjà imprimé » : une couleur par plateau, plusieurs couleurs par plateau */
+/* « Déjà imprimé » : une couleur par plateau, plusieurs couleurs par plateau*/
 .ap-plate-block { margin-bottom: 10px; }
 .ap-spool-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
 .ap-dot { display: inline-block; width: 14px; height: 14px; flex: none; border-radius: 50%; border: 1px solid var(--border); vertical-align: middle; margin-right: 4px; }
 .ap-spool-row .ap-dot { margin-right: 0; }
 
-/* v1.1.1 — la liste « Recherches récentes » passe toujours au-dessus des puces de filtre et des cartes (elle était parfois recouverte) */
+/* la liste « Recherches récentes » passe toujours au-dessus des puces de filtre et des cartes (elle était parfois recouverte)*/
 .app-header:focus-within,
-.app-header:has(#notif-panel:not(.hidden)) { z-index: 200; }   /* v1.1.2 : panneau des notifications ouvert = au-dessus des widgets, même après un clic sur la croix (le bouton disparaît, le focus aussi) */
+.app-header:has(#notif-panel:not(.hidden)) { z-index: 200; }   /* panneau des notifications ouvert = au-dessus des widgets, même après un clic sur la croix (le bouton disparaît, le focus aussi)*/
 
-/* v1.1.1 — halo ambre autour des fichiers envoyés au slicer (pas encore notés réussi / raté) */
+/* halo ambre autour des fichiers envoyés au slicer (pas encore notés réussi / raté)*/
 .file-card.ps-sent {
     border-color: rgba(251, 191, 36, 0.95);
     box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.7), 0 0 14px 3px rgba(251, 191, 36, 0.45);
 }
 
-/* v1.1.1 — Application Android / petits écrans : plus de barre en bas. Un bouton en haut à gauche ouvre la même barre latérale que sur ordinateur
-   (rail de catégories + volet qui s'ouvre à droite), en tiroir par-dessus la page. */
+/* Application Android / petits écrans : plus de barre en bas. Un bouton en haut à gauche ouvre la même barre latérale que sur ordinateur
+   (rail de catégories + volet qui s'ouvre à droite), en tiroir par-dessus la page.*/
 @media (max-width: 860px) {
     :root { --bottom-nav-h: env(safe-area-inset-bottom, 0px); }
     .bottom-nav, .bottom-nav-scroll-hint { display: none !important; }
@@ -10193,12 +10196,12 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
     html.has-bg-image .sidebar-header { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
-/* v1.1.1 — petit écran : la pastille « impression en cours » (et les notifications) ne passent plus devant la barre latérale :
-   barre ouverte → on se décale à droite du rail et la pastille se réduit (icône + %), volet ouvert → pastille masquée, puis elle revient. */
+/* petit écran : la pastille « impression en cours » (et les notifications) ne passent plus devant la barre latérale :
+   barre ouverte → on se décale à droite du rail et la pastille se réduit (icône + %), volet ouvert → pastille masquée, puis elle revient.*/
 @media (max-width: 860px) {
     #bottom-stack { transition: left 0.25s cubic-bezier(0.32, 0.72, 0, 1); }
     body.nav-drawer-open #bottom-stack { left: calc(var(--rail-width) + 8px); }
-    /* v1.1.2 : sur téléphone le badge d'impression est toujours réduit (icône seule), pas seulement barre ouverte */
+    /* sur téléphone le badge d'impression est toujours réduit (icône seule), pas seulement barre ouverte*/
     #bottom-stack > .mini-printer-widget { align-self: flex-end; max-width: none; gap: 6px; padding-right: 12px; }
     #bottom-stack > .mini-printer-widget .mini-printer-widget-body,
     #bottom-stack > .mini-printer-widget .mini-printer-widget-extra,
@@ -10211,22 +10214,22 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
     body.nav-panel-open #bottom-stack > * { display: none !important; }
 }
 
-/* v1.1.2 : une fenêtre (modale) ouverte passe devant le badge d'impression, le bouton « haut de page » et les bandeaux ;
-   sur téléphone le badge cachait les boutons du bas (ex. « Compris » de « Quoi de neuf »). Les notifications (toasts) restent visibles. */
+/* une fenêtre (modale) ouverte passe devant le badge d'impression, le bouton « haut de page » et les bandeaux ;
+   sur téléphone le badge cachait les boutons du bas (ex. « Compris » de « Quoi de neuf »). Les notifications (toasts) restent visibles.*/
 @media (min-width: 861px) {
     body:has(.modal:not(.hidden)) #bottom-stack > .mini-printer-widget,
     body:has(.modal:not(.hidden)) #bottom-stack > .scroll-to-top,
     body:has(.modal:not(.hidden)) #bottom-stack > .viewer-banner { display: none !important; }
 }
 
-/* v1.1.2 — démo sur téléphone : la barre latérale (tiroir) démarre sous le bandeau bleu au lieu de passer dessus ;
-   son haut est collé au bas du bandeau et le fond assombri ne le recouvre plus. */
+/* démo sur téléphone : la barre latérale (tiroir) démarre sous le bandeau bleu au lieu de passer dessus ;
+   son haut est collé au bas du bandeau et le fond assombri ne le recouvre plus.*/
 @media (max-width: 860px) {
     body.has-demo-banner .sidebar { top: var(--demo-banner-h, 32px); height: calc(100vh - var(--demo-banner-h, 32px)); height: calc(100dvh - var(--demo-banner-h, 32px)); }
     body.has-demo-banner .sidebar-overlay { top: var(--demo-banner-h, 32px); }
 }
 
-/* ===== v1.1.3 : versions, collections, causes d'échec, tarif, Obico ===== */
+/* ===== versions, collections, causes d'échec, tarif, Obico =====*/
 .v13-overlay{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px}
 .v13-modal{background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-lg,12px);width:560px;max-width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:var(--shadow)}
 .v13-modal.v13-wide{width:760px}
@@ -10287,9 +10290,9 @@ textarea.v13-in{width:100%;resize:vertical}
 #v13-tariff-section .accord-body,#v13-obico-section .accord-body{display:flex;flex-direction:column;gap:10px}
 #v13-tariff-section .accord-body .v13-check,#v13-tariff-section .accord-body .v13-block,#v13-tariff-section .accord-body .v13-grid2,#v13-obico-section .accord-body .v13-block,#v13-obico-section .accord-body .v13-check{margin:0}
 
-/* ===== v1.1.4 : imprimantes résine ===== */
+/* ===== imprimantes résine =====*/
 
-/* ===== v1.1.3 : inventaire de résine ===== */
+/* ===== inventaire de résine =====*/
 .v13-bottles{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
 .v13-bottle{border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:var(--bg-card);display:flex;flex-direction:column;gap:8px;min-width:0}
 .v13-bottle-top{display:flex;gap:10px;align-items:center;min-width:0}
@@ -10624,7 +10627,7 @@ textarea.v13-in{width:100%;resize:vertical}
 @media (max-width: 480px) { .merge3mf-grid { grid-template-columns: minmax(0, 1fr); } }
 
 
-/* ── v1.1.4 : page BigPrint ───────────────────────────────────────────── */
+/* ── page BigPrint ─────────────────────────────────────────────*/
 .bp-layout { display: grid; grid-template-columns: minmax(300px, 420px) minmax(0, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 980px) { .bp-layout { grid-template-columns: minmax(0, 1fr); } }
 .bp-form, .bp-result { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
@@ -10674,7 +10677,7 @@ textarea.v13-in{width:100%;resize:vertical}
 .bp-form input[type=number], .bp-form input[type=text] { font-size: calc(13px * var(--fs, 1)); }
 #bp-model-info { font-size: calc(13px * var(--fs, 1)); }
 
-/* ── v1.1.4 : menu « Actions » d'un fichier sur 2 colonnes ── */
+/* ── menu « Actions » d'un fichier sur 2 colonnes ──*/
 #modal-file-actions .modal-content.small { width: min(700px, 94vw); max-width: 94vw; }
 #modal-file-actions .modal-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; max-height: 78vh; overflow-y: auto; }
 #modal-file-actions .modal-body > :not(.file-action-row) { grid-column: 1 / -1; }
@@ -10694,7 +10697,7 @@ textarea.v13-in{width:100%;resize:vertical}
 #bp-custom-bed input { width: 100%; min-width: 0; box-sizing: border-box; text-align: center; }
 #bp-custom-bed .bp-bed-hint { grid-column: 1 / -1; margin: 0; text-align: center; }
 
-/* v1.1.4 : tous les réglages visibles d'un coup (cartes en colonnes), aperçu masqué tant qu'il n'est pas généré */
+/* tous les réglages visibles d'un coup (cartes en colonnes), aperçu masqué tant qu'il n'est pas généré*/
 .bp-layout { grid-template-columns: minmax(0, 1fr); }
 .bp-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; align-items: start; }
 .bp-form > .bp-actions, .bp-form > #bp-status, .bp-form > .bp-progress { grid-column: 1 / -1; }
@@ -10706,7 +10709,7 @@ textarea.v13-in{width:100%;resize:vertical}
 .bp-card h3 { margin-bottom: 8px; }
 .bp-form { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
 
-/* v1.1.4 : trois colonnes équilibrées (modèle / fabrication / assemblage et sortie) */
+/* trois colonnes équilibrées (modèle / fabrication / assemblage et sortie)*/
 .bp-form { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 16px; align-items: start; }
 .bp-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 @media (max-width: 1250px) { .bp-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -10722,7 +10725,7 @@ textarea.v13-in{width:100%;resize:vertical}
 .bp-adv > summary::-webkit-details-marker { display: none; }
 .bp-form > .bp-actions { justify-content: flex-end; }
 
-/* v1.1.4 : badge BigPrint sur les miniatures */
+/* badge BigPrint sur les miniatures*/
 .file-bigprint-badge {
     position: absolute;
     bottom: 6px;
@@ -10750,7 +10753,7 @@ textarea.v13-in{width:100%;resize:vertical}
 }
 .dv-thumb .file-bigprint-badge i { display: none; }
 
-/* v1.1.5 : page Planning (capacité, fin estimée, alertes) */
+/* page Planning (capacité, fin estimée, alertes)*/
 .order-hours { width: 78px !important; flex: 0 0 78px; }
 .pl-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 14px; }
 .pl-toolbar .settings-select { width: auto; }
@@ -10817,7 +10820,7 @@ textarea.v13-in{width:100%;resize:vertical}
 .pl-day-chk { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: calc(12px * var(--fs, 1)); cursor: pointer; }
 @media (max-width: 760px) { .pl-row { grid-template-columns: 1fr; } .pl-gantt .pl-track { min-width: 520px; } }
 
-/* v1.1.6 — traçabilité */
+/* traçabilité*/
 .tr-row { cursor: pointer; }
 .tr-row:hover td, .tr-row:focus td { background: var(--bg-hover, rgba(127,127,127,.12)); }
 .tr-rate.ok, .tr-badge.ok { color: var(--cb-ok, #10b981); }
@@ -10827,7 +10830,7 @@ textarea.v13-in{width:100%;resize:vertical}
 .tr-badge { font-size: calc(12px * var(--fs, 1)); font-weight: 600; margin-top: 2px; }
 .tr-box { margin-bottom: 12px; }
 
-/* v1.1.7 — traçabilité : puce de version, boîte de rattachement, empreinte du profil */
+/* traçabilité : puce de version, boîte de rattachement, empreinte du profil*/
 .history-trace-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px; font-size: calc(11px * var(--fs, 1)); background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-secondary); }
 .history-trace-chip i { color: var(--accent); }
 .tr-fp { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: calc(11px * var(--fs, 1)); color: var(--text-muted); border: 1px solid var(--border); border-radius: 6px; padding: 0 4px; }
@@ -10839,7 +10842,7 @@ textarea.v13-in{width:100%;resize:vertical}
 .tr-dlg-ver { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
 .tr-dlg-ver select { width: 100%; max-width: 100%; }
 
-/* v1.1.7 — API publique */
+/* API publique*/
 .api-create { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .api-create input { flex: 1 1 220px; min-width: 0; }
 .api-table { width: 100%; border-collapse: collapse; font-size: calc(12px * var(--fs, 1)); }
@@ -10856,14 +10859,14 @@ textarea.v13-in{width:100%;resize:vertical}
 .api-log-wrap { max-height: 260px; overflow: auto; margin-top: 6px; }
 .settings-hint a { color: var(--accent); }
 
-/* v1.1.7 — webhooks */
+/* webhooks*/
 .wh-events { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0; }
 .wh-ev { display: inline-flex; align-items: center; gap: 6px; font-size: calc(12px * var(--fs, 1)); }
 .wh-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .wh-test-row td { padding-top: 0; border-top: 0; }
 .api-table td.v13-muted { word-break: break-word; max-width: 260px; }
 
-/* v1.1.6 — badge « Mise à jour disponible » (surveillance chaque minute) */
+/* badge « Mise à jour disponible » (surveillance chaque minute)*/
 .update-badge { display: inline-flex; align-items: center; gap: 8px; margin-right: 10px; padding: 6px 14px; border: 0; border-radius: 999px; background: linear-gradient(135deg, var(--accent), #00d9ff); color: #fff; font-family: inherit; font-size: calc(12.5px * var(--fs, 1)); font-weight: 600; cursor: pointer; white-space: nowrap; box-shadow: 0 0 0 0 rgba(78, 161, 211, .55); animation: updateBadgePulse 2.4s ease-in-out infinite; }
 .update-badge b { font-weight: 700; padding-left: 8px; border-left: 1px solid rgba(255, 255, 255, .45); }
 .update-badge:hover { filter: brightness(1.1); }
@@ -10872,7 +10875,7 @@ textarea.v13-in{width:100%;resize:vertical}
 @media (max-width: 760px) { .update-badge span { display: none; } .update-badge { margin-right: 6px; padding: 6px 10px; } }
 .rail-btn.has-update::after { content: ''; position: absolute; top: 6px; right: 14px; width: 9px; height: 9px; border-radius: 50%; background: var(--success, #3fb950); box-shadow: 0 0 0 2px var(--bg-secondary, #1e2129); }
 
-/* v1.1.7 — assistant de bibliothèque */
+/* assistant de bibliothèque*/
 .as-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
 .as-chip { border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-primary); border-radius: 999px; padding: 4px 12px; font-size: calc(12px * var(--fs, 1)); cursor: pointer; }
 .as-chip:hover { border-color: var(--accent, #58a6ff); }
@@ -10897,7 +10900,7 @@ button.dashboard-health-alert-btn:focus-visible { outline: 2px solid var(--accen
 /* le bouton « retour en haut » ne masque pas les boutons d'une fenêtre ouverte */
 body:has(.modal:not(.hidden)) .scroll-to-top { display: none !important; }
 
-/* 1.1.6 — journal des connexions et badge de licence */
+/* journal des connexions et badge de licence*/
 .authlog-details { border-top: 1px solid var(--border); padding-top: 10px; }
 .authlog-details summary { cursor: pointer; font-size: calc(13px * var(--fs, 1)); font-weight: 500; }
 .authlog-box { margin-top: 8px; }
@@ -10910,7 +10913,7 @@ body:has(.modal:not(.hidden)) .scroll-to-top { display: none !important; }
 .license-chip.license-no { color: var(--danger, #f85149); border-color: var(--danger, #f85149); }
 .license-chip.license-unknown { color: var(--warning, #d29922); border-color: var(--warning, #d29922); }
 
-/* v1.1.7 — Atelier avancé */
+/* Atelier avancé*/
 .suite-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
 .suite-tabs .btn.active { background: var(--accent, #4f8cff); color: #fff; }
 .suite-body h4 { margin: 14px 0 6px; }
@@ -10920,7 +10923,7 @@ body:has(.modal:not(.hidden)) .scroll-to-top { display: none !important; }
 .suite-table th, .suite-table td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border, rgba(128,128,128,.25)); }
 .suite-pre { white-space: pre-wrap; word-break: break-word; font-size: 0.8rem; max-height: 260px; overflow: auto; }
 
-/* 1.1.7 — diff 3D, éditeur de plateau, divers (Atelier avancé) */
+/* diff 3D, éditeur de plateau, divers (Atelier avancé)*/
 .suite-cloud { width: 100%; max-width: 720px; height: auto; aspect-ratio: 720 / 440; background: var(--bg-secondary, rgba(128,128,128,.08)); border: 1px solid var(--border, rgba(128,128,128,.25)); border-radius: 8px; touch-action: none; cursor: grab; display: block; }
 .suite-legend { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 6px 0; font-size: 0.85rem; }
 .suite-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; }
@@ -11014,7 +11017,7 @@ body:has(.modal:not(.hidden)) .scroll-to-top { display: none !important; }
 .su-notice-info { border-color: var(--border); background: var(--bg-secondary); }
 .su-notice-info i { color: var(--accent); }
 
-/* v1.1.7 : temps de travail humain sur les commandes */
+/* temps de travail humain sur les commandes*/
 .order-labor { width: 64px !important; flex: 0 0 64px; }
 .pl-set-labor { margin-top: 10px; }
 
@@ -11062,7 +11065,7 @@ body:has(.modal:not(.hidden)) .scroll-to-top { display: none !important; }
 .su-line .suite-field-md .settings-select { width: 100%; min-width: 0; }
 .su-line .suite-field-sm > span, .su-line .suite-field-md > span { white-space: normal; line-height: 1.2; }
 
-/* Atelier avancé : cadre resserré, champs de taille adaptée (1.1.7) */
+/* Atelier avancé : cadre resserré, champs de taille adaptée*/
 #page-suite .suite-body.bp-card { min-height: 0; padding: 14px 16px; }
 #page-suite .su-line > .suite-field, #page-suite .suite-row-sm > .suite-field { width: auto; flex: 0 0 auto; }
 #page-suite .su-line > .suite-field:first-child { flex: 1 1 260px; min-width: 200px; }
@@ -11077,6 +11080,8 @@ body:has(.modal:not(.hidden)) .scroll-to-top { display: none !important; }
 #page-suite .su-actions { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
 /* La confirmation de suppression doit passer devant les fenêtres plein écran (timelapses, rapports) */
 #modal-confirm { z-index: 100500; }
+/* fenêtres ouvertes depuis « Sources de fichiers » (Ajouter, types, renommer) : toujours devant la liste */
+#modal-select-type, #modal-smb, #modal-nfs, #modal-source-types, #modal-rename-source { z-index: 1100; }
 /* Page Timelapses */
 .tlp-page { max-width: none; }
 .tlp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin: 12px 0; }
@@ -11109,7 +11114,7 @@ body:has(.modal:not(.hidden)) .scroll-to-top { display: none !important; }
 .su-logo-ph { display: inline-flex; align-items: center; justify-content: center; color: var(--accent); font-size: 22px; }
 
 
-/* 1.1.7 : plugins avec une page — menu « Plugins » de la barre latérale et cadre isolé */
+/* plugins avec une page — menu « Plugins » de la barre latérale et cadre isolé*/
 @media all {
     .sidebar[data-cat="plugins"] .nav-btn[data-cat]:not([data-cat="plugins"]) { display: none !important; }
     .plugin-nav-list { display: contents; }
@@ -11156,7 +11161,7 @@ details.su-fold[open] > summary { margin-bottom: 10px; }
 /* Plugins intégrés : tant que la liste des plugins actifs n'est pas connue, leurs menus et sections restent invisibles (pas de clignotement) */
 html:not([data-hp-ready]) [data-host-plugin] { visibility: hidden; }
 
-/* v1.1.7 : le badge « Officiel » (et l'état) passent sous le titre du plugin */
+/* le badge « Officiel » (et l'état) passent sous le titre du plugin*/
 .su-plugin-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 2px 0 6px; }
 .su-plugin-tags:empty { display: none; }
 .su-pp-list { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 10px; max-height: 260px; overflow-y: auto; }
@@ -11165,7 +11170,7 @@ html:not([data-hp-ready]) [data-host-plugin] { visibility: hidden; }
 .su-pp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .su-pp-del:hover { color: var(--danger, #e5484d); }
 
-/* v1.1.7 : repère visuel pendant l'export 3MF / l'organisation automatique du plateau */
+/* repère visuel pendant l'export 3MF / l'organisation automatique du plateau*/
 .su-work { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0; padding: 8px 12px; border: 1px solid var(--accent); border-radius: 8px; background: color-mix(in srgb, var(--accent) 10%, transparent); font-weight: 600; }
 .su-work[hidden] { display: none; }
 .su-work-bar { flex: 1 1 100%; height: 4px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 20%, transparent); overflow: hidden; }
@@ -11177,7 +11182,7 @@ html:not([data-hp-ready]) [data-host-plugin] { visibility: hidden; }
 .su-busy-plate .suite-plate-view { opacity: .7; transition: opacity .15s; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .su-work-bar i, .su-btn-busy::before { animation-duration: 3s; } }
 
-/* v1.1.7 : miniatures (Similaires), puces d'exemples (Assistant), formulaire de règle (Organisation) */
+/* miniatures (Similaires), puces d'exemples (Assistant), formulaire de règle (Organisation)*/
 .su-thumb { display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 8px; overflow: hidden; background: var(--bg-card, rgba(128,128,128,.12)); border: 1px solid var(--border); color: var(--text-secondary); }
 .su-thumb img { width: 100%; height: 100%; object-fit: contain; }
 .su-sim td { vertical-align: middle; }
@@ -11188,7 +11193,7 @@ html:not([data-hp-ready]) [data-host-plugin] { visibility: hidden; }
 .su-warn { color: var(--warning, #f59e0b); }
 .su-org-form { align-items: flex-end; flex-wrap: wrap; }
 
-/* 1.1.7 : le menu Administration n'apparaît que si cette instance est reliée à d'autres (voir applyHostFeatures dans suite.js) */
+/* le menu Administration n'apparaît que si cette instance est reliée à d'autres (voir applyHostFeatures dans suite.js)*/
 html:not([data-net-ok]) [data-admin-net] { display: none !important; }
 
 /* Centre de notifications : pied « Tout voir » et page « Toutes les notifications » */

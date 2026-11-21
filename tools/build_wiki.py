@@ -69,7 +69,7 @@ CAPTIONS = {
            'stats': '統計', 'management': '「管理」画面（顧客向け見積）', 'settings': '設定'},
 }
 
-# v1.1.2 : nouvelles captures (page « Déjà imprimés » avec croix au survol, plateaux/couleurs, barre latérale, menu téléphone)
+# nouvelles captures (page « Déjà imprimés » avec croix au survol, plateaux/couleurs, barre latérale, menu téléphone)
 CAPTIONS_V112 = {
     'fr': {'already-printed': '« Déjà imprimés » : la croix rouge apparaît au survol', 'already-printed-plates': 'Une bobine (ou plusieurs couleurs) par plateau', 'sidebar-panel': 'La barre latérale : rail et volet', 'mobile-drawer': 'Le menu sur téléphone (application Android)'},
     'en': {'already-printed': '“Already printed”: the red cross appears on hover', 'already-printed-plates': 'One spool (or several colors) per plate', 'sidebar-panel': 'The sidebar: rail and panel', 'mobile-drawer': 'The menu on a phone (Android app)'},
@@ -82,7 +82,7 @@ CAPTIONS_V112 = {
 }
 for _l, _c in CAPTIONS_V112.items():
     CAPTIONS[_l].update(_c)
-# v1.1.4 : captures BigPrint
+# captures BigPrint
 CAPTIONS_V114 = {
     'fr': {'bigprint': 'BigPrint : réglages en trois colonnes', 'bigprint-result': 'BigPrint : aperçu éclaté, filament et liste des pièces'},
     'en': {'bigprint': 'BigPrint: settings in three columns', 'bigprint-result': 'BigPrint: exploded preview, filament and piece list'},
@@ -95,7 +95,7 @@ CAPTIONS_V114 = {
 }
 for _l, _c in CAPTIONS_V114.items():
     CAPTIONS[_l].update(_c)
-# v1.1.5 : capture du planning
+# capture du planning
 CAPTIONS_V115 = {
     'fr': {'planning': 'Planning de production : fin estimée par imprimante, capacité et alertes'},
     'en': {'planning': 'Production planning: end dates per printer, capacity and alerts'},
@@ -108,7 +108,7 @@ CAPTIONS_V115 = {
 }
 for _l, _c in CAPTIONS_V115.items():
     CAPTIONS[_l].update(_c)
-# v1.1.6 : captures de la traçabilité
+# captures de la traçabilité
 CAPTIONS_V116 = {
     'fr': {'trace': 'Traçabilité : meilleure combinaison version + profil par modèle', 'trace_versions': 'Versions du modèle : taux de réussite par version et par profil'},
     'en': {'trace': 'Traceability: best version + profile combination per model', 'trace_versions': 'Model versions: success rate per version and per profile'},
