@@ -131,7 +131,7 @@ def test_repetier_helpers():
 # ── branchement ──────────────────────────────────────────────────────────────
 def test_v113_wiring_backend():
     main = (ROOT / 'main.py').read_text(encoding='utf-8')
-    assert 'CURRENT_VERSION = "1.1.8"' in main and "@app.route('/v113.js')" in main
+    assert 'CURRENT_VERSION = "1.1.9"' in main and "@app.route('/v113.js')" in main
     assert "('klipper','octoprint','prusalink','duet','repetier')" in main.replace(' ', '')
     for m in ('model_versions', 'printers_extra', 'failure_stats', 'collections_sets'):
         assert f'{m}.init(globals())' in main

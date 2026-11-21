@@ -1,1336 +1,1336 @@
 {
- "source": "https://github.com/OpenFilamentCollective/open-filament-database",
- "license": "MIT",
- "shops": [
-  {
-   "id": "ofd_3d_fuel",
-   "name": "3D Fuel",
-   "url": "https://3dfuel.com/",
-   "host": "3dfuel.com",
-   "ships_from": [
-    "US"
-   ],
-   "ships_to": [],
-   "brands": [
-    "3D Fuel",
-    "3d fuel"
-   ]
-  },
-  {
-   "id": "ofd_3dea",
-   "name": "3DEA",
-   "url": "https://www.3dea.co.nz/",
-   "host": "www.3dea.co.nz",
-   "ships_from": [
-    "NZ"
-   ],
-   "ships_to": [
-    "NZ"
-   ],
-   "brands": [
-    "3DEA",
-    "3dea"
-   ]
-  },
-  {
-   "id": "ofd_3deksperten",
-   "name": "3D Eksperten",
-   "url": "https://3deksperten.dk/",
-   "host": "3deksperten.dk",
-   "ships_from": "DK",
-   "ships_to": [],
-   "brands": [
-    "3DE",
-    "3deksperten"
-   ]
-  },
-  {
-   "id": "ofd_3djake",
-   "name": "3DJake",
-   "url": "https://www.3djake.com/",
-   "host": "www.3djake.com",
-   "ships_from": [
-    "AT"
-   ],
-   "ships_to": [
-    "AE",
-    "AT",
-    "AU",
-    "BE",
-    "BG",
-    "BH",
-    "CA",
-    "CN",
-    "CY",
-    "CZ",
-    "DE",
-    "DK",
-    "EE",
-    "ES",
-    "FI",
-    "FR",
-    "GR",
-    "HK",
-    "HR",
-    "HU",
-    "IE",
-    "IT",
-    "JP",
-    "LT",
-    "LU",
-    "LV",
-    "MT",
-    "NL",
-    "PL",
-    "PT",
-    "RO",
-    "SE",
-    "SG",
-    "SI",
-    "SK",
-    "TW",
-    "US"
-   ],
-   "brands": [
-    "3DJAKE",
-    "3djake"
-   ]
-  },
-  {
-   "id": "ofd_3dodk",
-   "name": "3DO.dk",
-   "url": "https://3do.dk/",
-   "host": "3do.dk",
-   "ships_from": "DK",
-   "ships_to": []
-  },
-  {
-   "id": "ofd_3dprima",
-   "name": "3D Prima",
-   "url": "https://www.3dprima.com/",
-   "host": "www.3dprima.com",
-   "ships_from": [
-    "SE"
-   ],
-   "ships_to": [
-    "AX",
-    "AL",
-    "AU",
-    "AT",
-    "BH",
-    "BE",
-    "BA",
-    "BG",
-    "CA",
-    "HR",
-    "CY",
-    "CZ",
-    "DK",
-    "EE",
-    "FO",
-    "FI",
-    "FR",
-    "DE",
-    "GI",
-    "GR",
-    "GG",
-    "HU",
-    "IS",
-    "IE",
-    "IM",
-    "IL",
-    "IT",
-    "XK",
-    "KW",
-    "LV",
-    "LI",
-    "LT",
-    "LU",
-    "MT",
-    "MQ",
-    "MD",
-    "MC",
-    "ME",
-    "NL",
-    "NZ",
-    "MK",
-    "NO",
-    "PL",
-    "PT",
-    "RO",
-    "SM",
-    "RS",
-    "SK",
-    "SI",
-    "ES",
-    "SE",
-    "CH",
-    "US",
-    "AE",
-    "GB"
-   ]
-  },
-  {
-   "id": "ofd_3dprintingcanada",
-   "name": "3D Printing Canada",
-   "url": "https://3dprintingcanada.com/",
-   "host": "3dprintingcanada.com",
-   "ships_from": [
-    "CA"
-   ],
-   "ships_to": []
-  },
-  {
-   "id": "ofd_3dstoredk",
-   "name": "3DStore.dk",
-   "url": "https://3dstore.dk/",
-   "host": "3dstore.dk",
-   "ships_from": "DK",
-   "ships_to": []
-  },
-  {
-   "id": "ofd_4d_lab",
-   "name": "4D-Lab",
-   "url": "https://4dlab.co/",
-   "host": "4dlab.co",
-   "ships_from": "CO",
-   "ships_to": [
-    "CO"
-   ],
-   "brands": [
-    "4D-Lab",
-    "4d lab"
-   ]
-  },
-  {
-   "id": "ofd_add_north",
-   "name": "ADD-North",
-   "url": "https://addnorth.com/",
-   "host": "addnorth.com",
-   "ships_from": [
-    "SE"
-   ],
-   "ships_to": [],
-   "brands": [
-    "Add-North",
-    "add north"
-   ]
-  },
-  {
-   "id": "ofd_additive_x",
-   "name": "Additive-X",
-   "url": "https://www.additive-x.com/",
-   "host": "www.additive-x.com",
-   "ships_from": [
-    "GB"
-   ],
-   "ships_to": [
-    "GB"
-   ]
-  },
-  {
-   "id": "ofd_alternate",
-   "name": "ALTERNATE",
-   "url": "https://www.alternate.de/",
-   "host": "www.alternate.de",
-   "ships_from": [
-    "DE"
-   ],
-   "ships_to": [
-    "DE",
-    "EU"
-   ]
-  },
-  {
-   "id": "ofd_alza",
-   "name": "Alza",
-   "url": "https://alza.cz",
-   "host": "alza.cz",
-   "ships_from": [
-    "CZ, SK, DE, HU, AT"
-   ],
-   "ships_to": [
-    "CZ, SK, DE, HU, AT"
-   ]
-  },
-  {
-   "id": "ofd_amazon",
-   "name": "Amazon",
-   "url": "https://www.amazon.com/",
-   "host": "www.amazon.com",
-   "ships_from": [
-    "US",
-    "CA",
-    "MX"
-   ],
-   "ships_to": [
-    "US",
-    "CA",
-    "MX"
-   ]
-  },
-  {
-   "id": "ofd_amazon_de",
-   "name": "Amazon.de",
-   "url": "https://amazon.de",
-   "host": "amazon.de",
-   "ships_from": [
-    "DE"
-   ],
-   "ships_to": [
-    "DE",
-    "AT",
-    "CH"
-   ]
-  },
-  {
-   "id": "ofd_amolen",
-   "name": "Amolen",
-   "url": "https://www.amolen.com/",
-   "host": "www.amolen.com",
-   "ships_from": [
-    "US",
-    "CN"
-   ],
-   "ships_to": [],
-   "brands": [
-    "Amolen",
-    "amolen"
-   ]
-  },
-  {
-   "id": "ofd_amolen_amazon",
-   "name": "amolen - Amazon",
-   "url": "https://www.amazon.com/stores/AMOLEN/page/358D2B52-F200-4D4C-8DA5-C4DE7797C263",
-   "host": "www.amazon.com",
-   "ships_from": [],
-   "ships_to": []
-  },
-  {
-   "id": "ofd_anycubic",
-   "name": "Anycubic",
-   "url": "https://store.anycubic.com/",
-   "host": "store.anycubic.com",
-   "ships_from": [
-    "CN, US, CA, EU, UK, AU"
-   ],
-   "ships_to": [
-    "CN, US, CA, EU, UK, AU"
-   ],
-   "brands": [
-    "Anycubic",
-    "anycubic"
-   ]
-  },
-  {
-   "id": "ofd_artillery_3d",
-   "name": "Artillery 3D",
-   "url": "https://www.artillery3d.com/",
-   "host": "www.artillery3d.com",
-   "ships_from": [
-    "US"
-   ],
-   "ships_to": [
-    "US"
-   ]
-  },
-  {
-   "id": "ofd_atomic_filament",
-   "name": "Atomic Filament",
-   "url": "https://atomicfilament.com/",
-   "host": "atomicfilament.com",
-   "ships_from": [],
-   "ships_to": [],
-   "brands": [
-    "Atomic Filament",
-    "atomic filament"
-   ]
-  },
-  {
-   "id": "ofd_aurapol",
-   "name": "AURAPOL",
-   "url": "https://www.aurapol.com/",
-   "host": "www.aurapol.com",
-   "ships_from": [],
-   "ships_to": [
-    "SK",
-    "DE",
-    "AT",
-    "HU",
-    "BE",
-    "DK",
-    "EE",
-    "HR",
-    "IT",
-    "LV",
-    "LT",
-    "NL",
-    "RO",
-    "GR",
-    "PT",
-    "BG",
-    "ES",
-    "FR",
-    "SI",
-    "SE",
-    "FI",
-    "LU",
-    "IE"
-   ],
-   "brands": [
-    "AURAPOL",
-    "aurapol"
-   ]
-  },
-  {
-   "id": "ofd_azurefilm",
-   "name": "AzureFilm",
-   "url": "https://www.azurefilm.com/",
-   "host": "www.azurefilm.com",
-   "ships_from": [],
-   "ships_to": [
-    "AT",
-    "BE",
-    "BG",
-    "HR",
-    "CZ",
-    "DK",
-    "EE",
-    "FI",
-    "FR",
-    "DE",
-    "GR",
-    "HU",
-    "IE",
-    "IT",
-    "LV",
-    "LT",
-    "LU",
-    "NL",
-    "PL",
-    "PT",
-    "RO",
-    "SK",
-    "SI",
-    "ES",
-    "SE"
-   ],
-   "brands": [
-    "AzureFilm",
-    "azurefilm"
-   ]
-  },
-  {
-   "id": "ofd_bavaria_filaments",
-   "name": "Bavaria Filaments",
-   "url": "https://www.bavaria-filaments.com/",
-   "host": "www.bavaria-filaments.com",
-   "ships_from": "DE",
-   "ships_to": [
-    "DE",
-    "AT"
-   ],
-   "brands": [
-    "Bavaria Filaments",
-    "bavaria filaments"
-   ]
-  },
-  {
-   "id": "ofd_bblstore",
-   "name": "Bambu Lab Store",
-   "url": "https://store.bambulab.com",
-   "host": "store.bambulab.com",
-   "ships_from": [],
-   "ships_to": []
-  },
-  {
-   "id": "ofd_beehive",
-   "name": "Beehive",
-   "url": "https://www.beehive.com.br/",
-   "host": "www.beehive.com.br",
-   "ships_from": [
-    "BR"
-   ],
-   "ships_to": [
-    "BR"
-   ]
-  },
-  {
-   "id": "ofd_best_buy",
-   "name": "Best Buy",
-   "url": "https://www.bestbuy.com/",
-   "host": "www.bestbuy.com",
-   "ships_from": [
-    "US"
-   ],
-   "ships_to": [
-    "US"
-   ]
-  },
-  {
-   "id": "ofd_biqu",
-   "name": "Biqu",
-   "url": "https://biqu.equipment/",
-   "host": "biqu.equipment",
-   "ships_from": [],
-   "ships_to": [],
-   "brands": [
-    "BIQU",
-    "biqu"
-   ]
-  },
-  {
-   "id": "ofd_clas_ohlson",
-   "name": "Clas Ohlson",
-   "url": "https://www.clasohlson.com",
-   "host": "www.clasohlson.com",
-   "ships_from": [
-    "FI",
-    "NO",
-    "SE"
-   ],
-   "ships_to": [
-    "FI",
-    "NO",
-    "SE"
-   ],
-   "brands": [
-    "Clas Ohlson",
-    "clas ohlson"
-   ]
-  },
-  {
-   "id": "ofd_colorfabb",
-   "name": "colorFabb",
-   "url": "https://colorfabb.com/",
-   "host": "colorfabb.com",
-   "ships_from": [
-    "NL"
-   ],
-   "ships_to": [],
-   "brands": [
-    "colorFabb",
-    "colorfabb"
-   ]
-  },
-  {
-   "id": "ofd_crealitystore",
-   "name": "Creality Store",
-   "url": "https://store.creality.com",
-   "host": "store.creality.com",
-   "ships_from": [
-    "US"
-   ],
-   "ships_to": [
-    "US"
-   ]
-  },
-  {
-   "id": "ofd_dancyn_3d_prints",
-   "name": "Dancyn 3D Prints",
-   "url": "https://www.dancyn3dprints.com",
-   "host": "www.dancyn3dprints.com",
-   "ships_from": [
-    "US"
-   ],
-   "ships_to": [
-    "US"
-   ],
-   "brands": [
-    "Dancyn 3D Prints",
-    "dancyn 3d prints"
-   ]
-  },
-  {
-   "id": "ofd_das_filament",
-   "name": "Das Filament",
-   "url": "https://dasfilament.de/",
-   "host": "dasfilament.de",
-   "ships_from": [
-    "DE"
-   ],
-   "ships_to": [],
-   "brands": [
-    "Das Filament",
-    "das filament"
-   ]
-  },
-  {
-   "id": "ofd_duramic3d",
-   "name": "DuramiC 3D",
-   "url": "https://duramic3d.com/collections/all",
-   "host": "duramic3d.com",
-   "ships_from": [
-    "CN"
-   ],
-   "ships_to": []
-  },
-  {
-   "id": "ofd_elegoo",
-   "name": "ELEGOO",
-   "url": "https://elegoo.com/",
-   "host": "elegoo.com",
-   "ships_from": [
-    "EU",
-    "US",
-    "CN"
-   ],
-   "ships_to": [
-    "EU",
-    "US",
-    "CN"
-   ],
-   "brands": [
-    "ELEGOO",
-    "elegoo"
-   ]
-  },
-  {
-   "id": "ofd_eryone",
-   "name": "Eryone",
-   "url": "https://eryone3d.com/",
-   "host": "eryone3d.com",
-   "ships_from": [
-    "US",
-    "CA",
-    "EU",
-    "UK",
-    "RU"
-   ],
-   "ships_to": [
-    "US",
-    "CA",
-    "EU",
-    "UK",
-    "RU"
-   ],
-   "brands": [
-    "Eryone",
-    "eryone"
-   ]
-  },
-  {
-   "id": "ofd_esun3d",
-   "name": "eSUN",
-   "url": "https://esun3dstore.com/",
-   "host": "esun3dstore.com",
-   "ships_from": [
-    "US",
-    "UK",
-    "EU",
-    "CA"
-   ],
-   "ships_to": [
-    "US",
-    "UK",
-    "EU",
-    "CA"
-   ]
-  },
-  {
-   "id": "ofd_extrudr",
-   "name": "extrudr",
-   "url": "https://www.extrudr.com/",
-   "host": "www.extrudr.com",
-   "ships_from": [],
-   "ships_to": [],
-   "brands": [
-    "extrudr"
-   ]
-  },
-  {
-   "id": "ofd_fiberlogy",
-   "name": "Fiberlogy",
-   "url": "https://fiberlogy.com/",
-   "host": "fiberlogy.com",
-   "ships_from": [],
-   "ships_to": [
-    "PL",
-    "EU",
-    "GB",
-    "NO",
-    "CH"
-   ],
-   "brands": [
-    "Fiberlogy",
-    "fiberlogy"
-   ]
-  },
-  {
-   "id": "ofd_filamentive",
-   "name": "Filamentive",
-   "url": "https://www.filamentive.com/",
-   "host": "www.filamentive.com",
-   "ships_from": [
-    "GB-ENG"
-   ],
-   "ships_to": [
-    "GB"
-   ],
-   "brands": [
-    "Filamentive",
-    "filamentive"
-   ]
-  },
-  {
-   "id": "ofd_filamentworld",
-   "name": "Filamentworld",
-   "url": "https://www.filamentworld.de/",
-   "host": "www.filamentworld.de",
-   "ships_from": [
-    "DE"
-   ],
-   "ships_to": [
-    "DE",
-    "EU",
-    "CH",
-    "NO",
-    "LI"
-   ],
-   "brands": [
-    "Filamentworld",
-    "filamentworld"
-   ]
-  },
-  {
-   "id": "ofd_fillamentum",
-   "name": "Fillamentum",
-   "url": "https://shop.fillamentum.com/",
-   "host": "shop.fillamentum.com",
-   "ships_from": [],
-   "ships_to": [],
-   "brands": [
-    "Fillamentum",
-    "fillamentum"
-   ]
-  },
-  {
-   "id": "ofd_flashforge",
-   "name": "Flashforge",
-   "url": "https://www.flashforge.com/",
-   "host": "www.flashforge.com",
-   "ships_from": [],
-   "ships_to": [],
-   "brands": [
-    "FLASHFORGE",
-    "flashforge"
-   ]
-  },
-  {
-   "id": "ofd_formfutura",
-   "name": "FormFutura",
-   "url": "https://www.formfutura.com/",
-   "host": "www.formfutura.com",
-   "ships_from": [
-    "NL"
-   ],
-   "ships_to": [],
-   "brands": [
-    "FormFutura",
-    "formfutura"
-   ]
-  },
-  {
-   "id": "ofd_gadgethuset",
-   "name": "Gadgethuset",
-   "url": "https://www.gadgethuset.dk/",
-   "host": "www.gadgethuset.dk",
-   "ships_from": "DK",
-   "ships_to": []
-  },
-  {
-   "id": "ofd_garhem_3d",
-   "name": "Garhem 3d",
-   "url": "https://shop.garhem3d.com/",
-   "host": "shop.garhem3d.com",
-   "ships_from": [
-    "ES"
-   ],
-   "ships_to": [
-    "ES"
-   ]
-  },
-  {
-   "id": "ofd_geeetech",
-   "name": "Geeetech",
-   "url": "https://www.geeetech.com/",
-   "host": "www.geeetech.com",
-   "ships_from": [],
-   "ships_to": [],
-   "brands": [
-    "Geeetech",
-    "geeetech"
-   ]
-  },
-  {
-   "id": "ofd_gst3d",
-   "name": "GST3d",
-   "url": "https://gst3d.eu/",
-   "host": "gst3d.eu",
-   "ships_from": [
-    "ES"
-   ],
-   "ships_to": [
-    "US",
-    "UK",
-    "EU",
-    "CA"
-   ],
-   "brands": [
-    "GST3D",
-    "gst3d"
-   ]
-  },
-  {
-   "id": "ofd_hatchbox",
-   "name": "Hatchbox",
-   "url": "https://www.hatchbox3d.com/",
-   "host": "www.hatchbox3d.com",
-   "ships_from": [
-    "US",
-    "CA",
-    "MX"
-   ],
-   "ships_to": [
-    "US",
-    "CA",
-    "MX"
-   ],
-   "brands": [
-    "Hatchbox",
-    "hatchbox"
-   ]
-  },
-  {
-   "id": "ofd_imaginesc",
-   "name": "Imagine S.C.",
-   "url": "https://print-imagine.com/",
-   "host": "print-imagine.com",
-   "ships_from": [
-    "PL"
-   ],
-   "ships_to": [
-    "PL",
-    "EU",
-    "UK"
-   ]
-  },
-  {
-   "id": "ofd_isanghu",
-   "name": "iSangHu",
-   "url": "https://www.isanghu3d.com/",
-   "host": "www.isanghu3d.com",
-   "ships_from": [],
-   "ships_to": [],
-   "brands": [
-    "iSangHu",
-    "isanghu"
-   ]
-  },
-  {
-   "id": "ofd_isanghu_amazon",
-   "name": "iSangHu - Amazon",
-   "url": "https://www.amazon.com/stores/iSANGHU/page/AFA914D7-4531-498B-B205-C1CA47D6BF23",
-   "host": "www.amazon.com",
-   "ships_from": [],
-   "ships_to": []
-  },
-  {
-   "id": "ofd_isanmate",
-   "name": "iSANMATE",
-   "url": "https://isanmate.store/",
-   "host": "isanmate.store",
-   "ships_from": [
-    "HK"
-   ],
-   "ships_to": [],
-   "brands": [
-    "iSANMATE",
-    "isanmate"
-   ]
-  },
-  {
-   "id": "ofd_isanmate_amazon",
-   "name": "iSANMATE - Amazon",
-   "url": "https://www.amazon.com/stores/iSANMATE/page/83D65319-8665-41EE-93FC-99B404085034",
-   "host": "www.amazon.com",
-   "ships_from": [
-    "HK"
-   ],
-   "ships_to": []
-  },
-  {
-   "id": "ofd_jaycar_nz",
-   "name": "Jaycar NZ",
-   "url": "https://www.jaycar.co.nz/",
-   "host": "www.jaycar.co.nz",
-   "ships_from": [
-    "NZ"
-   ],
-   "ships_to": [
-    "NZ"
-   ]
-  },
-  {
-   "id": "ofd_joybuy",
-   "name": "Joybuy",
-   "url": "https://www.joybuy.fr",
-   "host": "www.joybuy.fr",
-   "ships_from": [
-    "FR"
-   ],
-   "ships_to": [
-    "FR"
-   ]
-  },
-  {
-   "id": "ofd_lab3d_store",
-   "name": "LAB3D Store",
-   "url": "https://shop.lab3d.dk/",
-   "host": "shop.lab3d.dk",
-   "ships_from": [
-    "DK"
-   ],
-   "ships_to": []
-  },
-  {
-   "id": "ofd_levemaker",
-   "name": "Levemaker",
-   "url": "https://levemaker.com/collections/3d-filaments",
-   "host": "levemaker.com",
-   "ships_from": [
-    "US"
-   ],
-   "ships_to": [
-    "US"
-   ]
-  },
-  {
-   "id": "ofd_liniya3d",
-   "name": "Liniya3D",
-   "url": "https://liniya3d.uz/",
-   "host": "liniya3d.uz",
-   "ships_from": [
-    "UZ"
-   ],
-   "ships_to": [
-    "UZ"
-   ]
-  },
-  {
-   "id": "ofd_lostboyslab",
-   "name": "lostboyslab",
-   "url": "https://www.lostboyslab.shop/",
-   "host": "www.lostboyslab.shop",
-   "ships_from": [
-    "EU",
-    "SE",
-    "US"
-   ],
-   "ships_to": [
-    "EU"
-   ],
-   "brands": [
-    "lostboyslab"
-   ]
-  },
-  {
-   "id": "ofd_majkl3d",
-   "name": "Majkl3D",
-   "url": "https://www.majkl3d.eu/",
-   "host": "www.majkl3d.eu",
-   "ships_from": [
-    "CZ"
-   ],
-   "ships_to": [
-    "EU"
-   ]
-  },
-  {
-   "id": "ofd_makeroad",
-   "name": "Makeroad",
-   "url": "https://store.makeroad.com/collections/filament-1",
-   "host": "store.makeroad.com",
-   "ships_from": [
-    "US"
-   ],
-   "ships_to": [
-    "US"
-   ]
-  },
-  {
-   "id": "ofd_marswork",
-   "name": "MarsWork",
-   "url": "https://www.marswork3d.com",
-   "host": "www.marswork3d.com",
-   "ships_from": [
-    "US"
-   ],
-   "ships_to": [
-    "US",
-    "DE",
-    "AT",
-    "BE",
-    "BG",
-    "HR",
-    "CY",
-    "DK",
-    "EE",
-    "FI",
-    "FR",
-    "GR",
-    "HU",
-    "IE",
-    "IT",
-    "LV",
-    "LT",
-    "LU",
-    "MT",
-    "NL",
-    "PL",
-    "PT",
-    "RO",
-    "SK",
-    "SI",
-    "ES",
-    "SE",
-    "CZ"
-   ],
-   "brands": [
-    "MarsWork",
-    "marswork"
-   ]
-  },
-  {
-   "id": "ofd_matterhackers",
-   "name": "MatterHackers",
-   "url": "https://www.matterhackers.com/",
-   "host": "www.matterhackers.com",
-   "ships_from": [],
-   "ships_to": [],
-   "brands": [
-    "MatterHackers",
-    "matterhackers"
-   ]
-  },
-  {
-   "id": "ofd_microcenter",
-   "name": "Microcenter",
-   "url": "https://microcenter.com",
-   "host": "microcenter.com",
-   "ships_from": [],
-   "ships_to": []
-  },
-  {
-   "id": "ofd_nobufil",
-   "name": "Nobufil",
-   "url": "https://www.nobufil.com/",
-   "host": "www.nobufil.com",
-   "ships_from": [
-    "AT"
-   ],
-   "ships_to": [],
-   "brands": [
-    "Nobufil",
-    "nobufil"
-   ]
-  },
-  {
-   "id": "ofd_overture3d",
-   "name": "overture",
-   "url": "https://overture3d.com/",
-   "host": "overture3d.com",
-   "ships_from": [
-    "US"
-   ],
-   "ships_to": [
-    "US"
-   ]
-  },
-  {
-   "id": "ofd_plastify",
-   "name": "Plastify",
-   "url": "https://plastify.es/",
-   "host": "plastify.es",
-   "ships_from": [
-    "ES"
-   ],
-   "ships_to": [
-    "ES"
-   ]
-  },
-  {
-   "id": "ofd_polarfilament",
-   "name": "Polar Filament",
-   "url": "https://polarfilament.com/",
-   "host": "polarfilament.com",
-   "ships_from": [],
-   "ships_to": []
-  },
-  {
-   "id": "ofd_polymaker",
-   "name": "PolyMaker",
-   "url": "https://us.polymaker.com/",
-   "host": "us.polymaker.com",
-   "ships_from": [
-    "US"
-   ],
-   "ships_to": [
-    "US"
-   ],
-   "brands": [
-    "Polymaker",
-    "polymaker"
-   ]
-  },
-  {
-   "id": "ofd_printed_solid",
-   "name": "Printed Solid",
-   "url": "https://www.printedsolid.com",
-   "host": "www.printedsolid.com",
-   "ships_from": [
-    "US"
-   ],
-   "ships_to": [
-    "US"
-   ]
-  },
-  {
-   "id": "ofd_proteorprint",
-   "name": "Proteor Print",
-   "url": "https://www.proteordigital.com/category/all-products",
-   "host": "www.proteordigital.com",
-   "ships_from": [
-    "US"
-   ],
-   "ships_to": []
-  },
-  {
-   "id": "ofd_protopasta",
-   "name": "Protopasta",
-   "url": "https://proto-pasta.com/",
-   "host": "proto-pasta.com",
-   "ships_from": [],
-   "ships_to": [],
-   "brands": [
-    "Protopasta",
-    "protopasta"
-   ]
-  },
-  {
-   "id": "ofd_prusa3d",
-   "name": "Prusa3D Store",
-   "url": "https://www.prusa3d.com/",
-   "host": "www.prusa3d.com",
-   "ships_from": [
-    "EU"
-   ],
-   "ships_to": [
-    "EU",
-    "US",
-    "UK"
-   ]
-  },
-  {
-   "id": "ofd_qidi_tech",
-   "name": "QIDI Tech",
-   "url": "https://qidi3d.com/",
-   "host": "qidi3d.com",
-   "ships_from": [
-    "CN",
-    "US",
-    "GB",
-    "EU",
-    "CA",
-    "AU",
-    "JP"
-   ],
-   "ships_to": [],
-   "brands": [
-    "QIDI Tech",
-    "qidi tech"
-   ]
-  },
-  {
-   "id": "ofd_recreus",
-   "name": "Recreus",
-   "url": "https://recreus.com/products/",
-   "host": "recreus.com",
-   "ships_from": [
-    "ES"
-   ],
-   "ships_to": [
-    "GB"
-   ],
-   "brands": [
-    "Recreus",
-    "recreus"
-   ]
-  },
-  {
-   "id": "ofd_rs_components",
-   "name": "RS Components",
-   "url": "https://uk.rs-online.com",
-   "host": "uk.rs-online.com",
-   "ships_from": [
-    "GB"
-   ],
-   "ships_to": [
-    "GB"
-   ]
-  },
-  {
-   "id": "ofd_siddament",
-   "name": "Siddament",
-   "url": "https://siddament.com.au/",
-   "host": "siddament.com.au",
-   "ships_from": [
-    "AU"
-   ],
-   "ships_to": [
-    "EU",
-    "AU"
-   ],
-   "brands": [
-    "Siddament",
-    "siddament"
-   ]
-  },
-  {
-   "id": "ofd_siraya_tech",
-   "name": "Siraya Tech",
-   "url": "https://siraya.tech/",
-   "host": "siraya.tech",
-   "ships_from": [],
-   "ships_to": [
-    "US",
-    "CA",
-    "MX",
-    "JP",
-    "AU",
-    "GB",
-    "EU",
-    "NO",
-    "CH"
-   ],
-   "brands": [
-    "Siraya Tech",
-    "siraya tech"
-   ]
-  },
-  {
-   "id": "ofd_snapmaker",
-   "name": "Snapmaker",
-   "url": "https://shop.snapmaker.com/",
-   "host": "shop.snapmaker.com",
-   "ships_from": [
-    "CN",
-    "US",
-    "EU"
-   ],
-   "ships_to": [
-    "US",
-    "EU",
-    "UK",
-    "CA",
-    "AU",
-    "JP",
-    "KR"
-   ],
-   "brands": [
-    "Snapmaker",
-    "snapmaker"
-   ]
-  },
-  {
-   "id": "ofd_spectrum",
-   "name": "Spectrum",
-   "url": "https://shop.spectrumfilaments.com/",
-   "host": "shop.spectrumfilaments.com",
-   "ships_from": [
-    "PL"
-   ],
-   "ships_to": [
-    "EU",
-    "UK"
-   ],
-   "brands": [
-    "Spectrum",
-    "spectrum"
-   ]
-  },
-  {
-   "id": "ofd_sunlu",
-   "name": "SUNLU",
-   "url": "https://sunlu.com/",
-   "host": "sunlu.com",
-   "ships_from": [
-    "US"
-   ],
-   "ships_to": [
-    "US",
-    "CA",
-    "AU",
-    "EU"
-   ],
-   "brands": [
-    "SUNLU",
-    "sunlu"
-   ]
-  },
-  {
-   "id": "ofd_tecbears",
-   "name": "TECBEARS",
-   "url": "https://www.amazon.com/stores/TECBEARS/page/F05182C4-BC19-404C-B375-C2F0D0783054",
-   "host": "www.amazon.com",
-   "ships_from": [],
-   "ships_to": [],
-   "brands": [
-    "TECBEARS",
-    "tecbears"
-   ]
-  },
-  {
-   "id": "ofd_ultimate3dprintingstore",
-   "name": "Ultimate 3D Printing Store",
-   "url": "https://ultimate3dprintingstore.com/",
-   "host": "ultimate3dprintingstore.com",
-   "ships_from": [],
-   "ships_to": []
-  },
-  {
-   "id": "ofd_unitak3d",
-   "name": "UniTak3D",
-   "url": "https://www.amazon.com/stores/UniTak3D/page/4A9530C3-3F06-4FDD-ABA3-574C0C85C832",
-   "host": "www.amazon.com",
-   "ships_from": [],
-   "ships_to": [],
-   "brands": [
-    "UniTak3D",
-    "unitak3d"
-   ]
-  },
-  {
-   "id": "ofd_yoopai",
-   "name": "YooPai",
-   "url": "https://www.yoopai.com/",
-   "host": "www.yoopai.com",
-   "ships_from": [
-    "US"
-   ],
-   "ships_to": [],
-   "brands": [
-    "YooPai",
-    "yoopai"
-   ]
-  },
-  {
-   "id": "ofd_yousu",
-   "name": "Yousu",
-   "url": "https://www.ysfilament.com/",
-   "host": "www.ysfilament.com",
-   "ships_from": [],
-   "ships_to": []
-  }
- ]
+  "source": "https://github.com/OpenFilamentCollective/open-filament-database",
+  "license": "MIT",
+  "shops": [
+    {
+      "id": "ofd_3d_fuel",
+      "name": "3D Fuel",
+      "url": "https://3dfuel.com/",
+      "host": "3dfuel.com",
+      "ships_from": [
+        "US"
+      ],
+      "ships_to": [],
+      "brands": [
+        "3D Fuel",
+        "3d fuel"
+      ]
+    },
+    {
+      "id": "ofd_3dea",
+      "name": "3DEA",
+      "url": "https://www.3dea.co.nz/",
+      "host": "www.3dea.co.nz",
+      "ships_from": [
+        "NZ"
+      ],
+      "ships_to": [
+        "NZ"
+      ],
+      "brands": [
+        "3DEA",
+        "3dea"
+      ]
+    },
+    {
+      "id": "ofd_3deksperten",
+      "name": "3D Eksperten",
+      "url": "https://3deksperten.dk/",
+      "host": "3deksperten.dk",
+      "ships_from": "DK",
+      "ships_to": [],
+      "brands": [
+        "3DE",
+        "3deksperten"
+      ]
+    },
+    {
+      "id": "ofd_3djake",
+      "name": "3DJake",
+      "url": "https://www.3djake.com/",
+      "host": "www.3djake.com",
+      "ships_from": [
+        "AT"
+      ],
+      "ships_to": [
+        "AE",
+        "AT",
+        "AU",
+        "BE",
+        "BG",
+        "BH",
+        "CA",
+        "CN",
+        "CY",
+        "CZ",
+        "DE",
+        "DK",
+        "EE",
+        "ES",
+        "FI",
+        "FR",
+        "GR",
+        "HK",
+        "HR",
+        "HU",
+        "IE",
+        "IT",
+        "JP",
+        "LT",
+        "LU",
+        "LV",
+        "MT",
+        "NL",
+        "PL",
+        "PT",
+        "RO",
+        "SE",
+        "SG",
+        "SI",
+        "SK",
+        "TW",
+        "US"
+      ],
+      "brands": [
+        "3DJAKE",
+        "3djake"
+      ]
+    },
+    {
+      "id": "ofd_3dodk",
+      "name": "3DO.dk",
+      "url": "https://3do.dk/",
+      "host": "3do.dk",
+      "ships_from": "DK",
+      "ships_to": []
+    },
+    {
+      "id": "ofd_3dprima",
+      "name": "3D Prima",
+      "url": "https://www.3dprima.com/",
+      "host": "www.3dprima.com",
+      "ships_from": [
+        "SE"
+      ],
+      "ships_to": [
+        "AX",
+        "AL",
+        "AU",
+        "AT",
+        "BH",
+        "BE",
+        "BA",
+        "BG",
+        "CA",
+        "HR",
+        "CY",
+        "CZ",
+        "DK",
+        "EE",
+        "FO",
+        "FI",
+        "FR",
+        "DE",
+        "GI",
+        "GR",
+        "GG",
+        "HU",
+        "IS",
+        "IE",
+        "IM",
+        "IL",
+        "IT",
+        "XK",
+        "KW",
+        "LV",
+        "LI",
+        "LT",
+        "LU",
+        "MT",
+        "MQ",
+        "MD",
+        "MC",
+        "ME",
+        "NL",
+        "NZ",
+        "MK",
+        "NO",
+        "PL",
+        "PT",
+        "RO",
+        "SM",
+        "RS",
+        "SK",
+        "SI",
+        "ES",
+        "SE",
+        "CH",
+        "US",
+        "AE",
+        "GB"
+      ]
+    },
+    {
+      "id": "ofd_3dprintingcanada",
+      "name": "3D Printing Canada",
+      "url": "https://3dprintingcanada.com/",
+      "host": "3dprintingcanada.com",
+      "ships_from": [
+        "CA"
+      ],
+      "ships_to": []
+    },
+    {
+      "id": "ofd_3dstoredk",
+      "name": "3DStore.dk",
+      "url": "https://3dstore.dk/",
+      "host": "3dstore.dk",
+      "ships_from": "DK",
+      "ships_to": []
+    },
+    {
+      "id": "ofd_4d_lab",
+      "name": "4D-Lab",
+      "url": "https://4dlab.co/",
+      "host": "4dlab.co",
+      "ships_from": "CO",
+      "ships_to": [
+        "CO"
+      ],
+      "brands": [
+        "4D-Lab",
+        "4d lab"
+      ]
+    },
+    {
+      "id": "ofd_add_north",
+      "name": "ADD-North",
+      "url": "https://addnorth.com/",
+      "host": "addnorth.com",
+      "ships_from": [
+        "SE"
+      ],
+      "ships_to": [],
+      "brands": [
+        "Add-North",
+        "add north"
+      ]
+    },
+    {
+      "id": "ofd_additive_x",
+      "name": "Additive-X",
+      "url": "https://www.additive-x.com/",
+      "host": "www.additive-x.com",
+      "ships_from": [
+        "GB"
+      ],
+      "ships_to": [
+        "GB"
+      ]
+    },
+    {
+      "id": "ofd_alternate",
+      "name": "ALTERNATE",
+      "url": "https://www.alternate.de/",
+      "host": "www.alternate.de",
+      "ships_from": [
+        "DE"
+      ],
+      "ships_to": [
+        "DE",
+        "EU"
+      ]
+    },
+    {
+      "id": "ofd_alza",
+      "name": "Alza",
+      "url": "https://alza.cz",
+      "host": "alza.cz",
+      "ships_from": [
+        "CZ, SK, DE, HU, AT"
+      ],
+      "ships_to": [
+        "CZ, SK, DE, HU, AT"
+      ]
+    },
+    {
+      "id": "ofd_amazon",
+      "name": "Amazon",
+      "url": "https://www.amazon.com/",
+      "host": "www.amazon.com",
+      "ships_from": [
+        "US",
+        "CA",
+        "MX"
+      ],
+      "ships_to": [
+        "US",
+        "CA",
+        "MX"
+      ]
+    },
+    {
+      "id": "ofd_amazon_de",
+      "name": "Amazon.de",
+      "url": "https://amazon.de",
+      "host": "amazon.de",
+      "ships_from": [
+        "DE"
+      ],
+      "ships_to": [
+        "DE",
+        "AT",
+        "CH"
+      ]
+    },
+    {
+      "id": "ofd_amolen",
+      "name": "Amolen",
+      "url": "https://www.amolen.com/",
+      "host": "www.amolen.com",
+      "ships_from": [
+        "US",
+        "CN"
+      ],
+      "ships_to": [],
+      "brands": [
+        "Amolen",
+        "amolen"
+      ]
+    },
+    {
+      "id": "ofd_amolen_amazon",
+      "name": "amolen - Amazon",
+      "url": "https://www.amazon.com/stores/AMOLEN/page/358D2B52-F200-4D4C-8DA5-C4DE7797C263",
+      "host": "www.amazon.com",
+      "ships_from": [],
+      "ships_to": []
+    },
+    {
+      "id": "ofd_anycubic",
+      "name": "Anycubic",
+      "url": "https://store.anycubic.com/",
+      "host": "store.anycubic.com",
+      "ships_from": [
+        "CN, US, CA, EU, UK, AU"
+      ],
+      "ships_to": [
+        "CN, US, CA, EU, UK, AU"
+      ],
+      "brands": [
+        "Anycubic",
+        "anycubic"
+      ]
+    },
+    {
+      "id": "ofd_artillery_3d",
+      "name": "Artillery 3D",
+      "url": "https://www.artillery3d.com/",
+      "host": "www.artillery3d.com",
+      "ships_from": [
+        "US"
+      ],
+      "ships_to": [
+        "US"
+      ]
+    },
+    {
+      "id": "ofd_atomic_filament",
+      "name": "Atomic Filament",
+      "url": "https://atomicfilament.com/",
+      "host": "atomicfilament.com",
+      "ships_from": [],
+      "ships_to": [],
+      "brands": [
+        "Atomic Filament",
+        "atomic filament"
+      ]
+    },
+    {
+      "id": "ofd_aurapol",
+      "name": "AURAPOL",
+      "url": "https://www.aurapol.com/",
+      "host": "www.aurapol.com",
+      "ships_from": [],
+      "ships_to": [
+        "SK",
+        "DE",
+        "AT",
+        "HU",
+        "BE",
+        "DK",
+        "EE",
+        "HR",
+        "IT",
+        "LV",
+        "LT",
+        "NL",
+        "RO",
+        "GR",
+        "PT",
+        "BG",
+        "ES",
+        "FR",
+        "SI",
+        "SE",
+        "FI",
+        "LU",
+        "IE"
+      ],
+      "brands": [
+        "AURAPOL",
+        "aurapol"
+      ]
+    },
+    {
+      "id": "ofd_azurefilm",
+      "name": "AzureFilm",
+      "url": "https://www.azurefilm.com/",
+      "host": "www.azurefilm.com",
+      "ships_from": [],
+      "ships_to": [
+        "AT",
+        "BE",
+        "BG",
+        "HR",
+        "CZ",
+        "DK",
+        "EE",
+        "FI",
+        "FR",
+        "DE",
+        "GR",
+        "HU",
+        "IE",
+        "IT",
+        "LV",
+        "LT",
+        "LU",
+        "NL",
+        "PL",
+        "PT",
+        "RO",
+        "SK",
+        "SI",
+        "ES",
+        "SE"
+      ],
+      "brands": [
+        "AzureFilm",
+        "azurefilm"
+      ]
+    },
+    {
+      "id": "ofd_bavaria_filaments",
+      "name": "Bavaria Filaments",
+      "url": "https://www.bavaria-filaments.com/",
+      "host": "www.bavaria-filaments.com",
+      "ships_from": "DE",
+      "ships_to": [
+        "DE",
+        "AT"
+      ],
+      "brands": [
+        "Bavaria Filaments",
+        "bavaria filaments"
+      ]
+    },
+    {
+      "id": "ofd_bblstore",
+      "name": "Bambu Lab Store",
+      "url": "https://store.bambulab.com",
+      "host": "store.bambulab.com",
+      "ships_from": [],
+      "ships_to": []
+    },
+    {
+      "id": "ofd_beehive",
+      "name": "Beehive",
+      "url": "https://www.beehive.com.br/",
+      "host": "www.beehive.com.br",
+      "ships_from": [
+        "BR"
+      ],
+      "ships_to": [
+        "BR"
+      ]
+    },
+    {
+      "id": "ofd_best_buy",
+      "name": "Best Buy",
+      "url": "https://www.bestbuy.com/",
+      "host": "www.bestbuy.com",
+      "ships_from": [
+        "US"
+      ],
+      "ships_to": [
+        "US"
+      ]
+    },
+    {
+      "id": "ofd_biqu",
+      "name": "Biqu",
+      "url": "https://biqu.equipment/",
+      "host": "biqu.equipment",
+      "ships_from": [],
+      "ships_to": [],
+      "brands": [
+        "BIQU",
+        "biqu"
+      ]
+    },
+    {
+      "id": "ofd_clas_ohlson",
+      "name": "Clas Ohlson",
+      "url": "https://www.clasohlson.com",
+      "host": "www.clasohlson.com",
+      "ships_from": [
+        "FI",
+        "NO",
+        "SE"
+      ],
+      "ships_to": [
+        "FI",
+        "NO",
+        "SE"
+      ],
+      "brands": [
+        "Clas Ohlson",
+        "clas ohlson"
+      ]
+    },
+    {
+      "id": "ofd_colorfabb",
+      "name": "colorFabb",
+      "url": "https://colorfabb.com/",
+      "host": "colorfabb.com",
+      "ships_from": [
+        "NL"
+      ],
+      "ships_to": [],
+      "brands": [
+        "colorFabb",
+        "colorfabb"
+      ]
+    },
+    {
+      "id": "ofd_crealitystore",
+      "name": "Creality Store",
+      "url": "https://store.creality.com",
+      "host": "store.creality.com",
+      "ships_from": [
+        "US"
+      ],
+      "ships_to": [
+        "US"
+      ]
+    },
+    {
+      "id": "ofd_dancyn_3d_prints",
+      "name": "Dancyn 3D Prints",
+      "url": "https://www.dancyn3dprints.com",
+      "host": "www.dancyn3dprints.com",
+      "ships_from": [
+        "US"
+      ],
+      "ships_to": [
+        "US"
+      ],
+      "brands": [
+        "Dancyn 3D Prints",
+        "dancyn 3d prints"
+      ]
+    },
+    {
+      "id": "ofd_das_filament",
+      "name": "Das Filament",
+      "url": "https://dasfilament.de/",
+      "host": "dasfilament.de",
+      "ships_from": [
+        "DE"
+      ],
+      "ships_to": [],
+      "brands": [
+        "Das Filament",
+        "das filament"
+      ]
+    },
+    {
+      "id": "ofd_duramic3d",
+      "name": "DuramiC 3D",
+      "url": "https://duramic3d.com/collections/all",
+      "host": "duramic3d.com",
+      "ships_from": [
+        "CN"
+      ],
+      "ships_to": []
+    },
+    {
+      "id": "ofd_elegoo",
+      "name": "ELEGOO",
+      "url": "https://elegoo.com/",
+      "host": "elegoo.com",
+      "ships_from": [
+        "EU",
+        "US",
+        "CN"
+      ],
+      "ships_to": [
+        "EU",
+        "US",
+        "CN"
+      ],
+      "brands": [
+        "ELEGOO",
+        "elegoo"
+      ]
+    },
+    {
+      "id": "ofd_eryone",
+      "name": "Eryone",
+      "url": "https://eryone3d.com/",
+      "host": "eryone3d.com",
+      "ships_from": [
+        "US",
+        "CA",
+        "EU",
+        "UK",
+        "RU"
+      ],
+      "ships_to": [
+        "US",
+        "CA",
+        "EU",
+        "UK",
+        "RU"
+      ],
+      "brands": [
+        "Eryone",
+        "eryone"
+      ]
+    },
+    {
+      "id": "ofd_esun3d",
+      "name": "eSUN",
+      "url": "https://esun3dstore.com/",
+      "host": "esun3dstore.com",
+      "ships_from": [
+        "US",
+        "UK",
+        "EU",
+        "CA"
+      ],
+      "ships_to": [
+        "US",
+        "UK",
+        "EU",
+        "CA"
+      ]
+    },
+    {
+      "id": "ofd_extrudr",
+      "name": "extrudr",
+      "url": "https://www.extrudr.com/",
+      "host": "www.extrudr.com",
+      "ships_from": [],
+      "ships_to": [],
+      "brands": [
+        "extrudr"
+      ]
+    },
+    {
+      "id": "ofd_fiberlogy",
+      "name": "Fiberlogy",
+      "url": "https://fiberlogy.com/",
+      "host": "fiberlogy.com",
+      "ships_from": [],
+      "ships_to": [
+        "PL",
+        "EU",
+        "GB",
+        "NO",
+        "CH"
+      ],
+      "brands": [
+        "Fiberlogy",
+        "fiberlogy"
+      ]
+    },
+    {
+      "id": "ofd_filamentive",
+      "name": "Filamentive",
+      "url": "https://www.filamentive.com/",
+      "host": "www.filamentive.com",
+      "ships_from": [
+        "GB-ENG"
+      ],
+      "ships_to": [
+        "GB"
+      ],
+      "brands": [
+        "Filamentive",
+        "filamentive"
+      ]
+    },
+    {
+      "id": "ofd_filamentworld",
+      "name": "Filamentworld",
+      "url": "https://www.filamentworld.de/",
+      "host": "www.filamentworld.de",
+      "ships_from": [
+        "DE"
+      ],
+      "ships_to": [
+        "DE",
+        "EU",
+        "CH",
+        "NO",
+        "LI"
+      ],
+      "brands": [
+        "Filamentworld",
+        "filamentworld"
+      ]
+    },
+    {
+      "id": "ofd_fillamentum",
+      "name": "Fillamentum",
+      "url": "https://shop.fillamentum.com/",
+      "host": "shop.fillamentum.com",
+      "ships_from": [],
+      "ships_to": [],
+      "brands": [
+        "Fillamentum",
+        "fillamentum"
+      ]
+    },
+    {
+      "id": "ofd_flashforge",
+      "name": "Flashforge",
+      "url": "https://www.flashforge.com/",
+      "host": "www.flashforge.com",
+      "ships_from": [],
+      "ships_to": [],
+      "brands": [
+        "FLASHFORGE",
+        "flashforge"
+      ]
+    },
+    {
+      "id": "ofd_formfutura",
+      "name": "FormFutura",
+      "url": "https://www.formfutura.com/",
+      "host": "www.formfutura.com",
+      "ships_from": [
+        "NL"
+      ],
+      "ships_to": [],
+      "brands": [
+        "FormFutura",
+        "formfutura"
+      ]
+    },
+    {
+      "id": "ofd_gadgethuset",
+      "name": "Gadgethuset",
+      "url": "https://www.gadgethuset.dk/",
+      "host": "www.gadgethuset.dk",
+      "ships_from": "DK",
+      "ships_to": []
+    },
+    {
+      "id": "ofd_garhem_3d",
+      "name": "Garhem 3d",
+      "url": "https://shop.garhem3d.com/",
+      "host": "shop.garhem3d.com",
+      "ships_from": [
+        "ES"
+      ],
+      "ships_to": [
+        "ES"
+      ]
+    },
+    {
+      "id": "ofd_geeetech",
+      "name": "Geeetech",
+      "url": "https://www.geeetech.com/",
+      "host": "www.geeetech.com",
+      "ships_from": [],
+      "ships_to": [],
+      "brands": [
+        "Geeetech",
+        "geeetech"
+      ]
+    },
+    {
+      "id": "ofd_gst3d",
+      "name": "GST3d",
+      "url": "https://gst3d.eu/",
+      "host": "gst3d.eu",
+      "ships_from": [
+        "ES"
+      ],
+      "ships_to": [
+        "US",
+        "UK",
+        "EU",
+        "CA"
+      ],
+      "brands": [
+        "GST3D",
+        "gst3d"
+      ]
+    },
+    {
+      "id": "ofd_hatchbox",
+      "name": "Hatchbox",
+      "url": "https://www.hatchbox3d.com/",
+      "host": "www.hatchbox3d.com",
+      "ships_from": [
+        "US",
+        "CA",
+        "MX"
+      ],
+      "ships_to": [
+        "US",
+        "CA",
+        "MX"
+      ],
+      "brands": [
+        "Hatchbox",
+        "hatchbox"
+      ]
+    },
+    {
+      "id": "ofd_imaginesc",
+      "name": "Imagine S.C.",
+      "url": "https://print-imagine.com/",
+      "host": "print-imagine.com",
+      "ships_from": [
+        "PL"
+      ],
+      "ships_to": [
+        "PL",
+        "EU",
+        "UK"
+      ]
+    },
+    {
+      "id": "ofd_isanghu",
+      "name": "iSangHu",
+      "url": "https://www.isanghu3d.com/",
+      "host": "www.isanghu3d.com",
+      "ships_from": [],
+      "ships_to": [],
+      "brands": [
+        "iSangHu",
+        "isanghu"
+      ]
+    },
+    {
+      "id": "ofd_isanghu_amazon",
+      "name": "iSangHu - Amazon",
+      "url": "https://www.amazon.com/stores/iSANGHU/page/AFA914D7-4531-498B-B205-C1CA47D6BF23",
+      "host": "www.amazon.com",
+      "ships_from": [],
+      "ships_to": []
+    },
+    {
+      "id": "ofd_isanmate",
+      "name": "iSANMATE",
+      "url": "https://isanmate.store/",
+      "host": "isanmate.store",
+      "ships_from": [
+        "HK"
+      ],
+      "ships_to": [],
+      "brands": [
+        "iSANMATE",
+        "isanmate"
+      ]
+    },
+    {
+      "id": "ofd_isanmate_amazon",
+      "name": "iSANMATE - Amazon",
+      "url": "https://www.amazon.com/stores/iSANMATE/page/83D65319-8665-41EE-93FC-99B404085034",
+      "host": "www.amazon.com",
+      "ships_from": [
+        "HK"
+      ],
+      "ships_to": []
+    },
+    {
+      "id": "ofd_jaycar_nz",
+      "name": "Jaycar NZ",
+      "url": "https://www.jaycar.co.nz/",
+      "host": "www.jaycar.co.nz",
+      "ships_from": [
+        "NZ"
+      ],
+      "ships_to": [
+        "NZ"
+      ]
+    },
+    {
+      "id": "ofd_joybuy",
+      "name": "Joybuy",
+      "url": "https://www.joybuy.fr",
+      "host": "www.joybuy.fr",
+      "ships_from": [
+        "FR"
+      ],
+      "ships_to": [
+        "FR"
+      ]
+    },
+    {
+      "id": "ofd_lab3d_store",
+      "name": "LAB3D Store",
+      "url": "https://shop.lab3d.dk/",
+      "host": "shop.lab3d.dk",
+      "ships_from": [
+        "DK"
+      ],
+      "ships_to": []
+    },
+    {
+      "id": "ofd_levemaker",
+      "name": "Levemaker",
+      "url": "https://levemaker.com/collections/3d-filaments",
+      "host": "levemaker.com",
+      "ships_from": [
+        "US"
+      ],
+      "ships_to": [
+        "US"
+      ]
+    },
+    {
+      "id": "ofd_liniya3d",
+      "name": "Liniya3D",
+      "url": "https://liniya3d.uz/",
+      "host": "liniya3d.uz",
+      "ships_from": [
+        "UZ"
+      ],
+      "ships_to": [
+        "UZ"
+      ]
+    },
+    {
+      "id": "ofd_lostboyslab",
+      "name": "lostboyslab",
+      "url": "https://www.lostboyslab.shop/",
+      "host": "www.lostboyslab.shop",
+      "ships_from": [
+        "EU",
+        "SE",
+        "US"
+      ],
+      "ships_to": [
+        "EU"
+      ],
+      "brands": [
+        "lostboyslab"
+      ]
+    },
+    {
+      "id": "ofd_majkl3d",
+      "name": "Majkl3D",
+      "url": "https://www.majkl3d.eu/",
+      "host": "www.majkl3d.eu",
+      "ships_from": [
+        "CZ"
+      ],
+      "ships_to": [
+        "EU"
+      ]
+    },
+    {
+      "id": "ofd_makeroad",
+      "name": "Makeroad",
+      "url": "https://store.makeroad.com/collections/filament-1",
+      "host": "store.makeroad.com",
+      "ships_from": [
+        "US"
+      ],
+      "ships_to": [
+        "US"
+      ]
+    },
+    {
+      "id": "ofd_marswork",
+      "name": "MarsWork",
+      "url": "https://www.marswork3d.com",
+      "host": "www.marswork3d.com",
+      "ships_from": [
+        "US"
+      ],
+      "ships_to": [
+        "US",
+        "DE",
+        "AT",
+        "BE",
+        "BG",
+        "HR",
+        "CY",
+        "DK",
+        "EE",
+        "FI",
+        "FR",
+        "GR",
+        "HU",
+        "IE",
+        "IT",
+        "LV",
+        "LT",
+        "LU",
+        "MT",
+        "NL",
+        "PL",
+        "PT",
+        "RO",
+        "SK",
+        "SI",
+        "ES",
+        "SE",
+        "CZ"
+      ],
+      "brands": [
+        "MarsWork",
+        "marswork"
+      ]
+    },
+    {
+      "id": "ofd_matterhackers",
+      "name": "MatterHackers",
+      "url": "https://www.matterhackers.com/",
+      "host": "www.matterhackers.com",
+      "ships_from": [],
+      "ships_to": [],
+      "brands": [
+        "MatterHackers",
+        "matterhackers"
+      ]
+    },
+    {
+      "id": "ofd_microcenter",
+      "name": "Microcenter",
+      "url": "https://microcenter.com",
+      "host": "microcenter.com",
+      "ships_from": [],
+      "ships_to": []
+    },
+    {
+      "id": "ofd_nobufil",
+      "name": "Nobufil",
+      "url": "https://www.nobufil.com/",
+      "host": "www.nobufil.com",
+      "ships_from": [
+        "AT"
+      ],
+      "ships_to": [],
+      "brands": [
+        "Nobufil",
+        "nobufil"
+      ]
+    },
+    {
+      "id": "ofd_overture3d",
+      "name": "overture",
+      "url": "https://overture3d.com/",
+      "host": "overture3d.com",
+      "ships_from": [
+        "US"
+      ],
+      "ships_to": [
+        "US"
+      ]
+    },
+    {
+      "id": "ofd_plastify",
+      "name": "Plastify",
+      "url": "https://plastify.es/",
+      "host": "plastify.es",
+      "ships_from": [
+        "ES"
+      ],
+      "ships_to": [
+        "ES"
+      ]
+    },
+    {
+      "id": "ofd_polarfilament",
+      "name": "Polar Filament",
+      "url": "https://polarfilament.com/",
+      "host": "polarfilament.com",
+      "ships_from": [],
+      "ships_to": []
+    },
+    {
+      "id": "ofd_polymaker",
+      "name": "PolyMaker",
+      "url": "https://us.polymaker.com/",
+      "host": "us.polymaker.com",
+      "ships_from": [
+        "US"
+      ],
+      "ships_to": [
+        "US"
+      ],
+      "brands": [
+        "Polymaker",
+        "polymaker"
+      ]
+    },
+    {
+      "id": "ofd_printed_solid",
+      "name": "Printed Solid",
+      "url": "https://www.printedsolid.com",
+      "host": "www.printedsolid.com",
+      "ships_from": [
+        "US"
+      ],
+      "ships_to": [
+        "US"
+      ]
+    },
+    {
+      "id": "ofd_proteorprint",
+      "name": "Proteor Print",
+      "url": "https://www.proteordigital.com/category/all-products",
+      "host": "www.proteordigital.com",
+      "ships_from": [
+        "US"
+      ],
+      "ships_to": []
+    },
+    {
+      "id": "ofd_protopasta",
+      "name": "Protopasta",
+      "url": "https://proto-pasta.com/",
+      "host": "proto-pasta.com",
+      "ships_from": [],
+      "ships_to": [],
+      "brands": [
+        "Protopasta",
+        "protopasta"
+      ]
+    },
+    {
+      "id": "ofd_prusa3d",
+      "name": "Prusa3D Store",
+      "url": "https://www.prusa3d.com/",
+      "host": "www.prusa3d.com",
+      "ships_from": [
+        "EU"
+      ],
+      "ships_to": [
+        "EU",
+        "US",
+        "UK"
+      ]
+    },
+    {
+      "id": "ofd_qidi_tech",
+      "name": "QIDI Tech",
+      "url": "https://qidi3d.com/",
+      "host": "qidi3d.com",
+      "ships_from": [
+        "CN",
+        "US",
+        "GB",
+        "EU",
+        "CA",
+        "AU",
+        "JP"
+      ],
+      "ships_to": [],
+      "brands": [
+        "QIDI Tech",
+        "qidi tech"
+      ]
+    },
+    {
+      "id": "ofd_recreus",
+      "name": "Recreus",
+      "url": "https://recreus.com/products/",
+      "host": "recreus.com",
+      "ships_from": [
+        "ES"
+      ],
+      "ships_to": [
+        "GB"
+      ],
+      "brands": [
+        "Recreus",
+        "recreus"
+      ]
+    },
+    {
+      "id": "ofd_rs_components",
+      "name": "RS Components",
+      "url": "https://uk.rs-online.com",
+      "host": "uk.rs-online.com",
+      "ships_from": [
+        "GB"
+      ],
+      "ships_to": [
+        "GB"
+      ]
+    },
+    {
+      "id": "ofd_siddament",
+      "name": "Siddament",
+      "url": "https://siddament.com.au/",
+      "host": "siddament.com.au",
+      "ships_from": [
+        "AU"
+      ],
+      "ships_to": [
+        "EU",
+        "AU"
+      ],
+      "brands": [
+        "Siddament",
+        "siddament"
+      ]
+    },
+    {
+      "id": "ofd_siraya_tech",
+      "name": "Siraya Tech",
+      "url": "https://siraya.tech/",
+      "host": "siraya.tech",
+      "ships_from": [],
+      "ships_to": [
+        "US",
+        "CA",
+        "MX",
+        "JP",
+        "AU",
+        "GB",
+        "EU",
+        "NO",
+        "CH"
+      ],
+      "brands": [
+        "Siraya Tech",
+        "siraya tech"
+      ]
+    },
+    {
+      "id": "ofd_snapmaker",
+      "name": "Snapmaker",
+      "url": "https://shop.snapmaker.com/",
+      "host": "shop.snapmaker.com",
+      "ships_from": [
+        "CN",
+        "US",
+        "EU"
+      ],
+      "ships_to": [
+        "US",
+        "EU",
+        "UK",
+        "CA",
+        "AU",
+        "JP",
+        "KR"
+      ],
+      "brands": [
+        "Snapmaker",
+        "snapmaker"
+      ]
+    },
+    {
+      "id": "ofd_spectrum",
+      "name": "Spectrum",
+      "url": "https://shop.spectrumfilaments.com/",
+      "host": "shop.spectrumfilaments.com",
+      "ships_from": [
+        "PL"
+      ],
+      "ships_to": [
+        "EU",
+        "UK"
+      ],
+      "brands": [
+        "Spectrum",
+        "spectrum"
+      ]
+    },
+    {
+      "id": "ofd_sunlu",
+      "name": "SUNLU",
+      "url": "https://sunlu.com/",
+      "host": "sunlu.com",
+      "ships_from": [
+        "US"
+      ],
+      "ships_to": [
+        "US",
+        "CA",
+        "AU",
+        "EU"
+      ],
+      "brands": [
+        "SUNLU",
+        "sunlu"
+      ]
+    },
+    {
+      "id": "ofd_tecbears",
+      "name": "TECBEARS",
+      "url": "https://www.amazon.com/stores/TECBEARS/page/F05182C4-BC19-404C-B375-C2F0D0783054",
+      "host": "www.amazon.com",
+      "ships_from": [],
+      "ships_to": [],
+      "brands": [
+        "TECBEARS",
+        "tecbears"
+      ]
+    },
+    {
+      "id": "ofd_ultimate3dprintingstore",
+      "name": "Ultimate 3D Printing Store",
+      "url": "https://ultimate3dprintingstore.com/",
+      "host": "ultimate3dprintingstore.com",
+      "ships_from": [],
+      "ships_to": []
+    },
+    {
+      "id": "ofd_unitak3d",
+      "name": "UniTak3D",
+      "url": "https://www.amazon.com/stores/UniTak3D/page/4A9530C3-3F06-4FDD-ABA3-574C0C85C832",
+      "host": "www.amazon.com",
+      "ships_from": [],
+      "ships_to": [],
+      "brands": [
+        "UniTak3D",
+        "unitak3d"
+      ]
+    },
+    {
+      "id": "ofd_yoopai",
+      "name": "YooPai",
+      "url": "https://www.yoopai.com/",
+      "host": "www.yoopai.com",
+      "ships_from": [
+        "US"
+      ],
+      "ships_to": [],
+      "brands": [
+        "YooPai",
+        "yoopai"
+      ]
+    },
+    {
+      "id": "ofd_yousu",
+      "name": "Yousu",
+      "url": "https://www.ysfilament.com/",
+      "host": "www.ysfilament.com",
+      "ships_from": [],
+      "ships_to": []
+    }
+  ]
 }

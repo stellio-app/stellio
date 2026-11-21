@@ -10,8 +10,8 @@ android {
         applicationId 'com.stellioapp.companion'
         minSdk 29
         targetSdk 34
-        versionCode 117
-        versionName '1.1.8'
+        versionCode 119
+        versionName '1.1.9'
         resConfigs 'en', 'fr', 'de', 'es', 'pt', 'it', 'zh', 'ja'
     }
 

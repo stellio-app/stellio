@@ -313,6 +313,7 @@ const NTF = { cat: '', state: 'all', q: '', source: '', page: 0, size: 25 };
 const ntfSrc = (s) => s === '@license' ? tr('ntf_src_license', 'Licences') : s === '@digest' ? tr('ntf_src_digest', 'Résumé périodique') : s;
 const NTF_CATS = [['filament_low', 'Filament faible', 'circle-exclamation'], ['restock', 'Filament à recommander', 'cart-shopping'], ['parts', 'Pièces à recommander', 'screwdriver-wrench'],
     ['print', 'Impressions', 'print'], ['maintenance', 'Maintenance', 'wrench'], ['planning', 'Planning', 'calendar-check'], ['update', 'Mises à jour', 'arrow-up-right-dots'], ['other', 'Autres', 'bell']];
+const ntfText = (n) => (typeof window.stellioNotifText === 'function' ? window.stellioNotifText(n) : { title: n.title, message: n.message });
 TABS.notifications = { fb: 'Notifications', icon: 'bell', async render(box) {
     const qs = new URLSearchParams({ limit: NTF.size, offset: NTF.page * NTF.size, state: NTF.state, q: NTF.q }); if (NTF.cat) qs.set('category', NTF.cat); if (NTF.source) qs.set('source', NTF.source);
     const d = await api('/api/notifications/all?' + qs);
@@ -327,7 +328,7 @@ TABS.notifications = { fb: 'Notifications', icon: 'bell', async render(box) {
         `<label class="suite-field suite-field-sm"><span>${esc(tr('ntf_source', 'Source'))}</span><select id="su-nsrc" class="settings-select"><option value="">${esc(tr('ntf_all_sources', 'Toutes'))}</option>${Object.keys(d.sources || {}).sort().map(s => `<option value="${esc(s)}"${NTF.source === s ? ' selected' : ''}>${esc(ntfSrc(s))} (${d.sources[s]})</option>`).join('')}</select></label>` + btn('su-nreadall', tr('ntf_mark_all', 'Tout marquer comme lu'), 'btn-secondary') + btn('su-nclear', tr('ntf_clear_read', 'Supprimer les lues'), 'btn-secondary') + '</div>' +
         `<div class="ntf-chips">${chips}</div>` +
         (d.notifications.length ? `<div class="ntf-list">${d.notifications.map(n => `<div class="ntf-row${n.is_read ? '' : ' unread'}" data-nid="${n.id}" data-link="${esc(n.link_page || '')}"><i class="fa-solid fa-${icon(n)} ntf-ico"></i>` +
-            `<div class="ntf-body"><div class="ntf-title">${esc(n.title)}</div>${n.message ? `<div class="ntf-msg">${esc(n.message)}</div>` : ''}<div class="ntf-meta"><span class="ntf-src">${esc(ntfSrc(n.source))}</span> ${esc(when(n.created_at))} · ${esc(tr('ntf_' + n.category, (NTF_CATS.find(c => c[0] === n.category) || NTF_CATS[7])[1]))}</div></div>` +
+            `<div class="ntf-body"><div class="ntf-title">${esc(ntfText(n).title)}</div>${ntfText(n).message ? `<div class="ntf-msg">${esc(ntfText(n).message)}</div>` : ''}<div class="ntf-meta"><span class="ntf-src">${esc(ntfSrc(n.source))}</span> ${esc(when(n.created_at))} · ${esc(tr('ntf_' + n.category, (NTF_CATS.find(c => c[0] === n.category) || NTF_CATS[7])[1]))}</div></div>` +
             `<button type="button" class="ntf-del" data-ndel="${n.id}" title="${esc(tr('ntf_delete', 'Supprimer'))}" aria-label="${esc(tr('ntf_delete', 'Supprimer'))}"><i class="fa-solid fa-xmark"></i></button></div>`).join('')}</div>`
             : `<p class="settings-hint">${esc(tr('ntf_empty', 'Aucune notification dans cette rubrique.'))}</p>`) +
         `<div class="su-pager" id="su-npager">${pagerHtml(NTF.page, pages)}</div>`;
@@ -468,7 +469,8 @@ TABS.similar = { fb: 'Similaires', icon: 'clone', async render(box) {
         const st = await api('/api/similar/status').catch(() => null), el = $('su-sidx'); if (!el) return;
         if (!st) { el.textContent = ''; return; }
         const left = Number(st.estimated_seconds_left) > 0 ? ` — ${esc(tr('sim_left', 'reste environ'))} ${Number(st.estimated_seconds_left) >= 90 ? Math.round(st.estimated_seconds_left / 60) + ' min' : Math.round(st.estimated_seconds_left) + ' s'}` : '';
-        el.innerHTML = `${esc(tr('sim_index', 'Index de similarité'))} : <b>${esc((st.indexed || 0).toLocaleString())} / ${esc((st.total || 0).toLocaleString())}</b> ${esc(tr('sim_indexed', 'modèle(s) indexé(s)'))}${st.skipped ? ` — ${esc(st.skipped.toLocaleString())} ${esc(tr('sim_skipped', 'ignoré(s) (illisible ou trop gros)'))}` : ''}${left}`;
+        el.innerHTML = `${esc(tr('sim_index', 'Index de similarité'))} : <b>${esc((st.indexed || 0).toLocaleString())} / ${esc((st.total || 0).toLocaleString())}</b> ${esc(tr('sim_indexed', 'modèle(s) indexé(s)'))}${st.skipped ? ` — ${esc(st.skipped.toLocaleString())} ${esc(tr('sim_skipped', 'ignoré(s) (illisible ou trop gros)'))} <button type="button" class="btn btn-secondary btn-sm su-skipbtn" id="su-sskip"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(tr('skip_btn', 'Fichiers ignorés'))} (${esc(st.skipped.toLocaleString())})</button>` : ''}${left}`;
+        const sb = $('su-sskip'); if (sb) sb.onclick = () => openSkipped(box, loadStatus);
     };
     loadStatus();
     wire(box, 'su-sgo', async () => {
@@ -491,6 +493,41 @@ TABS.similar = { fb: 'Similaires', icon: 'clone', async render(box) {
         if (box.isConnected) { note(box, '✓'); loadStatus(); }
     });
 } };
+/* Fichiers ignorés par l'index de similarité : liste avec miniature, cause et solution ; « Réessayer » les remet dans l'indexation. */
+const SKIP_CODES = ['too_big', 'empty', 'unreadable', 'missing'];
+async function openSkipped(box, refresh) {
+    let dlg = $('modal-suite-skipped');
+    if (!dlg) {
+        dlg = document.createElement('div'); dlg.id = 'modal-suite-skipped'; dlg.className = 'modal hidden';
+        dlg.innerHTML = `<div class="modal-content sk-content"><div class="modal-header"><h3><i class="fa-solid fa-triangle-exclamation"></i> <span>${esc(tr('skip_title', 'Fichiers ignorés'))}</span></h3><button class="modal-close" type="button" id="sk-x">×</button></div><div class="modal-body" id="sk-body"></div></div>`;
+        document.body.appendChild(dlg);
+        const close = () => { if (typeof closeModal === 'function') closeModal('modal-suite-skipped'); else dlg.classList.add('hidden'); };
+        dlg.addEventListener('click', (e) => { if (e.target === dlg) close(); });
+        $('sk-x').onclick = close; dlg._close = close;
+    }
+    const body = $('sk-body'); body.innerHTML = '<p class="settings-hint"><i class="fa-solid fa-spinner fa-spin"></i></p>';
+    if (typeof openModal === 'function') openModal('modal-suite-skipped'); else dlg.classList.remove('hidden');
+    let d; try { d = await api('/api/similar/skipped'); } catch (e) { body.innerHTML = `<p class="settings-hint">${esc(e.message)}</p>`; return; }
+    const mb = (n) => (n / 1048576).toFixed(n >= 10485760 ? 0 : 1) + ' Mo';
+    const label = (c) => tr('skip_c_' + c, { too_big: 'Trop gros', empty: 'Aucune surface', unreadable: 'Illisible', missing: 'Introuvable' }[c]);
+    const fix = (c) => tr('skip_f_' + c, { too_big: 'Ce modèle dépasse {max} Mo : trop lourd pour l\'empreinte de forme. Simplifiez-le dans votre logiciel 3D (réduire le nombre de triangles) puis remplacez le fichier, ou laissez-le de côté : il reste utilisable partout ailleurs dans Stellio.',
+        empty: 'Le fichier ne contient aucune surface. Réexportez-le depuis votre logiciel 3D, ou essayez l\'outil Réparation.',
+        unreadable: 'Le fichier est illisible ou son format n\'est pas standard. Réexportez-le en STL ou 3MF depuis votre logiciel, ou essayez l\'outil Réparation.',
+        missing: 'Le fichier a été déplacé ou supprimé. Relancez l\'analyse de la bibliothèque (Paramètres, Sources), puis réessayez.' }[c]).replace('{max}', d.max_mb || 60);
+    const dir = (p) => String(p || '').replace(/\\/g, '/').split('/').slice(-3, -1).join('/');
+    const th = (p) => `<span class="su-thumb"><img src="${API}/api/thumb?path=${encodeURIComponent(p)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'fa-solid fa-cube'}))"></span>`;
+    const groups = SKIP_CODES.map(c => [c, (d.files || []).filter(f => f.code === c)]).filter(g => g[1].length);
+    body.innerHTML = !groups.length ? `<p class="settings-hint">${esc(tr('skip_none', 'Aucun fichier ignoré.'))}</p>` :
+        `<p class="settings-hint">${esc(tr('skip_intro', 'Ces modèles n\'ont pas pu entrer dans l\'index de similarité. Ils restent dans votre bibliothèque, seule la recherche de pièces similaires les ignore.'))}</p>` +
+        groups.map(([c, list]) => `<div class="sk-group"><div class="sk-head"><b>${esc(label(c))}</b> <span class="su-dim">(${list.length})</span></div><p class="settings-hint sk-fix"><i class="fa-solid fa-lightbulb"></i> ${esc(fix(c))}</p>` +
+            `<div class="sk-list">${list.map(f => `<div class="sk-row" title="${esc(f.reason)}">${th(f.path)}<div class="sk-name"><b>${esc(f.name)}</b><div class="su-dim">${esc(dir(f.path))}${f.size ? ' · ' + esc(mb(f.size)) : ''}</div></div></div>`).join('')}</div></div>`).join('') +
+        `<div class="sk-foot"><button type="button" class="btn btn-primary btn-sm" id="sk-retry"><i class="fa-solid fa-rotate"></i> ${esc(tr('skip_retry', 'Réessayer l\'indexation'))}</button><button type="button" class="btn btn-ghost btn-sm" id="sk-close">${esc(tr('skip_close', 'Fermer'))}</button></div>`;
+    $('sk-close') && ($('sk-close').onclick = dlg._close);
+    $('sk-retry') && ($('sk-retry').onclick = async () => {
+        $('sk-retry').disabled = true;
+        try { await api('/api/similar/skipped/retry', {}); dlg._close(); const b = $('su-sbuild'); if (b) b.click(); else if (refresh) refresh(); } catch (e) { body.insertAdjacentHTML('afterbegin', `<p class="settings-hint" style="color:var(--danger,#e5484d)">${esc(e.message)}</p>`); $('sk-retry').disabled = false; }
+    });
+}
 const flash = (box, id) => { if (!id) return; box.querySelectorAll(`[data-pid="${id}"]`).forEach(el => { el.classList.add('su-flash'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); setTimeout(() => el.classList.remove('su-flash'), 2600); }); };
 const sigChip = (st) => {
     const m = { valid: ['su-chip-ok', 'fa-signature', 'sig_valid', 'Signé'], invalid: ['su-chip-warn', 'fa-triangle-exclamation', 'sig_invalid', 'Signature invalide'],
@@ -501,7 +538,8 @@ const auditChip = (lv) => {
     const m = { ok: ['su-chip-ok', 'audit_ok', 'Audit : rien à signaler'], warn: ['su-chip-muted', 'audit_warn', 'Audit : points à lire'], danger: ['su-chip-warn', 'audit_danger', 'Audit : code dangereux (risque accepté)'] }[lv];
     return m ? `<span class="su-chip ${m[0]}">${esc(tr(m[1], m[2]))}</span>` : '';
 };
-const sandboxNotice = (sb) => !sb || !sb.enforced ? tr(sb && sb.reason === 'disabled' ? 'sb_off' : 'sb_none', sb && sb.reason === 'disabled' ? 'Restrictions du noyau désactivées (STELLIO_PLUGIN_SANDBOX) : les permissions des plugins sont déclaratives.' : "Aucune restriction du noyau sur ce système : les permissions des plugins sont déclaratives (audit + acceptation). N'activez que du code que vous avez lu.")
+/* Pas d'avertissement quand le noyau ne restreint rien (retiré en 1.1.9) : seule la restriction réellement active est indiquée. */
+const sandboxNotice = (sb) => !sb || !sb.enforced ? ''
     : (sb.filesystem ? tr('sb_full', "Sous Linux, le noyau restreint chaque plugin : fichiers (lecture seule, écriture dans son dossier data/) et réseau (selon ses permissions). Un plugin autorisé à utiliser le réseau n'est pas limité à certains sites.")
         : tr('sb_net', "Le noyau restreint le réseau des plugins sans permission « network ». Les fichiers ne sont pas restreints sur ce noyau (Landlock absent) : n'activez que du code que vous avez lu."));
 /* Installation avec les deux confirmations explicites du serveur : risque détecté par l'audit, changement de clé de signature. */
@@ -555,7 +593,7 @@ TABS.plugins = { fb: 'Plugins', icon: 'puzzle-piece', async render(box) {
         `<div class="su-actions"><button type="button" class="btn btn-${b.some(x => x.restart_required) ? 'primary' : 'ghost'} btn-sm" id="su-restart"><i class="fa-solid fa-rotate"></i> ${esc(tr('restart_btn', 'Redémarrer Stellio'))}</button></div>`; };
     const builtSection = (d) => `<details class="su-card su-fold" id="su-plbuilt" open>${builtHtml(d)}</details>`;
     const instSection = (d) => `<details class="su-card su-fold" id="su-plinst" open>${instHtml(d)}</details>`;
-    box.innerHTML = `<div class="su-notice"><i class="fa-solid fa-triangle-exclamation"></i><span>${esc(sandboxNotice(d.sandbox))}</span></div>` +
+    box.innerHTML = (sandboxNotice(d.sandbox) ? `<div class="su-notice"><i class="fa-solid fa-shield-halved"></i><span>${esc(sandboxNotice(d.sandbox))}</span></div>` : '') +
         `<section class="su-card"><h4><i class="fa-solid fa-store"></i> ${esc(tr('catalog', 'Catalogue'))} <span id="su-plcn" class="su-chip" hidden></span><button type="button" class="btn btn-ghost btn-sm su-refresh" id="su-plref" title="${esc(tr('refresh', 'Actualiser le catalogue'))}" aria-label="${esc(tr('refresh', 'Actualiser le catalogue'))}"><i class="fa-solid fa-rotate"></i> ${esc(tr('refresh_btn', 'Actualiser'))}</button></h4><p class="settings-hint">${esc(tr('store_hint', 'Plugins proposés par la communauté, hébergés sur GitHub. Installer un plugin ne l\'active pas : vous lisez ses permissions d\'abord.'))}</p><div id="su-plstore" class="su-store"><p class="settings-hint">…</p></div></section>` +
         builtSection(d) + instSection(d) +
         `<div class="su-two"><details class="su-card su-fold"><summary><h4><i class="fa-solid fa-file-zipper"></i> ${esc(tr('install_zip', 'Installer ou mettre à jour depuis un .zip'))}</h4></summary>` +
@@ -998,7 +1036,7 @@ const SOON = { community: true };
 /* « Plugins » n'est plus un onglet de l'Atelier avancé : il a sa propre page dans le menu Outils. */
 const HIDDEN = { plugins: true };
 /* Onglets fournis par un plugin intégré : masqués tant que ce plugin n'est pas activé (voir applyHostFeatures) */
-const TAB_PLUGIN = { plate: 'plate-studio', sync: 'sharing', community: 'sharing' };
+const TAB_PLUGIN = { plate: 'plate-studio', sync: 'sharing', community: 'sharing', needs: 'stellio-pro', fab: 'ai-assistant' };
 function serverEdition() { try { return !!(typeof stellioAppConfig !== 'undefined' && stellioAppConfig && stellioAppConfig.server_edition); } catch (e) { return false; } }
 const serverOnly = (k) => k === 'sync' && !serverEdition();
 function build(root) {
@@ -1025,6 +1063,11 @@ async function show(k) {
     const my = ++showSeq;                                   // un onglet lent (Similaires…) ne doit pas écraser celui qu'on vient d'ouvrir
     const h = document.getElementById('suite-page-title'); if (h && TABS[k]) h.innerHTML = `<i class="fa-solid fa-${TABS[k].icon}"></i> ${esc(tr('tab_' + k, TABS[k].fb))}`;
     const host = $('su-body'); host.innerHTML = '';
+    const need = TAB_PLUGIN[k];
+    if (need && window.STELLIO_FEATURES && window.STELLIO_FEATURES[need] === false) {      // plugin désactivé : message clair au lieu d'une erreur « 404 »
+        host.innerHTML = `<div class="su-pane"><p class="settings-hint"><i class="fa-solid fa-puzzle-piece"></i> ${esc(tr('needs_plugin', 'Cette page est fournie par un plugin intégré qui n\'est pas activé. Activez-le dans Plugins, puis redémarrez Stellio.'))}</p></div>`;
+        return;
+    }
     host.classList.toggle('su-plain', !!(TABS[k] && TABS[k].plain));   // page sans cadre global (Collections : bannières posées directement sur la page, comme Filament)
     const box = Object.assign(document.createElement('div'), { className: 'su-pane' }); box.innerHTML = '<p class="settings-hint">…</p>'; host.appendChild(box);
     try { await TABS[k].render(box); if (my === showSeq) addReset(box); } catch (e) { if (my !== showSeq) return; box.innerHTML = `<p class="settings-hint">${esc(e.data && e.data.code === 'server_edition_only' ? tr('server_only', 'Fonction réservée à l\'édition serveur.') : (e.message || tr('unavailable', 'Indisponible.')))}</p>`; }

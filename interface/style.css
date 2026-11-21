@@ -4854,6 +4854,14 @@ kbd {
     margin-top: 16px;
 }
 
+/* Téléphone : une seule colonne, la progression d'abord puis les températures dessous (côte à côte, les libellés se coupaient) */
+@media (max-width: 640px) {
+    .monitor-grid { grid-template-columns: minmax(0, 1fr); }
+    .monitor-card-progress { order: 1; }
+    .monitor-card-temps { order: 2; }
+    .monitor-grid > .monitor-card.full { order: 3; }
+}
+
 .monitor-card {
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
@@ -9082,15 +9090,20 @@ body, .app-screen, .auth-screen {
 
 
 /* Mode atelier */
-.workshop-overlay { position: fixed; inset: 0; z-index: 99990; background: #0b0e13; color: #fff; display: flex; flex-direction: column; padding: 18px 20px 24px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.workshop-overlay { position: fixed; inset: 0; z-index: 99990; background: #0b0e13; color: #fff; display: flex; flex-direction: column; padding: 18px 20px 24px; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; box-sizing: border-box; }
 .ws-top { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
 .ws-title { font-size: calc(22px * var(--fs, 1)); font-weight: 700; display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ws-count { font-size: calc(15px * var(--fs, 1)); font-weight: 500; color: #8b95a8; margin-left: 6px; }
 .ws-clock { font-size: calc(34px * var(--fs, 1)); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
 .ws-btn { width: 52px; height: 52px; border-radius: 14px; border: 1px solid rgba(255,255,255,.12); background: #1a1f2a; color: #fff; font-size: calc(20px * var(--fs, 1)); cursor: pointer; flex-shrink: 0; }
 .ws-btn:active { transform: scale(.96); background: #232a38; }
-.ws-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-content: start; }
-.ws-tile { background: #151a23; border: 2px solid #232a38; border-radius: 22px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; min-height: 210px; }
+.ws-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px; align-content: start; min-width: 0; }
+.ws-tile { background: #151a23; border: 2px solid #232a38; border-radius: 22px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; min-height: 210px; min-width: 0; box-sizing: border-box; }
+.ws-tile.ws-clickable { cursor: pointer; }
+.ws-tile.ws-clickable:active { transform: scale(.99); }
+.ws-tile.ws-clickable:focus-visible { outline: 3px solid var(--accent, #4ea1d3); outline-offset: 2px; }
+/* la carte imprimante ouverte depuis le mode atelier doit passer devant lui */
+body:has(#workshop-overlay) #modal-printer-monitor { z-index: 99995; }
 .ws-tile.ws-printing { border-color: var(--accent, #4ea1d3); }
 .ws-tile.ws-paused { border-color: #f5a623; }
 .ws-tile.ws-error { border-color: #e85d75; }
@@ -9102,7 +9115,7 @@ body, .app-screen, .auth-screen {
 .ws-paused .ws-pill { background: rgba(245,166,35,.2); color: #f5a623; }
 .ws-tile.ws-idle .ws-pill { background: rgba(56,193,114,.18); color: #38c172; }
 .ws-error .ws-pill { background: rgba(232,93,117,.2); color: #e85d75; }
-.ws-main { display: flex; align-items: center; gap: 16px; }
+.ws-main { display: flex; align-items: center; gap: 16px; min-width: 0; }
 .ws-thumb { width: 96px; height: 96px; object-fit: contain; border-radius: 14px; background: #1e2330; flex-shrink: 0; }
 .ws-prog { flex: 1; min-width: 0; }
 .ws-pct { font-size: calc(68px * var(--fs, 1)); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -9111,7 +9124,7 @@ body, .app-screen, .auth-screen {
 .ws-bar { height: 14px; background: #232a38; border-radius: 8px; overflow: hidden; }
 .ws-bar > div { height: 100%; background: var(--accent, #4ea1d3); border-radius: 8px; transition: width .6s ease; }
 .ws-paused .ws-bar > div { background: #f5a623; }
-.ws-file { font-size: calc(16px * var(--fs, 1)); color: #8b95a8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-file { font-size: calc(16px * var(--fs, 1)); color: #8b95a8; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-ico { flex: 1; display: flex; align-items: center; justify-content: center; font-size: calc(64px * var(--fs, 1)); color: #38c172; }
 .ws-error .ws-ico { color: #e85d75; }
 .ws-offline .ws-ico { color: #64748b; }
@@ -9119,7 +9132,9 @@ body, .app-screen, .auth-screen {
 .ws-empty { grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: #8b95a8; font-size: calc(18px * var(--fs, 1)); }
 .ws-empty i { font-size: calc(42px * var(--fs, 1)); display: block; margin-bottom: 12px; }
 @media (max-width: 640px) {
-    .ws-grid { grid-template-columns: 1fr; }
+    .ws-grid { grid-template-columns: minmax(0, 1fr); }   /* « 1fr » seul = minmax(auto, 1fr) : le nom de fichier élargissait la colonne au-delà de l'écran */
+    .ws-tile { padding: 14px 14px; }
+    .ws-temps { flex-wrap: wrap; gap: 8px 18px; }
     .ws-clock { font-size: calc(22px * var(--fs, 1)); }
     .ws-title { font-size: calc(17px * var(--fs, 1)); }
     .ws-count { display: none; }
@@ -11081,7 +11096,8 @@ body:has(.modal:not(.hidden)) .scroll-to-top { display: none !important; }
 /* La confirmation de suppression doit passer devant les fenêtres plein écran (timelapses, rapports) */
 #modal-confirm { z-index: 100500; }
 /* fenêtres ouvertes depuis « Sources de fichiers » (Ajouter, types, renommer) : toujours devant la liste */
-#modal-select-type, #modal-smb, #modal-nfs, #modal-source-types, #modal-rename-source { z-index: 1100; }
+#modal-select-type, #modal-smb, #modal-nfs, #modal-source-types, #modal-rename-source, #modal-slicer,
+body:has(.accord-section.accord-popup) .modal:not(#modal-confirm) { z-index: 9100; }   /* au-dessus des sections de réglages ouvertes en popup (#accord-pop : 9001) */
 /* Page Timelapses */
 .tlp-page { max-width: none; }
 .tlp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin: 12px 0; }
@@ -11239,3 +11255,34 @@ html:not([data-net-ok]) [data-admin-net] { display: none !important; }
 .col-body { padding-top: 4px; }
 .suite-body.bp-card.su-plain { background: none; border: none; padding: 0; min-height: 0; }
 .su-plain .col-new { margin-bottom: 4px; }
+
+
+/* Similaires : fichiers ignorés par l'index */
+.su-skipbtn { margin-left: 8px; vertical-align: middle; }
+.sk-content { width: 640px; max-width: 95vw; max-height: 88vh; display: flex; flex-direction: column; }
+.sk-content .modal-body { overflow-y: auto; min-height: 0; }
+.sk-group { margin-top: 14px; }
+.sk-head { display: flex; gap: 6px; align-items: baseline; }
+.sk-fix { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0 8px; }
+.sk-fix i { color: var(--accent, #4ea1d3); margin-top: 3px; }
+.sk-list { display: flex; flex-direction: column; gap: 6px; }
+.sk-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card, transparent); min-width: 0; }
+.sk-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sk-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+
+
+/* Carte imprimante sur grand écran : caméra à gauche, températures / progression / dernière impression à droite, sans défilement */
+@media (min-width: 900px) {
+    .monitor-modal-content { width: min(1120px, 96vw); max-width: 96vw; }
+    .monitor-split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; align-items: start; }
+    .monitor-split > .monitor-card.full { grid-column: auto; margin: 0; }
+    .monitor-split .monitor-grid { grid-template-columns: minmax(0, 1fr); margin-top: 0; gap: 12px; }
+    .monitor-split .monitor-grid .monitor-card.full { grid-column: auto; }
+    .monitor-split:has(#printer-camera-container[style*="none"]) { grid-template-columns: minmax(0, 1fr); }
+    .monitor-split:has(#printer-camera-container[style*="none"]) .monitor-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .monitor-split:has(#printer-camera-container[style*="none"]) .monitor-grid .monitor-card.full { grid-column: 1 / -1; }
+}
+@media (min-width: 900px) and (max-height: 760px) {
+    .monitor-modal-content .monitor-card { padding: 12px; }
+    .monitor-split #camera-content { min-height: 0 !important; }
+}

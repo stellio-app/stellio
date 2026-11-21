@@ -186,3 +186,15 @@ def test_open_filament_database_shops_are_merged(stellio_app, logged):
     assert len({l['id'] for l in links}) == len(links)
     r = logged.get('/api/filament/buy-links', query_string={'vendor': 'Polymaker', 'material': 'PLA', 'color': 'Rouge'})
     assert r.status_code == 200 and r.get_json()['shops']
+
+
+def test_notifications_expose_the_stock_kind_for_retranslation(stellio_app, logged):
+    h = _csrf(logged)
+    logged.post('/api/notifications', json={'type': 'low_stock', 'title': 'Low filament stock', 'message': 'Rose — 59g left', 'link_page': 'spoolman', 'dedup_key': 'low_stock_spoolman_9'}, headers=h)
+    logged.post('/api/notifications', json={'type': 'low_stock', 'title': 'Filament to order', 'message': 'PLA — 96 g', 'link_page': 'spoolman', 'dedup_key': 'restock_x'}, headers=h)
+    kinds = {n['title']: n['kind'] for n in logged.get('/api/notifications').get_json()['notifications']}
+    assert kinds['Low filament stock'] == 'low_stock' and kinds['Filament to order'] == 'restock'
+    allk = {n['title']: n['kind'] for n in logged.get('/api/notifications/all').get_json()['notifications']}
+    assert allk['Low filament stock'] == 'low_stock'
+    logged.post('/api/notifications', json={'type': 'maintenance', 'title': 'Maintenance due', 'message': 'P1 — x', 'dedup_key': 'maintenance_4'}, headers=h)
+    assert {n['title']: n['kind'] for n in logged.get('/api/notifications').get_json()['notifications']}['Maintenance due'] == 'maintenance'

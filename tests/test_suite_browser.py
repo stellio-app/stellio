@@ -415,6 +415,29 @@ def test_similaires_message_lisible(page):
     assert '12 / 1' in t and '{' not in t and '10 min' in t
 
 
+def test_similaires_fichiers_ignores_bouton_popup_causes_et_reessayer(page):
+    page.evaluate("""() => { window.__routes['GET /api/similar/status'] = () => ({ indexed: 1, total: 5, skipped: 4 });
+        window.__routes['GET /api/similar/skipped'] = () => ({ max_mb: 60, count: 4, files: [
+          { path: '/s/gros.stl', name: 'gros.stl', size: 90000000, reason: 'Fichier non indexable.', code: 'too_big', ext: 'stl' },
+          { path: '/s/casse.stl', name: 'casse.stl', size: 26, reason: 'bad', code: 'unreadable', ext: 'stl' },
+          { path: '/s/vide.obj', name: 'vide.obj', size: 8, reason: 'Maillage vide.', code: 'empty', ext: 'obj' },
+          { path: '/s/absent.stl', name: 'absent.stl', size: 1, reason: 'No such file', code: 'missing', ext: 'stl' }] });
+        window.__routes['POST /api/similar/skipped/retry'] = () => ({ ok: true, retried: 4 }); window.__routes['POST /api/similar/build'] = () => ({ job_id: 'j1' });
+        window.__routes['GET /api/jobs/j1'] = () => ({ state: 'done', progress: 1 }); }""")
+    page.evaluate("window.__calls.length = 0")
+    page.evaluate("window.StellioSuite.open('similar')"); page.wait_for_selector('#su-sskip')
+    assert 'Fichiers ignorés (4)' in page.inner_text('#su-sskip')
+    page.click('#su-sskip'); page.wait_for_selector('#modal-suite-skipped .sk-row')
+    t = page.inner_text('#modal-suite-skipped')
+    assert page.locator('#modal-suite-skipped .sk-row').count() == 4 and page.locator('#modal-suite-skipped .sk-row .su-thumb').count() == 4          # une miniature par fichier
+    assert 'Trop gros' in t and 'Aucune surface' in t and 'Illisible' in t and 'Introuvable' in t
+    assert 'dépasse 60 Mo' in t and 'Réexportez' in t and 'Simplifiez' in t and '{max}' not in t                                            # une solution par cause
+    page.click('#sk-retry')
+    page.wait_for_function("window.__calls.some(c => c.url === '/api/similar/build')")
+    assert any(c['url'] == '/api/similar/skipped/retry' and c['method'] == 'POST' for c in page.evaluate('window.__calls'))
+    assert page.locator('#modal-suite-skipped.hidden').count() == 1
+
+
 def test_onglet_lent_n_ecrase_pas_l_onglet_ouvert_ensuite(page):
     """Cliquer « Archives G-code » pendant que « Similaires » charge : l'onglet affiché reste celui sur lequel on est."""
     page.evaluate("""() => { window.__release = null; window.__routes['GET /api/similar/status'] = () => ({ indexed: 1, total: 2 });
@@ -816,7 +839,7 @@ def test_plugins_signature_audit_restrictions_et_confirmation_du_risque(page):
     page.evaluate("document.getElementById('plugins-root') && document.getElementById('plugins-root').remove(); window.StellioSuite.open('plugins')")
     page.wait_for_selector('#plugins-root .su-store-card')
     txt = page.inner_text('#plugins-root')
-    assert 'Aucune restriction du noyau sur ce système' in txt and 'déclaratives' in txt                  # honnête hors Linux
+    assert 'Aucune restriction du noyau' not in txt                                                      # plus d'avertissement hors Linux (1.1.9)
     assert 'Aucune clé de confiance configurée' in txt
     alpha = page.inner_text('#plugins-root .su-plugin[data-pid="a"]')
     beta = page.inner_text('#plugins-root .su-plugin[data-pid="b"]')
@@ -832,4 +855,9 @@ def test_plugins_signature_audit_restrictions_et_confirmation_du_risque(page):
     page.wait_for_selector('#plugins-root .su-notice')
     t2 = page.inner_text('#plugins-root .su-notice')
     assert 'le noyau restreint chaque plugin' in t2 and 'pas limité à certains sites' in t2
+    page.evaluate("document.getElementById('plugins-root').remove()")
+    page.evaluate("window.__routes['GET /api/plugins'] = { sandbox: { platform: 'windows', enforced: false, filesystem: false, network: false, reason: 'unsupported' }, trusted_keys: [], plugins: [], builtin: [], restart_required: false }")
+    page.evaluate("window.StellioSuite.open('plugins')"); page.wait_for_selector('#plugins-root .su-card')
+    assert page.locator('#plugins-root .su-notice').count() == 0                                       # 1.1.9 : plus d'avertissement « aucune restriction du noyau »
+    assert 'Aucune restriction du noyau' not in page.inner_text('#plugins-root')
     page.evaluate("document.getElementById('plugins-root').remove()")

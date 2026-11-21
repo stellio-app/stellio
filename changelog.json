@@ -1,5 +1,82 @@
 [
   {
+    "version": "1.1.9",
+    "items": {
+      "fr": [
+        "Fenêtres : « Ajouter une source » (SMB, NFS, types, renommer) et toutes les fenêtres ouvertes depuis les Paramètres s'affichent maintenant devant la section ouverte, plus derrière",
+        "Besoins matière et Assistant fabrication : l'entrée de menu disparaît quand leur plugin intégré (Stellio Pro / IA) est désactivé ; si on y arrive quand même, un message explique quoi activer au lieu de « 404 »",
+        "Notifications : titres et textes des alertes de stock, pièces, séchage, fin ou échec d'impression et maintenance retraduits dans la langue actuelle (fin du mélange français / anglais)",
+        "Outil de signature des plugins : nouvelle commande « pub » qui réaffiche la clé publique d'une clé existante",
+        "Mode atelier : un appui sur une imprimante en cours d'impression ouvre sa carte (caméra, températures, progression) devant le mode atelier ; en portrait, les cartes ne sont plus coupées (téléphone / APK) ; sur téléphone la carte imprimante affiche la progression puis les températures dessous",
+        "Similaires : bouton « Fichiers ignorés » avec popup (miniatures, cause : trop gros, vide, illisible, introuvable) et la solution pour chacun, plus « Réessayer » ; carte imprimante sur PC / serveur en deux colonnes : tout tient à l'écran sans défiler",
+        "Plugins : l'avertissement « Aucune restriction du noyau sur ce système » est supprimé"
+      ],
+      "en": [
+        "Windows: “Add a source” (SMB, NFS, types, rename) and every window opened from Settings now appear in front of the open section instead of behind it",
+        "Material needs and Manufacturing assistant: the menu entry disappears when its built-in plugin (Stellio Pro / AI) is disabled; if you still land there, a message says what to enable instead of “404”",
+        "Notifications: titles and texts of stock, parts, drying, print finished/failed and maintenance alerts are translated into the current language when displayed (no more French/English mix)",
+        "Plugin signing tool: new “pub” command that shows the public key of an existing key again",
+        "Workshop mode: tapping a printer that is printing opens its card (camera, temperatures, progress) in front of workshop mode; in portrait the cards are no longer cut off (phone / APK); on a phone the printer card shows progress, then temperatures below it",
+        "Similar: new \"Skipped files\" button with a popup (thumbnails, cause: too big, empty, unreadable, missing) and a fix for each, plus \"Retry\"; printer card on PC / server in two columns: everything fits on screen without scrolling",
+        "Plugins: the \"No kernel restriction on this system\" warning is removed"
+      ],
+      "de": [
+        "Fenster: „Quelle hinzufügen“ (SMB, NFS, Typen, Umbenennen) und alle aus den Einstellungen geöffneten Fenster erscheinen jetzt vor dem geöffneten Bereich statt dahinter",
+        "Materialbedarf und Fertigungsassistent: Der Menüeintrag verschwindet, wenn das integrierte Plugin (Stellio Pro / KI) deaktiviert ist; wer trotzdem dort landet, sieht einen Hinweis statt „404“",
+        "Benachrichtigungen: Titel und Texte der Warnungen (Bestand, Teile, Trocknen, Druck fertig/fehlgeschlagen, Wartung) werden in der aktuellen Sprache angezeigt (kein Französisch-Englisch-Mix mehr)",
+        "Plugin-Signaturwerkzeug: neuer Befehl „pub“, der den öffentlichen Schlüssel eines vorhandenen Schlüssels erneut anzeigt",
+        "Werkstattmodus: Ein Tipp auf einen druckenden Drucker öffnet seine Karte (Kamera, Temperaturen, Fortschritt) vor dem Werkstattmodus; im Hochformat werden die Karten nicht mehr abgeschnitten (Handy / APK); auf dem Handy zeigt die Druckerkarte zuerst den Fortschritt, darunter die Temperaturen",
+        "Ähnliche: neue Schaltfläche „Übersprungene Dateien“ mit Popup (Vorschaubilder, Ursache: zu groß, leer, unlesbar, fehlt) und Lösung je Datei, plus „Erneut versuchen“; Druckerkarte am PC / Server zweispaltig: alles passt ohne Scrollen auf den Bildschirm",
+        "Plugins: der Hinweis „Keine Kernel-Einschränkung auf diesem System“ entfällt"
+      ],
+      "es": [
+        "Ventanas: «Añadir una fuente» (SMB, NFS, tipos, renombrar) y todas las ventanas abiertas desde Ajustes aparecen ahora delante de la sección abierta, no detrás",
+        "Necesidades de material y Asistente de fabricación: la entrada del menú desaparece si su plugin integrado (Stellio Pro / IA) está desactivado; si se llega igualmente, un mensaje indica qué activar en lugar de «404»",
+        "Notificaciones: títulos y textos de las alertas de stock, piezas, secado, impresión terminada o fallida y mantenimiento se traducen al idioma actual (fin de la mezcla francés / inglés)",
+        "Herramienta de firma de plugins: nuevo comando «pub» que vuelve a mostrar la clave pública de una clave existente",
+        "Modo taller: al pulsar una impresora que está imprimiendo se abre su ficha (cámara, temperaturas, progreso) delante del modo taller; en vertical las tarjetas ya no se cortan (móvil / APK); en el móvil la ficha de la impresora muestra el progreso y debajo las temperaturas",
+        "Similares: nuevo botón «Archivos omitidos» con ventana (miniaturas, causa: demasiado grande, vacío, ilegible, no encontrado) y solución para cada uno, más «Reintentar»; tarjeta de impresora en PC / servidor en dos columnas: todo cabe en pantalla sin desplazarse",
+        "Plugins: se elimina el aviso «Sin restricción del núcleo en este sistema»"
+      ],
+      "pt": [
+        "Janelas: «Adicionar uma fonte» (SMB, NFS, tipos, renomear) e todas as janelas abertas a partir das Definições aparecem agora à frente da secção aberta, e não atrás",
+        "Necessidades de material e Assistente de fabrico: a entrada do menu desaparece quando o plugin integrado (Stellio Pro / IA) está desativado; se chegar lá na mesma, uma mensagem indica o que ativar em vez de «404»",
+        "Notificações: títulos e textos dos alertas de stock, peças, secagem, impressão concluída ou falhada e manutenção são traduzidos para o idioma atual (fim da mistura francês / inglês)",
+        "Ferramenta de assinatura de plugins: novo comando «pub» que volta a mostrar a chave pública de uma chave existente",
+        "Modo oficina: tocar numa impressora em impressão abre o seu cartão (câmara, temperaturas, progresso) à frente do modo oficina; na vertical os cartões já não ficam cortados (telemóvel / APK); no telemóvel o cartão da impressora mostra o progresso e, por baixo, as temperaturas",
+        "Semelhantes: novo botão «Ficheiros ignorados» com janela (miniaturas, causa: demasiado grande, vazio, ilegível, em falta) e solução para cada um, mais «Tentar de novo»; cartão da impressora no PC / servidor em duas colunas: tudo cabe no ecrã sem deslocar",
+        "Plugins: o aviso «Sem restrição do núcleo neste sistema» foi removido"
+      ],
+      "it": [
+        "Finestre: «Aggiungi una sorgente» (SMB, NFS, tipi, rinomina) e tutte le finestre aperte dalle Impostazioni compaiono ora davanti alla sezione aperta, non dietro",
+        "Fabbisogno di materiale e Assistente di fabbricazione: la voce di menu scompare quando il plugin integrato (Stellio Pro / IA) è disattivato; se ci si arriva comunque, un messaggio indica cosa attivare invece di «404»",
+        "Notifiche: titoli e testi degli avvisi di scorta, pezzi, essiccazione, stampa terminata o fallita e manutenzione vengono tradotti nella lingua attuale (fine del mix francese / inglese)",
+        "Strumento di firma dei plugin: nuovo comando «pub» che mostra di nuovo la chiave pubblica di una chiave esistente",
+        "Modalità officina: toccando una stampante in stampa si apre la sua scheda (camera, temperature, avanzamento) davanti alla modalità officina; in verticale le schede non vengono più tagliate (telefono / APK); su telefono la scheda della stampante mostra l'avanzamento e sotto le temperature",
+        "Simili: nuovo pulsante «File ignorati» con popup (miniature, causa: troppo grande, vuoto, illeggibile, mancante) e soluzione per ciascuno, più «Riprova»; scheda stampante su PC / server su due colonne: tutto entra nello schermo senza scorrere",
+        "Plugin: rimosso l'avviso «Nessuna restrizione del kernel su questo sistema»"
+      ],
+      "zh": [
+        "窗口：“添加来源”（SMB、NFS、类型、重命名）以及从设置中打开的所有窗口现在显示在已展开的分区前面，而不是后面",
+        "材料需求和制造助手：其内置插件（Stellio Pro / AI）停用时菜单项会消失；若仍进入该页面，会提示需要启用什么，而不再显示“404”",
+        "通知：库存、零件、烘干、打印完成/失败和维护提醒的标题与内容按当前语言显示（不再中英法混杂）",
+        "插件签名工具：新增“pub”命令，可重新显示现有密钥的公钥",
+        "车间模式：点击正在打印的打印机会在车间模式前打开它的卡片（摄像头、温度、进度）；竖屏时卡片不再被截断（手机 / APK）；手机上打印机卡片先显示进度，温度显示在其下方",
+        "相似：新增“已跳过的文件”按钮和弹窗（缩略图、原因：过大、为空、无法读取、找不到，以及每种情况的解决办法）和“重试”；PC / 服务器上的打印机卡片改为两列，无需滚动即可完整显示",
+        "插件：移除“此系统上没有内核限制”的警告"
+      ],
+      "ja": [
+        "ウィンドウ：「ソースを追加」（SMB、NFS、種類、名前変更）と設定から開くすべてのウィンドウが、開いているセクションの後ろではなく前面に表示されます",
+        "材料の必要量と製造アシスタント：内蔵プラグイン（Stellio Pro / AI）が無効のときはメニュー項目が消え、それでも開いた場合は「404」ではなく有効化すべきものを表示します",
+        "通知：在庫、部品、乾燥、印刷完了/失敗、メンテナンスの通知のタイトルと本文を、表示時に現在の言語へ翻訳します（フランス語と英語の混在を解消）",
+        "プラグイン署名ツール：既存の鍵の公開鍵を再表示する新コマンド「pub」",
+        "ワークショップモード：印刷中のプリンターをタップすると、そのカード（カメラ、温度、進捗）がワークショップモードの前面に開きます。縦向きでもカードが切れなくなりました（スマートフォン / APK）。スマートフォンではプリンターカードに進捗を表示し、その下に温度を表示します",
+        "類似：「スキップされたファイル」ボタンとポップアップ（サムネイル、原因：大きすぎる/空/読み取り不可/見つからない、それぞれの対処法）と「再試行」を追加。PC / サーバーではプリンターカードを2列にし、スクロールなしで画面に収まります",
+        "プラグイン：「このシステムにカーネル制限はありません」の警告を削除"
+      ]
+    }
+  },
+  {
     "version": "1.1.8",
     "items": {
       "fr": [

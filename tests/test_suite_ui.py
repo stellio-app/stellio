@@ -192,7 +192,8 @@ def test_source_dialogs_sit_above_the_sources_list_and_work_indicator_exists():
     root = pathlib.Path(__file__).resolve().parent.parent
     css = (root / 'interface/style.css').read_text(encoding='utf-8')
     m = re.search(r'#modal-select-type[^{]*\{\s*z-index:\s*(\d+)', css)
-    assert m and int(m.group(1)) > 1000          # « Ajouter une source » ne passe plus derrière la liste des sources
+    z = re.search(r'#accord-backdrop[^}]*z-index:\s*(\d+)', css) ; pop = re.search(r'position: fixed; inset: 0; margin: auto; z-index: (\d+)', css)
+    assert m and pop and int(m.group(1)) > int(pop.group(1)) > int(z.group(1))   # « Ajouter une source » passe devant la liste des sources (popup de réglages)
     js = (root / 'interface/suite.js').read_text(encoding='utf-8')
     assert 'su-work-auto' in js and 'su-btn-busy' in js   # repère visuel pendant un calcul (Diff 3D, etc.)
 
@@ -201,3 +202,25 @@ def test_project_picker_quantity_field_keeps_its_size_inside_checkbox_rows():
     import pathlib
     css = (pathlib.Path(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
     assert '.checkbox-label input.qty-needed' in css and 'width: 52px; height: auto' in css
+
+
+def test_every_dialog_opened_from_a_settings_popup_sits_above_it():
+    import pathlib
+    css = (pathlib.Path(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
+    assert 'body:has(.accord-section.accord-popup) .modal:not(#modal-confirm)' in css
+
+
+def test_needs_and_fab_tabs_follow_their_plugin():
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent
+    js = (root / 'interface/suite.js').read_text(encoding='utf-8')
+    html = (root / 'interface/index.html').read_text(encoding='utf-8')
+    assert "needs: 'stellio-pro'" in js and "fab: 'ai-assistant'" in js
+    assert 'data-host-plugin="stellio-pro" data-nav-id="suite-needs"' in html and 'data-host-plugin="ai-assistant" data-nav-id="suite-fab"' in html
+
+
+def test_workshop_mode_never_overflows_a_portrait_phone():
+    import pathlib
+    css = (pathlib.Path(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
+    assert 'grid-template-columns: minmax(0, 1fr); }' in css and 'minmax(min(320px, 100%), 1fr)' in css
+    assert '.workshop-overlay {' in css and 'overflow-x: hidden' in css

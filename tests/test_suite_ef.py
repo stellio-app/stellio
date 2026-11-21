@@ -281,6 +281,34 @@ def test_index_status_et_construction(tmp_path):
     assert st['skipped'] == 1 and st['missing'] == 0 and st['indexed'] == 3                              # « ignoré » ≠ « reste à indexer » : plus de « reste environ 2 min » fantôme
 
 
+def test_fichiers_ignores_causes_et_reessayer(tmp_path):
+    """1.1.9 : liste des fichiers ignorés par l'index, avec cause (trop gros / vide / illisible / introuvable) ; « réessayer » les remet dans l'indexation."""
+    ss = _mod('shape_search'); get_db = _db(tmp_path)
+    ok = str(tmp_path / 'ok.stl'); trimesh.creation.box(extents=(10, 10, 10)).export(ok)
+    bad = tmp_path / 'casse.stl'; bad.write_bytes(b'ceci n est pas un maillage')
+    vide = tmp_path / 'vide.obj'; vide.write_text('# rien\n')
+    gros = tmp_path / 'gros.stl'; gros.write_bytes(b'0' * 16)
+    app = flask.Flask('t'); app.secret_key = 'x'
+    cache = {'files': [{'path': ok, 'mtime': 1, 'size': os.path.getsize(ok)}, {'path': str(bad), 'mtime': 1, 'size': 26}, {'path': str(vide), 'mtime': 1, 'size': 8},
+                       {'path': str(gros), 'mtime': 1, 'size': ss.MAX_BYTES + 5}, {'path': str(tmp_path / 'absent.stl'), 'mtime': 1, 'size': 1}]}
+    ss.init(_svc(app, get_db, _is_path_within_sources=lambda p, uid: True, _read_cache_json_safe=lambda: cache))
+    class Ctx:
+        def progress(self, *a): pass
+    ss.build_index(Ctx(), 1)
+    cl = app.test_client()
+    with cl.session_transaction() as s: s['user_id'] = 1
+    d = cl.get('/api/similar/skipped').get_json()
+    codes = {os.path.basename(f['path']): f['code'] for f in d['files']}
+    assert d['count'] == 4 and d['max_mb'] == 60
+    assert codes['gros.stl'] == 'too_big' and codes['absent.stl'] == 'missing' and codes['casse.stl'] in ('empty', 'unreadable') and codes['vide.obj'] in ('empty', 'unreadable')
+    assert 'ok.stl' not in codes
+    assert cl.post('/api/similar/skipped/retry', json={'paths': [str(bad)]}).get_json()['retried'] == 1
+    assert cl.get('/api/similar/skipped').get_json()['count'] == 3
+    assert cl.post('/api/similar/skipped/retry', json={}).get_json()['retried'] == 3                  # sans liste : tout est réessayé
+    assert cl.get('/api/similar/skipped').get_json()['count'] == 0
+    assert ss.build_index(Ctx(), 1)['failed'] == 4                                                     # la nouvelle indexation les réessaie
+
+
 def test_organize_auteur_categorie_date():
     m = _mod('auto_organize')
     f = {'path': '/a.stl', 'name': 'a.stl', 'ext': 'stl', 'size_mb': 1, 'license_commercial': 'unknown', 'materials': [], 'printers': [], 'printed': False,

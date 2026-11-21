@@ -18544,6 +18544,15 @@ def api_presence_active():
         return jsonify({"others": []}), 200
 
 
+_NOTIF_KINDS = ('low_stock', 'restock', 'part_low', 'drying_due', 'print_finished', 'print_failed', 'maintenance')
+
+
+def _notif_kind(dedup_key):
+    """Nature d'une notification créée par l'interface (titre et texte enregistrés dans la langue du moment : l'interface les retraduit à l'affichage)."""
+    k = str(dedup_key or '')
+    return next((n for n in _NOTIF_KINDS if k.startswith(n + '_')), '')
+
+
 @app.route('/api/notifications', methods=['GET'])
 @login_required
 def api_get_notifications():
@@ -18552,7 +18561,7 @@ def api_get_notifications():
         conn = get_db()
         try:
             rows = conn.execute(
-                "SELECT id, type, title, message, link_page, is_read, created_at FROM notifications "
+                "SELECT id, type, title, message, link_page, dedup_key, is_read, created_at FROM notifications "
                 "WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
                 (session['user_id'], limit)
             ).fetchall()
@@ -18563,7 +18572,7 @@ def api_get_notifications():
         finally:
             conn.close()
         return jsonify({
-            "notifications": [dict(r) for r in rows],
+            "notifications": [dict(r, kind=_notif_kind(r['dedup_key']), dedup_key=None) for r in rows],
             "unread_count": unread_count,
         }), 200
     except Exception as e:
@@ -18907,7 +18916,7 @@ def api_notifications_all():
         conn.close()
     items = []
     for r in rows:
-        d = dict(r); d['category'] = _notif_category(d['type'], d.get('dedup_key')); d['source'] = _notif_source(d['type'], d.get('dedup_key')); d.pop('dedup_key', None); items.append(d)
+        d = dict(r); d['category'] = _notif_category(d['type'], d.get('dedup_key')); d['source'] = _notif_source(d['type'], d.get('dedup_key')); d['kind'] = _notif_kind(d.get('dedup_key')); d.pop('dedup_key', None); items.append(d)
     counts = {c: 0 for c in _NOTIF_CATEGORIES}
     sources = {}
     for d in items:
@@ -20413,7 +20422,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.1.8"
+CURRENT_VERSION = "1.1.9"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 

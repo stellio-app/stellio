@@ -5206,6 +5206,23 @@ function _updateNotifBadge(count) {
     badge.style.display = count > 0 ? '' : 'none';
 }
 
+/* Titre et texte d'une notification de stock : enregistrés dans la langue du moment, donc retraduits à l'affichage (plus de mélange français / anglais). */
+function _notifText(n) {
+    const TITLES = { low_stock: ['notif.low_stock_title', 'Stock filament faible'], restock: ['notif.restock_title', 'Filament à commander'], part_low: ['parts.notif_title', 'Pièce à recommander'],
+        drying_due: ['drying.notif_title', 'Bobine à sécher'], print_finished: ['notif.print_finished_title', 'Impression terminée'], print_failed: ['notif.print_failed_title', "Échec d'impression"],
+        maintenance: ['notif.maintenance_title', 'Maintenance à prévoir'] };
+    let title = n.title, message = n.message;
+    const msg = message || '';
+    if (n.kind === 'restock' && (/ ml\b/.test(msg) || !/ g\b/.test(msg))) return { title, message };     // résine : le titre est le nom de la rubrique
+    if (TITLES[n.kind]) title = _t2(TITLES[n.kind][0], TITLES[n.kind][1]);
+    let m;
+    if (n.kind === 'low_stock' && (m = /^(.*) — (\d+)\s*g\b/.exec(msg))) message = `${m[1]} — ${m[2]}g ${_t2('dashboard.stock_remaining', 'restants')}`;
+    else if (n.kind === 'part_low' && (m = /^(.*) — (\d+)\b/.exec(msg))) message = `${m[1]} — ${_tf('parts.notif_msg', '{{n}} en stock', { n: m[2] })}`;
+    else if (n.kind === 'drying_due' && (m = /^(.*) — (\d+)\b/.exec(msg))) message = `${m[1]} — ${_tf('drying.notif_msg', '{{days}} j depuis le dernier séchage', { days: m[2] })}`;
+    return { title, message };
+}
+window.stellioNotifText = _notifText;
+
 function _renderNotifList(notifications) {
     const listEl = document.getElementById('notif-panel-list');
     if (!listEl) return;
@@ -5228,8 +5245,8 @@ function _renderNotifList(notifications) {
         <div class="notif-item ${n.is_read ? '' : 'unread'}" data-id="${n.id}" onclick="handleNotificationClick(${n.id}, ${n.link_page ? `'${escapeJs(n.link_page)}'` : 'null'})">
             <div class="notif-item-icon"><i class="fa-solid ${icons[n.type] || icons.info}"></i></div>
             <div class="notif-item-body">
-                <div class="notif-item-title">${escapeHtml(n.title)}</div>
-                ${n.message ? `<div class="notif-item-message">${escapeHtml(n.message)}</div>` : ''}
+                <div class="notif-item-title">${escapeHtml(_notifText(n).title)}</div>
+                ${n.message ? `<div class="notif-item-message">${escapeHtml(_notifText(n).message)}</div>` : ''}
                 <div class="notif-item-time">${timeStr}</div>
             </div>
             <button type="button" class="notif-item-close" onclick="event.stopPropagation(); deleteNotificationItem(${n.id})"><i class="fa-solid fa-xmark"></i></button>
@@ -21423,6 +21440,7 @@ function initMonitorUI(printer) {
             ${octoprintBtn}
          </div>
      </div>
+     <div class="monitor-split">
      <div id="printer-camera-container" class="monitor-card full" style="display:none;">
          <h4><i class="fa-solid fa-camera"></i> ${I18N.t('printers.camera')}</h4>
          <div id="camera-content" style="position:relative; width:100%; aspect-ratio:16/9; min-height:200px; background:#000; border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center;">
@@ -21430,11 +21448,11 @@ function initMonitorUI(printer) {
          </div>
      </div>
      <div class="monitor-grid">
-         <div class="monitor-card">
+         <div class="monitor-card monitor-card-temps">
              <h4><i class="fa-solid fa-temperature-half"></i> ${I18N.t('printers.temperatures')}</h4>
              <div id="monitor-temps-container"></div>
          </div>
-         <div class="monitor-card">
+         <div class="monitor-card monitor-card-progress">
              <h4><i class="fa-solid fa-clock"></i> ${I18N.t('printers.progression')}</h4>
              <div class="monitor-progress-bar">
                  <div id="monitor-progress-fill" class="monitor-progress-fill" style="width: 0%"></div>
@@ -21459,6 +21477,7 @@ function initMonitorUI(printer) {
                  <p style="color:var(--text-muted); font-size:calc(13px * var(--fs, 1))">${I18N.t('common.loading')}</p>
              </div>
          </div>
+     </div>
      </div>
     `;
     loadPrinterCamera(currentMonitorPid);
@@ -27043,7 +27062,7 @@ function _workshopTileHtml(p, d) {
     const rem = active && d.time && d.time.remaining > 0 ? formatDuration(d.time.remaining).replace(/ \d+s$/, '') : '';
     const ext = d && d.temps && d.temps.extruder ? Math.round(d.temps.extruder.current || 0) : null;
     const bed = d && d.temps && d.temps.bed ? Math.round(d.temps.bed.current || 0) : null;
-    return `<div class="ws-tile ws-${cls}">
+    return `<div class="ws-tile ws-${cls}${active ? ' ws-clickable' : ''}" data-pid="${p.id}"${active ? ` role="button" tabindex="0" title="${escapeHtml(_t3('workshop.open_card', 'Ouvrir la carte de l\'imprimante'))}"` : ''}>
         <div class="ws-tile-head"><span class="ws-name">${escapeHtml(p.name)}</span><span class="ws-pill">${escapeHtml(label)}</span></div>
         ${active ? `
         <div class="ws-main">
@@ -27112,11 +27131,25 @@ window.openWorkshopMode = function () {
         ov.remove();
         if (location.hash === '#workshop') history.replaceState(null, '', location.pathname + location.search);
     };
-    const onKey = e => { if (e.key === 'Escape') close(); };
+    const onKey = e => {
+        if (e.key !== 'Escape') return;
+        const mon = document.getElementById('modal-printer-monitor');
+        if (mon && !mon.classList.contains('hidden')) { closePrinterMonitor(); return; }     // Échap ferme d'abord la carte imprimante, pas le mode atelier
+        close();
+    };
     const onVis = () => { if (!document.hidden) { _workshopKeepAwake(); _workshopRefresh(); } };
     document.addEventListener('keydown', onKey);
     document.addEventListener('visibilitychange', onVis);
     ov.querySelector('#workshop-close').addEventListener('click', close);
+    // Une imprimante en cours d'impression : un appui ouvre sa carte (caméra, températures, progression). Délégation : la grille est redessinée toutes les 5 s.
+    const openTile = (e) => {
+        const t = e.target.closest('.ws-tile.ws-clickable'); if (!t) return;
+        if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        openPrinterMonitor(Number(t.dataset.pid) || t.dataset.pid);
+    };
+    ov.querySelector('#workshop-grid').addEventListener('click', openTile);
+    ov.querySelector('#workshop-grid').addEventListener('keydown', openTile);
     ov.querySelector('#workshop-share')?.addEventListener('click', () => openStatusLinksModal());
     ov.querySelector('#workshop-fs').addEventListener('click', () => {
         if (document.fullscreenElement) document.exitFullscreen().catch(() => {});

@@ -210,6 +210,68 @@ def api_similar_status():
         conn.close()
 
 
+def classify_skip(reason, size, exists=True):
+    """Cause d'un fichier ignoré → code (traduit par l'interface) : « trop gros », « vide », « introuvable », « illisible »."""
+    r = str(reason or '').lower()
+    if not exists or 'no such file' in r or 'introuvable' in r or 'not found' in r:
+        return 'missing'
+    if (size or 0) > MAX_BYTES:
+        return 'too_big'
+    if 'vide' in r or 'empty' in r:
+        return 'empty'
+    return 'unreadable'
+
+
+def skipped_files(conn, uid):
+    """Fichiers que l'indexation a mis de côté, avec la cause et la taille (limite : MAX_BYTES, soit 60 Mo)."""
+    _ensure(conn)
+    out = []
+    for r in conn.execute("SELECT path, size, reason FROM shape_skip WHERE user_id = ? ORDER BY path", (uid,)).fetchall():
+        ok = _is_path_within_sources(r['path'], uid)
+        if not ok:
+            continue
+        exists = os.path.exists(r['path'])
+        out.append({'path': r['path'], 'name': os.path.basename(r['path']), 'size': r['size'] or 0, 'reason': r['reason'] or '', 'code': classify_skip(r['reason'], r['size'], exists),
+                    'ext': os.path.splitext(r['path'])[1].lower().lstrip('.')})
+    return out
+
+
+def api_similar_skipped():
+    r = _no_viewer()
+    if r:
+        return r
+    uid = session['user_id']
+    conn = get_db()
+    try:
+        items = skipped_files(conn, uid)
+        return jsonify({'files': items, 'count': len(items), 'max_mb': MAX_BYTES // (1024 * 1024)})
+    finally:
+        conn.close()
+
+
+def api_similar_skipped_retry():
+    """Oublie les fichiers ignorés (tous, ou ceux de `paths`) : la prochaine indexation les réessaie (après réparation, réexport ou simplification)."""
+    r = _no_viewer()
+    if r:
+        return r
+    uid = session['user_id']
+    data = request.get_json(silent=True) or {}
+    paths = data.get('paths')
+    conn = get_db()
+    try:
+        _ensure(conn)
+        if isinstance(paths, list) and paths:
+            n = 0
+            for p in paths[:5000]:
+                n += conn.execute("DELETE FROM shape_skip WHERE user_id = ? AND path = ?", (uid, _norm(p))).rowcount
+        else:
+            n = conn.execute("DELETE FROM shape_skip WHERE user_id = ?", (uid,)).rowcount
+        conn.commit()
+        return jsonify({'ok': True, 'retried': n})
+    finally:
+        conn.close()
+
+
 def api_similar_build():
     r = _no_viewer()
     if r:
@@ -272,6 +334,8 @@ def _demo_ok():
 _ROUTES = (
     ('/api/similar', ['GET'], 'api_similar', ('login_required', )),
     ('/api/similar/status', ['GET'], 'api_similar_status', ('login_required', )),
+    ('/api/similar/skipped', ['GET'], 'api_similar_skipped', ('login_required', )),
+    ('/api/similar/skipped/retry', ['POST'], 'api_similar_skipped_retry', ('login_required', )),
     ('/api/similar/build', ['POST'], 'api_similar_build', ('login_required', )),
 )
 
