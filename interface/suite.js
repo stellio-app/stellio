@@ -1107,7 +1107,7 @@ function open(tab) {
    (GET /api/…), et seulement si le plugin a la permission « api:read ». */
 const PV_DENY = ['plugins', 'auth', 'settings', 'accounts', 'account-models', 'security', 'sessions', 'guests', 'backup', 'audit', 'diagnostic', 'update', 'smtp', 'mqtt', 'push', 'users', 'tokens', 'api-keys'].map(d => '/api/' + d);
 const PV_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; frame-src 'none'; base-uri 'none'";
-const PV_CLIENT = "(function(){var n=0,w={};var S=window.stellio={theme:{},lang:'fr',ready:false,api:function(p,as){return new Promise(function(ok,ko){var i=++n;w[i]={ok:ok,ko:ko};parent.postMessage({type:'stellio.api',id:i,path:p,as:as||'json'},'*');});}};" +
+const PV_CLIENT = "(function(){var n=0,w={};var S=window.stellio={theme:{},lang:'fr',ready:false,api:function(p,as,o){return new Promise(function(ok,ko){var i=++n;w[i]={ok:ok,ko:ko};parent.postMessage({type:'stellio.api',id:i,path:p,as:as||'json',method:(o&&o.method)||'GET',body:(o&&o.body)},'*');});}};" +
     "function th(t){var r=document.documentElement.style;for(var k in t)r.setProperty('--st-'+k,t[k]);}" +
     "window.addEventListener('message',function(e){var d=e.data||{};if(d.type==='stellio.reply'&&w[d.id]){var f=w[d.id];delete w[d.id];if(d.ok)f.ok(d.data);else f.ko(new Error(d.error||('HTTP '+d.status)));}" +
     "else if(d.type==='stellio.init'){S.theme=d.theme||{};S.lang=d.lang||'fr';S.ready=true;th(S.theme);document.dispatchEvent(new Event('stellio-ready'));}});})();";
@@ -1123,9 +1123,13 @@ async function pvApi(m) {
     const path = String(m.path || ''), pl = PV.plugin;
     const reply = (o) => pvPost(Object.assign({ type: 'stellio.reply', id: m.id }, o));
     if (!pl || !(pl.permissions || []).includes('api:read')) return reply({ ok: false, error: 'Permission « api:read » absente du plugin.' });
+    // 1.2.0 : écriture (POST JSON) réservée aux plugins SIGNÉS à code intégré, et uniquement vers leur propre espace /api/x/<id>/ (permission « api:write »)
+    const post = m.method === 'POST';
+    if (post && !(pl.host && (pl.permissions || []).includes('api:write') && path.startsWith(['', 'api', 'x', pl.id, ''].join('/')) && !path.includes('..') && /^\/api\/x\/[a-z0-9_-]+\/[A-Za-z0-9_\-./]*$/.test(path))) return reply({ ok: false, error: 'Écriture non autorisée pour ce plugin.' });
     if (!/^\/api\/[A-Za-z0-9_\-./?=&%:,+~@]*$/.test(path) || path.includes('..') || path.includes('//') || PV_DENY.some(d => path === d || path.startsWith(d + '/') || path.startsWith(d + '?'))) return reply({ ok: false, error: 'Chemin non autorisé.' });
     try {
-        const r = await fetch(API + path, { credentials: 'same-origin' });
+        const r = post ? await fetch(API + path, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(m.body == null ? {} : m.body) })
+            : await fetch(API + path, { credentials: 'same-origin' });
         const as = m.as === 'text' ? 'text' : (m.as === 'arraybuffer' ? 'arraybuffer' : 'json');
         let data = null;
         if (r.ok) data = await (as === 'text' ? r.text() : as === 'arraybuffer' ? r.arrayBuffer() : r.json());

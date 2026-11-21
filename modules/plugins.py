@@ -83,15 +83,21 @@ LOG_KEEP = 200
 _slots = threading.Semaphore(4)           # exécutions simultanées
 
 
-def validate_manifest(m):
-    """(manifeste propre, erreur)."""
+def validate_manifest(m, allow_host=False):
+    """(manifeste propre, erreur). `host` (modules Python exécutés DANS Stellio) n'est admis que si allow_host : l'installation exige alors une signature valide."""
     if not isinstance(m, dict):
         return None, 'Manifeste illisible.'
     pid = str(m.get('id') or '')
     if not ID_RE.match(pid):
         return None, "Identifiant invalide (minuscules, chiffres, - et _, 2 à 40 caractères)."
+    host = None
     if 'host' in m:
-        return None, "Le champ « host » est réservé aux plugins intégrés à Stellio."
+        if not allow_host:
+            return None, "Le champ « host » est réservé aux plugins intégrés à Stellio et aux plugins signés."
+        hm = m['host'].get('modules') if isinstance(m['host'], dict) else None
+        if not isinstance(hm, list) or not hm or len(hm) > 8 or not all(isinstance(x, str) and x.isidentifier() for x in hm):
+            return None, "« host.modules » : liste de noms de modules Python du plugin."
+        host = {'modules': hm}
     if m.get('api') != API_VERSION:
         return None, f"Version d'API non prise en charge (attendu : {API_VERSION})."
     name = str(m.get('name') or '').strip()[:60]
@@ -100,7 +106,7 @@ def validate_manifest(m):
     events = m.get('events') or []
     perms = m.get('permissions') or []
     ui_raw = m.get('ui')
-    if m.get('entry') is None and ui_raw and not events:      # plugin purement visuel : pas de script à lancer
+    if m.get('entry') is None and (ui_raw or host) and not events:      # plugin purement visuel ou à code intégré (`host`) : pas de script à lancer
         entry = ''
     else:
         entry = str(m.get('entry') or 'main.py')
@@ -125,13 +131,13 @@ def validate_manifest(m):
         return None, "Pour recevoir des évènements, déclarez la permission « events »."
     if ui and 'ui' not in perms:
         return None, "Pour afficher une page, déclarez la permission « ui »."
-    if not entry and not ui:
+    if not entry and not ui and not host:
         return None, "Le plugin n'a ni script ni page."
     rawd = m.get('description')
     d18 = {k: str(v)[:300] for k, v in rawd.items() if k in LANGS and isinstance(v, str) and v.strip()} if isinstance(rawd, dict) else {}
     desc = (d18.get('en') or d18.get('fr') or next(iter(d18.values()), '')) if isinstance(rawd, dict) else str(rawd or '')[:300]
     return {'id': pid, 'name': name, 'version': str(m.get('version') or '0')[:20], 'description': desc, **({'description_i18n': d18} if d18 else {}),
-            'author': str(m.get('author') or '')[:60], 'entry': entry, 'events': list(dict.fromkeys(events)), 'permissions': list(dict.fromkeys(perms)), 'api': API_VERSION, **({'ui': ui} if ui else {})}, None
+            'author': str(m.get('author') or '')[:60], 'entry': entry, 'events': list(dict.fromkeys(events)), 'permissions': list(dict.fromkeys(perms)), 'api': API_VERSION, **({'host': host} if host else {}), **({'ui': ui} if ui else {})}, None
 
 
 def safe_extract(zip_bytes, dest):
@@ -155,9 +161,12 @@ def safe_extract(zip_bytes, dest):
             prefix = list(tops)[0] + '/'
         else:
             raise ValueError('plugin.json introuvable à la racine.')
-    manifest, err = validate_manifest(json.loads(zf.read(prefix + 'plugin.json').decode('utf-8', 'replace')))
+    manifest, err = validate_manifest(json.loads(zf.read(prefix + 'plugin.json').decode('utf-8', 'replace')), allow_host=True)
     if err:
         raise ValueError(err)
+    for hm in (manifest.get('host') or {}).get('modules', []):
+        if prefix + hm + '.py' not in names:
+            raise ValueError(f"Module introuvable : {hm}.py.")
     if manifest['entry'] and prefix + manifest['entry'] not in names:
         raise ValueError(f"Fichier d'entrée introuvable : {manifest['entry']}.")
     if manifest.get('ui'):
@@ -308,9 +317,13 @@ def installed():
         mf = os.path.join(d, 'plugin.json')
         if os.path.isfile(mf):
             try:
-                m, err = validate_manifest(json.load(open(mf, encoding='utf-8')))
+                m, err = validate_manifest(json.load(open(mf, encoding='utf-8')), allow_host=True)
             except (OSError, ValueError):
                 continue
+            if m and m.get('host'):      # plugin signé à code intégré : listé seulement si l'archive signée est toujours intacte
+                from modules import plugin_host
+                if not plugin_host.verify_external(name, d)[0]:
+                    continue
             if not err and m['id'] == name:
                 out.append((d, m))
     return out
@@ -555,6 +568,8 @@ REFUSALS = {
     'signature_required': "Ce plugin officiel n'est pas signé (ou sa signature est inconnue) : installation refusée.",
     'signature_downgrade': "Ce plugin était signé et cette version ne l'est pas : mise à jour refusée.",
     'key_changed': "Cette version est signée par une autre clé que celle de la version installée : mise à jour refusée.",
+    'host_no_key': "Ce plugin exécute du code DANS Stellio : il n'est admis que signé par une clé de confiance, et aucune clé de confiance n'est configurée. Installation refusée.",
+    'host_unsigned': "Ce plugin exécute du code DANS Stellio : sa signature est absente ou n'est pas celle d'une clé de confiance. Installation refusée.",
     'audit_blocked': "L'audit automatique a trouvé du code dangereux (voir le détail). Installation refusée, sauf acceptation explicite du risque.",
 }
 
@@ -568,10 +583,15 @@ def install_bytes(data, allow_downgrade=False, origin='community', signature='',
     try:
         manifest = safe_extract(data, tmp)
         from modules import plugin_host, plugin_security
-        if plugin_host.manifest(manifest['id']):
+        if plugin_host.is_bundled(manifest['id']):
             raise ValueError("Cet identifiant est celui d'un plugin intégré à Stellio : il ne peut pas être remplacé par une archive.")
         keys = plugin_security.trusted_keys()
         sig = plugin_security.signature_status(signature, manifest['id'], manifest['version'], hashlib.sha256(data).hexdigest(), keys)
+        if manifest.get('host'):                     # code exécuté dans le processus de Stellio : signature de confiance OBLIGATOIRE, sans exception ni acceptation de risque
+            if not keys:
+                raise PluginRefused(REFUSALS['host_no_key'], 'host_no_key')
+            if sig['status'] != 'valid':
+                raise PluginRefused(REFUSALS['host_unsigned'], 'host_unsigned')
         ok, code = plugin_security.signature_policy(sig, origin == 'official', bool(keys), plugin_security.load_store().get(manifest['id']), accept_key_change)
         if not ok:
             raise PluginRefused(REFUSALS[code], code)
@@ -600,6 +620,10 @@ def install_bytes(data, allow_downgrade=False, origin='community', signature='',
         shutil.rmtree(old, ignore_errors=True)
         _set_origin(manifest['id'], 'official' if origin == 'official' else 'community')
         plugin_security.save_record(manifest['id'], sig, audit, bool(audit['blocking'] and (accept_risk or sig['status'] == 'valid')))
+        if manifest.get('host'):
+            plugin_host.save_external_proof(manifest['id'], manifest['version'], signature, data)
+        else:
+            plugin_host.drop_external_proof(manifest['id'])     # une version sans code intégré remplace une version signée : la preuve n'a plus d'objet
         return {'manifest': manifest, 'action': action, 'previous_version': prev['version'] if prev else None, 'added_permissions': added,
                 'security': {'signature': sig['status'], 'key': sig['key'], 'audit': audit['level'], 'findings': audit['findings'][:20], 'accepted_risk': bool(audit['blocking'])}}
     finally:
@@ -649,10 +673,14 @@ def api_plugins_list():
             s = st.get(m['id'])
             cfg = json.loads(s['config'] or '{}') if s else {}
             out.append(dict(m, security=_sec.get(m['id']), description=pick_description(m, request.args.get('lang')), origin=org.get(m['id']) if org.get(m['id']) == 'official' else 'community', enabled=bool(s and s['enabled']), config={k: ('••••' if k == 'token' and v else v) for k, v in cfg.items()}))
+            if m.get('host'):      # plugin signé à code intégré : activation à l'échelle de l'installation (comme les plugins intégrés), effective au redémarrage
+                from modules import plugin_host as _ph
+                en_h = _ph.is_enabled(m['id'])
+                out[-1].update(enabled=en_h, host=True, loaded=_ph.loaded(m['id']), restart_required=en_h != _ph.loaded(m['id']))
         from modules import plugin_host
         builtin = []
         for pid, _d, m in plugin_host.manifests():
-            if not plugin_host.available(m):          # fournisseurs d'IA à clé d'API : édition serveur seulement
+            if m.get('_external') or not plugin_host.available(m):          # (signés du catalogue : listés avec les plugins installés) ; fournisseurs d'IA à clé d'API : édition serveur seulement
                 continue
             en = plugin_host.is_enabled(pid)
             builtin.append({'id': pid, 'name': str(((m.get('name_i18n') or {}).get(str(request.args.get('lang') or '').lower()[:2])) or m.get('name') or pid)[:60], 'version': str(m.get('version') or '1.0.0')[:20], 'author': str(m.get('author') or 'Stellio')[:60],
@@ -880,6 +908,11 @@ def api_plugin_delete(pid):
     if not ID_RE.match(pid) or not os.path.isdir(os.path.join(_root(), pid)):
         return jsonify({'error': 'Plugin introuvable.'}), 404
     shutil.rmtree(os.path.join(_root(), pid), ignore_errors=True)
+    try:
+        from modules import plugin_host
+        plugin_host.drop_external_proof(pid)
+    except Exception:
+        pass
     _set_origin(pid, None)
     try:
         from modules import plugin_security
@@ -935,6 +968,9 @@ def api_plugin_ui(pid):
         row = conn.execute("SELECT enabled FROM plugin_state WHERE user_id = ? AND plugin_id = ?", (session['user_id'], pid)).fetchone()
     finally:
         conn.close()
+    if m.get('host'):                      # plugin signé à code intégré : actif seulement s'il est activé ET chargé (donc vérifié au démarrage)
+        from modules import plugin_host as _ph
+        row = {'enabled': _ph.is_enabled(pid) and _ph.loaded(pid)}
     if not (row and row['enabled']):
         return jsonify({'error': 'Plugin désactivé : activez-le dans Plugins › Catalogue.', 'code': 'plugin_disabled'}), 403
     path = os.path.realpath(os.path.join(d, m['ui']['entry']))

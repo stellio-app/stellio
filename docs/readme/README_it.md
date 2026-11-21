@@ -134,6 +134,8 @@ Che tu sia un maker alle prime armi o un utente esperto con più macchine, Stell
 ### 🧵 Materiali: filamento e resina
 - **Inventario resina**: la categoria della barra laterale diventa **Materiali** (Filamento + Resina). Aggiungi i flaconi a mano (marca, tipo, colore, volume, rimasto, prezzo, posizione), sottrai quanto usi in ml e ricevi lo stesso promemoria **«Da ordinare»** del filamento (soglia bassa, casella manuale, link di ricerca dei negozi, «già ordinato»), anche nel widget della dashboard. Dalla 1.1.8 scegli il **flacone attivo** di ogni stampante a resina e la resina usata viene **sottratta automaticamente** al termine di una stampa (volume dal file `.sl1`, altrimenti stimato dal modello e segnalato come tale; senza un volume affidabile non si sottrae nulla; ogni sottrazione è annullabile)
 - 🏭 **Produzione assistita (1.1.8)**: dal menu di un file, Stellio propone stampante e profilo dello slicer, controlla file, stampante e materiali di consumo, poi **attende la tua convalida** prima di inviare il file (non avvia le stampe da remoto). La fine della stampa viene registrata e i consigli seguiti, con il loro esito, correggono la classifica di Intelligence.
+- 🆕 **Anche nella 1.1.9**: in **Parti simili**, un pulsante **File ignorati** elenca i file che l'indice non ha potuto leggere (miniature, causa — troppo grande oltre 60 MB, mesh vuota, illeggibile, mancante — e soluzione per ciascuno) con **Riprova**; la **scheda stampante** entra nello schermo senza scorrere su PC / server e mostra l'avanzamento prima delle temperature sul telefono; in **modalità officina**, toccare una stampante in stampa apre la sua scheda (e il layout non viene più tagliato in verticale sull'APK); un **motivo del fallimento** facoltativo quando si segna una stampa come fallita; le finestre aperte dalle Impostazioni (es. *Aggiungi una sorgente*) passano davanti; i testi delle notifiche seguono la lingua dell'app; scompare l'avviso *Nessuna restrizione del kernel* nella pagina Plugin.
+- 🆕 **Anche nella 1.2.0**: l'indirizzo di Spoolman mantiene il percorso (es. FilaMan con il plugin *Spoolman API*: `http://host:porta/spoolman`); con l'inventario manuale disattivato, la sezione di pesatura non propone più la pesata manuale; le sezioni di *I miei like* / *Le mie creazioni* si chiudono al ritorno sulla pagina; il widget *File recenti* ordina i file SMB ed estratti per data di aggiunta e *Download recenti* si aggiorna da solo. I plugin firmati del catalogo possono includere codice Python (rifiutato senza firma attendibile); primo esempio **Separa per colore** (3MF multicolore → un piatto per colore).
 - 🔗 Integrazione **Spoolman** (server di gestione bobine), con rilevamento automatico sulla tua rete
 - 🟠 Supporto **AMS Bambu Lab** (lettura degli slot)
 - 🟢 Supporto **CFS Creality**
@@ -514,6 +516,7 @@ Stellio è partner di integrazione di [**TigerTag**](https://tigersystem.io), il
 - 💡 **Richiedi una funzionalità**: [GitHub Discussions](https://github.com/stellio-app/stellio/discussions)
 - 📧 **Email**: contact@stellio-app.com
 - 🌐 **Sito web**: [stellio-app.com](https://stellio-app.com)
+- 🧩 **Plugin**: [stellio-app/stellio-plugins](https://github.com/stellio-app/stellio-plugins) (catalogo ufficiale, aggiungi il tuo plugin con una Pull Request)
 - 💬 **Discord**: [Unisciti alla community Discord](https://discord.gg/ySxpHvS6bd)
 
 ---

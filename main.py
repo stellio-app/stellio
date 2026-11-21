@@ -12291,6 +12291,7 @@ def extract_archive_to_disk(file_path, source_name, extensions_3d=None):
                     'size': os.path.getsize(extracted_path),
                     'source': source_name,
                     'date_added': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'mtime': int(os.path.getmtime(extracted_path)),
                     'has_thumb': os.path.exists(thumb_path),
                     'has_metadata': False,
                     'multi_plate': plate_count > 1,
@@ -12406,6 +12407,7 @@ def scan_smb_folder_recursive(base_path, current_subdir, kwargs, source_name):
                         'size': info.st_size,
                         'source': source_name,
                         'date_added': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'mtime': int(getattr(info, 'st_mtime', 0) or 0),
                         'subdir': current_subdir,
                         'has_thumb': os.path.exists(thumb_path),
                         'has_metadata': False,
@@ -12689,6 +12691,7 @@ def _do_background_scan(sources_list, user_id, blocking=False):
                         'size': os.path.getsize(source['path']),
                         'source': source['name'],
                         'date_added': source.get('created_at') or datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'mtime': int(os.path.getmtime(source['path'])),
                         'has_thumb': os.path.exists(thumb_path),
                         'has_metadata': False,
                         'multi_plate': plate_count > 1,
@@ -20422,7 +20425,7 @@ from packaging import version
 
 GITHUB_REPO = "stellio-app/stellio"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.1.9"
+CURRENT_VERSION = "1.2.0"
 
 CHANGELOG_FILE = os.path.join(BASE_DIR, 'languages', 'changelog.json')
 
@@ -24985,6 +24988,7 @@ _DEFAULT_USEFUL_LINKS = [
     {"id": "tigertag-studio", "name": "TigerTag Studio Manager", "group": "Ressources", "url": "https://github.com/TigerTag-Project/TigerTag-Studio-Manager", "icon": "fa-solid fa-desktop"},
     {"id": "tigertag-ios", "name": "TigerTag RFID Connect — iOS", "group": "Ressources", "url": "https://apps.apple.com/fr/app/tigertag-rfid-connect/id6745437963", "icon": "fa-brands fa-apple"},
     {"id": "tigertag-android", "name": "TigerTag RFID Connect — Android", "group": "Ressources", "url": "https://play.google.com/store/apps/details?id=com.tigertag.connect", "icon": "fa-brands fa-android"},
+    {"id": "stellio-plugins", "name": "Stellio — Plugins (GitHub)", "group": "Ressources", "url": "https://github.com/stellio-app/stellio-plugins", "icon": "fa-brands fa-github"},
     {"id": "tigersystem", "name": "TigerSystem — site officiel", "group": "Ressources", "url": "https://tigersystem.io", "icon": "fa-solid fa-globe"},
 ]
 _useful_links_missing_logged = False

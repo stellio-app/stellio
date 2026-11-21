@@ -61,6 +61,14 @@ def ensure_tables():
         _READY = True
 
 
+def _manual_enabled():
+    """Inventaire manuel activé (réglage `manual_inventory_enabled`, vrai par défaut) : sinon les pesées manuelles sont ignorées."""
+    try:
+        return bool((_MAIN['load_settings']() or {}).get('manual_inventory_enabled', True))
+    except Exception:
+        return True
+
+
 def _num(v):
     try:
         f = float(str(v).replace(',', '.'))
@@ -148,7 +156,10 @@ def build_forecast(uid, days_window=90):
         groups.setdefault((r['source_type'], r['source_id']), []).append(r)
     out = []
     today = datetime.date.today()
+    manual_on = _manual_enabled()
     for (stype, sid), items in groups.items():
+        if stype == 'manual' and not manual_on:
+            continue
         pts = [(_parse_ts(i['recorded_at']), float(i['remaining_g'])) for i in items]
         pts = [p for p in pts if p[0]]
         if not pts:
@@ -183,6 +194,8 @@ def api_filament_weigh():
     ensure_tables()
     data = request.get_json(silent=True) or {}
     uid = session['user_id']
+    if not _manual_enabled():
+        return jsonify({'success': False, 'error': 'manual_disabled'}), 403
     try:
         sid = int(data.get('source_id'))
     except (TypeError, ValueError):

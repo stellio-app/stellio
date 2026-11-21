@@ -100,3 +100,113 @@ def test_carte_imprimante_tient_dans_l_ecran_sans_defiler_sur_pc(page):
         pro = page.evaluate("document.querySelector('.monitor-card-progress').getBoundingClientRect().left")
         assert cam < pro                                   # caméra à gauche, infos à droite
     page.set_viewport_size({'width': 390, 'height': 800})
+
+
+def test_adresse_spoolman_garde_son_chemin_et_le_port_n_est_ajoute_qu_au_besoin(page):
+    """1.2.0 : « http://hôte:port/spoolman » (FilaMan + plugin Spoolman API) ne perd plus « /spoolman » à l'enregistrement."""
+    fn = SRC[SRC.index('function normalizeSpoolmanUrl(raw) {'):SRC.index('async function saveSpoolmanUrl()')]
+    r = page.evaluate("(src) => { const f = new Function(src + '; return normalizeSpoolmanUrl;')(); return ['http://filaman.lan:8080/spoolman', 'http://filaman.lan:8080/spoolman/', 'https://filaman.example.com/spoolman', '192.168.1.5', '192.168.1.5:7912', 'http://192.168.1.5', 'http://h:1/a/b//', '  ', null].map(f); }", fn)
+    assert r == ['http://filaman.lan:8080/spoolman', 'http://filaman.lan:8080/spoolman', 'https://filaman.example.com/spoolman',
+                 'http://192.168.1.5:7912', 'http://192.168.1.5:7912', 'http://192.168.1.5', 'http://h:1/a/b', '', '']
+
+
+def test_pesee_filament_sans_mention_manuelle_quand_l_inventaire_manuel_est_desactive(page):
+    """1.2.0 : section « Pesée et prévision » (vrai management.js dans Chromium) — inventaire manuel désactivé : pas de carte « Peser une bobine manuelle »,
+    pas de bobine manuelle dans les alertes, sous-titre limité à TigerTag ; réactivé : tout revient."""
+    mg = open(os.path.join(ROOT, 'interface', 'management.js'), encoding='utf-8').read()
+    pg = page.context.browser.new_page()
+    try:
+        errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
+        pg.set_content('<html lang="fr"><body><h3 data-mg-slot-title="fil"></h3><p data-mg-slot-sub="fil"></p><div data-mg-slot="fil"></div><div id="mg-body"></div></body></html>')
+        pg.add_script_tag(content="""delete window.IntersectionObserver; window.manualInventoryEnabled = false;
+          window.fetch = async (u) => { const U = String(u); const body = U.includes('/forecast') ? { spools: [
+              { source_type: 'manual', source_id: '1', name: 'Manuelle', remaining_g: 50, capacity_g: 1000, g_per_day: 10, days_left: 5, empty_on: '2026-12-01' },
+              { source_type: 'tigertag', source_id: 't', name: 'TT bobine', remaining_g: 60, capacity_g: 1000, g_per_day: 10, days_left: 6, empty_on: '2026-12-02' }] }
+            : U.includes('/manual') ? [{ id: 1, name: 'Manuelle', material: 'PLA' }] : [{ source_id: 't', name: 'TT bobine', material: 'PETG' }];
+            return { ok: true, json: async () => body }; };""")
+        pg.add_script_tag(content=mg)
+        pg.evaluate("window.StellioManagement.initSlots()"); pg.wait_for_selector('[data-mg-slot="fil"] .spool-card')
+        txt = pg.inner_text('[data-mg-slot="fil"]')
+        assert 'TT bobine' in txt and 'Manuelle' not in txt and pg.locator('.mg-weigh-card').count() == 0 and '#fw-id' not in txt
+        assert 'manuelles' not in pg.inner_text('[data-mg-slot-sub]') and 'TigerTag' in pg.inner_text('[data-mg-slot-sub]')
+        pg.evaluate("window.manualInventoryEnabled = true; document.querySelector('[data-mg-slot=\"fil\"]').innerHTML = ''; window.StellioManagement.filRefresh()")
+        pg.wait_for_selector('.mg-weigh-card')
+        assert 'Manuelle' in pg.inner_text('[data-mg-slot="fil"]') and pg.locator('#fw-id').count() == 1
+        assert 'manuelles' in pg.inner_text('[data-mg-slot-sub]')
+        assert not errs, errs
+    finally:
+        pg.close()
+
+
+def _fresh(page):
+    pg = page.context.browser.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e))); pg._errs = errs
+    pg.set_content('<html lang="fr"><body></body></html>')
+    return pg
+
+
+def test_likes_sections_repliees_au_retour_sur_la_page(page):
+    """1.2.0 : « Mes likes » / « Mes créations » — l'état ouvert d'une section ne survit pas à une sortie de la page (et l'autre page n'est pas touchée)."""
+    a = SRC.index("const _acctKey = 'stellio_acct_open';"); b = SRC.index('function _acctResetOpen(kind) {'); e = SRC.index('\n', b)
+    fn = SRC[a:e]          # clé, lecture, écriture et remise à zéro (fonctions réelles de script.js)
+    pg = _fresh(page)
+    try:
+        r = pg.evaluate("""(src) => { const mem = {}; Object.defineProperty(window, 'localStorage', { configurable: true, value: { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); } } });
+            const f = new Function(src + '; return {reset: _acctResetOpen, get: _acctCollapsedState, save: _acctSaveCollapsed};')();
+            f.save({'likes:makerworld': true, 'likes:printables': true, 'creations:makerworld': true});
+            const before = Object.keys(f.get()).sort();
+            f.reset('likes'); const after = Object.keys(f.get()).sort();
+            f.reset('likes'); return [before, after, Object.keys(f.get()).sort()]; }""", fn)
+        assert r[0] == ['creations:makerworld', 'likes:makerworld', 'likes:printables'] and r[1] == ['creations:makerworld'] and r[2] == ['creations:makerworld']
+        assert "_acctResetOpen('likes')" in SRC and "_acctResetOpen('creations')" in SRC          # branché à l'entrée sur chaque page
+        assert not pg._errs, pg._errs
+    finally:
+        pg.close()
+
+
+def test_fichiers_recents_sans_mtime_se_classent_par_date_d_ajout(page):
+    """1.2.0 : fichiers SMB / anciens caches sans « mtime » → classés par date d'ajout au lieu de l'ordre alphabétique ; un fichier plus récent passe en tête."""
+    fn = SRC[SRC.index('const _recentFirstSeen'):SRC.index('function _recentSignature')]
+    pg = _fresh(page)
+    try:
+        r = pg.evaluate("""(src) => { const f = new Function(src + '; return _recentFilesTop;')();
+            const files = [{path:'a', name:'Bolt', date_added:'2026-11-01 10:00:00'}, {path:'b', name:'Box', date_added:'2026-11-20 10:00:00'},
+                           {path:'c', name:'Key', date_added:'2026-11-21 09:00:00'}, {path:'d', name:'Lid', mtime: 1700000000}, {path:'e', name:'Zed'}];
+            return f(files).map(x => x.name); }""", fn)
+        assert r[:3] == ['Key', 'Box', 'Bolt'] or r[:3] == ['Key', 'Box', 'Lid'], r
+        assert r[0] == 'Key' and r.index('Box') < r.index('Bolt')
+    finally:
+        pg.close()
+
+
+def test_telechargements_recents_se_rafraichissent_seuls(page):
+    """1.2.0 : le widget « Téléchargements récents » se met à jour quand l'historique change, sans redessiner s'il n'a pas bougé."""
+    fn = SRC[SRC.index('let _dlWidgetSig = null;'):SRC.index('let _dashboardUpdateChecked')]
+    pg = _fresh(page)
+    try:
+        pg.set_content('<html lang="fr"><body><div id="dashboard-downloads-body"></div></body></html>')
+        r = pg.evaluate("""async (src) => {
+            window.API = ''; window.I18N = { lang: 'fr', t: (k) => k }; window._t2 = (k, f) => f; window.escapeHtml = (s) => String(s);
+            let data = [{ id: 1, file_name: 'Ancien', platform: 'MakerWorld', downloaded_at: '2026-11-20 10:00:00' }];
+            window.fetch = async () => ({ ok: true, json: async () => data });
+            const f = new Function(src + '; return _loadDashboardDownloads;')();
+            const body = document.getElementById('dashboard-downloads-body');
+            await f(); const t1 = body.textContent; const node = body.firstElementChild;
+            await f(); const same = body.firstElementChild === node;             // inchangé : pas de redessin
+            data = [{ id: 2, file_name: 'Nouveau', platform: 'Printables', downloaded_at: '2026-11-21 14:00:00' }].concat(data);
+            await f(); return [t1.includes('Ancien'), same, body.textContent.includes('Nouveau'), body.querySelectorAll('.dashboard-row').length]; }""", fn)
+        assert r == [True, True, True, 2], r
+        assert 'setInterval' in SRC[SRC.index('/* 1.2.0 : « Téléchargements récents »'):][:400]
+        assert not pg._errs, pg._errs
+    finally:
+        pg.close()
+
+
+def test_toute_entree_de_bibliotheque_porte_sa_date_de_modification():
+    """1.2.0 : fichiers SMB, extraits d'archives et sources « fichier unique » avaient une entrée sans « mtime » → « Fichiers récents » restait par ordre alphabétique."""
+    import re
+    main = open(os.path.join(ROOT, 'main.py'), encoding='utf-8').read()
+    blocks = [m.start() for m in re.finditer(r"'date_added':", main)]
+    assert len(blocks) >= 5
+    for i in blocks:
+        start = main.rfind('.append({', 0, i); end = main.index('})', i)
+        assert "'mtime'" in main[start:end], main[start:start + 80]

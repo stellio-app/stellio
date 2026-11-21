@@ -814,6 +814,24 @@ def test_weigh_and_forecast(env_106):
     assert c.post('/api/filament/weigh', json={'source_id': 1}).status_code == 400
 
 
+def test_pesee_manuelle_ignoree_quand_l_inventaire_manuel_est_desactive(env_106):
+    """1.2.0 : inventaire manuel désactivé → pas de pesée manuelle, et les bobines manuelles sortent de la prévision (TigerTag inchangé)."""
+    cfg = {'manual_inventory_enabled': True}
+    slots = [{'source_id': 'tt1', 'name': 'PLA noir', 'remaining_g': 800, 'capacity_g': 1000}]
+    env_106.ns.update({'_get_tigertag_slots': lambda uid: slots, 'load_settings': lambda: cfg})
+    m = load_module('filament_weighing'); m.init(env_106.ns)
+    c = env_106.client()
+    env_106.sql("INSERT INTO manual_filament_spools (user_id, name, remaining_g) VALUES (1,'Manuel',900)")
+    assert c.post('/api/filament/weigh', json={'source_id': 1, 'remaining_g': 700}).get_json()['success']
+    c.post('/api/filament/weigh-sync')
+    assert {f['source_type'] for f in c.get('/api/filament/forecast').get_json()['spools']} == {'manual', 'tigertag'}
+    cfg['manual_inventory_enabled'] = False
+    assert {f['source_type'] for f in c.get('/api/filament/forecast').get_json()['spools']} == {'tigertag'}
+    r = c.post('/api/filament/weigh', json={'source_id': 1, 'remaining_g': 100})
+    assert r.status_code == 403 and r.get_json()['error'] == 'manual_disabled'
+    assert env_106.sql("SELECT remaining_g FROM manual_filament_spools")[0]['remaining_g'] == 700           # rien n'a été modifié
+
+
 # ── 7. Partage de profils ──
 def test_profile_receive_and_send(env_106, tmp_path):
     store = []
@@ -2192,10 +2210,10 @@ def test_v110_no_update_done_popup():
     js = (root / 'interface/script.js').read_text(encoding='utf-8')
     body = js[js.index('async checkAndShowChangelog()'):js.index('async checkForUpdates(')]
     assert 'showChangelogModal(' not in body and 'stellio-last-seen-version' in body
-    assert 'CURRENT_VERSION = "1.1.9"' in (root / 'main.py').read_text(encoding='utf-8')
+    assert 'CURRENT_VERSION = "1.2.0"' in (root / 'main.py').read_text(encoding='utf-8')
     for p in ('changelog.json', 'languages/changelog.json'):
         d = json.loads((root / p).read_text(encoding='utf-8'))
-        assert d[0]['version'] == '1.1.9' and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
+        assert d[0]["version"] == "1.2.0" and set(d[0]['items']) == {'fr', 'en', 'de', 'es', 'pt', 'it', 'zh', 'ja'}
 
 
 def test_v110_no_badge_on_likes_and_creations():
@@ -2341,7 +2359,7 @@ def test_v111_changelog_entry():
     root = _P(__file__).resolve().parent.parent
     for p in ('changelog.json', 'languages/changelog.json'):
         d = json.loads((root / p).read_text(encoding='utf-8'))
-        assert d[8]['version'] == '1.1.1' and len(d[8]['items']['fr']) >= 15 and all(len(v) >= 2 for v in d[3]['items'].values())
+        assert d[9]['version'] == '1.1.1' and len(d[9]['items']['fr']) >= 15 and all(len(v) >= 2 for v in d[4]['items'].values())
 
 
 def test_v111_security_options_and_modules():
@@ -2476,7 +2494,7 @@ def test_v114_workflow_uses_notes_and_community_files():
     assert (root / 'CONTRIBUTING.md').is_file()
     for n in ('bug.yml', 'feature.yml', 'good-first-issue.yml', 'config.yml'):
         assert (root / '.github' / 'ISSUE_TEMPLATE' / n).is_file()
-    assert 'versionName \'1.1.9\'' in (root / 'apk-src' / 'app' / 'build.gradle').read_text(encoding='utf-8')
+    assert 'versionName \'1.2.0\'' in (root / 'apk-src' / 'app' / 'build.gradle').read_text(encoding='utf-8')
 
 
 # ── v1.1.1 (ajouts) : popup caméra, couleurs par plateau, boutiques OFD ─────
@@ -2732,3 +2750,19 @@ def test_v114_update_modal_collapsible_languages():
     main = (root / 'main.py').read_text(encoding='utf-8')
     assert 'buildReleaseNotesHtml(updateInfo)' in js and 'details class="rn-lang"' in js and "release_notes_all" in js
     assert "'release_notes_all': update_info.get('release_notes_all', '')" in main
+
+
+def test_page_filament_sans_banniere_manuelle_quand_desactive():
+    js = (ROOT / "interface" / "script.js").read_text(encoding="utf-8") if "ROOT" in globals() else open("interface/script.js", encoding="utf-8").read()
+    fn = js.split("async function loadSpoolmanPage")[1].split("window.loadSpoolmanPage")[0]
+    assert fn.index("await loadManualInventorySettings()") < fn.index("window.manualInventoryEnabled")
+    assert "manual-banner" in fn and "manualEnabled ? '' : 'none'" in fn
+    html = open("interface/index.html", encoding="utf-8").read()
+    assert 'id="manual-banner"' in html
+
+
+def test_pesee_masquee_sans_aucune_source():
+    m = open("interface/management.js", encoding="utf-8").read()
+    assert "filament-forecast-section" in m and "!manualOn && !tags.length" in m
+    assert "filReload" in m.split("window.StellioManagement =")[1]
+    assert "filReload" in open("interface/script.js", encoding="utf-8").read()

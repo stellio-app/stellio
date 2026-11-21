@@ -1,64 +1,48 @@
 <!--fr-->
-✓ Fenêtres : « Ajouter une source » (SMB, NFS, types, renommer) et toutes les fenêtres ouvertes depuis les Paramètres s'affichent maintenant devant la section ouverte, plus derrière
-✓ Besoins matière et Assistant fabrication : l'entrée de menu disparaît quand leur plugin intégré (Stellio Pro / IA) est désactivé ; si on y arrive quand même, un message explique quoi activer au lieu de « 404 »
-✓ Notifications : titres et textes des alertes de stock, pièces, séchage, fin ou échec d'impression et maintenance retraduits dans la langue actuelle (fin du mélange français / anglais)
-✓ Outil de signature des plugins : nouvelle commande « pub » qui réaffiche la clé publique d'une clé existante
-✓ Mode atelier : un appui sur une imprimante en cours d'impression ouvre sa carte (caméra, températures, progression) devant le mode atelier ; en portrait, les cartes ne sont plus coupées (téléphone / APK) ; sur téléphone la carte imprimante affiche la progression puis les températures dessous
-✓ Similaires : bouton « Fichiers ignorés » avec popup (miniatures, cause : trop gros, vide, illisible, introuvable) et la solution pour chacun, plus « Réessayer » ; carte imprimante sur PC / serveur en deux colonnes : tout tient à l'écran sans défiler
-✓ Plugins : l'avertissement « Aucune restriction du noyau sur ce système » est supprimé
+✓ Spoolman : l'adresse enregistrée garde son chemin (ex. FilaMan avec son plugin « Spoolman API » : http://hôte:port/spoolman) ; le port 7912 n'est plus imposé aux adresses https ou avec chemin
+✓ Inventaire filament : avec l'inventaire manuel désactivé, la section « Pesée et prévision » ne propose plus la pesée manuelle ni les bobines manuelles (TigerTag inchangé) ; la page Filament n'affiche plus la bannière « Inventaire manuel » quand il est désactivé ; la section « Pesée et prévision » disparaît aussi s'il n'y a aucune source
+✓ Tableau de bord : « Fichiers récents » classe aussi les fichiers sans date de modification (partages SMB, archives extraites, fichiers uniques) par date d'ajout au lieu de l'ordre alphabétique ; « Téléchargements récents » se met à jour tout seul
+✓ Mes likes / Mes créations : les sections se replient quand on revient sur la page
+✓ Plugins : un plugin du catalogue peut maintenant embarquer du code Python s'il est signé par une clé de confiance (refusé sinon) ; premier exemple : « Séparer par couleur », qui découpe un 3MF multicolore en un nouveau 3MF avec un plateau par couleur
 <!--en-->
-✓ Windows: “Add a source” (SMB, NFS, types, rename) and every window opened from Settings now appear in front of the open section instead of behind it
-✓ Material needs and Manufacturing assistant: the menu entry disappears when its built-in plugin (Stellio Pro / AI) is disabled; if you still land there, a message says what to enable instead of “404”
-✓ Notifications: titles and texts of stock, parts, drying, print finished/failed and maintenance alerts are translated into the current language when displayed (no more French/English mix)
-✓ Plugin signing tool: new “pub” command that shows the public key of an existing key again
-✓ Workshop mode: tapping a printer that is printing opens its card (camera, temperatures, progress) in front of workshop mode; in portrait the cards are no longer cut off (phone / APK); on a phone the printer card shows progress, then temperatures below it
-✓ Similar: new "Skipped files" button with a popup (thumbnails, cause: too big, empty, unreadable, missing) and a fix for each, plus "Retry"; printer card on PC / server in two columns: everything fits on screen without scrolling
-✓ Plugins: the "No kernel restriction on this system" warning is removed
+✓ Spoolman: the saved address keeps its path (e.g. FilaMan with its “Spoolman API” plugin: http://host:port/spoolman); port 7912 is no longer forced on https addresses or addresses with a path
+✓ Filament inventory: with the manual inventory turned off, the “Weighing and forecast” section no longer offers manual weighing or manual spools (TigerTag unchanged); the Filament page no longer shows the “Manual inventory” banner when it is off; the “Weighing and forecast” section is hidden too when there is no source
+✓ Dashboard: “Recent files” also ranks files without a modification date (SMB shares, extracted archives, single files) by date added instead of alphabetical order; “Recent downloads” now updates by itself
+✓ My likes / My creations: sections are folded again when you come back to the page
+✓ Plugins: a catalog plugin can now ship Python code if it is signed by a trusted key (refused otherwise); first example: “Split by color”, which cuts a multicolor 3MF into a new 3MF with one plate per color
 <!--de-->
-✓ Fenster: „Quelle hinzufügen“ (SMB, NFS, Typen, Umbenennen) und alle aus den Einstellungen geöffneten Fenster erscheinen jetzt vor dem geöffneten Bereich statt dahinter
-✓ Materialbedarf und Fertigungsassistent: Der Menüeintrag verschwindet, wenn das integrierte Plugin (Stellio Pro / KI) deaktiviert ist; wer trotzdem dort landet, sieht einen Hinweis statt „404“
-✓ Benachrichtigungen: Titel und Texte der Warnungen (Bestand, Teile, Trocknen, Druck fertig/fehlgeschlagen, Wartung) werden in der aktuellen Sprache angezeigt (kein Französisch-Englisch-Mix mehr)
-✓ Plugin-Signaturwerkzeug: neuer Befehl „pub“, der den öffentlichen Schlüssel eines vorhandenen Schlüssels erneut anzeigt
-✓ Werkstattmodus: Ein Tipp auf einen druckenden Drucker öffnet seine Karte (Kamera, Temperaturen, Fortschritt) vor dem Werkstattmodus; im Hochformat werden die Karten nicht mehr abgeschnitten (Handy / APK); auf dem Handy zeigt die Druckerkarte zuerst den Fortschritt, darunter die Temperaturen
-✓ Ähnliche: neue Schaltfläche „Übersprungene Dateien“ mit Popup (Vorschaubilder, Ursache: zu groß, leer, unlesbar, fehlt) und Lösung je Datei, plus „Erneut versuchen“; Druckerkarte am PC / Server zweispaltig: alles passt ohne Scrollen auf den Bildschirm
-✓ Plugins: der Hinweis „Keine Kernel-Einschränkung auf diesem System“ entfällt
+✓ Spoolman: die gespeicherte Adresse behält ihren Pfad (z. B. FilaMan mit dem Plugin „Spoolman API“: http://host:port/spoolman); Port 7912 wird bei https-Adressen oder Adressen mit Pfad nicht mehr erzwungen
+✓ Filamentinventar: Bei deaktiviertem manuellen Inventar bietet der Bereich „Wiegen und Prognose“ weder manuelles Wiegen noch manuelle Spulen an (TigerTag unverändert); die Filament-Seite zeigt das Banner „Manuelles Inventar“ bei deaktiviertem Inventar nicht mehr an; der Bereich „Wiegen und Prognose“ wird ohne Quelle ebenfalls ausgeblendet
+✓ Dashboard: „Zuletzt hinzugefügte Dateien“ ordnet auch Dateien ohne Änderungsdatum (SMB-Freigaben, entpackte Archive, Einzeldateien) nach Hinzufügedatum statt alphabetisch; „Letzte Downloads“ aktualisiert sich selbst
+✓ Meine Likes / Meine Kreationen: Die Abschnitte sind wieder eingeklappt, wenn Sie auf die Seite zurückkehren
+✓ Plugins: Ein Katalog-Plugin darf jetzt Python-Code mitbringen, wenn es mit einem vertrauenswürdigen Schlüssel signiert ist (sonst abgelehnt); erstes Beispiel: „Nach Farbe trennen“ zerlegt eine mehrfarbige 3MF in eine neue 3MF mit einer Platte pro Farbe
 <!--es-->
-✓ Ventanas: «Añadir una fuente» (SMB, NFS, tipos, renombrar) y todas las ventanas abiertas desde Ajustes aparecen ahora delante de la sección abierta, no detrás
-✓ Necesidades de material y Asistente de fabricación: la entrada del menú desaparece si su plugin integrado (Stellio Pro / IA) está desactivado; si se llega igualmente, un mensaje indica qué activar en lugar de «404»
-✓ Notificaciones: títulos y textos de las alertas de stock, piezas, secado, impresión terminada o fallida y mantenimiento se traducen al idioma actual (fin de la mezcla francés / inglés)
-✓ Herramienta de firma de plugins: nuevo comando «pub» que vuelve a mostrar la clave pública de una clave existente
-✓ Modo taller: al pulsar una impresora que está imprimiendo se abre su ficha (cámara, temperaturas, progreso) delante del modo taller; en vertical las tarjetas ya no se cortan (móvil / APK); en el móvil la ficha de la impresora muestra el progreso y debajo las temperaturas
-✓ Similares: nuevo botón «Archivos omitidos» con ventana (miniaturas, causa: demasiado grande, vacío, ilegible, no encontrado) y solución para cada uno, más «Reintentar»; tarjeta de impresora en PC / servidor en dos columnas: todo cabe en pantalla sin desplazarse
-✓ Plugins: se elimina el aviso «Sin restricción del núcleo en este sistema»
-<!--pt-->
-✓ Janelas: «Adicionar uma fonte» (SMB, NFS, tipos, renomear) e todas as janelas abertas a partir das Definições aparecem agora à frente da secção aberta, e não atrás
-✓ Necessidades de material e Assistente de fabrico: a entrada do menu desaparece quando o plugin integrado (Stellio Pro / IA) está desativado; se chegar lá na mesma, uma mensagem indica o que ativar em vez de «404»
-✓ Notificações: títulos e textos dos alertas de stock, peças, secagem, impressão concluída ou falhada e manutenção são traduzidos para o idioma atual (fim da mistura francês / inglês)
-✓ Ferramenta de assinatura de plugins: novo comando «pub» que volta a mostrar a chave pública de uma chave existente
-✓ Modo oficina: tocar numa impressora em impressão abre o seu cartão (câmara, temperaturas, progresso) à frente do modo oficina; na vertical os cartões já não ficam cortados (telemóvel / APK); no telemóvel o cartão da impressora mostra o progresso e, por baixo, as temperaturas
-✓ Semelhantes: novo botão «Ficheiros ignorados» com janela (miniaturas, causa: demasiado grande, vazio, ilegível, em falta) e solução para cada um, mais «Tentar de novo»; cartão da impressora no PC / servidor em duas colunas: tudo cabe no ecrã sem deslocar
-✓ Plugins: o aviso «Sem restrição do núcleo neste sistema» foi removido
+✓ Spoolman: la dirección guardada conserva su ruta (p. ej. FilaMan con su plugin «Spoolman API»: http://host:puerto/spoolman); ya no se impone el puerto 7912 a las direcciones https o con ruta
+✓ Inventario de filamento: con el inventario manual desactivado, la sección «Pesaje y previsión» ya no ofrece pesada manual ni bobinas manuales (TigerTag sin cambios); la página Filamento ya no muestra el banner «Inventario manual» cuando está desactivado; la sección «Pesaje y previsión» también se oculta si no hay ninguna fuente
+✓ Panel: «Archivos recientes» clasifica también los archivos sin fecha de modificación (recursos SMB, archivos extraídos, archivos sueltos) por fecha de incorporación en vez de orden alfabético; «Descargas recientes» se actualiza sola
+✓ Mis likes / Mis creaciones: las secciones vuelven a estar plegadas al volver a la página
+✓ Plugins: un plugin del catálogo puede incluir código Python si está firmado con una clave de confianza (rechazado en caso contrario); primer ejemplo: «Separar por color», que divide un 3MF multicolor en un nuevo 3MF con una bandeja por color
 <!--it-->
-✓ Finestre: «Aggiungi una sorgente» (SMB, NFS, tipi, rinomina) e tutte le finestre aperte dalle Impostazioni compaiono ora davanti alla sezione aperta, non dietro
-✓ Fabbisogno di materiale e Assistente di fabbricazione: la voce di menu scompare quando il plugin integrato (Stellio Pro / IA) è disattivato; se ci si arriva comunque, un messaggio indica cosa attivare invece di «404»
-✓ Notifiche: titoli e testi degli avvisi di scorta, pezzi, essiccazione, stampa terminata o fallita e manutenzione vengono tradotti nella lingua attuale (fine del mix francese / inglese)
-✓ Strumento di firma dei plugin: nuovo comando «pub» che mostra di nuovo la chiave pubblica di una chiave esistente
-✓ Modalità officina: toccando una stampante in stampa si apre la sua scheda (camera, temperature, avanzamento) davanti alla modalità officina; in verticale le schede non vengono più tagliate (telefono / APK); su telefono la scheda della stampante mostra l'avanzamento e sotto le temperature
-✓ Simili: nuovo pulsante «File ignorati» con popup (miniature, causa: troppo grande, vuoto, illeggibile, mancante) e soluzione per ciascuno, più «Riprova»; scheda stampante su PC / server su due colonne: tutto entra nello schermo senza scorrere
-✓ Plugin: rimosso l'avviso «Nessuna restrizione del kernel su questo sistema»
+✓ Spoolman: l'indirizzo salvato mantiene il percorso (es. FilaMan con il plugin «Spoolman API»: http://host:porta/spoolman); la porta 7912 non viene più imposta agli indirizzi https o con percorso
+✓ Inventario filamento: con l'inventario manuale disattivato, la sezione «Pesatura e previsione» non propone più la pesata manuale né le bobine manuali (TigerTag invariato); la pagina Filamento non mostra più il banner «Inventario manuale» quando è disattivato; anche la sezione «Pesatura e previsione» viene nascosta se non c'è alcuna fonte
+✓ Dashboard: «File recenti» ordina anche i file senza data di modifica (condivisioni SMB, archivi estratti, file singoli) per data di aggiunta invece che alfabeticamente; «Download recenti» si aggiorna da sola
+✓ I miei like / Le mie creazioni: le sezioni tornano chiuse quando si ritorna sulla pagina
+✓ Plugin: un plugin del catalogo può includere codice Python se è firmato con una chiave attendibile (altrimenti rifiutato); primo esempio: «Separa per colore», che divide un 3MF multicolore in un nuovo 3MF con un piatto per colore
+<!--pt-->
+✓ Spoolman: o endereço guardado mantém o caminho (ex. FilaMan com o plugin «Spoolman API»: http://host:porta/spoolman); a porta 7912 deixa de ser imposta a endereços https ou com caminho
+✓ Inventário de filamento: com o inventário manual desativado, a secção «Pesagem e previsão» já não oferece pesagem manual nem bobines manuais (TigerTag inalterado); a página Filamento já não mostra o banner «Inventário manual» quando está desativado; a secção «Pesagem e previsão» também é ocultada se não houver nenhuma fonte
+✓ Painel: «Ficheiros recentes» ordena também os ficheiros sem data de modificação (partilhas SMB, arquivos extraídos, ficheiros únicos) por data de adição em vez de ordem alfabética; «Transferências recentes» atualiza-se sozinha
+✓ Os meus likes / As minhas criações: as secções voltam a ficar recolhidas ao regressar à página
+✓ Plugins: um plugin do catálogo pode agora incluir código Python se estiver assinado com uma chave de confiança (recusado caso contrário); primeiro exemplo: «Separar por cor», que divide um 3MF multicolor num novo 3MF com uma mesa por cor
 <!--zh-->
-✓ 窗口：“添加来源”（SMB、NFS、类型、重命名）以及从设置中打开的所有窗口现在显示在已展开的分区前面，而不是后面
-✓ 材料需求和制造助手：其内置插件（Stellio Pro / AI）停用时菜单项会消失；若仍进入该页面，会提示需要启用什么，而不再显示“404”
-✓ 通知：库存、零件、烘干、打印完成/失败和维护提醒的标题与内容按当前语言显示（不再中英法混杂）
-✓ 插件签名工具：新增“pub”命令，可重新显示现有密钥的公钥
-✓ 车间模式：点击正在打印的打印机会在车间模式前打开它的卡片（摄像头、温度、进度）；竖屏时卡片不再被截断（手机 / APK）；手机上打印机卡片先显示进度，温度显示在其下方
-✓ 相似：新增“已跳过的文件”按钮和弹窗（缩略图、原因：过大、为空、无法读取、找不到，以及每种情况的解决办法）和“重试”；PC / 服务器上的打印机卡片改为两列，无需滚动即可完整显示
-✓ 插件：移除“此系统上没有内核限制”的警告
+✓ Spoolman：保存的地址会保留路径（例如 FilaMan 搭配“Spoolman API”插件：http://主机:端口/spoolman）；不再给 https 或带路径的地址强加 7912 端口
+✓ 耗材库存：关闭手动库存后，“称重与预测”区域不再提供手动称重和手动耗材盘（TigerTag 不受影响）；关闭手动库存时，耗材页面不再显示“手动库存”横幅；没有任何来源时，“称重与预测”区域也会隐藏
+✓ 仪表板：“最近文件”现在也会按添加日期（而非字母顺序）排列没有修改日期的文件（SMB 共享、解压的压缩包、单个文件）；“最近下载”会自动更新
+✓ 我的点赞 / 我的作品：返回该页面时各分组会重新折叠
+✓ 插件：目录插件现在可以携带 Python 代码，前提是已由受信任的密钥签名（否则被拒绝）；首个示例：“按颜色拆分”，将多色 3MF 拆分为每种颜色一个盘的新 3MF
 <!--ja-->
-✓ ウィンドウ：「ソースを追加」（SMB、NFS、種類、名前変更）と設定から開くすべてのウィンドウが、開いているセクションの後ろではなく前面に表示されます
-✓ 材料の必要量と製造アシスタント：内蔵プラグイン（Stellio Pro / AI）が無効のときはメニュー項目が消え、それでも開いた場合は「404」ではなく有効化すべきものを表示します
-✓ 通知：在庫、部品、乾燥、印刷完了/失敗、メンテナンスの通知のタイトルと本文を、表示時に現在の言語へ翻訳します（フランス語と英語の混在を解消）
-✓ プラグイン署名ツール：既存の鍵の公開鍵を再表示する新コマンド「pub」
-✓ ワークショップモード：印刷中のプリンターをタップすると、そのカード（カメラ、温度、進捗）がワークショップモードの前面に開きます。縦向きでもカードが切れなくなりました（スマートフォン / APK）。スマートフォンではプリンターカードに進捗を表示し、その下に温度を表示します
-✓ 類似：「スキップされたファイル」ボタンとポップアップ（サムネイル、原因：大きすぎる/空/読み取り不可/見つからない、それぞれの対処法）と「再試行」を追加。PC / サーバーではプリンターカードを2列にし、スクロールなしで画面に収まります
-✓ プラグイン：「このシステムにカーネル制限はありません」の警告を削除
+✓ Spoolman：保存したアドレスのパスを保持します（例：FilaMan の「Spoolman API」プラグイン：http://ホスト:ポート/spoolman）。https やパス付きのアドレスに 7912 ポートを強制しなくなりました
+✓ フィラメント在庫：手動在庫をオフにすると、「計量と予測」セクションに手動計量と手動スプールが表示されなくなります；ソースがない場合は「計量と予測」セクションも非表示になります（TigerTag は変更なし）；手動在庫をオフにすると、フィラメントページに「手動在庫」バナーが表示されなくなります
+✓ ダッシュボード：「最近のファイル」は、更新日時のないファイル（SMB 共有、展開したアーカイブ、単体ファイル）も、アルファベット順ではなく追加日で並べます。「最近のダウンロード」は自動で更新されます
+✓ 「いいね」/「作品」：ページに戻ると各セクションが再び折りたたまれます
+✓ プラグイン：信頼できる鍵で署名されていれば、カタログのプラグインが Python コードを含められるようになりました（未署名は拒否）。最初の例：「色で分割」は、マルチカラー 3MF を色ごとに 1 プレートの新しい 3MF に分割します

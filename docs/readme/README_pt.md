@@ -134,6 +134,8 @@ Seja você um maker iniciante ou um usuário experiente com várias máquinas, o
 ### 🧵 Materiais: filamento e resina
 - **Inventário de resina**: a categoria da barra lateral passa a **Materiais** (Filamento + Resina). Adicione seus frascos à mão (marca, tipo, cor, volume, restante, preço, local), subtraia o que usar em ml e receba o mesmo lembrete **«A encomendar»** do filamento (limite baixo, caixa manual, links de busca de lojas, «já encomendado»), também no widget do painel. Desde a 1.1.8, escolha o **frasco ativo** de cada impressora de resina e a resina usada é **descontada automaticamente** no fim de uma impressão (volume do ficheiro `.sl1`, senão estimado a partir do modelo e assinalado como tal; sem volume fiável nada é descontado; cada desconto pode ser anulado)
 - 🏭 **Produção assistida (1.1.8)**: a partir do menu de um ficheiro, o Stellio propõe impressora e perfil de slicer, verifica ficheiro, impressora e consumíveis e **aguarda a sua validação** antes de enviar o ficheiro (não inicia impressões à distância). O fim da impressão é registado e as recomendações seguidas, com o seu resultado, corrigem a classificação do Intelligence.
+- 🆕 **Também na 1.1.9**: em **Peças semelhantes**, um botão **Ficheiros ignorados** lista os ficheiros que o índice não conseguiu ler (miniaturas, causa — demasiado grande acima de 60 MB, malha vazia, ilegível, em falta — e solução para cada um) com **Tentar de novo**; o **cartão da impressora** cabe no ecrã sem deslocar no PC / servidor e mostra o progresso antes das temperaturas no telemóvel; no **modo oficina**, tocar numa impressora a imprimir abre o seu cartão (e o ecrã já não fica cortado na vertical na APK); um **motivo da falha** opcional ao marcar uma impressão como falhada; as janelas abertas a partir das Definições (ex. *Adicionar uma fonte*) passam para a frente; os textos das notificações seguem o idioma da aplicação; o aviso *Sem restrição do núcleo* da página Plugins desaparece.
+- 🆕 **Também na 1.2.0**: o endereço do Spoolman mantém o caminho (ex. FilaMan com o plugin *Spoolman API*: `http://host:porta/spoolman`); com o inventário manual desativado, a secção de pesagem já não oferece pesagem manual; as secções de *Os meus likes* / *As minhas criações* voltam a recolher ao regressar à página; o widget *Ficheiros recentes* ordena os ficheiros SMB e extraídos por data de adição e *Transferências recentes* atualiza-se sozinho. Os plugins assinados do catálogo podem incluir código Python (recusado sem assinatura de confiança); primeiro exemplo **Separar por cor** (3MF multicolor → uma mesa por cor).
 - 🔗 Integração com **Spoolman** (servidor de gestão de carretéis), com detecção automática na sua rede
 - 🟠 Suporte a **AMS da Bambu Lab** (leitura dos slots)
 - 🟢 Suporte a **CFS da Creality**
@@ -514,6 +516,7 @@ O Stellio é parceiro de integração da [**TigerTag**](https://tigersystem.io),
 - 💡 **Solicitar uma funcionalidade**: [GitHub Discussions](https://github.com/stellio-app/stellio/discussions)
 - 📧 **Email**: contact@stellio-app.com
 - 🌐 **Site**: [stellio-app.com](https://stellio-app.com)
+- 🧩 **Plugins**: [stellio-app/stellio-plugins](https://github.com/stellio-app/stellio-plugins) (catálogo oficial, adicione o seu plugin por Pull Request)
 - 💬 **Discord**: [Entre na comunidade do Discord](https://discord.gg/ySxpHvS6bd)
 
 ---

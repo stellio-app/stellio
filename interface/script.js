@@ -4951,6 +4951,7 @@ async function _loadDashboardQueue() {
     }
 }
 
+let _dlWidgetSig = null;
 async function _loadDashboardDownloads() {
     const body = document.getElementById('dashboard-downloads-body');
     if (!body) return;
@@ -4958,6 +4959,9 @@ async function _loadDashboardDownloads() {
         const res = await fetch(`${API}/api/download-history`);
         const data = await res.json();
         const recent = (Array.isArray(data) ? data : []).slice(0, 5);
+        const sig = recent.map(d => `${d.id || ''}|${d.file_name}|${d.downloaded_at}`).join(';');
+        if (sig === _dlWidgetSig && body.children.length) return;       // rien de neuf : on ne redessine pas
+        _dlWidgetSig = sig;
         if (!recent.length) {
             body.innerHTML = `<div class="dashboard-widget-empty"><i class="fa-solid fa-download"></i><p>${_t2('dashboard.no_downloads', 'Aucun téléchargement pour l\'instant')}</p></div>`;
             return;
@@ -5053,6 +5057,13 @@ async function _loadDashboardAccounts() {
     }
 }
 window._loadDashboardAccounts = _loadDashboardAccounts;
+
+/* 1.2.0 : « Téléchargements récents » suit l'historique tout seul (toutes les 5 s tant que le widget est visible) */
+setInterval(() => {
+    const body = document.getElementById('dashboard-downloads-body');
+    if (body && body.offsetParent !== null && !document.hidden) _loadDashboardDownloads();
+}, 5000);
+window._loadDashboardDownloads = _loadDashboardDownloads;
 
 // Rafraîchit la disponibilité des instances toutes les 30 s tant que le widget est visible
 setInterval(() => {
@@ -6452,7 +6463,8 @@ window.restockSnooze = async function (i) {
 const _recentFirstSeen = new Map();     // chemin -> date d'apparition dans cette session (s)
 let _recentBaselineDone = false;
 let _recentSig = '';
-function _recentRank(f) { return Math.max(f.mtime || 0, _recentFirstSeen.get(f.path) || 0); }
+function _recentAdded(f) { const t = f.date_added ? Date.parse(String(f.date_added).replace(' ', 'T')) : NaN; return isNaN(t) ? 0 : t / 1000; }
+function _recentRank(f) { return Math.max(f.mtime || _recentAdded(f), _recentFirstSeen.get(f.path) || 0); }
 function _recentFilesTop(files) { return [...files].sort((a, b) => _recentRank(b) - _recentRank(a)).slice(0, 5); }
 function _recentSignature(list) { return list.map(f => `${f.path}|${f.size}|${f.mtime || 0}|${f.has_thumb ? 1 : 0}`).join(';'); }
 function _recentTrackNewFiles() {
@@ -12477,17 +12489,21 @@ window.toggleAccord = toggleAccord;
 
 
 function normalizeSpoolmanUrl(raw) {
+/* 1.2.0 : le chemin est conservé (ex. FilaMan + son plugin « Spoolman API » : http://hôte:port/spoolman) ; le port 7912 de Spoolman n'est ajouté que pour une adresse saisie sans schéma, sans port et sans chemin. */
 let url = (raw || '').trim();
 if (!url) return '';
-if (!/^https?:\/\//i.test(url)) url = `http://${url}`;
+const hadScheme = /^https?:\/\//i.test(url);
+if (!hadScheme) url = `http://${url}`;
 try {
 const u = new URL(url);
-if (!u.port) u.port = '7912';
-return u.origin;
+const path = u.pathname.replace(/\/+$/, '');
+if (!hadScheme && !u.port && !path) u.port = '7912';
+return u.origin + path;
 } catch (e) {
-return url.replace(/\/$/, '');
+return url.replace(/\/+$/, '');
 }
 }
+window.normalizeSpoolmanUrl = normalizeSpoolmanUrl;
 async function saveSpoolmanUrl() {
 const input = document.getElementById('spoolman-url-input');
 if (!input) return;
@@ -12898,6 +12914,7 @@ async function toggleManualInventoryEnabled(enabled) {
     if (document.getElementById('page-spoolman')?.classList.contains('active')) {
         loadSpoolmanPage();
     }
+    try { window.StellioManagement && window.StellioManagement.filRefresh && window.StellioManagement.filRefresh(); } catch (_) { /* section pesée absente */ }
 }
 window.toggleManualInventoryEnabled = toggleManualInventoryEnabled;
 
@@ -14727,8 +14744,12 @@ async function loadSpoolmanPage() {
     ];
     if (!spoolmanSection || !manualSection || !manualGrid) return;
 
+    // Réglage relu avant le rendu : sinon la valeur par défaut (activé) affichait la bannière « Inventaire manuel » alors qu'il est désactivé
+    await loadManualInventorySettings();
     const url = await getSpoolmanUrl();
     const manualEnabled = !!window.manualInventoryEnabled;
+    const manualBanner = document.getElementById('manual-banner');
+    if (manualBanner) manualBanner.style.display = manualEnabled ? '' : 'none';   // désactivé : ni bannière, ni boutons Catalogue/Rafraîchir
     const isSpoolmanPageActive = document.getElementById('page-spoolman')?.classList.contains('active');
 
     // Les filtres de l'en-tête ne s'appliquent qu'à l'inventaire manuel
@@ -14768,6 +14789,8 @@ async function loadSpoolmanPage() {
         }
     }
     tasks.push(loadTigerTagSpools());
+    // La section « Pesée et prévision » se masque d'elle-même sans source : on la réévalue à chaque ouverture de la page
+    if (window.StellioManagement && window.StellioManagement.filReload) tasks.push(window.StellioManagement.filReload());
     await Promise.all(tasks);
     // Aucune source visible (ni Spoolman, ni manuel, ni TigerTag) : on affiche le message d'aide à la place de la bannière manuelle
     if (!manualEnabled && !url) {
@@ -17404,8 +17427,8 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         else stopDiagnosticConsolePoll();
         if (page === 'spoolman') loadSpoolmanPage();
         if (page === 'resin') window.StellioV113?.onResin();
-        if (page === 'acct-likes') refreshAcctModelsNav().then(() => loadAcctModels('likes'));
-        if (page === 'acct-creations') refreshAcctModelsNav().then(() => loadAcctModels('creations'));
+        if (page === 'acct-likes') { _acctResetOpen('likes'); refreshAcctModelsNav().then(() => loadAcctModels('likes')); }
+        if (page === 'acct-creations') { _acctResetOpen('creations'); refreshAcctModelsNav().then(() => loadAcctModels('creations')); }
         if (page === 'stats') { loadStats(); window.StellioV113?.onStats(); }
         if (page === 'history') { loadHistory(); loadDownloadHistory(); }
         if (page === 'printed') loadPrintedPage();
@@ -27498,6 +27521,8 @@ let _acctPollTimer = null;
 const _acctKey = 'stellio_acct_open';   // sections dépliées (fermées par défaut)
 function _acctCollapsedState() { try { return JSON.parse(localStorage.getItem(_acctKey) || '{}') || {}; } catch (_) { return {}; } }
 function _acctSaveCollapsed(o) { try { localStorage.setItem(_acctKey, JSON.stringify(o)); } catch (_) {} }
+/* 1.2.0 : en revenant sur « Mes likes » / « Mes créations », toutes les sections sont de nouveau repliées (l'état ouvert ne vaut que le temps de la visite). */
+function _acctResetOpen(kind) { const st = _acctCollapsedState(); let ch = false; Object.keys(st).forEach(k => { if (k.startsWith(kind + ':')) { delete st[k]; ch = true; } }); if (ch) _acctSaveCollapsed(st); }
 
 async function refreshAcctModelsNav(force) {
     if (typeof IS_VIEWER !== 'undefined' && IS_VIEWER && !window.STELLIO_DEMO) return null;   // invité : rien, sauf sur la démo (données fictives)

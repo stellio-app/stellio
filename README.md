@@ -134,6 +134,8 @@ Whether you're a beginner maker or an experienced printer owner running multiple
 ### 🧵 Materials: filament & resin
 - **Resin inventory**: the sidebar category is now **Materials** (Filament + Resin). Add your resin bottles by hand (brand, type, colour, volume, remaining, price, storage place), subtract what you use in ml, and get the same **“To order”** reminder as for filament (low-stock threshold, manual checkbox, shop search links, “already ordered”) — also shown in the dashboard widget. Since 1.1.8, choose each resin printer's **active bottle** and the resin used is **deducted automatically** at the end of a print (volume from the `.sl1` file, otherwise estimated from the model and flagged as such; nothing is deducted without a reliable volume; every deduction can be undone)
 - 🏭 **Assisted production (1.1.8)**: from a file's menu, Stellio proposes the printer and slicer profile, checks the file, printer and consumables, then **waits for your validation** before sending the file (it does not start prints remotely). The end of the print is recorded, and followed recommendations with their outcome correct Intelligence's ranking.
+- 🆕 **Also in 1.1.9**: in **Similar parts**, a **Skipped files** button lists the files the index could not read (thumbnails, cause — too big above 60 MB, empty mesh, unreadable, missing — and a fix for each) with **Retry**; the **printer card** fits the screen without scrolling on PC / server and shows progress before temperatures on a phone; in **workshop mode**, tapping a printing printer opens its card (and the layout no longer gets cut off in portrait on the APK); an optional **failure reason** when you mark a print as failed; windows opened from Settings (e.g. *Add a source*) now appear in front; notification texts follow the app language; the *No kernel restriction* warning on the Plugins page is gone.
+- 🆕 **Also in 1.2.0**: the Spoolman address keeps its path (e.g. FilaMan with its *Spoolman API* plugin: `http://host:port/spoolman`); with the manual inventory turned off, the weighing section no longer offers manual weighing; *My likes* / *My creations* sections fold again when you return to the page; the *Recent files* dashboard widget ranks SMB and extracted files by date added, and *Recent downloads* updates by itself. Signed catalog plugins can now ship Python code (refused without a trusted signature); first example **Split by color** (multicolor 3MF → one plate per color).
 - 🔗 **Spoolman** integration (spool management server), with automatic detection on your network
 - 🟠 **Bambu Lab AMS** support (slot reading)
 - 🟢 **Creality CFS** support
@@ -516,6 +518,7 @@ Stellio is an official integration partner of [**TigerTag**](https://tigersystem
 - 💡 **Feature request**: [GitHub Discussions](https://github.com/stellio-app/stellio/discussions)
 - 📧 **Email**: contact@stellio-app.com
 - 🌐 **Website**: [stellio-app.com](https://stellio-app.com)
+- 🧩 **Plugins**: [stellio-app/stellio-plugins](https://github.com/stellio-app/stellio-plugins) (official catalog, add your own plugin via Pull Request)
 - 💬 **Discord**: [Join the Discord community](https://discord.gg/ySxpHvS6bd)
 
 ---

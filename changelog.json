@@ -1,5 +1,66 @@
 [
   {
+    "version": "1.2.0",
+    "items": {
+      "fr": [
+        "Spoolman : l'adresse enregistrée garde son chemin (ex. FilaMan avec son plugin « Spoolman API » : http://hôte:port/spoolman) ; le port 7912 n'est plus imposé aux adresses https ou avec chemin",
+        "Inventaire filament : avec l'inventaire manuel désactivé, la section « Pesée et prévision » ne propose plus la pesée manuelle ni les bobines manuelles (TigerTag inchangé) ; la page Filament n'affiche plus la bannière « Inventaire manuel » quand il est désactivé ; la section « Pesée et prévision » disparaît aussi s'il n'y a aucune source",
+        "Tableau de bord : « Fichiers récents » classe aussi les fichiers sans date de modification (partages SMB, archives extraites, fichiers uniques) par date d'ajout au lieu de l'ordre alphabétique ; « Téléchargements récents » se met à jour tout seul",
+        "Mes likes / Mes créations : les sections se replient quand on revient sur la page",
+        "Plugins : un plugin du catalogue peut maintenant embarquer du code Python s'il est signé par une clé de confiance (refusé sinon) ; premier exemple : « Séparer par couleur », qui découpe un 3MF multicolore en un nouveau 3MF avec un plateau par couleur"
+      ],
+      "en": [
+        "Spoolman: the saved address keeps its path (e.g. FilaMan with its “Spoolman API” plugin: http://host:port/spoolman); port 7912 is no longer forced on https addresses or addresses with a path",
+        "Filament inventory: with the manual inventory turned off, the “Weighing and forecast” section no longer offers manual weighing or manual spools (TigerTag unchanged); the Filament page no longer shows the “Manual inventory” banner when it is off; the “Weighing and forecast” section is hidden too when there is no source",
+        "Dashboard: “Recent files” also ranks files without a modification date (SMB shares, extracted archives, single files) by date added instead of alphabetical order; “Recent downloads” now updates by itself",
+        "My likes / My creations: sections are folded again when you come back to the page",
+        "Plugins: a catalog plugin can now ship Python code if it is signed by a trusted key (refused otherwise); first example: “Split by color”, which cuts a multicolor 3MF into a new 3MF with one plate per color"
+      ],
+      "de": [
+        "Spoolman: die gespeicherte Adresse behält ihren Pfad (z. B. FilaMan mit dem Plugin „Spoolman API“: http://host:port/spoolman); Port 7912 wird bei https-Adressen oder Adressen mit Pfad nicht mehr erzwungen",
+        "Filamentinventar: Bei deaktiviertem manuellen Inventar bietet der Bereich „Wiegen und Prognose“ weder manuelles Wiegen noch manuelle Spulen an (TigerTag unverändert); die Filament-Seite zeigt das Banner „Manuelles Inventar“ bei deaktiviertem Inventar nicht mehr an; der Bereich „Wiegen und Prognose“ wird ohne Quelle ebenfalls ausgeblendet",
+        "Dashboard: „Zuletzt hinzugefügte Dateien“ ordnet auch Dateien ohne Änderungsdatum (SMB-Freigaben, entpackte Archive, Einzeldateien) nach Hinzufügedatum statt alphabetisch; „Letzte Downloads“ aktualisiert sich selbst",
+        "Meine Likes / Meine Kreationen: Die Abschnitte sind wieder eingeklappt, wenn Sie auf die Seite zurückkehren",
+        "Plugins: Ein Katalog-Plugin darf jetzt Python-Code mitbringen, wenn es mit einem vertrauenswürdigen Schlüssel signiert ist (sonst abgelehnt); erstes Beispiel: „Nach Farbe trennen“ zerlegt eine mehrfarbige 3MF in eine neue 3MF mit einer Platte pro Farbe"
+      ],
+      "es": [
+        "Spoolman: la dirección guardada conserva su ruta (p. ej. FilaMan con su plugin «Spoolman API»: http://host:puerto/spoolman); ya no se impone el puerto 7912 a las direcciones https o con ruta",
+        "Inventario de filamento: con el inventario manual desactivado, la sección «Pesaje y previsión» ya no ofrece pesada manual ni bobinas manuales (TigerTag sin cambios); la página Filamento ya no muestra el banner «Inventario manual» cuando está desactivado; la sección «Pesaje y previsión» también se oculta si no hay ninguna fuente",
+        "Panel: «Archivos recientes» clasifica también los archivos sin fecha de modificación (recursos SMB, archivos extraídos, archivos sueltos) por fecha de incorporación en vez de orden alfabético; «Descargas recientes» se actualiza sola",
+        "Mis likes / Mis creaciones: las secciones vuelven a estar plegadas al volver a la página",
+        "Plugins: un plugin del catálogo puede incluir código Python si está firmado con una clave de confianza (rechazado en caso contrario); primer ejemplo: «Separar por color», que divide un 3MF multicolor en un nuevo 3MF con una bandeja por color"
+      ],
+      "pt": [
+        "Spoolman: o endereço guardado mantém o caminho (ex. FilaMan com o plugin «Spoolman API»: http://host:porta/spoolman); a porta 7912 deixa de ser imposta a endereços https ou com caminho",
+        "Inventário de filamento: com o inventário manual desativado, a secção «Pesagem e previsão» já não oferece pesagem manual nem bobines manuais (TigerTag inalterado); a página Filamento já não mostra o banner «Inventário manual» quando está desativado; a secção «Pesagem e previsão» também é ocultada se não houver nenhuma fonte",
+        "Painel: «Ficheiros recentes» ordena também os ficheiros sem data de modificação (partilhas SMB, arquivos extraídos, ficheiros únicos) por data de adição em vez de ordem alfabética; «Transferências recentes» atualiza-se sozinha",
+        "Os meus likes / As minhas criações: as secções voltam a ficar recolhidas ao regressar à página",
+        "Plugins: um plugin do catálogo pode agora incluir código Python se estiver assinado com uma chave de confiança (recusado caso contrário); primeiro exemplo: «Separar por cor», que divide um 3MF multicolor num novo 3MF com uma mesa por cor"
+      ],
+      "it": [
+        "Spoolman: l'indirizzo salvato mantiene il percorso (es. FilaMan con il plugin «Spoolman API»: http://host:porta/spoolman); la porta 7912 non viene più imposta agli indirizzi https o con percorso",
+        "Inventario filamento: con l'inventario manuale disattivato, la sezione «Pesatura e previsione» non propone più la pesata manuale né le bobine manuali (TigerTag invariato); la pagina Filamento non mostra più il banner «Inventario manuale» quando è disattivato; anche la sezione «Pesatura e previsione» viene nascosta se non c'è alcuna fonte",
+        "Dashboard: «File recenti» ordina anche i file senza data di modifica (condivisioni SMB, archivi estratti, file singoli) per data di aggiunta invece che alfabeticamente; «Download recenti» si aggiorna da sola",
+        "I miei like / Le mie creazioni: le sezioni tornano chiuse quando si ritorna sulla pagina",
+        "Plugin: un plugin del catalogo può includere codice Python se è firmato con una chiave attendibile (altrimenti rifiutato); primo esempio: «Separa per colore», che divide un 3MF multicolore in un nuovo 3MF con un piatto per colore"
+      ],
+      "zh": [
+        "Spoolman：保存的地址会保留路径（例如 FilaMan 搭配“Spoolman API”插件：http://主机:端口/spoolman）；不再给 https 或带路径的地址强加 7912 端口",
+        "耗材库存：关闭手动库存后，“称重与预测”区域不再提供手动称重和手动耗材盘（TigerTag 不受影响）；关闭手动库存时，耗材页面不再显示“手动库存”横幅；没有任何来源时，“称重与预测”区域也会隐藏",
+        "仪表板：“最近文件”现在也会按添加日期（而非字母顺序）排列没有修改日期的文件（SMB 共享、解压的压缩包、单个文件）；“最近下载”会自动更新",
+        "我的点赞 / 我的作品：返回该页面时各分组会重新折叠",
+        "插件：目录插件现在可以携带 Python 代码，前提是已由受信任的密钥签名（否则被拒绝）；首个示例：“按颜色拆分”，将多色 3MF 拆分为每种颜色一个盘的新 3MF"
+      ],
+      "ja": [
+        "Spoolman：保存したアドレスのパスを保持します（例：FilaMan の「Spoolman API」プラグイン：http://ホスト:ポート/spoolman）。https やパス付きのアドレスに 7912 ポートを強制しなくなりました",
+        "フィラメント在庫：手動在庫をオフにすると、「計量と予測」セクションに手動計量と手動スプールが表示されなくなります；ソースがない場合は「計量と予測」セクションも非表示になります（TigerTag は変更なし）；手動在庫をオフにすると、フィラメントページに「手動在庫」バナーが表示されなくなります",
+        "ダッシュボード：「最近のファイル」は、更新日時のないファイル（SMB 共有、展開したアーカイブ、単体ファイル）も、アルファベット順ではなく追加日で並べます。「最近のダウンロード」は自動で更新されます",
+        "「いいね」/「作品」：ページに戻ると各セクションが再び折りたたまれます",
+        "プラグイン：信頼できる鍵で署名されていれば、カタログのプラグインが Python コードを含められるようになりました（未署名は拒否）。最初の例：「色で分割」は、マルチカラー 3MF を色ごとに 1 プレートの新しい 3MF に分割します"
+      ]
+    }
+  },
+  {
     "version": "1.1.9",
     "items": {
       "fr": [

@@ -32,6 +32,15 @@ Un plugin autorisé à utiliser le réseau n'est **pas** limité à certains sit
 * **Outil de l'éditeur** : `python tools/plugin_sign.py keygen|plugin|catalog|verify` (la clé privée ne quitte jamais la machine de l'éditeur).
 * **Audit automatique** avant installation (analyse statique, le code n'est pas exécuté) : réseau non déclaré, lancement de processus, code dynamique (`eval`, `exec`, `__import__`, `ctypes`…), binaires, lecture hors du dossier, pages HTML chargeant du contenu externe. Les constats **bloquants** refusent l'installation sauf acceptation explicite du risque (ou signature d'une clé de confiance). Un audit peut rater du code obfusqué : c'est un filet, pas une preuve. Résultat visible par plugin (`Signé` / `Non signé`, `Audit : …`).
 
+
+## Plugins signés à code intégré (1.2.0)
+Un plugin du catalogue peut déclarer `host` dans `plugin.json` (`"host": {"modules": ["mon_module"]}`) : ses modules Python s'exécutent alors **dans le processus de Stellio**, avec ses droits (routes, tâches de fond), comme les plugins intégrés. C'est la seule façon d'écrire des fichiers ou d'ajouter des routes ; c'est donc très encadré :
+* **Signature obligatoire.** L'installation est refusée si l'archive n'est pas signée par une clé de confiance, ou si **aucune** clé de confiance n'est configurée (`OFFICIAL_PUBLIC_KEYS`, `STELLIO_PLUGIN_PUBKEYS` ou `trusted_keys.json`). « Accepter le risque » ne contourne pas cette règle.
+* **Revérification permanente.** L'archive signée est conservée (`<données>/plugins/.host-proofs/`) ; à chaque lecture et juste avant de charger le code, Stellio revérifie la signature, l'empreinte et que le dossier du plugin est **exactement** le contenu de l'archive. Un fichier modifié, ajouté ou supprimé, une clé retirée ou une preuve absente : le plugin n'est ni listé ni chargé.
+* **Jamais d'activation automatique.** `default_on` et `migrate` du manifeste sont ignorés ; l'activation se fait dans Plugins (effective au redémarrage, comme les plugins intégrés), puis le plugin s'ajoute à l'installation entière.
+* **Pas d'identifiant intégré.** Un plugin ne peut pas remplacer un plugin livré avec Stellio.
+* **Écrire depuis la page du plugin.** La page (`ui`, cadre isolé) peut appeler `window.stellio.api(chemin, 'json', {method: 'POST', body: {...}})` **uniquement** vers `/api/x/<id>/…` (l'espace de routes du plugin) et avec la permission `api:write`. Les routes du plugin se déclarent dans son `init(globals())` (modèle : `sdk/examples/split-color`).
+Exemple complet : `sdk/examples/split-color` (« Séparer par couleur » : un 3MF multicolore → un nouveau 3MF avec un plateau par couleur).
 ## Mises à jour
 Réinstaller une archive d'un plugin déjà présent la **met à jour** :
 * version plus récente → mise à jour ; même version → réinstallation ; version plus ancienne → refus (`409`) sauf case « autoriser le retour en arrière » ;

@@ -3,7 +3,9 @@
 Un plugin intégré est une fonction de Stellio livrée DANS l'application (dossier `bundled_plugins/<id>/`, signé avec elle) mais
 qui ne se charge que s'il est activé : ses routes, ses tâches de fond et ses dépendances n'existent pas tant qu'il est désactivé.
 Il s'exécute dans le processus de Stellio (contrairement aux plugins Python tiers, isolés) ; c'est pourquoi seuls ceux livrés avec
-l'application sont admis : une archive installée depuis le catalogue ou un .zip ne peut JAMAIS déclarer `host`.
+l'application sont admis, SAUF une archive du catalogue (ou un .zip) dont la signature Ed25519 est valide pour une clé de confiance (1.2.0) :
+c'est la seule exception, et elle est refusée dès qu'aucune clé n'est configurée. L'archive signée est conservée à part et revérifiée (signature,
+empreinte, contenu du dossier) à CHAQUE lecture ; au moindre écart le plugin n'est ni listé ni chargé.
 
 Manifeste `bundled_plugins/<id>/plugin.json` : champs habituels (id, name, version, description, author) +
   "host": {"modules": ["mqtt_publisher"],            # modules Python du dossier, dans l'ordre d'`init(globals())`
@@ -16,6 +18,7 @@ restent là où ils étaient (réglages globaux et base inchangés) : rien à re
 L'activation ou la désactivation prend effet au redémarrage (les routes Flask ne se retirent pas à chaud).
 """
 import importlib
+import importlib.util
 import json
 import os
 import sys
@@ -57,10 +60,122 @@ def bundled_dirs():
     return out
 
 
-def manifests():
-    """[(id, dossier, manifeste)] des plugins intégrés valides."""
+def _plugins_root():
+    base = _MAIN.get('DATA_DIR') or getattr(sys.modules.get('modules.plugin_security'), 'DATA_DIR', None) or '.'
+    return os.path.join(base, 'plugins')
+
+
+def _proof_dir():
+    return os.path.join(_plugins_root(), '.host-proofs')
+
+
+def _proof_paths(pid):
+    return os.path.join(_proof_dir(), pid + '.zip'), os.path.join(_proof_dir(), pid + '.json')
+
+
+def save_external_proof(pid, version, signature, data):
+    """Conserve l'archive signée (octets exacts) et sa signature : base de la revérification à chaque lecture."""
+    import hashlib
+    os.makedirs(_proof_dir(), exist_ok=True)
+    zp, jp = _proof_paths(pid)
+    with open(zp, 'wb') as f:
+        f.write(data)
+    with open(jp, 'w', encoding='utf-8') as f:
+        json.dump({'id': pid, 'version': str(version), 'sha256': hashlib.sha256(data).hexdigest(), 'signature': str(signature or '').lower()}, f)
+
+
+def drop_external_proof(pid):
+    for p in _proof_paths(pid):
+        try:
+            os.remove(p)
+        except OSError:
+            pass
+    _VERIFIED.pop(pid, None)
+
+
+_VERIFIED = {}      # pid -> (empreinte des fichiers de preuve, résultat) : évite de relire l'archive à chaque appel de manifests()
+
+
+def _zip_files(data):
+    """{chemin relatif: sha256} des fichiers d'une archive de plugin (tolère un dossier racine unique, comme l'installation)."""
+    import hashlib
+    import io
+    import zipfile
+    zf = zipfile.ZipFile(io.BytesIO(data))
+    infos = [i for i in zf.infolist() if not i.is_dir()]
+    names = [i.filename.replace('\\', '/') for i in infos]
+    prefix = ''
+    if 'plugin.json' not in names:
+        tops = {n.split('/', 1)[0] for n in names}
+        if len(tops) == 1 and f"{list(tops)[0]}/plugin.json" in names:
+            prefix = list(tops)[0] + '/'
+    return {n[len(prefix):]: hashlib.sha256(zf.read(i)).hexdigest() for n, i in zip(names, infos)}
+
+
+def verify_external(pid, d):
+    """(ok, raison) — le dossier `d` est EXACTEMENT le contenu de l'archive signée par une clé de confiance. Refus par défaut : sans clé
+    de confiance configurée, sans preuve, ou au moindre écart, la réponse est non."""
+    import hashlib
+    zp, jp = _proof_paths(pid)
+    try:
+        sig_key = (os.path.getmtime(zp), os.path.getsize(zp), os.path.getmtime(jp))
+        files_key = tuple(sorted((os.path.relpath(os.path.join(r, f), d), os.path.getmtime(os.path.join(r, f)), os.path.getsize(os.path.join(r, f)))
+                                 for r, _ds, fs in os.walk(d) for f in fs))
+    except OSError:
+        return False, 'preuve absente'
+    from modules import plugin_security
+    keys = plugin_security.trusted_keys()
+    stamp = (sig_key, files_key, tuple(keys))
+    hit = _VERIFIED.get(pid)
+    if hit and hit[0] == stamp:
+        return hit[1]
+    res = (False, 'invalide')
+    try:
+        proof = json.load(open(jp, encoding='utf-8'))
+        data = open(zp, 'rb').read()
+        sha = hashlib.sha256(data).hexdigest()
+        if not keys:
+            res = (False, 'aucune clé de confiance configurée')
+        elif proof.get('id') != pid or proof.get('sha256') != sha:
+            res = (False, 'archive modifiée')
+        elif plugin_security.signature_status(proof.get('signature') or '', pid, proof.get('version') or '', sha, keys)['status'] != 'valid':
+            res = (False, 'signature invalide')
+        else:
+            expected = _zip_files(data)
+            actual = {os.path.relpath(os.path.join(r, f), d).replace(os.sep, '/'): hashlib.sha256(open(os.path.join(r, f), 'rb').read()).hexdigest()
+                      for r, _ds, fs in os.walk(d) for f in fs}
+            res = (True, 'ok') if actual == expected else (False, 'fichiers modifiés après installation')
+    except Exception:
+        res = (False, 'preuve illisible')
+    _VERIFIED[pid] = (stamp, res)
+    return res
+
+
+def external_dirs():
+    """[(id, dossier)] des plugins signés installés depuis le catalogue (déclarant `host`), vérifiés."""
     out = []
-    for pid, d in bundled_dirs():
+    try:
+        names = sorted(os.listdir(_plugins_root()))
+    except OSError:
+        return out
+    bundled = {n for n, _d in bundled_dirs()}
+    for name in names:
+        d = os.path.join(_plugins_root(), name)
+        if name.startswith('.') or name in bundled or not os.path.isfile(os.path.join(d, 'plugin.json')) or not os.path.isfile(_proof_paths(name)[1]):
+            continue
+        if verify_external(name, d)[0]:
+            out.append((name, d))
+    return out
+
+
+def is_bundled(pid):
+    return any(n == pid for n, _d in bundled_dirs())
+
+
+def manifests():
+    """[(id, dossier, manifeste)] des plugins intégrés valides, puis des plugins signés du catalogue (clé `_external`)."""
+    out = []
+    for pid, d in bundled_dirs() + external_dirs():
         try:
             m = json.load(open(os.path.join(d, 'plugin.json'), encoding='utf-8'))
         except (OSError, ValueError):
@@ -70,6 +185,8 @@ def manifests():
             continue
         if not all(isinstance(x, str) and x.isidentifier() for x in h['modules']):
             continue
+        if not is_bundled(pid):
+            m = dict(m, _external=True)
         out.append((pid, d, m))
     return out
 
@@ -122,7 +239,7 @@ def _forced():
 def enabled_map(data_dir=None):
     en = dict(read_state(data_dir)['enabled'])
     for pid, _d, m in manifests():                       # « default_on » : actif d'office (installation neuve comprise) tant que l'utilisateur ne l'a pas désactivé lui-même
-        if m['host'].get('default_on') and pid not in en:
+        if m['host'].get('default_on') and not m.get('_external') and pid not in en:
             en[pid] = True
     for pid in _forced() or ():
         en[pid] = True
@@ -226,7 +343,7 @@ def migrate(settings, conn, data_dir, existing_install):
         for pid, _d, m in manifests():
             if pid in st['enabled'] or not available(m):
                 continue
-            if _used(m['host'].get('migrate'), settings or {}, conn, data_dir):
+            if not m.get('_external') and _used(m['host'].get('migrate'), settings or {}, conn, data_dir):
                 st['enabled'][pid] = True
                 done.append(pid)
     st['migrated'] = STATE_VERSION
@@ -258,7 +375,14 @@ def load_enabled(ns):
             if d not in sys.path:
                 sys.path.append(d)
             for name in m['host']['modules']:
-                mod = importlib.import_module('modules.' + name)
+                if m.get('_external'):
+                    if not verify_external(pid, d)[0]:          # revérification juste avant d'exécuter du code
+                        raise RuntimeError('signature ou contenu invalide')
+                    spec = importlib.util.spec_from_file_location(f"stellio_ext_{pid.replace('-', '_')}_{name}", os.path.join(d, name + '.py'))
+                    mod = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(mod)
+                else:
+                    mod = importlib.import_module('modules.' + name)
                 r = mod.init(ns)
                 if isinstance(r, dict):
                     ns.update(r)
