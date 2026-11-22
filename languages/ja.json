@@ -3589,6 +3589,7 @@
   "suite.ack_perms": "このプラグインが要求する権限",
   "suite.confirm_delete": "このプラグインを削除しますか？",
   "suite.pick_zip": ".zip ファイルを選択してください。",
+  "suite.sig_hint": "署名済みプラグイン：.zip と、その .signature.json（signer-plugin.bat で作成）を同時に選択してください。",
   "suite.updates": "件の更新あり",
   "suite.installed": "インストール済み",
   "suite.update": "更新",
@@ -3780,6 +3781,12 @@
   "suite.store_hint": "GitHub で公開されているコミュニティのプラグイン。インストールしただけでは有効になりません。先に権限を確認してください。",
   "suite.store_empty": "このカタログにはまだプラグインがありません。",
   "suite.store_fail": "カタログを取得できません",
+  "suite.catalog_updating": "カタログを更新しています…",
+  "suite.catalog_updating_hint": "公開直後のため、数秒後に再確認します。",
+  "suite.update_badge": "アップデートあり",
+  "suite.catalog_later": "カタログの更新に少し時間がかかっています",
+  "suite.catalog_later_hint": "問題はありません。数分後にもう一度お試しください。",
+  "suite.catalog_stale_hint": "最後に検証した版を表示中。自動で再読み込みします。",
   "suite.retry": "再試行",
   "suite.plugin_page": "プラグインのページ",
   "suite.by": "作者",
@@ -3812,6 +3819,7 @@
   "suite.builtin_hint": "Stellio に同梱されており、有効にした場合にのみ読み込まれます。無効にしても設定は保持されます。変更は Stellio の再起動後に反映されます。",
   "suite.restart_needed": "再起動が必要",
   "suite.restart_note": "Stellio の再起動後に反映されます。",
+  "suite.restart_after_install": "プラグインをインストールしました。読み込み（またはアップデートの適用）には Stellio を再起動してください。",
   "suite.restart_btn": "Stellio を再起動",
   "suite.restart_confirm": "有効化・無効化したプラグインを反映するため、今すぐ Stellio を再起動しますか？",
   "suite.restart_wait": "再起動中… ページが自動で再読み込みされます。",
@@ -3938,5 +3946,8 @@
   "suite.skip_f_missing": "ファイルが移動または削除されました。ライブラリを再スキャン（設定、ソース）してからやり直してください。",
   "suite.skip_none": "無視されたファイルはありません。",
   "suite.skip_retry": "インデックスを再試行",
-  "suite.skip_close": "閉じる"
+  "suite.skip_close": "閉じる",
+  "suite.unsigned_title": "未署名のプラグイン",
+  "suite.unsigned_body": "このプラグインは署名されていません。作者と内容は検証されておらず、Stellio 内で直接コードを実行し、あなたのファイルやアカウントにアクセスします。\n\nこのプラグインによる損害、データ損失、脆弱性について、Stellio および開発チームは一切責任を負いません。信頼できる提供元のコードのみをインストールしてください。",
+  "suite.unsigned_confirm": "リスクを理解し、同意します。それでもインストールしますか？"
 }

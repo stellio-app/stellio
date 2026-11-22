@@ -1183,7 +1183,7 @@ def _thumb_allowed_workers():
         if _machine_is_modest():
             n = 1
         else:
-            n = moderate if thumb_generation_queue.qsize() > 50 else NUM_THUMB_WORKERS
+            n = moderate if thumb_generation_queue.qsize() > 50 else min(NUM_THUMB_WORKERS, max(2, _effective_cpu_count() // 2))   # jamais tous les cœurs : l'interface reste réactive
     try:
         import psutil
         vm = psutil.virtual_memory()
@@ -7829,7 +7829,14 @@ def _render_thumb_isolated(path, thumb_path, timeout_s):
     processus n'a pas pu démarrer (l'appelant utilise alors le rendu intégré)."""
     kw = {}
     if os.name == 'nt':
-        kw['creationflags'] = 0x08000000      # CREATE_NO_WINDOW
+        kw['creationflags'] = 0x08000000 | 0x00004000      # CREATE_NO_WINDOW + BELOW_NORMAL : le rendu ne doit pas ralentir l'application
+    else:
+        def _low_prio():
+            try:
+                os.nice(10)
+            except Exception:
+                pass
+        kw['preexec_fn'] = _low_prio
     try:
         proc = subprocess.Popen(_thumb_worker_cmd(path, thumb_path), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                 stderr=subprocess.DEVNULL, **kw)

@@ -1,22 +1,48 @@
 <style>
-:root{color-scheme:light dark}
-body{margin:0;padding:16px;background:var(--st-bg,#111);color:var(--st-text,#eee);font:14px/1.5 system-ui,sans-serif}
+html,body{background:transparent}
+body{margin:0;padding:16px;color:var(--st-text,#eee);font:14px/1.5 system-ui,sans-serif}
 h1{font-size:18px;margin:0 0 4px}
 p.sub{margin:0 0 14px;color:var(--st-muted,#999)}
 .card{background:var(--st-card,#1b1b1b);border:1px solid var(--st-border,#333);border-radius:8px;padding:14px;margin-bottom:12px}
+label.chk{display:flex;gap:8px;align-items:center;font-size:13px;color:inherit;margin:10px 0 0}label.chk input{width:auto}
 label{display:block;font-size:12px;color:var(--st-muted,#999);margin:8px 0 3px}
 input,select{width:100%;box-sizing:border-box;padding:7px 9px;border-radius:6px;border:1px solid var(--st-border,#333);background:var(--st-panel,#161616);color:inherit;font:inherit}
 .row{display:flex;gap:10px;flex-wrap:wrap}.row>div{flex:1;min-width:140px}
 button{padding:8px 14px;border-radius:6px;border:1px solid var(--st-border,#333);background:var(--st-panel,#161616);color:inherit;font:inherit;cursor:pointer}
 button.primary{background:var(--st-accent,#4ea1d3);border-color:transparent;color:#fff}
 button:disabled{opacity:.5;cursor:default}
-.files{max-height:180px;overflow:auto;margin-top:8px;border:1px solid var(--st-border,#333);border-radius:6px}
-.files div{padding:6px 9px;cursor:pointer;border-bottom:1px solid var(--st-border,#333);word-break:break-all}
-.files div.sel{background:var(--st-accent,#4ea1d3);color:#fff}
+.files{max-height:380px;overflow:auto;margin-top:8px;padding:8px;border:1px solid var(--st-border,#333);border-radius:6px;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.files .f{cursor:pointer;border:1px solid var(--st-border,#333);border-radius:8px;overflow:hidden;background:var(--st-panel,#161616);display:flex;flex-direction:column}
+.files .f.sel{outline:2px solid var(--st-accent,#4ea1d3);background:color-mix(in srgb,var(--st-accent,#4ea1d3) 22%,transparent)}
+.files .th{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:rgba(127,127,127,.12);font-size:26px;opacity:1}
+.files .th img{width:100%;height:100%;object-fit:contain;display:block}
+.files .nm{padding:5px 7px;font-size:12px;line-height:1.25;word-break:break-all;max-height:3.9em;overflow:hidden}
+.files .none{grid-column:1/-1;padding:6px}
+#dest{display:none;flex:2 1 320px}
+.crumb{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:2px 0 6px;font-size:13px}
+.crumb button{padding:2px 8px;font-size:12px}
+.dirs{max-height:170px;overflow:auto;border:1px solid var(--st-border,#333);border-radius:6px;background:var(--st-panel,#161616)}
+.dirs div{padding:6px 10px;cursor:pointer;border-bottom:1px solid var(--st-border,#333);display:flex;gap:8px;align-items:center}
+.dirs div:last-child{border-bottom:0}.dirs div:hover{background:color-mix(in srgb,var(--st-accent,#4ea1d3) 16%,transparent)}
+.dirs .none{cursor:default;opacity:.7}.dirs .none:hover{background:none}
+.srcrow{display:flex;gap:8px;align-items:center}.srcrow select{flex:1 1 0;width:auto;min-width:0}.srcrow .dsel{margin-top:0;flex:none}
+.dsel{display:flex;gap:8px;align-items:center;margin-top:8px}.dsel button{background:transparent;border-color:transparent;padding:6px 12px;font-size:13px;display:inline-flex;align-items:center;justify-content:center;gap:8px}.dsel button:hover{background:color-mix(in srgb,var(--st-text,#eee) 8%,transparent)}.dsel #mkopen{flex:1}.mi{display:inline-flex;color:var(--st-accent,#4ea1d3)}.mo{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;z-index:50}.mo .md{background:var(--st-panel,#1e2129);border:1px solid var(--st-border,#2a2f3a);border-radius:16px;padding:28px;max-width:450px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,.6)}.mo h3{margin:0 0 14px;font-size:18px;display:flex;gap:12px;align-items:center}.mo h3 .mi svg{width:24px;height:24px}.mo p{margin:0 0 14px;opacity:.75;line-height:1.5}.mo input{padding:12px 16px;border:2px solid var(--st-border,#2a2f3a);border-radius:10px;margin-bottom:20px;background:var(--st-bg,#161a22)}.mo input:focus{outline:none;border-color:var(--st-accent,#4ea1d3);box-shadow:0 0 0 3px color-mix(in srgb,var(--st-accent,#4ea1d3) 35%,transparent)}.mo .bt button:not(.primary){background:var(--st-hover,#2a2f3a)}.mo .bt{display:flex;gap:12px;justify-content:flex-end}.mo .bt button{padding:11px 24px;border-radius:10px;border:none}.mo .bt .primary{font-weight:600}.mk{display:flex;gap:8px;margin-top:8px}.mk input{flex:1}
+.here{margin-top:6px;font-size:12px;opacity:.85}
+.dots{display:inline-flex;gap:4px;margin-left:8px;vertical-align:middle}.dots i{width:6px;height:6px;border-radius:50%;background:currentColor;animation:dotb 1.2s infinite ease-in-out both}.dots i:nth-child(2){animation-delay:.18s}.dots i:nth-child(3){animation-delay:.36s}@keyframes dotb{0%,80%,100%{transform:translateY(0);opacity:.35}40%{transform:translateY(-5px);opacity:1}}
+#view{display:none;margin-top:14px}
+#view .hint{font-size:12px;opacity:.7;margin-bottom:8px}
+#view .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+#view .card{border:1px solid var(--st-border,#333);border-radius:8px;background:var(--st-panel,#161616);overflow:hidden}
+#view canvas{width:100%;height:auto;aspect-ratio:1;display:block;cursor:grab;touch-action:none}
+#view .cap{padding:5px 8px;font-size:12px;display:flex;gap:6px;align-items:center;border-top:1px solid var(--st-border,#333)}
+#view .cap i{width:12px;height:12px;border-radius:3px;border:1px solid var(--st-border,#333);display:inline-block}
+#big{display:none;margin-top:10px;gap:12px;align-items:center}
+#big img{width:96px;height:96px;object-fit:contain;border-radius:8px;border:1px solid var(--st-border,#333);background:rgba(127,127,127,.12)}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--st-border,#333);border-radius:6px;background:var(--st-panel,#161616)}
 .chip i{width:14px;height:14px;border-radius:3px;border:1px solid var(--st-border,#333);display:inline-block}
 #msg{margin-top:10px;padding:9px 11px;border-radius:6px;border:1px solid var(--st-border,#333);display:none}
+#msg.finished{display:flex!important;align-items:center;gap:14px;padding:16px 18px;border:2px solid var(--st-success,#30a46c);background:color-mix(in srgb,var(--st-success,#30a46c) 14%,transparent);animation:pop .45s ease-out}#msg.finished .tick{flex:none;width:38px;height:38px;border-radius:50%;background:var(--st-success,#30a46c);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700}#msg.finished b{display:block;font-size:15px}#msg.finished small{opacity:.8}@keyframes pop{0%{transform:scale(.96);opacity:0}60%{transform:scale(1.02)}100%{transform:scale(1);opacity:1}}
 #msg.err{border-color:var(--st-danger,#e5484d)}#msg.ok{border-color:var(--st-success,#30a46c)}
 </style>
 <h1 id="t_title"></h1>
@@ -32,14 +58,32 @@ button:disabled{opacity:.5;cursor:default}
     <div><label id="t_tol"></label><input id="tol" type="number" min="0" max="100" step="5" value="0"></div>
   </div>
   <div class="row">
-    <div><label id="t_src"></label><select id="src"></select></div>
-    <div><label id="t_sub"></label><input id="sub" placeholder="Couleurs/projets"></div>
+    <div><label id="t_mg"></label><input id="mg" type="number" min="0" max="500" step="1" value="5"></div>
+    <div><label>&nbsp;</label><span class="hint" id="t_mgh" style="font-size:12px;opacity:.7"></span></div>
+  </div>
+  <div class="cnrow">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="cn" checked style="width:auto"><span id="t_cn"></span></label>
+    <div class="hint" id="t_cnh" style="font-size:12px;opacity:.7;margin:4px 0 8px"></div>
+    <div class="row" id="cnopts" style="display:none">
+      <div><label id="t_cd"></label><input id="cd" type="number" min="0" max="30" step="0.5" value="0"></div>
+      <div><label id="t_cl"></label><input id="cl" type="number" min="0" max="40" step="0.5" value="0"></div>
+      <div><label id="t_cc"></label><input id="cc" type="number" min="0" max="1" step="0.05" value="0.2"></div>
+    </div>
+  </div>
+  <div>
+    <label id="t_src"></label>
+    <div class="srcrow"><select id="src"></select><div class="dsel"><button type="button" id="mkopen"></button><button type="button" id="browse" class="ico"></button></div></div>
+    <div class="hint" id="t_savehint" style="font-size:12px;opacity:.7;margin-top:6px"></div>
+    <div class="here" id="here"></div>
   </div>
   <div class="row">
     <div><label id="t_bw"></label><input id="bw" type="number" min="50" value="220"></div>
     <div><label id="t_bd"></label><input id="bd" type="number" min="50" value="220"></div>
   </div>
+  <div class="hint" id="t_bedh" style="font-size:12px;opacity:.7;margin:-4px 0 8px"></div>
+  <div id="big"></div>
   <div class="chips" id="chips"></div>
+  <div id="view"><div class="hint" id="t_view"></div><div class="grid" id="vgrid"></div></div>
   <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
     <button id="analyze"></button><button id="run" class="primary" disabled></button>
   </div>
@@ -47,41 +91,164 @@ button:disabled{opacity:.5;cursor:default}
 </div>
 <script>
 const T={
-fr:{title:'Séparer par couleur',intro:'Choisissez un 3MF multicolore : un nouveau 3MF est créé avec un plateau par couleur (le fichier d\'origine n\'est pas modifié).',search:'Rechercher un 3MF de la bibliothèque',name:'Nom du nouveau fichier',tol:'Regrouper les couleurs proches (0 = exact)',src:'Enregistrer dans (source)',sub:'Sous-dossier (facultatif)',bw:'Largeur plateau (mm)',bd:'Profondeur plateau (mm)',analyze:'Analyser les couleurs',run:'Créer le 3MF par couleur',pick:'Choisissez d\'abord un fichier.',busy:'Traitement…',found:'{n} couleurs détectées',done:'{p} plateaux créés dans {f}',big:'Attention : le modèle dépasse le plateau indiqué.',none:'Aucun 3MF trouvé.',same:'Dossier du fichier d\'origine',def:'couleur par défaut'},
-en:{title:'Split by color',intro:'Pick a multicolor 3MF: a new 3MF is created with one plate per color (the original file is not modified).',search:'Search a 3MF in the library',name:'New file name',tol:'Group similar colors (0 = exact)',src:'Save to (source)',sub:'Subfolder (optional)',bw:'Bed width (mm)',bd:'Bed depth (mm)',analyze:'Analyze colors',run:'Create the per-color 3MF',pick:'Pick a file first.',busy:'Working…',found:'{n} colors detected',done:'{p} plates created in {f}',big:'Warning: the model is larger than the bed given.',none:'No 3MF found.',same:'Folder of the original file',def:'default color'},
-de:{title:'Nach Farbe trennen',intro:'Wählen Sie eine mehrfarbige 3MF: Es entsteht eine neue 3MF mit einer Platte pro Farbe (die Originaldatei bleibt unverändert).',search:'3MF in der Bibliothek suchen',name:'Name der neuen Datei',tol:'Ähnliche Farben zusammenfassen (0 = exakt)',src:'Speichern in (Quelle)',sub:'Unterordner (optional)',bw:'Plattenbreite (mm)',bd:'Plattentiefe (mm)',analyze:'Farben analysieren',run:'3MF pro Farbe erstellen',pick:'Wählen Sie zuerst eine Datei.',busy:'Wird verarbeitet…',found:'{n} Farben erkannt',done:'{p} Platten erstellt in {f}',big:'Achtung: Das Modell ist größer als die Platte.',none:'Keine 3MF gefunden.',same:'Ordner der Originaldatei',def:'Standardfarbe'},
-es:{title:'Separar por color',intro:'Elija un 3MF multicolor: se crea un nuevo 3MF con una bandeja por color (el archivo original no se modifica).',search:'Buscar un 3MF de la biblioteca',name:'Nombre del nuevo archivo',tol:'Agrupar colores parecidos (0 = exacto)',src:'Guardar en (fuente)',sub:'Subcarpeta (opcional)',bw:'Ancho de bandeja (mm)',bd:'Fondo de bandeja (mm)',analyze:'Analizar colores',run:'Crear el 3MF por color',pick:'Elija primero un archivo.',busy:'Procesando…',found:'{n} colores detectados',done:'{p} bandejas creadas en {f}',big:'Atención: el modelo supera la bandeja indicada.',none:'No se encontró ningún 3MF.',same:'Carpeta del archivo original',def:'color por defecto'},
-it:{title:'Separa per colore',intro:'Scegli un 3MF multicolore: viene creato un nuovo 3MF con un piatto per colore (il file originale non viene modificato).',search:'Cerca un 3MF nella libreria',name:'Nome del nuovo file',tol:'Raggruppa colori simili (0 = esatto)',src:'Salva in (sorgente)',sub:'Sottocartella (facoltativa)',bw:'Larghezza piatto (mm)',bd:'Profondità piatto (mm)',analyze:'Analizza i colori',run:'Crea il 3MF per colore',pick:'Scegli prima un file.',busy:'Elaborazione…',found:'{n} colori rilevati',done:'{p} piatti creati in {f}',big:'Attenzione: il modello supera il piatto indicato.',none:'Nessun 3MF trovato.',same:'Cartella del file originale',def:'colore predefinito'},
-pt:{title:'Separar por cor',intro:'Escolha um 3MF multicolor: é criado um novo 3MF com uma mesa por cor (o ficheiro original não é alterado).',search:'Procurar um 3MF na biblioteca',name:'Nome do novo ficheiro',tol:'Agrupar cores semelhantes (0 = exato)',src:'Guardar em (origem)',sub:'Subpasta (opcional)',bw:'Largura da mesa (mm)',bd:'Profundidade da mesa (mm)',analyze:'Analisar cores',run:'Criar o 3MF por cor',pick:'Escolha primeiro um ficheiro.',busy:'A processar…',found:'{n} cores detetadas',done:'{p} mesas criadas em {f}',big:'Atenção: o modelo excede a mesa indicada.',none:'Nenhum 3MF encontrado.',same:'Pasta do ficheiro original',def:'cor predefinida'},
-zh:{title:'按颜色拆分',intro:'选择一个多色 3MF：将创建新的 3MF，每种颜色一个盘（不会修改原文件）。',search:'在库中搜索 3MF',name:'新文件名',tol:'合并相近颜色（0 = 精确）',src:'保存到（来源）',sub:'子文件夹（可选）',bw:'打印盘宽度 (mm)',bd:'打印盘深度 (mm)',analyze:'分析颜色',run:'创建按颜色拆分的 3MF',pick:'请先选择文件。',busy:'处理中…',found:'检测到 {n} 种颜色',done:'已在 {f} 中创建 {p} 个盘',big:'注意：模型超出所填的打印盘。',none:'未找到 3MF。',same:'原文件所在文件夹',def:'默认颜色'},
-ja:{title:'色で分割',intro:'マルチカラー 3MF を選択すると、色ごとに 1 プレートの新しい 3MF を作成します（元のファイルは変更されません）。',search:'ライブラリから 3MF を検索',name:'新しいファイル名',tol:'近い色をまとめる（0 = 完全一致）',src:'保存先（ソース）',sub:'サブフォルダ（任意）',bw:'プレート幅 (mm)',bd:'プレート奥行 (mm)',analyze:'色を解析',run:'色別の 3MF を作成',pick:'先にファイルを選択してください。',busy:'処理中…',found:'{n} 色を検出',done:'{f} に {p} プレートを作成しました',big:'注意：モデルが指定のプレートを超えています。',none:'3MF が見つかりません。',same:'元ファイルのフォルダ',def:'既定の色'}};
+fr:{mg:'Regrouper les morceaux d\'une même couleur plus proches que (mm)',mgh:'Les morceaux qui se touchent presque restent ensemble comme une seule pièce ; plus éloignés, ils sont séparés et posés sur le plateau. 0 = tout séparer.',cn:'Ajouter des connecteurs d\'emboîtement',cnh:'Un tenon carré, adapté à la taille du contact, est soudé à la plus petite pièce (il n\'en est pas détachable) ; le trou correspondant (avec du jeu) est creusé dans celle qui la reçoit.',cd:'Côté du tenon (mm, 0 = auto)',cl:'Longueur (mm, 0 = auto)',cc:'Jeu du trou (mm)',conns:'{n} connecteur(s) créé(s)',connoff:'Connecteurs indisponibles',outside:'Ce dossier n\'est dans aucune de tes sources : ajoute-le d\'abord comme source, ou choisis un dossier de la liste.',fin:'Terminé',fixed:'{n} trou(s) refermé(s) — maillage réparé',bedh:'Mets la taille du plateau de ton imprimante dans le slicer.',savehint:'Choisis où enregistrer le fichier créé.',mkenter:'Entrez le nom du nouveau dossier',mkph:'Nom du dossier',cancel:'Annuler',create:'Créer',browse:'Parcourir',nosrc:'Aucune source disponible.',selfold:'Veuillez sélectionner un dossier.',mkopen:'Créer un dossier...',dest:'Dossier de destination',newdir:'Nom du nouveau dossier',mk:'Créer le dossier',nofold:'Aucun sous-dossier',here:'Enregistrement dans : ',ov:'Chevauchement sur la pièce voisine (mm)',ovh:'Chaque pièce reprend une bande de cette largeur de la surface voisine (ex. la main déborde dans le bras). 0 = aucun.',view:'Aperçu du résultat : un plateau par couleur (glissez pour faire pivoter)',all:'Modèle complet',title:'Séparer par couleur',intro:'Choisissez un 3MF multicolore : un nouveau 3MF est créé avec un plateau par couleur (le fichier d\'origine n\'est pas modifié).',search:'Rechercher un 3MF de la bibliothèque',name:'Nom du nouveau fichier',tol:'Regrouper les couleurs proches (0 = exact)',src:'Enregistrer dans (source)',sub:'Sous-dossier (facultatif)',bw:'Largeur plateau (mm)',bd:'Profondeur plateau (mm)',analyze:'Analyser les couleurs',run:'Créer le 3MF par couleur',pick:'Choisissez d\'abord un fichier.',busy:'Traitement…',found:'{n} couleurs détectées',done:'{p} plateaux créés dans {f}',big:'Attention : le modèle dépasse le plateau indiqué.',none:'Aucun 3MF trouvé.',same:'Dossier du fichier d\'origine',def:'couleur par défaut'},
+en:{mg:'Keep same-color parts together when closer than (mm)',mgh:'Parts that almost touch stay together as one piece; farther apart, they are separated and laid on the plate. 0 = separate everything.',cn:'Add interlocking connectors',cnh:'A square peg, sized to the contact area, is fused to the smaller piece (it cannot come off); the matching hole (with clearance) is cut into the piece that receives it.',cd:'Peg side (mm, 0 = auto)',cl:'Length (mm, 0 = auto)',cc:'Hole clearance (mm)',conns:'{n} connector(s) created',connoff:'Connectors unavailable',outside:'This folder is not in any of your sources: add it as a source first, or pick a folder from the list.',fin:'Done',fixed:'{n} hole(s) closed — mesh repaired',bedh:'Use your printer\'s bed size from your slicer.',savehint:'Choose where to save the created file.',mkenter:'Enter the new folder name',mkph:'Folder name',cancel:'Cancel',create:'Create',browse:'Browse',nosrc:'No source available.',selfold:'Please select a folder.',mkopen:'Create folder...',dest:'Destination folder',newdir:'New folder name',mk:'Create folder',nofold:'No subfolder',here:'Saving in: ',ov:'Overlap into the neighbouring piece (mm)',ovh:'Each piece also takes a band of this width from the neighbouring surface (e.g. the hand extends into the arm). 0 = none.',view:'Result preview: one plate per color (drag to rotate)',all:'Full model',title:'Split by color',intro:'Pick a multicolor 3MF: a new 3MF is created with one plate per color (the original file is not modified).',search:'Search a 3MF in the library',name:'New file name',tol:'Group similar colors (0 = exact)',src:'Save to (source)',sub:'Subfolder (optional)',bw:'Bed width (mm)',bd:'Bed depth (mm)',analyze:'Analyze colors',run:'Create the per-color 3MF',pick:'Pick a file first.',busy:'Working…',found:'{n} colors detected',done:'{p} plates created in {f}',big:'Warning: the model is larger than the bed given.',none:'No 3MF found.',same:'Folder of the original file',def:'default color'},
+de:{mg:'Gleichfarbige Teile zusammenhalten, wenn näher als (mm)',mgh:'Sich fast berührende Teile bleiben als ein Stück zusammen; weiter entfernte werden getrennt und auf das Bett gelegt. 0 = alles trennen.',cn:'Steckverbinder hinzufügen',cnh:'Ein quadratischer Zapfen, passend zur Kontaktfläche, wird fest mit dem kleineren Teil verschmolzen (nicht abnehmbar); das passende Loch (mit Spiel) wird im aufnehmenden Teil ausgespart.',cd:'Zapfenseite (mm, 0 = auto)',cl:'Länge (mm, 0 = auto)',cc:'Lochspiel (mm)',conns:'{n} Verbinder erstellt',connoff:'Verbinder nicht verfügbar',outside:'Dieser Ordner liegt in keiner deiner Quellen: füge ihn zuerst als Quelle hinzu oder wähle einen Ordner aus der Liste.',fin:'Fertig',fixed:'{n} Loch/Löcher geschlossen — Netz repariert',bedh:'Verwende die Druckbettgröße deines Druckers aus dem Slicer.',savehint:'Wähle, wo die erstellte Datei gespeichert wird.',mkenter:'Name des neuen Ordners eingeben',mkph:'Ordnername',cancel:'Abbrechen',create:'Erstellen',browse:'Durchsuchen',nosrc:'Keine Quelle verfügbar.',selfold:'Bitte einen Ordner wählen.',mkopen:'Ordner erstellen...',dest:'Zielordner',newdir:'Name des neuen Ordners',mk:'Ordner erstellen',nofold:'Kein Unterordner',here:'Speichern in: ',ov:'Überlappung in das Nachbarteil (mm)',ovh:'Jedes Teil übernimmt zusätzlich einen Streifen dieser Breite der Nachbarfläche (z. B. die Hand reicht in den Arm). 0 = keine.',view:'Vorschau des Ergebnisses: eine Platte pro Farbe (zum Drehen ziehen)',all:'Gesamtmodell',title:'Nach Farbe trennen',intro:'Wählen Sie eine mehrfarbige 3MF: Es entsteht eine neue 3MF mit einer Platte pro Farbe (die Originaldatei bleibt unverändert).',search:'3MF in der Bibliothek suchen',name:'Name der neuen Datei',tol:'Ähnliche Farben zusammenfassen (0 = exakt)',src:'Speichern in (Quelle)',sub:'Unterordner (optional)',bw:'Plattenbreite (mm)',bd:'Plattentiefe (mm)',analyze:'Farben analysieren',run:'3MF pro Farbe erstellen',pick:'Wählen Sie zuerst eine Datei.',busy:'Wird verarbeitet…',found:'{n} Farben erkannt',done:'{p} Platten erstellt in {f}',big:'Achtung: Das Modell ist größer als die Platte.',none:'Keine 3MF gefunden.',same:'Ordner der Originaldatei',def:'Standardfarbe'},
+es:{mg:'Mantener juntas las partes del mismo color a menos de (mm)',mgh:'Las partes que casi se tocan siguen juntas como una sola pieza; más lejos se separan y se apoyan en la cama. 0 = separar todo.',cn:'Añadir conectores de encaje',cnh:'Una espiga cuadrada, adaptada al tamaño del contacto, se funde con la pieza más pequeña (no se puede separar); el agujero correspondiente (con holgura) se vacía en la que la recibe.',cd:'Lado de la espiga (mm, 0 = auto)',cl:'Longitud (mm, 0 = auto)',cc:'Holgura del agujero (mm)',conns:'{n} conector(es) creado(s)',connoff:'Conectores no disponibles',outside:'Esta carpeta no está en ninguna de tus fuentes: añádela primero como fuente o elige una de la lista.',fin:'Terminado',fixed:'{n} agujero(s) cerrado(s) — malla reparada',bedh:'Usa el tamaño de la cama de tu impresora en el slicer.',savehint:'Elige dónde guardar el archivo creado.',mkenter:'Introduce el nombre de la nueva carpeta',mkph:'Nombre de la carpeta',cancel:'Cancelar',create:'Crear',browse:'Examinar',nosrc:'Ninguna fuente disponible.',selfold:'Selecciona una carpeta.',mkopen:'Crear carpeta...',dest:'Carpeta de destino',newdir:'Nombre de la nueva carpeta',mk:'Crear carpeta',nofold:'Sin subcarpetas',here:'Guardar en: ',ov:'Solapamiento sobre la pieza vecina (mm)',ovh:'Cada pieza toma además una banda de este ancho de la superficie vecina (p. ej. la mano entra en el brazo). 0 = ninguno.',view:'Vista previa del resultado: una bandeja por color (arrastre para girar)',all:'Modelo completo',title:'Separar por color',intro:'Elija un 3MF multicolor: se crea un nuevo 3MF con una bandeja por color (el archivo original no se modifica).',search:'Buscar un 3MF de la biblioteca',name:'Nombre del nuevo archivo',tol:'Agrupar colores parecidos (0 = exacto)',src:'Guardar en (fuente)',sub:'Subcarpeta (opcional)',bw:'Ancho de bandeja (mm)',bd:'Fondo de bandeja (mm)',analyze:'Analizar colores',run:'Crear el 3MF por color',pick:'Elija primero un archivo.',busy:'Procesando…',found:'{n} colores detectados',done:'{p} bandejas creadas en {f}',big:'Atención: el modelo supera la bandeja indicada.',none:'No se encontró ningún 3MF.',same:'Carpeta del archivo original',def:'color por defecto'},
+it:{mg:'Tieni insieme le parti dello stesso colore se più vicine di (mm)',mgh:'Le parti che quasi si toccano restano insieme come un unico pezzo; più lontane vengono separate e appoggiate sul piano. 0 = separa tutto.',cn:'Aggiungi connettori a incastro',cnh:'Un perno quadrato, adattato alla dimensione del contatto, è fuso al pezzo più piccolo (non si stacca); il foro corrispondente (con gioco) è scavato nel pezzo che lo riceve.',cd:'Lato del perno (mm, 0 = auto)',cl:'Lunghezza (mm, 0 = auto)',cc:'Gioco del foro (mm)',conns:'{n} connettore/i creato/i',connoff:'Connettori non disponibili',outside:'Questa cartella non è in nessuna delle tue sorgenti: aggiungila prima come sorgente o scegli una cartella dall\'elenco.',fin:'Fatto',fixed:'{n} foro/i chiuso/i — mesh riparata',bedh:'Usa le dimensioni del piano della tua stampante nello slicer.',savehint:'Scegli dove salvare il file creato.',mkenter:'Inserisci il nome della nuova cartella',mkph:'Nome della cartella',cancel:'Annulla',create:'Crea',browse:'Sfoglia',nosrc:'Nessuna sorgente disponibile.',selfold:'Seleziona una cartella.',mkopen:'Crea cartella...',dest:'Cartella di destinazione',newdir:'Nome della nuova cartella',mk:'Crea cartella',nofold:'Nessuna sottocartella',here:'Salvataggio in: ',ov:'Sovrapposizione sul pezzo vicino (mm)',ovh:'Ogni pezzo include anche una fascia di questa larghezza della superficie vicina (es. la mano entra nel braccio). 0 = nessuna.',view:'Anteprima del risultato: un piatto per colore (trascina per ruotare)',all:'Modello completo',title:'Separa per colore',intro:'Scegli un 3MF multicolore: viene creato un nuovo 3MF con un piatto per colore (il file originale non viene modificato).',search:'Cerca un 3MF nella libreria',name:'Nome del nuovo file',tol:'Raggruppa colori simili (0 = esatto)',src:'Salva in (sorgente)',sub:'Sottocartella (facoltativa)',bw:'Larghezza piatto (mm)',bd:'Profondità piatto (mm)',analyze:'Analizza i colori',run:'Crea il 3MF per colore',pick:'Scegli prima un file.',busy:'Elaborazione…',found:'{n} colori rilevati',done:'{p} piatti creati in {f}',big:'Attenzione: il modello supera il piatto indicato.',none:'Nessun 3MF trovato.',same:'Cartella del file originale',def:'colore predefinito'},
+pt:{mg:'Manter juntas as partes da mesma cor a menos de (mm)',mgh:'As partes que quase se tocam ficam juntas como uma só peça; mais afastadas, são separadas e assentes na mesa. 0 = separar tudo.',cn:'Adicionar conectores de encaixe',cnh:'Um pino quadrado, adaptado ao tamanho do contacto, é fundido à peça mais pequena (não se solta); o furo correspondente (com folga) é aberto na que o recebe.',cd:'Lado do pino (mm, 0 = auto)',cl:'Comprimento (mm, 0 = auto)',cc:'Folga do furo (mm)',conns:'{n} conector(es) criado(s)',connoff:'Conectores indisponíveis',outside:'Esta pasta não está em nenhuma das tuas origens: adiciona-a primeiro como origem ou escolhe uma pasta da lista.',fin:'Concluído',fixed:'{n} buraco(s) fechado(s) — malha reparada',bedh:'Usa o tamanho da mesa da tua impressora no slicer.',savehint:'Escolha onde guardar o ficheiro criado.',mkenter:'Introduza o nome da nova pasta',mkph:'Nome da pasta',cancel:'Cancelar',create:'Criar',browse:'Procurar',nosrc:'Nenhuma origem disponível.',selfold:'Selecione uma pasta.',mkopen:'Criar pasta...',dest:'Pasta de destino',newdir:'Nome da nova pasta',mk:'Criar pasta',nofold:'Sem subpastas',here:'A guardar em: ',ov:'Sobreposição na peça vizinha (mm)',ovh:'Cada peça inclui também uma faixa desta largura da superfície vizinha (ex. a mão entra no braço). 0 = nenhuma.',view:'Pré-visualização do resultado: uma mesa por cor (arraste para rodar)',all:'Modelo completo',title:'Separar por cor',intro:'Escolha um 3MF multicolor: é criado um novo 3MF com uma mesa por cor (o ficheiro original não é alterado).',search:'Procurar um 3MF na biblioteca',name:'Nome do novo ficheiro',tol:'Agrupar cores semelhantes (0 = exato)',src:'Guardar em (origem)',sub:'Subpasta (opcional)',bw:'Largura da mesa (mm)',bd:'Profundidade da mesa (mm)',analyze:'Analisar cores',run:'Criar o 3MF por cor',pick:'Escolha primeiro um ficheiro.',busy:'A processar…',found:'{n} cores detetadas',done:'{p} mesas criadas em {f}',big:'Atenção: o modelo excede a mesa indicada.',none:'Nenhum 3MF encontrado.',same:'Pasta do ficheiro original',def:'cor predefinida'},
+zh:{mg:'相同颜色的部件距离小于该值时保持在一起（毫米）',mgh:'几乎相接的部件保持为一个整体；距离更远的会被分开并放在热床上。0 = 全部分开。',cn:'添加卡扣连接件',cnh:'与接触面大小相适应的方形销钉与较小的零件熔为一体（无法分离）；接收它的零件上挖出对应的孔（留有间隙）。',cd:'销钉边长（毫米，0 = 自动）',cl:'长度（毫米，0 = 自动）',cc:'孔间隙（毫米）',conns:'已创建 {n} 个连接件',connoff:'连接件不可用',outside:'该文件夹不在任何来源中：请先将其添加为来源，或从列表中选择文件夹。',fin:'完成',fixed:'已封闭 {n} 个孔洞 — 网格已修复',bedh:'请使用切片软件中打印机的热床尺寸。',savehint:'选择保存新文件的位置。',mkenter:'输入新文件夹名称',mkph:'文件夹名称',cancel:'取消',create:'创建',browse:'浏览',nosrc:'没有可用的来源。',selfold:'请选择文件夹。',mkopen:'创建文件夹…',dest:'目标文件夹',newdir:'新文件夹名称',mk:'创建文件夹',nofold:'没有子文件夹',here:'保存到：',ov:'与相邻部件的重叠（毫米）',ovh:'每个部件还会带上相邻表面这一宽度的一条带（例如手伸入手臂）。0 = 无。',view:'结果预览：每种颜色一个盘（拖动可旋转）',all:'完整模型',title:'按颜色拆分',intro:'选择一个多色 3MF：将创建新的 3MF，每种颜色一个盘（不会修改原文件）。',search:'在库中搜索 3MF',name:'新文件名',tol:'合并相近颜色（0 = 精确）',src:'保存到（来源）',sub:'子文件夹（可选）',bw:'打印盘宽度 (mm)',bd:'打印盘深度 (mm)',analyze:'分析颜色',run:'创建按颜色拆分的 3MF',pick:'请先选择文件。',busy:'处理中…',found:'检测到 {n} 种颜色',done:'已在 {f} 中创建 {p} 个盘',big:'注意：模型超出所填的打印盘。',none:'未找到 3MF。',same:'原文件所在文件夹',def:'默认颜色'},
+ja:{mg:'同じ色のパーツをこの距離（mm）より近ければまとめる',mgh:'ほぼ接しているパーツは一つのピースとして残り、離れていれば分けてプレートに置きます。0 = すべて分ける。',cn:'はめ込みコネクターを追加',cnh:'接触面の大きさに合わせた角ピンが小さい方のパーツと一体化され（取り外せません）、受ける側のパーツに対応する穴（クリアランス付き）が空きます。',cd:'ピンの一辺（mm、0 = 自動）',cl:'長さ（mm、0 = 自動）',cc:'穴のクリアランス（mm）',conns:'{n} 個のコネクターを作成',connoff:'コネクターは利用できません',outside:'このフォルダーはどのソースにも含まれていません。先にソースとして追加するか、一覧から選んでください。',fin:'完了',fixed:'{n} 個の穴を閉じました — メッシュ修復済み',bedh:'スライサーのプリンターのベッドサイズを入力してください。',savehint:'作成したファイルの保存先を選択してください。',mkenter:'新しいフォルダ名を入力',mkph:'フォルダ名',cancel:'キャンセル',create:'作成',browse:'参照',nosrc:'利用可能なソースがありません。',selfold:'フォルダを選択してください。',mkopen:'フォルダを作成…',dest:'保存先フォルダ',newdir:'新しいフォルダ名',mk:'フォルダを作成',nofold:'サブフォルダはありません',here:'保存先：',ov:'隣接パーツへの重なり（mm）',ovh:'各パーツは隣接する面から、この幅の帯も取り込みます（例：手が腕の中に入る）。0 = なし。',view:'結果のプレビュー：色ごとに 1 プレート（ドラッグで回転）',all:'モデル全体',title:'色で分割',intro:'マルチカラー 3MF を選択すると、色ごとに 1 プレートの新しい 3MF を作成します（元のファイルは変更されません）。',search:'ライブラリから 3MF を検索',name:'新しいファイル名',tol:'近い色をまとめる（0 = 完全一致）',src:'保存先（ソース）',sub:'サブフォルダ（任意）',bw:'プレート幅 (mm)',bd:'プレート奥行 (mm)',analyze:'色を解析',run:'色別の 3MF を作成',pick:'先にファイルを選択してください。',busy:'処理中…',found:'{n} 色を検出',done:'{f} に {p} プレートを作成しました',big:'注意：モデルが指定のプレートを超えています。',none:'3MF が見つかりません。',same:'元ファイルのフォルダ',def:'既定の色'}};
 let L='fr',sel=null,sources=[];
 const $=id=>document.getElementById(id),t=k=>(T[L]||T.en)[k]||T.en[k]||k;
 function esc(x){return String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-function labels(){const m={t_title:'title',t_intro:'intro',t_search:'search',t_name:'name',t_tol:'tol',t_src:'src',t_sub:'sub',t_bw:'bw',t_bd:'bd'};
-  for(const k in m)$(k).textContent=t(m[k]);$('analyze').textContent=t('analyze');$('run').textContent=t('run');}
-function msg(txt,cls){const m=$('msg');m.textContent=txt;m.className=cls||'';m.style.display=txt?'block':'none'}
+function labels(){const m={t_title:'title',t_intro:'intro',t_search:'search',t_name:'name',t_tol:'tol',t_src:'src',t_bw:'bw',t_bd:'bd',t_view:'view',t_mg:'mg',t_mgh:'mgh',t_cn:'cn',t_cnh:'cnh',t_cd:'cd',t_cl:'cl',t_cc:'cc'};
+  for(const k in m)$(k).textContent=t(m[k]);$('analyze').textContent=t('analyze');$('run').textContent=t('run');$('mkopen').innerHTML='<span class="mi">'+ICO_PLUS+'</span> ';$('mkopen').appendChild(document.createTextNode(t('mkopen')));$('browse').innerHTML=ICO_OPEN;$('browse').title=t('browse');$('t_savehint').textContent=t('savehint');$('t_bedh').textContent=t('bedh');if($('here'))$('here').textContent=hereTxt();}
+function msg(txt,cls){const m=$('msg');m.textContent=cls==='busy'?String(txt).replace(/[\u2026.]+$/,''):txt;m.className=cls||'';if(cls==='busy'){const d=document.createElement('span');d.className='dots';d.innerHTML='<i></i><i></i><i></i>';m.appendChild(d)}m.style.display=txt?'block':'none'}
+function finished(d){const m=$('msg');m.className='finished';m.innerHTML='';
+  const k=document.createElement('div');k.className='tick';k.textContent='\u2713';const w=document.createElement('div');
+  const b=document.createElement('b');b.textContent=t('fin')+' \u2014 '+t('done').replace('{p}',d.plate_count).replace('{f}',d.output_filename);w.appendChild(b);
+  const r=d.repair||{},cn=d.connectors||{};const parts=[];if(r.filled)parts.push(t('fixed').replace('{n}',r.filled));if(cn.made)parts.push(t('conns').replace('{n}',cn.made));if(cn.error)parts.push(t('connoff'));if(d.too_big)parts.push(t('big'));const sm=document.createElement('small');sm.textContent=parts.join(' \u00b7 ');if(sm.textContent)w.appendChild(sm);
+  m.appendChild(k);m.appendChild(w);m.style.display='flex';try{m.scrollIntoView({behavior:'smooth',block:'center'})}catch(e){}}
+const thumbs=new Map();
+function mime(b){const u=new Uint8Array(b);if(u[0]===0x89&&u[1]===0x50)return'image/png';if(u[0]===0xff&&u[1]===0xd8)return'image/jpeg';return'image/webp'}
+let thN=0;const thQ=[];   // au plus 3 miniatures demandées en même temps : l'application reste fluide
+function thNext(){while(thN<3&&thQ.length){const j=thQ.shift();thN++;j().finally(()=>{thN--;thNext()})}}
+function thumbUrl(path){
+  if(!thumbs.has(path))thumbs.set(path,new Promise(ok=>{thQ.push(()=>window.stellio.api('/api/thumb?path='+encodeURIComponent(path),'arraybuffer')
+    .then(b=>ok(URL.createObjectURL(new Blob([b],{type:mime(b)})))).catch(()=>ok(null)));thNext()}));
+  return thumbs.get(path);
+}
+function fill(el,path){thumbUrl(path).then(u=>{if(u){el.innerHTML='';const i=new Image();i.alt='';i.src=u;el.appendChild(i)}})}
+let io=null;
+function lazy(el,path){
+  if(!('IntersectionObserver' in window))return fill(el,path);
+  if(!io)io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){io.unobserve(e.target);fill(e.target,e.target.dataset.p)}}),{root:$('files'),rootMargin:'120px'});
+  el.dataset.p=path;io.observe(el);
+}
+function showBig(){const b=$('big');if(!sel){b.style.display='none';return}
+  b.style.display='flex';b.innerHTML='<div class="th"></div><b></b>';b.lastChild.textContent=sel.name;
+  const th=b.firstChild;th.style.cssText='width:96px;height:96px';thumbUrl(sel.path).then(u=>{if(u&&sel){const i=new Image();i.src=u;th.appendChild(i)}})}
 async function search(){
   try{const d=await window.stellio.api('/api/x/split-color/files?q='+encodeURIComponent($('q').value.trim()));
-    const box=$('files');box.innerHTML=(d.files||[]).map((f,i)=>`<div data-i="${i}" title="${esc(f.path)}">${esc(f.name)}</div>`).join('')||`<div>${esc(t('none'))}</div>`;
-    box.querySelectorAll('[data-i]').forEach(el=>el.onclick=()=>{sel=d.files[+el.dataset.i];box.querySelectorAll('div').forEach(x=>x.classList.remove('sel'));el.classList.add('sel');
-      $('name').value=sel.name.replace(/\.3mf$/i,'')+'_couleurs';$('chips').innerHTML='';$('run').disabled=true;msg('');});
+    const box=$('files');if(io)io.disconnect();
+    box.innerHTML=(d.files||[]).map((f,i)=>`<div class="f${sel&&sel.path===f.path?' sel':''}" data-i="${i}" title="${esc(f.path)}"><div class="th"><i>&#9638;</i></div><div class="nm">${esc(f.name)}</div></div>`).join('')||`<div class="none">${esc(t('none'))}</div>`;
+    box.querySelectorAll('.f').forEach(el=>{const f=d.files[+el.dataset.i];lazy(el.querySelector('.th'),f.path);
+      el.onclick=()=>{sel=f;box.querySelectorAll('.f').forEach(x=>x.classList.remove('sel'));el.classList.add('sel');
+        $('name').value=sel.name.replace(/\.3mf$/i,'')+'_couleurs';$('chips').innerHTML='';renderView(null);$('run').disabled=true;msg('');showBig();setTimeout(()=>{if(sel===f)$('analyze').click()},50);}});
   }catch(e){msg(e.message,'err')}
 }
-function body(extra){const s=$('src');return Object.assign({path:sel&&sel.path,bed_width:+$('bw').value||220,bed_height:+$('bd').value||220,tolerance:+$('tol').value||0,
-  filename:$('name').value.trim(),source_id:s.value,target_subfolder:$('sub').value.trim()},extra||{})}
+
+const VW={yaw:-0.6,el:0.62},views=[];
+function decode(p){const s=atob(p.tris),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return new Int16Array(u.buffer)}
+function shade(hex,k){const n=parseInt(hex.slice(1),16);return'rgb('+[(n>>16)&255,(n>>8)&255,n&255].map(c=>Math.round(c*k)).join(',')+')'}
+function draw(cv,list,R){
+  const ctx=cv.getContext('2d'),W=cv.width,cy=Math.cos(VW.yaw),sy=Math.sin(VW.yaw),ce=Math.cos(VW.el),se=Math.sin(VW.el),sc=W/2/R*0.86;
+  ctx.clearRect(0,0,W,W);const items=[];
+  list.forEach(pc=>{const a=pc.a,n=a.length/9;for(let i=0;i<n;i++){const o=i*9,P=[];
+    for(let j=0;j<3;j++){const x=a[o+j*3]/pc.q,y=a[o+j*3+1]/pc.q,z=a[o+j*3+2]/pc.q,x1=x*cy-y*sy,y1=x*sy+y*cy;P.push([x1,z*ce+y1*se,y1*ce-z*se])}
+    const ux=P[1][0]-P[0][0],uy=P[1][1]-P[0][1],uz=P[1][2]-P[0][2],vx=P[2][0]-P[0][0],vy=P[2][1]-P[0][1],vz=P[2][2]-P[0][2];
+    let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;const l=Math.hypot(nx,ny,nz)||1;nx/=l;ny/=l;nz/=l;
+    const k=0.38+0.62*Math.abs(-0.3*nx+0.45*ny+0.55*nz);
+    items.push({P,d:(P[0][2]+P[1][2]+P[2][2])/3,c:pc.hex,k})}});
+  items.sort((p,q)=>q.d-p.d);ctx.lineWidth=0.8;ctx.lineJoin='round';
+  for(const it of items){const col=shade(it.c,it.k);ctx.fillStyle=col;ctx.strokeStyle=col;ctx.beginPath();
+    ctx.moveTo(W/2+it.P[0][0]*sc,W*0.56-it.P[0][1]*sc);ctx.lineTo(W/2+it.P[1][0]*sc,W*0.56-it.P[1][1]*sc);ctx.lineTo(W/2+it.P[2][0]*sc,W*0.56-it.P[2][1]*sc);ctx.closePath();ctx.fill();ctx.stroke()}
+}
+function redraw(){views.forEach(v=>draw(v.cv,v.list,v.R))}
+function renderView(pv){
+  const box=$('view'),g=$('vgrid');views.length=0;g.innerHTML='';
+  if(!pv||!pv.pieces||pv.pieces.length<2){box.style.display='none';return}
+  const ps=pv.pieces.map(p=>({hex:p.hex,q:pv.q,a:decode(p)}));
+  const e=pv.extent,R=Math.max(1e-6,Math.hypot(e[0],e[1],e[2])/2);
+  const cols=(window.__cols||[]).reduce((m,c)=>(m[c.hex]=c,m),{});
+  const add=(label,list,hex,rr)=>{const card=document.createElement('div');card.className='card';const cv=document.createElement('canvas');cv.width=cv.height=360;
+    const cap=document.createElement('div');cap.className='cap';if(hex){const i=document.createElement('i');i.style.background=hex;cap.appendChild(i)}
+    const sp=document.createElement('span');sp.textContent=label;cap.appendChild(sp);card.appendChild(cv);card.appendChild(cap);g.appendChild(card);
+    views.push({cv,list,R:rr||R});
+    let drag=null;cv.onpointerdown=ev=>{drag=[ev.clientX,ev.clientY];cv.setPointerCapture(ev.pointerId);cv.style.cursor='grabbing'};
+    cv.onpointermove=ev=>{if(!drag)return;VW.yaw+=(ev.clientX-drag[0])*0.012;VW.el=Math.max(-1.4,Math.min(1.4,VW.el+(ev.clientY-drag[1])*0.01));drag=[ev.clientX,ev.clientY];redraw()};
+    cv.onpointerup=cv.onpointercancel=()=>{drag=null;cv.style.cursor='grab'}};
+  add(t('all'),ps);
+  ps.forEach(p=>{const c=cols[p.hex],a=p.a,n=a.length;let lo=[1e9,1e9,1e9],hi=[-1e9,-1e9,-1e9];
+    for(let i=0;i<n;i+=3)for(let k=0;k<3;k++){const v=a[i+k];if(v<lo[k])lo[k]=v;if(v>hi[k])hi[k]=v}
+    const cx=Math.round((lo[0]+hi[0])/2),cy=Math.round((lo[1]+hi[1])/2),cz=Math.round((lo[2]+hi[2])/2),b=new Int16Array(n);   // pièce recentrée : comme sur son plateau
+    for(let i=0;i<n;i+=3){b[i]=a[i]-cx;b[i+1]=a[i+1]-cy;b[i+2]=a[i+2]-cz}
+    const r=Math.max(1e-6,Math.hypot(hi[0]-lo[0],hi[1]-lo[1],hi[2]-lo[2])/2/pv.q);
+    add(p.hex+(c?' · '+c.percent+'%':''),[{hex:p.hex,q:pv.q,a:b}],p.hex,r)});
+  box.style.display='block';redraw();
+}
+
+let cur='',curSid='';   // dossier choisi : source + sous-dossier relatif
+function hereTxt(){const o=$('src').selectedOptions[0];return curSid?t('here')+(o?o.dataset.label:'')+(cur?' / '+cur.split('/').join(' / '):''):t('here')+t('same')}
+const opened=new Set();
+function addOpt(sid,sub,label,depth,after,path){const o=document.createElement('option');o.value=sid+'|'+sub;o.dataset.sid=sid;o.dataset.sub=sub;o.dataset.label=label;
+  const full=(path||after.dataset.path||'')+(depth&&sub?'/'+sub.split('/').pop():'');o.dataset.path=depth?full:(path||'');
+  o.textContent=(depth?'\uD83D\uDCC2 '+label+' / '+sub.split('/').join(' / '):'\uD83D\uDCC1 '+label)+(o.dataset.path?' ('+o.dataset.path+')':'');after.after(o);return o}
+async function expand(opt){const sid=opt.dataset.sid,sub=opt.dataset.sub,key=sid+'|'+sub;if(!sid||opened.has(key))return;opened.add(key);
+  try{const d=await window.stellio.api('/api/x/split-color/folders?source_id='+encodeURIComponent(sid)+'&sub='+encodeURIComponent(sub));
+    const depth=sub?sub.split('/').length:0;let prev=opt;
+    (d.folders||[]).forEach(f=>{prev=addOpt(sid,(sub?sub+'/':'')+f,opt.dataset.label,depth+1,prev,opt.dataset.path)})}catch(e){opened.delete(key)}}
+async function pickDest(){const o=$('src').selectedOptions[0];
+  if(!o||!o.dataset.sid){cur='';curSid='';$('here').textContent=hereTxt();return}
+  curSid=o.dataset.sid;cur=o.dataset.sub||'';$('here').textContent=hereTxt();await expand(o)}
+async function createIn(name){
+  const d=await window.stellio.api('/api/x/split-color/mkdir','json',{method:'POST',body:{source_id:curSid,sub:cur,name}});
+  const o=$('src').selectedOptions[0];await expand(o);
+  let n=[...$('src').options].find(x=>x.value===curSid+'|'+d.sub);
+  if(!n){let prev=o,i=$('src').selectedIndex+1;const dp=cur?cur.split('/').length:0;const pre=cur?cur+'/':'';
+    while($('src').options[i]&&$('src').options[i].dataset.sid===curSid&&$('src').options[i].dataset.sub.startsWith(pre)&&$('src').options[i].dataset.sub!==cur){prev=$('src').options[i];i++}
+    n=addOpt(curSid,d.sub,o.dataset.label,dp+1,prev,o.dataset.path)}
+  $('src').value=n.value;await pickDest();
+}
+async function selectPath(sid,sub){
+  let o=[...$('src').options].find(x=>x.value===sid+'|');if(!o)return false;
+  await expand(o);const parts=sub?sub.split('/'):[];let acc='';
+  for(const p of parts){acc=acc?acc+'/'+p:p;const n=[...$('src').options].find(x=>x.value===sid+'|'+acc);if(!n)break;o=n;await expand(o)}
+  $('src').value=o.value;await pickDest();return true}
+async function browse(){
+  try{const d=await window.stellio.api('/api/x/split-color/browse','json',{method:'POST',body:{}});
+    if(!(await selectPath(String(d.source_id),d.sub||'')))msg(t('outside'),'err');else msg('')}
+  catch(e){const m=String(e&&e.message||'');if(/annul|cancel/i.test(m))return false;
+    msg(/n'est dans aucune|aucune de tes sources|outside/i.test(m)?t('outside'):m,'err');return false}
+  return true}
+const ICO_PLUS='<svg viewBox="0 0 512 512" width="18" height="18" fill="currentColor"><path d="M512 416c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V96c0-35.3 28.7-64 64-64h128c20.1 0 39.1 9.5 51.2 25.6l19.2 25.6c6 8.1 15.5 12.8 25.6 12.8h160c35.3 0 64 28.7 64 64v256zM232 376c0 13.3 10.7 24 24 24s24-10.7 24-24v-64h64c13.3 0 24-10.7 24-24s-10.7-24-24-24h-64v-64c0-13.3-10.7-24-24-24s-24 10.7-24 24v64h-64c-13.3 0-24 10.7-24 24s10.7 24 24 24h64v64z"/></svg>';
+const ICO_OPEN='<svg viewBox="0 0 576 512" width="18" height="18" fill="currentColor"><path d="M88.7 223.8L0 375.8V96C0 60.7 28.7 32 64 32H181.5c17 0 33.3 6.7 45.3 18.7l26.5 26.5c12 12 28.3 18.7 45.3 18.7H416c35.3 0 64 28.7 64 64v32H144c-22.8 0-43.8 12.1-55.3 31.8zm27.6 16.1C122.1 230 132.6 224 144 224H544c11.5 0 22 6.1 27.7 16.1s5.7 22.2-.1 32.1l-112 192C453.9 474 443.4 480 432 480H32c-11.5 0-22-6.1-27.7-16.1s-5.7-22.2 .1-32.1l112-192z"/></svg>';
+async function openMk(){
+  if(!curSid)await browse();                                                        // comme pour les téléchargements : sans dossier choisi, l'explorateur s'ouvre
+  if(!curSid&&$('src').options.length>1){$('src').selectedIndex=1;await pickDest()}   // explorateur indisponible : première source
+  if(!curSid)return;
+  const ov=document.createElement('div');ov.className='mo';const md=document.createElement('div');md.className='md';ov.appendChild(md);
+  const h=document.createElement('h3');h.innerHTML='<span class="mi">'+ICO_PLUS+'</span>';const ht=document.createElement('span');ht.textContent=t('mkopen');h.appendChild(ht);md.appendChild(h);
+  const p=document.createElement('p');p.textContent=t('mkenter');md.appendChild(p);
+  const err=document.createElement('p');err.style.cssText='color:var(--st-danger,#ef4444);margin:-8px 0 12px;display:none';md.appendChild(err);
+  const inp=document.createElement('input');inp.maxLength=50;inp.placeholder=t('mkph');md.appendChild(inp);
+  const bt=document.createElement('div');bt.className='bt';const c=document.createElement('button');c.type='button';c.textContent=t('cancel');
+  const ok=document.createElement('button');ok.type='button';ok.className='primary';ok.textContent=t('create');bt.appendChild(c);bt.appendChild(ok);md.appendChild(bt);
+  const close=()=>ov.remove();c.onclick=close;ov.onclick=e=>{if(e.target===ov)close()};
+  const go=async()=>{const name=inp.value.trim();if(!name){inp.style.borderColor='var(--st-danger,#ef4444)';return}
+    ok.disabled=true;try{await createIn(name);close()}catch(e){err.textContent=e.message;err.style.display='block';ok.disabled=false}};
+  ok.onclick=go;inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();go()}else if(e.key==='Escape')close()};
+  document.body.appendChild(ov);setTimeout(()=>inp.focus(),50);
+}
+function body(extra){return Object.assign({path:sel&&sel.path,bed_width:+$('bw').value||220,bed_height:+$('bd').value||220,tolerance:+$('tol').value||0,
+  merge_gap:$('mg').value===''?5:+$('mg').value,
+  connectors:$('cn').checked,conn_size:+$('cd').value||0,conn_length:+$('cl').value||0,conn_clearance:$('cc').value===''?0.2:+$('cc').value,
+  filename:$('name').value.trim(),source_id:curSid,target_subfolder:curSid?cur:''},extra||{})}
 function chips(cols){$('chips').innerHTML=(cols||[]).map(c=>`<span class="chip"><i style="background:${esc(c.hex)}"></i>${esc(c.hex)} · ${c.percent}%${c.default?' · '+esc(t('def')):''}</span>`).join('')}
 async function call(extra){return window.stellio.api('/api/x/split-color/split','json',{method:'POST',body:body(extra)})}
-$('analyze').onclick=async()=>{if(!sel)return msg(t('pick'),'err');msg(t('busy'));$('run').disabled=true;
-  try{const d=await call({dry_run:true});chips(d.colors);msg(t('found').replace('{n}',d.color_count),'ok');$('run').disabled=d.color_count<2}
+$('analyze').onclick=async()=>{if(!sel)return msg(t('pick'),'err');msg(t('busy'),'busy');$('run').disabled=true;
+  try{const d=await call({dry_run:true});window.__cols=d.colors;chips(d.colors);renderView(d.preview);msg(t('found').replace('{n}',d.color_count),'ok');$('run').disabled=d.color_count<2}
   catch(e){msg(e.message,'err')}};
-$('run').onclick=async()=>{if(!sel)return msg(t('pick'),'err');msg(t('busy'));$('run').disabled=true;
-  try{const d=await call();msg(t('done').replace('{p}',d.plate_count).replace('{f}',d.output_filename)+(d.too_big?' — '+t('big'):''),d.too_big?'err':'ok')}
+$('run').onclick=async()=>{if(!sel)return msg(t('pick'),'err');msg(t('busy'),'busy');$('run').disabled=true;
+  try{const d=await call();window.__cols=d.colors;renderView(d.preview);finished(d)}
   catch(e){msg(e.message,'err')}finally{$('run').disabled=false}};
 $('tol').onchange=()=>{if(sel)$('analyze').click()};
+$('cn').onchange=()=>{$('cnopts').style.display=$('cn').checked?'':'none'};
 let timer;$('q').oninput=()=>{clearTimeout(timer);timer=setTimeout(search,250)};
 document.addEventListener('stellio-ready',async()=>{L=(window.stellio.lang||'fr').slice(0,2);if(!T[L])L='en';labels();
   try{sources=await window.stellio.api('/api/sources')}catch(e){sources=[]}
-  $('src').innerHTML=`<option value="">${esc(t('same'))}</option>`+sources.map(s=>`<option value="${esc(s.id)}">${esc(s.name||s.path)}</option>`).join('');search()});
+  $('src').innerHTML=`<option value="">${esc(t('selfold'))}</option>`;let prev=$('src').options[0];sources.filter(s=>!s.type||['folder','smb','nfs'].includes(s.type)).forEach(s=>{prev=addOpt(String(s.id),'',s.name||s.path,0,prev,String(s.path||''))});$('here').textContent=hereTxt();search()
+  $('src').onchange=pickDest;$('mkopen').onclick=openMk;$('browse').onclick=browse;});
 labels();
 </script>

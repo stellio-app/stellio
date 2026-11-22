@@ -22,6 +22,8 @@ function table(rows, cols) {
         `<tr>${cols.map(c => cell(c[2] ? c[2](r[c[0]], r) : r[c[0]])).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 const note = (box, msg, bad) => { const p = box.querySelector('.suite-msg') || box.insertAdjacentElement('afterbegin', Object.assign(document.createElement('p'), { className: 'suite-msg settings-hint' })); p.textContent = msg; p.style.color = bad ? 'var(--danger, #e5484d)' : ''; };
+/* 1.2.0 : un plugin à code intégré (signé) ne se charge qu'au démarrage : après chaque installation ou mise à jour, on le dit et on propose le redémarrage. */
+const offerRestart = (box, pl) => { if (!(pl && pl.host)) return; note(box, '✓ ' + tr('restart_after_install', 'Plugin installé : redémarrez Stellio pour le charger (ou pour appliquer la mise à jour).')); setTimeout(() => { const b = document.getElementById('su-restart'); if (b) b.click(); }, 300); };
 /* Avancement d'une tâche longue : dans le bandeau d'activité s'il existe (Diff 3D…), sinon message ordinaire. */
 const prog = (box, msg) => { const wk = box.querySelector('.su-work-auto span'); if (!wk) return note(box, msg); const m = String(msg || '').trim().replace(/^[a-z_]+\s*/i, ''); wk.textContent = tr('working', 'Calcul en cours…') + (m ? ' ' + m : ''); };
 const field = (id, label, ph, cls) => `<label class="suite-field${cls ? ' ' + cls : ''}"><span>${esc(label)}</span><input type="text" id="${id}" class="settings-select" placeholder="${esc(ph || '')}" autocomplete="off"></label>`;
@@ -543,15 +545,19 @@ const sandboxNotice = (sb) => !sb || !sb.enforced ? ''
     : (sb.filesystem ? tr('sb_full', "Sous Linux, le noyau restreint chaque plugin : fichiers (lecture seule, écriture dans son dossier data/) et réseau (selon ses permissions). Un plugin autorisé à utiliser le réseau n'est pas limité à certains sites.")
         : tr('sb_net', "Le noyau restreint le réseau des plugins sans permission « network ». Les fichiers ne sont pas restreints sur ce noyau (Landlock absent) : n'activez que du code que vous avez lu."));
 /* Installation avec les deux confirmations explicites du serveur : risque détecté par l'audit, changement de clé de signature. */
-async function installFlow(send) {
+async function installFlow(send, opts) {
     let extra = {};
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
         try { return await send(extra); } catch (e) {
             const code = e.data && e.data.code;
             if (code === 'audit_blocked' && !extra.accept_risk) {
                 const list = ((e.data.audit && e.data.audit.findings) || []).filter(f => f.blocking).slice(0, 6).map(f => `• ${f.file}${f.line ? ':' + f.line : ''} — ${f.detail}`).join('\n');
                 if (!await ask(`${tr('risk_title', 'Code dangereux détecté')}\n\n${list}\n\n${tr('risk_confirm', 'Installer malgré ce risque ?')}`, { danger: true })) throw e;
                 extra = Object.assign({}, extra, { accept_risk: true });
+            } else if ((code === 'host_unsigned' || code === 'host_no_key') && opts && opts.unsigned && !extra.accept_unsigned) {
+                /* installation directe depuis un .zip : la signature n'est pas exigée, mais l'utilisateur doit accepter la responsabilité */
+                if (!await ask(`${tr('unsigned_title', 'Plugin non signé')}\n\n${tr('unsigned_body', "Ce plugin n'est pas signé : son auteur et son contenu ne sont pas vérifiés, et il exécutera du code directement dans Stellio, avec accès à vos fichiers et à votre compte.\n\nStellio et l'équipe de développement ne peuvent en aucun cas être tenus pour responsables des dégâts, pertes de données ou failles causés par ce plugin. N'installez que du code dont vous avez confiance en la source.")}\n\n${tr('unsigned_confirm', 'Je comprends et j\'accepte ce risque : installer quand même ?')}`, { danger: true })) throw e;
+                extra = Object.assign({}, extra, { accept_unsigned: true });
             } else if (code === 'key_changed' && !extra.accept_key_change) {
                 if (!await ask(`${e.message}\n\n${tr('key_confirm', 'La clé de signature a changé. Installer quand même ?')}`, { danger: true })) throw e;
                 extra = Object.assign({}, extra, { accept_key_change: true });
@@ -559,6 +565,7 @@ async function installFlow(send) {
         }
     }
 }
+const plOpen = new Set();   // sections dépliées pendant la visite en cours (vide à chaque ouverture de la page)
 let plSource = null;      // source de catalogue choisie pendant la session (le stockage du navigateur n'est qu'un confort)
 TABS.plugins = { fb: 'Plugins', icon: 'puzzle-piece', async render(box) {
     const lang = (window.I18N && I18N.lang) || 'fr';
@@ -582,7 +589,7 @@ TABS.plugins = { fb: 'Plugins', icon: 'puzzle-piece', async render(box) {
         (d.plugins.length ? `<div class="su-plugins">${d.plugins.map(p => item(p,
             `<button type="button" class="btn btn-ghost btn-sm" data-pl="${p.enabled ? 'off' : 'on'}" data-id="${esc(p.id)}" data-perms="${esc((p.permissions || []).join(','))}">${esc(p.enabled ? tr('disable', 'Désactiver') : tr('enable', 'Activer'))}</button>` +
             `<button type="button" class="btn btn-ghost btn-sm" data-pl="test" data-id="${esc(p.id)}">${esc(tr('test', 'Essai'))}</button><button type="button" class="btn btn-ghost btn-sm su-danger" data-pl="del" data-id="${esc(p.id)}">${esc(tr('delete', 'Supprimer'))}</button>`,
-            `<span class="su-chip ${p.enabled ? 'su-chip-ok' : 'su-chip-muted'}">${esc(p.enabled ? tr('active', 'Actif') : tr('inactive', 'Inactif'))}</span>${p.security ? sigChip(p.security.signature) + auditChip(p.security.audit) : ''}`)).join('')}</div>` : `<p class="settings-hint">${esc(tr('no_plugin', 'Aucun plugin installé.'))}</p>`) +
+            `<span class="su-chip ${p.enabled ? 'su-chip-ok' : 'su-chip-muted'}">${esc(p.enabled ? tr('active', 'Actif') : tr('inactive', 'Inactif'))}</span>${p.restart_required ? `<span class="su-chip su-chip-warn">${esc(tr('restart_needed', 'Redémarrage requis'))}</span>` : ''}${p.security ? sigChip(p.security.signature) + auditChip(p.security.audit) : ''}`)).join('')}</div>` : `<p class="settings-hint">${esc(tr('no_plugin', 'Aucun plugin installé.'))}</p>`) +
         ((d.trusted_keys || []).length ? '' : `<p class="settings-hint"><i class="fa-solid fa-circle-info"></i> ${esc(tr('keys_none', "Aucune clé de confiance configurée : les téléchargements ne sont protégés que par l'empreinte SHA-256 du catalogue."))}</p>`);
     const builtHtml = (d) => { const b = d.builtin || []; return `<summary><h4><i class="fa-solid fa-cubes"></i> ${esc(tr('builtin_title', 'Plugins intégrés'))} <span class="su-chip">${b.filter(x => x.enabled).length}/${b.length}</span></h4></summary>` +
         `<p class="settings-hint">${esc(tr('builtin_hint', 'Livrés avec Stellio, ils ne se chargent que lorsqu\'ils sont activés. Vos réglages sont conservés quand vous désactivez un plugin. Le changement s\'applique au redémarrage de Stellio.'))}</p>` +
@@ -591,30 +598,58 @@ TABS.plugins = { fb: 'Plugins', icon: 'puzzle-piece', async render(box) {
             (p.description ? `<p class="settings-hint">${esc(p.description)}</p>` : '') +
             `<div class="su-actions"><button type="button" class="btn btn-${p.enabled ? 'ghost' : 'secondary'} btn-sm" data-hp="${p.enabled ? 'off' : 'on'}" data-id="${esc(p.id)}">${esc(p.enabled ? tr('disable', 'Désactiver') : tr('enable', 'Activer'))}</button></div></div>`).join('')}</div>` : '') +
         `<div class="su-actions"><button type="button" class="btn btn-${b.some(x => x.restart_required) ? 'primary' : 'ghost'} btn-sm" id="su-restart"><i class="fa-solid fa-rotate"></i> ${esc(tr('restart_btn', 'Redémarrer Stellio'))}</button></div>`; };
-    const builtSection = (d) => `<details class="su-card su-fold" id="su-plbuilt" open>${builtHtml(d)}</details>`;
-    const instSection = (d) => `<details class="su-card su-fold" id="su-plinst" open>${instHtml(d)}</details>`;
+    const op = (id) => (plOpen.has(id) ? ' open' : '');
+    const builtSection = (d) => `<details class="su-card su-fold" id="su-plbuilt"${op('su-plbuilt')}>${builtHtml(d)}</details>`;
+    const instSection = (d) => `<details class="su-card su-fold" id="su-plinst"${op('su-plinst')}>${instHtml(d)}</details>`;
     box.innerHTML = (sandboxNotice(d.sandbox) ? `<div class="su-notice"><i class="fa-solid fa-shield-halved"></i><span>${esc(sandboxNotice(d.sandbox))}</span></div>` : '') +
-        `<section class="su-card"><h4><i class="fa-solid fa-store"></i> ${esc(tr('catalog', 'Catalogue'))} <span id="su-plcn" class="su-chip" hidden></span><button type="button" class="btn btn-ghost btn-sm su-refresh" id="su-plref" title="${esc(tr('refresh', 'Actualiser le catalogue'))}" aria-label="${esc(tr('refresh', 'Actualiser le catalogue'))}"><i class="fa-solid fa-rotate"></i> ${esc(tr('refresh_btn', 'Actualiser'))}</button></h4><p class="settings-hint">${esc(tr('store_hint', 'Plugins proposés par la communauté, hébergés sur GitHub. Installer un plugin ne l\'active pas : vous lisez ses permissions d\'abord.'))}</p><div id="su-plstore" class="su-store"><p class="settings-hint">…</p></div></section>` +
-        builtSection(d) + instSection(d) +
-        `<div class="su-two"><details class="su-card su-fold"><summary><h4><i class="fa-solid fa-file-zipper"></i> ${esc(tr('install_zip', 'Installer ou mettre à jour depuis un .zip'))}</h4></summary>` +
-        `<div class="su-actions"><label class="btn btn-secondary btn-sm suite-file"><i class="fa-solid fa-folder-open"></i> ${esc(tr('choose_file', 'Choisir un fichier'))}<input type="file" id="su-plf" accept=".zip" hidden></label><span id="su-plfn" class="settings-hint">${esc(tr('no_file', 'Aucun fichier sélectionné'))}</span></div>` +
+        `<details class="su-card su-fold" id="su-plcat"${op('su-plcat')}><summary><h4><i class="fa-solid fa-store"></i> ${esc(tr('catalog', 'Catalogue'))} <span id="su-plcn" class="su-chip" hidden></span><span id="su-plupd" class="su-chip su-chip-upd" hidden style="display:none"><i class="fa-solid fa-arrow-up"></i> ${esc(tr('update_badge', 'Mise à jour disponible'))}</span><button type="button" class="btn btn-ghost btn-sm su-refresh" id="su-plref" title="${esc(tr('refresh', 'Actualiser le catalogue'))}" aria-label="${esc(tr('refresh', 'Actualiser le catalogue'))}"><i class="fa-solid fa-rotate"></i> ${esc(tr('refresh_btn', 'Actualiser'))}</button></h4></summary><p class="settings-hint">${esc(tr('store_hint', 'Plugins proposés par la communauté, hébergés sur GitHub. Installer un plugin ne l\'active pas : vous lisez ses permissions d\'abord.'))}</p><div id="su-plstore" class="su-store"><p class="settings-hint">…</p></div>` +
+        `<div class="su-sub"><details class="su-fold su-fold-in" id="su-plzip"${op('su-plzip')}><summary><h4><i class="fa-solid fa-file-zipper"></i> ${esc(tr('install_zip', 'Installer ou mettre à jour depuis un .zip'))}</h4></summary>` +
+        `<div class="su-actions"><label class="btn btn-secondary btn-sm suite-file"><i class="fa-solid fa-folder-open"></i> ${esc(tr('choose_file', 'Choisir un fichier'))}<input type="file" id="su-plf" accept=".zip,.json,.sig" multiple hidden></label><span id="su-plfn" class="settings-hint">${esc(tr('no_file', 'Aucun fichier sélectionné'))}</span></div><p class="settings-hint">${esc(tr('sig_hint', "Plugin signé : sélectionnez en même temps le .zip et son fichier .signature.json (créé par signer-plugin.bat)."))}</p>` +
         `<label class="suite-inline"><input type="checkbox" id="su-pldg"> ${esc(tr('allow_downgrade', 'autoriser le retour à une version plus ancienne'))}</label><div class="su-actions">${btn('su-plup', tr('install', 'Installer'))}</div></details>` +
-        `<details class="su-card su-fold"${custom ? ' open' : ''}><summary><h4><i class="fa-solid fa-link"></i> ${esc(tr('source_title', 'Source du catalogue'))}</h4></summary><p class="settings-hint">${esc(tr('source_hint', 'Par défaut, le catalogue officiel de Stellio. Vous pouvez lire un autre catalogue (adresse https d\'un fichier JSON), par exemple celui de votre équipe.'))}</p>` +
+        `<details class="su-fold su-fold-in" id="su-plsrc"${op('su-plsrc')}><summary><h4><i class="fa-solid fa-link"></i> ${esc(tr('source_title', 'Source du catalogue'))}</h4></summary><p class="settings-hint">${esc(tr('source_hint', 'Par défaut, le catalogue officiel de Stellio. Vous pouvez lire un autre catalogue (adresse https d\'un fichier JSON), par exemple celui de votre équipe.'))}</p>` +
         field('su-plcu', tr('catalog_url', 'Adresse https du catalogue (JSON)'), 'https://…/catalog.json') +
-        `<div class="su-actions">${btn('su-plcat', tr('source_use', 'Utiliser cette source'), 'btn-secondary')}${btn('su-plcdef', tr('source_default', 'Catalogue officiel'), 'btn-ghost')}</div></details></div>`;
+        `<div class="su-actions">${btn('su-plcuse', tr('source_use', 'Utiliser cette source'), 'btn-secondary')}${btn('su-plcdef', tr('source_default', 'Catalogue officiel'), 'btn-ghost')}</div></details></div></details>` +
+        builtSection(d) + instSection(d);
+    if (!box._plToggle) { box._plToggle = true; box.addEventListener('toggle', (e) => { const el = e.target; if (el && el.tagName === 'DETAILS' && el.id) { if (el.open) plOpen.add(el.id); else plOpen.delete(el.id); } }, true); }
     if ($('su-plcu')) $('su-plcu').value = custom;
-    if ($('su-plf')) $('su-plf').onchange = () => { $('su-plfn').textContent = ($('su-plf').files[0] || {}).name || tr('no_file', 'Aucun fichier sélectionné'); };
+    if ($('su-plf')) $('su-plf').onchange = () => { $('su-plfn').textContent = Array.from($('su-plf').files).map(x => x.name).join(' + ') || tr('no_file', 'Aucun fichier sélectionné'); };
     const loadStore = async (refresh) => {
         const host = $('su-plstore'); if (!host) return;
         const rb = $('su-plref'); if (refresh) { bust = Date.now(); if (rb) { rb.disabled = true; rb.querySelector('i').classList.add('fa-spin'); } host.classList.add('su-loading'); }
         try {
             const c = await api('/api/plugins/catalog', Object.assign({ lang }, custom ? { url: custom } : {}, refresh ? { refresh: true } : {}));
             if (!$('su-plstore')) return;
+            loadStore._soft = 0; clearTimeout(loadStore._t);
             if ($('su-plcn')) { $('su-plcn').hidden = false; $('su-plcn').textContent = c.count; }
-            host.innerHTML = c.plugins.length ? `<div class="su-store-grid">${c.plugins.map(card).join('')}</div>` : `<p class="settings-hint">${esc(tr('store_empty', 'Aucun plugin dans ce catalogue pour le moment.'))}</p>`;
+            if ($('su-plupd')) { const nu = c.plugins.filter(x => x.update_available).length; $('su-plupd').hidden = !nu; $('su-plupd').style.display = nu ? '' : 'none'; $('su-plupd').title = nu ? String(nu) : ''; }
+            /* pas de redessin (donc pas de clignotement ni de rechargement des logos) quand le catalogue n'a pas changé */
+            const gridHtml = c.plugins.length ? `<div class="su-store-grid">${c.plugins.map(card).join('')}</div>` : `<p class="settings-hint">${esc(tr('store_empty', 'Aucun plugin dans ce catalogue pour le moment.'))}</p>`;
+            const gridSig = gridHtml.replace(/&t=\d+/g, '');
+            if (host.dataset.sig !== gridSig || (!c.stale && host.querySelector('.su-soft')) || refresh) { host.innerHTML = gridHtml; host.dataset.sig = gridSig; }
+            /* catalogue toujours consultable : en cas de lecture difficile (hors connexion, GitHub en retard), la dernière version vérifiée s'affiche avec un bandeau calme ;
+               relecture automatique (15 s, puis toutes les 2 min), et actualisation silencieuse toutes les 5 min quand tout va bien */
+            clearTimeout(loadStore._t);
+            if (c.stale) {
+                if (!host.querySelector('.su-soft')) host.insertAdjacentHTML('afterbegin', `<div class="su-soft su-soft-slim"><i class="fa-solid fa-rotate fa-spin"></i><div><b>${esc(tr('catalog_updating', 'Le catalogue se met à jour…'))}</b> <span class="settings-hint">${esc(tr('catalog_stale_hint', 'Dernière version vérifiée affichée ; nouvelle lecture automatique.'))}</span></div></div>`);
+                loadStore._stale = (refresh ? 0 : (loadStore._stale || 0)) + 1;
+                loadStore._t = setTimeout(() => { if ($('su-plstore')) loadStore(); }, loadStore._stale <= 6 ? 15000 : 120000);
+            } else {
+                loadStore._stale = 0;
+                loadStore._t = setTimeout(() => { if ($('su-plstore')) loadStore(); }, 300000);
+            }
             host.querySelectorAll('img.su-logo').forEach(im => im.addEventListener('error', () => im.replaceWith(Object.assign(document.createElement('span'), { className: 'su-logo su-logo-ph', innerHTML: '<i class="fa-solid fa-puzzle-piece"></i>' }))));
         } catch (x) {
-            if ($('su-plstore')) host.innerHTML = `<p class="settings-hint">${esc(tr('store_fail', 'Catalogue indisponible'))} — ${esc(x.message || '')} <button type="button" class="btn btn-ghost btn-sm" data-retry="1">${esc(tr('retry', 'Réessayer'))}</button></p>`;
+            if ($('su-plstore') && (x.data && x.data.code === 'catalog_signature')) {
+                /* Juste après une publication, GitHub peut servir un instant le catalogue et sa signature de deux versions différentes : ce n'est pas une panne.
+                   Message rassurant avec repère visuel, et nouvelle tentative automatique (4 fois, toutes les 15 s) avant de proposer de réessayer soi-même. */
+                const n = refresh ? 0 : (loadStore._soft || 0);
+                const waiting = n < 4;
+                host.dataset.sig = '';
+                host.innerHTML = `<div class="su-soft"><i class="fa-solid ${waiting ? 'fa-rotate fa-spin' : 'fa-clock'}"></i><div><b>${esc(waiting ? tr('catalog_updating', 'Le catalogue se met à jour…') : tr('catalog_later', 'La mise à jour du catalogue prend un peu de temps'))}</b>` +
+                    `<div class="settings-hint">${esc(waiting ? tr('catalog_updating_hint', 'Une publication vient d\'avoir lieu : nouvelle vérification dans quelques secondes.') : tr('catalog_later_hint', 'Rien n\'est cassé. Réessayez dans quelques minutes.'))}</div></div>` +
+                    (waiting ? '' : `<button type="button" class="btn btn-ghost btn-sm" data-retry="1">${esc(tr('retry', 'Réessayer'))}</button>`) + `</div>`;
+                if (waiting) { loadStore._soft = n + 1; clearTimeout(loadStore._t); loadStore._t = setTimeout(() => { if ($('su-plstore')) loadStore(); }, 15000); }
+            } else if ($('su-plstore')) { loadStore._soft = 0; host.dataset.sig = ''; host.innerHTML = `<p class="settings-hint">${esc(tr('store_fail', 'Catalogue indisponible'))} — ${esc(x.message || '')} <button type="button" class="btn btn-ghost btn-sm" data-retry="1">${esc(tr('retry', 'Réessayer'))}</button></p>`; }
         } finally {
             const rb2 = $('su-plref'); if (rb2) { rb2.disabled = false; rb2.querySelector('i').classList.remove('fa-spin'); }
             if ($('su-plstore')) $('su-plstore').classList.remove('su-loading');
@@ -623,8 +658,8 @@ TABS.plugins = { fb: 'Plugins', icon: 'puzzle-piece', async render(box) {
     // mise à jour « en douceur » : on ne redessine que la liste des installés (et le catalogue en arrière-plan), sans reconstruire toute la page
     const reloadInstalled = async () => { const nd = await api('/api/plugins?lang=' + encodeURIComponent(lang)); const sec = $('su-plinst'); if (sec) sec.innerHTML = instHtml(nd); const sb = $('su-plbuilt'); if (sb) sb.innerHTML = builtHtml(nd); };
     box.onclick = async (e) => {
-        if (e.target.closest('#su-plref')) { await loadStore(true); note(box, '✓ ' + tr('refreshed', 'Catalogue actualisé')); return; }
-        if (e.target.closest('[data-retry]')) { $('su-plstore').innerHTML = '<p class="settings-hint">…</p>'; loadStore(); return; }
+        if (e.target.closest('#su-plref')) { e.preventDefault(); await loadStore(true); if (!box.querySelector('.su-soft')) note(box, '✓ ' + tr('refreshed', 'Catalogue actualisé')); return; }
+        if (e.target.closest('[data-retry]')) { loadStore._soft = 0; $('su-plstore').innerHTML = '<p class="settings-hint">…</p>'; loadStore(); return; }
         if (e.target.closest('#su-restart')) {
             const rb = e.target.closest('#su-restart');
             const okR = (typeof showConfirmDialog === 'function') ? await showConfirmDialog(tr('restart_confirm', 'Redémarrer Stellio maintenant ?'), { title: tr('restart_btn', 'Redémarrer Stellio'), confirmLabel: tr('restart_btn', 'Redémarrer Stellio') }) : true;
@@ -657,21 +692,25 @@ TABS.plugins = { fb: 'Plugins', icon: 'puzzle-piece', async render(box) {
         }
         const c = e.target.closest('[data-cat]'); if (c) {
             const label = c.innerHTML; c.disabled = true; c.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + esc(tr('installing', 'Installation…'));
-            try { const r = await installFlow((x) => api('/api/plugins/catalog/install', Object.assign({ id: c.dataset.cat }, custom ? { url: custom } : {}, x))); await reloadInstalled(); await loadStore(); note(box, '✓ ' + (r.note || tr('installed_ok', 'Plugin installé'))); flash(box, c.dataset.cat); refreshPluginNav(); } catch (x) { c.disabled = false; c.innerHTML = label; note(box, x.message, true); }
+            try { const r = await installFlow((x) => api('/api/plugins/catalog/install', Object.assign({ id: c.dataset.cat }, custom ? { url: custom } : {}, x))); await reloadInstalled(); await loadStore(); note(box, '✓ ' + (r.note || tr('installed_ok', 'Plugin installé'))); flash(box, c.dataset.cat); refreshPluginNav(); offerRestart(box, r.plugin); } catch (x) { c.disabled = false; c.innerHTML = label; note(box, x.message, true); }
         }
     };
     wire(box, 'su-plup', async () => {
-        const f = $('su-plf').files[0]; if (!f) throw new Error(tr('pick_zip', 'Choisissez un fichier .zip.'));
+        const all = Array.from($('su-plf').files);
+        const f = all.find(x => /\.zip$/i.test(x.name)); if (!f) throw new Error(tr('pick_zip', 'Choisissez un fichier .zip.'));
+        /* signature détachée (fichier .signature.json de signer-plugin.bat, ou hexadécimal brut) : nécessaire pour un plugin qui exécute du code dans Stellio */
+        let sig = ''; const sf = all.find(x => x !== f);
+        if (sf) { const raw = (await sf.text()).trim(); try { const o = JSON.parse(raw); sig = String(o.signature || ''); } catch (e) { sig = raw.replace(/\s+/g, ''); } }
         const j = await installFlow(async (x) => {
-            const fd = new FormData(); fd.append('file', f); if ($('su-pldg').checked) fd.append('allow_downgrade', '1');
+            const fd = new FormData(); fd.append('file', f); if (sig) fd.append('signature', sig); if ($('su-pldg').checked) fd.append('allow_downgrade', '1');
             Object.keys(x).forEach(k => fd.append(k, '1'));
             const r = await fetch(`${API}/api/plugins/install`, { method: 'POST', body: fd }); const jj = await r.json().catch(() => ({}));
             if (!r.ok) { const e = new Error(jj.error || r.status); e.data = jj; throw e; }
             return jj;
-        });
-        await reloadInstalled(); loadStore(); note(box, '✓ ' + (j.note || tr('installed_ok', 'Plugin installé'))); flash(box, j.plugin && j.plugin.id); refreshPluginNav();
+        }, { unsigned: true });
+        await reloadInstalled(); loadStore(); note(box, '✓ ' + (j.note || tr('installed_ok', 'Plugin installé'))); flash(box, j.plugin && j.plugin.id); refreshPluginNav(); offerRestart(box, j.plugin);
     });
-    wire(box, 'su-plcat', async () => { custom = plSource = val('su-plcu'); try { localStorage.setItem('stellio-plugins-source', custom); } catch (e) { /* facultatif */ } await TABS.plugins.render(box); });
+    wire(box, 'su-plcuse', async () => { custom = plSource = val('su-plcu'); try { localStorage.setItem('stellio-plugins-source', custom); } catch (e) { /* facultatif */ } await TABS.plugins.render(box); });
     wire(box, 'su-plcdef', async () => { plSource = ''; try { localStorage.removeItem('stellio-plugins-source'); } catch (e) { /* facultatif */ } await TABS.plugins.render(box); });
     loadStore();
     refreshPluginNav();
@@ -1085,6 +1124,7 @@ function onShow() {
 }
 /* Page « Plugins » du menu Outils. */
 function onShowPlugins() {
+    plOpen.clear();   // sections repliées à chaque nouvelle visite de la page
     let root = $('plugins-root');
     if (!root) { root = Object.assign(document.createElement('div'), { id: 'plugins-root', className: 'suite-body bp-card' }); document.body.appendChild(root); }
     try { if (typeof IS_VIEWER !== 'undefined' && IS_VIEWER && !window.STELLIO_DEMO) { root.innerHTML = `<p class="settings-hint">${esc(tr('owner_only', 'Réservé au propriétaire.'))}</p>`; return; } } catch (e) { return; }

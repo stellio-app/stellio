@@ -19,6 +19,7 @@ L'activation ou la désactivation prend effet au redémarrage (les routes Flask 
 """
 import importlib
 import importlib.util
+import types
 import json
 import os
 import sys
@@ -73,15 +74,16 @@ def _proof_paths(pid):
     return os.path.join(_proof_dir(), pid + '.zip'), os.path.join(_proof_dir(), pid + '.json')
 
 
-def save_external_proof(pid, version, signature, data):
-    """Conserve l'archive signée (octets exacts) et sa signature : base de la revérification à chaque lecture."""
+def save_external_proof(pid, version, signature, data, unsigned=False):
+    """Conserve l'archive (octets exacts) et sa signature : base de la revérification à chaque lecture.
+    `unsigned` : archive NON signée, installée après acceptation explicite du risque (installation directe depuis un .zip) ; seule son intégrité est vérifiée."""
     import hashlib
     os.makedirs(_proof_dir(), exist_ok=True)
     zp, jp = _proof_paths(pid)
     with open(zp, 'wb') as f:
         f.write(data)
     with open(jp, 'w', encoding='utf-8') as f:
-        json.dump({'id': pid, 'version': str(version), 'sha256': hashlib.sha256(data).hexdigest(), 'signature': str(signature or '').lower()}, f)
+        json.dump({'id': pid, 'version': str(version), 'sha256': hashlib.sha256(data).hexdigest(), 'signature': str(signature or '').lower(), 'unsigned': bool(unsigned)}, f)
 
 
 def drop_external_proof(pid):
@@ -112,6 +114,14 @@ def _zip_files(data):
     return {n[len(prefix):]: hashlib.sha256(zf.read(i)).hexdigest() for n, i in zip(names, infos)}
 
 
+def _walk(d):
+    """os.walk sans les dossiers `__pycache__` : le code d'un plugin signé n'est JAMAIS chargé depuis du bytecode (il est compilé depuis les sources
+    vérifiées, voir load_enabled) ; ces dossiers ne comptent donc ni comme contenu de l'archive ni comme modification."""
+    for r, ds, fs in os.walk(d):
+        ds[:] = [x for x in ds if x != '__pycache__']
+        yield r, ds, fs
+
+
 def verify_external(pid, d):
     """(ok, raison) — le dossier `d` est EXACTEMENT le contenu de l'archive signée par une clé de confiance. Refus par défaut : sans clé
     de confiance configurée, sans preuve, ou au moindre écart, la réponse est non."""
@@ -120,7 +130,7 @@ def verify_external(pid, d):
     try:
         sig_key = (os.path.getmtime(zp), os.path.getsize(zp), os.path.getmtime(jp))
         files_key = tuple(sorted((os.path.relpath(os.path.join(r, f), d), os.path.getmtime(os.path.join(r, f)), os.path.getsize(os.path.join(r, f)))
-                                 for r, _ds, fs in os.walk(d) for f in fs))
+                                 for r, _ds, fs in _walk(d) for f in fs))
     except OSError:
         return False, 'preuve absente'
     from modules import plugin_security
@@ -134,16 +144,17 @@ def verify_external(pid, d):
         proof = json.load(open(jp, encoding='utf-8'))
         data = open(zp, 'rb').read()
         sha = hashlib.sha256(data).hexdigest()
-        if not keys:
+        unsigned = proof.get('unsigned') is True
+        if not keys and not unsigned:
             res = (False, 'aucune clé de confiance configurée')
         elif proof.get('id') != pid or proof.get('sha256') != sha:
             res = (False, 'archive modifiée')
-        elif plugin_security.signature_status(proof.get('signature') or '', pid, proof.get('version') or '', sha, keys)['status'] != 'valid':
+        elif not unsigned and plugin_security.signature_status(proof.get('signature') or '', pid, proof.get('version') or '', sha, keys)['status'] != 'valid':
             res = (False, 'signature invalide')
         else:
             expected = _zip_files(data)
             actual = {os.path.relpath(os.path.join(r, f), d).replace(os.sep, '/'): hashlib.sha256(open(os.path.join(r, f), 'rb').read()).hexdigest()
-                      for r, _ds, fs in os.walk(d) for f in fs}
+                      for r, _ds, fs in _walk(d) for f in fs}
             res = (True, 'ok') if actual == expected else (False, 'fichiers modifiés après installation')
     except Exception:
         res = (False, 'preuve illisible')
@@ -372,15 +383,19 @@ def load_enabled(ns):
             continue
         mods = []
         try:
-            if d not in sys.path:
+            if d not in sys.path and not m.get('_external'):
                 sys.path.append(d)
             for name in m['host']['modules']:
                 if m.get('_external'):
                     if not verify_external(pid, d)[0]:          # revérification juste avant d'exécuter du code
                         raise RuntimeError('signature ou contenu invalide')
-                    spec = importlib.util.spec_from_file_location(f"stellio_ext_{pid.replace('-', '_')}_{name}", os.path.join(d, name + '.py'))
-                    mod = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(mod)
+                    path = os.path.join(d, name + '.py')
+                    src = open(path, 'rb').read()                     # compilé depuis les sources vérifiées : ni bytecode lu, ni bytecode écrit dans le dossier du plugin
+                    modname = f"stellio_ext_{pid.replace('-', '_')}_{name}"
+                    mod = types.ModuleType(modname)
+                    mod.__file__ = path
+                    sys.modules[modname] = mod
+                    exec(compile(src, path, 'exec'), mod.__dict__)
                 else:
                     mod = importlib.import_module('modules.' + name)
                 r = mod.init(ns)

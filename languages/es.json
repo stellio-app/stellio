@@ -3589,6 +3589,7 @@
   "suite.ack_perms": "Permisos solicitados por este plugin",
   "suite.confirm_delete": "¿Eliminar este plugin?",
   "suite.pick_zip": "Elige un archivo .zip.",
+  "suite.sig_hint": "Plugin firmado: selecciona a la vez el .zip y su archivo .signature.json (creado por signer-plugin.bat).",
   "suite.updates": "actualización(es) disponible(s)",
   "suite.installed": "instalado",
   "suite.update": "Actualizar",
@@ -3780,6 +3781,12 @@
   "suite.store_hint": "Plugins de la comunidad alojados en GitHub. Instalar un plugin no lo activa: primero lee sus permisos.",
   "suite.store_empty": "Aún no hay plugins en este catálogo.",
   "suite.store_fail": "Catálogo no disponible",
+  "suite.catalog_updating": "El catálogo se está actualizando…",
+  "suite.catalog_updating_hint": "Se acaba de publicar algo: nueva comprobación en unos segundos.",
+  "suite.update_badge": "Actualización disponible",
+  "suite.catalog_later": "La actualización del catálogo tarda un poco",
+  "suite.catalog_later_hint": "No hay ningún fallo. Inténtelo de nuevo en unos minutos.",
+  "suite.catalog_stale_hint": "Se muestra la última versión verificada; nueva lectura automática.",
   "suite.retry": "Reintentar",
   "suite.plugin_page": "Página del plugin",
   "suite.by": "por",
@@ -3812,6 +3819,7 @@
   "suite.builtin_hint": "Se incluyen con Stellio y solo se cargan cuando están activados. Tus ajustes se conservan al desactivar un plugin. El cambio se aplica al reiniciar Stellio.",
   "suite.restart_needed": "Reinicio necesario",
   "suite.restart_note": "Se aplicará al reiniciar Stellio.",
+  "suite.restart_after_install": "Plugin instalado: reinicie Stellio para cargarlo (o aplicar la actualización).",
   "suite.restart_btn": "Reiniciar Stellio",
   "suite.restart_confirm": "¿Reiniciar Stellio ahora para aplicar los plugins activados o desactivados?",
   "suite.restart_wait": "Reiniciando… la página se recargará.",
@@ -3938,5 +3946,8 @@
   "suite.skip_f_missing": "El archivo se movió o se eliminó. Vuelva a analizar la biblioteca (Ajustes, Fuentes) y reintente.",
   "suite.skip_none": "Ningún archivo omitido.",
   "suite.skip_retry": "Reintentar la indexación",
-  "suite.skip_close": "Cerrar"
+  "suite.skip_close": "Cerrar",
+  "suite.unsigned_title": "Plugin sin firmar",
+  "suite.unsigned_body": "Este plugin no está firmado: su autor y su contenido no están verificados, y ejecutará código directamente en Stellio, con acceso a sus archivos y a su cuenta.\n\nStellio y el equipo de desarrollo no pueden ser considerados responsables de daños, pérdidas de datos o fallos de seguridad causados por este plugin. Instale solo código de una fuente de confianza.",
+  "suite.unsigned_confirm": "Entiendo y acepto este riesgo: ¿instalar de todos modos?"
 }

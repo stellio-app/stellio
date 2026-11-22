@@ -331,6 +331,7 @@ def test_catalogue_signe_refuse_si_invalide_ou_absent_pour_l_officiel(plug, monk
     sigs = {m.default_catalog_url() + '.sig': sig.encode()}
 
     def fake(url, max_bytes, timeout=15):
+        url = url.split('?t=')[0]        # le paramètre anti-cache n'a pas d'incidence sur le contenu servi
         if url in store:
             return store[url]
         if url in sigs:
@@ -341,6 +342,9 @@ def test_catalogue_signe_refuse_si_invalide_ou_absent_pour_l_officiel(plug, monk
     monkeypatch.setenv('STELLIO_PLUGIN_PUBKEYS', pub)
     assert m._fetch_catalog(m.default_catalog_url())[0]['catalog_signature'] == 'valid'
     sigs[m.default_catalog_url() + '.sig'] = ('00' * 64).encode()
+    got = m._fetch_catalog(m.default_catalog_url())                                                     # signature invalide : jamais de contenu non vérifié…
+    assert got[0]['catalog_stale'] is True and got[0]['catalog_signature'] == 'valid'                    # …mais la dernière version VÉRIFIÉE reste consultable
+    os.remove(m._cache_path(m.default_catalog_url()))                                                   # sans version mémorisée : refus net
     with pytest.raises(ValueError):
         m._fetch_catalog(m.default_catalog_url())                                                       # signature invalide
     del sigs[m.default_catalog_url() + '.sig']

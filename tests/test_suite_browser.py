@@ -169,6 +169,7 @@ def test_onglets_sessions_et_plugins_et_archives(page):
     assert any(c['url'] == '/api/sessions/revoke-others' for c in page.evaluate("window.__calls"))
     assert page.locator('#su-tabs').count() == 0                                                         # plus de barre d'onglets : chaque outil a son entrée dans le volet latéral
     page.evaluate("window.StellioSuite.open('plugins')")                                               # sans menu (test) : la page se crée sur place
+    page.evaluate("document.querySelectorAll('#plugins-root details').forEach(d => { d.open = true; })")       # les sections sont repliées par défaut : on les déplie pour les lire
     page.wait_for_selector('#plugins-root [data-pl="on"]'); page.wait_for_selector('#plugins-root .su-store-card')
     card = page.inner_text('#plugins-root .su-store-card')
     assert 'Météo' in card and 'Mettre à jour' in card and 'installé 1.0' in card and 'par Ana' in card and page.locator('#plugins-root .su-store-card .su-logo').count() == 1 and 'Page du plugin' in card
@@ -188,7 +189,7 @@ def test_onglets_sessions_et_plugins_et_archives(page):
     page.click('#plugins-root [data-cat="meteo"]'); page.wait_for_timeout(100)
     assert any(c['url'] == '/api/plugins/catalog/install' and c['body'] == {'id': 'meteo'} for c in page.evaluate("window.__calls"))
     page.evaluate("document.querySelectorAll('#plugins-root details.su-fold').forEach(d => d.open = true)")                 # sections repliables
-    page.fill('#su-plcu', 'https://x.org/c.json'); page.click('#su-plcat'); page.wait_for_timeout(200)       # source personnalisée
+    page.fill('#su-plcu', 'https://x.org/c.json'); page.click('#su-plcuse'); page.wait_for_timeout(200)       # source personnalisée
     page.click('#plugins-root [data-cat="meteo"]'); page.wait_for_timeout(100)
     assert any(c['url'] == '/api/plugins/catalog/install' and c['body'] == {'id': 'meteo', 'url': 'https://x.org/c.json'} for c in page.evaluate("window.__calls"))
     page.click('#su-plcdef'); page.wait_for_timeout(200); assert page.input_value('#su-plcu') == ''
@@ -837,6 +838,7 @@ def test_plugins_signature_audit_restrictions_et_confirmation_du_risque(page):
       R['POST /api/plugins/catalog/install'] = (body) => body.accept_risk ? { ok: true, note: 'Installé' } : { __status: 400, error: 'Audit refuse', code: 'audit_blocked', audit: { findings: [{ blocking: true, file: 'main.py', line: 3, detail: 'import subprocess' }] } };
     }""")
     page.evaluate("document.getElementById('plugins-root') && document.getElementById('plugins-root').remove(); window.StellioSuite.open('plugins')")
+    page.evaluate("document.querySelectorAll('#plugins-root details').forEach(d => { d.open = true; })")       # les sections sont repliées par défaut : on les déplie pour les lire
     page.wait_for_selector('#plugins-root .su-store-card')
     txt = page.inner_text('#plugins-root')
     assert 'Aucune restriction du noyau' not in txt                                                      # plus d'avertissement hors Linux (1.1.9)

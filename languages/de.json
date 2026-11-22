@@ -3589,6 +3589,7 @@
   "suite.ack_perms": "Von diesem Plugin angeforderte Berechtigungen",
   "suite.confirm_delete": "Dieses Plugin löschen?",
   "suite.pick_zip": "Eine .zip-Datei auswählen.",
+  "suite.sig_hint": "Signiertes Plugin: Wähle die .zip und ihre .signature.json (von signer-plugin.bat erstellt) gleichzeitig aus.",
   "suite.updates": "Update(s) verfügbar",
   "suite.installed": "installiert",
   "suite.update": "Aktualisieren",
@@ -3780,6 +3781,12 @@
   "suite.store_hint": "Community-Plugins auf GitHub. Installieren aktiviert ein Plugin nicht: Sie lesen zuerst die Berechtigungen.",
   "suite.store_empty": "Noch keine Plugins in diesem Katalog.",
   "suite.store_fail": "Katalog nicht verfügbar",
+  "suite.catalog_updating": "Der Katalog wird aktualisiert…",
+  "suite.catalog_updating_hint": "Gerade wurde etwas veröffentlicht: erneute Prüfung in wenigen Sekunden.",
+  "suite.update_badge": "Update verfügbar",
+  "suite.catalog_later": "Die Aktualisierung des Katalogs dauert etwas",
+  "suite.catalog_later_hint": "Nichts ist defekt. Versuchen Sie es in ein paar Minuten erneut.",
+  "suite.catalog_stale_hint": "Zuletzt geprüfte Version wird angezeigt; automatische erneute Abfrage.",
   "suite.retry": "Erneut versuchen",
   "suite.plugin_page": "Plugin-Seite",
   "suite.by": "von",
@@ -3812,6 +3819,7 @@
   "suite.builtin_hint": "Mit Stellio geliefert, werden sie nur geladen, wenn sie aktiviert sind. Deine Einstellungen bleiben beim Deaktivieren erhalten. Die Änderung gilt nach dem Neustart von Stellio.",
   "suite.restart_needed": "Neustart erforderlich",
   "suite.restart_note": "Wird beim Neustart von Stellio übernommen.",
+  "suite.restart_after_install": "Plugin installiert: Starten Sie Stellio neu, um es zu laden (oder das Update anzuwenden).",
   "suite.restart_btn": "Stellio neu starten",
   "suite.restart_confirm": "Stellio jetzt neu starten, um die aktivierten oder deaktivierten Plugins zu übernehmen?",
   "suite.restart_wait": "Neustart läuft … die Seite wird neu geladen.",
@@ -3938,5 +3946,8 @@
   "suite.skip_f_missing": "Die Datei wurde verschoben oder gelöscht. Durchsuchen Sie die Bibliothek erneut (Einstellungen, Quellen) und versuchen Sie es noch einmal.",
   "suite.skip_none": "Keine ignorierten Dateien.",
   "suite.skip_retry": "Indexierung wiederholen",
-  "suite.skip_close": "Schließen"
+  "suite.skip_close": "Schließen",
+  "suite.unsigned_title": "Nicht signiertes Plugin",
+  "suite.unsigned_body": "Dieses Plugin ist nicht signiert: Autor und Inhalt sind nicht überprüft, und es führt Code direkt in Stellio aus, mit Zugriff auf Ihre Dateien und Ihr Konto.\n\nStellio und das Entwicklungsteam können für Schäden, Datenverlust oder Sicherheitslücken durch dieses Plugin nicht haftbar gemacht werden. Installieren Sie nur Code aus vertrauenswürdiger Quelle.",
+  "suite.unsigned_confirm": "Ich verstehe und akzeptiere dieses Risiko: trotzdem installieren?"
 }

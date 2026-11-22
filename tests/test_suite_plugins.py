@@ -242,13 +242,14 @@ def test_catalogue_par_defaut_logo_et_description_par_langue(tmp_path, monkeypat
     seen = []
     def fake(url, max_bytes, timeout=15):
         seen.append(url)
+        url = url.split('?t=')[0]
         if url not in served: raise ValueError('introuvable')
         return served[url]
     monkeypatch.setattr(p, 'http_get', fake)
     monkeypatch.delenv('STELLIO_PLUGINS_CATALOG', raising=False)
     cat = cl.post('/api/plugins/catalog', json={'lang': 'fr'}).get_json()                       # sans adresse : catalogue officiel
     by = {e['id']: e for e in cat['plugins']}
-    assert cat['default'] is True and seen[0] == p.DEFAULT_CATALOG_URL
+    assert cat['default'] is True and seen[0].split('?t=')[0] == p.DEFAULT_CATALOG_URL
     assert by['meteo']['description'] == 'Prévisions sur le plateau' and by['meteo']['has_logo'] is True and by['meteo']['homepage'] == 'https://github.com/x/meteo'
     assert by['svg']['description'] == 'texte simple' and by['nologo']['has_logo'] is False and 'logo' not in by['meteo'] and 'description_i18n' not in by['meteo']
     assert cl.post('/api/plugins/catalog', json={'lang': 'de'}).get_json()['plugins'][0]['description'] == 'Forecast on the plate'      # repli anglais
@@ -364,3 +365,12 @@ def test_description_lue_dans_le_plugin_json_sur_github(tmp_path, monkeypatch):
     assert ask('en', refresh=True)['meteo'] == 'Updated'                                         # ...jusqu'à « Actualiser »
     m, err = p.validate_manifest({'id': 'tt', 'name': 'T', 'version': '1', 'api': 1, 'entry': 'main.py', 'description': {'fr': 'a', 'en': 'b'}})
     assert err is None and m['description'] == 'b' and m['description_i18n']['fr'] == 'a'
+
+
+def test_badge_mise_a_jour_cache_tant_qu_aucune_mise_a_jour():
+    """Le badge « Mise à jour disponible » porte l'attribut hidden : le CSS ne doit pas le réafficher (display:inline-flex des puces)."""
+    import os
+    css = open(os.path.join(os.path.dirname(__file__), '..', 'interface', 'style.css'), encoding='utf-8').read()
+    js = open(os.path.join(os.path.dirname(__file__), '..', 'interface', 'suite.js'), encoding='utf-8').read()
+    assert '.su-chip[hidden]' in css and 'display: none !important' in css.split('.su-chip[hidden]')[1][:80]
+    assert "$('su-plupd').hidden = !nu" in js and "filter(x => x.update_available)" in js

@@ -3589,6 +3589,7 @@
   "suite.ack_perms": "Permessi richiesti da questo plugin",
   "suite.confirm_delete": "Eliminare questo plugin?",
   "suite.pick_zip": "Scegli un file .zip.",
+  "suite.sig_hint": "Plugin firmato: seleziona insieme lo .zip e il suo file .signature.json (creato da signer-plugin.bat).",
   "suite.updates": "aggiornamento/i disponibile/i",
   "suite.installed": "installato",
   "suite.update": "Aggiorna",
@@ -3780,6 +3781,12 @@
   "suite.store_hint": "Plugin della community ospitati su GitHub. Installare un plugin non lo attiva: prima leggi i permessi.",
   "suite.store_empty": "Nessun plugin in questo catalogo per ora.",
   "suite.store_fail": "Catalogo non disponibile",
+  "suite.catalog_updating": "Il catalogo si sta aggiornando…",
+  "suite.catalog_updating_hint": "È appena stata pubblicata una novità: nuovo controllo tra pochi secondi.",
+  "suite.update_badge": "Aggiornamento disponibile",
+  "suite.catalog_later": "L'aggiornamento del catalogo richiede un po' di tempo",
+  "suite.catalog_later_hint": "Nulla è rotto. Riprova tra qualche minuto.",
+  "suite.catalog_stale_hint": "Mostrata l'ultima versione verificata; nuova lettura automatica.",
   "suite.retry": "Riprova",
   "suite.plugin_page": "Pagina del plugin",
   "suite.by": "di",
@@ -3812,6 +3819,7 @@
   "suite.builtin_hint": "Forniti con Stellio, si caricano solo quando sono attivi. Le impostazioni restano salvate quando disattivi un plugin. La modifica si applica al riavvio di Stellio.",
   "suite.restart_needed": "Riavvio necessario",
   "suite.restart_note": "Applicato al riavvio di Stellio.",
+  "suite.restart_after_install": "Plugin installato: riavvia Stellio per caricarlo (o applicare l'aggiornamento).",
   "suite.restart_btn": "Riavvia Stellio",
   "suite.restart_confirm": "Riavviare Stellio ora per applicare i plugin attivati o disattivati?",
   "suite.restart_wait": "Riavvio in corso… la pagina si ricaricherà.",
@@ -3938,5 +3946,8 @@
   "suite.skip_f_missing": "Il file è stato spostato o eliminato. Rianalizza la libreria (Impostazioni, Sorgenti) e riprova.",
   "suite.skip_none": "Nessun file ignorato.",
   "suite.skip_retry": "Riprova l'indicizzazione",
-  "suite.skip_close": "Chiudi"
+  "suite.skip_close": "Chiudi",
+  "suite.unsigned_title": "Plugin non firmato",
+  "suite.unsigned_body": "Questo plugin non è firmato: autore e contenuto non sono verificati ed eseguirà codice direttamente in Stellio, con accesso ai tuoi file e al tuo account.\n\nStellio e il team di sviluppo non possono essere ritenuti responsabili di danni, perdite di dati o vulnerabilità causati da questo plugin. Installa solo codice di una fonte attendibile.",
+  "suite.unsigned_confirm": "Capisco e accetto questo rischio: installare comunque?"
 }

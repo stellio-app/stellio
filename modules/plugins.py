@@ -574,7 +574,7 @@ REFUSALS = {
 }
 
 
-def install_bytes(data, allow_downgrade=False, origin='community', signature='', accept_risk=False, accept_key_change=False):
+def install_bytes(data, allow_downgrade=False, origin='community', signature='', accept_risk=False, accept_key_change=False, accept_unsigned=False):
     """Installe ou met à jour un plugin depuis une archive. Remplacement atomique (l'ancienne version est restaurée si le déplacement échoue).
     Retourne {'manifest', 'action', 'previous_version', 'added_permissions'}. Lève ValueError."""
     tmp = os.path.join(_root(), '.install-tmp')
@@ -587,14 +587,19 @@ def install_bytes(data, allow_downgrade=False, origin='community', signature='',
             raise ValueError("Cet identifiant est celui d'un plugin intégré à Stellio : il ne peut pas être remplacé par une archive.")
         keys = plugin_security.trusted_keys()
         sig = plugin_security.signature_status(signature, manifest['id'], manifest['version'], hashlib.sha256(data).hexdigest(), keys)
-        if manifest.get('host'):                     # code exécuté dans le processus de Stellio : signature de confiance OBLIGATOIRE, sans exception ni acceptation de risque
-            if not keys:
-                raise PluginRefused(REFUSALS['host_no_key'], 'host_no_key')
-            if sig['status'] != 'valid':
-                raise PluginRefused(REFUSALS['host_unsigned'], 'host_unsigned')
-        ok, code = plugin_security.signature_policy(sig, origin == 'official', bool(keys), plugin_security.load_store().get(manifest['id']), accept_key_change)
-        if not ok:
-            raise PluginRefused(REFUSALS[code], code)
+        unsigned_host = False
+        if manifest.get('host'):                     # code exécuté dans le processus de Stellio : signature de confiance obligatoire, SAUF installation directe depuis un .zip
+            if not keys or sig['status'] != 'valid':   # avec acceptation explicite (accept_unsigned) : jamais depuis le catalogue (origin officiel), jamais sans ce drapeau
+                if accept_unsigned and origin == 'community':
+                    unsigned_host = True
+                elif not keys:
+                    raise PluginRefused(REFUSALS['host_no_key'], 'host_no_key')
+                else:
+                    raise PluginRefused(REFUSALS['host_unsigned'], 'host_unsigned')
+        if not unsigned_host:
+            ok, code = plugin_security.signature_policy(sig, origin == 'official', bool(keys), plugin_security.load_store().get(manifest['id']), accept_key_change)
+            if not ok:
+                raise PluginRefused(REFUSALS[code], code)
         audit = plugin_security.audit_dir(tmp, manifest)
         if audit['blocking'] and not accept_risk and sig['status'] != 'valid':
             raise PluginRefused(REFUSALS['audit_blocked'], 'audit_blocked', audit)
@@ -621,11 +626,11 @@ def install_bytes(data, allow_downgrade=False, origin='community', signature='',
         _set_origin(manifest['id'], 'official' if origin == 'official' else 'community')
         plugin_security.save_record(manifest['id'], sig, audit, bool(audit['blocking'] and (accept_risk or sig['status'] == 'valid')))
         if manifest.get('host'):
-            plugin_host.save_external_proof(manifest['id'], manifest['version'], signature, data)
+            plugin_host.save_external_proof(manifest['id'], manifest['version'], signature, data, unsigned=unsigned_host)
         else:
             plugin_host.drop_external_proof(manifest['id'])     # une version sans code intégré remplace une version signée : la preuve n'a plus d'objet
         return {'manifest': manifest, 'action': action, 'previous_version': prev['version'] if prev else None, 'added_permissions': added,
-                'security': {'signature': sig['status'], 'key': sig['key'], 'audit': audit['level'], 'findings': audit['findings'][:20], 'accepted_risk': bool(audit['blocking'])}}
+                'security': {'signature': 'unsigned_accepted' if unsigned_host else sig['status'], 'key': sig['key'], 'audit': audit['level'], 'findings': audit['findings'][:20], 'accepted_risk': bool(audit['blocking'])}}
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -705,7 +710,7 @@ def api_plugins_install():
     allow = str(request.form.get('allow_downgrade') or '') in ('1', 'true', 'on')
     flag = lambda k: str(request.form.get(k) or '') in ('1', 'true', 'on')
     try:
-        res = _after_install(install_bytes(data, allow, 'community', str(request.form.get('signature') or ''), flag('accept_risk'), flag('accept_key_change')))
+        res = _after_install(install_bytes(data, allow, 'community', str(request.form.get('signature') or ''), flag('accept_risk'), flag('accept_key_change'), flag('accept_unsigned')))
     except PluginRefused as e:
         return jsonify({'error': str(e), 'code': e.code, 'audit': e.audit}), 400
     except ValueError as e:
@@ -714,20 +719,40 @@ def api_plugins_install():
                     'added_permissions': res['added_permissions'], 'reack_required': res['reack_required'], 'note': res['note'], 'security': res['security']})
 
 
-def _fetch_catalog(url):
+_SIG_RETRY_DELAY = 1.5
+
+
+def _fresh(url):
+    """raw.githubusercontent.com garde chaque fichier ~5 min, séparément : juste après une mise à jour, catalogue et signature pouvaient venir de deux versions
+    différentes (« signature invalide »). Un paramètre unique par appel contourne ce cache ; sans effet sur le contenu ni sur la signature (octets du fichier)."""
+    if url.startswith('https://raw.githubusercontent.com/') and '?' not in url:
+        return '%s?t=%d' % (url, int(time.time() * 1000))
+    return url
+
+
+def _fetch_catalog_live(url):
     """Catalogue validé. Signé (`<url>.sig`, Ed25519 sur les octets exacts du fichier) : si des clés de confiance existent, une signature invalide est
-    toujours refusée et le catalogue officiel doit être signé ; sans clé configurée, aucune exigence (l'écran indique « non vérifié »)."""
+    toujours refusée et le catalogue officiel doit être signé ; sans clé configurée, aucune exigence (l'écran indique « non vérifié »).
+    Une signature jugée invalide déclenche UNE seconde lecture complète (fichier + signature) avant le refus : si les deux étaient de versions
+    différentes au moment de la mise à jour du dépôt, la relecture les remet d'accord ; une vraie signature fausse reste refusée."""
     from modules import plugin_security
-    raw = http_get(url, MAX_CATALOG_BYTES)
     keys = plugin_security.trusted_keys()
-    st = 'unsigned'
+    st, raw = 'unsigned', b''
+    for attempt in range(2):
+        raw = http_get(_fresh(url), MAX_CATALOG_BYTES)
+        st = 'unsigned'
+        if keys:
+            try:
+                sigtxt = http_get(_fresh(url + '.sig'), 1024).decode('ascii', 'ignore').strip()
+            except ValueError:
+                sigtxt = ''
+            if sigtxt:
+                st = 'valid' if plugin_security.verify(sigtxt, plugin_security.catalog_message(raw), keys) else 'invalid'
+            if st == 'invalid' and attempt == 0:
+                time.sleep(_SIG_RETRY_DELAY)
+                continue
+        break
     if keys:
-        try:
-            sigtxt = http_get(url + '.sig', 1024).decode('ascii', 'ignore').strip()
-        except ValueError:
-            sigtxt = ''
-        if sigtxt:
-            st = 'valid' if plugin_security.verify(sigtxt, plugin_security.catalog_message(raw), keys) else 'invalid'
         if st == 'invalid' or (st != 'valid' and (url == default_catalog_url() or is_official(url))):
             raise ValueError("Signature du catalogue absente ou invalide : catalogue refusé." if st != 'invalid' else "Signature du catalogue invalide : catalogue refusé.")
     else:
@@ -735,7 +760,70 @@ def _fetch_catalog(url):
     entries = validate_catalog(json.loads(raw.decode('utf-8', 'replace')))
     for e in entries:
         e['catalog_signature'] = st
+    _cache_save(url, raw, sigtxt if keys else '')
     return entries
+
+
+def _cache_path(url):
+    import hashlib
+    base = globals().get('DATA_DIR')
+    if not base:
+        return None
+    return os.path.join(base, 'plugins', '.catalog-cache', hashlib.sha1(url.encode('utf-8')).hexdigest()[:16] + '.json')
+
+
+def _cache_save(url, raw, sigtxt):
+    """Garde la dernière lecture VÉRIFIÉE du catalogue sur le disque : il reste consultable hors connexion ou quand GitHub répond mal."""
+    import base64
+    p = _cache_path(url)
+    if not p:
+        return
+    try:
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        tmp = p + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump({'time': time.time(), 'sig': sigtxt or '', 'raw': base64.b64encode(raw).decode('ascii')}, f)
+        os.replace(tmp, p)
+    except OSError:
+        pass
+
+
+def _cache_load(url):
+    """Dernière lecture vérifiée, REVÉRIFIÉE avec les clés actuelles (une clé retirée ou un fichier altéré l'invalide), ou None."""
+    import base64
+    from modules import plugin_security
+    p = _cache_path(url)
+    try:
+        d = json.load(open(p, encoding='utf-8')) if p and os.path.isfile(p) else None
+        if not d:
+            return None
+        raw = base64.b64decode(d['raw'])
+        keys = plugin_security.trusted_keys()
+        if keys:
+            if not d.get('sig') or not plugin_security.verify(str(d['sig']), plugin_security.catalog_message(raw), keys):
+                return None
+            st = 'valid'
+        else:
+            st = 'unverified'
+        entries = validate_catalog(json.loads(raw.decode('utf-8', 'replace')))
+    except Exception:
+        return None
+    for e in entries:
+        e['catalog_signature'] = st
+        e['catalog_stale'] = True
+    return entries
+
+
+def _fetch_catalog(url):
+    """Catalogue toujours consultable : lecture en direct ; si elle échoue (hors connexion, GitHub qui répond mal, signature momentanément incohérente
+    juste après une publication), on affiche la dernière version vérifiée, marquée `catalog_stale`. Sans version mémorisée, l'erreur d'origine est renvoyée."""
+    try:
+        return _fetch_catalog_live(url)
+    except (ValueError, TypeError, OSError) as e:
+        old = _cache_load(url)
+        if old is not None:
+            return old
+        raise e
 
 
 def plugin_security_status(entry):
@@ -758,7 +846,8 @@ def api_plugins_catalog():
     try:
         entries = _fetch_catalog(url)
     except (ValueError, TypeError) as e:
-        return jsonify({'error': str(e)}), 400
+        code = 'catalog_signature' if str(e).startswith('Signature du catalogue') else 'catalog_error'
+        return jsonify({'error': str(e), 'code': code}), 400
     apply_remote_descriptions(entries)
     have = {m['id']: m for _d, m in installed()}
     for e in entries:
@@ -772,7 +861,7 @@ def api_plugins_catalog():
         e['installed_version'] = cur['version'] if cur else None
         e['update_available'] = bool(cur and compare_versions(e['version'], cur['version']) > 0)
         e['new_permissions'] = [p for p in e['permissions'] if cur and p not in cur['permissions']]
-    return jsonify({'plugins': entries, 'count': len(entries), 'updates': sum(1 for e in entries if e['update_available']), 'url': url, 'default': url == default_catalog_url()})
+    return jsonify({'stale': any(e.get('catalog_stale') for e in entries), 'plugins': entries, 'count': len(entries), 'updates': sum(1 for e in entries if e['update_available']), 'url': url, 'default': url == default_catalog_url()})
 
 
 def api_plugins_catalog_install():
@@ -970,6 +1059,8 @@ def api_plugin_ui(pid):
         conn.close()
     if m.get('host'):                      # plugin signé à code intégré : actif seulement s'il est activé ET chargé (donc vérifié au démarrage)
         from modules import plugin_host as _ph
+        if _ph.is_enabled(pid) and not _ph.loaded(pid):
+            return jsonify({'error': 'Plugin activé : redémarrez Stellio pour le charger.', 'code': 'plugin_restart_required'}), 403
         row = {'enabled': _ph.is_enabled(pid) and _ph.loaded(pid)}
     if not (row and row['enabled']):
         return jsonify({'error': 'Plugin désactivé : activez-le dans Plugins › Catalogue.', 'code': 'plugin_disabled'}), 403

@@ -3589,6 +3589,7 @@
   "suite.ack_perms": "Permissões solicitadas por este plugin",
   "suite.confirm_delete": "Excluir este plugin?",
   "suite.pick_zip": "Escolha um arquivo .zip.",
+  "suite.sig_hint": "Plugin assinado: selecione ao mesmo tempo o .zip e o seu ficheiro .signature.json (criado pelo signer-plugin.bat).",
   "suite.updates": "atualização(ões) disponível(is)",
   "suite.installed": "instalado",
   "suite.update": "Atualizar",
@@ -3780,6 +3781,12 @@
   "suite.store_hint": "Plugins da comunidade alojados no GitHub. Instalar um plugin não o ativa: lê primeiro as permissões.",
   "suite.store_empty": "Ainda não há plugins neste catálogo.",
   "suite.store_fail": "Catálogo indisponível",
+  "suite.catalog_updating": "O catálogo está a atualizar…",
+  "suite.catalog_updating_hint": "Acabou de ser publicado algo: nova verificação dentro de alguns segundos.",
+  "suite.update_badge": "Atualização disponível",
+  "suite.catalog_later": "A atualização do catálogo demora um pouco",
+  "suite.catalog_later_hint": "Nada está avariado. Tente novamente dentro de alguns minutos.",
+  "suite.catalog_stale_hint": "A mostrar a última versão verificada; nova leitura automática.",
   "suite.retry": "Tentar novamente",
   "suite.plugin_page": "Página do plugin",
   "suite.by": "por",
@@ -3812,6 +3819,7 @@
   "suite.builtin_hint": "Incluídos no Stellio, só são carregados quando ativados. As tuas definições são mantidas ao desativar um plugin. A alteração aplica-se ao reiniciar o Stellio.",
   "suite.restart_needed": "Reinício necessário",
   "suite.restart_note": "Aplicado ao reiniciar o Stellio.",
+  "suite.restart_after_install": "Plugin instalado: reinicie o Stellio para o carregar (ou aplicar a atualização).",
   "suite.restart_btn": "Reiniciar o Stellio",
   "suite.restart_confirm": "Reiniciar o Stellio agora para aplicar os plugins ativados ou desativados?",
   "suite.restart_wait": "A reiniciar… a página vai recarregar.",
@@ -3938,5 +3946,8 @@
   "suite.skip_f_missing": "O ficheiro foi movido ou eliminado. Volte a analisar a biblioteca (Definições, Fontes) e tente de novo.",
   "suite.skip_none": "Nenhum ficheiro ignorado.",
   "suite.skip_retry": "Repetir a indexação",
-  "suite.skip_close": "Fechar"
+  "suite.skip_close": "Fechar",
+  "suite.unsigned_title": "Plugin não assinado",
+  "suite.unsigned_body": "Este plugin não está assinado: o autor e o conteúdo não são verificados, e ele executará código diretamente no Stellio, com acesso aos seus arquivos e à sua conta.\n\nO Stellio e a equipe de desenvolvimento não podem ser responsabilizados por danos, perda de dados ou falhas causados por este plugin. Instale apenas código de uma fonte confiável.",
+  "suite.unsigned_confirm": "Eu entendo e aceito este risco: instalar mesmo assim?"
 }

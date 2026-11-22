@@ -3589,6 +3589,7 @@
   "suite.ack_perms": "Permissions demandées par ce plugin",
   "suite.confirm_delete": "Supprimer ce plugin ?",
   "suite.pick_zip": "Choisissez un fichier .zip.",
+  "suite.sig_hint": "Plugin signé : sélectionnez en même temps le .zip et son fichier .signature.json (créé par signer-plugin.bat).",
   "suite.updates": "mise(s) à jour disponible(s)",
   "suite.installed": "installé",
   "suite.update": "Mettre à jour",
@@ -3780,6 +3781,12 @@
   "suite.store_hint": "Plugins proposés par la communauté, hébergés sur GitHub. Installer un plugin ne l'active pas : vous lisez ses permissions d'abord.",
   "suite.store_empty": "Aucun plugin dans ce catalogue pour le moment.",
   "suite.store_fail": "Catalogue indisponible",
+  "suite.catalog_updating": "Le catalogue se met à jour…",
+  "suite.catalog_updating_hint": "Une publication vient d'avoir lieu : nouvelle vérification dans quelques secondes.",
+  "suite.update_badge": "Mise à jour disponible",
+  "suite.catalog_later": "La mise à jour du catalogue prend un peu de temps",
+  "suite.catalog_later_hint": "Rien n'est cassé. Réessayez dans quelques minutes.",
+  "suite.catalog_stale_hint": "Dernière version vérifiée affichée ; nouvelle lecture automatique.",
   "suite.retry": "Réessayer",
   "suite.plugin_page": "Page du plugin",
   "suite.by": "par",
@@ -3812,6 +3819,7 @@
   "suite.builtin_hint": "Livrés avec Stellio, ils ne se chargent que lorsqu'ils sont activés. Vos réglages sont conservés quand vous désactivez un plugin. Le changement s'applique au redémarrage de Stellio.",
   "suite.restart_needed": "Redémarrage requis",
   "suite.restart_note": "Pris en compte au redémarrage de Stellio.",
+  "suite.restart_after_install": "Plugin installé : redémarrez Stellio pour le charger (ou pour appliquer la mise à jour).",
   "suite.restart_btn": "Redémarrer Stellio",
   "suite.restart_confirm": "Redémarrer Stellio maintenant pour appliquer les plugins activés ou désactivés ?",
   "suite.restart_wait": "Redémarrage en cours… la page va se recharger.",
@@ -3938,5 +3946,8 @@
   "suite.skip_f_missing": "Le fichier a été déplacé ou supprimé. Relancez l'analyse de la bibliothèque (Paramètres, Sources), puis réessayez.",
   "suite.skip_none": "Aucun fichier ignoré.",
   "suite.skip_retry": "Réessayer l'indexation",
-  "suite.skip_close": "Fermer"
+  "suite.skip_close": "Fermer",
+  "suite.unsigned_title": "Plugin non signé",
+  "suite.unsigned_body": "Ce plugin n'est pas signé : son auteur et son contenu ne sont pas vérifiés, et il exécutera du code directement dans Stellio, avec accès à vos fichiers et à votre compte.\n\nStellio et l'équipe de développement ne peuvent en aucun cas être tenus pour responsables des dégâts, pertes de données ou failles causés par ce plugin. N'installez que du code dont vous avez confiance en la source.",
+  "suite.unsigned_confirm": "Je comprends et j'accepte ce risque : installer quand même ?"
 }

@@ -3589,6 +3589,7 @@
   "suite.ack_perms": "此插件请求的权限",
   "suite.confirm_delete": "删除此插件？",
   "suite.pick_zip": "请选择 .zip 文件。",
+  "suite.sig_hint": "已签名的插件：请同时选择 .zip 及其 .signature.json 文件（由 signer-plugin.bat 生成）。",
   "suite.updates": "个可用更新",
   "suite.installed": "已安装",
   "suite.update": "更新",
@@ -3780,6 +3781,12 @@
   "suite.store_hint": "托管在 GitHub 上的社区插件。安装插件不会启用它：请先阅读其权限。",
   "suite.store_empty": "此目录暂无插件。",
   "suite.store_fail": "目录不可用",
+  "suite.catalog_updating": "目录正在更新…",
+  "suite.catalog_updating_hint": "刚刚有新内容发布：几秒后将重新检查。",
+  "suite.update_badge": "有可用更新",
+  "suite.catalog_later": "目录更新需要一点时间",
+  "suite.catalog_later_hint": "一切正常，请几分钟后重试。",
+  "suite.catalog_stale_hint": "显示最近一次已验证的版本；将自动重新读取。",
   "suite.retry": "重试",
   "suite.plugin_page": "插件页面",
   "suite.by": "作者",
@@ -3812,6 +3819,7 @@
   "suite.builtin_hint": "随 Stellio 一起提供，仅在启用时才会加载。停用插件时你的设置会保留。更改将在 Stellio 重启后生效。",
   "suite.restart_needed": "需要重启",
   "suite.restart_note": "将在 Stellio 重启后生效。",
+  "suite.restart_after_install": "插件已安装：请重启 Stellio 以加载它（或应用更新）。",
   "suite.restart_btn": "重启 Stellio",
   "suite.restart_confirm": "现在重启 Stellio 以应用已启用或停用的插件？",
   "suite.restart_wait": "正在重启…页面将自动刷新。",
@@ -3938,5 +3946,8 @@
   "suite.skip_f_missing": "文件已被移动或删除。请重新扫描库（设置，来源），然后重试。",
   "suite.skip_none": "没有被忽略的文件。",
   "suite.skip_retry": "重试索引",
-  "suite.skip_close": "关闭"
+  "suite.skip_close": "关闭",
+  "suite.unsigned_title": "未签名的插件",
+  "suite.unsigned_body": "此插件未签名：其作者和内容均未经验证，它将直接在 Stellio 内运行代码，并可访问您的文件和账户。\n\n对于此插件造成的任何损害、数据丢失或漏洞，Stellio 及开发团队概不负责。请仅安装来自可信来源的代码。",
+  "suite.unsigned_confirm": "我已了解并接受此风险：仍然安装？"
 }

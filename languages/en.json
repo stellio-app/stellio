@@ -3589,6 +3589,7 @@
   "suite.ack_perms": "Permissions requested by this plugin",
   "suite.confirm_delete": "Delete this plugin?",
   "suite.pick_zip": "Choose a .zip file.",
+  "suite.sig_hint": "Signed plugin: select the .zip and its .signature.json file (created by signer-plugin.bat) together.",
   "suite.updates": "update(s) available",
   "suite.installed": "installed",
   "suite.update": "Update",
@@ -3780,6 +3781,12 @@
   "suite.store_hint": "Community plugins hosted on GitHub. Installing a plugin does not enable it: you read its permissions first.",
   "suite.store_empty": "No plugins in this catalog yet.",
   "suite.store_fail": "Catalog unavailable",
+  "suite.catalog_updating": "The catalog is updating…",
+  "suite.catalog_updating_hint": "A release was just published: checking again in a few seconds.",
+  "suite.update_badge": "Update available",
+  "suite.catalog_later": "The catalog update is taking a little while",
+  "suite.catalog_later_hint": "Nothing is broken. Try again in a few minutes.",
+  "suite.catalog_stale_hint": "Showing the last verified version; reading again automatically.",
   "suite.retry": "Retry",
   "suite.plugin_page": "Plugin page",
   "suite.by": "by",
@@ -3812,6 +3819,7 @@
   "suite.builtin_hint": "Shipped with Stellio, they only load when enabled. Your settings are kept when you disable a plugin. The change applies when Stellio restarts.",
   "suite.restart_needed": "Restart required",
   "suite.restart_note": "Applied when Stellio restarts.",
+  "suite.restart_after_install": "Plugin installed: restart Stellio to load it (or to apply the update).",
   "suite.restart_btn": "Restart Stellio",
   "suite.restart_confirm": "Restart Stellio now to apply the enabled or disabled plugins?",
   "suite.restart_wait": "Restarting… the page will reload.",
@@ -3938,5 +3946,8 @@
   "suite.skip_f_missing": "The file was moved or deleted. Rescan the library (Settings, Sources), then try again.",
   "suite.skip_none": "No skipped files.",
   "suite.skip_retry": "Retry indexing",
-  "suite.skip_close": "Close"
+  "suite.skip_close": "Close",
+  "suite.unsigned_title": "Unsigned plugin",
+  "suite.unsigned_body": "This plugin is not signed: its author and contents are not verified, and it will run code directly inside Stellio, with access to your files and account.\n\nStellio and the development team cannot be held responsible for any damage, data loss or vulnerability caused by this plugin. Only install code from a source you trust.",
+  "suite.unsigned_confirm": "I understand and accept this risk: install anyway?"
 }

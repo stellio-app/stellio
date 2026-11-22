@@ -46,7 +46,7 @@ login_required = None
 session = None
 
 # Clé publique officielle (64 caractères hex) à renseigner après `python tools/plugin_sign.py keygen` (la clé privée ne quitte JAMAIS la machine de l'éditeur).
-OFFICIAL_PUBLIC_KEYS = ()
+OFFICIAL_PUBLIC_KEYS = ("01573098fb48f9f90291fda0b89b99309cb62ef2be47c728ede667fbc30d2b7a",)
 SIG_RE = re.compile(r'^[0-9a-f]{128}$')
 KEY_RE = re.compile(r'^[0-9a-f]{64}$')
 
@@ -69,11 +69,11 @@ def trusted_keys(extra=()):
     """Clés publiques de confiance (hex), sans doublon, uniquement les clés bien formées."""
     keys = list(OFFICIAL_PUBLIC_KEYS) + [k.strip().lower() for k in (os.environ.get('STELLIO_PLUGIN_PUBKEYS') or '').split(',') if k.strip()] + list(extra)
     try:
-        path = os.path.join(DATA_DIR, 'plugins', 'trusted_keys.json')
-        if DATA_DIR and os.path.isfile(path):
+        path = os.path.join(DATA_DIR, 'plugins', 'trusted_keys.json') if DATA_DIR else ''
+        if path and os.path.isfile(path):
             data = json.load(open(path, encoding='utf-8'))
             keys += [str(k).strip().lower() for k in data] if isinstance(data, list) else []
-    except (OSError, ValueError):
+    except (OSError, ValueError, TypeError):
         pass
     return list(dict.fromkeys(k for k in keys if KEY_RE.match(k)))
 
