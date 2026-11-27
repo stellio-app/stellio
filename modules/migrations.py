@@ -56,10 +56,25 @@ def _m4(conn):       # rôle d'équipe d'un compte invité (operator / manager /
     add_column(conn, 'users', 'team_role', "TEXT DEFAULT ''")
 
 
+def add_index(conn, name, table, cols):
+    """CREATE INDEX IF NOT EXISTS ; ignore une table ou une colonne absente."""
+    wanted = [c.split()[0] for c in cols.split(',')]
+    if has_table(conn, table) and all(has_column(conn, table, c) for c in wanted):
+        conn.execute(f"CREATE INDEX IF NOT EXISTS {name} ON {table}({cols})")
+
+
+def _m5(conn):       # index des requêtes les plus fréquentes (1.2.1) : étiquettes par tag, historique par utilisateur
+    add_index(conn, 'idx_file_tags_tag', 'file_tags', 'tag_id')
+    add_index(conn, 'idx_print_history_user_sent', 'print_history', 'user_id, sent_at DESC')
+    add_index(conn, 'idx_print_history_user_path', 'print_history', 'user_id, file_path')
+    conn.execute("PRAGMA optimize")
+
+
 MIGRATIONS = (
     (2, 'print_history_temperatures_slicer', _m2),
     (3, 'license_expiry', _m3),
     (4, 'users_team_role', _m4),
+    (5, 'query_indexes', _m5),
 )
 
 
@@ -114,12 +129,46 @@ def run_pending(conn, migrations=None, now=None):
     return out
 
 
+KEEP_BACKUPS = 3
+
+
+def backup_before(conn, versions, now=None):
+    """Copie cohérente de la base (API de sauvegarde SQLite) avant d'appliquer des migrations. Retourne le chemin ou None (base neuve/vide, échec)."""
+    import os
+    try:
+        path = next((r[2] for r in conn.execute("PRAGMA database_list").fetchall() if r[1] == 'main'), '')
+        if not path or not os.path.isfile(path) or os.path.getsize(path) < 4096 or not has_table(conn, 'users'):
+            return None
+        folder = os.path.join(os.path.dirname(path), 'backups_migration')
+        os.makedirs(folder, exist_ok=True)
+        dest = os.path.join(folder, 'pre-v%s-%d.db' % (max(versions), int(now if now is not None else time.time())))
+        import sqlite3
+        out = sqlite3.connect(dest)
+        try:
+            conn.backup(out)
+        finally:
+            out.close()
+        olds = sorted(f for f in os.listdir(folder) if f.startswith('pre-v') and f.endswith('.db'))
+        for f in sorted(olds, key=lambda f: os.path.getmtime(os.path.join(folder, f)))[:-KEEP_BACKUPS]:
+            try:
+                os.remove(os.path.join(folder, f))
+            except OSError:
+                pass
+        return dest
+    except Exception:
+        return None
+
+
 def run_pending_safe():
     """Appelé au démarrage : au mieux, ne bloque jamais le lancement."""
     try:
         conn = get_db()
         try:
+            done = applied(conn)
+            todo = [v for v, _n, _f in MIGRATIONS if not done.get(v, {}).get('ok')]
+            bk = backup_before(conn, todo) if todo else None
             res = run_pending(conn)
+            res['backup'] = bk
         finally:
             conn.close()
         if res['applied']:

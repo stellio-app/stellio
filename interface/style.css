@@ -11310,3 +11310,21 @@ details.su-fold > summary h4 { flex: 1; min-width: 0; }
 
 /* bandeau « Calcul en cours… » : flottant en bas de page, il ne décale plus le contenu (pas de saut de mise en page) */
 .su-work-auto { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 60; margin: 0; width: min(520px, calc(100vw - 32px)); box-shadow: 0 8px 28px rgba(0,0,0,.45); background: color-mix(in srgb, var(--accent) 16%, var(--bg-secondary, #1b2030)); }
+.su-wait { display: flex; align-items: center; gap: 10px; padding: 14px 4px; font-size: 14px; opacity: .85; }
+.su-wait i { color: var(--accent, #4ea1d3); font-size: 18px; }
+.su-wait-s { display: flex; align-items: center; gap: 8px; opacity: .8; }
+
+
+/* 1.2.1 : widgets repliables */
+.dashboard-widget-collapse-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 6px; margin-left: 4px; flex-shrink: 0; border-radius: 6px; }
+.dashboard-widget-collapse-btn:hover { color: var(--accent); background: var(--bg-hover, rgba(255,255,255,.06)); }
+.dashboard-widget-collapse-btn i { transition: transform .15s ease; }
+.dashboard-widget.dashboard-widget-collapsed { height: auto; min-height: 0; align-self: start; content-visibility: visible; }
+.dashboard-widget.dashboard-widget-collapsed > .dashboard-widget-header { margin-bottom: 0; }
+.dashboard-widget.dashboard-widget-collapsed > :not(.dashboard-widget-header) { display: none; }
+.dashboard-widget.dashboard-widget-collapsed .dashboard-widget-collapse-btn i { transform: rotate(-90deg); }
+
+/* Accueil : disposition « maçonnerie » — lignes de 8 px, un widget déplié = 42 lignes (320 px + 16 px), replié = hauteur de l'en-tête */
+.dashboard-grid { grid-auto-rows: 8px; row-gap: 0; column-gap: 16px; grid-auto-flow: row dense; }
+.dashboard-widget { grid-row: span 42; height: calc(100% - 16px); }
+.dashboard-widget.dashboard-widget-collapsed { grid-row: span var(--cspan, 9); height: auto; align-self: start; }

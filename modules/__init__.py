@@ -14,6 +14,7 @@ if _os.path.isdir(_BUNDLED):
         if _os.path.isfile(_os.path.join(_d, 'plugin.json')):
             __path__.append(_d)
 ALL = (
+    'filament_spools',
     'print_session',
     'production_flow',
     'plugin_security',

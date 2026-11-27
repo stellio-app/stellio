@@ -1641,6 +1641,8 @@
   "dashboard.customize": "Anpassen",
   "dashboard.customize_done": "Fertig",
   "dashboard.hide_widget": "Ausblenden",
+  "dashboard.collapse_widget": "Einklappen",
+  "dashboard.expand_widget": "Ausklappen",
   "dashboard.hidden_widgets_label": "Ausgeblendete Widgets:",
   "dashboard.sos_title": "Letzter S.O.S Print",
   "dashboard.no_sos": "Noch keine S.O.S Print-Diagnose",
@@ -3123,6 +3125,7 @@
   "bigprint.dest_source": "Ordner",
   "bigprint.dest_name": "Name des neuen Ordners",
   "bigprint.dest_default": "Stellio-Datenordner",
+  "bigprint.dest_beside": "Neben der Quelldatei",
   "bigprint.preview": "Vorschau",
   "bigprint.save": "Druckdateien speichern",
   "bigprint.cancel": "Abbrechen",
@@ -3800,6 +3803,11 @@
   "plugins.manage": "Katalog",
   "suite.installed_ui": "Installiert",
   "suite.pv_error": "Dieses Plugin kann nicht angezeigt werden",
+  "suite.busy_msg": "A job is running. If you change page, it will be cancelled.",
+  "suite.busy_title": "Job in progress",
+  "suite.busy_leave": "Change page anyway",
+  "suite.busy_stay": "Continue",
+  "suite.plugins_installed": "plugins installed",
   "suite.pv_off": "Deaktiviert: im Katalog aktivieren",
   "suite.ack_title": "Dieses Plugin aktivieren?",
   "suite.ack_ok": "Aktivieren",
@@ -3949,5 +3957,7 @@
   "suite.skip_close": "Schließen",
   "suite.unsigned_title": "Nicht signiertes Plugin",
   "suite.unsigned_body": "Dieses Plugin ist nicht signiert: Autor und Inhalt sind nicht überprüft, und es führt Code direkt in Stellio aus, mit Zugriff auf Ihre Dateien und Ihr Konto.\n\nStellio und das Entwicklungsteam können für Schäden, Datenverlust oder Sicherheitslücken durch dieses Plugin nicht haftbar gemacht werden. Installieren Sie nur Code aus vertrauenswürdiger Quelle.",
-  "suite.unsigned_confirm": "Ich verstehe und akzeptiere dieses Risiko: trotzdem installieren?"
+  "suite.unsigned_confirm": "Ich verstehe und akzeptiere dieses Risiko: trotzdem installieren?",
+  "suite.tab_bigprintproj": "BigPrint",
+  "suite.bp_empty": "Noch kein BigPrint-Projekt. Erstellen Sie eines unter Werkzeuge › BigPrint."
 }

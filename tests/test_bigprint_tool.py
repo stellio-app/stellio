@@ -85,11 +85,11 @@ def test_apercu_puis_enregistrement_reels(tmp_path):
     assert html.status_code == 200 and b'importmap' in html.data and 'data:' in html.headers['Content-Security-Policy']
     # enregistrer avec d'autres réglages que ceux de l'aperçu → refusé
     assert c.post('/api/bigprint/save', json={'settings': _settings(info['id'], wall='5')}).status_code == 400
-    r = c.post('/api/bigprint/save', json={'settings': s, 'folder_name': 'ma_boule', 'target_subfolder': 'tests'})
+    r = c.post('/api/bigprint/save', json={'settings': s, 'folder_name': 'ma_boule'})   # sans destination : à côté du fichier source
     assert r.status_code == 200
     d = _wait(c)
     assert d['job']['state'] == 'done', d['job'].get('error')
-    out = os.path.join(str(tmp_path), 'bigprint_output', 'tests', 'ma_boule_bigprint')   # suffixe ajouté automatiquement
+    out = os.path.join(str(tmp_path), 'BigPrint', 'ma_boule_bigprint')   # suffixe ajouté automatiquement ; le modèle est dans tmp_path
     assert d['job']['out'] == out   # « terminé » n'est annoncé qu'une fois les fichiers copiés
     assert os.path.exists(os.path.join(out, 'project.3mf')) and os.path.isdir(os.path.join(out, 'pieces')) and os.path.exists(os.path.join(out, 'report.md'))
     assert os.path.basename(d['job']['out']).endswith('_bigprint')
@@ -165,3 +165,16 @@ def test_selecteur_pagine_par_10():
     for icon in ('fa-angles-left', 'fa-angle-left', 'fa-angle-right', 'fa-angles-right'):
         assert icon in js
     assert "addEventListener('input', () => renderPicker())" in js         # une recherche revient à la page 1
+
+
+
+def test_destination_a_cote_du_fichier_source(tmp_path):
+    _, mod = _client(tmp_path)
+    import flask
+    with flask.Flask('t2').test_request_context():
+        mod.session = {'user_id': 1}
+        f = mod._beside_dir(str(tmp_path / 'modeles'), 'boule_bigprint')
+        assert f == os.path.join(str(tmp_path / 'modeles'), 'BigPrint', 'boule_bigprint') and os.path.isdir(f)
+        # modèle déjà dans un projet BigPrint : pas d'imbrication
+        g = mod._beside_dir(os.path.join(f, 'pieces'), 'autre_bigprint')
+        assert g == os.path.join(str(tmp_path / 'modeles'), 'BigPrint', 'autre_bigprint')

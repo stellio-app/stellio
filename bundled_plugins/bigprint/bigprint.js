@@ -112,10 +112,17 @@ function showModel(info) {
         $('bp-folder-name').value = info.stem + '_bigprint';
         $('bp-folder-name').dataset.auto = '1';
     }
+    syncDestLabel();
     $('bp-viewer').hidden = true;
     $('bp-summary').hidden = true;
     $('bp-result').hidden = true;
     updateDerived();
+}
+
+// Premier choix du sélecteur de destination : « à côté du fichier source » pour un modèle de la bibliothèque, sinon le dossier de données de Stellio.
+function syncDestLabel() {
+    const sel = $('bp-source'); const o = sel && sel.options[0]; if (!o || o.value !== '') return;
+    o.textContent = ' ' + (model && model.from_library ? T('dest_beside', 'À côté du fichier source') : T('dest_default', 'Dossier de données de Stellio'));
 }
 
 function isViewer() { return document.body.classList.contains('role-viewer'); }   // invité / démo : aperçu seulement
@@ -353,8 +360,9 @@ async function onShow() {
     wire();
     try { await loadConfig(); } catch (e) { setStatus(e.message, 'err'); }
     if (typeof loadDownloadSources === 'function') {
-        loadDownloadSources('bp-source', T('dest_default', 'Dossier de données de Stellio'));
+        try { await loadDownloadSources('bp-source', T('dest_default', 'Dossier de données de Stellio')); } catch (e) { /* liste de sources : sans incidence */ }
     }
+    syncDestLabel();
     updateDerived();
 }
 

@@ -303,9 +303,8 @@ def test_plugin_avec_page_manifeste_installation_et_service(tmp_path):
     assert 'sandbox' in r.headers['Content-Security-Policy'] and r.headers['X-Content-Type-Options'] == 'nosniff'
     assert cl.get('/api/plugins/inconnu/ui').status_code == 404
     assert cl.post('/api/plugins/vue/test', json={}).get_json()['ok'] is False                              # pas de script à lancer
-    ex = os.path.join(ROOT, 'sdk', 'examples', 'gcode-viewer')
-    mv, errv = p.validate_manifest(json.load(open(os.path.join(ex, 'plugin.json')))); assert errv is None and mv['ui']['entry'] == 'viewer.html'
-    assert os.path.isfile(os.path.join(ex, 'viewer.html')) and 'api:read' in mv['permissions']
+    mv, errv = p.validate_manifest({'id': 'page-demo', 'name': 'Page demo', 'version': '1.0.0', 'api': 1, 'permissions': ['ui', 'api:read'], 'ui': {'title': 'Page demo', 'entry': 'page.html'}})
+    assert errv is None and mv['ui']['entry'] == 'page.html' and 'api:read' in mv['permissions']
 
 
 def test_origine_officiel_ou_communautaire_selon_l_adresse_reelle(tmp_path, monkeypatch):
@@ -340,12 +339,12 @@ def test_actualiser_le_catalogue_vide_les_caches(tmp_path, monkeypatch):
     p._catalog_cache['https://x.example/c.json'] = (time.time(), []); p._logo_cache['u'] = (time.time(), b'x', 'image/png')
     assert cl.post('/api/plugins/catalog', json={'url': 'https://x.example/c.json'}).status_code == 200 and 'u' in p._logo_cache
     assert cl.post('/api/plugins/catalog', json={'url': 'https://x.example/c.json', 'refresh': True}).status_code == 200
-    assert 'u' not in p._logo_cache and 'https://x.example/c.json' not in p._catalog_cache
+    assert 'u' not in p._logo_cache and p._catalog_cache['https://x.example/c.json'][1]      # caches vidés puis relus (le catalogue frais sert aux logos)
 
 
 def test_description_lue_dans_le_plugin_json_sur_github(tmp_path, monkeypatch):
     p, cl, _ = _env(tmp_path)
-    assert p.manifest_url({'homepage': 'https://github.com/stellio-app/stellio-plugins/tree/main/plugins/gcode-viewer'}) == 'https://raw.githubusercontent.com/stellio-app/stellio-plugins/main/plugins/gcode-viewer/plugin.json'
+    assert p.manifest_url({'homepage': 'https://github.com/stellio-app/stellio-plugins/tree/main/plugins/mon-plugin'}) == 'https://raw.githubusercontent.com/stellio-app/stellio-plugins/main/plugins/mon-plugin/plugin.json'
     assert p.manifest_url({'homepage': 'https://github.com/ana/meteo'}) == 'https://raw.githubusercontent.com/ana/meteo/HEAD/plugin.json'
     assert p.manifest_url({'homepage': 'https://exemple.org/x'}) == '' and p.manifest_url({'manifest': 'https://exemple.org/p.json'}) == 'https://exemple.org/p.json'
     raw = 'https://raw.githubusercontent.com/ana/meteo/HEAD/plugin.json'
@@ -374,3 +373,20 @@ def test_badge_mise_a_jour_cache_tant_qu_aucune_mise_a_jour():
     js = open(os.path.join(os.path.dirname(__file__), '..', 'interface', 'suite.js'), encoding='utf-8').read()
     assert '.su-chip[hidden]' in css and 'display: none !important' in css.split('.su-chip[hidden]')[1][:80]
     assert "$('su-plupd').hidden = !nu" in js and "filter(x => x.update_available)" in js
+
+
+def test_catalogue_affichage_immediat_depuis_la_derniere_lecture_verifiee(tmp_path, monkeypatch):
+    p, cl, _ = _env(tmp_path)
+    url = 'https://x.example/c.json'
+    cat = json.dumps({'plugins': [{'id': 'aa', 'name': 'N', 'version': '1', 'url': 'https://x.example/a.zip', 'sha256': 'c' * 64}]}).encode()
+    monkeypatch.setattr(p, 'http_get', lambda u, m, timeout=15: cat)
+    assert cl.post('/api/plugins/catalog', json={'url': url}).status_code == 200            # 1re lecture : mémorisée sur disque
+
+    def boom(*a, **k):
+        raise AssertionError('aucune requête réseau attendue')
+    monkeypatch.setattr(p, 'http_get', boom)
+    r = cl.post('/api/plugins/catalog', json={'url': url, 'cached': True})
+    d = r.get_json()
+    assert r.status_code == 200
+    assert [x['id'] for x in d['plugins']] == ['aa']
+    assert cl.post('/api/plugins/catalog', json={'url': 'https://y.example/none.json', 'cached': True}).get_json()['plugins'] == []   # rien de mémorisé : vide, sans erreur

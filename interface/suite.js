@@ -21,7 +21,7 @@ function table(rows, cols) {
     return `<div class="suite-scroll"><table class="suite-table"><thead><tr>${cols.map(c => `<th>${esc(c[1])}</th>`).join('')}</tr></thead><tbody>${rows.map(r =>
         `<tr>${cols.map(c => cell(c[2] ? c[2](r[c[0]], r) : r[c[0]])).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
-const note = (box, msg, bad) => { const p = box.querySelector('.suite-msg') || box.insertAdjacentElement('afterbegin', Object.assign(document.createElement('p'), { className: 'suite-msg settings-hint' })); p.textContent = msg; p.style.color = bad ? 'var(--danger, #e5484d)' : ''; };
+const note = (box, msg, bad) => { const p = box.querySelector('.suite-msg') || box.insertAdjacentElement('afterbegin', Object.assign(document.createElement('p'), { className: 'suite-msg settings-hint' })); p.textContent = msg; p.style.whiteSpace = 'pre-line'; p.style.color = bad ? 'var(--danger, #e5484d)' : ''; };
 /* 1.2.0 : un plugin à code intégré (signé) ne se charge qu'au démarrage : après chaque installation ou mise à jour, on le dit et on propose le redémarrage. */
 const offerRestart = (box, pl) => { if (!(pl && pl.host)) return; note(box, '✓ ' + tr('restart_after_install', 'Plugin installé : redémarrez Stellio pour le charger (ou pour appliquer la mise à jour).')); setTimeout(() => { const b = document.getElementById('su-restart'); if (b) b.click(); }, 300); };
 /* Avancement d'une tâche longue : dans le bandeau d'activité s'il existe (Diff 3D…), sinon message ordinaire. */
@@ -394,6 +394,57 @@ TABS.collections = { fb: 'Collections', icon: 'layer-group', plain: true, async 
     open0.forEach(id => { const s = box.querySelector(`.inv-section[data-cid="${id}"]`); if (s) toggle(s); });
     wire(box, 'su-cadd', async () => { const n = val('su-cname').trim(); if (!n) return; await api('/api/collections/save', { name: n }); await TABS.collections.render(box); });
 } };
+/* BigPrint : les projets générés par BigPrint (dossiers « …_bigprint » de la bibliothèque), une section dépliable par dossier, comme Collections.
+   L'entrée du menu n'apparaît que s'il en existe un ; elle se met à jour à chaque rechargement de la bibliothèque (voir refreshBigPrintNav). */
+function bigprintGroups(files) {
+    const m = new Map();
+    for (const f of files || []) {
+        const parts = String(f.path || '').replace(/\\/g, '/').split('/'), dirs = parts.slice(0, -1);
+        const i = dirs.findIndex(x => /_bigprint$/i.test(x)); if (i < 0) continue;
+        const key = dirs.slice(0, i + 1).join('/');
+        if (!m.has(key)) m.set(key, { key, name: dirs[i], files: [] });
+        m.get(key).files.push(f);
+    }
+    return [...m.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
+}
+TABS.bigprintproj = { fb: 'BigPrint', icon: 'up-right-and-down-left-from-center', plain: true, async render(box) {
+    let bpFiles = []; try { const r = await fetch(`${API}/api/files?bigprint=1`); if (r.ok) bpFiles = await r.json(); } catch (e) { bpFiles = []; }
+    const groups = bigprintGroups(bpFiles);
+    const open0 = new Set([...box.querySelectorAll('.inv-section:not(.inv-collapsed)')].map(s => s.dataset.bkey));
+    const sub = (g) => `${g.files.length} ${tr(g.files.length === 1 ? 'col_file' : 'col_files', g.files.length === 1 ? 'fichier' : 'fichiers')}`;
+    box.innerHTML = '<div class="col-root">' + (groups.length ? groups.map((g, n) => `<div class="inv-section inv-collapsed" data-bkey="${esc(g.key)}" data-bn="${n}" style="margin-top:14px;">` +
+        `<div class="source-banner source-banner-collection" style="--cc:#4ea1d3">` +
+        `<button type="button" class="inv-toggle" aria-expanded="false" title="${esc(tr('col_expand', 'Déplier'))}" aria-label="${esc(tr('col_expand', 'Déplier'))}"><i class="fa-solid fa-chevron-down"></i></button>` +
+        `<div class="source-banner-icon"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></div>` +
+        `<div style="flex:1; min-width:0;"><div style="font-weight:600; font-size:calc(14px * var(--fs, 1));">${esc(g.name.replace(/_bigprint$/i, ''))}</div><div class="source-banner-sub">${esc(sub(g))}</div></div></div>` +
+        `<div class="col-body"></div></div>`).join('') : `<p class="settings-hint">${esc(tr('bp_empty', "Aucun projet BigPrint pour l'instant. Créez-en un depuis Outils › BigPrint."))}</p>`) + '</div>';
+    const root = box.querySelector('.col-root');
+    const fill = (sec) => {
+        const g = groups[Number(sec.dataset.bn)]; const body = sec.querySelector('.col-body'); if (!g) return;
+        body.innerHTML = `<div class="col-files">${g.files.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true })).map(f => `<div class="col-file" data-cpath="${esc(f.path)}" role="button" tabindex="0">` +
+            `<span class="col-thumb"><img src="${API}/api/thumb?path=${encodeURIComponent(f.path)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'fa-solid fa-cube'}))"></span>` +
+            `<span class="col-name">${esc(f.name)}</span></div>`).join('')}</div>`;
+    };
+    const toggle = (sec) => { const collapsed = !sec.classList.contains('inv-collapsed'); sec.classList.toggle('inv-collapsed', collapsed);
+        const b = sec.querySelector('.inv-toggle'); b.setAttribute('aria-expanded', String(!collapsed)); const l = tr(collapsed ? 'col_expand' : 'col_collapse', collapsed ? 'Déplier' : 'Replier'); b.title = l; b.setAttribute('aria-label', l); if (!collapsed) fill(sec); };
+    root.addEventListener('click', (e) => {
+        const f = e.target.closest('[data-cpath]'); if (f) { if (typeof window.openFileInfoModal === 'function') window.openFileInfoModal(f.dataset.cpath); return; }
+        const bn = e.target.closest('.source-banner-collection'); if (bn) toggle(bn.closest('.inv-section'));
+    });
+    root.addEventListener('keydown', (e) => { if (e.key !== 'Enter' && e.key !== ' ') return; const f = e.target.closest('[data-cpath]'); if (f && typeof window.openFileInfoModal === 'function') { e.preventDefault(); window.openFileInfoModal(f.dataset.cpath); } });
+    const toOpen = [...open0];   // repliées par défaut ; seules les sections que l'utilisateur avait ouvertes le restent à la mise à jour
+    toOpen.forEach(k => { const s = [...box.querySelectorAll('.inv-section')].find(x => x.dataset.bkey === k); if (s) toggle(s); });
+} };
+/* Montre l'entrée « BigPrint » du menu Bibliothèque seulement s'il existe des fichiers BigPrint ; réaffiche la page si elle est ouverte. */
+function refreshBigPrintNav(count) {
+    const n = Number(count) || 0;
+    const btn = document.getElementById('nav-bigprint-projects'); if (btn) btn.style.display = n ? '' : 'none';
+    if (current === 'bigprintproj' && btn && btn.classList.contains('active')) {
+        const box = document.querySelector('#su-body .su-pane');
+        if (box) TABS.bigprintproj.render(box).catch(() => {});
+    }
+    return n;
+}
 TABS.compat = { fb: 'Compatibilité', icon: 'print', async render(box) {
     box.innerHTML = '<div class="su-line">' + pfield('su-cp', tr('path', 'Chemin du modèle'), '/…/piece.stl') + field('su-cm', tr('material', 'Matière'), 'PLA', 'suite-field-md') + btn('su-cgo', tr('check', 'Vérifier')) + '</div><div id="su-cout"></div>';
     wire(box, 'su-cgo', async () => {
@@ -602,7 +653,7 @@ TABS.plugins = { fb: 'Plugins', icon: 'puzzle-piece', async render(box) {
     const builtSection = (d) => `<details class="su-card su-fold" id="su-plbuilt"${op('su-plbuilt')}>${builtHtml(d)}</details>`;
     const instSection = (d) => `<details class="su-card su-fold" id="su-plinst"${op('su-plinst')}>${instHtml(d)}</details>`;
     box.innerHTML = (sandboxNotice(d.sandbox) ? `<div class="su-notice"><i class="fa-solid fa-shield-halved"></i><span>${esc(sandboxNotice(d.sandbox))}</span></div>` : '') +
-        `<details class="su-card su-fold" id="su-plcat"${op('su-plcat')}><summary><h4><i class="fa-solid fa-store"></i> ${esc(tr('catalog', 'Catalogue'))} <span id="su-plcn" class="su-chip" hidden></span><span id="su-plupd" class="su-chip su-chip-upd" hidden style="display:none"><i class="fa-solid fa-arrow-up"></i> ${esc(tr('update_badge', 'Mise à jour disponible'))}</span><button type="button" class="btn btn-ghost btn-sm su-refresh" id="su-plref" title="${esc(tr('refresh', 'Actualiser le catalogue'))}" aria-label="${esc(tr('refresh', 'Actualiser le catalogue'))}"><i class="fa-solid fa-rotate"></i> ${esc(tr('refresh_btn', 'Actualiser'))}</button></h4></summary><p class="settings-hint">${esc(tr('store_hint', 'Plugins proposés par la communauté, hébergés sur GitHub. Installer un plugin ne l\'active pas : vous lisez ses permissions d\'abord.'))}</p><div id="su-plstore" class="su-store"><p class="settings-hint">…</p></div>` +
+        `<details class="su-card su-fold" id="su-plcat"${op('su-plcat')}><summary><h4><i class="fa-solid fa-store"></i> ${esc(tr('catalog', 'Catalogue'))} <span id="su-plcn" class="su-chip" hidden></span><span id="su-plupd" class="su-chip su-chip-upd" hidden style="display:none"><i class="fa-solid fa-arrow-up"></i> ${esc(tr('update_badge', 'Mise à jour disponible'))}</span><button type="button" class="btn btn-ghost btn-sm su-refresh" id="su-plref" title="${esc(tr('refresh', 'Actualiser le catalogue'))}" aria-label="${esc(tr('refresh', 'Actualiser le catalogue'))}"><i class="fa-solid fa-rotate"></i> ${esc(tr('refresh_btn', 'Actualiser'))}</button></h4></summary><p class="settings-hint">${esc(tr('store_hint', 'Plugins proposés par la communauté, hébergés sur GitHub. Installer un plugin ne l\'active pas : vous lisez ses permissions d\'abord.'))}</p><div id="su-plstore" class="su-store"><p class="settings-hint su-wait"><i class="fa-solid fa-spinner fa-spin"></i> ${esc(tr('loading', 'Chargement…'))}</p></div>` +
         `<div class="su-sub"><details class="su-fold su-fold-in" id="su-plzip"${op('su-plzip')}><summary><h4><i class="fa-solid fa-file-zipper"></i> ${esc(tr('install_zip', 'Installer ou mettre à jour depuis un .zip'))}</h4></summary>` +
         `<div class="su-actions"><label class="btn btn-secondary btn-sm suite-file"><i class="fa-solid fa-folder-open"></i> ${esc(tr('choose_file', 'Choisir un fichier'))}<input type="file" id="su-plf" accept=".zip,.json,.sig" multiple hidden></label><span id="su-plfn" class="settings-hint">${esc(tr('no_file', 'Aucun fichier sélectionné'))}</span></div><p class="settings-hint">${esc(tr('sig_hint', "Plugin signé : sélectionnez en même temps le .zip et son fichier .signature.json (créé par signer-plugin.bat)."))}</p>` +
         `<label class="suite-inline"><input type="checkbox" id="su-pldg"> ${esc(tr('allow_downgrade', 'autoriser le retour à une version plus ancienne'))}</label><div class="su-actions">${btn('su-plup', tr('install', 'Installer'))}</div></details>` +
@@ -616,6 +667,19 @@ TABS.plugins = { fb: 'Plugins', icon: 'puzzle-piece', async render(box) {
     const loadStore = async (refresh) => {
         const host = $('su-plstore'); if (!host) return;
         const rb = $('su-plref'); if (refresh) { bust = Date.now(); if (rb) { rb.disabled = true; rb.querySelector('i').classList.add('fa-spin'); } host.classList.add('su-loading'); }
+        if (!refresh && !host.dataset.sig && !loadStore._fast) {
+            /* affichage immédiat : dernière lecture vérifiée du catalogue (disque, sans réseau), puis lecture en direct juste après */
+            loadStore._fast = 1;
+            try {
+                const f = await api('/api/plugins/catalog', Object.assign({ lang, cached: true }, custom ? { url: custom } : {}));
+                if ($('su-plstore') && !host.dataset.sig && f && f.plugins && f.plugins.length) {
+                    const html = `<div class="su-store-grid">${f.plugins.map(card).join('')}</div>`;
+                    host.innerHTML = html; host.dataset.sig = html.replace(/&t=\d+/g, '');
+                    if ($('su-plcn')) { $('su-plcn').hidden = false; $('su-plcn').textContent = f.count; }
+                    host.querySelectorAll('img.su-logo').forEach(im => im.addEventListener('error', () => im.replaceWith(Object.assign(document.createElement('span'), { className: 'su-logo su-logo-ph', innerHTML: '<i class="fa-solid fa-puzzle-piece"></i>' }))));
+                }
+            } catch (x) { /* pas de lecture mémorisée : la lecture en direct ci-dessous s'en charge */ }
+        }
         try {
             const c = await api('/api/plugins/catalog', Object.assign({ lang }, custom ? { url: custom } : {}, refresh ? { refresh: true } : {}));
             if (!$('su-plstore')) return;
@@ -697,18 +761,34 @@ TABS.plugins = { fb: 'Plugins', icon: 'puzzle-piece', async render(box) {
     };
     wire(box, 'su-plup', async () => {
         const all = Array.from($('su-plf').files);
-        const f = all.find(x => /\.zip$/i.test(x.name)); if (!f) throw new Error(tr('pick_zip', 'Choisissez un fichier .zip.'));
-        /* signature détachée (fichier .signature.json de signer-plugin.bat, ou hexadécimal brut) : nécessaire pour un plugin qui exécute du code dans Stellio */
-        let sig = ''; const sf = all.find(x => x !== f);
-        if (sf) { const raw = (await sf.text()).trim(); try { const o = JSON.parse(raw); sig = String(o.signature || ''); } catch (e) { sig = raw.replace(/\s+/g, ''); } }
-        const j = await installFlow(async (x) => {
-            const fd = new FormData(); fd.append('file', f); if (sig) fd.append('signature', sig); if ($('su-pldg').checked) fd.append('allow_downgrade', '1');
-            Object.keys(x).forEach(k => fd.append(k, '1'));
-            const r = await fetch(`${API}/api/plugins/install`, { method: 'POST', body: fd }); const jj = await r.json().catch(() => ({}));
-            if (!r.ok) { const e = new Error(jj.error || r.status); e.data = jj; throw e; }
-            return jj;
-        }, { unsigned: true });
-        await reloadInstalled(); loadStore(); note(box, '✓ ' + (j.note || tr('installed_ok', 'Plugin installé'))); flash(box, j.plugin && j.plugin.id); refreshPluginNav(); offerRestart(box, j.plugin);
+        const zips = all.filter(x => /\.zip$/i.test(x.name)); if (!zips.length) throw new Error(tr('pick_zip', 'Choisissez un fichier .zip.'));
+        const others = all.filter(x => !/\.zip$/i.test(x.name));
+        /* signature détachée (fichier .signature.json de signer-plugin.bat, ou hexadécimal brut) : chaque .zip prend le fichier « <nom>.zip.signature.json » ;
+           avec un seul .zip, n'importe quel autre fichier choisi fait l'affaire */
+        const sigFor = async (f) => {
+            const sf = others.find(x => x.name.toLowerCase().startsWith(f.name.toLowerCase())) || (zips.length === 1 ? others[0] : null);
+            if (!sf) return '';
+            const raw = (await sf.text()).trim(); try { return String(JSON.parse(raw).signature || ''); } catch (e) { return raw.replace(/\s+/g, ''); }
+        };
+        const done = [], failed = []; let needRestart = false, last = null;
+        for (const f of zips) {
+            const sig = await sigFor(f);
+            try {
+                const j = await installFlow(async (x) => {
+                    const fd = new FormData(); fd.append('file', f); if (sig) fd.append('signature', sig); if ($('su-pldg').checked) fd.append('allow_downgrade', '1');
+                    Object.keys(x).forEach(k => fd.append(k, '1'));
+                    const r = await fetch(`${API}/api/plugins/install`, { method: 'POST', body: fd }); const jj = await r.json().catch(() => ({}));
+                    if (!r.ok) { const e = new Error(jj.error || r.status); e.data = jj; throw e; }
+                    return jj;
+                }, { unsigned: true });
+                done.push((j.plugin && j.plugin.name) || f.name); last = j; if (j.plugin && j.plugin.host) needRestart = true;
+            } catch (e) { failed.push(f.name + ' : ' + (e.message || e)); }
+        }
+        await reloadInstalled(); loadStore(); refreshPluginNav();
+        if (last && last.plugin) flash(box, last.plugin.id);
+        if (failed.length) note(box, (done.length ? '✓ ' + done.join(', ') + '\n' : '') + '✗ ' + failed.join('\n'), true);
+        else note(box, '✓ ' + (done.length > 1 ? done.length + ' ' + tr('plugins_installed', 'plugins installés') + ' : ' + done.join(', ') : ((last && last.note) || tr('installed_ok', 'Plugin installé'))));
+        if (needRestart) offerRestart(box, { host: true });      // une seule demande de redémarrage, une fois tous les plugins installés
     });
     wire(box, 'su-plcuse', async () => { custom = plSource = val('su-plcu'); try { localStorage.setItem('stellio-plugins-source', custom); } catch (e) { /* facultatif */ } await TABS.plugins.render(box); });
     wire(box, 'su-plcdef', async () => { plSource = ''; try { localStorage.removeItem('stellio-plugins-source'); } catch (e) { /* facultatif */ } await TABS.plugins.render(box); });
@@ -1108,7 +1188,7 @@ async function show(k) {
         return;
     }
     host.classList.toggle('su-plain', !!(TABS[k] && TABS[k].plain));   // page sans cadre global (Collections : bannières posées directement sur la page, comme Filament)
-    const box = Object.assign(document.createElement('div'), { className: 'su-pane' }); box.innerHTML = '<p class="settings-hint">…</p>'; host.appendChild(box);
+    const box = Object.assign(document.createElement('div'), { className: 'su-pane' }); box.innerHTML = `<p class="settings-hint su-wait"><i class="fa-solid fa-spinner fa-spin"></i> ${esc(tr('loading', 'Chargement…'))}</p>`; host.appendChild(box);
     try { await TABS[k].render(box); if (my === showSeq) addReset(box); } catch (e) { if (my !== showSeq) return; box.innerHTML = `<p class="settings-hint">${esc(e.data && e.data.code === 'server_edition_only' ? tr('server_only', 'Fonction réservée à l\'édition serveur.') : (e.message || tr('unavailable', 'Indisponible.')))}</p>`; }
 }
 /* Appelée par la navigation quand la page « Atelier avancé » s'affiche. */
@@ -1181,6 +1261,67 @@ window.addEventListener('message', (e) => {
     const f = $('pv-frame'); if (!f || e.source !== f.contentWindow) return;
     const m = e.data || {}; if (m.type === 'stellio.api') pvApi(m);
 });
+
+/* 1.2.3 : un travail est en cours (plugin, conversion, découpe en plateaux, diff, allègement…) et on change de page → confirmation.
+   Tout POST /api/… qui répond {job_id} est suivi (fetch enveloppé). « Continuer » reste sur la page (le travail continue) ;
+   « Changer de page quand même » annule le travail puis navigue. Les tâches du gestionnaire se lisent sur /api/jobs/<id>,
+   les conversions et découpes sur leur propre route (même forme : <base>/<id> et <base>/<id>/cancel). */
+const BUSY = new Map();   // job_id → base de l'API
+const BUSY_REQ = new Set();   // requêtes IA longues en vol (pas de job_id : annulées par AbortController)
+const BUSY_AI = /^\/api\/(assistant\/ask|ai\/(photo-search|predict-print-time))$/;
+(function wrapFetch() {
+    const orig = window.fetch; if (!orig || orig._stBusy) return;
+    window.fetch = function (input, init) {
+        let ac = null;
+        try {
+            const u0 = typeof input === 'string' ? input : (input && input.url) || '', m0 = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+            if (m0 === 'POST' && BUSY_AI.test(u0.replace(/^https?:\/\/[^/]+/, '').replace(/^.*?(\/api\/)/, '$1').split('?')[0]) && !(init && init.signal)) {
+                ac = new AbortController(); init = Object.assign({}, init, { signal: ac.signal });
+            }
+        } catch (e) { ac = null; }
+        const p = orig.call(this, input, init);
+        if (ac) { const t = { ac }; BUSY_REQ.add(t); const done = () => BUSY_REQ.delete(t); p.then(done, done); }
+        try {
+            const url = typeof input === 'string' ? input : (input && input.url) || '', method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+            const path = url.replace(/^https?:\/\/[^/]+/, '').replace(/^.*?(\/api\/)/, '$1').split('?')[0];
+            if (method === 'POST' && path.startsWith('/api/') && !/\/cancel$/.test(path)) {
+                p.then(r => { if (r && r.ok) r.clone().json().then(j => { if (j && j.job_id) BUSY.set(String(j.job_id), /^\/api\/files\/(convert-batch|split-plates)$/.test(path) ? path : '/api/jobs'); }).catch(() => {}); }).catch(() => {});
+            }
+        } catch (e) { /* suivi facultatif */ }
+        return p;
+    };
+    window.fetch._stBusy = true;
+})();
+async function busyRunning() {
+    const out = [];
+    for (const [id, base] of [...BUSY]) {
+        try {
+            const r = await fetch(`${API}${base}/${encodeURIComponent(id)}`, { credentials: 'same-origin' });
+            const j = r.ok ? await r.json() : null; const st = j && (j.state || (j.job && j.job.state));
+            if (st === 'running' || st === 'queued' || st === 'paused') out.push([id, base]); else BUSY.delete(id);
+        } catch (e) { /* injoignable : ignoré */ }
+    }
+    BUSY_REQ.forEach(t => out.push(t));
+    return out;
+}
+let busyBypass = false;
+document.addEventListener('click', async (e) => {
+    const b = e.target.closest && e.target.closest('.nav-btn'); if (!b || busyBypass || !(BUSY.size || BUSY_REQ.size)) return;
+    if (b.classList.contains('active') || (b.dataset.pluginUi && b.dataset.pluginUi === PV.id)) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    const run = await busyRunning();
+    let go = true;
+    if (run.length && typeof showConfirmDialog === 'function') {
+        go = await showConfirmDialog(tr('busy_msg', 'Un travail est en cours. Si vous changez de page, il sera annulé.'), {
+            title: tr('busy_title', 'Travail en cours'), icon: 'fa-hourglass-half', danger: true,
+            confirmLabel: tr('busy_leave', 'Changer de page quand même'), cancelLabel: tr('busy_stay', 'Continuer') });
+    }
+    if (!go) return;
+    run.forEach(x => { if (x && x.ac) x.ac.abort(); });
+    await Promise.all(run.filter(Array.isArray).map(([id, base]) => fetch(`${API}${base}/${encodeURIComponent(id)}/cancel`, { method: 'POST', credentials: 'same-origin' }).catch(() => {})));
+    BUSY.clear(); BUSY_REQ.clear();
+    busyBypass = true; try { b.click(); } finally { busyBypass = false; }
+}, true);
 async function openPluginView(id) {
     const p = (PV.list || []).find(x => x.id === id); if (!p) return;
     PV.id = id; PV.plugin = p;
@@ -1195,13 +1336,23 @@ async function openPluginView(id) {
         fr.srcdoc = `<!doctype html><meta http-equiv="Content-Security-Policy" content="${PV_CSP}"><script>${PV_CLIENT}<\/script>` + html;
     } catch (e) { fr.hidden = true; msg.hidden = false; msg.textContent = `${tr('pv_error', 'Impossible d\'afficher ce plugin')} : ${e.message || e}`; }
 }
+const PNAV_KEY = 'stellio-plugin-nav';
+function paintPluginNav(items) {
+    const box = $('plugin-nav-list'); if (!box) return;
+    PV.list = items;
+    box.innerHTML = items.length ? `<div class="plugin-nav-sub" data-cat="plugins">${esc(tr('installed_ui', 'Installés'))}</div>` + items.map(p => `<button type="button" class="nav-btn${p.enabled ? '' : ' plugin-off'}" data-cat="plugins" data-plugin-ui="${esc(p.id)}" data-icon="${esc(p.ui.icon)}" title="${esc(p.enabled ? p.name : tr('pv_off', 'Désactivé : activez-le dans le catalogue'))}"><i class="fa-solid ${esc(p.ui.icon)}"></i><span>${esc(p.ui.title)}</span></button>`).join('') : '';
+    wirePluginNav(box);
+}
 async function refreshPluginNav() {
     try { if (typeof IS_VIEWER !== 'undefined' && IS_VIEWER && !window.STELLIO_DEMO) return; } catch (e) { return; }
     const box = $('plugin-nav-list'); if (!box) return;
-    let d; try { const r = await fetch(`${API}/api/plugins`, { credentials: 'same-origin' }); if (!r.ok) return; d = await r.json(); } catch (e) { return; }
+    if (!box.children.length) box.innerHTML = `<div class="plugin-nav-sub su-wait-s" data-cat="plugins"><i class="fa-solid fa-spinner fa-spin"></i> ${esc(tr('loading', 'Chargement…'))}</div>`;   // repère visuel pendant la lecture
+    let d; try { const r = await fetch(`${API}/api/plugins`, { credentials: 'same-origin' }); if (!r.ok) { if (box.querySelector('.su-wait-s')) box.innerHTML = ''; return; } d = await r.json(); } catch (e) { if (box.querySelector('.su-wait-s')) box.innerHTML = ''; return; }
     const items = (d.plugins || []).filter(p => p.ui);
-    PV.list = items;
-    box.innerHTML = items.length ? `<div class="plugin-nav-sub" data-cat="plugins">${esc(tr('installed_ui', 'Installés'))}</div>` + items.map(p => `<button type="button" class="nav-btn${p.enabled ? '' : ' plugin-off'}" data-cat="plugins" data-plugin-ui="${esc(p.id)}" data-icon="${esc(p.ui.icon)}" title="${esc(p.enabled ? p.name : tr('pv_off', 'Désactivé : activez-le dans le catalogue'))}"><i class="fa-solid ${esc(p.ui.icon)}"></i><span>${esc(p.ui.title)}</span></button>`).join('') : '';
+    try { localStorage.setItem(PNAV_KEY, JSON.stringify(items.map(p => ({ id: p.id, name: p.name, enabled: !!p.enabled, ui: { icon: p.ui.icon, title: p.ui.title } })))); } catch (e) { /* confort seulement */ }
+    paintPluginNav(items);
+}
+function wirePluginNav(box) {
     box.querySelectorAll('[data-plugin-ui]').forEach(b => b.addEventListener('click', () => {
         if (b.classList.contains('plugin-off')) { document.getElementById('plugins-btn')?.click(); return; }      // désactivé : on va l'activer dans le catalogue
         document.querySelectorAll('.nav-btn').forEach(x => x.classList.remove('active')); b.classList.add('active');
@@ -1239,7 +1390,8 @@ applyHostFeatures();
 // la liaison entre instances peut changer (appairage, acceptation) : on relit au retour sur la page et chaque minute
 window.addEventListener('focus', () => applyHostFeatures());
 setInterval(() => { if (!document.hidden) applyHostFeatures(); }, 60000);
-[1500, 5000].forEach(ms => setTimeout(refreshPluginNav, ms));
+try { const c = JSON.parse(localStorage.getItem(PNAV_KEY) || '[]'); if (Array.isArray(c) && c.length) paintPluginNav(c.filter(p => p && p.id && p.ui)); } catch (e) { /* pas de copie mémorisée */ }   // liste affichée tout de suite, puis mise à jour
+[0, 1500, 5000].forEach(ms => setTimeout(refreshPluginNav, ms));
 function registerTab(k, def) { if (k && def && typeof def.render === 'function') { TABS[k] = def; window.StellioSuite.tabs = Object.keys(TABS); } }
-window.StellioSuite = { registerTab, _tabs: TABS, _applyHostFeatures: applyHostFeatures, _refreshPluginNav: refreshPluginNav, _openPluginView: openPluginView, _pvTheme: pvTheme, _pct: pct, open, onShow, onShowPlugins, _soon: SOON, tabs: Object.keys(TABS), _h: H, _pager: pagerHtml, _cloudView: cloudView, _plateEditor: plateEditor };
+window.StellioSuite = { registerTab, _tabs: TABS, _applyHostFeatures: applyHostFeatures, _refreshPluginNav: refreshPluginNav, refreshBigPrintNav, _openPluginView: openPluginView, _pvTheme: pvTheme, _pct: pct, open, onShow, onShowPlugins, _soon: SOON, tabs: Object.keys(TABS), _h: H, _pager: pagerHtml, _cloudView: cloudView, _plateEditor: plateEditor };
 })();

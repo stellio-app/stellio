@@ -1641,6 +1641,8 @@
   "dashboard.customize": "Customize",
   "dashboard.customize_done": "Done",
   "dashboard.hide_widget": "Hide",
+  "dashboard.collapse_widget": "Collapse",
+  "dashboard.expand_widget": "Expand",
   "dashboard.hidden_widgets_label": "Hidden widgets:",
   "dashboard.sos_title": "Latest S.O.S Print",
   "dashboard.no_sos": "No S.O.S Print diagnosis yet",
@@ -3123,6 +3125,7 @@
   "bigprint.dest_source": "Folder",
   "bigprint.dest_name": "Name of the new folder",
   "bigprint.dest_default": "Stellio data folder",
+  "bigprint.dest_beside": "Next to the source file",
   "bigprint.preview": "Preview",
   "bigprint.save": "Save print files",
   "bigprint.cancel": "Cancel",
@@ -3800,6 +3803,11 @@
   "plugins.manage": "Catalog",
   "suite.installed_ui": "Installed",
   "suite.pv_error": "Cannot display this plugin",
+  "suite.busy_msg": "A job is running. If you change page, it will be cancelled.",
+  "suite.busy_title": "Job in progress",
+  "suite.busy_leave": "Change page anyway",
+  "suite.busy_stay": "Continue",
+  "suite.plugins_installed": "plugins installed",
   "suite.pv_off": "Disabled: enable it in the catalog",
   "suite.ack_title": "Enable this plugin?",
   "suite.ack_ok": "Enable",
@@ -3949,5 +3957,7 @@
   "suite.skip_close": "Close",
   "suite.unsigned_title": "Unsigned plugin",
   "suite.unsigned_body": "This plugin is not signed: its author and contents are not verified, and it will run code directly inside Stellio, with access to your files and account.\n\nStellio and the development team cannot be held responsible for any damage, data loss or vulnerability caused by this plugin. Only install code from a source you trust.",
-  "suite.unsigned_confirm": "I understand and accept this risk: install anyway?"
+  "suite.unsigned_confirm": "I understand and accept this risk: install anyway?",
+  "suite.tab_bigprintproj": "BigPrint",
+  "suite.bp_empty": "No BigPrint project yet. Create one from Tools › BigPrint."
 }

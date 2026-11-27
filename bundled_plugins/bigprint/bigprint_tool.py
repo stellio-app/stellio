@@ -257,6 +257,28 @@ def _dest_dir(source_id, sub_rel, folder_name):
     return folder
 
 
+def _beside_dir(origin, folder_name):
+    """« À côté du fichier source » : <dossier du modèle>/BigPrint/<dossier du projet>. Si le modèle est déjà dans un projet
+    BigPrint, on remonte au dossier qui contient « BigPrint » pour ne pas imbriquer les projets."""
+    unc = _is_unc(origin)
+    segs = _unc(origin).replace('\\', '/').rstrip('/').split('/')
+    idx = next((i for i, x in enumerate(segs) if re.search(r'_bigprint$', x, re.I)), None)
+    if idx is not None:
+        segs = segs[:idx]
+        if segs and segs[-1].lower() == 'bigprint':
+            segs = segs[:-1]
+    base = '/'.join(segs)
+    folder = base + '/BigPrint/' + folder_name if unc else os.path.join(base or os.sep, 'BigPrint', folder_name)
+    if unc:
+        kw = _smb_kwargs_for_path(session['user_id'], folder)
+        if kw is None:
+            raise ValueError("Source réseau introuvable pour ce dossier")
+        smbclient.makedirs(folder, exist_ok=True, **kw)
+    else:
+        os.makedirs(folder, exist_ok=True)
+    return folder
+
+
 def _deliver(tmp_dir, folder, uid):
     """Copie le contenu de `tmp_dir` dans `folder` (local ou SMB), sous‑dossiers compris."""
     if not _is_unc(folder):
@@ -287,6 +309,7 @@ def api_bigprint_config():
     try:
         bp_gui, bp_strategy, bp_printers = _engine()
     except RuntimeError as e:
+        app_logger.warning(f"[BigPrint] moteur indisponible : {e}")   # trace pour le diagnostic (logs de Stellio)
         return jsonify({"available": False, "error": str(e)}), 200
     return jsonify({
         "available": True,
@@ -318,6 +341,8 @@ def api_bigprint_model():
     try:
         raw = _read_library_file(data.get('path'), VIEWER_MAX_MODEL_BYTES if _is_viewer() else None)
         info = sess.add_model(os.path.basename(_unc(data['path'])), raw)
+        sess.models[info['id']]['origin'] = os.path.dirname(data['path'].replace('\\', '/')) if _is_unc(data['path']) else os.path.dirname(data['path'])
+        info['from_library'] = True
     except bp_gui.SettingsError as e:
         return jsonify({"error": str(e)}), 400
     except ValueError as e:
@@ -393,6 +418,9 @@ def api_bigprint_job():
         job = sess.job.to_json() if sess.job else None
         summary = sess.summary
         key = sess.result_key
+    if job and job.get('state') == 'error' and getattr(sess, '_logged_err', None) is not job:
+        sess._logged_err = job   # une seule trace par échec
+        app_logger.warning(f"[BigPrint] calcul en erreur : {job.get('error')} | dernières lignes : {' / '.join(str(x) for x in (job.get('log') or [])[-6:])}")
     cp = _COPY.get(uid)
     if job and job.get('kind') == 'save' and cp:
         # Le calcul est fini mais les fichiers ne sont pas encore tous copiés dans le dossier choisi : la page attend.
@@ -442,7 +470,15 @@ def api_bigprint_save():
     if not folder_name.lower().endswith('_bigprint'):
         folder_name += '_bigprint'   # suffixe obligatoire : il sert au badge BigPrint de la bibliothèque
     try:
-        folder = _dest_dir(str(data.get('source_id') or '').strip() or None, data.get('target_subfolder'), folder_name)
+        # Tous les projets vont dans un dossier « BigPrint » (créé au besoin), un sous‑dossier « <modèle>_bigprint » par modèle.
+        sub = [x for x in str(data.get('target_subfolder') or '').replace('\\', '/').strip('/').split('/') if x]
+        if not sub or sub[-1].lower() != 'bigprint':
+            sub.append('BigPrint')
+        origin = (model or {}).get('origin')
+        if origin and not str(data.get('source_id') or '').strip():
+            folder = _beside_dir(origin, folder_name)   # destination par défaut : à côté du fichier source
+        else:
+            folder = _dest_dir(str(data.get('source_id') or '').strip() or None, '/'.join(sub), folder_name)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:

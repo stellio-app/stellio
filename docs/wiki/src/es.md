@@ -1019,21 +1019,21 @@ Límites: 10 segundos por ejecución, 512 MB de memoria, entorno mínimo (solo v
 ### 5. Probar
 Comprima el **contenido** de la carpeta como `mon-plugin.zip` (2 MB máximo), instálelo desde **Plugins › Catálogo** (archivo local), acepte los permisos, actívelo y use **Prueba**. Corrija los problemas leyendo el registro.
 
-## Plugin con una página: ejemplo de visor de G-code
+## Plugin con una página
 
-Un plugin también puede mostrar **su propia página** en Stellio. Aparece entonces en el menú **Plugins** de la barra lateral, bajo «Catálogo», en la lista «Instalados»: un clic abre su página. El ejemplo `sdk/examples/gcode-viewer` es un visor 3D de G-code: vista 3D (rotación, zoom), rango de capas, reproducción de movimientos, colores por tipo, velocidad o flujo, desplazamientos y retracciones; en 8 idiomas.
+Un plugin también puede mostrar **su propia página** en Stellio. Aparece entonces en el menú **Plugins** de la barra lateral, bajo «Catálogo», en la lista «Instalados»: un clic abre su página. El manifiesto siguiente es un ejemplo mínimo.
 
 ```json
 {
-  "id": "gcode-viewer",
-  "name": "G-code viewer",
+  "id": "mon-plugin",
+  "name": "Mon plugin",
   "version": "1.0.0",
   "api": 1,
   "description": "Shows your archived G-code files layer by layer.",
   "author": "Stellio",
   "permissions": ["ui", "api:read"],
   "ui": {
-    "title": "G-code viewer",
+    "title": "Mon plugin",
     "icon": "fa-layer-group",
     "entry": "viewer.html"
   }
@@ -1053,7 +1053,7 @@ document.addEventListener('stellio-ready', async () => {
 });
 ```
 
-Para probarlo: comprima el contenido de la carpeta `gcode-viewer`, instale el archivo desde **Plugins › Catálogo**, acepte los permisos, actívelo y ábralo desde el menú **Plugins**. Hace falta al menos un G-code archivado (ficha de archivo o proyecto). Un plugin desactivado aparece atenuado en la lista.
+Para probarlo: comprima el contenido de la carpeta `mon-plugin`, instale el archivo desde **Plugins › Catálogo**, acepte los permisos, actívelo y ábralo desde el menú **Plugins**. Hace falta al menos un G-code archivado (ficha de archivo o proyecto). Un plugin desactivado aparece atenuado en la lista.
 
 ## Publicar en GitHub
 1. Cree un repositorio público para su plugin con el código, un `README` y una licencia.

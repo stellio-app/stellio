@@ -1019,21 +1019,21 @@ Limites: 10 segundos por execução, 512 MB de memória, ambiente mínimo (apena
 ### 5. Testar
 Comprima o **conteúdo** da pasta como `mon-plugin.zip` (2 MB no máximo), instale-o a partir de **Plugins › Catálogo** (arquivo local), aceite as permissões, ative-o e use **Teste**. Corrija os problemas lendo o registo.
 
-## Plugin com uma página: exemplo de visualizador de G-code
+## Plugin com uma página
 
-Um plugin também pode mostrar **a sua própria página** no Stellio. Aparece então no menu **Plugins** da barra lateral, em «Catálogo», na lista «Instalados»: um clique abre a página. O exemplo `sdk/examples/gcode-viewer` é um visualizador 3D de G-code: vista 3D (rotação, zoom), intervalo de camadas, reprodução dos movimentos, cores por tipo, velocidade ou fluxo, deslocações e retrações; em 8 idiomas.
+Um plugin também pode mostrar **a sua própria página** no Stellio. Aparece então no menu **Plugins** da barra lateral, em «Catálogo», na lista «Instalados»: um clique abre a página. O manifesto abaixo é um exemplo mínimo.
 
 ```json
 {
-  "id": "gcode-viewer",
-  "name": "G-code viewer",
+  "id": "mon-plugin",
+  "name": "Mon plugin",
   "version": "1.0.0",
   "api": 1,
   "description": "Shows your archived G-code files layer by layer.",
   "author": "Stellio",
   "permissions": ["ui", "api:read"],
   "ui": {
-    "title": "G-code viewer",
+    "title": "Mon plugin",
     "icon": "fa-layer-group",
     "entry": "viewer.html"
   }
@@ -1053,7 +1053,7 @@ document.addEventListener('stellio-ready', async () => {
 });
 ```
 
-Para experimentar: comprima o conteúdo da pasta `gcode-viewer`, instale o arquivo em **Plugins › Catálogo**, aceite as permissões, ative-o e abra-o no menu **Plugins**. É preciso pelo menos um G-code arquivado (ficha de ficheiro ou projeto). Um plugin desativado fica acinzentado na lista.
+Para experimentar: comprima o conteúdo da pasta `mon-plugin`, instale o arquivo em **Plugins › Catálogo**, aceite as permissões, ative-o e abra-o no menu **Plugins**. É preciso pelo menos um G-code arquivado (ficha de ficheiro ou projeto). Um plugin desativado fica acinzentado na lista.
 
 ## Publicar no GitHub
 1. Crie um repositório público para o seu plugin com o código, um `README` e uma licença.

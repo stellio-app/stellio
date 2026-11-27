@@ -1019,21 +1019,21 @@ Grenzen: 10 Sekunden pro Ausführung, 512 MB Speicher, minimale Umgebung (nur `S
 ### 5. Testen
 Packen Sie den **Inhalt** des Ordners als `mon-plugin.zip` (maximal 2 MB), installieren Sie es über **Plugins › Katalog** (lokales Archiv), akzeptieren Sie die Berechtigungen, aktivieren Sie es und nutzen Sie **Test**. Beheben Sie Fehler anhand des Protokolls.
 
-## Plugin mit eigener Seite: Beispiel G-code-Betrachter
+## Plugin mit eigener Seite
 
-Ein Plugin kann auch **eine eigene Seite** in Stellio anzeigen. Es erscheint dann im Menü **Plugins** der Seitenleiste, unter „Katalog“, in der Liste „Installiert“: Ein Klick öffnet die Seite. Das Beispiel `sdk/examples/gcode-viewer` ist ein 3D-G-code-Betrachter: 3D-Ansicht (Drehen, Zoom), Schichtbereich, Wiedergabe der Bewegungen, Farben nach Typ, Geschwindigkeit oder Fluss, Leerfahrten und Retractions; in 8 Sprachen.
+Ein Plugin kann auch **eine eigene Seite** in Stellio anzeigen. Es erscheint dann im Menü **Plugins** der Seitenleiste, unter „Katalog“, in der Liste „Installiert“: Ein Klick öffnet die Seite. Das folgende Manifest ist ein minimales Beispiel.
 
 ```json
 {
-  "id": "gcode-viewer",
-  "name": "G-code viewer",
+  "id": "mon-plugin",
+  "name": "Mon plugin",
   "version": "1.0.0",
   "api": 1,
   "description": "Shows your archived G-code files layer by layer.",
   "author": "Stellio",
   "permissions": ["ui", "api:read"],
   "ui": {
-    "title": "G-code viewer",
+    "title": "Mon plugin",
     "icon": "fa-layer-group",
     "entry": "viewer.html"
   }
@@ -1053,7 +1053,7 @@ document.addEventListener('stellio-ready', async () => {
 });
 ```
 
-Zum Ausprobieren: Packen Sie den Inhalt des Ordners `gcode-viewer`, installieren Sie das Archiv unter **Plugins › Katalog**, akzeptieren Sie die Berechtigungen, aktivieren Sie es und öffnen Sie es im Menü **Plugins**. Es wird mindestens ein archivierter G-code benötigt (Dateiblatt oder Projekt). Ein deaktiviertes Plugin bleibt in der Liste ausgegraut.
+Zum Ausprobieren: Packen Sie den Inhalt des Ordners `mon-plugin`, installieren Sie das Archiv unter **Plugins › Katalog**, akzeptieren Sie die Berechtigungen, aktivieren Sie es und öffnen Sie es im Menü **Plugins**. Es wird mindestens ein archivierter G-code benötigt (Dateiblatt oder Projekt). Ein deaktiviertes Plugin bleibt in der Liste ausgegraut.
 
 ## Auf GitHub veröffentlichen
 1. Erstellen Sie ein öffentliches Repository für Ihr Plugin mit Code, einer `README` und einer Lizenz.

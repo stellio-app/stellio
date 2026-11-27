@@ -1641,6 +1641,8 @@
   "dashboard.customize": "Personnaliser",
   "dashboard.customize_done": "Terminé",
   "dashboard.hide_widget": "Masquer",
+  "dashboard.collapse_widget": "Replier",
+  "dashboard.expand_widget": "Déplier",
   "dashboard.hidden_widgets_label": "Widgets masqués :",
   "dashboard.sos_title": "Dernier S.O.S Print",
   "dashboard.no_sos": "Aucun diagnostic S.O.S Print pour l'instant",
@@ -3123,6 +3125,7 @@
   "bigprint.dest_source": "Dossier",
   "bigprint.dest_name": "Nom du dossier créé",
   "bigprint.dest_default": "Dossier de données de Stellio",
+  "bigprint.dest_beside": "À côté du fichier source",
   "bigprint.preview": "Aperçu",
   "bigprint.save": "Enregistrer les fichiers",
   "bigprint.cancel": "Annuler",
@@ -3800,6 +3803,11 @@
   "plugins.manage": "Catalogue",
   "suite.installed_ui": "Installés",
   "suite.pv_error": "Impossible d'afficher ce plugin",
+  "suite.busy_msg": "Un travail est en cours. Si vous changez de page, il sera annulé.",
+  "suite.busy_title": "Travail en cours",
+  "suite.busy_leave": "Changer de page quand même",
+  "suite.busy_stay": "Continuer",
+  "suite.plugins_installed": "plugins installés",
   "suite.pv_off": "Désactivé : activez-le dans le catalogue",
   "suite.ack_title": "Activer ce plugin ?",
   "suite.ack_ok": "Activer",
@@ -3949,5 +3957,7 @@
   "suite.skip_close": "Fermer",
   "suite.unsigned_title": "Plugin non signé",
   "suite.unsigned_body": "Ce plugin n'est pas signé : son auteur et son contenu ne sont pas vérifiés, et il exécutera du code directement dans Stellio, avec accès à vos fichiers et à votre compte.\n\nStellio et l'équipe de développement ne peuvent en aucun cas être tenus pour responsables des dégâts, pertes de données ou failles causés par ce plugin. N'installez que du code dont vous avez confiance en la source.",
-  "suite.unsigned_confirm": "Je comprends et j'accepte ce risque : installer quand même ?"
+  "suite.unsigned_confirm": "Je comprends et j'accepte ce risque : installer quand même ?",
+  "suite.tab_bigprintproj": "BigPrint",
+  "suite.bp_empty": "Aucun projet BigPrint pour l'instant. Créez-en un depuis Outils › BigPrint."
 }

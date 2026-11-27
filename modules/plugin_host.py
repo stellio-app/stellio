@@ -373,6 +373,25 @@ def existing_install(settings, conn):
 
 # ── chargement ────────────────────────────────────────────────────────────────────────────────────
 
+_SENSITIVE = ('secret', 'password', 'passwd', 'credential', 'token', 'private_key', 'api_key', 'encrypt', 'decrypt')
+
+
+def scoped_services(mod, ns, manifest=None):
+    """Services réellement transmis à un plugin SIGNÉ du catalogue : uniquement ceux que son module déclare (_REQUIRED/_OPTIONAL/_OVERRIDABLE),
+    sans jamais les noms sensibles (secrets, mots de passe, jetons, chiffrement) ; si le manifeste liste `host.services`, le module ne peut
+    pas en demander davantage. Les plugins intégrés (livrés et signés avec Stellio) gardent l'accès complet."""
+    names = tuple(getattr(mod, '_REQUIRED', ())) + tuple(getattr(mod, '_OPTIONAL', ())) + tuple(getattr(mod, '_OVERRIDABLE', ()))
+    bad = [n for n in names if any(w in n.lower() for w in _SENSITIVE)]
+    if bad:
+        raise RuntimeError(f"services sensibles refusés : {bad}")
+    allowed = ((manifest or {}).get('host') or {}).get('services')
+    if allowed is not None:
+        extra = [n for n in names if n not in allowed]
+        if extra:
+            raise RuntimeError(f"services non déclarés dans plugin.json (host.services) : {extra}")
+    return {n: ns[n] for n in names if n in ns}
+
+
 def load_enabled(ns):
     """Initialise (import + `init(globals())`) les plugins intégrés activés. Un plugin en échec est ignoré et journalisé."""
     _MAIN.update(ns)
@@ -398,9 +417,20 @@ def load_enabled(ns):
                     exec(compile(src, path, 'exec'), mod.__dict__)
                 else:
                     mod = importlib.import_module('modules.' + name)
-                r = mod.init(ns)
-                if isinstance(r, dict):
-                    ns.update(r)
+                if m.get('_external'):
+                    given = scoped_services(mod, ns, m)
+                    _say('info', f"[PLUGINS] « {pid} » reçoit {len(given)} service(s) : {', '.join(sorted(given))}")
+                    r = mod.init(given)                  # plugin tiers : services déclarés seulement
+                    if isinstance(r, dict):
+                        for k, v in r.items():
+                            if k not in ns:              # il peut ajouter des services, jamais remplacer ceux de l'application
+                                ns[k] = v
+                            else:
+                                _say('warning', f"[PLUGINS] « {pid} » : remplacement du service « {k} » refusé")
+                else:
+                    r = mod.init(ns)
+                    if isinstance(r, dict):
+                        ns.update(r)
                 mods.append(mod)
         except Exception as e:           # un plugin cassé ne doit pas empêcher Stellio de démarrer
             _say('error', f"[PLUGINS] plugin intégré « {pid} » non chargé : {e}")

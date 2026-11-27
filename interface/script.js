@@ -355,8 +355,18 @@ let allFiles = [];
 // Fichiers qu'on vient de supprimer : un rechargement de la liste (scan lent, partage réseau) ne doit pas les réafficher
 const _clientDeleted = new Map();
 const _CLIENT_DELETED_TTL = 10 * 60 * 1000;
-function _dedupeFilesByPath(list) {
+/* Fichiers générés par BigPrint (dans un dossier « …_bigprint ») : ils n'apparaissent pas dans la bibliothèque, seulement dans la page Bibliothèque › BigPrint. */
+window.StellioBigPrintFiles = window.StellioBigPrintFiles || [];
+function _isBigPrintPath(p) { return String(p || '').replace(/\\/g, '/').split('/').slice(0, -1).some(seg => /_bigprint$/i.test(seg)); }
+function _dedupeFilesByPath(list, merge) {
     if (!Array.isArray(list)) return list;
+    const bp = list.filter(f => f && _isBigPrintPath(f.path));
+    if (bp.length || !merge) {
+        const byPath = new Map(merge ? window.StellioBigPrintFiles.map(f => [f.path, f]) : []);
+        bp.forEach(f => byPath.set(f.path, f));
+        window.StellioBigPrintFiles = [...byPath.values()].filter(f => !_clientDeleted.has(String(f.path).replace(/\\/g, '/')));
+    }
+    if (bp.length) list = list.filter(f => !(f && _isBigPrintPath(f.path)));
     const seen = new Set();
     const nowTs = Date.now();
     _clientDeleted.forEach((ts, k) => { if (nowTs - ts > _CLIENT_DELETED_TTL) _clientDeleted.delete(k); });
@@ -7592,6 +7602,7 @@ if (appScreen && appScreen.classList.contains('hidden')) return;
 try {
 const tagParams = activeTagFilters.size > 0 ? `?tags=${encodeURIComponent([...activeTagFilters].join(','))}` : '';
 const res = await fetch(`${API}/api/files${tagParams}`);
+    window.__bigprintCount = Number(res.headers.get('X-Bigprint-Count') || 0);
 if (res.status === 401) return;
 if (!res.ok) {
 const errorText = await res.text();
@@ -7608,6 +7619,7 @@ throw new Error(`${I18N.t('toast.server_error')}: ${res.status} - ${errorText.su
     renderFiles();
     setTimeout(() => generateVisibleThumbnails(), 200);
     updateSidebarCounts(filteredFiles);
+    try { window.StellioSuite?.refreshBigPrintNav?.(window.__bigprintCount); } catch (e) { /* menu BigPrint : sans incidence sur la bibliothèque */ }
     updateFooterCounts();
 
     console.log(`✅ ${allFiles.length} fichiers chargés depuis le cache`);
@@ -7670,7 +7682,7 @@ scanPollingInterval = setInterval(async () => {
             updateScanBadge(I18N.t('scan.in_progress', { count: data.found }));
 
             if (data.new_files && data.new_files.length > 0) {
-                allFiles = _dedupeFilesByPath(allFiles.concat(data.new_files));
+                allFiles = _dedupeFilesByPath(allFiles.concat(data.new_files), true);
                 filteredFiles = rebuildFilteredFiles();
                 applySorting();
                 renderFiles();
@@ -8048,7 +8060,7 @@ async function _fileInfoLoadCostSettings() {
 
 window.openFileInfoModal = async function (path, opts) {
     const demo = opts && opts.demo ? opts.demo : null;   // visite guidée : fichier fictif, aucune requête réseau
-    const file = demo ? demo.file : (typeof allFiles !== 'undefined' ? allFiles : []).find(f => f.path === path)
+    const file = demo ? demo.file : (typeof allFiles !== 'undefined' ? allFiles : []).find(f => f.path === path) || (window.StellioBigPrintFiles || []).find(f => f.path === path)
         || (typeof filteredFiles !== 'undefined' ? filteredFiles : []).find(f => f.path === path) || { path, name: path.split(/[\\/]/).pop() };
     let modal = document.getElementById('modal-file-info');
     if (!modal) {
@@ -28455,3 +28467,61 @@ function _initLicenseBadge() {
     inp.addEventListener('input', () => { clearTimeout(_licenseBadgeTimer); _licenseBadgeTimer = setTimeout(_refreshLicenseBadge, 300); });
     _refreshLicenseBadge();
 }
+
+
+/* 1.2.1 : widgets de l'accueil repliables (chevron dans l'en-tête, état mémorisé) */
+(function dashboardCollapsible() {
+    // Par défaut TOUS les widgets sont repliés ; on mémorise ceux que l'utilisateur a dépliés.
+    const KEY = 'stellio-dashboard-expanded';
+    const load = () => { try { const a = JSON.parse(localStorage.getItem(KEY) || '[]'); return new Set(Array.isArray(a) ? a : []); } catch { return new Set(); } };
+    const save = (s) => { try { localStorage.setItem(KEY, JSON.stringify([...s])); } catch {} };
+    const ROW = 8, GAP = 16;   // la grille est en lignes de 8 px : un widget replié libère la place, ceux du dessous remontent
+    const fit = (w) => {
+        if (!w.classList.contains('dashboard-widget-collapsed')) { w.style.removeProperty('--cspan'); return; }
+        const h = w.offsetHeight || 52;
+        w.style.setProperty('--cspan', Math.ceil((h + GAP) / ROW));
+    };
+    const paint = (w, collapsed) => {
+        w.classList.toggle('dashboard-widget-collapsed', collapsed);
+        const b = w.querySelector('.dashboard-widget-collapse-btn'); if (!b) return;
+        b.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        b.title = I18N.t(collapsed ? 'dashboard.expand_widget' : 'dashboard.collapse_widget');
+        b.setAttribute('aria-label', b.title);
+        fit(w);
+    };
+    // Chaque widget reste dans sa colonne (ordre de lecture : 1,2,3… puis on recommence) ; replié, ceux du dessous remontent.
+    const layout = () => {
+        const grid = document.getElementById('dashboard-grid'); if (!grid) return;
+        const n = Math.max(1, getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length);
+        let i = 0;
+        grid.querySelectorAll(':scope > .dashboard-widget').forEach(w => {
+            if (getComputedStyle(w).display === 'none') return;
+            const c = String((i++ % n) + 1);
+            if (w.style.gridColumnStart !== c) w.style.gridColumnStart = c;
+        });
+    };
+    function init() {
+        const grid = document.getElementById('dashboard-grid'); if (!grid || grid.dataset.collapsible) return;
+        grid.dataset.collapsible = '1';
+        const open = load();
+        grid.querySelectorAll('.dashboard-widget[data-widget-id]').forEach(w => {
+            const h = w.querySelector('.dashboard-widget-header'); if (!h || h.querySelector('.dashboard-widget-collapse-btn')) return;
+            const b = document.createElement('button');
+            b.type = 'button'; b.className = 'dashboard-widget-collapse-btn';
+            b.innerHTML = '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
+            h.appendChild(b);
+            paint(w, !open.has(w.dataset.widgetId));
+        });
+        grid.addEventListener('click', (e) => {
+            const b = e.target.closest('.dashboard-widget-collapse-btn'); if (!b) return;
+            const w = b.closest('.dashboard-widget'); if (!w) return;
+            const s = load(), id = w.dataset.widgetId, now = !w.classList.contains('dashboard-widget-collapsed');
+            if (now) s.delete(id); else s.add(id);
+            save(s); paint(w, now);
+        });
+        window.addEventListener('resize', () => { layout(); grid.querySelectorAll('.dashboard-widget-collapsed').forEach(fit); });
+        new MutationObserver(layout).observe(grid, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+        layout();
+    }
+    document.addEventListener('DOMContentLoaded', () => { init(); setTimeout(() => { document.querySelectorAll('#dashboard-grid .dashboard-widget').forEach(w => paint(w, w.classList.contains('dashboard-widget-collapsed'))); }, 800); });
+})();

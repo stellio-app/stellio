@@ -205,6 +205,8 @@ def main():
             if kind == 'catalog':
                 lab = '   (re-signer le catalogue seulement)'
             print('  %d) %s%s' % (i, os.path.basename(p), lab))
+        if len(zips) > 1:
+            print('  T) Tout signer (tous les .zip, un seul catalogue mis à jour)')
         print('  0) Quitter')
         c = input('Votre choix : ').strip()
         if c in ('0', 'q', ''):
@@ -215,6 +217,14 @@ def main():
                 except Exception:
                     pass
             return
+        if c.lower() == 't' and len(zips) > 1:
+            for z in zips:
+                print('\n==== %s ====' % os.path.basename(z))
+                try:
+                    sign_plugin(k, z)
+                except Exception as e:
+                    print('[ERREUR]', e)
+            continue
         if not c.isdigit() or not (1 <= int(c) <= len(items)):
             print('Choix invalide.')
             continue

@@ -1641,6 +1641,8 @@
   "dashboard.customize": "Personalizza",
   "dashboard.customize_done": "Fatto",
   "dashboard.hide_widget": "Nascondi",
+  "dashboard.collapse_widget": "Comprimi",
+  "dashboard.expand_widget": "Espandi",
   "dashboard.hidden_widgets_label": "Widget nascosti:",
   "dashboard.sos_title": "Ultimo S.O.S Print",
   "dashboard.no_sos": "Nessuna diagnosi S.O.S Print per ora",
@@ -3123,6 +3125,7 @@
   "bigprint.dest_source": "Cartella",
   "bigprint.dest_name": "Nome della cartella creata",
   "bigprint.dest_default": "Cartella dati di Stellio",
+  "bigprint.dest_beside": "Accanto al file sorgente",
   "bigprint.preview": "Anteprima",
   "bigprint.save": "Salva i file",
   "bigprint.cancel": "Annulla",
@@ -3800,6 +3803,11 @@
   "plugins.manage": "Catalogo",
   "suite.installed_ui": "Installati",
   "suite.pv_error": "Impossibile mostrare questo plugin",
+  "suite.busy_msg": "A job is running. If you change page, it will be cancelled.",
+  "suite.busy_title": "Job in progress",
+  "suite.busy_leave": "Change page anyway",
+  "suite.busy_stay": "Continue",
+  "suite.plugins_installed": "plugins installed",
   "suite.pv_off": "Disattivato: attivatelo nel catalogo",
   "suite.ack_title": "Attivare questo plugin?",
   "suite.ack_ok": "Attiva",
@@ -3949,5 +3957,7 @@
   "suite.skip_close": "Chiudi",
   "suite.unsigned_title": "Plugin non firmato",
   "suite.unsigned_body": "Questo plugin non è firmato: autore e contenuto non sono verificati ed eseguirà codice direttamente in Stellio, con accesso ai tuoi file e al tuo account.\n\nStellio e il team di sviluppo non possono essere ritenuti responsabili di danni, perdite di dati o vulnerabilità causati da questo plugin. Installa solo codice di una fonte attendibile.",
-  "suite.unsigned_confirm": "Capisco e accetto questo rischio: installare comunque?"
+  "suite.unsigned_confirm": "Capisco e accetto questo rischio: installare comunque?",
+  "suite.tab_bigprintproj": "BigPrint",
+  "suite.bp_empty": "Nessun progetto BigPrint per ora. Creane uno da Strumenti › BigPrint."
 }

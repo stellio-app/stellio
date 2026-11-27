@@ -151,17 +151,18 @@ def test_remplacement_par_une_version_sans_code_integre_retire_la_preuve(env, mo
     assert not os.path.exists(ph._proof_paths('ext-demo')[1]) and ph.external_dirs() == []
 
 
-def test_le_vrai_plugin_split_color_s_installe_signe(env, monkeypatch):
+def test_plugin_a_page_et_code_integre_s_installe_signe(env, monkeypatch):
     m, ph, sec, tmp = env
     k, pub = _key()
     monkeypatch.setenv('STELLIO_PLUGIN_PUBKEYS', pub)
-    src = os.path.join(ROOT, 'sdk', 'examples', 'split-color')
-    data = _zip({n: open(os.path.join(src, n), 'rb').read() for n in ('plugin.json', 'split_color.py', 'split.html')})
-    res = m.install_bytes(data, signature=_sign(k, 'split-color', '1.0.0', data))
+    man = {'id': 'page-host', 'name': 'Page host', 'version': '1.0.0', 'api': 1, 'permissions': ['ui', 'api:read', 'api:write'],
+           'host': {'modules': ['page_host']}, 'ui': {'title': 'Page host', 'entry': 'page.html'}}
+    data = _zip({'plugin.json': json.dumps(man), 'page_host.py': 'def init(ns, routes=True):\n    return {}\n', 'page.html': '<!doctype html><p>ok</p>'})
+    res = m.install_bytes(data, signature=_sign(k, 'page-host', '1.0.0', data))
     man = res['manifest']
-    assert man['host'] == {'modules': ['split_color']} and man['ui']['entry'] == 'split.html'
+    assert man['host'] == {'modules': ['page_host']} and man['ui']['entry'] == 'page.html'
     assert set(man['permissions']) == {'ui', 'api:read', 'api:write'}
-    assert [p for p, _d in ph.external_dirs()] == ['split-color']
+    assert [p for p, _d in ph.external_dirs()] == ['page-host']
 
 
 def test_le_pont_ecriture_est_limite_aux_plugins_signes_et_a_leur_espace():
@@ -315,3 +316,21 @@ def test_installation_directe_non_signee_exige_acceptation_explicite(env):
     assert ph.external_dirs() != []
     proof = json.load(open(os.path.join(m._root(), '.host-proofs', 'ext-demo.json'))) if os.path.exists(os.path.join(m._root(), '.host-proofs', 'ext-demo.json')) else {}
     assert proof.get('unsigned') is True
+
+
+def test_plugin_signe_ne_recoit_que_ses_services_et_ne_remplace_rien(env, monkeypatch):
+    """1.2.1 : services limités à ce que le module déclare ; il peut en ajouter, pas écraser ceux de l'application."""
+    m, ph, sec, tmp = env
+    k, pub = _key()
+    monkeypatch.setenv('STELLIO_PLUGIN_PUBKEYS', pub)
+    code = ("_REQUIRED = ('DATA_DIR',)\nSEEN = {}\n"
+            "def init(ns):\n    SEEN.update(ns)\n    return {'DATA_DIR': 'PIRATE', 'AJOUT': 1}\n")
+    data = _zip({'plugin.json': json.dumps(MAN), 'ext_demo.py': code})
+    m.install_bytes(data, signature=_sign(k, 'ext-demo', '1.0.0', data))
+    ph.set_enabled('ext-demo', True)
+    ph._LOADED.clear(); ph._VERIFIED.clear()
+    ns = {'app_logger': None, 'DATA_DIR': str(tmp), 'SECRET_KEY': 's3cret', 'get_db': object()}
+    assert 'ext-demo' in ph.load_enabled(ns)
+    seen = sys.modules['stellio_ext_ext_demo_ext_demo'].SEEN
+    assert set(seen) == {'DATA_DIR'}                       # ni SECRET_KEY ni get_db
+    assert ns['DATA_DIR'] == str(tmp) and ns['AJOUT'] == 1

@@ -514,10 +514,13 @@ def _remote_description(url):
     return desc, i18n
 
 
-def apply_remote_descriptions(entries):
-    """La description d'un plugin est celle de son plugin.json sur GitHub ; celle du catalogue n'est qu'un repli (réseau coupé, fichier absent)."""
+def apply_remote_descriptions(entries, network=True):
+    """La description d'un plugin est celle de son plugin.json sur GitHub ; celle du catalogue n'est qu'un repli (réseau coupé, fichier absent).
+    network=False : n'utilise que les descriptions déjà lues (affichage immédiat), sans aucune requête."""
     todo = [(e, manifest_url(e)) for e in entries]
     todo = [(e, u) for e, u in todo if u]
+    if not network:
+        todo = [(e, u) for e, u in todo if u in _manifest_cache]
     if not todo:
         return
     from concurrent.futures import ThreadPoolExecutor
@@ -740,12 +743,13 @@ def _fetch_catalog_live(url):
     st, raw = 'unsigned', b''
     for attempt in range(2):
         raw = http_get(_fresh(url), MAX_CATALOG_BYTES)
-        st = 'unsigned'
         if keys:
             try:
                 sigtxt = http_get(_fresh(url + '.sig'), 1024).decode('ascii', 'ignore').strip()
             except ValueError:
                 sigtxt = ''
+        st = 'unsigned'
+        if keys:
             if sigtxt:
                 st = 'valid' if plugin_security.verify(sigtxt, plugin_security.catalog_message(raw), keys) else 'invalid'
             if st == 'invalid' and attempt == 0:
@@ -843,12 +847,19 @@ def api_plugins_catalog():
         _catalog_cache.pop(url, None)
         _logo_cache.clear()
         _manifest_cache.clear()
-    try:
-        entries = _fetch_catalog(url)
-    except (ValueError, TypeError) as e:
-        code = 'catalog_signature' if str(e).startswith('Signature du catalogue') else 'catalog_error'
-        return jsonify({'error': str(e), 'code': code}), 400
-    apply_remote_descriptions(entries)
+    fast = bool(d.get('cached')) and not d.get('refresh')
+    if fast:                                               # affichage immédiat : dernière lecture vérifiée (disque), aucune requête réseau ; la page relit ensuite en direct
+        entries = _cache_load(url)
+        if entries is None:
+            return jsonify({'stale': True, 'plugins': [], 'count': 0, 'updates': 0, 'fast': True})
+    else:
+        try:
+            entries = _fetch_catalog(url)
+        except (ValueError, TypeError) as e:
+            code = 'catalog_signature' if str(e).startswith('Signature du catalogue') else 'catalog_error'
+            return jsonify({'error': str(e), 'code': code}), 400
+        _catalog_cache[url] = (time.time(), [dict(e) for e in entries])     # les logos (une requête chacun) réutilisent cette lecture au lieu de relire GitHub
+    apply_remote_descriptions(entries, network=not fast)
     have = {m['id']: m for _d, m in installed()}
     for e in entries:
         e['description'] = pick_description(e, d.get('lang'))
@@ -912,7 +923,7 @@ def api_plugins_logo():
     now = time.time()
     try:
         hit = _catalog_cache.get(url)
-        if not hit or now - hit[0] > 60:
+        if not hit or now - hit[0] > 300:
             hit = (now, _fetch_catalog(url))
             _catalog_cache[url] = hit
             if len(_catalog_cache) > 8:

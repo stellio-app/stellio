@@ -452,68 +452,33 @@ def test_onglet_lent_n_ecrase_pas_l_onglet_ouvert_ensuite(page):
 
 
 
-def _gcode_exemple(layers=40):
-    """G-code de démonstration : un vase carré (3 périmètres) puis un cylindre, 0,2 mm par couche, extrusion relative."""
-    import math
-    out = ['; test', 'G21', 'G90', 'M83', 'G92 E0']
-    for i in range(layers):
-        z = round(0.2 * (i + 1), 3)
-        out.append(f'G1 Z{z} F600')
-        for k, r in enumerate((20, 19.2, 18.4)):
-            if i < layers // 2:
-                pts = [(110 - r, 110 - r), (110 + r, 110 - r), (110 + r, 110 + r), (110 - r, 110 + r), (110 - r, 110 - r)]
-            else:
-                pts = [(110 + r * math.cos(a * math.pi / 18), 110 + r * math.sin(a * math.pi / 18)) for a in range(37)]
-            out.append(f'G0 X{pts[0][0]:.2f} Y{pts[0][1]:.2f}')
-            for (x, y) in pts[1:]:
-                out.append(f'G1 X{x:.2f} Y{y:.2f} E0.4 F1800')
-        out.append('G1 E-0.8 F2400 ; retract')
-    return '\n'.join(out)
-
-
-def test_plugin_avec_page_menu_cadre_isole_et_visionneuse_gcode(page):
-    viewer = open(os.path.join(ROOT, 'sdk', 'examples', 'gcode-viewer', 'viewer.html'), encoding='utf-8').read()
-    manifest = json.load(open(os.path.join(ROOT, 'sdk', 'examples', 'gcode-viewer', 'plugin.json'), encoding='utf-8'))
+def test_plugin_avec_page_menu_cadre_isole_et_passerelle_en_lecture_seule(page):
+    """Plugin à page (fixture synthétique) : listé au menu, page dans un cadre isolé, passerelle limitée à api:read."""
+    viewer = ('<!doctype html><meta charset="utf-8"><div id="list"></div><div id="stats"><b>0</b></div>'
+              '<script>document.addEventListener("stellio-ready", async () => { let l; try { l = await window.stellio.api("/api/gcodes"); } catch (e) { return; }'
+              'document.getElementById("list").innerHTML = l.gcodes.map(g => "<div class=item>" + g.name + "</div>").join("");'
+              'document.querySelector("#stats b").textContent = String(l.gcodes.length); });</script>')
+    manifest = {'id': 'page-demo', 'name': 'Page demo', 'version': '1.0.0', 'api': 1, 'permissions': ['ui', 'api:read'],
+                'ui': {'title': 'Page demo', 'icon': 'fa-cube', 'entry': 'page.html'}}
     page.set_viewport_size({'width': 1300, 'height': 800})
     page.evaluate("""() => { document.body.insertAdjacentHTML('beforeend', '<h1 id="header-page-title"></h1><div id="plugin-nav-list"></div><div id="page-plugin-view" class="page active"><div id="pv-msg" hidden></div><iframe id="pv-frame" sandbox="allow-scripts" style="width:100%;height:600px;border:0"></iframe></div>'); }""")
-    page.evaluate("""([m, html, gc]) => {
+    page.evaluate("""([m, html]) => {
       const R = window.__routes;
       R['GET /api/plugins'] = { plugins: [Object.assign({}, m, { enabled: true, config: {} }), { id: 'sans-page', name: 'Sans page', version: '1', enabled: true, permissions: ['events'], events: ['print.finished'] }] };
-      R['GET /api/plugins/gcode-viewer/ui'] = html;
-      R['GET /api/gcodes'] = { total: 2, gcodes: [{ id: 7, name: 'vase_carre.gcode', size: 52000, project_name: 'Déco' }, { id: 8, name: 'autre.gcode', size: 1000 }] };
-      R['GET /api/projects/gcodes/7/download'] = gc;
+      R['GET /api/plugins/page-demo/ui'] = html;
+      R['GET /api/gcodes'] = { total: 2, gcodes: [{ id: 7, name: 'vase_carre.gcode' }, { id: 8, name: 'autre.gcode' }] };
       R['GET /api/settings'] = { secret: 'ne doit jamais sortir' };
-    }""", [manifest, viewer, _gcode_exemple()])
+    }""", [manifest, viewer])
     page.evaluate("window.StellioSuite._refreshPluginNav()")
-    page.wait_for_selector('#plugin-nav-list [data-plugin-ui="gcode-viewer"]')
+    page.wait_for_selector('#plugin-nav-list [data-plugin-ui="page-demo"]')
     assert page.locator('#plugin-nav-list [data-plugin-ui]').count() == 1                          # seul un plugin qui a une page est listé
-    assert 'G-code viewer' in page.inner_text('#plugin-nav-list')
-    page.click('#plugin-nav-list [data-plugin-ui="gcode-viewer"]')
+    assert 'Page demo' in page.inner_text('#plugin-nav-list')
+    page.click('#plugin-nav-list [data-plugin-ui="page-demo"]')
     fr = page.frame_locator('#pv-frame')
     fr.locator('.item').first.wait_for()
     assert fr.locator('.item').count() == 2 and 'vase_carre.gcode' in fr.locator('.item').first.inner_text()
-    fr.locator('.item').first.click()
-    fr.locator('#stats b').first.wait_for(timeout=20000)
-    assert fr.locator('#stats b').first.inner_text() == '40'                                       # 40 couches reconnues
+    assert fr.locator('#stats b').first.inner_text() == '2'
     frame = [f for f in page.frames if f != page.main_frame][0]
-    assert frame.evaluate("document.getElementById('lmax').max") == '40' and frame.evaluate("document.getElementById('lmax').value") == '40'
-    assert 'G1 X' in frame.evaluate("document.getElementById('code').textContent")                  # ligne de G-code courante
-    px = frame.evaluate("(() => { const c = document.getElementById('gl'), t = document.createElement('canvas'); t.width = c.width; t.height = c.height; const x = t.getContext('2d'); x.drawImage(c, 0, 0); const d = x.getImageData(0, 0, t.width, t.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - d[0]) + Math.abs(d[i + 1] - d[1]) + Math.abs(d[i + 2] - d[2]) > 60) n++; return n; })()")
-    assert px > 500                                                                                  # le modèle 3D est dessiné (WebGL 2)
-    frame.evaluate("document.getElementById('lmax').value = 5; document.getElementById('lmax').dispatchEvent(new Event('input'))")
-    assert '5/40' in frame.evaluate("document.getElementById('lmaxl').textContent")
-    frame.evaluate("document.getElementById('ocol').value = 'speed'; document.getElementById('ocol').dispatchEvent(new Event('change'))")
-    frame.evaluate("document.querySelector('[data-v=top]').click()")
-    assert frame.evaluate("document.getElementById('play').click(), document.getElementById('play').textContent") == '⏸'
-    frame.evaluate("document.getElementById('play').click()")
-    gc = os.path.join(os.path.dirname(__file__), '_local_exemple.gcode')                           # G-code choisi depuis le PC
-    open(gc, 'w').write(_gcode_exemple())
-    try:
-        frame.set_input_files('#fin', gc)
-        frame.wait_for_function("document.querySelector('.item.on') && document.querySelector('.item.on').textContent.indexOf('_local_exemple') >= 0", timeout=20000)
-        assert frame.evaluate("document.getElementById('lmax').max") == '40'
-    finally:
-        os.remove(gc)
     # isolation : aucun réseau direct, aucun cookie/stockage de Stellio, passerelle en lecture seule avec liste noire
     assert frame.evaluate("fetch('/api/settings').then(() => 'ouvert', () => 'bloque')") == 'bloque'
     assert frame.evaluate("(() => { try { return parent.document.title, 'acces'; } catch (e) { return 'bloque'; } })()") == 'bloque'
@@ -524,7 +489,7 @@ def test_plugin_avec_page_menu_cadre_isole_et_visionneuse_gcode(page):
     # sans la permission api:read, la passerelle refuse tout
     page.evaluate("window.__routes['GET /api/plugins'].plugins[0].permissions = ['ui']; window.StellioSuite._refreshPluginNav()")
     page.wait_for_timeout(100)
-    page.evaluate("window.StellioSuite._openPluginView('gcode-viewer')")
+    page.evaluate("window.StellioSuite._openPluginView('page-demo')")
     page.wait_for_timeout(600)
     frame = [f for f in page.frames if f != page.main_frame][0]
     assert 'api:read' in frame.evaluate("window.stellio.api('/api/gcodes').then(() => 'ok', e => e.message)")

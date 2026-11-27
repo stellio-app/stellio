@@ -1641,6 +1641,8 @@
   "dashboard.customize": "カスタマイズ",
   "dashboard.customize_done": "完了",
   "dashboard.hide_widget": "非表示",
+  "dashboard.collapse_widget": "折りたたむ",
+  "dashboard.expand_widget": "展開",
   "dashboard.hidden_widgets_label": "非表示のウィジェット：",
   "dashboard.sos_title": "最新のS.O.S Print",
   "dashboard.no_sos": "S.O.S Printの診断はまだありません",
@@ -3123,6 +3125,7 @@
   "bigprint.dest_source": "フォルダー",
   "bigprint.dest_name": "作成するフォルダー名",
   "bigprint.dest_default": "Stellioのデータフォルダー",
+  "bigprint.dest_beside": "元ファイルと同じ場所",
   "bigprint.preview": "プレビュー",
   "bigprint.save": "印刷ファイルを保存",
   "bigprint.cancel": "キャンセル",
@@ -3800,6 +3803,11 @@
   "plugins.manage": "カタログ",
   "suite.installed_ui": "インストール済み",
   "suite.pv_error": "このプラグインを表示できません",
+  "suite.busy_msg": "A job is running. If you change page, it will be cancelled.",
+  "suite.busy_title": "Job in progress",
+  "suite.busy_leave": "Change page anyway",
+  "suite.busy_stay": "Continue",
+  "suite.plugins_installed": "plugins installed",
   "suite.pv_off": "無効：カタログで有効にしてください",
   "suite.ack_title": "このプラグインを有効にしますか？",
   "suite.ack_ok": "有効にする",
@@ -3949,5 +3957,7 @@
   "suite.skip_close": "閉じる",
   "suite.unsigned_title": "未署名のプラグイン",
   "suite.unsigned_body": "このプラグインは署名されていません。作者と内容は検証されておらず、Stellio 内で直接コードを実行し、あなたのファイルやアカウントにアクセスします。\n\nこのプラグインによる損害、データ損失、脆弱性について、Stellio および開発チームは一切責任を負いません。信頼できる提供元のコードのみをインストールしてください。",
-  "suite.unsigned_confirm": "リスクを理解し、同意します。それでもインストールしますか？"
+  "suite.unsigned_confirm": "リスクを理解し、同意します。それでもインストールしますか？",
+  "suite.tab_bigprintproj": "BigPrint",
+  "suite.bp_empty": "BigPrint プロジェクトはまだありません。ツール › BigPrint から作成してください。"
 }

@@ -52,7 +52,7 @@ def test_buttons_moved_out_of_toolbar():
     # Atelier avancé : dans le groupe Outils, plus dans la barre de la bibliothèque
     # Chaque outil de l'Atelier avancé a son entrée dans le volet, rangée dans sa catégorie ; « Administration » regroupe les outils d'exploitation
     cats = {m.group(1): m.group(2) for m in re.finditer(r'<button[^>]*data-suite-tab="(\w+)"[^>]*data-cat="(\w+)"', html)}
-    assert cats == {'organize': 'library', 'collections': 'library', 'diff': 'library', 'similar': 'library', 'licenses': 'library', 'part': 'library', 'compat': 'print', 'check': 'print', 'gcode': 'print', 'needs': 'filament',
+    assert cats == {'organize': 'library', 'collections': 'library', 'bigprintproj': 'library', 'diff': 'library', 'similar': 'library', 'licenses': 'library', 'part': 'library', 'compat': 'print', 'check': 'print', 'gcode': 'print', 'needs': 'filament',
                     'plate': 'tools', 'sync': 'tools', 'fab': 'tools', 'jobs': 'admin', 'db': 'admin', 'admin': 'admin'}, cats
     assert 'data-rail="admin"' in html and "'admin'" in js and 'id="suite-btn"' not in html and 'id="assistant-btn"' not in html
     for tab in cats:                                                              # chaque entrée a son interrupteur dans les réglages de la barre latérale
@@ -224,3 +224,53 @@ def test_workshop_mode_never_overflows_a_portrait_phone():
     css = (pathlib.Path(__file__).resolve().parent.parent / 'interface/style.css').read_text(encoding='utf-8')
     assert 'grid-template-columns: minmax(0, 1fr); }' in css and 'minmax(min(320px, 100%), 1fr)' in css
     assert '.workshop-overlay {' in css and 'overflow-x: hidden' in css
+
+
+def test_page_bigprint_de_la_bibliotheque():
+    """Entrée « BigPrint » du menu Bibliothèque : masquée par défaut, onglet dédié, rafraîchie à chaque rechargement des fichiers."""
+    import json
+    html = open(os.path.join(ROOT, 'interface', 'index.html'), encoding='utf-8').read()
+    m = re.search(r'<button[^>]*id="nav-bigprint-projects"[^>]*>', html)
+    assert m and 'display:none' in m.group(0) and 'data-cat="library"' in m.group(0) and 'data-suite-tab="bigprintproj"' in m.group(0)
+    suite = open(os.path.join(ROOT, 'interface', 'suite.js'), encoding='utf-8').read()
+    assert 'TABS.bigprintproj' in suite and 'refreshBigPrintNav' in suite
+    assert 'refreshBigPrintNav' in open(os.path.join(ROOT, 'interface', 'script.js'), encoding='utf-8').read()
+    for l in ('fr', 'en', 'de', 'es', 'it', 'pt', 'zh', 'ja'):
+        d = json.load(open(os.path.join(ROOT, 'languages', l + '.json'), encoding='utf-8'))
+        assert d.get('suite.tab_bigprintproj') and d.get('suite.bp_empty'), l
+
+
+def test_fichiers_bigprint_retires_de_la_bibliotheque():
+    """Les fichiers des dossiers « …_bigprint » ne sont pas dans la liste de la bibliothèque : la page BigPrint les reçoit à part."""
+    import subprocess, shutil
+    node = shutil.which('node')
+    if not node:
+        import pytest; pytest.skip('node absent')
+    src = open(os.path.join(ROOT, 'interface', 'script.js'), encoding='utf-8').read()
+    a = src.index('window.StellioBigPrintFiles = window.StellioBigPrintFiles')
+    b = src.index('let _thumbColorHex')
+    js = ("const window = {}; const _clientDeleted = new Map();\n" + src[a:b] + """
+const full = [{path:'/lib/a.stl'},{path:'/lib/BigPrint/boule_bigprint/pieces/p1.stl'},{path:'C:\\\\lib\\\\BigPrint\\\\x_bigprint\\\\project.3mf'},{path:'/lib/b_bigprint.stl'}];
+const out = _dedupeFilesByPath(full);
+console.log(JSON.stringify([out.map(f=>f.path), window.StellioBigPrintFiles.length]));
+const more = _dedupeFilesByPath(out.concat([{path:'/lib/c.stl'}]), true);
+console.log(JSON.stringify([more.length, window.StellioBigPrintFiles.length]));
+_dedupeFilesByPath([{path:'/lib/a.stl'}]);
+console.log(window.StellioBigPrintFiles.length);
+""")
+    r = subprocess.run([node, '-e', js], capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr
+    l = r.stdout.strip().splitlines()
+    assert json.loads(l[0]) == [['/lib/a.stl', '/lib/b_bigprint.stl'], 2]   # un fichier dont seul le NOM finit par _bigprint reste dans la bibliothèque
+    assert json.loads(l[1]) == [3, 2] and l[2] == '0'   # ajout partiel : conservé ; rechargement complet : remplacé
+
+
+def test_widgets_de_l_accueil_repliables():
+    """1.2.1 : chevron injecté dans chaque en-tête de widget, état mémorisé, libellés en 8 langues."""
+    import json
+    js = open(os.path.join(ROOT, 'interface', 'script.js'), encoding='utf-8').read()
+    css = open(os.path.join(ROOT, 'interface', 'style.css'), encoding='utf-8').read()
+    assert 'stellio-dashboard-expanded' in js and 'dashboard-widget-collapse-btn' in js and '.dashboard-widget.dashboard-widget-collapsed' in css
+    for l in ('fr', 'en', 'de', 'es', 'it', 'pt', 'zh', 'ja'):
+        d = json.load(open(os.path.join(ROOT, 'languages', l + '.json'), encoding='utf-8'))
+        assert d.get('dashboard.collapse_widget') and d.get('dashboard.expand_widget'), l

@@ -46,7 +46,7 @@ login_required = None
 session = None
 
 # Clé publique officielle (64 caractères hex) à renseigner après `python tools/plugin_sign.py keygen` (la clé privée ne quitte JAMAIS la machine de l'éditeur).
-OFFICIAL_PUBLIC_KEYS = ("01573098fb48f9f90291fda0b89b99309cb62ef2be47c728ede667fbc30d2b7a",)
+OFFICIAL_PUBLIC_KEYS = ()
 SIG_RE = re.compile(r'^[0-9a-f]{128}$')
 KEY_RE = re.compile(r'^[0-9a-f]{64}$')
 

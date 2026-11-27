@@ -1019,21 +1019,21 @@ Limits: 10 seconds per run, 512 MB of memory, minimal environment (`STELLIO_*` v
 ### 5. Testing
 Zip the **contents** of the folder as `mon-plugin.zip` (2 MB maximum), install it from **Plugins › Catalog** (local archive), accept the permissions, enable it and use **Test**. Fix problems by reading the log.
 
-## Plugin with a page: G-code viewer example
+## Plugin with a page
 
-A plugin can also show **its own page** inside Stellio. It then appears in the **Plugins** menu of the sidebar, under "Catalog", in the "Installed" list: one click opens its page. The `sdk/examples/gcode-viewer` example is a 3D G-code viewer: 3D view (orbit, zoom), layer range, move playback, colors by type, speed or flow, travel moves and retractions; in 8 languages.
+A plugin can also show **its own page** inside Stellio. It then appears in the **Plugins** menu of the sidebar, under "Catalog", in the "Installed" list: one click opens its page. The manifest below is a minimal example.
 
 ```json
 {
-  "id": "gcode-viewer",
-  "name": "G-code viewer",
+  "id": "mon-plugin",
+  "name": "Mon plugin",
   "version": "1.0.0",
   "api": 1,
   "description": "Shows your archived G-code files layer by layer.",
   "author": "Stellio",
   "permissions": ["ui", "api:read"],
   "ui": {
-    "title": "G-code viewer",
+    "title": "Mon plugin",
     "icon": "fa-layer-group",
     "entry": "viewer.html"
   }
@@ -1053,7 +1053,7 @@ document.addEventListener('stellio-ready', async () => {
 });
 ```
 
-To try it: zip the contents of the `gcode-viewer` folder, install the archive from **Plugins › Catalog**, accept the permissions, enable it, then open it from the **Plugins** menu. At least one archived G-code is needed (file sheet or project). A disabled plugin stays greyed out in the list.
+To try it: zip the contents of the `mon-plugin` folder, install the archive from **Plugins › Catalog**, accept the permissions, enable it, then open it from the **Plugins** menu. At least one archived G-code is needed (file sheet or project). A disabled plugin stays greyed out in the list.
 
 ## Publishing on GitHub
 1. Create a public repository for your plugin with the code, a `README` and a license.

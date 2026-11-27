@@ -198,3 +198,20 @@ def test_notifications_expose_the_stock_kind_for_retranslation(stellio_app, logg
     assert allk['Low filament stock'] == 'low_stock'
     logged.post('/api/notifications', json={'type': 'maintenance', 'title': 'Maintenance due', 'message': 'P1 — x', 'dedup_key': 'maintenance_4'}, headers=h)
     assert {n['title']: n['kind'] for n in logged.get('/api/notifications').get_json()['notifications']}['Maintenance due'] == 'maintenance'
+
+
+def test_dossiers_bigprint_masques_de_la_liste_de_la_bibliotheque(stellio_app, logged):
+    """/api/files exclut les dossiers « …_bigprint » ; ?bigprint=1 ne renvoie qu'eux ; l'en-tête donne leur nombre."""
+    g = stellio_app.view_functions['api_get_files'].__globals__
+    files = [{'path': '/s/a.stl', 'name': 'a.stl', 'extension': '.stl'},
+             {'path': '/s/BigPrint/boule_bigprint/pieces/p1.stl', 'name': 'p1.stl', 'extension': '.stl'}]
+    old = g['_read_cache_json_safe']
+    try:
+        g['_read_cache_json_safe'] = lambda: {'files': files, 'timestamp': 1}
+        open(g['CACHE_FILE'], 'a').close()
+        r = logged.get('/api/files')
+        assert r.status_code == 200 and [f['name'] for f in r.get_json()] == ['a.stl'] and r.headers['X-Bigprint-Count'] == '1'
+        r = logged.get('/api/files?bigprint=1')
+        assert [f['name'] for f in r.get_json()] == ['p1.stl']
+    finally:
+        g['_read_cache_json_safe'] = old

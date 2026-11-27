@@ -105,8 +105,8 @@ def test_migrations_appliquees_une_fois_dans_l_ordre():
     c.execute("CREATE TABLE file_origins (file_path TEXT)")
     c.execute("CREATE TABLE users (id INTEGER PRIMARY KEY)")
     r = mg.run_pending(c, now=1)
-    assert r['applied'] == [2, 3, 4] and r['failed'] is None and r['version'] == 4
-    assert c.execute("PRAGMA user_version").fetchone()[0] == 4
+    assert r['applied'] == [2, 3, 4, 5] and r['failed'] is None and r['version'] == 5
+    assert c.execute("PRAGMA user_version").fetchone()[0] == 5
     assert {'nozzle_temp', 'bed_temp', 'slicer_version'} <= {x[1] for x in c.execute("PRAGMA table_info(print_history)")}
     assert mg.run_pending(c)['applied'] == []                      # idempotent
 

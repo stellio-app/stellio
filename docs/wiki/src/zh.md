@@ -1019,21 +1019,21 @@ print(f"{event}: {data.get('file_name') or data.get('printer') or '-'}")
 ### 5. 测试
 把文件夹的**内容**压缩为 `mon-plugin.zip`（最大 2 MB），在 **插件 › 目录** 中安装（本地压缩包），接受权限，启用并使用 **测试**。通过阅读日志来排查问题。
 
-## 带页面的插件：G-code 查看器示例
+## 带页面的插件
 
-插件还可以在 Stellio 中显示**自己的页面**。它会出现在侧边栏的 **插件** 菜单中，位于“目录”下方的“已安装”列表里：点击即可打开其页面。示例 `sdk/examples/gcode-viewer` 是一个3D G-code 查看器：3D 视图（旋转、缩放）、层范围、移动回放、按类型/速度/流量着色、空走与回抽；支持 8 种语言。
+插件还可以在 Stellio 中显示**自己的页面**。它会出现在侧边栏的 **插件** 菜单中，位于“目录”下方的“已安装”列表里：点击即可打开其页面。 下面的清单是一个最小示例。
 
 ```json
 {
-  "id": "gcode-viewer",
-  "name": "G-code viewer",
+  "id": "mon-plugin",
+  "name": "Mon plugin",
   "version": "1.0.0",
   "api": 1,
   "description": "Shows your archived G-code files layer by layer.",
   "author": "Stellio",
   "permissions": ["ui", "api:read"],
   "ui": {
-    "title": "G-code viewer",
+    "title": "Mon plugin",
     "icon": "fa-layer-group",
     "entry": "viewer.html"
   }
@@ -1053,7 +1053,7 @@ document.addEventListener('stellio-ready', async () => {
 });
 ```
 
-试用方法：压缩 `gcode-viewer` 文件夹的内容，在 **插件 › 目录** 中安装压缩包，接受权限并启用，然后从 **插件** 菜单打开。至少需要一个已归档的 G-code（文件详情或项目中）。已停用的插件在列表中显示为灰色。
+试用方法：压缩 `mon-plugin` 文件夹的内容，在 **插件 › 目录** 中安装压缩包，接受权限并启用，然后从 **插件** 菜单打开。至少需要一个已归档的 G-code（文件详情或项目中）。已停用的插件在列表中显示为灰色。
 
 ## 发布到 GitHub
 1. 为您的插件创建公开仓库，包含代码、`README` 和许可证。

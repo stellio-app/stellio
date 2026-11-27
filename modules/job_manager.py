@@ -35,6 +35,17 @@ MAX_WORKERS = 2
 KEEP_FINISHED = 100
 
 
+_TL = threading.local()
+
+
+def job_check():
+    """Point d'annulation pour le code appelé depuis une tâche (ex. vue de plugin lancée en asynchrone) : lève Cancelled si la tâche
+    a été annulée ; sans effet hors tâche."""
+    c = getattr(_TL, 'ctx', None)
+    if c is not None:
+        c.check()
+
+
 class Cancelled(Exception):
     """Levée par `ctx.check()` quand la tâche a été annulée."""
 
@@ -131,7 +142,11 @@ class JobManager:
         try:
             if job.cancel_requested:
                 raise Cancelled()
-            job.result = job.fn(JobContext(job), *job.args, **job.kwargs)
+            _TL.ctx = JobContext(job)
+            try:
+                job.result = job.fn(_TL.ctx, *job.args, **job.kwargs)
+            finally:
+                _TL.ctx = None
             job.set_state('done')
         except Cancelled:
             job.set_state('cancelled')

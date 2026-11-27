@@ -1641,6 +1641,8 @@
   "dashboard.customize": "Personalizar",
   "dashboard.customize_done": "Concluído",
   "dashboard.hide_widget": "Ocultar",
+  "dashboard.collapse_widget": "Recolher",
+  "dashboard.expand_widget": "Expandir",
   "dashboard.hidden_widgets_label": "Widgets ocultos:",
   "dashboard.sos_title": "Último S.O.S Print",
   "dashboard.no_sos": "Nenhum diagnóstico S.O.S Print ainda",
@@ -3123,6 +3125,7 @@
   "bigprint.dest_source": "Pasta",
   "bigprint.dest_name": "Nome da pasta criada",
   "bigprint.dest_default": "Pasta de dados do Stellio",
+  "bigprint.dest_beside": "Junto ao ficheiro de origem",
   "bigprint.preview": "Pré-visualização",
   "bigprint.save": "Guardar os ficheiros",
   "bigprint.cancel": "Cancelar",
@@ -3800,6 +3803,11 @@
   "plugins.manage": "Catálogo",
   "suite.installed_ui": "Instalados",
   "suite.pv_error": "Não é possível mostrar este plugin",
+  "suite.busy_msg": "A job is running. If you change page, it will be cancelled.",
+  "suite.busy_title": "Job in progress",
+  "suite.busy_leave": "Change page anyway",
+  "suite.busy_stay": "Continue",
+  "suite.plugins_installed": "plugins installed",
   "suite.pv_off": "Desativado: ative-o no catálogo",
   "suite.ack_title": "Ativar este plugin?",
   "suite.ack_ok": "Ativar",
@@ -3949,5 +3957,7 @@
   "suite.skip_close": "Fechar",
   "suite.unsigned_title": "Plugin não assinado",
   "suite.unsigned_body": "Este plugin não está assinado: o autor e o conteúdo não são verificados, e ele executará código diretamente no Stellio, com acesso aos seus arquivos e à sua conta.\n\nO Stellio e a equipe de desenvolvimento não podem ser responsabilizados por danos, perda de dados ou falhas causados por este plugin. Instale apenas código de uma fonte confiável.",
-  "suite.unsigned_confirm": "Eu entendo e aceito este risco: instalar mesmo assim?"
+  "suite.unsigned_confirm": "Eu entendo e aceito este risco: instalar mesmo assim?",
+  "suite.tab_bigprintproj": "BigPrint",
+  "suite.bp_empty": "Ainda não há projetos BigPrint. Crie um em Ferramentas › BigPrint."
 }
