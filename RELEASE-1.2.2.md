@@ -1,0 +1,64 @@
+## Stellio v1.2.2
+<details>
+<summary><b>🇫🇷 Français</b></summary>
+
+✓ Traitements lourds en tâche de fond : les plugins peuvent confier un traitement long au gestionnaire central de tâches (suivi, annulation, résultat sur /api/jobs) au lieu de bloquer l'écran ; les anciens plugins continuent de fonctionner  
+✓ Bilan d'impression : export CSV (totaux, période précédente, par imprimante, par matière, modèles les plus imprimés) à côté de l'export PDF ; tableur FR/EN, protégé contre l'injection de formules  
+✓ Modularisation : séchage des bobines, calibrations et pièces d'usure quittent main.py pour modules/workshop_logs.py (mêmes URL, mêmes réponses ; main.py passe sous 28 800 lignes), avec leurs tests  
+</details>
+
+<details>
+<summary><b>🇬🇧 English</b></summary>
+
+✓ Heavy processing in the background: plugins can hand a long task to the central job manager (progress, cancel, result on /api/jobs) instead of blocking the screen; older plugins keep working  
+✓ Print report: CSV export (totals, previous period, by printer, by material, most printed models) next to the PDF export; spreadsheet-friendly, protected against formula injection  
+✓ Modularization: spool drying, calibrations and wear parts move from main.py to modules/workshop_logs.py (same URLs, same responses; main.py is now under 28,800 lines), with their tests  
+</details>
+
+<details>
+<summary><b>🇩🇪 Deutsch</b></summary>
+
+✓ Schwere Verarbeitung im Hintergrund: Plugins können lange Aufgaben an den zentralen Job-Manager übergeben (Fortschritt, Abbruch, Ergebnis unter /api/jobs), statt den Bildschirm zu blockieren; ältere Plugins funktionieren weiter  
+✓ Druckbericht: CSV-Export (Summen, Vorperiode, je Drucker, je Material, meistgedruckte Modelle) neben dem PDF-Export; tabellenfreundlich, gegen Formel-Injektion geschützt  
+✓ Modularisierung: Spulentrocknung, Kalibrierungen und Verschleißteile wandern von main.py nach modules/workshop_logs.py (gleiche URLs, gleiche Antworten; main.py unter 28 800 Zeilen), mit Tests  
+</details>
+
+<details>
+<summary><b>🇪🇸 Español</b></summary>
+
+✓ Procesos pesados en segundo plano: los plugins pueden confiar una tarea larga al gestor central (progreso, cancelación, resultado en /api/jobs) en lugar de bloquear la pantalla; los plugins antiguos siguen funcionando  
+✓ Informe de impresión: exportación a CSV (totales, periodo anterior, por impresora, por material, modelos más impresos) junto a la exportación a PDF; apto para hojas de cálculo, protegido contra inyección de fórmulas  
+✓ Modularización: secado de bobinas, calibraciones y piezas de desgaste salen de main.py hacia modules/workshop_logs.py (mismas URL, mismas respuestas; main.py baja de 28 800 líneas), con sus pruebas  
+</details>
+
+<details>
+<summary><b>🇵🇹 Português</b></summary>
+
+✓ Processamento pesado em segundo plano: os plugins podem confiar uma tarefa longa ao gestor central (progresso, cancelamento, resultado em /api/jobs) em vez de bloquear o ecrã; os plugins antigos continuam a funcionar  
+✓ Relatório de impressão: exportação em CSV (totais, período anterior, por impressora, por material, modelos mais impressos) ao lado da exportação em PDF; compatível com folhas de cálculo, protegido contra injeção de fórmulas  
+✓ Modularização: secagem de bobinas, calibrações e peças de desgaste saem de main.py para modules/workshop_logs.py (mesmos URL, mesmas respostas; main.py fica abaixo de 28 800 linhas), com os seus testes  
+</details>
+
+<details>
+<summary><b>🇮🇹 Italiano</b></summary>
+
+✓ Elaborazioni pesanti in background: i plugin possono affidare un'attività lunga al gestore centrale (avanzamento, annullamento, risultato su /api/jobs) invece di bloccare lo schermo; i vecchi plugin continuano a funzionare  
+✓ Report di stampa: esportazione CSV (totali, periodo precedente, per stampante, per materiale, modelli più stampati) accanto all'esportazione PDF; adatto ai fogli di calcolo, protetto dall'iniezione di formule  
+✓ Modularizzazione: essiccazione delle bobine, calibrazioni e parti di usura passano da main.py a modules/workshop_logs.py (stessi URL, stesse risposte; main.py scende sotto le 28 800 righe), con i relativi test  
+</details>
+
+<details>
+<summary><b>🇨🇳 中文</b></summary>
+
+✓ 繁重处理转入后台：插件可将耗时任务交给中央任务管理器（进度、取消、结果见 /api/jobs），不再阻塞界面；旧版插件仍可正常使用  
+✓ 打印报告：在 PDF 导出旁新增 CSV 导出（合计、上一周期、按打印机、按材料、最常打印的模型），适合电子表格，并防止公式注入  
+✓ 模块化：耗材盘干燥、校准和易损件从 main.py 移至 modules/workshop_logs.py（URL 与响应不变；main.py 降至 28 800 行以下），并附带测试  
+</details>
+
+<details>
+<summary><b>🇯🇵 日本語</b></summary>
+
+✓ 重い処理をバックグラウンドで実行：プラグインは長時間の処理を中央のジョブ管理に任せられます（進捗・キャンセル・結果は /api/jobs）。画面をブロックせず、旧バージョンのプラグインもそのまま動作します  
+✓ 印刷レポート：PDF 出力の隣に CSV 出力を追加（合計、前期間、プリンター別、素材別、よく印刷されるモデル）。表計算向けで、数式インジェクション対策済み  
+✓ モジュール化：スプールの乾燥、キャリブレーション、消耗部品を main.py から modules/workshop_logs.py に移動（URL・応答は同一。main.py は 28,800 行未満に）。テスト付き  
+</details>

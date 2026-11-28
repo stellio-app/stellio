@@ -1,5 +1,50 @@
 [
   {
+    "version": "1.2.2",
+    "items": {
+      "fr": [
+        "Traitements lourds en tâche de fond : les plugins peuvent confier un traitement long au gestionnaire central de tâches (suivi, annulation, résultat sur /api/jobs) au lieu de bloquer l'écran ; les anciens plugins continuent de fonctionner",
+        "Bilan d'impression : export CSV (totaux, période précédente, par imprimante, par matière, modèles les plus imprimés) à côté de l'export PDF ; tableur FR/EN, protégé contre l'injection de formules",
+        "Modularisation : séchage des bobines, calibrations et pièces d'usure quittent main.py pour modules/workshop_logs.py (mêmes URL, mêmes réponses ; main.py passe sous 28 800 lignes), avec leurs tests"
+      ],
+      "en": [
+        "Heavy processing in the background: plugins can hand a long task to the central job manager (progress, cancel, result on /api/jobs) instead of blocking the screen; older plugins keep working",
+        "Print report: CSV export (totals, previous period, by printer, by material, most printed models) next to the PDF export; spreadsheet-friendly, protected against formula injection",
+        "Modularization: spool drying, calibrations and wear parts move from main.py to modules/workshop_logs.py (same URLs, same responses; main.py is now under 28,800 lines), with their tests"
+      ],
+      "de": [
+        "Schwere Verarbeitung im Hintergrund: Plugins können lange Aufgaben an den zentralen Job-Manager übergeben (Fortschritt, Abbruch, Ergebnis unter /api/jobs), statt den Bildschirm zu blockieren; ältere Plugins funktionieren weiter",
+        "Druckbericht: CSV-Export (Summen, Vorperiode, je Drucker, je Material, meistgedruckte Modelle) neben dem PDF-Export; tabellenfreundlich, gegen Formel-Injektion geschützt",
+        "Modularisierung: Spulentrocknung, Kalibrierungen und Verschleißteile wandern von main.py nach modules/workshop_logs.py (gleiche URLs, gleiche Antworten; main.py unter 28 800 Zeilen), mit Tests"
+      ],
+      "es": [
+        "Procesos pesados en segundo plano: los plugins pueden confiar una tarea larga al gestor central (progreso, cancelación, resultado en /api/jobs) en lugar de bloquear la pantalla; los plugins antiguos siguen funcionando",
+        "Informe de impresión: exportación a CSV (totales, periodo anterior, por impresora, por material, modelos más impresos) junto a la exportación a PDF; apto para hojas de cálculo, protegido contra inyección de fórmulas",
+        "Modularización: secado de bobinas, calibraciones y piezas de desgaste salen de main.py hacia modules/workshop_logs.py (mismas URL, mismas respuestas; main.py baja de 28 800 líneas), con sus pruebas"
+      ],
+      "pt": [
+        "Processamento pesado em segundo plano: os plugins podem confiar uma tarefa longa ao gestor central (progresso, cancelamento, resultado em /api/jobs) em vez de bloquear o ecrã; os plugins antigos continuam a funcionar",
+        "Relatório de impressão: exportação em CSV (totais, período anterior, por impressora, por material, modelos mais impressos) ao lado da exportação em PDF; compatível com folhas de cálculo, protegido contra injeção de fórmulas",
+        "Modularização: secagem de bobinas, calibrações e peças de desgaste saem de main.py para modules/workshop_logs.py (mesmos URL, mesmas respostas; main.py fica abaixo de 28 800 linhas), com os seus testes"
+      ],
+      "it": [
+        "Elaborazioni pesanti in background: i plugin possono affidare un'attività lunga al gestore centrale (avanzamento, annullamento, risultato su /api/jobs) invece di bloccare lo schermo; i vecchi plugin continuano a funzionare",
+        "Report di stampa: esportazione CSV (totali, periodo precedente, per stampante, per materiale, modelli più stampati) accanto all'esportazione PDF; adatto ai fogli di calcolo, protetto dall'iniezione di formule",
+        "Modularizzazione: essiccazione delle bobine, calibrazioni e parti di usura passano da main.py a modules/workshop_logs.py (stessi URL, stesse risposte; main.py scende sotto le 28 800 righe), con i relativi test"
+      ],
+      "zh": [
+        "繁重处理转入后台：插件可将耗时任务交给中央任务管理器（进度、取消、结果见 /api/jobs），不再阻塞界面；旧版插件仍可正常使用",
+        "打印报告：在 PDF 导出旁新增 CSV 导出（合计、上一周期、按打印机、按材料、最常打印的模型），适合电子表格，并防止公式注入",
+        "模块化：耗材盘干燥、校准和易损件从 main.py 移至 modules/workshop_logs.py（URL 与响应不变；main.py 降至 28 800 行以下），并附带测试"
+      ],
+      "ja": [
+        "重い処理をバックグラウンドで実行：プラグインは長時間の処理を中央のジョブ管理に任せられます（進捗・キャンセル・結果は /api/jobs）。画面をブロックせず、旧バージョンのプラグインもそのまま動作します",
+        "印刷レポート：PDF 出力の隣に CSV 出力を追加（合計、前期間、プリンター別、素材別、よく印刷されるモデル）。表計算向けで、数式インジェクション対策済み",
+        "モジュール化：スプールの乾燥、キャリブレーション、消耗部品を main.py から modules/workshop_logs.py に移動（URL・応答は同一。main.py は 28,800 行未満に）。テスト付き"
+      ]
+    }
+  },
+  {
     "version": "1.2.1",
     "items": {
       "fr": [
@@ -7,7 +52,6 @@
         "Base de données : nouvelle migration (index sur les étiquettes et l'historique d'impression, requêtes d'étiquettes ~2× plus rapides sur 200 000 lignes) ; une copie de sauvegarde est faite automatiquement avant toute migration (les 3 dernières sont conservées)",
         "Modularisation : les bobines manuelles et l'affectation d'une bobine à un fichier quittent main.py pour modules/filament_spools.py (mêmes URL, mêmes réponses)",
         "Qualité : test de non-régression des routes (aucune route ne peut disparaître sans alerte), tests de migration et de portée des plugins, benchmarks reproductibles (bench/run_bench.py, comparaison à une exécution précédente)",
-        "Exemples de plugins du SDK : « Séparer par couleur » (tenons/logements plus propres, une seule patte par pièce), « Découpe 3D » (plans de coupe, tenons, aimants, guide PDF, aperçu WebGL) et « Peinture filaments » (peindre un 3MF/STL avec les couleurs de votre stock, 3MF peint pour Bambu Studio / OrcaSlicer)",
         "BigPrint : un échec du moteur ou du calcul est maintenant écrit dans les logs de Stellio (aide au diagnostic)",
         "Bibliothèque : nouvelle page « BigPrint » (visible seulement s'il existe des projets BigPrint) avec une section dépliable par dossier, comme les collections ; elle se met à jour dès qu'un projet est enregistré",
         "BigPrint : les projets sont désormais rangés dans un dossier « BigPrint », avec un sous-dossier au nom du modèle (« …_bigprint »), retrouvés dans Bibliothèque › BigPrint",
@@ -21,7 +65,6 @@
         "Database: new migration (indexes on tags and print history, tag queries ~2× faster on 200,000 rows); a backup copy is taken automatically before any migration (the last 3 are kept)",
         "Modularization: manual spools and spool-to-file assignment moved from main.py to modules/filament_spools.py (same URLs, same responses)",
         "Quality: route regression test (no route can disappear unnoticed), migration and plugin-scope tests, reproducible benchmarks (bench/run_bench.py, comparison with a previous run)",
-        "SDK plugin examples: “Split by color” (cleaner pegs/sockets, a single peg per piece), “3D cutter” (cut planes, pegs, magnets, PDF guide, WebGL preview) and “Filament painter” (paint a 3MF/STL with the colors of your stock, painted 3MF for Bambu Studio / OrcaSlicer)",
         "BigPrint: an engine or calculation failure is now written to Stellio's logs (diagnostic aid)",
         "Library: new “BigPrint” page (only shown when BigPrint projects exist) with one collapsible section per folder, like collections; it updates as soon as a project is saved",
         "BigPrint: projects are now stored in a “BigPrint” folder, with a subfolder named after the model (“…_bigprint”), found in Library › BigPrint",
@@ -35,7 +78,6 @@
         "Datenbank: neue Migration (Indizes für Tags und Druckverlauf, Tag-Abfragen bei 200 000 Zeilen ~2× schneller); vor jeder Migration wird automatisch eine Sicherungskopie angelegt (die letzten 3 bleiben erhalten)",
         "Modularisierung: manuelle Spulen und die Zuordnung einer Spule zu einer Datei wandern von main.py nach modules/filament_spools.py (gleiche URLs, gleiche Antworten)",
         "Qualität: Regressionstest der Routen (keine Route verschwindet unbemerkt), Migrations- und Plugin-Scope-Tests, reproduzierbare Benchmarks (bench/run_bench.py, Vergleich mit einem früheren Lauf)",
-        "SDK-Plugin-Beispiele: „Nach Farbe trennen“ (sauberere Zapfen/Aufnahmen, ein Zapfen pro Teil), „3D-Schnitt“ (Schnittebenen, Zapfen, Magnete, PDF-Anleitung, WebGL-Vorschau) und „Filament-Malen“ (3MF/STL mit den Farben Ihres Bestands bemalen, bemalte 3MF für Bambu Studio / OrcaSlicer)",
         "BigPrint: Ein Fehler der Engine oder der Berechnung wird jetzt in die Stellio-Logs geschrieben (Diagnosehilfe)",
         "Bibliothek: neue Seite „BigPrint“ (nur sichtbar, wenn BigPrint-Projekte existieren) mit einem aufklappbaren Abschnitt pro Ordner wie bei den Sammlungen; sie aktualisiert sich, sobald ein Projekt gespeichert wird",
         "BigPrint: Projekte werden jetzt in einem Ordner „BigPrint“ mit einem nach dem Modell benannten Unterordner („…_bigprint“) abgelegt und unter Bibliothek › BigPrint gefunden",
@@ -49,7 +91,6 @@
         "Base de datos: nueva migración (índices en etiquetas e historial de impresión, consultas de etiquetas ~2× más rápidas con 200 000 filas); se hace una copia de seguridad automática antes de cualquier migración (se conservan las 3 últimas)",
         "Modularización: las bobinas manuales y la asignación de una bobina a un archivo pasan de main.py a modules/filament_spools.py (mismas URL, mismas respuestas)",
         "Calidad: prueba de regresión de rutas (ninguna ruta puede desaparecer sin aviso), pruebas de migración y alcance de plugins, benchmarks reproducibles (bench/run_bench.py, comparación con una ejecución anterior)",
-        "Ejemplos de plugins del SDK: «Separar por color» (espigas/alojamientos más limpios, una sola espiga por pieza), «Corte 3D» (planos de corte, espigas, imanes, guía PDF, vista WebGL) y «Pintura de filamentos» (pintar un 3MF/STL con los colores de tu stock, 3MF pintado para Bambu Studio / OrcaSlicer)",
         "BigPrint: un fallo del motor o del cálculo se registra ahora en los logs de Stellio (ayuda al diagnóstico)",
         "Biblioteca: nueva página «BigPrint» (solo visible si existen proyectos BigPrint) con una sección desplegable por carpeta, como las colecciones; se actualiza en cuanto se guarda un proyecto",
         "BigPrint: los proyectos se guardan ahora en una carpeta «BigPrint», con una subcarpeta con el nombre del modelo («…_bigprint»), y se encuentran en Biblioteca › BigPrint",
@@ -63,7 +104,6 @@
         "Base de dados: nova migração (índices nas etiquetas e no histórico de impressão, consultas de etiquetas ~2× mais rápidas com 200 000 linhas); é feita uma cópia de segurança automática antes de qualquer migração (as 3 últimas são mantidas)",
         "Modularização: as bobinas manuais e a atribuição de uma bobina a um ficheiro passam de main.py para modules/filament_spools.py (mesmos URL, mesmas respostas)",
         "Qualidade: teste de regressão das rotas (nenhuma rota desaparece sem aviso), testes de migração e de âmbito dos plugins, benchmarks reproduzíveis (bench/run_bench.py, comparação com uma execução anterior)",
-        "Exemplos de plugins do SDK: «Separar por cor» (pinos/encaixes mais limpos, um só pino por peça), «Corte 3D» (planos de corte, pinos, ímanes, guia PDF, pré-visualização WebGL) e «Pintura de filamentos» (pintar um 3MF/STL com as cores do seu stock, 3MF pintado para Bambu Studio / OrcaSlicer)",
         "BigPrint: uma falha do motor ou do cálculo é agora escrita nos logs do Stellio (ajuda ao diagnóstico)",
         "Biblioteca: nova página «BigPrint» (visível apenas se existirem projetos BigPrint) com uma secção expansível por pasta, como as coleções; atualiza-se assim que um projeto é guardado",
         "BigPrint: os projetos são agora guardados numa pasta «BigPrint», com uma subpasta com o nome do modelo («…_bigprint»), e encontram-se em Biblioteca › BigPrint",
@@ -77,7 +117,6 @@
         "Database: nuova migrazione (indici su etichette e cronologia di stampa, query delle etichette ~2× più veloci con 200 000 righe); prima di ogni migrazione viene eseguita una copia di sicurezza automatica (le ultime 3 vengono conservate)",
         "Modularizzazione: le bobine manuali e l'assegnazione di una bobina a un file passano da main.py a modules/filament_spools.py (stessi URL, stesse risposte)",
         "Qualità: test di regressione delle rotte (nessuna rotta può sparire senza avviso), test di migrazione e di ambito dei plugin, benchmark riproducibili (bench/run_bench.py, confronto con un'esecuzione precedente)",
-        "Esempi di plugin dell'SDK: «Separa per colore» (spinotti/alloggiamenti più puliti, un solo spinotto per pezzo), «Taglio 3D» (piani di taglio, spinotti, magneti, guida PDF, anteprima WebGL) e «Pittura filamenti» (dipingere un 3MF/STL con i colori del tuo stock, 3MF dipinto per Bambu Studio / OrcaSlicer)",
         "BigPrint: un errore del motore o del calcolo viene ora scritto nei log di Stellio (aiuto alla diagnosi)",
         "Libreria: nuova pagina «BigPrint» (visibile solo se esistono progetti BigPrint) con una sezione comprimibile per cartella, come le collezioni; si aggiorna appena un progetto viene salvato",
         "BigPrint: i progetti vengono ora salvati in una cartella «BigPrint», con una sottocartella col nome del modello («…_bigprint»), e si trovano in Libreria › BigPrint",
@@ -91,7 +130,6 @@
         "数据库：新增迁移（为标签和打印历史建立索引，20 万行时标签查询约快 2 倍）；每次迁移前自动备份（保留最近 3 份）",
         "模块化：手动耗材盘及耗材盘与文件的关联从 main.py 移至 modules/filament_spools.py（URL 与响应不变）",
         "质量：路由回归测试（任何路由消失都会报警）、迁移与插件作用域测试、可复现的基准测试（bench/run_bench.py，可与先前结果比较）",
-        "SDK 插件示例：「按颜色拆分」（更干净的榫头/榫孔，每件只有一个榫头）、「3D 切割」（切割面、榫头、磁铁、PDF 指南、WebGL 预览）和「耗材上色」（用库存耗材的颜色给 3MF/STL 上色，生成适用于 Bambu Studio / OrcaSlicer 的 3MF）",
         "BigPrint：引擎或计算失败现在会写入 Stellio 日志（便于诊断）",
         "资料库：新增“BigPrint”页面（仅在存在 BigPrint 项目时显示），按文件夹分为可折叠的分区，与合集相同；保存项目后立即更新",
         "BigPrint：项目现在保存在“BigPrint”文件夹中，并以模型名称建立子文件夹（“…_bigprint”），可在 资料库 › BigPrint 中找到",
@@ -105,7 +143,6 @@
         "データベース：新しいマイグレーション（タグと印刷履歴のインデックス。20 万行でタグ検索が約 2 倍高速）。マイグレーション前に自動でバックアップを作成します（直近 3 件を保持）",
         "モジュール化：手動スプールとスプールのファイルへの割り当てを main.py から modules/filament_spools.py に移動（URL・応答は同一）",
         "品質：ルートの回帰テスト（ルートが黙って消えることはありません）、マイグレーションとプラグイン範囲のテスト、再現可能なベンチマーク（bench/run_bench.py、前回との比較）",
-        "SDK プラグイン例：「色で分割」（よりきれいなピン/ソケット、1 パーツ 1 ピン）、「3D カット」（切断面、ピン、マグネット、PDF ガイド、WebGL プレビュー）、「フィラメント塗装」（在庫の色で 3MF/STL を塗り、Bambu Studio / OrcaSlicer 用の 3MF を作成）",
         "BigPrint：エンジンまたは計算の失敗を Stellio のログに記録するようにしました（診断用）",
         "ライブラリ：新しい「BigPrint」ページ（BigPrint プロジェクトがある場合のみ表示）。コレクションと同様にフォルダごとの折りたたみセクションで、プロジェクトの保存後すぐに更新されます",
         "BigPrint：プロジェクトは「BigPrint」フォルダ内にモデル名のサブフォルダ（「…_bigprint」）として保存され、ライブラリ › BigPrint で確認できます",

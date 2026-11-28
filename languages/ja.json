@@ -2086,6 +2086,8 @@
   "report.title": "月次レポート",
   "report.month": "月",
   "report.export_pdf": "PDFで書き出す",
+  "report.export_csv": "CSV でエクスポート",
+  "report.export_error_csv": "CSV のエクスポートに失敗しました",
   "report.kpi_prints": "印刷数",
   "report.kpi_success": "成功率",
   "report.kpi_time": "推定印刷時間",

@@ -14,6 +14,7 @@ if _os.path.isdir(_BUNDLED):
         if _os.path.isfile(_os.path.join(_d, 'plugin.json')):
             __path__.append(_d)
 ALL = (
+    'report_csv',
     'filament_spools',
     'print_session',
     'production_flow',
@@ -63,4 +64,5 @@ ALL = (
     'collections_sets',
     'plugin_host',
     'print_events',
+    'workshop_logs',
 )

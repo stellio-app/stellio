@@ -2086,6 +2086,8 @@
   "report.title": "Informe mensual",
   "report.month": "Mes",
   "report.export_pdf": "Exportar a PDF",
+  "report.export_csv": "Exportar a CSV",
+  "report.export_error_csv": "Error al exportar el CSV",
   "report.kpi_prints": "Impresiones",
   "report.kpi_success": "Tasa de éxito",
   "report.kpi_time": "Tiempo de impresión estimado",

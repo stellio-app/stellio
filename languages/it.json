@@ -2086,6 +2086,8 @@
   "report.title": "Resoconto mensile",
   "report.month": "Mese",
   "report.export_pdf": "Esporta in PDF",
+  "report.export_csv": "Esporta in CSV",
+  "report.export_error_csv": "Esportazione CSV non riuscita",
   "report.kpi_prints": "Stampe",
   "report.kpi_success": "Tasso di successo",
   "report.kpi_time": "Tempo di stampa stimato",

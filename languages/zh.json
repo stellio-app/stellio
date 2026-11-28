@@ -2086,6 +2086,8 @@
   "report.title": "月度报告",
   "report.month": "月份",
   "report.export_pdf": "导出为 PDF",
+  "report.export_csv": "导出为 CSV",
+  "report.export_error_csv": "CSV 导出失败",
   "report.kpi_prints": "打印次数",
   "report.kpi_success": "成功率",
   "report.kpi_time": "预计打印时间",

@@ -16070,7 +16070,8 @@ function openMonthlyReport() {
                             <span id="print-report-period" class="report-period-label"></span>
                             <button type="button" class="btn btn-ghost btn-sm" id="print-report-next" title="${escapeHtml(_t3('report.next', 'Période suivante'))}"><i class="fa-solid fa-chevron-right"></i></button>
                         </div>
-                        <button type="button" class="btn btn-primary btn-sm" id="print-report-export" style="margin-left:auto;"><i class="fa-solid fa-file-pdf"></i> ${escapeHtml(_t3('report.export_pdf', 'Exporter en PDF'))}</button>
+                        <button type="button" class="btn btn-ghost btn-sm" id="print-report-csv" style="margin-left:auto;"><i class="fa-solid fa-file-csv"></i> ${escapeHtml(_t3('report.export_csv', 'Exporter en CSV'))}</button>
+                        <button type="button" class="btn btn-primary btn-sm" id="print-report-export"><i class="fa-solid fa-file-pdf"></i> ${escapeHtml(_t3('report.export_pdf', 'Exporter en PDF'))}</button>
                     </div>
                     <div id="print-report-body"></div>
                 </div>
@@ -16085,6 +16086,7 @@ function openMonthlyReport() {
         modal.querySelector('#print-report-prev').addEventListener('click', () => _reportShift(-1));
         modal.querySelector('#print-report-next').addEventListener('click', () => _reportShift(1));
         modal.querySelector('#print-report-export').addEventListener('click', exportReport);
+        modal.querySelector('#print-report-csv').addEventListener('click', exportReportCsv);
     }
     _reportFreq = _reportLoadFreq();
     _reportAnchor = new Date();
@@ -16141,6 +16143,19 @@ async function loadReport() {
     } catch (e) {
         if (reqId !== _reportReqId) return;
         body.innerHTML = `<p style="color:var(--danger); font-size:calc(13px * var(--fs, 1));">${escapeHtml(_t3('toast.connection_error', 'Erreur de connexion'))}</p>`;
+    }
+}
+
+async function exportReportCsv() {
+    try {
+        const res = await fetch(`${API}/api/reports/period.csv?frequency=${encodeURIComponent(_reportFreq)}&date=${encodeURIComponent(_reportIso(_reportAnchor))}`, { credentials: 'same-origin' });
+        if (!res.ok) throw new Error('csv');
+        const blob = await res.blob(), url = URL.createObjectURL(blob), a = document.createElement('a');
+        a.href = url; a.download = `${_t3('report.file_prefix', 'bilan')}-${_reportFreq}-${_reportIso(_reportAnchor)}.csv`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+        showToast(_t3('report.export_error_csv', "Échec de l'export CSV"), 'error');
     }
 }
 

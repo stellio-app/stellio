@@ -219,6 +219,26 @@ def submit(name, fn, owner=None, kind='generic', args=(), kwargs=None):
     return MANAGER.submit(name, fn, owner, kind, args, kwargs)
 
 
+def run_view_async(name, view, kind='plugin'):
+    """Exécute une vue Flask (POST JSON) en tâche de fond : répond 202 {job_id} tout de suite ; état et résultat
+    ({status, body}) se lisent sur /api/jobs/<id>. Utilisé par les plugins pour les traitements lourds (découpes, exports, calculs de maillage).
+    La session (utilisateur, rôle) de la requête d'origine est rejouée dans la tâche ; le drapeau « async » est retiré du corps."""
+    body = dict(request.get_json(silent=True) or {})
+    body.pop('async', None)
+    uid, role, path, args = session.get('user_id'), session.get('role'), request.path, request.args.to_dict()
+    flask_app = _MAIN.get('app') or app
+
+    def work(ctx):
+        with flask_app.test_request_context(path, method='POST', json=body, query_string=args):
+            session['user_id'] = uid
+            if role:
+                session['role'] = role
+            resp = flask_app.make_response(view())
+            return {'status': resp.status_code, 'body': resp.get_json(silent=True)}
+    job = submit(name, work, owner=uid, kind=kind)
+    return jsonify({'job_id': job.id, 'async': True}), 202
+
+
 # ── routes ──────────────────────────────────────────────────────────────
 
 def _owner():
